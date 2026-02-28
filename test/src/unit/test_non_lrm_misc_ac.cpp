@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetFormalType_LogicPacked) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let f(logic [31:0] x) = x;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetFormalType_Integer) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

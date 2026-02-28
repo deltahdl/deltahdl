@@ -121,4 +121,11 @@ TEST(ParserA212, LetFormalType_Logic) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetFormalType_LogicPacked) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(logic [31:0] x) = x;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
