@@ -256,4 +256,23 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarFunctionCall) {
               "endmodule\n"));
 }
 
+// @* with if-else body
+TEST(ParserSection9, Sec9_4_2_3_AtStarIfElseBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg sel, a, b, out;\n"
+      "  always @* if (sel) out = a; else out = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kIf);
+  EXPECT_NE(item->body->condition, nullptr);
+  EXPECT_NE(item->body->then_branch, nullptr);
+  EXPECT_NE(item->body->else_branch, nullptr);
+}
+
 }  // namespace

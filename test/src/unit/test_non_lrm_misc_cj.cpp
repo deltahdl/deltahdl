@@ -53,26 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 12.4 -- Conditional if-else statement
-// =============================================================================
-// Basic if without else -- verifies condition/branch pointers.
-TEST(ParserSection12, IfNoElseConditionAndBranches) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->condition, nullptr);
-  EXPECT_NE(stmt->then_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch, nullptr);
-}
-
 // If-else with both branches.
 TEST(ParserSection12, IfWithElse) {
   auto r = Parse(
