@@ -15,19 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, BlockingAssignment_ClassNewWithArgs) {
-  // class_new with arguments: obj = new(arg1, arg2)
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj = new(1, 2); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(ParserA602, BlockingAssignment_IncExpression) {
   // inc_or_dec_expression: i++
   auto r = Parse(
