@@ -17,15 +17,6 @@ static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST_F(CheckerParseTest, CheckerWithEmptyParenPorts) {
-  auto* unit = Parse(R"(
-    checker empty_parens();
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_TRUE(unit->checkers[0]->ports.empty());
-}
-
 // =============================================================================
 // §17.3 Checker body with properties and sequences
 // =============================================================================

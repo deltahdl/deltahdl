@@ -57,4 +57,13 @@ TEST_F(CheckerParseTest, CheckerWithNoPorts) {
   EXPECT_TRUE(unit->checkers[0]->ports.empty());
 }
 
+TEST_F(CheckerParseTest, CheckerWithEmptyParenPorts) {
+  auto* unit = Parse(R"(
+    checker empty_parens();
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_TRUE(unit->checkers[0]->ports.empty());
+}
+
 }  // namespace
