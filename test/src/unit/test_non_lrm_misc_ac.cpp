@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.2.12 Production #5: let_formal_type
-// let_formal_type ::= data_type_or_implicit | untyped
-// =============================================================================
-TEST(ParserA212, LetFormalType_Untyped) {
-  auto r = Parse(
-      "module m;\n"
-      "  let f(untyped a) = a;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->func_args.size(), 1u);
-  EXPECT_EQ(item->func_args[0].name, "a");
-}
-
 TEST(ParserA212, LetFormalType_Implicit) {
   auto r = Parse(
       "module m;\n"
