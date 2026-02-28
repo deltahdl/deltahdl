@@ -49,21 +49,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-// From test_parser_clause_05.cpp
-TEST(ParserCh513, BuiltInMethodCall_Parse) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = arr.size();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCall);
-}
-
 TEST(ParserCh513, BuiltInMethodCall_Callee) {
   // The callee_expr should be the full member-access expression.
   auto r = Parse(
