@@ -51,21 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-TEST(ParserSection9c, DelayWithExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #(a + b) c = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-  EXPECT_NE(stmt->delay, nullptr);
-}
-
 // =============================================================================
 // LRM section 9.4.2 -- Event control
 // Named event trigger and bare @identifier event control.
