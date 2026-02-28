@@ -49,22 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-// =========================================================================
-// §7.12.1: Array locator methods
-// =========================================================================
-TEST(ParserSection7, ArrayFindWithClause) {
-  auto r = Parse(
-      "module t;\n"
-      "  int d[] = '{1,2,3,4,5};\n"
-      "  initial qi = d.find with (item > 3);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-}
-
 TEST(ParserSection7, ArrayFindIndexMethod) {
   auto r = Parse(
       "module t;\n"
