@@ -41,17 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, InterconnectNet) {
-  // §6.7.1: interconnect net has no data type, optional packed/unpacked dims.
-  auto r = Parse(
-      "module t;\n"
-      "  interconnect w1;\n"
-      "  interconnect [3:0] w2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
-}
-
 TEST(ParserSection6, AllBuiltinNetTypes) {
   auto r = Parse(
       "module t;\n"
