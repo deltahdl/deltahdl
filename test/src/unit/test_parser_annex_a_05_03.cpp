@@ -336,4 +336,34 @@ TEST(ParserAnnexA053, OutputSymbol_AllFour) {
   EXPECT_TRUE(udp->table[3].output == 'X' || udp->table[3].output == 'x');
 }
 
+// ---------------------------------------------------------------------------
+// Production 15: level_symbol ::= 0 | 1 | x | X | ? | b | B
+// ---------------------------------------------------------------------------
+// All level symbols in input positions
+TEST(ParserAnnexA053, LevelSymbol_AllValues) {
+  auto r = Parse(
+      "primitive p(output y, input a);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "    x : 0;\n"
+      "    X : 0;\n"
+      "    ? : 0;\n"
+      "    b : 0;\n"
+      "    B : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->table.size(), 7);
+  EXPECT_EQ(udp->table[0].inputs[0], '0');
+  EXPECT_EQ(udp->table[1].inputs[0], '1');
+  EXPECT_EQ(udp->table[2].inputs[0], 'x');
+  EXPECT_TRUE(udp->table[3].inputs[0] == 'X' || udp->table[3].inputs[0] == 'x');
+  EXPECT_EQ(udp->table[4].inputs[0], '?');
+  EXPECT_EQ(udp->table[5].inputs[0], 'b');
+  EXPECT_TRUE(udp->table[6].inputs[0] == 'B' || udp->table[6].inputs[0] == 'b');
+}
+
 }  // namespace
