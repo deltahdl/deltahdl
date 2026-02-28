@@ -4,8 +4,6 @@
 
 using namespace delta;
 
-return nullptr;
-}
 
 namespace {
 
