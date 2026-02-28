@@ -23,4 +23,20 @@ TEST(ParserA301, GateInst_PulldownBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
+// =============================================================================
+// A.3.1 Production #1: gate_instantiation (pullup alternative)
+// gate_instantiation ::=
+//   pullup [pullup_strength] pull_gate_instance {, pull_gate_instance} ;
+// =============================================================================
+TEST(ParserA301, GateInst_PullupBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  pullup (out);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 1u);
+}
+
 }  // namespace
