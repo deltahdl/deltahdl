@@ -951,6 +951,19 @@ def test_run_without_issue_calls_maybe_tick(tmp_path, monkeypatch):
     assert len(called) == 1
 
 
+def test_run_no_commit_skips_commit(tmp_path, monkeypatch):
+    """_run with no_commit=True does not call commit_classification."""
+    args = _setup_live_run(tmp_path, monkeypatch)
+    args.no_commit = True
+    called = []
+    monkeypatch.setattr(
+        classify_test, "commit_classification",
+        lambda _ctx: called.append(True),
+    )
+    _run(args)
+    assert not called
+
+
 # ---- main ------------------------------------------------------------------
 
 

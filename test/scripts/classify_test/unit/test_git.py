@@ -2,11 +2,17 @@
 
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
-from classify_test._git import build_commit_message, commit_and_push
+import classify_test._git as _git_module
+from classify_test._git import (
+    build_commit_message,
+    commit_and_push,
+    commit_classification,
+)
 from helpers import stub_subprocess_failure, stub_subprocess_success
 
 
@@ -246,3 +252,94 @@ def test_commit_and_push_message_passed_to_commit(monkeypatch):
     monkeypatch.setattr(subprocess, "run", capture_run)
     commit_and_push([Path("/a/b.cpp")], [], "my commit msg")
     assert inputs[0] == "my commit msg"
+
+
+# ---- commit_classification ---------------------------------------------------
+
+
+def _stub_commit_push(monkeypatch):
+    """Stub commit_and_push to capture arguments."""
+    captured = {}
+
+    def fake(changed, deleted, message):
+        captured["changed"] = list(changed)
+        captured["deleted"] = list(deleted)
+        captured["message"] = message
+
+    monkeypatch.setattr(_git_module, "commit_and_push", fake)
+    return captured
+
+
+def _make_ctx(tmp_path, **overrides):
+    """Build a commit_classification context dict."""
+    defaults = {
+        "filepath": tmp_path / "test_input.cpp",
+        "target": [SimpleNamespace(
+            test_name="T", clause="6.1", rationale="r",
+        )],
+        "new_names": [],
+        "to_merge": [],
+        "test_dir": tmp_path,
+        "cmake_path": tmp_path / "CMakeLists.txt",
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+def test_commit_classification_includes_new_files(monkeypatch, tmp_path):
+    """Changed files include newly created output files."""
+    captured = _stub_commit_push(monkeypatch)
+    ctx = _make_ctx(tmp_path, new_names=["test_parser_clause_06_01"])
+    commit_classification(ctx)
+    assert tmp_path / "test_parser_clause_06_01.cpp" in captured["changed"]
+
+
+def test_commit_classification_includes_merged(monkeypatch, tmp_path):
+    """Changed files include merge targets."""
+    merge_path = tmp_path / "test_parser_clause_06_01.cpp"
+    captured = _stub_commit_push(monkeypatch)
+    ctx = _make_ctx(tmp_path, to_merge=[(merge_path, None)])
+    commit_classification(ctx)
+    assert merge_path in captured["changed"]
+
+
+def test_commit_classification_includes_cmake(monkeypatch, tmp_path):
+    """Changed files include CMakeLists.txt."""
+    cmake = tmp_path / "CMakeLists.txt"
+    captured = _stub_commit_push(monkeypatch)
+    ctx = _make_ctx(tmp_path, cmake_path=cmake)
+    commit_classification(ctx)
+    assert cmake in captured["changed"]
+
+
+def test_commit_classification_existing_source_in_changed(
+    monkeypatch, tmp_path,
+):
+    """Source file that still exists goes into changed list."""
+    src = tmp_path / "test_input.cpp"
+    src.touch()
+    captured = _stub_commit_push(monkeypatch)
+    ctx = _make_ctx(tmp_path, filepath=src)
+    commit_classification(ctx)
+    assert src in captured["changed"]
+
+
+def test_commit_classification_deleted_source_in_deleted(
+    monkeypatch, tmp_path,
+):
+    """Source file that was removed goes into deleted list."""
+    src = tmp_path / "test_input.cpp"
+    captured = _stub_commit_push(monkeypatch)
+    ctx = _make_ctx(tmp_path, filepath=src)
+    commit_classification(ctx)
+    assert src in captured["deleted"]
+
+
+def test_commit_classification_message_has_test_name(monkeypatch, tmp_path):
+    """Commit message includes the test name."""
+    captured = _stub_commit_push(monkeypatch)
+    ctx = _make_ctx(tmp_path, target=[SimpleNamespace(
+        test_name="FooBar", clause="6.1", rationale="r",
+    )])
+    commit_classification(ctx)
+    assert "FooBar" in captured["message"]
