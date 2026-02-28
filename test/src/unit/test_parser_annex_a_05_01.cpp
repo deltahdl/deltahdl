@@ -41,4 +41,10 @@ TEST(ParserAnnexA051, ExternAnsi) {
   VerifyExternInvPrimitive(r);
 }
 
+// --- udp_declaration: extern udp_nonansi_declaration ---
+TEST(ParserAnnexA051, ExternNonAnsi) {
+  auto r = Parse("extern primitive inv(out, in);\n");
+  VerifyExternInvPrimitive(r);
+}
+
 }  // namespace
