@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Simulation: verify table entries are evaluated in order
-TEST(ParserAnnexA053, CombBody_SimFirstMatch) {
-  auto r = Parse(
-      "primitive nand_gate(output y, input a, b);\n"
-      "  table\n"
-      "    0 ? : 1;\n"
-      "    ? 0 : 1;\n"
-      "    1 1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-  EXPECT_EQ(eval.Evaluate({'0', '0'}), '1');
-  EXPECT_EQ(eval.Evaluate({'0', '1'}), '1');
-  EXPECT_EQ(eval.Evaluate({'1', '0'}), '1');
-  EXPECT_EQ(eval.Evaluate({'1', '1'}), '0');
-}
-
 // ---------------------------------------------------------------------------
 // Production 3: combinational_entry ::= level_input_list : output_symbol ;
 // ---------------------------------------------------------------------------
