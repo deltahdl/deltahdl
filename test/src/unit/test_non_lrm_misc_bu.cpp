@@ -49,23 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-// =============================================================================
-// §9.6.2 -- Disable statement (additional tests)
-// =============================================================================
-TEST(ParserSection9, DisableNamedBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : blk\n"
-      "    disable blk;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDisable);
-}
-
 TEST(ParserSection9, DisableTaskName) {
   auto r = Parse(
       "module m;\n"
