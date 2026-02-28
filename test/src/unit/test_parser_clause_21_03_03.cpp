@@ -46,4 +46,12 @@ TEST(ParserSection21, SformatNoExtraArgs) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, SformatfInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  string s;\n"
+              "  initial s = $sformatf(\"val=%0d\", 42);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
