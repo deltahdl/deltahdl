@@ -34,4 +34,11 @@ TEST(ParserA301, GateInst_PmosBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA301, GateInst_RnmosBasic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rnmos (out, in, ctrl);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
