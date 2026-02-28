@@ -51,40 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.4.2 -- Event control
-// Named event trigger and bare @identifier event control.
-// =============================================================================
-TEST(ParserSection9c, EventControlAtIdentifier) {
-  // @clk shorthand for @(clk)
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @clk a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-}
-
-TEST(ParserSection9c, EventControlMultipleOrExpressions) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a or b or c) x = a + b + c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_GE(stmt->events.size(), 3u);
-}
-
 TEST(ParserSection9c, EventControlMixedEdgesComma) {
   auto r = Parse(
       "module m;\n"
