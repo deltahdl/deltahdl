@@ -1,0 +1,98 @@
+---
+concurrency:
+  cancel-in-progress: true
+  group: classify_files-${{ github.ref }}
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-classify_files-${{
+            hashFiles('.github/workflows/classify_files.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-classify_files-
+      - name: Install tools
+        run: |
+          pip install \
+            assert-no-inline-directives \
+            assert-no-linter-config-files \
+            assert-one-assert-per-pytest \
+            mypy pylint pytest pytest-cov
+          npm install -g jscpd
+      - name: Assert no inline lint disables
+        run: >-
+          assert-no-inline-directives
+          --tools pylint,mypy
+          --verbose
+          ${{ github.workspace }}/scripts/classify_files/
+          ${{ github.workspace }}/test/scripts/classify_files/**/*
+      - name: Assert no linter config files
+        run: >-
+          assert-no-linter-config-files
+          --linters pylint,mypy
+          --verbose
+          ${{ github.workspace }}
+      - name: Assert one assert per pytest
+        run: >-
+          assert-one-assert-per-pytest
+          --verbose
+          ${{ github.workspace }}/test/scripts/classify_files
+      - name: Run pylint on source
+        run: >-
+          PYTHONPATH=. python3 -m pylint scripts/classify_files/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run pylint on tests
+        run: >-
+          PYTHONPATH=.:scripts:test/scripts/classify_files/unit
+          python3 -m pylint --recursive=y test/scripts/classify_files/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run mypy on source
+        run: PYTHONPATH=. python3 -m mypy scripts/classify_files/
+      - name: Run mypy on tests
+        run: >-
+          MYPYPATH=.:scripts:test/scripts/classify_files/unit
+          python3 -m mypy --explicit-package-bases
+          test/scripts/classify_files/
+      - name: Detect copy-paste in source
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console scripts/classify_files/
+      - name: Detect copy-paste in tests
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console test/scripts/classify_files/
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_files/unit/ -v
+          --cov=classify_files
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_files/integration/ -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_files/e2e/ -v
+name: classify_files
+on:
+  pull_request:
+    paths:
+      - .github/workflows/classify_files.yml
+      - scripts/classify_files/**
+      - test/scripts/classify_files/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/classify_files.yml
+      - scripts/classify_files/**
+      - test/scripts/classify_files/**
+  workflow_dispatch:
