@@ -128,4 +128,11 @@ TEST(ParserA212, LetFormalType_LogicPacked) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetFormalType_Integer) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(integer x) = x;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
