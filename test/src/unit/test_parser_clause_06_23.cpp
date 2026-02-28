@@ -75,4 +75,11 @@ TEST(ParserSection8, TypeRefVarDecl) {
               "endmodule\n"));
 }
 
+// type(data_type) in parameter default.
+TEST(ParserSection8, TypeRefDataTypeParam) {
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter type T = type(logic [11:0]));\n"
+              "endmodule\n"));
+}
+
 }  // namespace

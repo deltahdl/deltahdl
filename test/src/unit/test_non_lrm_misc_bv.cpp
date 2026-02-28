@@ -4,43 +4,52 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult9d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
 
-// =============================================================================
-// LRM section 9.2.3 -- Final procedures
-// Final blocks with begin/end and multiple statements.
-// =============================================================================
-TEST(ParserSection9c, FinalBlockWithBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  final begin\n"
-      "    $display(\"cycles: %0d\", count);\n"
-      "    $display(\"done\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* final_item = FindItemByKind(r, ModuleItemKind::kFinalBlock);
-  ASSERT_NE(final_item, nullptr);
-  ASSERT_NE(final_item->body, nullptr);
-  EXPECT_EQ(final_item->body->kind, StmtKind::kBlock);
-  EXPECT_GE(final_item->body->stmts.size(), 2u);
+static ParseResult9d Parse(const std::string& src) {
+  ParseResult9d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
 }
 
-TEST(ParserSection9c, MultipleFinalBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"final1\");\n"
-      "  final $display(\"final2\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
+static Stmt* FirstInitialBody(ParseResult9d& r) {
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFinalBlock) ++count;
+    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
   }
-  EXPECT_EQ(count, 2);
+  return nullptr;
 }
+
+static Stmt* FirstInitialStmt(ParseResult9d& r) {
+  auto* body = FirstInitialBody(r);
+  if (body && body->kind == StmtKind::kBlock) {
+    return body->stmts.empty() ? nullptr : body->stmts[0];
+  }
+  return body;
+}
+
+static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      return item;
+    }
+  }
+  return nullptr;
+}
+
+namespace {
 
 // =============================================================================
 // LRM section 9.3.1 -- Sequential blocks
@@ -609,51 +618,6 @@ TEST(ParserSection9c, AlwaysCombWithFunctionCall) {
               "  logic [3:0] a, b, y;\n"
               "  always_comb y = mux(sel, a, b);\n"
               "endmodule\n"));
-}
-
-struct ParseResult9d {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult9d Parse(const std::string& src) {
-  ParseResult9d result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static Stmt* FirstInitialBody(ParseResult9d& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
-  }
-  return nullptr;
-}
-
-static Stmt* FirstInitialStmt(ParseResult9d& r) {
-  auto* body = FirstInitialBody(r);
-  if (body && body->kind == StmtKind::kBlock) {
-    return body->stmts.empty() ? nullptr : body->stmts[0];
-  }
-  return body;
-}
-
-static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      return item;
-    }
-  }
-  return nullptr;
 }
 
 // =============================================================================

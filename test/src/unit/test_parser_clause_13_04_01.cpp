@@ -59,4 +59,31 @@ TEST(ParserA26, FuncReturnTypeLogicPacked) {
   EXPECT_NE(item->return_type.packed_dim_right, nullptr);
 }
 
+// §3.8: Function returning value, void function, all 4 argument directions.
+TEST(ParserClause03, Cl3_8_FunctionReturnAndVoidAndDirections) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int compute(input int a, output int b,\n"
+      "                       inout int c, ref int d);\n"
+      "    b = a;\n"
+      "    return a + c + d;\n"
+      "  endfunction\n"
+      "  function void show(input int val);\n"
+      "    $display(\"%d\", val);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(
+      CountItemsByKind(r.cu->modules[0]->items, ModuleItemKind::kFunctionDecl),
+      2);
+  const auto* compute = FindFunctionByName(r.cu->modules[0]->items, "compute");
+  ASSERT_NE(compute, nullptr);
+  ASSERT_EQ(compute->func_args.size(), 4u);
+  EXPECT_EQ(compute->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(compute->func_args[1].direction, Direction::kOutput);
+  EXPECT_EQ(compute->func_args[2].direction, Direction::kInout);
+  EXPECT_EQ(compute->func_args[3].direction, Direction::kRef);
+}
+
 }  // namespace

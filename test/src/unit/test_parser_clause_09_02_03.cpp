@@ -119,4 +119,19 @@ TEST(ParserSection9c, FinalBlockWithBeginEnd) {
   EXPECT_GE(final_item->body->stmts.size(), 2u);
 }
 
+TEST(ParserSection9c, MultipleFinalBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  final $display(\"final1\");\n"
+      "  final $display(\"final2\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kFinalBlock) ++count;
+  }
+  EXPECT_EQ(count, 2);
+}
+
 }  // namespace
