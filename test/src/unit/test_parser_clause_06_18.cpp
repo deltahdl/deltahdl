@@ -109,4 +109,16 @@ TEST(ParserA28, TypedefInFunction) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, TypeCompatibilityTypedefParsing) {
+  // §6.22.1b: A simple typedef that renames a built-in type matches it.
+  auto r = Parse(
+      "module m;\n"
+      "  typedef bit node;\n"
+      "  typedef int type1;\n"
+      "  typedef type1 type2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
 }  // namespace

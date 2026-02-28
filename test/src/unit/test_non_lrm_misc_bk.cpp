@@ -5,6 +5,24 @@
 
 using namespace delta;
 
+static ModuleItem* FirstItem(ParseResult& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+static Stmt* FirstInitialStmt(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
 namespace {
 
 TEST(ParserSection6, TypesNotEquivalentDifferentSign) {
@@ -45,18 +63,6 @@ TEST(ParserSection6, MatchingTypesSameSigningModifier) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypeCompatibilityTypedefParsing) {
-  // §6.22.1b: A simple typedef that renames a built-in type matches it.
-  auto r = Parse(
-      "module m;\n"
-      "  typedef bit node;\n"
-      "  typedef int type1;\n"
-      "  typedef type1 type2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
-}
-
 TEST(ParserSection6, TypeCompatibilityAnonymousStruct) {
   // §6.22.1c: Anonymous struct matches itself within same declaration.
   auto r = Parse(
@@ -67,6 +73,7 @@ TEST(ParserSection6, TypeCompatibilityAnonymousStruct) {
   // AB1 and AB2 should both be declared
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
+
 // =============================================================================
 // LRM section 6.10 -- Implicit declarations
 // =============================================================================
@@ -246,23 +253,6 @@ TEST(ParserSection6, AssignCompatibleStringLiteral) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-static ModuleItem* FirstItem(ParseResult& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
-static Stmt* FirstInitialStmt(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
 }
 
 // =========================================================================
