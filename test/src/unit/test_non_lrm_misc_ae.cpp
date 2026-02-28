@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, InputTerminal_NOutputExpr) {
-  // Expression as input_terminal in not gate
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  not (out, a ^ b);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, InputTerminal_MultipleInputs) {
   // Multiple input_terminals in n-input gate
   auto r = Parse(

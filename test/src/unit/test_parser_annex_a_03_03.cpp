@@ -155,4 +155,12 @@ TEST(ParserA303, InputTerminal_NOutputGate) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA303, InputTerminal_NOutputExpr) {
+  // Expression as input_terminal in not gate
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  not (out, a ^ b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
