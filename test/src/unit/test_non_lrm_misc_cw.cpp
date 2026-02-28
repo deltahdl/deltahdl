@@ -26,17 +26,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-TEST(Parser, ProgramWithInitial) {
-  auto r = Parse(
-      "program test_prog;\n"
-      "  initial $display(\"hello\");\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->programs.size(), 1);
-  EXPECT_EQ(r.cu->programs[0]->items.size(), 1);
-  EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
-}
-
 TEST_F(ProgramTestParse, ProgramAutomaticLifetime) {
   auto* unit = Parse("program automatic auto_prog; endprogram");
   ASSERT_EQ(unit->programs.size(), 1u);

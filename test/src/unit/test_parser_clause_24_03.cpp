@@ -89,4 +89,15 @@ TEST(ParserSection4, Sec4_6_ProgramBlockDeterministicScheduling) {
   EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
+TEST(Parser, ProgramWithInitial) {
+  auto r = Parse(
+      "program test_prog;\n"
+      "  initial $display(\"hello\");\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->programs.size(), 1);
+  EXPECT_EQ(r.cu->programs[0]->items.size(), 1);
+  EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
 }  // namespace
