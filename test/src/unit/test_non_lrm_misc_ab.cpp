@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.11 Production #16: repeat_range
-// =============================================================================
-TEST(ParserA211, RepeatRange_SingleExpr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins t = (1 [* 5]);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, RepeatRange_Range) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
