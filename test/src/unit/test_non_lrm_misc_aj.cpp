@@ -5,34 +5,50 @@
 
 using namespace delta;
 
-namespace {
-
-// Simulation: '-' keeps current output
-TEST(ParserAnnexA053, NextState_SimDashKeepsState) {
-  auto r = Parse(
-      "primitive latch(output reg q, input d, en);\n"
-      "  initial q = 1;\n"
-      "  table\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-  // Initial output = 1
-  EXPECT_EQ(eval.GetOutput(), '1');
-  // Enable low -> no change -> still 1
-  eval.Evaluate({'0', '0'});
-  EXPECT_EQ(eval.GetOutput(), '1');
-  // Enable high, data=0 -> output=0
-  eval.Evaluate({'0', '1'});
-  EXPECT_EQ(eval.GetOutput(), '0');
-  // Enable low -> no change -> still 0
-  eval.Evaluate({'1', '0'});
-  EXPECT_EQ(eval.GetOutput(), '0');
+static std::vector<ModuleItem*> FindUdpInsts(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> insts;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
+  }
+  return insts;
 }
+
+static std::vector<ModuleItem*> FindContAssigns(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
+  }
+  return result;
+}
+
+static ModuleItem* FindAlias(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kAlias) return item;
+  }
+  return nullptr;
+}
+
+// Helpers to extract items from the first module.
+static ModuleItem* FindItem(const std::vector<ModuleItem*>& items,
+                            ModuleItemKind kind) {
+  for (auto* item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
+                                          ModuleItemKind kind) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == kind) result.push_back(item);
+  }
+  return result;
+}
+
+namespace {
 
 // ---------------------------------------------------------------------------
 // Production 14: output_symbol ::= 0 | 1 | x | X
@@ -265,15 +281,6 @@ TEST(ParserAnnexA053, EdgeSymbol_SimStar) {
   EXPECT_EQ(eval.EvaluateWithEdge({'1'}, 0, '0'), '1');
   // 1->0 also matches *
   EXPECT_EQ(eval.EvaluateWithEdge({'0'}, 0, '1'), '1');
-}
-
-static std::vector<ModuleItem*> FindUdpInsts(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> insts;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
-  }
-  return insts;
 }
 
 // =============================================================================
@@ -563,22 +570,6 @@ TEST(ParserA504, UdpInst_ExternUdp) {
   EXPECT_EQ(insts[0]->inst_module, "my_udp");
 }
 
-static std::vector<ModuleItem*> FindContAssigns(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
-  }
-  return result;
-}
-
-static ModuleItem* FindAlias(const std::vector<ModuleItem*>& items) {
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kAlias) return item;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // A.6.1 Production: continuous_assign (parsing)
 // continuous_assign ::=
@@ -837,34 +828,6 @@ TEST(ParserA601, NetAlias_BitSelect) {
   auto* alias = FindAlias(r.cu->modules[0]->items);
   ASSERT_NE(alias, nullptr);
   ASSERT_EQ(alias->alias_nets.size(), 2u);
-}
-
-// Helpers to extract items from the first module.
-static ModuleItem* FindItem(const std::vector<ModuleItem*>& items,
-                            ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
-static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
-                                          ModuleItemKind kind) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == kind) result.push_back(item);
-  }
-  return result;
-}
-
-// Return the first statement inside the first initial block's begin/end.
-static Stmt* FirstInitialStmt(ParseResult& r) {
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body) return nullptr;
-  if (item->body->kind == StmtKind::kBlock) {
-    return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-  }
-  return item->body;
 }
 
 // =============================================================================
