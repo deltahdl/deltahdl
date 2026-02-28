@@ -97,4 +97,18 @@ TEST_F(CheckerParseTest, CheckerWithSequenceDecl) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kSequenceDecl));
 }
 
+// =============================================================================
+// §17.8 Checker coexists with module and program
+// =============================================================================
+TEST_F(CheckerParseTest, CheckerCoexistsWithModuleAndProgram) {
+  auto* unit = Parse(R"(
+    module m; endmodule
+    program p; endprogram
+    checker c; endchecker
+  )");
+  EXPECT_EQ(unit->modules.size(), 1u);
+  EXPECT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->checkers.size(), 1u);
+}
+
 }  // namespace

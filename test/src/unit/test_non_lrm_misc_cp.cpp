@@ -18,20 +18,6 @@ static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
 namespace {
 
 // =============================================================================
-// §17.8 Checker coexists with module and program
-// =============================================================================
-TEST_F(CheckerParseTest, CheckerCoexistsWithModuleAndProgram) {
-  auto* unit = Parse(R"(
-    module m; endmodule
-    program p; endprogram
-    checker c; endchecker
-  )");
-  EXPECT_EQ(unit->modules.size(), 1u);
-  EXPECT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->checkers.size(), 1u);
-}
-
-// =============================================================================
 // §17.9 Checker with assert property
 // =============================================================================
 TEST_F(CheckerParseTest, CheckerWithAssertProperty) {

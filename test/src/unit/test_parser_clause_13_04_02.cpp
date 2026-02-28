@@ -202,4 +202,23 @@ TEST(ParserSection4, Sec4_9_3_MixedStaticAutoFuncsInModule) {
   EXPECT_FALSE(static_fn->is_automatic);
 }
 
+// =============================================================================
+// 25. Function without explicit lifetime (implicit static in module)
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_FuncNoLifetimeQualifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int plain_fn(int x);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_FALSE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+}
+
 }  // namespace
