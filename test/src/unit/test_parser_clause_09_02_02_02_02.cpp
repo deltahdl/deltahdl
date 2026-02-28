@@ -53,4 +53,36 @@ TEST(ParserSection9, Sec9_2_2_2_BothFormsWithBlocksInModule) {
   EXPECT_EQ(star->body->kind, StmtKind::kBlock);
 }
 
+// ---------------------------------------------------------------------------
+// 30. Full combo module: always_comb, always @*, always @(*), with
+//     case, if-else, and variable declarations, verifying all parse OK.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_FullComboModuleParseOk) {
+  EXPECT_TRUE(
+      ParseOk("module combo_module;\n"
+              "  logic [3:0] sel, a, b, c, d;\n"
+              "  logic [3:0] out1, out2, out3;\n"
+              "  always_comb begin\n"
+              "    int tmp;\n"
+              "    tmp = a + b;\n"
+              "    case (sel)\n"
+              "      4'b0001: out1 = a;\n"
+              "      4'b0010: out1 = b;\n"
+              "      default: out1 = 0;\n"
+              "    endcase\n"
+              "  end\n"
+              "  always @* begin\n"
+              "    int tmp2;\n"
+              "    tmp2 = c - d;\n"
+              "    if (sel[0])\n"
+              "      out2 = c;\n"
+              "    else\n"
+              "      out2 = d;\n"
+              "  end\n"
+              "  always @(*) begin\n"
+              "    out3 = a ^ b ^ c ^ d;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
