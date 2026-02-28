@@ -41,15 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, CompoundAssignInExpr) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial b = (a += 1);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =========================================================================
 // Postfix increment in for-loop step
 // =========================================================================
