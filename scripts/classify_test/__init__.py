@@ -18,6 +18,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from ._github import (
+    _validate_issue_args, maybe_post_issue_comment,
+)
+from ._github import build_issue_comment, post_issue_comment
 from ._output import (
     print_classification_table,
     print_summary,
@@ -765,6 +769,12 @@ def _parse_args():
         "--dry-run", action="store_true",
         help="Classify only, don't write files",
     )
+    parser.add_argument("--issue", type=int, default=None,
+                        help="GitHub issue number to update")
+    parser.add_argument("--organization", default=None,
+                        help="GitHub organization for the issue")
+    parser.add_argument("--repo", default=None,
+                        help="GitHub repository for the issue")
     return parser.parse_args()
 
 
@@ -919,6 +929,7 @@ def _count_kept(groups, test_name):
 
 def _run(args):
     """Execute the split operation."""
+    _validate_issue_args(args)
     filepath = Path(args.file).resolve()
     test_name = filepath.stem
     parsed, target = _validate_input(filepath, args.test)
@@ -929,6 +940,7 @@ def _run(args):
         Path(args.lrm).resolve(),
     )
     print_classification_table(target)
+    maybe_post_issue_comment(args, target)
     groups = _group_tests(target)
     source_is_target = any(
         clause_to_filename(p, c) == test_name

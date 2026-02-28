@@ -62,6 +62,9 @@ def _run_pipeline(tmp_path, test, dry_run=False):
         dry_run=dry_run,
         lrm=str(tmp_path / "lrm.txt"),
         test=test,
+        issue=None,
+        organization=None,
+        repo=None,
     ))
 
 
@@ -217,6 +220,7 @@ def test_self_named_source_not_treated_as_duplicate(tmp_path, monkeypatch):
     _run(SimpleNamespace(
         file=str(src), output_dir=str(tmp_path), dry_run=False,
         lrm=str(tmp_path / "lrm.txt"), test="Keeper",
+        issue=None, organization=None, repo=None,
     ))
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 

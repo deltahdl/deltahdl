@@ -42,11 +42,10 @@ def _run_args(tmp_path, **overrides):
     """Build a SimpleNamespace with all required _run args."""
     defaults = {
         "file": str(tmp_path / "test_input.cpp"),
-        "output_dir": str(tmp_path),
-        "dry_run": False,
-        "lrm": str(tmp_path / "lrm.txt"),
-        "max_lines": None,
-        "test": "T",
+        "output_dir": str(tmp_path), "dry_run": False,
+        "lrm": str(tmp_path / "lrm.txt"), "max_lines": None,
+        "test": "T", "issue": None, "organization": None,
+        "repo": None,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -910,6 +909,40 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch):
     assert "Keep" in src
 
 
+# ---- _run with --issue -----------------------------------------------------
+
+
+def test_run_with_issue_calls_maybe_post(tmp_path, monkeypatch):
+    """_run with --issue calls maybe_post_issue_comment."""
+    _make_input_file(tmp_path)
+    stub_classifier(monkeypatch, _parser_response())
+    called = []
+    monkeypatch.setattr(
+        classify_test, "maybe_post_issue_comment",
+        lambda args, tests: called.append(True),
+    )
+    args = _run_args(
+        tmp_path, dry_run=True,
+        issue=42, organization="myorg", repo="myrepo",
+    )
+    _run(args)
+    assert len(called) == 1
+
+
+def test_run_without_issue_calls_maybe_post(tmp_path, monkeypatch):
+    """_run without --issue still calls maybe_post_issue_comment."""
+    _make_input_file(tmp_path)
+    stub_classifier(monkeypatch, _parser_response())
+    called = []
+    monkeypatch.setattr(
+        classify_test, "maybe_post_issue_comment",
+        lambda args, tests: called.append(True),
+    )
+    args = _run_args(tmp_path, dry_run=True)
+    _run(args)
+    assert len(called) == 1
+
+
 # ---- main ------------------------------------------------------------------
 
 
@@ -921,13 +954,10 @@ def test_main(monkeypatch):
         ran[0] = True
 
     monkeypatch.setattr(classify_test, "_run", mock_run)
-    monkeypatch.setattr(
-        classify_test, "_parse_args",
-        lambda: SimpleNamespace(
-            file="x", output_dir="/tmp", dry_run=True,
-            lrm="/lrm.txt",
-        ),
-    )
+    monkeypatch.setattr(classify_test, "_parse_args", lambda: SimpleNamespace(
+        file="x", output_dir="/tmp", dry_run=True, lrm="/lrm.txt",
+        issue=None, organization=None, repo=None,
+    ))
     classify_test.main()
     assert ran[0] is True
 
@@ -941,12 +971,9 @@ def test_main_enables_line_buffering(monkeypatch):
 
     monkeypatch.setattr(sys.stdout, "reconfigure", mock_reconfigure)
     monkeypatch.setattr(classify_test, "_run", lambda _: None)
-    monkeypatch.setattr(
-        classify_test, "_parse_args",
-        lambda: SimpleNamespace(
-            file="x", output_dir="/tmp", dry_run=True,
-            lrm="/lrm.txt",
-        ),
-    )
+    monkeypatch.setattr(classify_test, "_parse_args", lambda: SimpleNamespace(
+        file="x", output_dir="/tmp", dry_run=True, lrm="/lrm.txt",
+        issue=None, organization=None, repo=None,
+    ))
     classify_test.main()
     assert any(k.get("line_buffering") for k in configured)
