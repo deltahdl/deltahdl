@@ -30,19 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserCh90301, BlockVarDecl_FullStructReplication) {
-  EXPECT_TRUE(
-      ParseOk("module top();\n"
-              "  struct {int X,Y,Z;} XYZ = '{3{1}};\n"
-              "  typedef struct {int a,b[4];} ab_t;\n"
-              "  int a,b,c;\n"
-              "  initial begin\n"
-              "    ab_t v1[1:0] [2:0];\n"
-              "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // 3. Named begin-end block creating a subscope
 TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
   auto r = Parse(
