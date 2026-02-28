@@ -34,4 +34,17 @@ TEST(ParserA602, OperatorAssignment_PlusEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kPlusEq);
 }
 
+TEST(ParserA602, OperatorAssignment_MinusEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a -= 1; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->rhs->op, TokenKind::kMinusEq);
+}
+
 }  // namespace
