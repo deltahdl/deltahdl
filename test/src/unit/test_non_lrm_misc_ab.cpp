@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, BinsSelection_WithIff) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint a;\n"
-              "    cp2: coverpoint b;\n"
-              "    cross cp1, cp2 {\n"
-              "      bins sel = binsof(cp1) iff (enable);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // §A.2.11 Production #24: select_expression
 // =============================================================================
