@@ -40,15 +40,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// Enum with explicit base type and value assignments.
-TEST(ParserSection8, EnumExplicitBaseTypeValues) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  enum bit [3:0] {BRONZE = 4'h3, SILVER, GOLD = 4'h5}"
-              " medal;\n"
-              "endmodule\n"));
-}
-
 // Typedef enum used as a named type for variable declarations.
 TEST(ParserSection8, EnumTypedefUsage) {
   auto r = Parse(

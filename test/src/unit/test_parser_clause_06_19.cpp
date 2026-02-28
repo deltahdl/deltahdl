@@ -62,4 +62,13 @@ TEST(ParserSection8, EnumAnonymousDeclMembers) {
   EXPECT_EQ(item->data_type.enum_members[2].name, "DONE");
 }
 
+// Enum with explicit base type and value assignments.
+TEST(ParserSection8, EnumExplicitBaseTypeValues) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  enum bit [3:0] {BRONZE = 4'h3, SILVER, GOLD = 4'h5}"
+              " medal;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
