@@ -239,4 +239,13 @@ TEST(ParserSection6, Sec6_6_7_MultipleNettypesInModule) {
   EXPECT_EQ(count, 2);
 }
 
+TEST(ParserA213, DataDeclNettypeDeclaration) {
+  // nettype_declaration alternative
+  auto r = Parse("module m; nettype logic my_net; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+}
+
 }  // namespace

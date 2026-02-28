@@ -30,15 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserA213, DataDeclNettypeDeclaration) {
-  // nettype_declaration alternative
-  auto r = Parse("module m; nettype logic my_net; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-}
-
 // --- nettype_declaration ---
 // Form 1: nettype data_type nettype_id [with [scope] tf_id] ;
 // Form 2: nettype [scope] nettype_id nettype_id ;
