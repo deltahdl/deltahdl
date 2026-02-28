@@ -80,4 +80,22 @@ TEST(ParserAnnexA, A9AttributeOnContAssign) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// §35.5 Attribute compatibility (multiple attributes)
+// =============================================================================
+TEST_F(DpiParseTest, MultipleAttributesOnDecl) {
+  auto* unit = Parse(R"(
+    module m;
+      (* full_case, parallel_case *)
+      wire a;
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  ASSERT_GE(items[0]->attrs.size(), 2u);
+  EXPECT_EQ(items[0]->attrs[0].name, "full_case");
+  EXPECT_EQ(items[0]->attrs[1].name, "parallel_case");
+}
+
 }  // namespace

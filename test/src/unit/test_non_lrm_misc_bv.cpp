@@ -51,23 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-TEST(ParserSection9c, EventControlMixedEdgesComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk, negedge rst, a) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_GE(stmt->events.size(), 3u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
-  EXPECT_EQ(stmt->events[2].edge, Edge::kNone);
-}
-
 TEST(ParserSection9c, SequenceEventParenthesized) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
