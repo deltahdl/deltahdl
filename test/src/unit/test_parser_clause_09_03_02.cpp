@@ -197,4 +197,30 @@ TEST(ParserA603, ForkMultipleStmts) {
   EXPECT_EQ(stmt->fork_stmts.size(), 3u);
 }
 
+// §9.3.2: Fork with begin...end sub-blocks (each is one concurrent process)
+TEST(ParserA603, ForkWithBeginEndSubBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        a = 1;\n"
+      "        b = 2;\n"
+      "      end\n"
+      "      begin\n"
+      "        c = 3;\n"
+      "        d = 4;\n"
+      "      end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->fork_stmts.size(), 2u);
+  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
+}
+
 }  // namespace
