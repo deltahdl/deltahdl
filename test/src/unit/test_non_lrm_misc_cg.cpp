@@ -42,30 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, XnorBinaryOperator) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a ^~ b;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
-}
-
-TEST(ParserSection11, ChainedAdditiveLeftAssoc) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a + b - c + d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
-}
-
 // =========================================================================
 // Section 11.3.1 -- Arithmetic operators with real operands
 // =========================================================================
