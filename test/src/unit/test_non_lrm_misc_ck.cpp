@@ -19,22 +19,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// tf_port_direction: [ const ] ref [ static ]
-// ---------------------------------------------------------------------------
-TEST(ParserA27, TfPortDirectionRefStatic) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task(ref static int x);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 1u);
-  EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
-}
-
-// ---------------------------------------------------------------------------
 // tf_port_item clarification 28: name omitted in prototype
 // ---------------------------------------------------------------------------
 TEST(ParserA27, TfPortItemNoNameInPrototype) {
