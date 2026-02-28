@@ -259,4 +259,9 @@ TEST(ParserA84, PrimaryLiteralDecimalNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
+TEST(ParserCh50701, IntLiteral_SpaceBetweenBaseAndDigits) {
+  // Space between base format and unsigned number is legal.
+  EXPECT_TRUE(ParseOk("module m; initial x = 32 'h 12ab_f001; endmodule"));
+}
+
 }  // namespace

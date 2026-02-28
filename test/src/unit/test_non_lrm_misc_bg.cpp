@@ -111,11 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_SpaceBetweenBaseAndDigits) {
-  // Space between base format and unsigned number is legal.
-  EXPECT_TRUE(ParseOk("module m; initial x = 32 'h 12ab_f001; endmodule"));
-}
-
 TEST(ParserCh50701, IntLiteral_LargeUnsized) {
   // 'h7_0000_0000 requires at least 35 bits.
   EXPECT_TRUE(
