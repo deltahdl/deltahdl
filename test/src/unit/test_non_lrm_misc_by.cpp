@@ -45,32 +45,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 19. always_comb with unique case
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_UniqueCase) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [3:0] y;\n"
-      "  always_comb begin\n"
-      "    unique case (sel)\n"
-      "      2'b00: y = 4'd0;\n"
-      "      2'b01: y = 4'd1;\n"
-      "      2'b10: y = 4'd2;\n"
-      "      2'b11: y = 4'd3;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstAlwaysCombStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
-  ASSERT_EQ(stmt->case_items.size(), 4u);
-}
-
-// ---------------------------------------------------------------------------
 // 20. always_comb with priority case
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_PriorityCase) {

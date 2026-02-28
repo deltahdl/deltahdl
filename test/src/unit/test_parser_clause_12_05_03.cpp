@@ -91,4 +91,48 @@ TEST(ParserSection4, Sec4_6_PriorityCaseFirstMatch) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
+struct ParseResult9h {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9h Parse(const std::string& src) {
+  ParseResult9h result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// 19. always_comb with unique case
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_UniqueCase) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [3:0] y;\n"
+      "  always_comb begin\n"
+      "    unique case (sel)\n"
+      "      2'b00: y = 4'd0;\n"
+      "      2'b01: y = 4'd1;\n"
+      "      2'b10: y = 4'd2;\n"
+      "      2'b11: y = 4'd3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstAlwaysCombStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+  ASSERT_EQ(stmt->case_items.size(), 4u);
+}
+
 }  // namespace
