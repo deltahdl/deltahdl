@@ -28,14 +28,4 @@ TEST(ParserA26, FuncPrototypeExternVoid) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-// typedef in function body
-TEST(ParserA28, TypedefInFunction) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function void foo();\n"
-              "    typedef logic [7:0] byte_t;\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
 }  // namespace

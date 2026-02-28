@@ -99,4 +99,14 @@ TEST(ParserA213, TypedefWithDims) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
+// typedef in function body
+TEST(ParserA28, TypedefInFunction) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void foo();\n"
+              "    typedef logic [7:0] byte_t;\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
 }  // namespace
