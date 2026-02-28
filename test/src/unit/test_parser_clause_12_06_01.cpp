@@ -48,4 +48,19 @@ TEST(ParserA60701, PatternTagged) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §12.6: tagged pattern with nested assignment pattern
+TEST(ParserA60701, PatternTaggedWithAssignmentPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(instr) matches\n"
+      "      tagged Add '{.r1, .r2, .rd}: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
