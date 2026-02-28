@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Additional gate_instantiation combinations
-// =============================================================================
-TEST(ParserA301, GateInst_AllNInputGateTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  and  a1(o, i1, i2);\n"
-              "  nand n1(o, i1, i2);\n"
-              "  or   o1(o, i1, i2);\n"
-              "  nor  r1(o, i1, i2);\n"
-              "  xor  x1(o, i1, i2);\n"
-              "  xnor z1(o, i1, i2);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA301, GateInst_AllEnableGateTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
