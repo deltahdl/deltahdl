@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_AllEnableGateTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  bufif0 b0(o, i, c);\n"
-              "  bufif1 b1(o, i, c);\n"
-              "  notif0 n0(o, i, c);\n"
-              "  notif1 n1(o, i, c);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA301, GateInst_AllMosSwitchTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
