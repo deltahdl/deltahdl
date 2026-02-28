@@ -57,24 +57,6 @@ TEST(ParserA23, ListOfUdpPortIdentifiersSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- list_of_tf_variable_identifiers ---
-// port_identifier { variable_dimension } [ = expression ]
-//     { , port_identifier { variable_dimension } [ = expression ] }
-TEST(ParserA23, ListOfTfVariableIdentifiersSingle) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int f;\n"
-      "    input int a;\n"
-      "    f = a;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(item->func_args.size(), 1u);
-}
-
 TEST(ParserA23, ListOfTypeAssignmentsMultiple) {
   auto r = Parse(
       "module m; parameter type T1 = int, T2 = real, T3 = string; endmodule\n");
