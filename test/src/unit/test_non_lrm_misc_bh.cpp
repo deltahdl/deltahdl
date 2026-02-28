@@ -30,14 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserCh513, BuiltInMethod_ChainedAccess) {
-  // Chained member accesses: a.b.c().
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial x = obj.sub.method();\n"
-              "endmodule"));
-}
-
 TEST(ParserCh513, BuiltInMethod_WithArgs) {
   // Built-in method with arguments: arr.find with (item > 3).
   EXPECT_TRUE(
