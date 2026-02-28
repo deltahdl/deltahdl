@@ -211,4 +211,18 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportFunction) {
   EXPECT_FALSE(items[0]->dpi_is_context);
 }
 
+TEST_F(AnnexHParseTest, AnnexHDpiImportWithCName) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" c_name = function void my_func();\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->dpi_c_name, "c_name");
+  EXPECT_EQ(items[0]->name, "my_func");
+  EXPECT_FALSE(items[0]->dpi_is_task);
+}
+
 }  // namespace
