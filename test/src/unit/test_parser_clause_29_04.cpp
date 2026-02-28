@@ -93,4 +93,25 @@ TEST(ParserAnnexA051, MultipleUdps) {
   EXPECT_EQ(r.cu->udps[1]->name, "buf2");
 }
 
+// --- udp_declaration: single input UDP ---
+TEST(ParserAnnexA051, SingleInput) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->output_name, "out");
+  ASSERT_EQ(udp->input_names.size(), 1u);
+  EXPECT_EQ(udp->input_names[0], "in");
+  ASSERT_EQ(udp->table.size(), 2u);
+  ASSERT_EQ(udp->table[0].inputs.size(), 1u);
+  EXPECT_EQ(udp->table[0].inputs[0], '0');
+  EXPECT_EQ(udp->table[0].output, '1');
+}
+
 }  // namespace
