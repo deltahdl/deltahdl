@@ -168,4 +168,13 @@ TEST(ParserA211, CovergroupDecl_WithEmptyPortList) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, CoverageSpecOrOption_CoverSpec) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
