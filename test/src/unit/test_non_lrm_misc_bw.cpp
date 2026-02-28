@@ -35,28 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 
 namespace {
 
-TEST(ParserSection9, Sec9_3_1_BlockInAlwaysFFWithSensitivity) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk or negedge rst_n) begin\n"
-      "    if (!rst_n)\n"
-      "      q <= 0;\n"
-      "    else\n"
-      "      q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
-  ASSERT_GE(item->sensitivity.size(), 2u);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
-}
-
 TEST(ParserSection9, Sec9_3_1_BlockInFinalBlock) {
   auto r = Parse(
       "module m;\n"

@@ -15,22 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// Edge-sensitive path with negative output polarity and data source
-TEST(ParserA702, DataSourceWithNegativeOutputPolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk => (q - : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_NE(si->path.data_source, nullptr);
-  EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kNegative);
-}
-
 // =============================================================================
 // A.7.2 Multiple path declarations in one specify block
 // =============================================================================

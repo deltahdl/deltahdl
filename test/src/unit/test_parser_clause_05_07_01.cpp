@@ -137,4 +137,14 @@ TEST(ParserCh50701, IntLiteral_UnsizedHex) {
   EXPECT_TRUE(ParseOk("module m; initial x = 'h837FF; endmodule"));
 }
 
+// § z_digit — ?
+TEST(ParserA87, ZDigitQuestion) {
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'b?; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace

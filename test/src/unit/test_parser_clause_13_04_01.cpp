@@ -163,4 +163,20 @@ TEST(ParserSection6, RealInFunction) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kReal);
 }
 
+// void cast with system function call
+TEST(ParserA609, VoidCastSystemCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial void'($sformatf(\"hello\"));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCast);
+  EXPECT_EQ(expr->text, "void");
+  ASSERT_NE(expr->lhs, nullptr);
+  EXPECT_EQ(expr->lhs->kind, ExprKind::kSystemCall);
+}
+
 }  // namespace
