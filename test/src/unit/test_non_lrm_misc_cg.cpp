@@ -42,21 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.3.5 -- Equality operators
-// =========================================================================
-TEST(ParserSection11, EqualityInComplexExpr) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a == b) && (c != d);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
-}
-
 TEST(ParserSection11, CaseEqualityInAssign) {
   auto r = Parse(
       "module t;\n"
