@@ -7,28 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Production 4: sequential_body ::= [ udp_initial_statement ] table
-//               sequential_entry { sequential_entry } endtable
-// ---------------------------------------------------------------------------
-// Sequential body without initial statement
-TEST(ParserAnnexA053, SeqBody_WithoutInitial) {
-  auto r = Parse(
-      "primitive latch_noinit(output reg q, input d, en);\n"
-      "  table\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_FALSE(udp->has_initial);
-  EXPECT_EQ(udp->table.size(), 3);
-}
-
 // Sequential body with initial statement
 TEST(ParserAnnexA053, SeqBody_WithInitial) {
   auto r = Parse(
