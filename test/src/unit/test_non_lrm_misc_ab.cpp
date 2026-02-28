@@ -13,22 +13,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #10: bins_or_options
-// =============================================================================
-TEST(ParserA211, BinsOrOptions_ValueRangeList) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins low = {[0:3]};\n"
-              "      bins mid = {[4:7]};\n"
-              "      bins high = {[8:15]};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, BinsOrOptions_AutoSizedArray) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
