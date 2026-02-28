@@ -128,4 +128,22 @@ TEST(ParserAnnexA042, ElaborationGenerateForWithAssign) {
   EXPECT_EQ(mod->assigns.size(), 2u);
 }
 
+// --- Elaborator expands for-generate with module instantiation ---
+TEST(ParserAnnexA042, ElaborationGenerateForModuleInst) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module sub(input logic a); endmodule\n"
+      "module top #(parameter N = 2) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin : blk\n"
+      "      sub u(.a(1'b0));\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  EXPECT_GE(mod->children.size(), 2u);
+}
+
 }  // namespace
