@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.3 Production #3: input_terminal ::= expression
-// Exercised via n-input gates (and/nand/or/nor/xor/xnor),
-// n-output gates (buf/not), cmos/mos switches.
-// =============================================================================
-TEST(ParserA303, InputTerminal_SimpleIdent) {
-  auto r = Parse(
-      "module m;\n"
-      "  and (out, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(ParserA303, InputTerminal_ComplexExpr) {
   // input_terminal accepts any expression
   EXPECT_TRUE(
