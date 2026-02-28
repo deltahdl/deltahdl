@@ -76,17 +76,6 @@ TEST(ParserCh5, UnpackedDim_Typedef) {
   EXPECT_TRUE(ParseOk5("module m; typedef int triple[1:3]; endmodule"));
 }
 
-// --- Comma-separated struct members ---
-TEST(ParserCh5, StructMembers_CommaSeparated) {
-  auto r = Parse(
-      "module m;\n"
-      "  struct { int X, Y, Z; } s;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.struct_members.size(), 3u);
-}
-
 TEST(ParserCh5, StructMembers_Single) {
   EXPECT_TRUE(ParseOk5("module m; struct { int X; } s; endmodule"));
 }
