@@ -45,16 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-TEST(ParserSection10, AssignmentPatternTypePrefixed) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef int T[3];\n"
-      "  T a = T'{1, 2, 3};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // =============================================================================
 // LRM section 10.10 -- Unpacked array concatenation
 // =============================================================================

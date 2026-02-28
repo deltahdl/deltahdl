@@ -274,4 +274,25 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberAccessWrite) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
+static ModuleItem* FirstItem(ParseResult7& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+TEST(ParserSection7, StructPackedSigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed signed {\n"
+      "    int a;\n"
+      "    byte b;\n"
+      "  } packed_s;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  EXPECT_TRUE(item->typedef_type.is_signed);
+}
+
 }  // namespace
