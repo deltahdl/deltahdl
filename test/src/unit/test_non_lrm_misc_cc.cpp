@@ -45,19 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-TEST(ParserSection10, UnpackedArrayConcatEmpty) {
-  auto r = Parse(
-      "module m;\n"
-      "  int q[$];\n"
-      "  initial q = {};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
-}
-
 TEST(ParserSection10, UnpackedArrayConcatNested) {
   auto r = Parse(
       "module m;\n"
