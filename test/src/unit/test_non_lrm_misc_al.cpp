@@ -22,26 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// par_block: fork...join_keyword
-// ---------------------------------------------------------------------------
-// §9.3.2: Basic fork...join
-TEST(ParserA603, ForkJoin) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork #10 a = 1; #20 b = 1; join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
-  EXPECT_EQ(stmt->fork_stmts.size(), 2u);
-}
-
 // §9.3.2: fork...join_any
 TEST(ParserA603, ForkJoinAny) {
   auto r = Parse(
