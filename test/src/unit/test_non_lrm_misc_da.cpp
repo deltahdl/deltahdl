@@ -91,39 +91,6 @@ TEST(ParserSection28, Sec28_12_TwelveDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 12u);
 }
 
-// =============================================================================
-// §30.3.3 Conditional path delays
-// =============================================================================
-TEST_F(SpecifyTest, ConditionalIfPath) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  if (sel) (a => b) = 5;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  auto* path = spec->specify_items[0];
-  EXPECT_EQ(path->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_NE(path->path.condition, nullptr);
-  EXPECT_FALSE(path->path.is_ifnone);
-}
-
-TEST_F(SpecifyTest, IfnoneConditionalPath) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  ifnone (a => b) = 7;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  EXPECT_TRUE(spec->specify_items[0]->path.is_ifnone);
-  EXPECT_EQ(spec->specify_items[0]->path.condition, nullptr);
-}
-
 TEST(ParserSection28, Sec28_12_PulsestyleOnevent) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"

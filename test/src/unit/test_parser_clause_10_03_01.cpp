@@ -112,4 +112,33 @@ TEST(ParserSection6, Sec6_5_WireImplicitContAssign) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
+struct ParseResult10b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult10b Parse(const std::string& src) {
+  ParseResult10b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection10, NetDeclAssignmentWithRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [7:0] data = 8'hAB;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_FALSE(mod->items.empty());
+  EXPECT_NE(mod->items[0]->init_expr, nullptr);
+}
+
 }  // namespace
