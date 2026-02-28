@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetDecl_InInterface) {
-  EXPECT_TRUE(
-      ParseOk("interface ifc;\n"
-              "  let bus_ok(req, ack) = req & ack;\n"
-              "endinterface\n"));
-}
-
 TEST(ParserA212, LetDecl_InProgram) {
   EXPECT_TRUE(
       ParseOk("program p;\n"

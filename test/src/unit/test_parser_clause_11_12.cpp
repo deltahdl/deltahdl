@@ -85,4 +85,11 @@ TEST(ParserA212, LetDecl_InPackage) {
               "endpackage\n"));
 }
 
+TEST(ParserA212, LetDecl_InInterface) {
+  EXPECT_TRUE(
+      ParseOk("interface ifc;\n"
+              "  let bus_ok(req, ack) = req & ack;\n"
+              "endinterface\n"));
+}
+
 }  // namespace
