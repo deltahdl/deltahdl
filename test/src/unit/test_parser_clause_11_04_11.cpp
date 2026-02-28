@@ -106,4 +106,23 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithSystemCall) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIntegerLiteral);
 }
 
+// --- Ternary with unary operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithUnaryOperands) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel ? ~a : &b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->true_expr->op, TokenKind::kTilde);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->false_expr->op, TokenKind::kAmp);
+}
+
 }  // namespace
