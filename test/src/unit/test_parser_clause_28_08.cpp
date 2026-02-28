@@ -24,4 +24,11 @@ TEST(ParserA301, GateInst_Tranif0Basic) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA301, GateInst_Tranif1Basic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  tranif1 (io1, io2, ctrl);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
