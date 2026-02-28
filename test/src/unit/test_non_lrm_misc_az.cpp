@@ -4,25 +4,21 @@
 
 using namespace delta;
 
-namespace {
-
-// =============================================================================
-// Annex H/I - DPI C layer / svdpi.h
-// =============================================================================
-TEST_F(AnnexHParseTest, AnnexHDpiImportFunction) {
-  auto* unit = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" function int c_add(int a, int b);\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(items[0]->name, "c_add");
-  EXPECT_FALSE(items[0]->dpi_is_task);
-  EXPECT_FALSE(items[0]->dpi_is_pure);
-  EXPECT_FALSE(items[0]->dpi_is_context);
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items)
+    if (item->kind == kind) return true;
+  return false;
 }
+
+static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+namespace {
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportPure) {
   auto* unit = Parse(
@@ -550,13 +546,6 @@ TEST(SourceText, MultipleDescriptions) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
-static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
-                          ModuleItemKind kind) {
-  for (const auto* item : items)
-    if (item->kind == kind) return true;
-  return false;
-}
-
 // =============================================================================
 // LRM §3.4 — Programs
 // =============================================================================
@@ -783,29 +772,6 @@ TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
   EXPECT_TRUE(
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kAlwaysBlock));
   EXPECT_GE(r.cu->checkers[0]->items.size(), 3u);  // var + initial + always
-}
-
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
-static int CountItemsByKind(const std::vector<ModuleItem*>& items,
-                            ModuleItemKind kind) {
-  int count = 0;
-  for (const auto* item : items)
-    if (item->kind == kind) ++count;
-  return count;
-}
-
-static const ModuleItem* FindFunctionByName(
-    const std::vector<ModuleItem*>& items, const std::string& name) {
-  for (const auto* item : items)
-    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name)
-      return item;
-  return nullptr;
 }
 
 // =============================================================================

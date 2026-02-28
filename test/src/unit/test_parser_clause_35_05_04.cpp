@@ -193,4 +193,22 @@ TEST(ParserA26, DpiTaskProtoWithArgs) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
+// =============================================================================
+// Annex H/I - DPI C layer / svdpi.h
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportFunction) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_add(int a, int b);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "c_add");
+  EXPECT_FALSE(items[0]->dpi_is_task);
+  EXPECT_FALSE(items[0]->dpi_is_pure);
+  EXPECT_FALSE(items[0]->dpi_is_context);
+}
+
 }  // namespace
