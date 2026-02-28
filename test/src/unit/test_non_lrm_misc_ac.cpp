@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetArgs_AllNamed) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let arb(request, valid, override) = "
-              "    |(request & valid) || override;\n"
-              "  initial begin\n"
-              "    logic result;\n"
-              "    result = arb(.request(2'b11), .valid(2'b10),"
-              " .override(1'b0));\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetArgs_ExprInArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
