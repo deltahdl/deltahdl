@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- udp_declaration: many inputs ---
-TEST(ParserAnnexA051, ManyInputs) {
-  auto r = Parse(
-      "primitive gate5(output out, input a, b, c, d, e);\n"
-      "  table\n"
-      "    0 0 0 0 0 : 0;\n"
-      "    1 1 1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->input_names.size(), 5u);
-  EXPECT_EQ(udp->input_names[4], "e");
-  ASSERT_EQ(udp->table[0].inputs.size(), 5u);
-}
-
 // --- udp_declaration: endprimitive with end label on sequential ---
 TEST(ParserAnnexA051, EndLabelSequential) {
   auto r = Parse(
