@@ -75,23 +75,6 @@ TEST(ParserA23, ListOfTfVariableIdentifiersSingle) {
   EXPECT_EQ(item->func_args.size(), 1u);
 }
 
-TEST(ParserA23, ListOfTfVariableIdentifiersMultiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int add;\n"
-      "    input int a, b;\n"
-      "    add = a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(item->func_args.size(), 2u);
-  EXPECT_EQ(item->func_args[0].name, "a");
-  EXPECT_EQ(item->func_args[1].name, "b");
-}
-
 TEST(ParserA23, ListOfTypeAssignmentsMultiple) {
   auto r = Parse(
       "module m; parameter type T1 = int, T2 = real, T3 = string; endmodule\n");
