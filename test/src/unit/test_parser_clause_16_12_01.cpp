@@ -57,4 +57,13 @@ TEST(ParserA210, PropertyExpr_PropertyInstance) {
               "endmodule\n"));
 }
 
+// property_list_of_arguments — mixed positional + named
+TEST(ParserA210, PropertyListOfArguments_Mixed) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(x, y, z); x |-> y ##1 z; endproperty\n"
+              "  assert property (p(a, .y(b), .z(c)));\n"
+              "endmodule\n"));
+}
+
 }  // namespace

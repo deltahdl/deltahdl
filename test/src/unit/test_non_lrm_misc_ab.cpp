@@ -13,15 +13,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-// property_list_of_arguments — mixed positional + named
-TEST(ParserA210, PropertyListOfArguments_Mixed) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  property p(x, y, z); x |-> y ##1 z; endproperty\n"
-              "  assert property (p(a, .y(b), .z(c)));\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CovergroupDecl_WithEmptyPortList) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
