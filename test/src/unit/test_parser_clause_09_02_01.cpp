@@ -59,4 +59,31 @@ TEST(ParserA602, InitialConstruct_SingleStmt) {
   ASSERT_NE(item->body, nullptr);
 }
 
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(Parser, ModuleWithInitialBlock) {
+  auto r = Parse(
+      "module hello;\n"
+      "  initial $display(\"Hello\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
 }  // namespace

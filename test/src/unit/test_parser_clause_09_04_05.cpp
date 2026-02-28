@@ -200,4 +200,60 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignEvent) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
+struct ParseResult9f {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static Stmt* FirstInitialStmt(ParseResult9f& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+struct ParseResult9g {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9g Parse(const std::string& src) {
+  ParseResult9g result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Repeat event control (blocking)
+// =============================================================================
+// Blocking repeat event with posedge: a = repeat(3) @(posedge clk) b;
+TEST(ParserSection9, Sec9_4_5_BlockingRepeatPosedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  initial a = repeat(3) @(posedge clk) b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+}
+
 }  // namespace
