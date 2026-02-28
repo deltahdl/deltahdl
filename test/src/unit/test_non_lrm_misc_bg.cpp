@@ -111,15 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50702, RealLiteral_ExponentOnly) {
-  // 39e8 is a valid real constant (exponent notation without decimal point).
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r;\n"
-              "  initial r = 39e8;\n"
-              "endmodule"));
-}
-
 TEST(ParserCh508, TimeLiteral_IntegerNs) {
   auto r = Parse(
       "module m;\n"

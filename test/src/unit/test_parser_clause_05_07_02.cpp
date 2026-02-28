@@ -92,4 +92,13 @@ TEST(ParserCh50702, RealLiteral_ScientificNotation) {
   EXPECT_DOUBLE_EQ(rhs->real_val, 0.013);
 }
 
+TEST(ParserCh50702, RealLiteral_ExponentOnly) {
+  // 39e8 is a valid real constant (exponent notation without decimal point).
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  initial r = 39e8;\n"
+              "endmodule"));
+}
+
 }  // namespace
