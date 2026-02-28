@@ -259,4 +259,25 @@ TEST(ParserSection6, Sec6_7_1_WireDriveStrengthReversedOrder) {
   EXPECT_EQ(item->drive_strength1, 3u);
 }
 
+static ModuleItem* FirstItem(ParseResult7& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// 3. wire struct packed { ... } memsig; — struct type after net keyword.
+TEST(ParserSection6, Sec6_7_1_WireWithPackedStructType) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_EQ(item->name, "memsig");
+}
+
 }  // namespace

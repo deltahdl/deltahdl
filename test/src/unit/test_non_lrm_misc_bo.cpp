@@ -49,21 +49,6 @@ static void VerifyStructMemberNames(const std::vector<StructMember>& members,
 
 namespace {
 
-// 3. wire struct packed { ... } memsig; — struct type after net keyword.
-TEST(ParserSection6, Sec6_7_1_WireWithPackedStructType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "memsig");
-}
-
 // 4. trireg (large) logic cap1; — charge strength + explicit type (LRM §6.7.1).
 TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithLogic) {
   auto r = Parse(

@@ -29,4 +29,14 @@ TEST(ParserA87, HexDigitLowercase) {
   EXPECT_EQ(rhs->int_val, 0xABCDEFu);
 }
 
+TEST(ParserA87, HexDigitUppercase) {
+  auto r =
+      Parse("module m; logic [23:0] x; initial x = 24'hABCDEF; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->int_val, 0xABCDEFu);
+}
+
 }  // namespace
