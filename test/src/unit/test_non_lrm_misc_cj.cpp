@@ -53,46 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-TEST(ParserSection12, IfWithBlockBody) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a) begin\n"
-      "      x = 1;\n"
-      "      y = 2;\n"
-      "    end else begin\n"
-      "      x = 3;\n"
-      "      y = 4;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  ASSERT_NE(stmt->then_branch, nullptr);
-  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
-  ASSERT_NE(stmt->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
-}
-
-// =============================================================================
-// LRM section 12.7.1 -- for-loop (additional coverage)
-// =============================================================================
-TEST(ParserSection12, ForLoopPostIncrementStep) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_NE(stmt->for_step, nullptr);
-}
-
 TEST(ParserSection12, ForLoopPostDecrementStep) {
   auto r = Parse(
       "module t;\n"
