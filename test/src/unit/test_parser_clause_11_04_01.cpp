@@ -99,4 +99,17 @@ TEST(ParserA602, OperatorAssignment_AmpEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kAmpEq);
 }
 
+TEST(ParserA602, OperatorAssignment_PipeEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a |= 8'h01; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->rhs->op, TokenKind::kPipeEq);
+}
+
 }  // namespace
