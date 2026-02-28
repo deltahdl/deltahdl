@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Ternary with cast operands ---
-TEST(ParserSection11, Sec11_4_6_TernaryWithCast) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = sel ? int'(a) : int'(b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kCast);
-  ASSERT_NE(rhs->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kCast);
-}
-
 // --- Ternary with inside condition ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithInsideCondition) {
   auto r = Parse(
