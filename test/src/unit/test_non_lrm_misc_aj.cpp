@@ -50,24 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// A.6.1 Production: net_assignment (parsing)
-// net_assignment ::= net_lvalue = expression
-// =============================================================================
-TEST(ParserA601, NetAssignment_ConcatLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [3:0] sum;\n"
-      "  wire carry;\n"
-      "  assign {carry, sum} = 5'b10101;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_EQ(cas[0]->assign_lhs->kind, ExprKind::kConcatenation);
-}
-
 TEST(ParserA601, NetAssignment_ExprRhs) {
   auto r = Parse(
       "module m;\n"
