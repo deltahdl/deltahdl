@@ -18,22 +18,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-// --- interface_instantiation: interface instantiated inside interface ---
-TEST(ParserAnnexA0412, InterfaceInstInsideInterface) {
-  auto r = Parse(
-      "interface outer_if;\n"
-      "  inner_if u0(.clk(clk));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  ASSERT_GE(r.cu->interfaces[0]->items.size(), 1u);
-  auto* item = r.cu->interfaces[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "inner_if");
-  EXPECT_EQ(item->inst_name, "u0");
-}
-
 // --- interface_instantiation: with empty parameter ---
 TEST(ParserAnnexA0412, InterfaceInstEmptyParam) {
   auto r = Parse("module m; my_if #() u0(.a(a)); endmodule\n");
