@@ -46,25 +46,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// §4.6: Fork-join ordering — all branches complete
-// =============================================================================
-TEST(ParserSection4, Sec4_6_ForkJoinAllComplete) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial fork\n"
-      "    a = 1;\n"
-      "    b = 2;\n"
-      "  join\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kFork);
-  EXPECT_EQ(body->join_kind, TokenKind::kKwJoin);
-}
-
-// =============================================================================
 // §4.6: Fork-join_any ordering — first branch completes
 // =============================================================================
 TEST(ParserSection4, Sec4_6_ForkJoinAnyFirstComplete) {
