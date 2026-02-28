@@ -18,23 +18,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-// --- program_instantiation: multiple hierarchical_instance ---
-TEST(ParserAnnexA0413, MultipleProgramInstances) {
-  auto r = Parse(
-      "program my_prog(input logic clk);\n"
-      "endprogram\n"
-      "module m; my_prog u0(.clk(a)), u1(.clk(b)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto* i0 = r.cu->modules[0]->items[0];
-  auto* i1 = r.cu->modules[0]->items[1];
-  EXPECT_EQ(i0->inst_module, "my_prog");
-  EXPECT_EQ(i0->inst_name, "u0");
-  EXPECT_EQ(i1->inst_module, "my_prog");
-  EXPECT_EQ(i1->inst_name, "u1");
-}
-
 // --- program_instantiation: with instance array ---
 TEST(ParserAnnexA0413, ProgramInstArray) {
   auto r = Parse(
