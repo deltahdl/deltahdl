@@ -36,36 +36,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// Assume property with a clocked implication.
-TEST(ParserSection16, Sec16_5_1_AssumePropertyClocked) {
-  auto r = Parse(
-      "module m;\n"
-      "  assume property (@(posedge clk) req |-> gnt);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  auto* ap =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
-  ASSERT_NE(ap, nullptr);
-  EXPECT_NE(ap->assert_expr, nullptr);
-}
-
-// Assume property with else action.
-TEST(ParserSection16, Sec16_5_1_AssumePropertyElseAction) {
-  auto r = Parse(
-      "module m;\n"
-      "  assume property (@(posedge clk) en |-> ready)\n"
-      "    else $error(\"assumption violated\");\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  auto* ap =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
-  ASSERT_NE(ap, nullptr);
-  EXPECT_EQ(ap->assert_pass_stmt, nullptr);
-  EXPECT_NE(ap->assert_fail_stmt, nullptr);
-}
-
 // =============================================================================
 // Section 16.5.1 -- Concurrent assertion statements: cover property
 // =============================================================================

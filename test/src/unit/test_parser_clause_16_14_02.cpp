@@ -133,4 +133,20 @@ TEST(ParserSection16, Sec16_5_1_AssumePropertyClocked) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
+// Assume property with else action.
+TEST(ParserSection16, Sec16_5_1_AssumePropertyElseAction) {
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) en |-> ready)\n"
+      "    else $error(\"assumption violated\");\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  auto* ap =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
+  ASSERT_NE(ap, nullptr);
+  EXPECT_EQ(ap->assert_pass_stmt, nullptr);
+  EXPECT_NE(ap->assert_fail_stmt, nullptr);
+}
+
 }  // namespace
