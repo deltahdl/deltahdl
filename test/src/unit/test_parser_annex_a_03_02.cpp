@@ -24,4 +24,16 @@ TEST(ParserA302, PullupStrength_Strength0Strength1) {
   EXPECT_EQ(g->gate_inst_name, "pu1");
 }
 
+TEST(ParserA302, PullupStrength_Weak0Supply1) {
+  auto r = Parse(
+      "module m;\n"
+      "  pullup (weak0, supply1) (out);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->drive_strength0, 2u);  // weak0
+  EXPECT_EQ(g->drive_strength1, 5u);  // supply1
+}
+
 }  // namespace
