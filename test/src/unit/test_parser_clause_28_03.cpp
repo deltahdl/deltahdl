@@ -81,4 +81,14 @@ TEST(ParserA301, GateInst_PassSwitchMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
+TEST(ParserA301, GateInst_PulldownMultipleInstances) {
+  auto r = Parse(
+      "module m;\n"
+      "  pulldown pd1(a), pd2(b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gates = FindAllGates(r.cu->modules[0]->items);
+  EXPECT_EQ(gates.size(), 2u);
+}
+
 }  // namespace
