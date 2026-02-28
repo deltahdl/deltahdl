@@ -255,4 +255,28 @@ TEST(ParserAnnexA052, InputDecl_SeparateDecls) {
   EXPECT_EQ(udp->input_names[2], "c");
 }
 
+// ---------------------------------------------------------------------------
+// udp_reg_declaration (standalone reg)
+// ---------------------------------------------------------------------------
+// Standalone reg declaration after output (no 'reg' on output line)
+TEST(ParserAnnexA052, RegDecl_AfterOutput) {
+  auto r = Parse(
+      "primitive latch(q, d, en);\n"
+      "  output q;\n"
+      "  reg q;\n"
+      "  input d, en;\n"
+      "  table\n"
+      "    ? 0 : ? : -;\n"
+      "    0 1 : ? : 0;\n"
+      "    1 1 : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_TRUE(udp->is_sequential);
+  EXPECT_EQ(udp->output_name, "q");
+  ASSERT_EQ(udp->input_names.size(), 2u);
+}
+
 }  // namespace
