@@ -24,4 +24,11 @@ TEST(ParserA301, GateInst_Bufif0Basic) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA301, GateInst_Bufif1Basic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  bufif1 (out, in, ctrl);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
