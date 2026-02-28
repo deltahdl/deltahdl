@@ -44,25 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// =============================================================================
-// LRM section 13.4.3 -- Function calls as expressions/statements
-// =============================================================================
-// Function call used in a continuous assign expression.
-TEST(ParserSection13, FunctionCallInContAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "  assign result = add(x, y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* assign = FindItemByKind(r, ModuleItemKind::kContAssign);
-  ASSERT_NE(assign, nullptr);
-  ASSERT_NE(assign->assign_rhs, nullptr);
-  EXPECT_EQ(assign->assign_rhs->kind, ExprKind::kCall);
-}
-
 // Nested function calls: func(func(x)).
 TEST(ParserSection13, NestedFunctionCalls) {
   auto r = Parse(
