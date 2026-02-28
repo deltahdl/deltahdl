@@ -4,50 +4,6 @@
 
 using namespace delta;
 
-namespace {
-
-TEST(ParserCh50603, SystemTask_FinishNoArgs) {
-  // $finish with no arguments and no parentheses.
-  EXPECT_TRUE(ParseOk("module m; initial $finish; endmodule"));
-}
-
-TEST(ParserCh50603, SystemFunction_InExpression) {
-  // A system function like $clog2 used inside an expression.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  parameter W = $clog2(256);\n"
-              "endmodule"));
-}
-
-// --- §5.7.1 Integer literal constants ---
-struct ParseResult50701 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult50701 Parse(const std::string& src) {
-  ParseResult50701 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult50701& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
 struct ParseDiag50701 {
   SourceManager mgr;
   Arena arena;
@@ -63,6 +19,67 @@ static ParseDiag50701 ParseWithDiag(const std::string& src) {
   Parser parser(lexer, result.arena, *result.diag);
   result.cu = parser.Parse();
   return result;
+}
+
+static void VerifyPatternKeys(const Expr* rhs,
+                              const std::string expected_keys[], size_t count) {
+  ASSERT_EQ(rhs->pattern_keys.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
+  }
+}
+
+// --- §5.12 Attributes ---
+struct ParseResult512 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult512 Parse(const std::string& src) {
+  ParseResult512 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult512& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+static ModuleItem* FirstItem(ParseResult512& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+static void VerifyAttrNames(const ModuleItem* item,
+                            const std::string expected_names[], size_t count) {
+  ASSERT_EQ(item->attrs.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(item->attrs[i].name, expected_names[i]) << "attr " << i;
+  }
+}
+
+namespace {
+
+TEST(ParserCh50603, SystemFunction_InExpression) {
+  // A system function like $clog2 used inside an expression.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter W = $clog2(256);\n"
+              "endmodule"));
 }
 
 // From test_parser_clause_05.cpp
@@ -224,37 +241,6 @@ TEST(ParserCh50701, IntLiteral_LargeUnsized) {
               "endmodule"));
 }
 
-// =========================================================================
-// Section 5.7.2: Real literal constants
-// =========================================================================
-struct ParseResult50702 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult50702 Parse(const std::string& src) {
-  ParseResult50702 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult50702& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
 TEST(ParserCh50702, RealLiteral_DecimalNotation) {
   auto r = Parse(
       "module m;\n"
@@ -290,37 +276,6 @@ TEST(ParserCh50702, RealLiteral_ExponentOnly) {
               "  real r;\n"
               "  initial r = 39e8;\n"
               "endmodule"));
-}
-
-// =========================================================================
-// Section 5.8: Time literals
-// =========================================================================
-struct ParseResult508 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult508 Parse(const std::string& src) {
-  ParseResult508 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult508& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
 }
 
 TEST(ParserCh508, TimeLiteral_IntegerNs) {
@@ -379,37 +334,6 @@ TEST(ParserA223, DelayValueAllTimeLiterals) {
               "  wire #5ms w5;\n"
               "  wire #6s w6;\n"
               "endmodule"));
-}
-
-// =========================================================================
-// Section 5.9: String literals
-// =========================================================================
-struct ParseResult509 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult509 Parse(const std::string& src) {
-  ParseResult509 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult509& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
 }
 
 TEST(ParserCh509, StringLiteral_Basic) {
@@ -477,43 +401,6 @@ TEST(ParserCh50901, StringEscape_Quote) {
       ParseOk("module m;\n"
               "  initial $display(\"say \\\"hello\\\"\");\n"
               "endmodule"));
-}
-
-// --- §5.10 Structure literals ---
-struct ParseResult510 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult510 Parse(const std::string& src) {
-  ParseResult510 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult510& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
-static void VerifyPatternKeys(const Expr* rhs,
-                              const std::string expected_keys[], size_t count) {
-  ASSERT_EQ(rhs->pattern_keys.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
-  }
 }
 
 // From test_parser_clause_05.cpp
@@ -664,49 +551,6 @@ TEST(ParserCh511, ArrayLiteral_DefaultValue) {
       ParseOk("module m;\n"
               "  int arr[0:3] = '{default:0};\n"
               "endmodule"));
-}
-
-// --- §5.12 Attributes ---
-struct ParseResult512 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult512 Parse(const std::string& src) {
-  ParseResult512 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult512& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
-static ModuleItem* FirstItem(ParseResult512& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
-static void VerifyAttrNames(const ModuleItem* item,
-                            const std::string expected_names[], size_t count) {
-  ASSERT_EQ(item->attrs.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(item->attrs[i].name, expected_names[i]) << "attr " << i;
-  }
 }
 
 // From test_parser_clause_05.cpp
