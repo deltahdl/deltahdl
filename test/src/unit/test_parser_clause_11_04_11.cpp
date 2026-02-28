@@ -293,4 +293,22 @@ TEST(ParserSection11, Sec11_4_6_TernaryInModulePortConnection) {
   EXPECT_EQ(inst->inst_ports[0].second->kind, ExprKind::kTernary);
 }
 
+// --- Ternary in always_comb ---
+TEST(ParserSection11, Sec11_4_6_TernaryInAlwaysComb) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic sel, a, b, y;\n"
+      "  always_comb y = sel ? a : b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysCombItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(item->body->rhs, nullptr);
+  EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
+}
+
 }  // namespace
