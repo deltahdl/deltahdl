@@ -54,24 +54,21 @@ def _run_args(tmp_path, **overrides):
 # ---- _parse_args -----------------------------------------------------------
 
 
+_BASE_ARGV = ["prog", "--file", "f.cpp", "--output-dir", "/out",
+              "--lrm", "/lrm.txt", "--test", "T",
+              "--issue", "1", "--organization", "o", "--repo", "r"]
+
+
 def test_parse_args_basic(monkeypatch):
     """Parses --file, --output-dir, --lrm, and --test."""
-    monkeypatch.setattr(
-        sys, "argv",
-        ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "T"],
-    )
+    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     args = _parse_args()
     assert args.file == "f.cpp" and not args.dry_run
 
 
 def test_parse_args_dry_run(monkeypatch):
     """Parses --dry-run flag."""
-    monkeypatch.setattr(
-        sys, "argv",
-        ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "T", "--dry-run"],
-    )
+    monkeypatch.setattr(sys, "argv", [*_BASE_ARGV, "--dry-run"])
     assert _parse_args().dry_run is True
 
 
@@ -80,7 +77,8 @@ def test_parse_args_lrm(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/my/LRM.txt", "--test", "T"],
+         "--lrm", "/my/LRM.txt", "--test", "T",
+         "--issue", "1", "--organization", "o", "--repo", "r"],
     )
     assert _parse_args().lrm == "/my/LRM.txt"
 
@@ -90,7 +88,8 @@ def test_parse_args_test_flag(monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "Foo"],
+         "--lrm", "/lrm.txt", "--test", "Foo",
+         "--issue", "1", "--organization", "o", "--repo", "r"],
     )
     assert _parse_args().test == "Foo"
 
@@ -98,20 +97,14 @@ def test_parse_args_test_flag(monkeypatch):
 def test_parse_args_max_lines(monkeypatch):
     """Parses --max-lines flag."""
     monkeypatch.setattr(
-        sys, "argv",
-        ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "T", "--max-lines", "500"],
+        sys, "argv", [*_BASE_ARGV, "--max-lines", "500"],
     )
     assert _parse_args().max_lines == 500
 
 
 def test_parse_args_max_lines_default(monkeypatch):
     """--max-lines defaults to None."""
-    monkeypatch.setattr(
-        sys, "argv",
-        ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "T"],
-    )
+    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().max_lines is None
 
 

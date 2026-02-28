@@ -769,11 +769,11 @@ def _parse_args():
         "--dry-run", action="store_true",
         help="Classify only, don't write files",
     )
-    parser.add_argument("--issue", type=int, default=None,
+    parser.add_argument("--issue", type=int, required=True,
                         help="GitHub issue number to update")
-    parser.add_argument("--organization", default=None,
+    parser.add_argument("--organization", required=True,
                         help="GitHub organization for the issue")
-    parser.add_argument("--repo", default=None,
+    parser.add_argument("--repo", required=True,
                         help="GitHub repository for the issue")
     return parser.parse_args()
 

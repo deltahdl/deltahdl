@@ -22,66 +22,64 @@ _parse_args = getattr(classify_test, "_parse_args")
 # ---- _parse_args (issue/organization/repo) ---------------------------------
 
 
+_ALL_FLAGS = ["prog", "--file", "f.cpp", "--output-dir", "/out",
+              "--lrm", "/lrm.txt", "--test", "T",
+              "--issue", "42", "--organization", "myorg",
+              "--repo", "myrepo"]
+
+
 def test_parse_args_issue(monkeypatch):
     """Parses --issue flag as integer."""
-    monkeypatch.setattr(
-        sys, "argv",
-        ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "T", "--issue", "42"],
-    )
+    monkeypatch.setattr(sys, "argv", _ALL_FLAGS)
     assert _parse_args().issue == 42
 
 
-def test_parse_args_issue_default(monkeypatch):
-    """--issue defaults to None."""
+def test_parse_args_issue_required(monkeypatch):
+    """Exits when --issue is missing."""
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "T"],
+         "--lrm", "/lrm.txt", "--test", "T",
+         "--organization", "myorg", "--repo", "myrepo"],
     )
-    assert _parse_args().issue is None
+    with pytest.raises(SystemExit):
+        _parse_args()
 
 
 def test_parse_args_organization(monkeypatch):
     """Parses --organization flag."""
+    monkeypatch.setattr(sys, "argv", _ALL_FLAGS)
+    assert _parse_args().organization == "myorg"
+
+
+def test_parse_args_organization_required(monkeypatch):
+    """Exits when --organization is missing."""
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
          "--lrm", "/lrm.txt", "--test", "T",
-         "--organization", "myorg"],
+         "--issue", "42", "--repo", "myrepo"],
     )
-    assert _parse_args().organization == "myorg"
-
-
-def test_parse_args_organization_default(monkeypatch):
-    """--organization defaults to None."""
-    monkeypatch.setattr(
-        sys, "argv",
-        ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "T"],
-    )
-    assert _parse_args().organization is None
+    with pytest.raises(SystemExit):
+        _parse_args()
 
 
 def test_parse_args_repo(monkeypatch):
     """Parses --repo flag."""
+    monkeypatch.setattr(sys, "argv", _ALL_FLAGS)
+    assert _parse_args().repo == "myrepo"
+
+
+def test_parse_args_repo_required(monkeypatch):
+    """Exits when --repo is missing."""
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
          "--lrm", "/lrm.txt", "--test", "T",
-         "--repo", "myrepo"],
+         "--issue", "42", "--organization", "myorg"],
     )
-    assert _parse_args().repo == "myrepo"
-
-
-def test_parse_args_repo_default(monkeypatch):
-    """--repo defaults to None."""
-    monkeypatch.setattr(
-        sys, "argv",
-        ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "T"],
-    )
-    assert _parse_args().repo is None
+    with pytest.raises(SystemExit):
+        _parse_args()
 
 
 # ---- build_issue_comment ---------------------------------------------------
