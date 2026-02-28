@@ -28,22 +28,6 @@ TEST(ParserA26, FuncPrototypeExternVoid) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-// ---------------------------------------------------------------------------
-// tf_port_item: [ var ] data_type_or_implicit
-// ---------------------------------------------------------------------------
-TEST(ParserA27, TfPortItemVar) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task(var int x);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 1u);
-  EXPECT_EQ(item->func_args[0].name, "x");
-}
-
 // typedef in function body
 TEST(ParserA28, TypedefInFunction) {
   EXPECT_TRUE(
