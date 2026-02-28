@@ -153,4 +153,19 @@ TEST(ParserSection6, Sec6_11_LongintUnsignedOverride) {
   EXPECT_EQ(item->name, "lu");
 }
 
+// 10. integer unsigned override.
+TEST(ParserSection6, Sec6_11_IntegerUnsignedOverride) {
+  auto r = Parse(
+      "module t;\n"
+      "  integer unsigned iu;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInteger);
+  EXPECT_FALSE(item->data_type.is_signed);
+  EXPECT_EQ(item->name, "iu");
+}
+
 }  // namespace
