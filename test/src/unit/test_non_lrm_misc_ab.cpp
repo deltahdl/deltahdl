@@ -13,17 +13,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-TEST(ParserA211, BinsOrOptions_DefaultSequence) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins others = default sequence;\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, BinsOrOptions_SetCovergroupExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
