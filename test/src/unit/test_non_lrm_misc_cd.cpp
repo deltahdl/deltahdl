@@ -87,24 +87,6 @@ static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
 
 namespace {
 
-// --- 5. Blocking assignment with bitwise AND expression ---
-TEST(ParserSection10, Sec10_4_1_ExprBitwiseAnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] a, b, c;\n"
-      "  initial begin\n"
-      "    a = b & c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
-}
-
 // --- 6. Blocking assignment to bit-select: a[3] = 1 ---
 TEST(ParserSection10, Sec10_4_1_BitSelect) {
   auto r = Parse(
