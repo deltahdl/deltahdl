@@ -155,21 +155,6 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
 
 namespace {
 
-// description: udp_declaration
-TEST(SourceText, DescriptionUdp) {
-  auto r = Parse(
-      "primitive my_udp(output y, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0 ;\n"
-      "    1 1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  EXPECT_EQ(r.cu->udps[0]->name, "my_udp");
-}
-
 // =============================================================================
 // LRM section 29.3.6 -- UDP state table entries: symbol summary
 // =============================================================================

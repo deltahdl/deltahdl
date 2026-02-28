@@ -193,4 +193,28 @@ TEST(ParserSection23, GenerateRegionWithIf) {
   EXPECT_TRUE(found);
 }
 
+// =========================================================================
+// LRM section 27.5: Conditional generates (if-generate)
+// =========================================================================
+TEST(ParserSection23, IfGenerateWithElseIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (W == 8) begin : w8\n"
+      "    assign a = b;\n"
+      "  end else if (W == 16) begin : w16\n"
+      "    assign a = c;\n"
+      "  end else begin : wother\n"
+      "    assign a = d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_NE(item->gen_cond, nullptr);
+  EXPECT_FALSE(item->gen_body.empty());
+  ASSERT_NE(item->gen_else, nullptr);
+  EXPECT_NE(item->gen_else->gen_cond, nullptr);
+  ASSERT_NE(item->gen_else->gen_else, nullptr);
+}
+
 }  // namespace
