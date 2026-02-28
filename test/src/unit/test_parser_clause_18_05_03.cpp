@@ -84,4 +84,15 @@ TEST(ParserSection18b, DistEqualWeightSingleValue) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
+TEST(ParserSection18b, DistDivideWeightMultipleValues) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {1 :/ 1, 2 :/ 1, 3 :/ 1, 4 :/ 1}; }\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
 }  // namespace
