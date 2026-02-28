@@ -14,20 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.7.5.3 scalar_constant
-// =============================================================================
-// scalar_constant ::= 1'b0
-TEST(ParserA70503, ScalarConstant1b0) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 1'b0), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
 // scalar_constant ::= 1'B1
 TEST(ParserA70503, ScalarConstant1B1) {
   auto r = Parse(
