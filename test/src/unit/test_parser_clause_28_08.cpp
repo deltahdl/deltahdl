@@ -45,4 +45,15 @@ TEST(ParserA301, GateInst_Rtranif1Basic) {
               "endmodule\n"));
 }
 
+TEST(ParserA301, GateInst_PassEnWithDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif0 #(3, 5) t1(io1, io2, ctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
+  ASSERT_NE(g, nullptr);
+  EXPECT_NE(g->gate_delay, nullptr);
+}
+
 }  // namespace
