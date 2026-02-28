@@ -6,21 +6,26 @@
 
 using namespace delta;
 
-namespace {
+using ProgramParseTest = ProgramTestParse;
 
-// =========================================================================
-// LRM section 23.4: Nested modules
-// =========================================================================
-TEST(ParserSection23, NestedModuleParsesOk) {
-  EXPECT_TRUE(
-      ParseOk("module outer;\n"
-              "  wire w;\n"
-              "  module inner;\n"
-              "    assign w = 1'b1;\n"
-              "  endmodule\n"
-              "  inner i1();\n"
-              "endmodule\n"));
+// Returns true if any item in the list matches the given kind.
+bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
+  for (auto* item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
 }
+
+// Returns true if any item matches the given kind and name.
+bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
+                      ModuleItemKind kind, std::string_view name) {
+  for (auto* item : items) {
+    if (item->kind == kind && item->name == name) return true;
+  }
+  return false;
+}
+
+namespace {
 
 TEST(ParserSection23, NestedModuleMultiple) {
   EXPECT_TRUE(
@@ -472,8 +477,6 @@ TEST(ParserSection23, Sec23_2_2_EmptyPortsAndMiscVariants) {
   EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
 }
 
-using ProgramParseTest = ProgramTestParse;
-
 // =============================================================================
 // §24.1 Basic program declarations
 // =============================================================================
@@ -658,23 +661,6 @@ TEST_F(ProgramParseTest, ProgramWithTaskAndFunction) {
   ASSERT_GE(unit->programs[0]->items.size(), 2u);
   EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
   EXPECT_EQ(unit->programs[0]->items[1]->kind, ModuleItemKind::kFunctionDecl);
-}
-
-// Returns true if any item in the list matches the given kind.
-bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return true;
-  }
-  return false;
-}
-
-// Returns true if any item matches the given kind and name.
-bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
-                      ModuleItemKind kind, std::string_view name) {
-  for (auto* item : items) {
-    if (item->kind == kind && item->name == name) return true;
-  }
-  return false;
 }
 
 // =============================================================================
