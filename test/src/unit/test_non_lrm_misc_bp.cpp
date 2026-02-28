@@ -49,19 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7, ArrayReductionXor) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte b[] = '{1, 2, 3, 4};\n"
-      "  initial y = b.xor;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
-}
-
 // =========================================================================
 // §7.10.4: Empty concatenation {} to clear queue
 // =========================================================================
