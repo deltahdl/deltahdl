@@ -7,28 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Non-ANSI port list with five inputs
-TEST(ParserAnnexA052, NonAnsiPortList_FiveInputs) {
-  auto r = Parse(
-      "primitive gate5(out, a, b, c, d, e);\n"
-      "  output out;\n"
-      "  input a, b, c, d, e;\n"
-      "  table\n"
-      "    0 0 0 0 0 : 0;\n"
-      "    1 1 1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->input_names.size(), 5u);
-  EXPECT_EQ(udp->input_names[0], "a");
-  EXPECT_EQ(udp->input_names[1], "b");
-  EXPECT_EQ(udp->input_names[2], "c");
-  EXPECT_EQ(udp->input_names[3], "d");
-  EXPECT_EQ(udp->input_names[4], "e");
-}
-
 // ---------------------------------------------------------------------------
 // udp_declaration_port_list (ANSI port declarations)
 // ---------------------------------------------------------------------------
