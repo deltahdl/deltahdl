@@ -62,4 +62,16 @@ TEST(ParserA301, EnableGateInst_Unnamed) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA301, EnableGateInst_Named) {
+  auto r = Parse(
+      "module m;\n"
+      "  notif1 n1(out, in, en);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif1);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_inst_name, "n1");
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
