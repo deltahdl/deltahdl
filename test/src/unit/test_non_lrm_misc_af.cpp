@@ -25,28 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-// =============================================================================
-// Elaboration: module instantiation creates hierarchy and binds ports
-// =============================================================================
-TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
-  auto r = Parse(
-      "module child(input a, output b);\n"
-      "  assign b = a;\n"
-      "endmodule\n"
-      "module parent;\n"
-      "  wire x, y;\n"
-      "  child u0(.a(x), .b(y));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules.size(), 2u);
-  auto* inst = FindModuleInst(r.cu->modules[1]->items);
-  ASSERT_NE(inst, nullptr);
-  EXPECT_EQ(inst->inst_module, "child");
-  EXPECT_EQ(inst->inst_name, "u0");
-  EXPECT_EQ(inst->inst_ports.size(), 2u);
-}
-
 TEST(ParserAnnexA0411, ElaborationParamOverrideOrdered) {
   auto r = Parse(
       "module sub #(parameter W = 1)(input [W-1:0] d);\n"

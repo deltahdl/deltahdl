@@ -27,4 +27,33 @@ TEST(ParserAnnexA0411, NamedPortEmptyExpression) {
   EXPECT_EQ(item->inst_ports[1].second, nullptr);
 }
 
+ModuleItem* FindModuleInst(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kModuleInst) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// Elaboration: module instantiation creates hierarchy and binds ports
+// =============================================================================
+TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
+  auto r = Parse(
+      "module child(input a, output b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module parent;\n"
+      "  wire x, y;\n"
+      "  child u0(.a(x), .b(y));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules.size(), 2u);
+  auto* inst = FindModuleInst(r.cu->modules[1]->items);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "child");
+  EXPECT_EQ(inst->inst_name, "u0");
+  EXPECT_EQ(inst->inst_ports.size(), 2u);
+}
+
 }  // namespace
