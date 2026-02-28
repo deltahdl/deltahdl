@@ -78,4 +78,15 @@ TEST(ParserA211, BinsOrOptions_ValueRangeList) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, BinsOrOptions_AutoSizedArray) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins b[] = {[0:15]};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
