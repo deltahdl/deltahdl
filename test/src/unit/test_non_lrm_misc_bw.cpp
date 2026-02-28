@@ -35,44 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 
 namespace {
 
-TEST(ParserSection9, Sec9_3_1_BlockWithMixedBlockingNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    temp = a + b;\n"
-      "    result <= temp;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
-}
-
-// =============================================================================
-// LRM section 9.3.1 -- Blocks in various procedural contexts.
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb begin\n"
-      "    x = a & b;\n"
-      "    y = a | c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->stmts.size(), 2u);
-}
-
 TEST(ParserSection9, Sec9_3_1_BlockInAlwaysFFWithSensitivity) {
   auto r = Parse(
       "module m;\n"
