@@ -288,4 +288,15 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardThreeEventsOr) {
       "endmodule\n"));
 }
 
+// ---------------------------------------------------------------------------
+// ParseOk: iff guard in always block with nonblocking assignment
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardNonblockingAssign) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  always @(posedge clk iff valid)\n"
+              "    data_out <= data_in;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
