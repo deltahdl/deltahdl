@@ -69,30 +69,6 @@ static ModuleItem* FirstAlwaysCombItem(ParseResult11g& r) {
 
 namespace {
 
-// =========================================================================
-// LRM section 11.4.1 -- Vector bit-select and part-select addressing
-// =========================================================================
-// --- Bit-select with constant index ---
-TEST(ParserSection11, Sec11_4_1_BitSelectConstantIndex) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] vec;\n"
-      "  initial x = vec[3];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->base, nullptr);
-  EXPECT_EQ(rhs->base->kind, ExprKind::kIdentifier);
-  ASSERT_NE(rhs->index, nullptr);
-  EXPECT_EQ(rhs->index->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->index_end, nullptr);
-  EXPECT_FALSE(rhs->is_part_select_plus);
-  EXPECT_FALSE(rhs->is_part_select_minus);
-}
-
 // --- Bit-select with variable index ---
 TEST(ParserSection11, Sec11_4_1_BitSelectVariableIndex) {
   auto r = Parse(

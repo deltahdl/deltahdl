@@ -57,4 +57,18 @@ TEST(ParserSection23, NonAnsiPortsBasic) {
   VerifyTwoPortModule(r, "a", Direction::kInput, "b", Direction::kOutput);
 }
 
+TEST(ParserSection23, NonAnsiPortsWithTypesPortA) {
+  auto r = Parse(
+      "module m(a, b);\n"
+      "  input [7:0] a;\n"
+      "  output reg b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 2);
+  EXPECT_EQ(mod->ports[0].name, "a");
+  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
+  EXPECT_NE(mod->ports[0].data_type.packed_dim_left, nullptr);
+}
+
 }  // namespace

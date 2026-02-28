@@ -36,31 +36,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// --- Non-ANSI port declarations (LRM §23.2.2.1) ---
-TEST(ParserSection23, NonAnsiPortsBasic) {
-  auto r = Parse(
-      "module m(a, b);\n"
-      "  input a;\n"
-      "  output b;\n"
-      "  assign b = a;\n"
-      "endmodule\n");
-  VerifyTwoPortModule(r, "a", Direction::kInput, "b", Direction::kOutput);
-}
-
-TEST(ParserSection23, NonAnsiPortsWithTypesPortA) {
-  auto r = Parse(
-      "module m(a, b);\n"
-      "  input [7:0] a;\n"
-      "  output reg b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 2);
-  EXPECT_EQ(mod->ports[0].name, "a");
-  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
-  EXPECT_NE(mod->ports[0].data_type.packed_dim_left, nullptr);
-}
-
 TEST(ParserSection23, NonAnsiPortsWithTypesPortB) {
   auto r = Parse(
       "module m(a, b);\n"
