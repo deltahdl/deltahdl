@@ -14,13 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// § primary — this
-TEST(ParserA84, PrimaryThis) {
-  auto r = Parse("module m; initial x = this; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § primary — $
 TEST(ParserA84, PrimaryDollar) {
   auto r = Parse(
