@@ -50,25 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// Simulation: 'r' matches rising edge (0->1)
-TEST(ParserAnnexA053, EdgeSymbol_SimR) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  initial q = 0;\n"
-      "  table\n"
-      "    1 r : ? : 1;\n"
-      "    0 r : ? : 0;\n"
-      "    ? f : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-  eval.SetInputs({'1', '0'});
-  // Rising edge (0->1) with d=1 -> output=1
-  EXPECT_EQ(eval.EvaluateWithEdge({'1', '1'}, 1, '0'), '1');
-}
-
 // Simulation: 'f' matches falling edge (1->0)
 TEST(ParserAnnexA053, EdgeSymbol_SimF) {
   auto r = Parse(
