@@ -121,4 +121,20 @@ TEST(ParserAnnexA042, GenerateBlockLabeled) {
   ASSERT_EQ(gen->gen_body.size(), 1u);
 }
 
+// --- generate_block: begin/end with multiple items ---
+TEST(ParserAnnexA042, GenerateBlockMultipleItems) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (W > 0) begin\n"
+      "    wire a;\n"
+      "    assign a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_GE(gen->gen_body.size(), 2u);
+}
+
 }  // namespace
