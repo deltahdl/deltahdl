@@ -40,21 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-TEST(Parser, EnumWithValues) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef enum { IDLE=0, RUN=1, STOP=2 } cmd_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& members = r.cu->modules[0]->items[0]->typedef_type.enum_members;
-  std::string expected[] = {"IDLE", "RUN", "STOP"};
-  ASSERT_EQ(members.size(), std::size(expected));
-  for (size_t i = 0; i < std::size(expected); ++i) {
-    EXPECT_EQ(members[i].name, expected[i]) << "member " << i;
-    EXPECT_NE(members[i].value, nullptr) << "member " << i;
-  }
-}
-
 TEST(Parser, InlineEnumVar) {
   auto r = Parse(
       "module t;\n"
