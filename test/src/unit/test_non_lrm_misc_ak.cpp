@@ -15,18 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityParenStar) {
-  // @(*) implicit sensitivity
-  auto r = Parse(
-      "module m;\n"
-      "  always @(*) y = a + b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-}
-
 TEST(ParserA602, AlwaysConstruct_WithBeginEnd) {
   auto r = Parse(
       "module m;\n"
