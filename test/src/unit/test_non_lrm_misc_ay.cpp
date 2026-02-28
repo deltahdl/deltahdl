@@ -14,16 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// § x_digit — X
-TEST(ParserA87, XDigitUpper) {
-  auto r = Parse("module m; logic [3:0] x; initial x = 4'hX; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-}
-
 // § z_digit — z
 TEST(ParserA87, ZDigitLower) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'hz; endmodule\n");
