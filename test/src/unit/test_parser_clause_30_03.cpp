@@ -68,4 +68,20 @@ TEST(ParserA701, SpecifyBlockEmpty) {
   EXPECT_EQ(spec->specify_items.size(), 0u);
 }
 
+TEST(ParserA701, SpecifyBlockMultipleItems) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "    (c => d) = 10;\n"
+      "    $setup(data, posedge clk, 3);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 3u);
+}
+
 }  // namespace
