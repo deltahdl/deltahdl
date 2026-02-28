@@ -87,4 +87,14 @@ TEST(ParserA301, MosSwitchInst_Named) {
   EXPECT_EQ(g->gate_inst_name, "p1");
 }
 
+TEST(ParserA301, GateInst_AllMosSwitchTypes) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nmos  n1(o, i, g);\n"
+              "  pmos  p1(o, i, g);\n"
+              "  rnmos rn1(o, i, g);\n"
+              "  rpmos rp1(o, i, g);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
