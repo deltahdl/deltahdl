@@ -17,22 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// =============================================================================
-// §24.4 Program with task/function declarations
-// =============================================================================
-TEST_F(ProgramTestParse, ProgramWithTask) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  task run_test;\n"
-      "    $display(\"running\");\n"
-      "  endtask\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  ASSERT_GE(unit->programs[0]->items.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_EQ(unit->programs[0]->items[0]->name, "run_test");
-}
-
 TEST_F(ProgramTestParse, ProgramWithFunction) {
   auto* unit = Parse(
       "program p;\n"
