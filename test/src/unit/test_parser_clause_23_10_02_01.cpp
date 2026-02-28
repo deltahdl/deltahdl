@@ -26,4 +26,27 @@ TEST(ParserAnnexA0411, OrderedParamsNamedPorts) {
   EXPECT_EQ(item->inst_ports.size(), 1u);
 }
 
+ModuleItem* FindModuleInst(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kModuleInst) return item;
+  }
+  return nullptr;
+}
+
+TEST(ParserAnnexA0411, ElaborationParamOverrideOrdered) {
+  auto r = Parse(
+      "module sub #(parameter W = 1)(input [W-1:0] d);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub #(8) u0(.d(8'd0));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* inst = FindModuleInst(r.cu->modules[1]->items);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_params.size(), 1u);
+  EXPECT_EQ(inst->inst_params[0].first, "");
+  EXPECT_NE(inst->inst_params[0].second, nullptr);
+}
+
 }  // namespace
