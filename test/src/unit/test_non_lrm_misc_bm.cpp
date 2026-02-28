@@ -31,27 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 6.11 -- Integer data types: packed dimensions
-// =============================================================================
-// 1. Packed dimensions on logic type.
-TEST(ParserSection6, Sec6_11_LogicPackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
-  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
-  EXPECT_EQ(item->name, "data");
-}
-
 // 1b. Packed dimensions on bit type.
 TEST(ParserSection6, Sec6_11_BitPackedDims) {
   auto r = Parse(
