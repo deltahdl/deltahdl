@@ -95,4 +95,21 @@ TEST(ParserSection11, UnaryPlusOperator) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
+// =========================================================================
+// Section 11.3.1 -- Arithmetic operators with real operands
+// =========================================================================
+TEST(ParserSection11, RealLiteralAddition) {
+  auto r = Parse(
+      "module t;\n"
+      "  real r;\n"
+      "  initial r = 1.5 + 2.5;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kRealLiteral);
+}
+
 }  // namespace
