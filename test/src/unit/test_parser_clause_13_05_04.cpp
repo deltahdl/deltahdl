@@ -82,4 +82,43 @@ TEST(ParserSection13, NamedArgBindingOnTaskCall) {
   EXPECT_EQ(call->arg_names[1], "addr");
 }
 
+// Mixed positional then named arguments
+TEST(ParserA609, ListOfArgsMixedPositionalThenNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(1, 2, .c(3)); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  // Two positional args + one named arg
+  EXPECT_EQ(expr->args.size(), 3u);
+  ASSERT_EQ(expr->arg_names.size(), 1u);
+  EXPECT_EQ(expr->arg_names[0], "c");
+}
+
+// Named arg binding with empty arg (.name()).
+TEST(ParserSection13, NamedArgBindingEmptyArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int fun(int j = 1, string s = \"no\");\n"
+      "    return j;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = fun(.s(), .j());\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  ASSERT_EQ(stmt->rhs->arg_names.size(), 2u);
+  EXPECT_EQ(stmt->rhs->arg_names[0], "s");
+  EXPECT_EQ(stmt->rhs->arg_names[1], "j");
+}
+
 }  // namespace

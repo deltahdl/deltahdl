@@ -192,4 +192,19 @@ TEST(ParserSection6, Sec6_5_IntVarDeclKind) {
   EXPECT_EQ(item->name, "count");
 }
 
+// 11. Variable with initialization (logic v = 0).
+TEST(ParserSection6, Sec6_5_LogicVarInit) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic v = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_FALSE(item->data_type.is_net);
+  ASSERT_NE(item->init_expr, nullptr);
+}
+
 }  // namespace
