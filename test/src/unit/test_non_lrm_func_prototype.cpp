@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §non-lrm:func_prototype
 
 #include "fixture_elaborator.h"
 
