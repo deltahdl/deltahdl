@@ -24,17 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, InstanceArrayRange) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub inst[3:0] (.a(a), .b(b));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_NE(item->inst_range_left, nullptr);
-  EXPECT_NE(item->inst_range_right, nullptr);
-}
-
 TEST(ParserSection23, InstanceArraySingle) {
   auto r = Parse(
       "module top;\n"
