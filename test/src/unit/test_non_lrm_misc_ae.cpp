@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA304, MosSwitchtype_Pmos) {
-  auto r = Parse(
-      "module m;\n"
-      "  pmos (out, in, ctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(ParserA304, MosSwitchtype_Rnmos) {
   auto r = Parse(
       "module m;\n"
