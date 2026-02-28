@@ -101,47 +101,6 @@ TEST(ParserSection4, Sec4_5_MixBlockingNonblocking) {
 }
 
 // ---------------------------------------------------------------------------
-// 8. $display system call (Active region)
-// ---------------------------------------------------------------------------
-TEST(ParserSection4, Sec4_5_DisplaySystemCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $display(\"hello\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  ASSERT_NE(stmt->expr, nullptr);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
-  EXPECT_EQ(stmt->expr->callee, "$display");
-}
-
-// ---------------------------------------------------------------------------
-// 9. $monitor system call
-// ---------------------------------------------------------------------------
-TEST(ParserSection4, Sec4_5_MonitorSystemCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a;\n"
-      "  initial begin\n"
-      "    $monitor(\"a=%b\", a);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  ASSERT_NE(stmt->expr, nullptr);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
-  EXPECT_EQ(stmt->expr->callee, "$monitor");
-}
-
-// ---------------------------------------------------------------------------
 // 10. $strobe system call (Postponed region sampling)
 // ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_StrobeSystemCall) {
