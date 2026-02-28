@@ -123,4 +123,19 @@ TEST(ParserSection6, Sec6_11_ByteUnsignedOverride) {
   EXPECT_EQ(item->name, "bu");
 }
 
+// 8. shortint unsigned override.
+TEST(ParserSection6, Sec6_11_ShortintUnsignedOverride) {
+  auto r = Parse(
+      "module t;\n"
+      "  shortint unsigned su;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortint);
+  EXPECT_FALSE(item->data_type.is_signed);
+  EXPECT_EQ(item->name, "su");
+}
+
 }  // namespace
