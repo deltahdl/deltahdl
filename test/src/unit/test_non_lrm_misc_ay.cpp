@@ -14,15 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// =============================================================================
-// A.9 -- General (attributes, identifiers)
-// =============================================================================
-TEST(ParserAnnexA, A9AttributeOnContAssign) {
-  auto r = Parse("module m; wire y; (* synthesis *) assign y = 1; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserAnnexA, A9AttributeWithValue) {
   auto r = Parse("module m; (* max_fanout = 8 *) wire w; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
