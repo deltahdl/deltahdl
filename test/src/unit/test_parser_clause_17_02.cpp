@@ -21,4 +21,20 @@ TEST_F(CheckerParseTest, EmptyChecker) {
   EXPECT_TRUE(unit->checkers[0]->items.empty());
 }
 
+// =============================================================================
+// §17.2 Checker ports
+// =============================================================================
+TEST_F(CheckerParseTest, CheckerWithInputPorts) {
+  auto* unit = Parse(R"(
+    checker port_check(input logic clk, input logic rst);
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  ASSERT_GE(unit->checkers[0]->ports.size(), 2u);
+  EXPECT_EQ(unit->checkers[0]->ports[0].name, "clk");
+  EXPECT_EQ(unit->checkers[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(unit->checkers[0]->ports[1].name, "rst");
+  EXPECT_EQ(unit->checkers[0]->ports[1].direction, Direction::kInput);
+}
+
 }  // namespace

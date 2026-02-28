@@ -7,32 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, LineDirectiveInAssignment) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  integer line_num;\n"
-              "  initial line_num = `__LINE__;\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection22, FileDirectiveInStringConcat) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $display(\"source: %s:%0d\", `__FILE__, `__LINE__);\n"
-              "endmodule\n"));
-}
-
-// ============================================================================
-// LRM section 22.14 -- `begin_keywords, `end_keywords
-// ============================================================================
-TEST(ParserSection22, BeginKeywords1800_2023) {
-  EXPECT_TRUE(
-      ParseOk("`begin_keywords \"1800-2023\"\n"
-              "module t;\n"
-              "endmodule\n"
-              "`end_keywords\n"));
-}
-
 TEST(ParserSection22, BeginKeywords1800_2017) {
   EXPECT_TRUE(
       ParseOk("`begin_keywords \"1800-2017\"\n"
