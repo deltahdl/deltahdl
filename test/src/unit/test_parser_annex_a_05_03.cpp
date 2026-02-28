@@ -221,4 +221,16 @@ TEST(ParserAnnexA053, CurrentState_Question) {
   EXPECT_EQ(r.cu->udps[0]->table[0].current_state, '?');
 }
 
+// current_state as 'x'
+TEST(ParserAnnexA053, CurrentState_X) {
+  auto r = Parse(
+      "primitive p(output reg q, input d, en);\n"
+      "  table\n"
+      "    0 1 : x : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->udps[0]->table[0].current_state, 'x');
+}
+
 }  // namespace
