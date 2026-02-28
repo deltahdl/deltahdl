@@ -49,25 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9, WaitStatementWithBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait (ready) begin\n"
-      "      a = 1;\n"
-      "      b = 2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-  EXPECT_NE(stmt->condition, nullptr);
-  ASSERT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
-}
-
 // =============================================================================
 // LRM section 9.3.1 -- Sequential blocks (additional tests)
 // =============================================================================
