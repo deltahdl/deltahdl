@@ -111,4 +111,18 @@ TEST(ParserSection7, Sec7_2_1_PackedAssignFromPattern) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
+// 24. Struct assigned in for loop body.
+TEST(ParserSection7, Sec7_2_2_AssignInForLoop) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int idx; int val; } entry_t;\n"
+              "  entry_t table[4];\n"
+              "  initial begin\n"
+              "    for (int i = 0; i < 4; i = i + 1) begin\n"
+              "      table[i] = '{i, i * 10};\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

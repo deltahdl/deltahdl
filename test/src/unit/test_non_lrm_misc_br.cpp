@@ -17,20 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// 24. Struct assigned in for loop body.
-TEST(ParserSection7, Sec7_2_2_AssignInForLoop) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct { int idx; int val; } entry_t;\n"
-              "  entry_t table[4];\n"
-              "  initial begin\n"
-              "    for (int i = 0; i < 4; i = i + 1) begin\n"
-              "      table[i] = '{i, i * 10};\n"
-              "    end\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // 25. Struct with packed array member assigned.
 TEST(ParserSection7, Sec7_2_2_PackedArrayMemberAssign) {
   auto r = Parse(
