@@ -68,4 +68,18 @@ TEST(ParserA27, TfPortItemVarWithDirection) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
+// ---------------------------------------------------------------------------
+// tf_port_item clarification 28: name omitted in prototype
+// ---------------------------------------------------------------------------
+TEST(ParserA27, TfPortItemNoNameInPrototype) {
+  auto r = Parse(
+      "module m;\n"
+      "  extern task my_task(input int, output int);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+}
+
 }  // namespace

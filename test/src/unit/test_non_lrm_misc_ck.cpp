@@ -19,20 +19,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// tf_port_item clarification 28: name omitted in prototype
-// ---------------------------------------------------------------------------
-TEST(ParserA27, TfPortItemNoNameInPrototype) {
-  auto r = Parse(
-      "module m;\n"
-      "  extern task my_task(input int, output int);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 2u);
-}
-
-// ---------------------------------------------------------------------------
 // tf_item_declaration: block_item_declaration and tf_port_declaration mixed
 // ---------------------------------------------------------------------------
 TEST(ParserA27, TfItemDeclMixed) {
