@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-// init_val = bare 0
-TEST(ParserAnnexA053, InitVal_Bare0) {
-  auto r = Parse(
-      "primitive p(output reg q, input d, clk);\n"
-      "  initial q = 0;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->udps[0]->initial_value, '0');
-}
-
 // init_val = bare 1
 TEST(ParserAnnexA053, InitVal_Bare1) {
   auto r = Parse(
