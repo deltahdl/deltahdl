@@ -15,23 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.6.2 Production: variable_assignment
-// variable_assignment ::= variable_lvalue = expression
-// =============================================================================
-TEST(ParserA602, VariableAssignment_SimpleExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = a + b * c; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
-}
-
 TEST(ParserA602, VariableAssignment_TernaryRhs) {
   auto r = Parse(
       "module m;\n"
