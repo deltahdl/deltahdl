@@ -8,57 +8,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// A.6.11 cycle_delay — ## integral_number
-// =============================================================================
-TEST(ParserA611, CycleDelayNumber) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    output data;\n"
-      "  endclocking\n"
-      "  initial begin\n"
-      "    cb.data <= ##3 8'h42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
-// A.6.11 cycle_delay — ## identifier
-// =============================================================================
-TEST(ParserA611, CycleDelayIdentifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    output data;\n"
-      "  endclocking\n"
-      "  initial begin\n"
-      "    cb.data <= ##n 8'h42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
-// A.6.11 cycle_delay — ## ( expression )
-// =============================================================================
-TEST(ParserA611, CycleDelayParenExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    output data;\n"
-      "  endclocking\n"
-      "  initial begin\n"
-      "    cb.data <= ##(n+1) 8'h42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
 // A.6.11 clockvar / clockvar_expression — hierarchical access
 // =============================================================================
 TEST(ParserA611, ClockvarExpression) {

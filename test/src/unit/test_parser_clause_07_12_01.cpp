@@ -88,4 +88,21 @@ TEST(ParserSection7, ArrayLocatorUnique) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
+// =========================================================================
+// §7.12: Array manipulation methods (additional tests)
+// =========================================================================
+TEST(ParserSection7, ArrayLocatorFindWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3, 4, 5};\n"
+      "  int found[$];\n"
+      "  initial found = arr.find with (item > 3);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace

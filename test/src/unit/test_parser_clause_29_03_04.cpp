@@ -204,4 +204,46 @@ TEST(ParserSection29, SequentialCurrentStateField) {
   EXPECT_EQ(udp->table[3].output, '-');
 }
 
+static void VerifyUdpRowInputs(const UdpTableRow& row,
+                               const std::string& expected) {
+  ASSERT_EQ(row.inputs.size(), expected.size());
+  for (size_t j = 0; j < expected.size(); ++j) {
+    EXPECT_EQ(row.inputs[j], expected[j]);
+  }
+}
+
+struct SeqUdpRow {
+  std::string inputs;
+  char state;
+  char output;
+};
+
+static void VerifySeqUdpTable(const UdpDecl* udp, const SeqUdpRow expected[],
+                              size_t count) {
+  ASSERT_EQ(udp->table.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    VerifyUdpRowInputs(udp->table[i], expected[i].inputs);
+    EXPECT_EQ(udp->table[i].current_state, expected[i].state);
+    EXPECT_EQ(udp->table[i].output, expected[i].output);
+  }
+}
+
+TEST(ParserSection29, SequentialUdp) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 1);
+  auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->name, "dff");
+  EXPECT_TRUE(udp->is_sequential);
+  EXPECT_EQ(udp->output_name, "q");
+  SeqUdpRow expected[] = {{"0r", '?', '0'}, {"1r", '?', '1'}};
+  VerifySeqUdpTable(udp, expected, std::size(expected));
+}
+
 }  // namespace
