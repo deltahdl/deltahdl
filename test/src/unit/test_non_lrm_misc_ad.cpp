@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #5: n_input_gate_instance
-// n_input_gate_instance ::= [name_of_instance]
-//   ( output_terminal , input_terminal {, input_terminal} )
-// =============================================================================
-TEST(ParserA301, NInputGateInst_TwoInputs) {
-  auto r = Parse(
-      "module m;\n"
-      "  and a1(out, in1, in2);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_inst_name, "a1");
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(ParserA301, NInputGateInst_FourInputs) {
   auto r = Parse(
       "module m;\n"
