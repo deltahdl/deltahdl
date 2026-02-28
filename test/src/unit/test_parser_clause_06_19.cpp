@@ -109,4 +109,11 @@ TEST(ParserA221, DataTypeEnum) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
 }
 
+TEST(ParserA221, EnumBaseVectorWithDim) {
+  auto r = Parse("module m; enum logic [7:0] {A=0, B=255} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_NE(r.cu->modules[0]->items[0]->data_type.packed_dim_left, nullptr);
+}
+
 }  // namespace

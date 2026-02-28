@@ -451,4 +451,19 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarNestedIfElseInBlock) {
   VerifyAlwaysNestedIfElse(r);
 }
 
+// @* in always block -- sensitivity list is empty, body is the statement
+TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSensitivityEmpty) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  always @* a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->sensitivity.size(), 0u);
+  ASSERT_NE(item->body, nullptr);
+}
+
 }  // namespace
