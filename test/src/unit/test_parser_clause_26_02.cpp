@@ -92,4 +92,15 @@ TEST(ParserSection26, PackageWithClassDecl) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kClassDecl));
 }
 
+TEST(Parser, PackageWithParam) {
+  auto r = Parse(
+      "package my_pkg;\n"
+      "  parameter int WIDTH = 8;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1);
+  ASSERT_EQ(r.cu->packages[0]->items.size(), 1);
+  EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kParamDecl);
+}
+
 }  // namespace

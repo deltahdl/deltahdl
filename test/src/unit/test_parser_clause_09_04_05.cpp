@@ -461,4 +461,24 @@ TEST(ParserSection10, Sec10_4_2_IntraAssignEventNegedge) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
+// =============================================================================
+// LRM section 9.4.5 / 10.4.1 -- Intra-assignment delay (blocking)
+// =============================================================================
+// Blocking intra-assignment delay: a = #10 b;
+TEST(ParserSection9, Sec9_4_5_BlockingIntraDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial a = #10 b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
