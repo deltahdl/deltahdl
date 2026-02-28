@@ -231,4 +231,15 @@ TEST(ParserA304, NInputGatetype_Or) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA304, NInputGatetype_Nor) {
+  auto r = Parse(
+      "module m;\n"
+      "  nor (out, a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNor);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
