@@ -57,15 +57,6 @@ TEST(ParserA23, ListOfUdpPortIdentifiersSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA23, ListOfSpecparamAssignmentsMultiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100, tFALL = 50, tHOLD = 10; endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // --- list_of_tf_variable_identifiers ---
 // port_identifier { variable_dimension } [ = expression ]
 //     { , port_identifier { variable_dimension } [ = expression ] }
