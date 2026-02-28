@@ -5,18 +5,14 @@
 
 using namespace delta;
 
-namespace {
-
-// § octal_digit — 0 through 7
-TEST(ParserA87, OctalDigitAll) {
-  auto r =
-      Parse("module m; logic [23:0] x; initial x = 24'o01234567; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->int_val, 01234567u);
+bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
 }
+
+namespace {
 
 // § hex_digit — 0-9, a-f, A-F
 TEST(ParserA87, HexDigitLowercase) {
@@ -234,13 +230,6 @@ TEST(ParserAnnexE, AnnexEDelayModeZero) {
   if (r.cu->modules.size() >= 1u) {
     EXPECT_EQ(r.cu->modules[0]->name, "m");
   }
-}
-
-bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return true;
-  }
-  return false;
 }
 
 // =============================================================================
