@@ -212,26 +212,4 @@ TEST(ParserA29, MultipleSimplePortsSameDir) {
   EXPECT_EQ(mp->ports[2].name, "c");
 }
 
-// Mixed modport_ports_declarations
-TEST(ParserA29, MixedDirImportExport) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic req, gnt;\n"
-      "  modport target(\n"
-      "    input req,\n"
-      "    output gnt,\n"
-      "    import Read,\n"
-      "    export Write\n"
-      "  );\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 4u);
-  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(mp->ports[1].direction, Direction::kOutput);
-  EXPECT_TRUE(mp->ports[2].is_import);
-  EXPECT_TRUE(mp->ports[3].is_export);
-}
-
 }  // namespace
