@@ -62,4 +62,29 @@ TEST(ParserAnnexA0414, ElaborationCheckerInstPortBindings) {
   EXPECT_EQ(top->children[0].port_bindings[0].port_name, "data");
 }
 
+// --- Elaborator resolves checker inside checker ---
+TEST(ParserAnnexA0414, ElaborationCheckerInsideChecker) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "checker inner_chk(input logic sig);\n"
+      "endchecker\n"
+      "checker outer_chk;\n"
+      "  logic sig;\n"
+      "  inner_chk u0(.sig(sig));\n"
+      "endchecker\n"
+      "module top;\n"
+      "  outer_chk oi();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* top = design->top_modules[0];
+  ASSERT_GE(top->children.size(), 1u);
+  EXPECT_EQ(top->children[0].module_name, "outer_chk");
+  auto* outer = top->children[0].resolved;
+  ASSERT_NE(outer, nullptr);
+  ASSERT_GE(outer->children.size(), 1u);
+  EXPECT_EQ(outer->children[0].module_name, "inner_chk");
+  EXPECT_NE(outer->children[0].resolved, nullptr);
+}
+
 }  // namespace
