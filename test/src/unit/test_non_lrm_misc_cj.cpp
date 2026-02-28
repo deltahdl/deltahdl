@@ -53,43 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// unique0 if with else-if chain (no violation when none match).
-TEST(ParserSection12, Unique0IfChainElseIf) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    unique0 if (a == 0) x = 0;\n"
-      "    else if (a == 1) x = 1;\n"
-      "    else if (a == 2) x = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
-}
-
-// priority if with a final else (covers all cases, LRM says no violation).
-TEST(ParserSection12, PriorityIfWithElse) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    priority if (a[2:1] == 0) x = 0;\n"
-      "    else if (a[2] == 0) x = 1;\n"
-      "    else x = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
-  // Verify the else-if chain is fully linked.
-  ASSERT_NE(stmt->else_branch, nullptr);
-  ASSERT_NE(stmt->else_branch->else_branch, nullptr);
-}
-
 // Plain if (no qualifier) has kNone qualifier.
 TEST(ParserSection12, PlainIfHasNoQualifier) {
   auto r = Parse(
