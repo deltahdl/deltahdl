@@ -48,22 +48,6 @@ TEST(ParserSection16, PropertyDeclAndAssertProperty) {
   EXPECT_TRUE(found_assert);
 }
 
-// =============================================================================
-// §16.2 Immediate assertions — overview (assert, assume, cover in one module)
-// =============================================================================
-TEST(ParserSection16, OverviewAllThreeImmediateKinds) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert(a);\n"
-      "    assume(b);\n"
-      "    cover(c);\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection16, OverviewAssertWithComplexExpr) {
   auto r = Parse(
       "module m;\n"

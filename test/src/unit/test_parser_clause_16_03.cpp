@@ -179,4 +179,20 @@ TEST(ParserSection9, Sec9_3_1_BlockWithAssertImmediate) {
   EXPECT_NE(body->stmts[1]->assert_expr, nullptr);
 }
 
+// =============================================================================
+// §16.2 Immediate assertions — overview (assert, assume, cover in one module)
+// =============================================================================
+TEST(ParserSection16, OverviewAllThreeImmediateKinds) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert(a);\n"
+      "    assume(b);\n"
+      "    cover(c);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
