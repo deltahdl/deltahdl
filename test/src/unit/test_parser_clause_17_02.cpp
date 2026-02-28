@@ -140,4 +140,25 @@ TEST_F(CheckerParseTest, CheckerWithContAssign) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kContAssign));
 }
 
+// =============================================================================
+// A.1.8 Checker items
+// =============================================================================
+// checker_port_list / checker_port_item / checker_port_direction
+TEST(SourceText, CheckerPortList) {
+  auto r = Parse(
+      "checker chk(input logic clk, output bit valid);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto* chk = r.cu->checkers[0];
+  EXPECT_EQ(chk->name, "chk");
+  EXPECT_EQ(chk->decl_kind, ModuleDeclKind::kChecker);
+  ASSERT_EQ(chk->ports.size(), 2u);
+  EXPECT_EQ(chk->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(chk->ports[0].name, "clk");
+  EXPECT_EQ(chk->ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(chk->ports[1].name, "valid");
+}
+
 }  // namespace
