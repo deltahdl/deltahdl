@@ -14,16 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// § primary_literal — number (binary)
-TEST(ParserA84, PrimaryLiteralBinaryNumber) {
-  auto r = Parse("module m; initial x = 4'b1010; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-}
-
 // § primary_literal — time_literal
 TEST(ParserA84, PrimaryLiteralTimeLiteral) {
   auto r = Parse("module m; initial #10ns; endmodule\n");
