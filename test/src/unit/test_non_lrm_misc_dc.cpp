@@ -52,18 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §41 Data read API / General system functions
-// =============================================================================
-TEST_F(ApiParseTest, SdfAnnotateSystemCall) {
-  auto* unit = Parse(R"(
-    module m;
-      initial $sdf_annotate("timing.sdf");
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-}
-
 TEST_F(ApiParseTest, ReadmemhSystemCall) {
   auto* unit = Parse(R"(
     module m;

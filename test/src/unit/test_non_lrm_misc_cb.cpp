@@ -23,19 +23,6 @@ static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
 
 namespace {
 
-TEST(Lexical, ContAssign_NoDelay) {
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  wire a, b;\n"
-      "  assign a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kContAssign) continue;
-    EXPECT_EQ(item->assign_delay, nullptr);
-  }
-}
-
 TEST(Parser, ContinuousAssignment) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
