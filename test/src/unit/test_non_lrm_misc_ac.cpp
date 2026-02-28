@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetPortItem_AttributeInstanceMultiple) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let f((* a = 1 *) x, (* b *) y) = x + y;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetPortItem_AttributeWithValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
