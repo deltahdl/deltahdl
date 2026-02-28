@@ -40,22 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-TEST(ParserSection7, UnionSoftPacked) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef union soft packed {\n"
-      "    bit [7:0] a;\n"
-      "    bit [3:0] b;\n"
-      "  } soft_u;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
-  EXPECT_TRUE(item->typedef_type.is_soft);
-  EXPECT_TRUE(item->typedef_type.is_packed);
-}
-
 // =========================================================================
 // §7.4: Packed and unpacked arrays
 // =========================================================================

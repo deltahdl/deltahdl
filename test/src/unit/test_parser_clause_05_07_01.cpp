@@ -293,4 +293,14 @@ TEST(ParserA84, PrimaryLiteralOctalNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
+// § primary_literal — number (binary)
+TEST(ParserA84, PrimaryLiteralBinaryNumber) {
+  auto r = Parse("module m; initial x = 4'b1010; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
