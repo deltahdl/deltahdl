@@ -501,4 +501,24 @@ TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
+// =============================================================================
+// LRM section 9.4.5 / 10.4.2 -- Intra-assignment event (blocking posedge)
+// =============================================================================
+// Blocking intra-assignment event: a = @(posedge clk) b;
+TEST(ParserSection9, Sec9_4_5_BlockingIntraEventPosedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  initial a = @(posedge clk) b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  EXPECT_EQ(stmt->repeat_event_count, nullptr);
+}
+
 }  // namespace
