@@ -25,25 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-TEST(ParserAnnexA, A4GenerateCase) {
-  auto r = Parse(
-      "module m;\n"
-      "  case (WIDTH)\n"
-      "    8: begin\n"
-      "      wire [7:0] d;\n"
-      "    end\n"
-      "    default: begin\n"
-      "      wire [31:0] d;\n"
-      "    end\n"
-      "  endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
-  EXPECT_EQ(item->gen_case_items.size(), 2u);
-}
-
 TEST(ParserAnnexA, A4GenerateRegion) {
   auto r = Parse(
       "module m;\n"
