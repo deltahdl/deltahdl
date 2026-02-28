@@ -457,4 +457,15 @@ TEST(ParserSection6, Sec6_5_WireUnpackedDims) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
+TEST(ParserSection6, WireExplicitLogicType) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire logic [7:0] w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+}
+
 }  // namespace

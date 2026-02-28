@@ -41,17 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, WireExplicitLogicType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire logic [7:0] w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-}
-
 TEST(ParserSection6, TriregDefaultInit) {
   // §6.7.1: trireg defaults to value x.
   auto r = Parse(
