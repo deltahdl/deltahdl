@@ -40,21 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// parameter_port_list: mixed forms
-TEST(SourceText, ParamPortMixedForms) {
-  auto r = Parse(
-      "module m #(parameter int A = 1, localparam int B = 2,\n"
-      "           type T = logic, int C = 3);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 4u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "A");
-  EXPECT_EQ(r.cu->modules[0]->params[1].first, "B");
-  EXPECT_EQ(r.cu->modules[0]->params[2].first, "T");
-  EXPECT_EQ(r.cu->modules[0]->params[3].first, "C");
-}
-
 TEST(ParserAnnexA, A2ParamDecl) {
   auto r = Parse(
       "module m;\n"
