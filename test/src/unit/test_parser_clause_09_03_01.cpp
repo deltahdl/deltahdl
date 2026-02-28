@@ -143,4 +143,35 @@ TEST(ParserA602, Integration_InitialWithTimingAndAssign) {
   EXPECT_EQ(stmts[3]->kind, StmtKind::kEventControl);
 }
 
+static Stmt* InitialBody(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    return item->body;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// A.6.3 Parallel and sequential blocks
+// =============================================================================
+// ---------------------------------------------------------------------------
+// seq_block: begin...end
+// ---------------------------------------------------------------------------
+// §9.3.1: Basic sequential block
+TEST(ParserA603, SeqBlockBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->stmts.size(), 2u);
+}
+
 }  // namespace

@@ -22,29 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.6.3 Parallel and sequential blocks
-// =============================================================================
-// ---------------------------------------------------------------------------
-// seq_block: begin...end
-// ---------------------------------------------------------------------------
-// §9.3.1: Basic sequential block
-TEST(ParserA603, SeqBlockBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->stmts.size(), 2u);
-}
-
 // §9.3.1: Empty sequential block
 TEST(ParserA603, SeqBlockEmpty) {
   auto r = Parse(
