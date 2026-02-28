@@ -517,4 +517,35 @@ TEST(ParserSection9, SequentialBlockVarDecl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
+// =============================================================================
+// LRM section 9.3.1 -- ParseOk smoke tests for complex block scenarios.
+// =============================================================================
+TEST(ParserSection9, Sec9_3_1_MultipleSequentialBlocksInSameInitial) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin : first\n"
+      "      a = 1;\n"
+      "    end : first\n"
+      "    begin : second\n"
+      "      b = 2;\n"
+      "    end : second\n"
+      "    begin : third\n"
+      "      c = 3;\n"
+      "    end : third\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->stmts[0]->label, "first");
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->stmts[1]->label, "second");
+  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->stmts[2]->label, "third");
+}
+
 }  // namespace

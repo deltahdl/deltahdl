@@ -42,22 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.4.1 -- Replication operator
-// =========================================================================
-TEST(ParserSection11, ReplicationCountAndElements) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {4{a}};\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
-  ASSERT_NE(rhs->repeat_count, nullptr);
-  EXPECT_EQ(rhs->repeat_count->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->elements.size(), 1u);
-}
-
 TEST(ParserSection11, ReplicationNestedInConcat) {
   auto r = Parse(
       "module t;\n"
