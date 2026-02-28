@@ -103,4 +103,22 @@ TEST(Parser, PackageWithParam) {
   EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kParamDecl);
 }
 
+// =============================================================================
+// A.1.11 Package items
+// =============================================================================
+// package_item: package_or_generate_item_declaration — net/data/task/function
+TEST(SourceText, PackageOrGenerateItemDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  wire w;\n"
+      "  int x;\n"
+      "  function void f(); endfunction\n"
+      "  task t(); endtask\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_GE(r.cu->packages[0]->items.size(), 4u);
+}
+
 }  // namespace
