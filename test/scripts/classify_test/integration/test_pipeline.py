@@ -45,7 +45,7 @@ def _make_classifier_with_topic(_name, clause, topic):
 
 
 def _stub_externals(monkeypatch, tmp_path, classifier):
-    """Stub Claude CLI and CMake path."""
+    """Stub Claude CLI, CMake path, and commit_and_push."""
     monkeypatch.setattr(classify_test, "_call_claude", classifier)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
@@ -55,6 +55,10 @@ def _stub_externals(monkeypatch, tmp_path, classifier):
     monkeypatch.setattr(
         classify_test, "maybe_tick_issue_checkbox",
         lambda args, tests: None,
+    )
+    monkeypatch.setattr(
+        classify_test, "commit_and_push",
+        lambda changed, deleted, msg: None,
     )
 
 
@@ -68,6 +72,7 @@ def _run_pipeline(tmp_path, test, dry_run=False):
         test=test,
         issue=1,
         organization="test-org",
+        no_commit=False,
         repo="test-repo",
     ))
 
@@ -225,6 +230,7 @@ def test_self_named_source_not_treated_as_duplicate(tmp_path, monkeypatch):
         file=str(src), output_dir=str(tmp_path), dry_run=False,
         lrm=str(tmp_path / "lrm.txt"), test="Keeper",
         issue=1, organization="test-org", repo="test-repo",
+        no_commit=False,
     ))
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 

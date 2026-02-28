@@ -53,7 +53,7 @@ def stub_subprocess_failure(monkeypatch):
 
 
 def stub_classifier(monkeypatch, response):
-    """Stub _call_claude and maybe_tick_issue_checkbox for _run tests."""
+    """Stub _call_claude, maybe_tick_issue_checkbox, and commit_and_push."""
     monkeypatch.setattr(
         classify_test, "_call_claude",
         lambda p, schema=None: response,
@@ -61,4 +61,8 @@ def stub_classifier(monkeypatch, response):
     monkeypatch.setattr(
         classify_test, "maybe_tick_issue_checkbox",
         lambda args, tests: None,
+    )
+    monkeypatch.setattr(
+        classify_test, "commit_and_push",
+        lambda changed, deleted, msg: None,
     )

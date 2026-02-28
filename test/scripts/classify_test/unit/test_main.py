@@ -45,7 +45,7 @@ def _run_args(tmp_path, **overrides):
         "output_dir": str(tmp_path), "dry_run": False,
         "lrm": str(tmp_path / "lrm.txt"), "max_lines": None,
         "test": "T", "issue": None, "organization": None,
-        "repo": None,
+        "repo": None, "no_commit": False,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -106,6 +106,20 @@ def test_parse_args_max_lines_default(monkeypatch):
     """--max-lines defaults to None."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().max_lines is None
+
+
+def test_parse_args_no_commit(monkeypatch):
+    """Parses --no-commit flag."""
+    monkeypatch.setattr(
+        sys, "argv", [*_BASE_ARGV, "--no-commit"],
+    )
+    assert _parse_args().no_commit is True
+
+
+def test_parse_args_no_commit_default(monkeypatch):
+    """--no-commit defaults to False."""
+    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
+    assert _parse_args().no_commit is False
 
 
 # ---- _format_clause --------------------------------------------------------
@@ -773,6 +787,10 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier,
     monkeypatch.setattr(
         classify_test, "maybe_tick_issue_checkbox",
         lambda args, tests: None,
+    )
+    monkeypatch.setattr(
+        classify_test, "commit_and_push",
+        lambda changed, deleted, msg: None,
     )
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(

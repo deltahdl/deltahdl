@@ -25,6 +25,7 @@ from ._github import (
     tick_checkbox,
     update_issue_body,
 )
+from ._git import build_commit_message, commit_and_push
 from ._output import (
     print_classification_table,
     print_summary,
@@ -777,6 +778,8 @@ def _parse_args():
                         help="GitHub organization for the issue")
     parser.add_argument("--repo", required=True,
                         help="GitHub repository for the issue")
+    parser.add_argument("--no-commit", action="store_true",
+                        help="Skip git commit and push")
     return parser.parse_args()
 
 
@@ -987,6 +990,21 @@ def _run(args):
     print_summary(to_create, to_merge, test_name,
                    source_is_target, n_kept=n_kept,
                    n_removed=n_removed, n_others=n_others)
+    if not getattr(args, "no_commit", False):
+        test_dir = Path(args.output_dir).resolve()
+        changed = [test_dir / f"{n}.cpp" for n in new_names]
+        changed.extend(mp for mp, _ in to_merge)
+        changed.append(CMAKE_PATH)
+        deleted = []
+        if filepath.exists():
+            changed.append(filepath)
+        else:
+            deleted.append(filepath)
+        msg = build_commit_message(
+            target[0].test_name, target[0].clause,
+            target[0].rationale,
+        )
+        commit_and_push(changed, deleted, msg)
 
 
 def main():
