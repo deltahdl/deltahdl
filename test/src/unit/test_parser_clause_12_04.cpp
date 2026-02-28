@@ -212,4 +212,23 @@ TEST(ParserA606, IfElseWithBlocks) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
 }
 
+// If with begin-end block body (then-only).
+TEST(ParserSection12, IfBlockBodyThenOnly) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      x = 1;\n"
+      "      y = 2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
+}
+
 }  // namespace

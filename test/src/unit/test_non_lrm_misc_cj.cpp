@@ -53,25 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// If with begin-end block body (then-only).
-TEST(ParserSection12, IfBlockBodyThenOnly) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a) begin\n"
-      "      x = 1;\n"
-      "      y = 2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  ASSERT_NE(stmt->then_branch, nullptr);
-  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
-}
-
 // =============================================================================
 // LRM section 12.4.2 -- unique-if, unique0-if, priority-if (additional cases)
 // =============================================================================
