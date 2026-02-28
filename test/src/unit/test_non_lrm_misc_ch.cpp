@@ -69,27 +69,6 @@ static ModuleItem* FirstAlwaysCombItem(ParseResult11g& r) {
 
 namespace {
 
-// --- Bit-select on LHS of blocking assignment ---
-TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsBlocking) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] vec;\n"
-      "  initial vec[3] = 1'b1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  auto* lhs = FirstAssignLhs(r);
-  ASSERT_NE(lhs, nullptr);
-  EXPECT_EQ(lhs->kind, ExprKind::kSelect);
-  ASSERT_NE(lhs->base, nullptr);
-  EXPECT_EQ(lhs->base->kind, ExprKind::kIdentifier);
-  ASSERT_NE(lhs->index, nullptr);
-  EXPECT_EQ(lhs->index_end, nullptr);
-}
-
 // --- Part-select on LHS of blocking assignment ---
 TEST(ParserSection11, Sec11_4_1_PartSelectOnLhsBlocking) {
   auto r = Parse(

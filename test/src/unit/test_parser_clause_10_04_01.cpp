@@ -390,4 +390,67 @@ TEST(ParserSection10, Sec10_4_1_InIfElseBranches) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
+struct ParseResult11f {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static Expr* FirstAssignLhs(ParseResult11f& r) {
+  auto* stmt = FirstInitialStmt(r);
+  if (!stmt) return nullptr;
+  return stmt->lhs;
+}
+
+struct ParseResult11g {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11g Parse(const std::string& src) {
+  ParseResult11g result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult11g& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// --- Bit-select on LHS of blocking assignment ---
+TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsBlocking) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] vec;\n"
+      "  initial vec[3] = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  auto* lhs = FirstAssignLhs(r);
+  ASSERT_NE(lhs, nullptr);
+  EXPECT_EQ(lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(lhs->base, nullptr);
+  EXPECT_EQ(lhs->base->kind, ExprKind::kIdentifier);
+  ASSERT_NE(lhs->index, nullptr);
+  EXPECT_EQ(lhs->index_end, nullptr);
+}
+
 }  // namespace
