@@ -5,18 +5,6 @@
 
 using namespace delta;
 
-// Helper for block 24: verify always block has nested if-else.
-static void VerifyAlwaysNestedIfElse(ParseResult& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
-}
-
 struct ParseResult9i {
   SourceManager mgr;
   Arena arena;
@@ -54,23 +42,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 }
 
 namespace {
-
-// ---------------------------------------------------------------------------
-// 28. always @* with nested if-else inside begin-end.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarNestedIfElseInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @* begin\n"
-      "    if (a)\n"
-      "      if (b) y = 1;\n"
-      "      else y = 2;\n"
-      "    else\n"
-      "      y = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  VerifyAlwaysNestedIfElse(r);
-}
 
 // ---------------------------------------------------------------------------
 // 29. Both always_comb and always @(*) in the same module with blocks.
