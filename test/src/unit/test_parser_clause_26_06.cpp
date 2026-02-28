@@ -21,4 +21,18 @@ TEST(ParserA213, PackageExportMultipleItems) {
   EXPECT_GE(export_count, 2);
 }
 
+// =============================================================================
+// LRM section 26.6 -- Exporting from packages
+// =============================================================================
+TEST(ParserSection26, PackageExportWildcard) {
+  auto r = Parse(
+      "package p;\n"
+      "  export *::*;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kExportDecl));
+}
+
 }  // namespace
