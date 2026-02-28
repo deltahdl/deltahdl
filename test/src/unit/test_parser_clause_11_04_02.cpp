@@ -58,4 +58,18 @@ TEST(ParserA602, BlockingAssignment_PrefixInc) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kUnary);
 }
 
+TEST(ParserA602, BlockingAssignment_PrefixDec) {
+  // prefix dec: --j
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin --j; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kUnary);
+}
+
 }  // namespace
