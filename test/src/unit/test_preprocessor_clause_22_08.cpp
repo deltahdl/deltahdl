@@ -42,3 +42,13 @@ TEST(Preprocessor, DefaultNettypeTrireg) {
   Preprocess("`default_nettype trireg\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
+TEST(ParserSection6, DefaultNettypeAffectsImplicit) {
+  auto r = ParseWithPreprocessor(
+      "`default_nettype none\n"
+      "module m;\n"
+      "  wire w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+

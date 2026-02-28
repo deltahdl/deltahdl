@@ -63,16 +63,6 @@ TEST(ParserSection6, MatchingTypesSameSigningModifier) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, DefaultNettypeAffectsImplicit) {
-  auto r = ParseWithPreprocessor(
-      "`default_nettype none\n"
-      "module m;\n"
-      "  wire w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection6, TypedefForwardClass) {
   auto r = ParseWithPreprocessor(
       "typedef class MyClass;\n"
