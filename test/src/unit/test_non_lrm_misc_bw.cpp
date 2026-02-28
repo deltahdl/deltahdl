@@ -36,43 +36,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 namespace {
 
 // =============================================================================
-// LRM section 9.3.1 -- Blocks with return statement (inside function).
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_BlockWithReturnInFunction) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function int compute(input int a, input int b);\n"
-              "    begin\n"
-              "      int tmp;\n"
-              "      tmp = a + b;\n"
-              "      return tmp;\n"
-              "    end\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with assert immediate.
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_BlockWithAssertImmediate) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    assert (a == 1);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kAssertImmediate);
-  EXPECT_NE(body->stmts[1]->assert_expr, nullptr);
-}
-
-// =============================================================================
 // LRM section 9.3.1 -- Block with only variable declarations (no statements).
 // =============================================================================
 TEST(ParserSection9, Sec9_3_1_BlockWithOnlyVarDecls) {

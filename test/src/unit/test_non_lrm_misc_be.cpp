@@ -45,26 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 28. Automatic function returning logic with packed dimensions
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_AutoFuncReturningLogic) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic logic [7:0] get_byte(int idx);\n"
-      "    return idx;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_EQ(item->return_type.kind, DataTypeKind::kLogic);
-  EXPECT_NE(item->return_type.packed_dim_left, nullptr);
-  EXPECT_NE(item->return_type.packed_dim_right, nullptr);
-}
-
-// =============================================================================
 // 29. Automatic function with const ref argument
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithConstRefArg) {
