@@ -92,4 +92,19 @@ TEST(ParserA221, SigningSigned) {
   EXPECT_TRUE(r.cu->modules[0]->items[0]->data_type.is_signed);
 }
 
+// --- simple_type ---
+// integer_type | non_integer_type | ps_type_identifier |
+// ps_parameter_identifier (covered by casting_type and data_type tests above)
+// --- struct_union ---
+// struct | union [soft | tagged]
+TEST(ParserA221, StructUnionStruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct { int a; int b; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
+}
+
 }  // namespace
