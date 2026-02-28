@@ -49,4 +49,15 @@ TEST(ParserA70503, ScalarTimingCheckCondInequality) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
+// scalar_constant ::= 'b0
+TEST(ParserA70503, ScalarConstantUnsized_b0) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data &&& (en == 'b0), posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
