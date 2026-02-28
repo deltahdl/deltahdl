@@ -83,4 +83,29 @@ TEST(ParserClause03, Cl3_12_1_IncludeBecomesPartOfCU) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+// 5. Global visibility: modules, primitives, programs, interfaces, packages
+// are visible in all CUs.  Within a single CU, all are accessible.
+TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {
+  auto r = ParseWithPreprocessor(
+      "package pkg; endpackage\n"
+      "interface intf; endinterface\n"
+      "program prog; endprogram\n"
+      "module mod; endmodule\n"
+      "primitive udp_and(output o, input a, b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 0;\n"
+      "    1 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->udps.size(), 1u);
+}
+
 }  // namespace
