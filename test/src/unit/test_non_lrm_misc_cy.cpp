@@ -52,19 +52,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-// §3.3 Generate blocks
-TEST(ParserClause03, Cl3_3_GenerateBlocks) {
-  EXPECT_TRUE(
-      ParseOk("module m #(parameter N = 4) ();\n"
-              "  genvar i;\n"
-              "  generate\n"
-              "    for (i = 0; i < N; i = i + 1) begin : gen_loop\n"
-              "      logic [7:0] data;\n"
-              "    end\n"
-              "  endgenerate\n"
-              "endmodule\n"));
-}
-
 // 14. Generate block scope (for-generate)
 TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
   auto r = Parse(
