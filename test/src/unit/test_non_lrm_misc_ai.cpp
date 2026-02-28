@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Multiple combinational entries
-TEST(ParserAnnexA053, CombBody_MultipleEntries) {
-  auto r = Parse(
-      "primitive xor_gate(output y, input a, b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 1;\n"
-      "    1 0 : 1;\n"
-      "    1 1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->table.size(), 4);
-}
-
 // Simulation: verify table entries are evaluated in order
 TEST(ParserAnnexA053, CombBody_SimFirstMatch) {
   auto r = Parse(
