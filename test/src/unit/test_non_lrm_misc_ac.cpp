@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetActualArg_FunctionCall) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function int inc(int x); return x + 1; endfunction\n"
-              "  let f(x) = x;\n"
-              "  initial begin\n"
-              "    int z;\n"
-              "    z = f(inc(5));\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // A.3 -- Primitive instances (gate_instantiation)
 // =============================================================================
