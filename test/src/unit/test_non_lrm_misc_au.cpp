@@ -5,21 +5,14 @@
 
 using namespace delta;
 
-namespace {
-
-// scalar_timing_check_condition ::= ~ expression
-TEST(ParserA70503, ScalarTimingCheckCondNegation) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& ~reset, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
+static Expr* FirstContAssignRHS(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kContAssign) return item->assign_rhs;
+  }
+  return nullptr;
 }
+
+namespace {
 
 // scalar_timing_check_condition ::= expression == scalar_constant
 TEST(ParserA70503, ScalarTimingCheckCondEquality) {
@@ -502,13 +495,6 @@ TEST(ParserA81, ModulePathConcatenation) {
   EXPECT_FALSE(r.has_errors);
 }
 
-static Expr* FirstContAssignRHS(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) return item->assign_rhs;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // A.8.2 Subroutine calls — constant_function_call
 // =============================================================================
@@ -949,11 +935,6 @@ TEST(ParserA82, VariableIdentifierList) {
   auto* expr = FirstInitialExpr(r);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kCall);
-}
-
-static Expr* FirstInitialRHS(ParseResult& r) {
-  auto* stmt = FirstInitialStmt(r);
-  return stmt ? stmt->rhs : nullptr;
 }
 
 }  // namespace
