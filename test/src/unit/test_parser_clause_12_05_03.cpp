@@ -48,4 +48,25 @@ TEST(ParserSection4, Sec4_6_UniqueCaseOneMatch) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
+// =============================================================================
+// §4.6: unique0 case statement — at most one match
+// =============================================================================
+TEST(ParserSection4, Sec4_6_Unique0CaseAtMostOneMatch) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 case (sel)\n"
+      "      0: x = 1;\n"
+      "      1: x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
 }  // namespace
