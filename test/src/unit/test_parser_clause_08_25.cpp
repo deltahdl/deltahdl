@@ -48,4 +48,16 @@ TEST(ParserSection8, ParameterizedClassMultipleParams) {
   EXPECT_EQ(cls->params[1].first, "DEPTH");
 }
 
+TEST(ParserSection8, ParameterizedClassTypeParam) {
+  auto r = Parse(
+      "class container #(type T = int);\n"
+      "  T data;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "T");
+}
+
 }  // namespace
