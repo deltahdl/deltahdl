@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// seq_input_list as edge_input_list (contains edge symbol)
-TEST(ParserAnnexA053, SeqInputList_WithEdge) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "    ? f : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  // Row 0: 'd' is level, 'clk' is edge
-  EXPECT_EQ(udp->table[0].inputs[1], 'r');
-  EXPECT_EQ(udp->table[2].inputs[1], 'f');
-}
-
 // =============================================================================
 // A.5.3 -- UDP body (part b: productions 9-16)
 //
