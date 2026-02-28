@@ -59,4 +59,20 @@ TEST(ParserSection9c, ProcessSelfAssignment) {
               "endmodule\n"));
 }
 
+TEST(ParserSection9c, ProcessKillCall) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    process p;\n"
+              "    p = process::self();\n"
+              "    fork\n"
+              "      begin\n"
+              "        #100;\n"
+              "      end\n"
+              "    join_none\n"
+              "    p.kill();\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
