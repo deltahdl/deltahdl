@@ -37,4 +37,14 @@ TEST(Parser, NettypeUsedInDecl) {
   EXPECT_EQ(item->name, "x");
 }
 
+// §6.6.7: Nettype used to declare a net variable.
+TEST(ParserSection6, Sec6_6_7_NettypeUsedForNetDecl) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { real field1; bit field2; } T;\n"
+              "  nettype T wT;\n"
+              "  wT my_signal;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

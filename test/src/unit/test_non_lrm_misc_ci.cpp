@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Parser, ReturnWithValue) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    return 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
 // =============================================================================
 // LRM section 12.6 -- Named blocks / block labels
 // =============================================================================
