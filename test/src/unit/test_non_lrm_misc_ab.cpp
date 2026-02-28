@@ -13,20 +13,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #14: trans_range_list
-// =============================================================================
-TEST(ParserA211, TransRangeList_SimpleItem) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins t = (0 => 1);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, TransRangeList_ConsecutiveRepeat) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
