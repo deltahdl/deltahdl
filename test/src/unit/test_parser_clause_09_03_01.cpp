@@ -344,4 +344,53 @@ TEST(ParserSection9, Sec9_3_1_BlockWithSystemCalls) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kExprStmt);
 }
 
+TEST(ParserSection9, Sec9_3_1_BlockWithMixedBlockingNonblocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    temp = a + b;\n"
+      "    result <= temp;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
+}
+
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(ParserCh90301, BlockVarDecl_BuiltinType_Block) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->kind, ModuleItemKind::kInitialBlock);
+  auto* blk = item->body;
+  ASSERT_NE(blk, nullptr);
+  ASSERT_EQ(blk->kind, StmtKind::kBlock);
+  ASSERT_EQ(blk->stmts.size(), 1u);
+}
+
 }  // namespace

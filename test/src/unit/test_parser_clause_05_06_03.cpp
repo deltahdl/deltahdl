@@ -21,4 +21,20 @@ TEST(ParserA609, SystemTfCallEmptyParens) {
   EXPECT_TRUE(expr->args.empty());
 }
 
+// system_tf_call with arguments
+TEST(ParserA609, SystemTfCallWithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial $display(\"x=%0d\", x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(expr->callee, "$display");
+  EXPECT_EQ(expr->args.size(), 2u);
+}
+
 }  // namespace

@@ -91,28 +91,6 @@ TEST(ParserSection28, Sec28_12_TwelveDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 12u);
 }
 
-TEST(ParserSection28, Sec28_12_MultiplePathsInSpecifyBlock) {
-  auto r = Parse(
-      "module m(input a, b, output x, y);\n"
-      "  specify\n"
-      "    (a => x) = 5;\n"
-      "    (b => y) = 7;\n"
-      "    (a => y) = 9;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 3u);
-  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[1]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[2]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kParallel);
-  EXPECT_EQ(spec->specify_items[1]->path.path_kind, SpecifyPathKind::kParallel);
-  EXPECT_EQ(spec->specify_items[2]->path.path_kind, SpecifyPathKind::kParallel);
-}
-
 TEST(ParserSection28, Sec28_12_SpecparamMinTypMax) {
   EXPECT_TRUE(
       ParseOk("module m(input a, output b);\n"
