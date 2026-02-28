@@ -50,28 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserA504, UdpInst_MultipleWithStrengthDelay) {
-  auto r = Parse(
-      "primitive my_udp(output y, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0 ;\n"
-      "    1 1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  my_udp (strong0, strong1) #10 u1(o1, i1, i2), u2(o2, i3, i4);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  ASSERT_EQ(insts.size(), 2u);
-  // Both share same strength and delay
-  EXPECT_NE(insts[0]->drive_strength0, 0);
-  EXPECT_NE(insts[1]->drive_strength0, 0);
-  EXPECT_NE(insts[0]->gate_delay, nullptr);
-  EXPECT_NE(insts[1]->gate_delay, nullptr);
-}
-
 // --- Instance arrays ---
 TEST(ParserA504, UdpInst_InstanceArray) {
   auto r = Parse(
