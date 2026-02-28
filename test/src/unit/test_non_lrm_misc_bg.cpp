@@ -111,11 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_SizedDecimal) {
-  // 5'D 3 is a 5-bit decimal number.
-  EXPECT_TRUE(ParseOk("module m; initial x = 5'D3; endmodule"));
-}
-
 TEST(ParserCh50701, IntLiteral_SpaceBetweenBaseAndDigits) {
   // Space between base format and unsigned number is legal.
   EXPECT_TRUE(ParseOk("module m; initial x = 32 'h 12ab_f001; endmodule"));

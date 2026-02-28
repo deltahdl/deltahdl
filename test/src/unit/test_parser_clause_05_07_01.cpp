@@ -241,4 +241,9 @@ TEST(ParserCh50701, IntLiteral_NegativeUnsized) {
   EXPECT_TRUE(ParseOk("module m; initial x = -8'd6; endmodule"));
 }
 
+TEST(ParserCh50701, IntLiteral_SizedDecimal) {
+  // 5'D 3 is a 5-bit decimal number.
+  EXPECT_TRUE(ParseOk("module m; initial x = 5'D3; endmodule"));
+}
+
 }  // namespace

@@ -40,20 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-TEST(ParserSection7, StructMemberUnpackedDim) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct {\n"
-      "    byte data[4];\n"
-      "  } packet;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->typedef_type.struct_members.size(), 1u);
-  EXPECT_FALSE(item->typedef_type.struct_members[0].unpacked_dims.empty());
-}
-
 // =========================================================================
 // §7.3: Unions
 // =========================================================================
