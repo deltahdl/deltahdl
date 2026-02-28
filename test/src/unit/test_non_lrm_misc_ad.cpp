@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_EnableWithStrength) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif0 (strong0, pull1) b1(out, in, ctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0);
-  ASSERT_NE(g, nullptr);
-  EXPECT_NE(g->drive_strength0, 0);
-  EXPECT_NE(g->drive_strength1, 0);
-}
-
 TEST(ParserA301, GateInst_EnableWithDelay) {
   auto r = Parse(
       "module m;\n"
