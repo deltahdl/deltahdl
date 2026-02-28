@@ -66,4 +66,25 @@ TEST(ParserA504, UdpInst_BasicNamed) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 3u);
 }
 
+// --- Unnamed UDP instance ---
+TEST(ParserA504, UdpInst_Unnamed) {
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_udp (out, in1, in2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto insts = FindUdpInsts(r.cu->modules[0]->items);
+  ASSERT_EQ(insts.size(), 1u);
+  EXPECT_EQ(insts[0]->inst_module, "my_udp");
+  EXPECT_TRUE(insts[0]->gate_inst_name.empty());
+  EXPECT_EQ(insts[0]->gate_terminals.size(), 3u);
+}
+
 }  // namespace
