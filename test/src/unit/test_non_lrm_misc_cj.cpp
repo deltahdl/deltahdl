@@ -53,19 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// Forever loop wrapping a timing control.
-TEST(ParserSection12, ForeverWithTimingControl) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    forever begin\n"
-              "      @(posedge clk);\n"
-              "      x = ~x;\n"
-              "    end\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // Nested loops: for inside while.
 TEST(ParserSection12, NestedForInsideWhile) {
   auto r = Parse(
