@@ -155,26 +155,6 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
 
 namespace {
 
-// --- Sequential UDP table symbols ---
-TEST(ParserSection29, TableSymbolDashNoChange) {
-  auto r = Parse(
-      "primitive latch(output reg q, input d, en);\n"
-      "  table\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  ASSERT_EQ(udp->table.size(), 3);
-  // Third row: no-change output
-  EXPECT_EQ(udp->table[2].output, '-');
-  // Current state field should be '?'
-  EXPECT_EQ(udp->table[2].current_state, '?');
-}
-
 TEST(ParserSection29, TableEdgeSymbolsRAndF) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"

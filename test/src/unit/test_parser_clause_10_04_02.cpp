@@ -404,4 +404,41 @@ TEST(ParserSection4, Sec4_5_NonblockingAssignInAlways) {
   EXPECT_NE(item->body->rhs, nullptr);
 }
 
+// --- 17. Nonblocking to struct member: s.field <= val ---
+TEST(ParserSection10, Sec10_4_2_StructMemberLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    s.field <= 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+// --- 18. Nonblocking to array element: mem[idx] <= data ---
+TEST(ParserSection10, Sec10_4_2_ArrayElementLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] mem [0:255];\n"
+      "  initial begin\n"
+      "    mem[0] <= 8'hAB;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
