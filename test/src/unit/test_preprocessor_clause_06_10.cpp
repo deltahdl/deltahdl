@@ -31,4 +31,13 @@ TEST(ParserSection6, ImplicitNetInContAssign) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection6, ImplicitNetInModuleInst) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  sub u1(.a(w1), .b(w2));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

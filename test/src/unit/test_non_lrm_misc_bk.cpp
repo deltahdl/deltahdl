@@ -63,15 +63,6 @@ TEST(ParserSection6, MatchingTypesSameSigningModifier) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, ImplicitNetInModuleInst) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  sub u1(.a(w1), .b(w2));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection6, DefaultNettypeAffectsImplicit) {
   auto r = ParseWithPreprocessor(
       "`default_nettype none\n"
