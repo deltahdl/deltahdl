@@ -77,4 +77,20 @@ TEST(ParserAnnexA051, ManyInputs) {
   ASSERT_EQ(udp->table[0].inputs.size(), 5u);
 }
 
+// --- udp_declaration: endprimitive with end label on sequential ---
+TEST(ParserAnnexA051, EndLabelSequential) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, input clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive : dff\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->udps[0]->name, "dff");
+  EXPECT_TRUE(r.cu->udps[0]->is_sequential);
+}
+
 }  // namespace
