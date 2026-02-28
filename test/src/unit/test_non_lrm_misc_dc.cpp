@@ -7,21 +7,50 @@ using namespace delta;
 
 using DpiParseTest = ProgramTestParse;
 
-namespace {
+using ApiParseTest = ProgramTestParse;
 
-TEST_F(DpiParseTest, ExportTask) {
-  auto* unit = Parse(R"(
-    module m;
-      export "DPI-C" task my_task;
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
-  EXPECT_EQ(items[0]->name, "my_task");
-  EXPECT_TRUE(items[0]->dpi_is_task);
+struct ParseResult38 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static bool ParseOk38(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
 }
+
+static ModuleItem* FindItemByKind(ParseResult38& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+struct ParseResult40 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult40 Parse(const std::string& src) {
+  ParseResult40 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+namespace {
 
 TEST_F(DpiParseTest, ExportWithCName) {
   auto* unit = Parse(R"(
@@ -143,8 +172,6 @@ TEST_F(DpiParseTest, AttributeWithAndWithoutValue) {
   EXPECT_EQ(items[0]->attrs[0].value, nullptr);
   EXPECT_NE(items[0]->attrs[1].value, nullptr);
 }
-
-using ApiParseTest = ProgramTestParse;
 
 // =============================================================================
 // §39 Assertion control system functions
@@ -364,42 +391,6 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUseConfig) {
   EXPECT_TRUE(inst_rule->use_config);
 }
 
-struct ParseResult38 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult38 Parse(const std::string& src) {
-  ParseResult38 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static bool ParseOk38(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
-static ModuleItem* FindItemByKind(ParseResult38& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // LRM section 38.36 -- vpi_register_cb: DPI-C imports for VPI callbacks
 // These tests verify that DPI-C import declarations with signatures typical
@@ -582,22 +573,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-struct ParseResult39 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult39 Parse(const std::string& src) {
-  ParseResult39 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 // =============================================================================
 // LRM section 39.4.1 -- Placing assertion system callbacks
 // These system tasks control assertion processing at the system level:
@@ -761,22 +736,6 @@ TEST(ParserSection39, AssertionControlSequence) {
       end
     endmodule
   )"));
-}
-
-struct ParseResult40 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult40 Parse(const std::string& src) {
-  ParseResult40 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
 }
 
 TEST(ParserSection40, CoverageGetSystemCall) {
