@@ -366,4 +366,30 @@ TEST(ParserSection10, OperatorAssignGtGtEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
+TEST(ParserSection10, OperatorAssignLtLtLtEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <<<= 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection10, OperatorAssignGtGtGtEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a >>>= 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace

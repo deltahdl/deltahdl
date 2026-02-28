@@ -38,4 +38,12 @@ TEST(ParserSection21, SformatBasic) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, SformatNoExtraArgs) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  string s;\n"
+              "  initial $sformat(s, \"no args here\");\n"
+              "endmodule\n"));
+}
+
 }  // namespace
