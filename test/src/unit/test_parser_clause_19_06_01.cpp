@@ -187,4 +187,20 @@ TEST(ParserA211, SelectCondition_BinsofIntersect) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// §A.2.11 Production #26: bins_expression
+// =============================================================================
+TEST(ParserA211, BinsExpression_Variable) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      bins sel = binsof(cp1);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
