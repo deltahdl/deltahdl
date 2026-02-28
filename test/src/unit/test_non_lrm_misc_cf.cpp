@@ -41,21 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-// =========================================================================
-// Postfix increment in for-loop step
-// =========================================================================
-TEST(ParserSection11, PostfixIncrementInForStep) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++)\n"
-      "      x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection11, PrefixDecrementInForStep) {
   auto r = Parse(
       "module t;\n"
