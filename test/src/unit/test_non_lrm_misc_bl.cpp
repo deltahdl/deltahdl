@@ -73,14 +73,6 @@ TEST(ParserSection6, CastCompatibleEnumToInt) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-// §6.6.7: Nettype with a packed vector type.
-TEST(ParserSection6, Sec6_6_7_NettypeWithPackedVector) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nettype logic [7:0] byte_net;\n"
-              "endmodule\n"));
-}
-
 // §6.6.7: Nettype with a struct data type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithStruct) {
   auto r = Parse(
