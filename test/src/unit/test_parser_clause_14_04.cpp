@@ -138,4 +138,24 @@ TEST(ParserSection14, ClockingBlockEventOutputNegedgeSkew) {
   ASSERT_NE(out_sig.skew_delay, nullptr);
 }
 
+// =============================================================================
+// A.6.11 clocking_skew — edge_identifier only (posedge)
+// =============================================================================
+TEST(ParserA611, ClockingSkewEdgeOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output posedge ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  auto& sig = item->clocking_signals[0];
+  EXPECT_EQ(sig.skew_edge, Edge::kPosedge);
+  EXPECT_EQ(sig.skew_delay, nullptr);
+}
+
 }  // namespace
