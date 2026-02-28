@@ -231,4 +231,13 @@ TEST(ParserA211, CoverGroup_InPackage) {
               "endpackage\n"));
 }
 
+TEST(ParserA211, CoverGroup_NegedgeEvent) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg @(negedge rst_n);\n"
+              "    coverpoint state;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
