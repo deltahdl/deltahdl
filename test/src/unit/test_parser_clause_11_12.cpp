@@ -252,4 +252,15 @@ TEST(ParserA212, LetExpr_NoArgs) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetExpr_EmptyParens) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let val() = 42;\n"
+              "  initial begin\n"
+              "    int z;\n"
+              "    z = val();\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
