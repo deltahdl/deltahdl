@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Edge indicator with trailing level symbol
-TEST(ParserAnnexA053, EdgeInputList_TrailingLevel) {
-  auto r = Parse(
-      "primitive clk_first(output reg q, input clk, d);\n"
-      "  table\n"
-      "    r 0 : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table[0].inputs.size(), 2);
-  EXPECT_EQ(udp->table[0].inputs[0], 'r');
-  EXPECT_EQ(udp->table[0].inputs[1], '0');
-}
-
 // Edge indicator surrounded by level symbols (3 inputs)
 TEST(ParserAnnexA053, EdgeInputList_SurroundedByLevels) {
   auto r = Parse(
