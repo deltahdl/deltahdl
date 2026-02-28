@@ -13,14 +13,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-TEST(ParserA211, CovergroupDecl_WithEmptyPortList) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg();\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CoverageSpecOrOption_CoverSpec) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

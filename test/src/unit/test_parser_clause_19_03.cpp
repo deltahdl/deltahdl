@@ -160,4 +160,12 @@ TEST(ParserAnnexA, A2CovergroupDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserA211, CovergroupDecl_WithEmptyPortList) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg();\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
