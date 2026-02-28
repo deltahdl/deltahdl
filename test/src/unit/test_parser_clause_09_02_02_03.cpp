@@ -283,4 +283,28 @@ TEST(ParserSection4, Sec4_6_AlwaysLatchIfNoElse) {
   EXPECT_EQ(item->body->else_branch, nullptr);
 }
 
+// ---------------------------------------------------------------------------
+// 8. Bit select on LHS of assignment.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_BitSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic en;\n"
+      "  logic [7:0] q, d;\n"
+      "  always_latch\n"
+      "    if (en) q[3] <= d[3];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  auto* if_stmt = item->body;
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  ASSERT_NE(if_stmt->then_branch, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(if_stmt->then_branch->lhs, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace
