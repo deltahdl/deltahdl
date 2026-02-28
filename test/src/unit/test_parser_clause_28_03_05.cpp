@@ -33,4 +33,35 @@ TEST(ParserAnnexA0412, InterfaceInstArray) {
   EXPECT_NE(item->inst_range_right, nullptr);
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// --- Instance arrays (LRM §23.3.2) ---
+TEST(ParserSection23, InstanceArrayKind) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub inst[3:0] (.a(a), .b(b));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "sub");
+  EXPECT_EQ(item->inst_name, "inst");
+}
+
 }  // namespace

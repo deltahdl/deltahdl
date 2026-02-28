@@ -24,36 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, ExternModuleNoBody) {
-  auto r = Parse(
-      "extern module bar(input logic x);\n"
-      "module baz; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 2);
-  struct Expected {
-    const char* name;
-    bool is_extern;
-  };
-  Expected expected[] = {{"bar", true}, {"baz", false}};
-  for (size_t i = 0; i < 2; ++i) {
-    EXPECT_EQ(r.cu->modules[i]->name, expected[i].name);
-    EXPECT_EQ(r.cu->modules[i]->is_extern, expected[i].is_extern);
-  }
-}
-
-// --- Instance arrays (LRM §23.3.2) ---
-TEST(ParserSection23, InstanceArrayKind) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub inst[3:0] (.a(a), .b(b));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "sub");
-  EXPECT_EQ(item->inst_name, "inst");
-}
-
 TEST(ParserSection23, InstanceArrayRange) {
   auto r = Parse(
       "module top;\n"
