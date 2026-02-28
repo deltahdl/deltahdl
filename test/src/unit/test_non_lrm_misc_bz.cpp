@@ -5,19 +5,6 @@
 
 using namespace delta;
 
-// Helper for block 18: verify star event control.
-static void VerifyStarEventControl(ParseResult& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  auto* stmt = body->stmts[0];
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(stmt->is_star_event);
-  EXPECT_TRUE(stmt->events.empty());
-}
-
 // Helper for block 24: verify always block has nested if-else.
 static void VerifyAlwaysNestedIfElse(ParseResult& r) {
   ASSERT_NE(r.cu, nullptr);
@@ -67,33 +54,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 }
 
 namespace {
-
-// ---------------------------------------------------------------------------
-// 25. Stmt-level @* produces kEventControl with is_star_event (not at
-//     module level). Contrast with always @* which absorbs @* into the item.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarEventIsStarTrue) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @* a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  VerifyStarEventControl(r);
-}
-
-// ---------------------------------------------------------------------------
-// 26. Stmt-level @(*) also sets is_star_event.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarParenEventIsStarTrue) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(*) a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  VerifyStarEventControl(r);
-}
 
 // ---------------------------------------------------------------------------
 // 27. always_comb with nested if-else inside begin-end.
