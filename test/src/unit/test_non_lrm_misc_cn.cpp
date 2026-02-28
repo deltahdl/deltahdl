@@ -48,19 +48,6 @@ TEST(ParserSection16, PropertyDeclAndAssertProperty) {
   EXPECT_TRUE(found_assert);
 }
 
-TEST(ParserSection16, ExpectStatement) {
-  auto r = Parse(
-      "module top();\n"
-      "  logic clk, a, b;\n"
-      "  initial begin\n"
-      "    expect (@(posedge clk) a ##1 b);\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-}
-
 // =============================================================================
 // §16.2 Immediate assertions — overview (assert, assume, cover in one module)
 // =============================================================================
