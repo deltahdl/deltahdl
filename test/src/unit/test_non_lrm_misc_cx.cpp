@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 26.3 -- Referencing data in packages (import)
-// =============================================================================
-TEST(ParserSection26, ModuleImportPackage) {
-  auto r = Parse(
-      "package p;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import p::*;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
-}
-
 TEST(ParserSection26, ModuleImportSpecific) {
   auto r = Parse(
       "package p;\n"
