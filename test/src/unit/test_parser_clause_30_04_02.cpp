@@ -103,4 +103,19 @@ TEST(ParserA703, InputTerminalBitSelect) {
   EXPECT_EQ(si->path.src_ports[0].range_right, nullptr);
 }
 
+TEST(ParserA701, SpecifyItemPathDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
+}
+
 }  // namespace
