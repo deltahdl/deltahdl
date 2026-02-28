@@ -541,4 +541,26 @@ TEST(ParserSection9, Sec9_4_5_NonblockingIntraEventNegedge) {
   EXPECT_EQ(stmt->repeat_event_count, nullptr);
 }
 
+// =============================================================================
+// LRM section 9.4.5 -- Repeat event with multiple events (or)
+// =============================================================================
+// Repeat event with multiple events: a = repeat(3) @(posedge clk or negedge
+// rst) b;
+TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsOr) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, rst, a, b;\n"
+      "  initial a = repeat(3) @(posedge clk or negedge rst) b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_EQ(stmt->events.size(), 2u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
+}
+
 }  // namespace
