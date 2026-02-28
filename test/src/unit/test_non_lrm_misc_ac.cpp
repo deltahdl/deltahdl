@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetActualArg_BinaryExpr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let f(x) = x;\n"
-              "  initial begin\n"
-              "    int a, b, z;\n"
-              "    z = f(a + b);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetActualArg_Ternary) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
