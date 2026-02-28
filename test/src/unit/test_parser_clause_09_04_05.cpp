@@ -404,4 +404,24 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountExpression) {
   EXPECT_EQ(stmt->repeat_event_count->kind, ExprKind::kBinary);
 }
 
+// =============================================================================
+// LRM section 9.4.5 -- Repeat count of 1
+// =============================================================================
+// Repeat count of 1: a = repeat(1) @(posedge clk) b;
+TEST(ParserSection9, Sec9_4_5_RepeatCountOne) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  initial a = repeat(1) @(posedge clk) b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
