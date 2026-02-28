@@ -139,4 +139,22 @@ TEST(ParserSection9c, StatementLabelOnCase) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
 
+// §9.3.5: Statement label on begin-end block
+TEST(ParserA603, SeqBlockWithStatementLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    labelA: begin\n"
+      "      a = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->label, "labelA");
+}
+
 }  // namespace
