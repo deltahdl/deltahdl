@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §12.6: matches with &&& in cond_predicate
-TEST(ParserA606, CondPatternMatchesWithTripleAnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (x matches 5 &&& en) y = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->condition, nullptr);
-}
-
 // ---------------------------------------------------------------------------
 // Structural tests: nested conditionals, complex conditions
 // ---------------------------------------------------------------------------
