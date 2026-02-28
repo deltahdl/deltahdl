@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, MosSwitchInst_Named) {
-  auto r = Parse(
-      "module m;\n"
-      "  pmos p1(out, in, gate);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_inst_name, "p1");
-}
-
 // =============================================================================
 // A.3.1 Production #5: n_input_gate_instance
 // n_input_gate_instance ::= [name_of_instance]

@@ -76,4 +76,15 @@ TEST(ParserA301, MosSwitchInst_Unnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
+TEST(ParserA301, MosSwitchInst_Named) {
+  auto r = Parse(
+      "module m;\n"
+      "  pmos p1(out, in, gate);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPmos);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_inst_name, "p1");
+}
+
 }  // namespace
