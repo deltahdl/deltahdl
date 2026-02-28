@@ -298,4 +298,52 @@ TEST(ParserA84, RangeExpressionPartSelect) {
   EXPECT_NE(rhs->index_end, nullptr);
 }
 
+struct ParseResult7e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult7e Parse(const std::string& src) {
+  ParseResult7e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult7e& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+// --- Packed struct bit-select ---
+TEST(ParserSection7, Sec7_2_1_PackedBitSelect) {
+  auto r = Parse(
+      "module t;\n"
+      "  struct packed {\n"
+      "    bit [7:0] a;\n"
+      "    bit [7:0] b;\n"
+      "  } s;\n"
+      "  initial x = s[0];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace

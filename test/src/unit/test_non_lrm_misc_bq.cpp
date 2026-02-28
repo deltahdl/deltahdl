@@ -60,43 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// --- Packed struct member access on LHS ---
-TEST(ParserSection7, Sec7_2_1_PackedMemberAccessWrite) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct packed {\n"
-      "    logic [7:0] hi;\n"
-      "    logic [7:0] lo;\n"
-      "  } s;\n"
-      "  initial s.hi = 8'hFF;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
-}
-
-// --- Packed struct bit-select ---
-TEST(ParserSection7, Sec7_2_1_PackedBitSelect) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct packed {\n"
-      "    bit [7:0] a;\n"
-      "    bit [7:0] b;\n"
-      "  } s;\n"
-      "  initial x = s[0];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
-}
-
 // --- Packed struct assigned from concatenation ---
 TEST(ParserSection7, Sec7_2_1_PackedAssignFromConcat) {
   auto r = Parse(
