@@ -99,4 +99,15 @@ TEST(ParserA304, NOutputGatetype_Buf) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
+TEST(ParserA304, NOutputGatetype_Not) {
+  auto r = Parse(
+      "module m;\n"
+      "  not (out, in);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNot);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
 }  // namespace

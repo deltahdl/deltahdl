@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA304, NOutputGatetype_Not) {
-  auto r = Parse(
-      "module m;\n"
-      "  not (out, in);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNot);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
 // =============================================================================
 // A.3.4 Production #6: pass_en_switchtype ::= tranif0 | tranif1 | rtranif1 |
 // rtranif0
