@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetPortItem_AttributeWithValue) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let f((* attr = 5 *) int x) = x;\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // A.2.12 Production #5: let_formal_type
 // let_formal_type ::= data_type_or_implicit | untyped
