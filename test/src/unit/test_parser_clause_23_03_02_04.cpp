@@ -104,4 +104,17 @@ TEST(ParserSection23, WildcardConnection) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
+TEST(ParserSection23, WildcardWithNamed) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub m1(.*, .clk(sys_clk));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_TRUE(item->inst_wildcard);
+  ASSERT_EQ(item->inst_ports.size(), 1);
+  EXPECT_EQ(item->inst_ports[0].first, "clk");
+}
+
 }  // namespace

@@ -36,19 +36,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, WildcardWithNamed) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub m1(.*, .clk(sys_clk));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_TRUE(item->inst_wildcard);
-  ASSERT_EQ(item->inst_ports.size(), 1);
-  EXPECT_EQ(item->inst_ports[0].first, "clk");
-}
-
 // --- Extern module declarations (LRM §23.2.1) ---
 TEST(ParserSection23, ExternModuleHeader) {
   auto r = Parse("extern module foo(input logic a, output logic b);\n");
