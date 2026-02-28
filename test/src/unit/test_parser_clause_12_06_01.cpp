@@ -29,4 +29,23 @@ TEST(ParserA60701, PatternConstantExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// ---------------------------------------------------------------------------
+// pattern ::= tagged member_identifier [ pattern ]
+// ---------------------------------------------------------------------------
+// §12.6: tagged union pattern
+TEST(ParserA60701, PatternTagged) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(v) matches\n"
+      "      tagged Valid .n: x = n;\n"
+      "      tagged Invalid: x = 0;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

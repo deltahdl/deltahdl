@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// pattern ::= tagged member_identifier [ pattern ]
-// ---------------------------------------------------------------------------
-// §12.6: tagged union pattern
-TEST(ParserA60701, PatternTagged) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case(v) matches\n"
-      "      tagged Valid .n: x = n;\n"
-      "      tagged Invalid: x = 0;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §12.6: tagged pattern with nested assignment pattern
 TEST(ParserA60701, PatternTaggedWithAssignmentPattern) {
   auto r = Parse(
