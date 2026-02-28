@@ -92,4 +92,18 @@ TEST(ParserAnnexA042, GenerateRegionEmpty) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
+// --- generate_region: multiple generate_items ---
+TEST(ParserAnnexA042, GenerateRegionMultipleItems) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    wire a;\n"
+      "    wire b;\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
 }  // namespace
