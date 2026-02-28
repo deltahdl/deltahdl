@@ -13,8 +13,8 @@ _run = getattr(classify_file, "_run")
 
 
 _ARGS_DEFAULTS = {
-    "issue": None, "organization": None, "repo": None,
-    "dry_run": False, "no_commit": False, "max_lines": None,
+    "issue": 99, "organization": "testorg", "repo": "testrepo",
+    "dry_run": False, "no_commit": False, "max_lines": 1000,
 }
 
 

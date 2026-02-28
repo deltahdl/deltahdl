@@ -30,19 +30,15 @@ def _build_command(
         "--output-dir", args.output_dir,
         "--lrm", args.lrm,
         "--test", test_name,
+        "--issue", str(args.issue),
+        "--organization", args.organization,
+        "--repo", args.repo,
+        "--max-lines", str(args.max_lines),
     ]
-    if args.issue is not None:
-        cmd.extend(["--issue", str(args.issue)])
-    if args.organization is not None:
-        cmd.extend(["--organization", args.organization])
-    if args.repo is not None:
-        cmd.extend(["--repo", args.repo])
     if args.dry_run:
         cmd.append("--dry-run")
     if args.no_commit:
         cmd.append("--no-commit")
-    if args.max_lines is not None:
-        cmd.extend(["--max-lines", str(args.max_lines)])
     return cmd
 
 
@@ -86,6 +82,7 @@ def print_summary(
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
+        prog="classify_file",
         description="Batch-classify all tests in a file.",
     )
     parser.add_argument(
@@ -101,15 +98,15 @@ def _parse_args() -> argparse.Namespace:
         help="Path to IEEE 1800-2023 LRM text file",
     )
     parser.add_argument(
-        "--issue", type=int, default=None,
+        "--issue", type=int, required=True,
         help="GitHub issue number to update",
     )
     parser.add_argument(
-        "--organization", default=None,
+        "--organization", required=True,
         help="GitHub organization for the issue",
     )
     parser.add_argument(
-        "--repo", default=None,
+        "--repo", required=True,
         help="GitHub repository for the issue",
     )
     parser.add_argument(
@@ -121,7 +118,7 @@ def _parse_args() -> argparse.Namespace:
         help="Skip git commit and push",
     )
     parser.add_argument(
-        "--max-lines", type=int, default=None,
+        "--max-lines", type=int, required=True,
         help="Maximum lines per output file",
     )
     return parser.parse_args()

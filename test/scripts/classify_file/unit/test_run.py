@@ -28,6 +28,10 @@ _BASE_ARGV = [
     "prog", "--file", "f.cpp",
     "--output-dir", "/out",
     "--lrm", "/lrm.txt",
+    "--issue", "99",
+    "--organization", "testorg",
+    "--repo", "testrepo",
+    "--max-lines", "1000",
 ]
 
 
@@ -37,12 +41,12 @@ def _make_args(**overrides):
         "file": "/path/to/test.cpp",
         "output_dir": "/out",
         "lrm": "/lrm.txt",
-        "issue": None,
-        "organization": None,
-        "repo": None,
+        "issue": 99,
+        "organization": "testorg",
+        "repo": "testrepo",
         "dry_run": False,
         "no_commit": False,
-        "max_lines": None,
+        "max_lines": 1000,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -54,12 +58,12 @@ def _make_run_args(tmp_path, **overrides):
         "file": str(tmp_path / "test_input.cpp"),
         "output_dir": str(tmp_path),
         "lrm": str(tmp_path / "lrm.txt"),
-        "issue": None,
-        "organization": None,
-        "repo": None,
+        "issue": 99,
+        "organization": "testorg",
+        "repo": "testrepo",
         "dry_run": False,
         "no_commit": False,
-        "max_lines": None,
+        "max_lines": 1000,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -86,6 +90,16 @@ def test_parse_args_lrm(monkeypatch):
     assert _parse_args().lrm == "/lrm.txt"
 
 
+def test_parse_args_prog_name(monkeypatch, capsys):
+    """Usage line shows 'classify_file' as program name."""
+    monkeypatch.setattr(sys, "argv", ["prog", "--help"])
+    try:
+        _parse_args()
+    except SystemExit:
+        pass
+    assert "classify_file" in capsys.readouterr().out
+
+
 def test_parse_args_issue(monkeypatch):
     """Parses --issue as integer."""
     monkeypatch.setattr(
@@ -94,10 +108,13 @@ def test_parse_args_issue(monkeypatch):
     assert _parse_args().issue == 42
 
 
-def test_parse_args_issue_default(monkeypatch):
-    """Defaults --issue to None when not provided."""
-    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().issue is None
+def test_parse_args_issue_required(monkeypatch):
+    """Rejects missing --issue flag."""
+    argv = [v for i, v in enumerate(_BASE_ARGV)
+            if _BASE_ARGV[max(0, i - 1)] != "--issue" and v != "--issue"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        _parse_args()
 
 
 def test_parse_args_organization(monkeypatch):
@@ -108,10 +125,14 @@ def test_parse_args_organization(monkeypatch):
     assert _parse_args().organization == "myorg"
 
 
-def test_parse_args_organization_default(monkeypatch):
-    """Defaults --organization to None when not provided."""
-    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().organization is None
+def test_parse_args_organization_required(monkeypatch):
+    """Rejects missing --organization flag."""
+    argv = [v for i, v in enumerate(_BASE_ARGV)
+            if _BASE_ARGV[max(0, i - 1)] != "--organization"
+            and v != "--organization"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        _parse_args()
 
 
 def test_parse_args_repo(monkeypatch):
@@ -122,10 +143,14 @@ def test_parse_args_repo(monkeypatch):
     assert _parse_args().repo == "myrepo"
 
 
-def test_parse_args_repo_default(monkeypatch):
-    """Defaults --repo to None when not provided."""
-    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().repo is None
+def test_parse_args_repo_required(monkeypatch):
+    """Rejects missing --repo flag."""
+    argv = [v for i, v in enumerate(_BASE_ARGV)
+            if _BASE_ARGV[max(0, i - 1)] != "--repo"
+            and v != "--repo"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        _parse_args()
 
 
 def test_parse_args_dry_run(monkeypatch):
@@ -164,10 +189,14 @@ def test_parse_args_max_lines(monkeypatch):
     assert _parse_args().max_lines == 500
 
 
-def test_parse_args_max_lines_default(monkeypatch):
-    """Defaults --max-lines to None."""
-    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().max_lines is None
+def test_parse_args_max_lines_required(monkeypatch):
+    """Rejects missing --max-lines flag."""
+    argv = [v for i, v in enumerate(_BASE_ARGV)
+            if _BASE_ARGV[max(0, i - 1)] != "--max-lines"
+            and v != "--max-lines"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        _parse_args()
 
 
 def test_parse_args_no_test_flag(monkeypatch):
@@ -213,16 +242,21 @@ def test_build_command_test_flag():
 
 
 def test_build_command_issue_included():
-    """Command includes --issue when set."""
-    args = _make_args(issue=42, organization="org", repo="repo")
-    cmd = _build_command(args, "T")
-    assert "--issue" in cmd
+    """Command includes --issue with correct value."""
+    cmd = _build_command(_make_args(issue=42), "T")
+    assert cmd[cmd.index("--issue") + 1] == "42"
 
 
-def test_build_command_issue_omitted():
-    """Command omits --issue when not set."""
+def test_build_command_organization_included():
+    """Command includes --organization."""
     cmd = _build_command(_make_args(), "T")
-    assert "--issue" not in cmd
+    assert cmd[cmd.index("--organization") + 1] == "testorg"
+
+
+def test_build_command_repo_included():
+    """Command includes --repo."""
+    cmd = _build_command(_make_args(), "T")
+    assert cmd[cmd.index("--repo") + 1] == "testrepo"
 
 
 def test_build_command_dry_run_included():
@@ -250,15 +284,15 @@ def test_build_command_no_commit_omitted():
 
 
 def test_build_command_max_lines_included():
-    """Command includes --max-lines when set."""
+    """Command includes --max-lines."""
+    cmd = _build_command(_make_args(), "T")
+    assert cmd[cmd.index("--max-lines") + 1] == "1000"
+
+
+def test_build_command_max_lines_value():
+    """Command passes --max-lines with correct string value."""
     cmd = _build_command(_make_args(max_lines=500), "T")
     assert cmd[cmd.index("--max-lines") + 1] == "500"
-
-
-def test_build_command_max_lines_omitted():
-    """Command omits --max-lines when not set."""
-    cmd = _build_command(_make_args(), "T")
-    assert "--max-lines" not in cmd
 
 
 # ---- run_classify_test -----------------------------------------------------

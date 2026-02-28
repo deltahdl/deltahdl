@@ -68,15 +68,26 @@ def _write_test_file(tmp_path, body):
     return f
 
 
+def _all_flags(tmp_path):
+    """Return the full set of required CLI flags."""
+    return [
+        "--file", str(tmp_path / "test_input.cpp"),
+        "--output-dir", str(tmp_path),
+        "--lrm", str(tmp_path / "lrm.txt"),
+        "--issue", "1",
+        "--organization", "org",
+        "--repo", "repo",
+        "--max-lines", "500",
+    ]
+
+
 def _run_batch(tmp_path, body, exit_code=0):
     """Write *body*, install fake classify_test, and invoke classify_file."""
     fake = _install_fake_classify_test(tmp_path, exit_code=exit_code)
     env = _base_env(tmp_path, fake)
     _write_test_file(tmp_path, body)
     return _invoke(
-        "--file", str(tmp_path / "test_input.cpp"),
-        "--output-dir", str(tmp_path),
-        "--lrm", str(tmp_path / "lrm.txt"),
+        *_all_flags(tmp_path),
         cwd=str(tmp_path), env=env,
     )
 
@@ -89,6 +100,15 @@ def test_no_args_prints_usage(tmp_path):
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
     assert "usage:" in _invoke(cwd=str(tmp_path), env=env).stderr
+
+
+def test_usage_shows_classify_file(tmp_path):
+    """Usage line shows 'classify_file' as program name."""
+    fake = _install_fake_classify_test(tmp_path)
+    env = _base_env(tmp_path, fake)
+    assert "classify_file" in _invoke(
+        cwd=str(tmp_path), env=env,
+    ).stderr
 
 
 def test_missing_file_flag_reported(tmp_path):
@@ -109,12 +129,9 @@ def test_nonexistent_file_reports_error(tmp_path):
     """Pointing --file at a missing path prints ERROR."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
-    result = _invoke(
-        "--file", str(tmp_path / "missing.cpp"),
-        "--output-dir", str(tmp_path),
-        "--lrm", str(tmp_path / "lrm.txt"),
-        cwd=str(tmp_path), env=env,
-    )
+    flags = _all_flags(tmp_path)
+    flags[flags.index("--file") + 1] = str(tmp_path / "missing.cpp")
+    result = _invoke(*flags, cwd=str(tmp_path), env=env)
     assert "ERROR" in result.stdout
 
 
@@ -124,9 +141,7 @@ def test_file_without_tests_reports_error(tmp_path):
     env = _base_env(tmp_path, fake)
     _write_test_file(tmp_path, "#include <gtest/gtest.h>\n")
     result = _invoke(
-        "--file", str(tmp_path / "test_input.cpp"),
-        "--output-dir", str(tmp_path),
-        "--lrm", str(tmp_path / "lrm.txt"),
+        *_all_flags(tmp_path),
         cwd=str(tmp_path), env=env,
     )
     assert "No TEST blocks" in result.stdout
