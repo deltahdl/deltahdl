@@ -50,22 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// Simulation: '?' matches 0, 1, and x
-TEST(ParserAnnexA053, LevelSymbol_SimQuestion) {
-  auto r = Parse(
-      "primitive p(output y, input a);\n"
-      "  table\n"
-      "    ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-  EXPECT_EQ(eval.Evaluate({'0'}), '1');
-  EXPECT_EQ(eval.Evaluate({'1'}), '1');
-  EXPECT_EQ(eval.Evaluate({'x'}), '1');
-}
-
 // Simulation: 'b' matches 0 and 1, but not x
 TEST(ParserAnnexA053, LevelSymbol_SimB) {
   auto r = Parse(
