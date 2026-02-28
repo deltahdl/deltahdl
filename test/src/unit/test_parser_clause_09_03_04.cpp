@@ -288,4 +288,21 @@ TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
   EXPECT_EQ(item->body->stmts[0]->label, "inner");
 }
 
+// =============================================================================
+// LRM section 12.6 -- Named blocks / block labels
+// =============================================================================
+TEST(ParserSection12, NamedBeginEnd) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : my_block\n"
+      "    x = 1;\n"
+      "  end : my_block\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "my_block");
+}
+
 }  // namespace

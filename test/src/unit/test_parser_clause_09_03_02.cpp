@@ -472,4 +472,23 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinThreeThreads) {
   EXPECT_EQ(stmt->fork_stmts.size(), 3u);
 }
 
+// =============================================================================
+// §4.6: Fork-join_any ordering — first branch completes
+// =============================================================================
+TEST(ParserSection4, Sec4_6_ForkJoinAnyFirstComplete) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  join_any\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kFork);
+  EXPECT_EQ(body->join_kind, TokenKind::kKwJoinAny);
+}
+
 }  // namespace

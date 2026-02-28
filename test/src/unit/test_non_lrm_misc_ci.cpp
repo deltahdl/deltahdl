@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 12.6 -- Named blocks / block labels
-// =============================================================================
-TEST(ParserSection12, NamedBeginEnd) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin : my_block\n"
-      "    x = 1;\n"
-      "  end : my_block\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->label, "my_block");
-}
-
 TEST(ParserSection12, NamedBeginEndNoEndLabel) {
   auto r = Parse(
       "module t;\n"
