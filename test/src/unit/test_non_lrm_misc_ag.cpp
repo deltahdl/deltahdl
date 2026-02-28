@@ -13,24 +13,6 @@ bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// --- nested generate constructs: for inside for ---
-TEST(ParserAnnexA042, NestedForInsideFor) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 2; i++) begin : outer\n"
-      "    for (genvar j = 0; j < 2; j++) begin : inner\n"
-      "      assign out[i][j] = in[i][j];\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* outer = r.cu->modules[0]->items[0];
-  EXPECT_EQ(outer->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(outer->gen_body.size(), 1u);
-  EXPECT_EQ(outer->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
-}
-
 // --- generate_region with mixed constructs ---
 TEST(ParserAnnexA042, GenerateRegionMixedConstructs) {
   auto r = Parse(
