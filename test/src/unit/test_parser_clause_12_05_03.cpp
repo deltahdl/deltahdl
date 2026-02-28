@@ -135,4 +135,50 @@ TEST(ParserSection9, Sec9_2_2_UniqueCase) {
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
 
+struct ParseResult12b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult12b Parse(const std::string& src) {
+  ParseResult12b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult12b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// unique casez combines qualifier with casez keyword.
+TEST(ParserSection12, UniqueCasezQualifier) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique casez (sel)\n"
+      "      2'b1?: x = 1;\n"
+      "      2'b01: x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
 }  // namespace

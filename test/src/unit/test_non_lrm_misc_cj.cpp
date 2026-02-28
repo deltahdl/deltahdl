@@ -53,25 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// unique casez combines qualifier with casez keyword.
-TEST(ParserSection12, UniqueCasezQualifier) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    unique casez (sel)\n"
-      "      2'b1?: x = 1;\n"
-      "      2'b01: x = 2;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
-}
-
 // priority casex.
 TEST(ParserSection12, PriorityCasex) {
   auto r = Parse(
