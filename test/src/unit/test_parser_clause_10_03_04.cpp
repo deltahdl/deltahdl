@@ -92,4 +92,66 @@ TEST(ParserA601, ContinuousAssign_StrengthAndDelay) {
   EXPECT_NE(cas[0]->assign_delay, nullptr);
 }
 
+struct ParseResult10b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult10b Parse(const std::string& src) {
+  ParseResult10b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// §10.3.4: Drive strength on continuous assignment.
+TEST(ParserSection10, ContinuousAssignDriveStrength) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (strong0, weak1) w = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* ca = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      ca = item;
+      break;
+    }
+  }
+  ASSERT_NE(ca, nullptr);
+  // 4=strong, 2=weak (parser encoding:
+  // 0=none,1=highz,2=weak,3=pull,4=strong,5=supply)
+  EXPECT_EQ(ca->drive_strength0, 4u);
+  EXPECT_EQ(ca->drive_strength1, 2u);
+}
+
+// §10.3.4: Drive strength order can be reversed.
+TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (pull1, supply0) w = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* ca = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      ca = item;
+      break;
+    }
+  }
+  ASSERT_NE(ca, nullptr);
+  EXPECT_EQ(ca->drive_strength0, 5u);  // supply0
+  EXPECT_EQ(ca->drive_strength1, 3u);  // pull1
+}
+
 }  // namespace

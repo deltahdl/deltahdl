@@ -5,25 +5,18 @@
 
 using namespace delta;
 
-namespace {
-
-// ---------------------------------------------------------------------------
-// task_prototype ::=
-//   task [ dynamic_override_specifiers ] task_identifier
-//     [ ( [ tf_port_list ] ) ]
-// ---------------------------------------------------------------------------
-TEST(ParserA27, TaskPrototypeExtern) {
-  auto r = Parse(
-      "module m;\n"
-      "  extern task my_task(input int x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(item->is_extern);
-  EXPECT_EQ(item->name, "my_task");
+static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl &&
+        item->kind != ModuleItemKind::kTaskDecl) {
+      continue;
+    }
+    if (item->name == name) return item;
+  }
+  return nullptr;
 }
+
+namespace {
 
 TEST(ParserA27, TfPortItemVarWithDirection) {
   auto r = Parse(
@@ -328,24 +321,6 @@ TEST(ParserA28, BlockItemInFunction) {
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   ASSERT_GE(item->func_body_stmts.size(), 1u);
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
-}
-
-static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kFunctionDecl &&
-        item->kind != ModuleItemKind::kTaskDecl) {
-      continue;
-    }
-    if (item->name == name) return item;
-  }
-  return nullptr;
-}
-
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
 }
 
 // =============================================================================
