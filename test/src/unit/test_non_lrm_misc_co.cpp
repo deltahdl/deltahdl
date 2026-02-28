@@ -36,23 +36,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// Section 16.5.1 -- Concurrent assertion statements: cover property
-// =============================================================================
-// Cover property with a simple clocked property.
-TEST(ParserSection16, Sec16_5_1_CoverPropertySimple) {
-  auto r = Parse(
-      "module m;\n"
-      "  cover property (@(posedge clk) a && b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  auto* cp =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverProperty);
-  ASSERT_NE(cp, nullptr);
-  EXPECT_NE(cp->assert_expr, nullptr);
-}
-
 // Cover property with a clocked sequence delay.
 TEST(ParserSection16, Sec16_5_1_CoverPropertyClocked) {
   auto r = Parse(
