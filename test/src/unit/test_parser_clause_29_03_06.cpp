@@ -259,4 +259,77 @@ TEST(ParserAnnexA053, EdgeSymbol_SimStar) {
   EXPECT_EQ(eval.EvaluateWithEdge({'0'}, 0, '1'), '1');
 }
 
+using SpecifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Parser test fixture
+// =============================================================================
+struct SpecifyTest : ::testing::Test {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
+    source_ = src;
+    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
+    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
+    return parser_->Parse();
+  }
+
+  // Helper: get first specify block from first module.
+  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
+    for (auto* item : cu->modules[0]->items) {
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+    }
+    return nullptr;
+  }
+
+  SourceManager mgr_;
+  Arena arena_;
+  DiagEngine diag_{mgr_};
+  std::string source_;
+  std::unique_ptr<Lexer> lexer_;
+  std::unique_ptr<Parser> parser_;
+};
+
+struct ParseResult30 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult30 Parse(const std::string& src) {
+  ParseResult30 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection29, UdpTableSpecialChars) {
+  auto r = Parse(
+      "primitive edge_detect(output reg q, input d, clk);\n"
+      "  table\n"
+      "    ? f : ? : 1;\n"
+      "    ? p : ? : 0;\n"
+      "    * ? : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->table.size(), 3);
+
+  struct Check {
+    size_t row;
+    size_t col;
+    char val;
+  };
+  Check input_checks[] = {{0, 1, 'f'}, {1, 1, 'p'}, {2, 0, '*'}};
+  for (const auto& c : input_checks) {
+    EXPECT_EQ(udp->table[c.row].inputs[c.col], c.val);
+  }
+  EXPECT_EQ(udp->table[2].output, '-');
+}
+
 }  // namespace

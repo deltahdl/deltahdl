@@ -155,31 +155,6 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
 
 namespace {
 
-TEST(ParserSection29, UdpTableSpecialChars) {
-  auto r = Parse(
-      "primitive edge_detect(output reg q, input d, clk);\n"
-      "  table\n"
-      "    ? f : ? : 1;\n"
-      "    ? p : ? : 0;\n"
-      "    * ? : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table.size(), 3);
-
-  struct Check {
-    size_t row;
-    size_t col;
-    char val;
-  };
-  Check input_checks[] = {{0, 1, 'f'}, {1, 1, 'p'}, {2, 0, '*'}};
-  for (const auto& c : input_checks) {
-    EXPECT_EQ(udp->table[c.row].inputs[c.col], c.val);
-  }
-  EXPECT_EQ(udp->table[2].output, '-');
-}
-
 // description: udp_declaration
 TEST(SourceText, DescriptionUdp) {
   auto r = Parse(
