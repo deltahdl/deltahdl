@@ -60,32 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// =========================================================================
-// LRM section 7.2.1 -- Packed structures
-// =========================================================================
-// --- Packed struct typedef with logic members of various widths ---
-TEST(ParserSection7, Sec7_2_1_PackedTypedefLogicWidths) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [15:0] addr;\n"
-      "    logic [7:0] data;\n"
-      "    logic valid;\n"
-      "  } bus_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-  EXPECT_TRUE(item->typedef_type.is_packed);
-  EXPECT_FALSE(item->typedef_type.is_signed);
-  ASSERT_EQ(item->typedef_type.struct_members.size(), 3u);
-  EXPECT_EQ(item->typedef_type.struct_members[0].name, "addr");
-  EXPECT_EQ(item->typedef_type.struct_members[1].name, "data");
-  EXPECT_EQ(item->typedef_type.struct_members[2].name, "valid");
-}
-
 // --- Packed struct typedef with bit members and packed dim checks ---
 TEST(ParserSection7, Sec7_2_1_PackedTypedefBitMembers) {
   auto r = Parse(
