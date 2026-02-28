@@ -158,4 +158,15 @@ TEST(ParserA301, NInputGateInst_FourInputs) {
   EXPECT_EQ(g->gate_terminals.size(), 5u);
 }
 
+TEST(ParserA301, NInputGateInst_EightInputs) {
+  auto r = Parse(
+      "module m;\n"
+      "  xor x1(out, a, b, c, d, e, f, g, h);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kXor);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 9u);
+}
+
 }  // namespace
