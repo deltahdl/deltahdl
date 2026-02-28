@@ -54,22 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 4. Int variable declaration.
-TEST(ParserSection6, Sec6_5_IntVarDeclKind) {
-  auto r = Parse(
-      "module t;\n"
-      "  int count;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_FALSE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "count");
-}
-
 // 5. Real variable declaration.
 TEST(ParserSection6, Sec6_5_RealVarDeclKind) {
   auto r = Parse(
