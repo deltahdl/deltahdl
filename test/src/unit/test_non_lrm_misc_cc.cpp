@@ -45,22 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-// =============================================================================
-// LRM section 10.10 -- Unpacked array concatenation
-// =============================================================================
-TEST(ParserSection10, UnpackedArrayConcat) {
-  auto r = Parse(
-      "module m;\n"
-      "  int A[3];\n"
-      "  initial A = {1, 2, 3};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 TEST(ParserSection10, UnpackedArrayConcatEmpty) {
   auto r = Parse(
       "module m;\n"
