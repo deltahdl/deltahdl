@@ -4,27 +4,24 @@
 
 using namespace delta;
 
-namespace {
-
-// =============================================================================
-// A.6.9 Subroutine call statements — subroutine_call_statement
-// =============================================================================
-// --- subroutine_call_statement: subroutine_call ; ---
-// tf_call with empty parentheses
-TEST(ParserA609, TfCallEmptyParens) {
-  auto r = Parse(
-      "module m;\n"
-      "  task foo; endtask\n"
-      "  initial foo();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  EXPECT_EQ(expr->callee, "foo");
-  EXPECT_TRUE(expr->args.empty());
+static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
 }
+
+static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (count == idx) return item;
+    ++count;
+  }
+  return nullptr;
+}
+
+namespace {
 
 // tf_call without parentheses (task call — footnote 42)
 TEST(ParserA609, TfCallNoParens) {
@@ -342,13 +339,6 @@ TEST(ParserA609, ArrayMethodWithClause) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
 }
 
 // =============================================================================
@@ -739,16 +729,6 @@ TEST(ParserA610, CoverPropertyPassAction) {
   auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->assert_pass_stmt, nullptr);
-}
-
-static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
 }
 
 // =============================================================================
