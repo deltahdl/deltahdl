@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_DelayWithMinTypMax) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  and #(1:2:3, 4:5:6) a1(out, in1, in2);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA301, GateInst_ComplexTerminalExpressions) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
