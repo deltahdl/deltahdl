@@ -304,36 +304,44 @@ on:
   pull_request:
     paths-ignore:
       - '**/*.md'
+      - .github/workflows/classify_file.yml
+      - .github/workflows/classify_files.yml
+      - .github/workflows/classify_test.yml
       - .github/workflows/convert_figure.yml
       - .github/workflows/convert_tables.yml
       - .github/workflows/markdownlint.yml
-      - .github/workflows/classify_test.yml
       - LICENSE
+      - scripts/classify_file/**
+      - scripts/classify_files/**
+      - scripts/classify_test/**
       - scripts/convert_figure.py
       - scripts/convert_table.py
-      - scripts/classify_test/**
       - scripts/implement_clause.py
+      - test/scripts/classify_test/**
       - test/scripts/convert_figure/**
       - test/scripts/convert_table/**
-      - test/scripts/classify_test/**
       - test/scripts/implement_clause/**
   push:
     branches: [main]
     paths-ignore:
       - '**/*.md'
+      - .github/workflows/classify_file.yml
+      - .github/workflows/classify_files.yml
+      - .github/workflows/classify_test.yml
       - .github/workflows/convert_figure.yml
       - .github/workflows/convert_tables.yml
       - .github/workflows/implement_clause.yml
       - .github/workflows/markdownlint.yml
-      - .github/workflows/classify_test.yml
       - LICENSE
+      - scripts/classify_file/**
+      - scripts/classify_files/**
+      - scripts/classify_test/**
       - scripts/convert_figure.py
       - scripts/convert_table.py
-      - scripts/classify_test/**
       - scripts/implement_clause.py
+      - test/scripts/classify_test/**
       - test/scripts/convert_figure/**
       - test/scripts/convert_table/**
-      - test/scripts/classify_test/**
       - test/scripts/implement_clause/**
   workflow_dispatch:
     inputs:
