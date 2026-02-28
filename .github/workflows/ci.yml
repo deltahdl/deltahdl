@@ -302,47 +302,42 @@ jobs:
 name: CI
 on:
   pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - .github/workflows/classify_file.yml
-      - .github/workflows/classify_files.yml
-      - .github/workflows/classify_test.yml
-      - .github/workflows/convert_figure.yml
-      - .github/workflows/convert_tables.yml
-      - .github/workflows/markdownlint.yml
-      - LICENSE
-      - scripts/classify_file/**
-      - scripts/classify_files/**
-      - scripts/classify_test/**
-      - scripts/convert_figure.py
-      - scripts/convert_table.py
-      - scripts/implement_clause.py
-      - test/scripts/classify_test/**
-      - test/scripts/convert_figure/**
-      - test/scripts/convert_table/**
-      - test/scripts/implement_clause/**
+    paths:
+      - .github/workflows/ci.yml
+      - .github/workflows/deltahdl.yml
+      - .github/workflows/documentation.yml
+      - CMakeLists.txt
+      - etc/**
+      - lib/**
+      - scripts/run_sim_tests.py
+      - scripts/run_sv_tests.py
+      - src/**
+      - test/CMakeLists.txt
+      - test/lib/**
+      - test/scripts/__init__.py
+      - test/scripts/conftest.py
+      - test/scripts/run_sim_tests/**
+      - test/scripts/run_sv_tests/**
+      - test/src/**
   push:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - .github/workflows/classify_file.yml
-      - .github/workflows/classify_files.yml
-      - .github/workflows/classify_test.yml
-      - .github/workflows/convert_figure.yml
-      - .github/workflows/convert_tables.yml
-      - .github/workflows/implement_clause.yml
-      - .github/workflows/markdownlint.yml
-      - LICENSE
-      - scripts/classify_file/**
-      - scripts/classify_files/**
-      - scripts/classify_test/**
-      - scripts/convert_figure.py
-      - scripts/convert_table.py
-      - scripts/implement_clause.py
-      - test/scripts/classify_test/**
-      - test/scripts/convert_figure/**
-      - test/scripts/convert_table/**
-      - test/scripts/implement_clause/**
+    paths:
+      - .github/workflows/ci.yml
+      - .github/workflows/deltahdl.yml
+      - .github/workflows/documentation.yml
+      - CMakeLists.txt
+      - etc/**
+      - lib/**
+      - scripts/run_sim_tests.py
+      - scripts/run_sv_tests.py
+      - src/**
+      - test/CMakeLists.txt
+      - test/lib/**
+      - test/scripts/__init__.py
+      - test/scripts/conftest.py
+      - test/scripts/run_sim_tests/**
+      - test/scripts/run_sv_tests/**
+      - test/src/**
   workflow_dispatch:
     inputs:
       force-static-analysis:
