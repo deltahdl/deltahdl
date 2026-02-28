@@ -231,4 +231,27 @@ TEST(ParserSection12, IfBlockBodyThenOnly) {
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
 }
 
+// §12.4: dangling else associates with closest if
+TEST(ParserA606, DanglingElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a)\n"
+      "      if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  // outer if has no else — the else belongs to the inner if
+  EXPECT_EQ(stmt->else_branch, nullptr);
+  // then_branch is the inner if, which has an else
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->then_branch->else_branch, nullptr);
+}
+
 }  // namespace
