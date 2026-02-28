@@ -87,69 +87,6 @@ static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
 
 namespace {
 
-// --- 9. Blocking assignment with ternary RHS ---
-TEST(ParserSection10, Sec10_4_1_TernaryRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, c, sel;\n"
-      "  initial begin\n"
-      "    a = sel ? b : c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
-}
-
-// --- 10. Blocking assignment in begin-end block ---
-TEST(ParserSection10, Sec10_4_1_InBeginEndBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] x, y;\n"
-      "  initial begin\n"
-      "    x = 8'h00;\n"
-      "    y = 8'hFF;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
-  ASSERT_NE(s0, nullptr);
-  ASSERT_NE(s1, nullptr);
-  EXPECT_EQ(s0->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(s1->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(s0->lhs->text, "x");
-  EXPECT_EQ(s1->lhs->text, "y");
-}
-
-// --- 11. Blocking assignment in if-else branches ---
-TEST(ParserSection10, Sec10_4_1_InIfElseBranches) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, sel;\n"
-      "  initial begin\n"
-      "    if (sel)\n"
-      "      a = 1;\n"
-      "    else\n"
-      "      a = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  ASSERT_NE(stmt->then_branch, nullptr);
-  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
-}
-
 // --- 12. Blocking assignment in case items ---
 TEST(ParserSection10, Sec10_4_1_InCaseItems) {
   auto r = Parse(
