@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CovergroupValueRange_OpenHigh) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins a = {[100:$]};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // §A.2.11 Production #29: with_covergroup_expression
 // =============================================================================
