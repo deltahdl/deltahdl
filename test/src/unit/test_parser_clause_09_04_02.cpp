@@ -205,4 +205,25 @@ TEST(ParserSection4, Sec4_5_PosedgeEventControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
+// ---------------------------------------------------------------------------
+// 12. @(negedge clk) event control
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_NegedgeEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a;\n"
+      "  initial begin\n"
+      "    @(negedge clk) a = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
 }  // namespace

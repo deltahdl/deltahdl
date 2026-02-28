@@ -378,4 +378,25 @@ TEST(ParserSection23, GenvarMultipleDeclarations) {
   EXPECT_EQ(mod->items[2]->name, "k");
 }
 
+// =========================================================================
+// LRM section 27.4: Genvar expressions in loop generate
+// =========================================================================
+TEST(ParserSection23, GenvarExprInLoopBound) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2 * N; i = i + 2) begin : evens\n"
+      "    assign a[i] = b[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ModuleItem* gen = nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) gen = item;
+  }
+  ASSERT_NE(gen, nullptr);
+  EXPECT_NE(gen->gen_cond, nullptr);
+  EXPECT_NE(gen->gen_step, nullptr);
+}
+
 }  // namespace
