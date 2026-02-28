@@ -124,4 +124,20 @@ TEST(ParserSection13, MixedDefaultAndNonDefaultArgs) {
   EXPECT_NE(fn->func_args[2].default_value, nullptr);
 }
 
+// Default arg with expression (not just literal).
+TEST(ParserSection13, DefaultArgWithExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int compute(int size = 8 * 4);\n"
+      "    return size;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "compute");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 1u);
+  ASSERT_NE(fn->func_args[0].default_value, nullptr);
+  EXPECT_EQ(fn->func_args[0].default_value->kind, ExprKind::kBinary);
+}
+
 }  // namespace
