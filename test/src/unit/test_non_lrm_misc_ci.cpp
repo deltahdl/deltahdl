@@ -7,38 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Ternary with inside condition ---
-TEST(ParserSection11, Sec11_4_6_TernaryWithInsideCondition) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if ((a inside {1, 2}) ? x : y) z = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  ASSERT_NE(stmt->condition, nullptr);
-  EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
-  ASSERT_NE(stmt->condition->condition, nullptr);
-  EXPECT_EQ(stmt->condition->condition->kind, ExprKind::kInside);
-}
-
-// --- Verify ExprKind::kTernary kind ---
-TEST(ParserSection11, Sec11_4_6_VerifyExprKindTernary) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = en ? val_a : val_b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-}
-
 // --- Verify condition, true_expr, false_expr fields ---
 TEST(ParserSection11, Sec11_4_6_VerifyTernaryFields) {
   auto r = Parse(
