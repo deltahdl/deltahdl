@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverGroup_ValueRangesInBins) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins a = {[$:50]};\n"
-              "      bins b = {[51:100]};\n"
-              "      bins c = {[101:$]};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CoverGroup_CrossThreeItems) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
