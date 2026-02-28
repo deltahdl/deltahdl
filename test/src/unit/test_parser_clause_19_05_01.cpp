@@ -128,4 +128,15 @@ TEST(ParserA211, CovergroupRangeList_Single) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, CovergroupRangeList_Multiple) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins a = {1, 2, 3, 4, 5};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
