@@ -76,4 +76,12 @@ TEST(ParserA301, CmosSwitchInst_Unnamed) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
+TEST(ParserA301, GateInst_AllCmosSwitchTypes) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  cmos  c1(o, i, n, p);\n"
+              "  rcmos rc1(o, i, n, p);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
