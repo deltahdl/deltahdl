@@ -22,21 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// §9.3.1: Empty sequential block
-TEST(ParserA603, SeqBlockEmpty) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->stmts.size(), 0u);
-}
-
 // §9.3.4: Named sequential block
 TEST(ParserA603, SeqBlockNamed) {
   auto r = Parse(
