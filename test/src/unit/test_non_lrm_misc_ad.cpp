@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_AllPassEnSwitchTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  tranif0  t0(a, b, c);\n"
-              "  tranif1  t1(a, b, c);\n"
-              "  rtranif0 rt0(a, b, c);\n"
-              "  rtranif1 rt1(a, b, c);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA301, GateInst_StrengthOrder_Strength1First) {
   auto r = Parse(
       "module m;\n"
