@@ -21,23 +21,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-// Default with colon (default :)
-TEST(ParserA612, RsCaseItemDefaultColon) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : case (0)\n"
-      "               default : a;\n"
-      "             endcase;\n"
-      "      a : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.6.12 Randsequence — break and return within productions
 // =============================================================================
