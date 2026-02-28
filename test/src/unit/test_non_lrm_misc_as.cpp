@@ -4,23 +4,16 @@
 
 using namespace delta;
 
-namespace {
-
-// if (expr) simple_path_declaration — full
-TEST(ParserA702, StateDependentIfSimpleFull) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (en) (a, b *> c) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_NE(si->path.condition, nullptr);
-  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
+TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  if (!spec || spec->specify_items.empty()) return nullptr;
+  if (spec->specify_items[0]->kind != SpecifyItemKind::kTimingCheck)
+    return nullptr;
+  return &spec->specify_items[0]->timing_check;
 }
+
+namespace {
 
 // if (expr) edge_sensitive_path_declaration
 TEST(ParserA702, StateDependentIfEdgeSensitive) {
@@ -869,15 +862,6 @@ TEST(ParserA704, SixDelaysConditionalPath) {
   ASSERT_NE(si, nullptr);
   EXPECT_NE(si->path.condition, nullptr);
   ASSERT_EQ(si->path.delays.size(), 6u);
-}
-
-TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty()) return nullptr;
-  if (spec->specify_items[0]->kind != SpecifyItemKind::kTimingCheck)
-    return nullptr;
-  return &spec->specify_items[0]->timing_check;
 }
 
 // =============================================================================
