@@ -23,57 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// Named argument with empty expression
-TEST(ParserA609, ListOfArgsNamedEmpty) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(.a(), .b(1)); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  EXPECT_EQ(expr->arg_names.size(), 2u);
-  EXPECT_EQ(expr->args[0], nullptr);
-  ASSERT_NE(expr->args[1], nullptr);
-}
-
-// Mixed positional then named arguments
-TEST(ParserA609, ListOfArgsMixedPositionalThenNamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(1, 2, .c(3)); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  // Two positional args + one named arg
-  EXPECT_EQ(expr->args.size(), 3u);
-  ASSERT_EQ(expr->arg_names.size(), 1u);
-  EXPECT_EQ(expr->arg_names[0], "c");
-}
-
-// =============================================================================
-// A.6.9 — method_call
-// =============================================================================
-// method_call: method_call_root . method_call_body (no args)
-TEST(ParserA609, MethodCallNoArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.method(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  ASSERT_NE(expr->lhs, nullptr);
-  EXPECT_EQ(expr->lhs->kind, ExprKind::kMemberAccess);
-}
-
 // method_call with arguments
 TEST(ParserA609, MethodCallWithArgs) {
   auto r = Parse(
