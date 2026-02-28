@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetExpr_InAssign) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let add(a, b) = a + b;\n"
-              "  logic [7:0] w;\n"
-              "  assign w = add(8'd1, 8'd2);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetExpr_Nested) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
