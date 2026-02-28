@@ -2,6 +2,7 @@
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
