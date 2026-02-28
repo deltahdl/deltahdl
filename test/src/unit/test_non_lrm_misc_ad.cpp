@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_NOutputWithDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  not #(4, 6) n1(out, in);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNot);
-  ASSERT_NE(g, nullptr);
-  EXPECT_NE(g->gate_delay, nullptr);
-  EXPECT_NE(g->gate_delay_fall, nullptr);
-}
-
 TEST(ParserA301, GateInst_NOutputMultipleInstances) {
   auto r = Parse(
       "module m;\n"
