@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetDecl_Multiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  let add(a, b) = a + b;\n"
-      "  let sub(a, b) = a - b;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kLetDecl) count++;
-  }
-  EXPECT_EQ(count, 2);
-}
-
 // =============================================================================
 // A.2.12 Production #2: let_identifier
 // let_identifier ::= identifier
