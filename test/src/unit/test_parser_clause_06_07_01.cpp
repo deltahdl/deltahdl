@@ -280,4 +280,56 @@ TEST(ParserSection6, Sec6_7_1_WireWithPackedStructType) {
   EXPECT_EQ(item->name, "memsig");
 }
 
+// 5. Multiple nets with explicit type: wire logic a, b, c;
+TEST(ParserSection6, Sec6_7_1_MultipleNetsExplicitType) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire logic a, b, c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(items[0]->data_type.is_net);
+  EXPECT_EQ(items[0]->name, "a");
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(items[1]->data_type.is_net);
+  EXPECT_EQ(items[1]->name, "b");
+  EXPECT_EQ(items[2]->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(items[2]->data_type.is_net);
+  EXPECT_EQ(items[2]->name, "c");
+}
+
+// 8. tri bit [3:0] b; — non-logic 4-state type after net keyword (parser
+// accepts).
+TEST(ParserSection6, Sec6_7_1_NetWithExplicitBitType) {
+  auto r = Parse(
+      "module t;\n"
+      "  tri bit [3:0] b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_EQ(item->name, "b");
+}
+
+// 9. wire (strong0, weak1) logic [7:0] w; — drive strength + explicit type.
+TEST(ParserSection6, Sec6_7_1_DriveStrengthWithExplicitType) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire (strong0, weak1) logic [7:0] w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_EQ(item->name, "w");
+}
+
 }  // namespace

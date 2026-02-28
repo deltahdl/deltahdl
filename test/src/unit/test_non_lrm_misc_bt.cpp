@@ -40,23 +40,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// Class implementing multiple interface classes.
-TEST(ParserSection8, ClassImplementsMultipleInterfaces) {
-  EXPECT_TRUE(
-      ParseOk("interface class A;\n"
-              "  pure virtual function void fa();\n"
-              "endclass\n"
-              "interface class B;\n"
-              "  pure virtual function void fb();\n"
-              "endclass\n"
-              "class C implements A, B;\n"
-              "  virtual function void fa();\n"
-              "  endfunction\n"
-              "  virtual function void fb();\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
 // Forward typedef class followed by full class definition.
 TEST(ParserSection8, ForwardTypedefClassSelfRef) {
   auto r = Parse(

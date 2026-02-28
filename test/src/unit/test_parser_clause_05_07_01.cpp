@@ -118,4 +118,18 @@ TEST(ParserA87, ZDigitUpper) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
+TEST(ParserCh50701, IntLiteral_SizedHex) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 8'hFF;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 0xFFu);
+}
+
 }  // namespace
