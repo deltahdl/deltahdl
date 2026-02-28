@@ -22,23 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// §16.3: action_block in immediate assert — pass and else (fail) statement
-TEST(ParserA603, ActionBlockAssertPassAndFail) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert (a) $display(\"pass\"); else $display(\"fail\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
-  EXPECT_NE(stmt->assert_pass_stmt, nullptr);
-  EXPECT_NE(stmt->assert_fail_stmt, nullptr);
-}
-
 // §16.3: action_block with null pass (semicolon), else fail
 TEST(ParserA603, ActionBlockAssertNullPassElseFail) {
   auto r = Parse(

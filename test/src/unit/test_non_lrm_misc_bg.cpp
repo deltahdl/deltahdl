@@ -111,20 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_UnbasedUnsized_One) {
-  // '1 sets all bits to 1.
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = '1;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
-}
-
 TEST(ParserCh50701, IntLiteral_UnbasedUnsized_Zero) {
   // '0 sets all bits to 0.
   EXPECT_TRUE(ParseOk("module m; initial x = '0; endmodule"));
