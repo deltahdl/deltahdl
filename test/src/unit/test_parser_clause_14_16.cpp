@@ -27,4 +27,26 @@ TEST(ParserA611, ClockingDriveSimple) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
+// =============================================================================
+// A.6.11 clocking_drive — clockvar_expression <= cycle_delay expression
+// =============================================================================
+TEST(ParserA611, ClockingDriveWithCycleDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    cb.data <= ##2 8'hFF;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->cycle_delay, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
