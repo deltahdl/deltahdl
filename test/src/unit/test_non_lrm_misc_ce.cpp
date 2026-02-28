@@ -50,38 +50,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// --- 27. Nonblocking in named begin-end block ---
-TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d;\n"
-      "  initial begin : my_block\n"
-      "    q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->label, "my_block");
-  ASSERT_EQ(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
-}
-
-// --- 28. Pipeline pattern with multiple nonblocking assignments ---
-TEST(ParserSection10, Sec10_4_2_PipelinePattern) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  reg [7:0] stage1, stage2, stage3, d;\n"
-              "  always_ff @(posedge clk) begin\n"
-              "    stage1 <= d;\n"
-              "    stage2 <= stage1;\n"
-              "    stage3 <= stage2;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // --- 29. Nonblocking swap pattern ---
 TEST(ParserSection10, Sec10_4_2_SwapPattern) {
   auto r = Parse(
