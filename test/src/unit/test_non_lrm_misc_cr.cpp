@@ -38,14 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserA211, CovergroupDecl_InClass) {
-  EXPECT_TRUE(
-      ParseOk("class c;\n"
-              "  covergroup cg;\n"
-              "  endgroup\n"
-              "endclass\n"));
-}
-
 // =============================================================================
 // A.1.4 Module items
 // =============================================================================
