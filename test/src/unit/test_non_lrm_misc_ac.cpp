@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetFormalType_MixedUntypedAndTyped) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let f(untyped a, logic [7:0] b) = b;\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // A.2.12 Production #6: let_expression
 // let_expression ::= [package_scope] let_identifier

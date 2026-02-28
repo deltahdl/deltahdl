@@ -156,4 +156,11 @@ TEST(ParserA212, LetFormalType_UnsignedImplicit) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetFormalType_MixedUntypedAndTyped) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(untyped a, logic [7:0] b) = b;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
