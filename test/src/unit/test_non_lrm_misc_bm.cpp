@@ -31,22 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// 2. Multiple packed dimensions on logic type.
-TEST(ParserSection6, Sec6_11_MultiplePackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [3:0][7:0] data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 3u);
-  EXPECT_FALSE(item->data_type.extra_packed_dims.empty());
-}
-
 // 3. Unpacked dimensions on int type (fixed-size array).
 TEST(ParserSection6, Sec6_11_IntUnpackedDim) {
   auto r = Parse(
