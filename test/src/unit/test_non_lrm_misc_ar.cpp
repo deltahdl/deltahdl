@@ -21,15 +21,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserAnnexA, A7TimingCheckHold) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify $hold(posedge clk, data, 5); endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserAnnexA, A7SpecparamInSpecify) {
   auto r = Parse(
       "module m;\n"

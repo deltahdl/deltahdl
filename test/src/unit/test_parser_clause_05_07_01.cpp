@@ -147,4 +147,8 @@ TEST(ParserA87, ZDigitQuestion) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
+TEST(ParserCh50701, IntLiteral_SizedOctal) {
+  EXPECT_TRUE(ParseOk("module m; initial x = 8'o77; endmodule"));
+}
+
 }  // namespace

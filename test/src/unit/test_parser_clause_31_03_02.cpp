@@ -27,4 +27,13 @@ TEST(ParserA70501, HoldTimingCheck) {
   EXPECT_EQ(tc->data_terminal.name, "data");
 }
 
+TEST(ParserAnnexA, A7TimingCheckHold) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify $hold(posedge clk, data, 5); endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

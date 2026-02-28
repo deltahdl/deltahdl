@@ -71,4 +71,33 @@ TEST(ParserSection8, EnumExplicitBaseTypeValues) {
               "endmodule\n"));
 }
 
+struct ParseResult6 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6 Parse(const std::string& src) {
+  ParseResult6 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(Parser, InlineEnumVar) {
+  auto r = Parse(
+      "module t;\n"
+      "  enum { X, Y } my_var;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "my_var");
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
+  ASSERT_EQ(item->data_type.enum_members.size(), 2);
+}
+
 }  // namespace
