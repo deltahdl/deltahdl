@@ -1,6 +1,7 @@
 // §11.2.1: Constant expressions
 
 #include "fixture_elaborator.h"
+#include "fixture_evaluator.h"
 
 using namespace delta;
 

@@ -47,7 +47,7 @@ TEST(Elaboration, RealAssign_Ok) {
 
 // § number — real_number elaborates
 TEST(ElabA87, NumberRealElaborates) {
-  ElabA87Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  real x;\n"

@@ -4,6 +4,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler_event.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 

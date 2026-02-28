@@ -5,6 +5,7 @@
 #include "fixture_synthesizer.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/aig_opt.h"
+#include "synthesizer/synth_lower.h"
 
 using namespace delta;
 

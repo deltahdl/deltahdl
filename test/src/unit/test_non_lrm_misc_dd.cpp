@@ -6,6 +6,7 @@
 #include "fixture_lexer.h"
 #include "fixture_preprocessor.h"
 #include "fixture_simulator.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 
@@ -16,7 +17,7 @@ namespace {
 // =============================================================================
 // Basic randsequence elaborates without errors
 TEST(ElabA612, BasicRandsequenceElaborates) {
-  ElabA612Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  initial begin\n"
@@ -290,7 +291,7 @@ TEST(Elaboration, HardPackedUnion_DifferentWidth_Error) {
 
 // §10.9: assignment pattern with default key elaborates
 TEST(ElabA60701, PatternDefaultKeyElaborates) {
-  ElabA60701Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] arr [0:3];\n"

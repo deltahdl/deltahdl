@@ -10,7 +10,7 @@ namespace {
 
 // § function_subroutine_call — in continuous assignment
 TEST(ElabA82, FunctionCallInContAssign) {
-  ElabA82Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  wire [7:0] y;\n"

@@ -20,7 +20,7 @@ TEST(ParserA25, PackedDimElaboratesWidth) {
 
 // § genvar_expression — genvar in generate for elaborates
 TEST(ElabA83, GenvarExprElaborates) {
-  ElabA83Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  parameter int N = 4;\n"

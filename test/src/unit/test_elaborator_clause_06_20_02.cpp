@@ -23,7 +23,7 @@ TEST(ElabA83, ConstantBinaryExprInParamElaborates) {
 // =============================================================================
 // § constant_primary — integer literal in parameter elaborates
 TEST(ElabA84, ConstantPrimaryIntegerLiteral) {
-  ElabA84Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  parameter int P = 42;\n"
@@ -35,7 +35,7 @@ TEST(ElabA84, ConstantPrimaryIntegerLiteral) {
 
 // § constant_primary — real literal in parameter elaborates
 TEST(ElabA84, ConstantPrimaryRealLiteral) {
-  ElabA84Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  parameter real R = 3.14;\n"
@@ -47,7 +47,7 @@ TEST(ElabA84, ConstantPrimaryRealLiteral) {
 
 // § constant_primary — parameter reference elaborates
 TEST(ElabA84, ConstantPrimaryParameterRef) {
-  ElabA84Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  parameter int A = 5;\n"

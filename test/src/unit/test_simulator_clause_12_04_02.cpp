@@ -14,6 +14,7 @@
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_result.h"
 #include "simulator/variable.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 

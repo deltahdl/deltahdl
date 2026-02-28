@@ -26,7 +26,7 @@ TEST(ElabA701, SpecifyBlockWithAllItemKindsElaborates) {
 
 // Timing checks mixed with path declarations elaborate
 TEST(ElabA705, TimingChecksMixedWithPathsElaborate) {
-  ElabA705Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
@@ -43,7 +43,7 @@ TEST(ElabA705, TimingChecksMixedWithPathsElaborate) {
 
 // Multiple specify blocks with timing checks elaborate
 TEST(ElabA705, MultipleSpecifyBlocksElaborate) {
-  ElabA705Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"

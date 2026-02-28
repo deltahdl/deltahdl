@@ -27,7 +27,7 @@ TEST(ElabA609, TfCallElaborates) {
 
 // § primary — function call elaborates
 TEST(ElabA84, PrimaryFunctionCallElaborates) {
-  ElabA84Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  function int foo(int a); return a + 1; endfunction\n"

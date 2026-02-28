@@ -8,7 +8,7 @@ namespace {
 
 // Mixed terminal forms together elaborate
 TEST(ElabA703, MixedTerminalFormsElaborate) {
-  ElabA703Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"

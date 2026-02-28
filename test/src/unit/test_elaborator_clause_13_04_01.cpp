@@ -32,7 +32,7 @@ TEST(ParserA26, ElabFunctionDeclInModule) {
 // ---------------------------------------------------------------------------
 // §13.4.4: return with value in void function is an error
 TEST(ElabA604, VoidFunctionReturnWithValueError) {
-  ElabA604Fixture f;
+  ElabFixture f;
   ElaborateSrc(
       "module m;\n"
       "  function void f();\n"
@@ -45,7 +45,7 @@ TEST(ElabA604, VoidFunctionReturnWithValueError) {
 
 // §13.4: non-void function can return a value
 TEST(ElabA604, NonVoidFunctionReturnWithValue) {
-  ElabA604Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  function int f();\n"
@@ -72,7 +72,7 @@ TEST(ElabA609, VoidCastElaborates) {
 
 // § tf_call — function call as expression elaborates
 TEST(ElabA82, TfCallAsExprElaborates) {
-  ElabA82Fixture f;
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] x;\n"

@@ -5,6 +5,7 @@
 #include "parser/ast.h"
 #include "simulator/eval.h"
 #include "simulator/eval_array.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 

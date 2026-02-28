@@ -8,6 +8,7 @@
 
 #include "fixture_simulator.h"
 #include "simulator/constraint_solver.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 
