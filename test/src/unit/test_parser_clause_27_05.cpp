@@ -154,4 +154,22 @@ TEST(ParserAnnexA042, NestedForInsideIf) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
+// §27.1: Generate-if with nested generate-for (hierarchical conditional).
+TEST(ParserSection27, GenerateIfWithNestedFor) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (USE_PIPELINE) begin\n"
+      "    for (genvar i = 0; i < STAGES; i++) begin : stage\n"
+      "      assign pipe[i] = data[i];\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateIf);
+  ASSERT_GE(mod->items[0]->gen_body.size(), 1u);
+  EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
+}
+
 }  // namespace
