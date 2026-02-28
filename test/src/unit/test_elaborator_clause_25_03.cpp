@@ -41,4 +41,29 @@ TEST(ParserAnnexA0412, ElaborationInterfaceInstInModule) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
+// --- Elaborator resolves interface inside interface ---
+TEST(ParserAnnexA0412, ElaborationInterfaceInsideInterface) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "interface inner_if(input logic sig);\n"
+      "endinterface\n"
+      "interface outer_if;\n"
+      "  logic sig;\n"
+      "  inner_if u0(.sig(sig));\n"
+      "endinterface\n"
+      "module top;\n"
+      "  outer_if oi();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* top = design->top_modules[0];
+  ASSERT_GE(top->children.size(), 1u);
+  EXPECT_EQ(top->children[0].module_name, "outer_if");
+  auto* outer = top->children[0].resolved;
+  ASSERT_NE(outer, nullptr);
+  ASSERT_GE(outer->children.size(), 1u);
+  EXPECT_EQ(outer->children[0].module_name, "inner_if");
+  EXPECT_NE(outer->children[0].resolved, nullptr);
+}
+
 }  // namespace
