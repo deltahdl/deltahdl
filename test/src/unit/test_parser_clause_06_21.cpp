@@ -139,4 +139,28 @@ TEST(ParserSection4, Sec4_9_4_VarDeclWithAssignInBlock) {
   EXPECT_EQ(stmt->var_init->kind, ExprKind::kBinary);
 }
 
+// =============================================================================
+// 27. Static var with complex initializer expression
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_StaticVarComplexInit) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int calc();\n"
+      "    static int base = (10 * 20) + 5;\n"
+      "    return base;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FirstFuncOrTask(r);
+  ASSERT_NE(fn, nullptr);
+  ASSERT_GE(fn->func_body_stmts.size(), 1u);
+  auto* var_stmt = fn->func_body_stmts[0];
+  EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(var_stmt->var_is_static);
+  EXPECT_EQ(var_stmt->var_name, "base");
+  ASSERT_NE(var_stmt->var_init, nullptr);
+  EXPECT_EQ(var_stmt->var_init->kind, ExprKind::kBinary);
+}
+
 }  // namespace
