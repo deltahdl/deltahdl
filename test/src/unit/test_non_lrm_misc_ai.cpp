@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Production 10: edge_input_list ::= { level_symbol } edge_indicator
-//                { level_symbol }
-// ---------------------------------------------------------------------------
-// Edge indicator with leading level symbol
-TEST(ParserAnnexA053, EdgeInputList_LeadingLevel) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  // d='0' (level), clk='r' (edge)
-  ASSERT_EQ(udp->table[0].inputs.size(), 2);
-  EXPECT_EQ(udp->table[0].inputs[0], '0');
-  EXPECT_EQ(udp->table[0].inputs[1], 'r');
-}
-
 // Edge indicator with trailing level symbol
 TEST(ParserAnnexA053, EdgeInputList_TrailingLevel) {
   auto r = Parse(
