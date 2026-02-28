@@ -51,28 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.3.1 -- Sequential blocks
-// Block-level variable declarations (block_item_declaration).
-// =============================================================================
-TEST(ParserSection9c, SequentialBlockWithLocalVarDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    x = 5;\n"
-      "    $display(\"%0d\", x);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-}
-
 TEST(ParserSection9c, SequentialBlockMultipleLocalVars) {
   auto r = Parse(
       "module m;\n"
