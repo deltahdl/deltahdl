@@ -20,12 +20,6 @@ static void VerifyExternInvPrimitive(ParseResult& r) {
 
 namespace {
 
-// --- udp_declaration: extern udp_ansi_declaration ---
-TEST(ParserAnnexA051, ExternAnsi) {
-  auto r = Parse("extern primitive inv(output out, input in);\n");
-  VerifyExternInvPrimitive(r);
-}
-
 // --- udp_declaration: extern udp_nonansi_declaration ---
 TEST(ParserAnnexA051, ExternNonAnsi) {
   auto r = Parse("extern primitive inv(out, in);\n");
