@@ -30,4 +30,18 @@ TEST(ParserA24, ParamAssignmentWithUnpackedDim) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
+// =============================================================================
+// A.8.3 Expressions — constant_param_expression / param_expression
+// =============================================================================
+// § constant_param_expression ::= constant_mintypmax_expression | data_type | $
+TEST(ParserA83, ParamExprLiteralValue) {
+  auto r = Parse(
+      "module m #(parameter int P = 10);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->params[0].second->kind,
+            ExprKind::kIntegerLiteral);
+}
+
 }  // namespace

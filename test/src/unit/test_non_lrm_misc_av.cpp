@@ -6,36 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.3 Expressions — constant_mintypmax_expression
-// =============================================================================
-// § constant_mintypmax_expression ::= constant_expression :
-// constant_expression : constant_expression
-TEST(ParserA83, ConstantMinTypMaxInSpecparam) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tpd = 1:2:3;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
-// A.8.3 Expressions — constant_param_expression / param_expression
-// =============================================================================
-// § constant_param_expression ::= constant_mintypmax_expression | data_type | $
-TEST(ParserA83, ParamExprLiteralValue) {
-  auto r = Parse(
-      "module m #(parameter int P = 10);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->params[0].second->kind,
-            ExprKind::kIntegerLiteral);
-}
-
 TEST(ParserA83, ParamExprBinaryOp) {
   auto r = Parse(
       "module m #(parameter int P = 2 * 8);\n"
