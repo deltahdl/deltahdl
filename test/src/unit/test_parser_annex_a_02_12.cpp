@@ -88,4 +88,11 @@ TEST(ParserA212, LetPortItem_RegType) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetPortItem_AttributeInstance) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f((* my_attr *) logic x) = x;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
