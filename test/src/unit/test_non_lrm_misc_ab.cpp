@@ -13,15 +13,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-// sequence_expr ::= ( sequence_expr {, sequence_match_item} ) [sequence_abbrev]
-TEST(ParserA210, SequenceExpr_ParenWithMatchItems) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    (a ##1 b, x = c) |-> d);\n"
-              "endmodule\n"));
-}
-
 // property_list_of_arguments — mixed positional + named
 TEST(ParserA210, PropertyListOfArguments_Mixed) {
   EXPECT_TRUE(

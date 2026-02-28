@@ -112,4 +112,13 @@ TEST(ParserA210, SequenceListOfArguments_Mixed) {
               "endmodule\n"));
 }
 
+// sequence_expr ::= ( sequence_expr {, sequence_match_item} ) [sequence_abbrev]
+TEST(ParserA210, SequenceExpr_ParenWithMatchItems) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk)\n"
+              "    (a ##1 b, x = c) |-> d);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
