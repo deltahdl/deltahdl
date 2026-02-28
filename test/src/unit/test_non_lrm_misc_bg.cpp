@@ -111,12 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_Underscore) {
-  // Underscores are legal anywhere except as first character.
-  EXPECT_TRUE(
-      ParseOk("module m; initial x = 16'b0011_0101_0001_1111; endmodule"));
-}
-
 TEST(ParserCh50701, IntLiteral_XValue) {
   // 12'hx -- 12-bit unknown.
   EXPECT_TRUE(ParseOk("module m; initial x = 12'hx; endmodule"));

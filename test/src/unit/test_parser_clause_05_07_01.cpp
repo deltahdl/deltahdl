@@ -205,4 +205,20 @@ TEST(ParserCh50701, IntLiteral_UnbasedUnsized_Zero) {
   EXPECT_TRUE(ParseOk("module m; initial x = '0; endmodule"));
 }
 
+// § unbased_unsized_literal — 'z (z_or_x)
+TEST(ParserA87, UnbasedUnsizedZ) {
+  auto r = Parse("module m; logic x; initial x = 'z; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
+}
+
+TEST(ParserCh50701, IntLiteral_Underscore) {
+  // Underscores are legal anywhere except as first character.
+  EXPECT_TRUE(
+      ParseOk("module m; initial x = 16'b0011_0101_0001_1111; endmodule"));
+}
+
 }  // namespace
