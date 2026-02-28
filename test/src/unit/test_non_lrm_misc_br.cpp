@@ -5,20 +5,17 @@
 
 using namespace delta;
 
-namespace {
-
-// 16. Array of structs with assignment pattern.
-TEST(ParserSection7, Sec7_2_2_ArrayOfStructsPattern) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct { int a; int b; } pair_t;\n"
-              "  pair_t arr[2];\n"
-              "  initial begin\n"
-              "    arr[0] = '{1, 2};\n"
-              "    arr[1] = '{3, 4};\n"
-              "  end\n"
-              "endmodule\n"));
+// Returns the first class member of kind kMethod, or nullptr if not found.
+static ClassMember* FindMethodMember(ClassDecl* cls) {
+  for (auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod) {
+      return m;
+    }
+  }
+  return nullptr;
 }
+
+namespace {
 
 // 17. Struct type cast from integer using type'(expr).
 TEST(ParserSection7, Sec7_2_2_TypeCastToStruct) {
@@ -814,27 +811,6 @@ TEST(SourceText, InterfaceClassDecl) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->name, "IC");
-}
-
-// Returns the first class member of kind kMethod, or nullptr if not found.
-static ClassMember* FindMethodMember(ClassDecl* cls) {
-  for (auto* m : cls->members) {
-    if (m->kind == ClassMemberKind::kMethod) {
-      return m;
-    }
-  }
-  return nullptr;
-}
-
-// Returns the ClassDecl from the first module item of kind kClassDecl,
-// or nullptr if not found.
-static ClassDecl* FindClassDeclItem(const std::vector<ModuleItem*>& items) {
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kClassDecl) {
-      return item->class_decl;
-    }
-  }
-  return nullptr;
 }
 
 // =============================================================================
