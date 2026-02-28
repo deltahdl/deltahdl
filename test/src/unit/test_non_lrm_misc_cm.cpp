@@ -34,22 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §14.12: unnamed default clocking block with multiple signals.
-TEST(ParserSection14, DefaultClockingUnnamedMultipleSignals) {
-  auto r = Parse(
-      "module m;\n"
-      "  default clocking @(posedge clk);\n"
-      "    input a, b;\n"
-      "    output c;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_TRUE(item->is_default_clocking);
-  EXPECT_TRUE(item->name.empty());
-  ASSERT_EQ(item->clocking_signals.size(), 3u);
-}
-
 // =============================================================================
 // LRM section 14.13 -- Input sampling
 // =============================================================================

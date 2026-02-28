@@ -54,4 +54,18 @@ TEST(ParserSection13, TaskWithNoPorts) {
   EXPECT_TRUE(tk->func_args.empty());
 }
 
+TEST(ParserA27, TfPortItemVarWithDirection) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(input var int x);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[0].name, "x");
+}
+
 }  // namespace
