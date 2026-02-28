@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, RepeatRange_Range) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins t = (1 [* 2:5]);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // §A.2.11 Production #17: cover_cross
 // =============================================================================

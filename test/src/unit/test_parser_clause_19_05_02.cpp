@@ -153,4 +153,15 @@ TEST(ParserA211, RepeatRange_SingleExpr) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, RepeatRange_Range) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 [* 2:5]);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
