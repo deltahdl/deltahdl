@@ -72,4 +72,11 @@ TEST(ParserA301, GateInst_AndBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA301, GateInst_NandBasic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nand (out, a, b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

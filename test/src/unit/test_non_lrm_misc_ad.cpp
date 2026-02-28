@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_NandBasic) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nand (out, a, b);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA301, GateInst_OrBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
