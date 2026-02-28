@@ -44,4 +44,29 @@ TEST(SourceText, BindDirectiveHasSourceLoc) {
   EXPECT_NE(r.cu->bind_directives[0]->loc.line, 0u);
 }
 
+// Multiple bind directives.
+TEST(SourceText, MultipleBindDirectives) {
+  auto r = Parse(
+      "bind mod1 chk1 c1(.a(s));\n"
+      "bind mod2 chk2 c2(.a(s));\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->bind_directives.size(), 2u);
+  EXPECT_EQ(r.cu->bind_directives[0]->target, "mod1");
+  EXPECT_EQ(r.cu->bind_directives[1]->target, "mod2");
+}
+
+// Bind mixed with other top-level descriptions.
+TEST(SourceText, BindMixedWithOtherDescriptions) {
+  auto r = Parse(
+      "module m; endmodule\n"
+      "bind m checker_mod chk_i(.a(sig));\n"
+      "package p; endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->bind_directives.size(), 1u);
+  EXPECT_EQ(r.cu->packages.size(), 1u);
+}
+
 }  // namespace

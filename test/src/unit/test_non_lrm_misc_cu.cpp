@@ -36,31 +36,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// Multiple bind directives.
-TEST(SourceText, MultipleBindDirectives) {
-  auto r = Parse(
-      "bind mod1 chk1 c1(.a(s));\n"
-      "bind mod2 chk2 c2(.a(s));\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->bind_directives.size(), 2u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "mod1");
-  EXPECT_EQ(r.cu->bind_directives[1]->target, "mod2");
-}
-
-// Bind mixed with other top-level descriptions.
-TEST(SourceText, BindMixedWithOtherDescriptions) {
-  auto r = Parse(
-      "module m; endmodule\n"
-      "bind m checker_mod chk_i(.a(sig));\n"
-      "package p; endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->packages.size(), 1u);
-}
-
 // --- Non-ANSI port declarations (LRM §23.2.2.1) ---
 TEST(ParserSection23, NonAnsiPortsBasic) {
   auto r = Parse(
