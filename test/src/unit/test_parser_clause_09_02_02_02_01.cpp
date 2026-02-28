@@ -109,4 +109,23 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombFunctionCall) {
               "endmodule\n"));
 }
 
+// ---------------------------------------------------------------------------
+// 22. always_comb has implicit sensitivity (no sensitivity list on item)
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_ImplicitSensitivity) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c;\n"
+      "  always_comb c = a ^ b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysComb(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  // always_comb must not have an explicit sensitivity list
+  EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+}
+
 }  // namespace
