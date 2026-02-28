@@ -46,4 +46,22 @@ TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
   EXPECT_EQ(r.cu->modules[1]->name, "b");
 }
 
+// 2. Compilation-unit scope: declarations outside any other scope.
+// CU scope can contain anything valid in a package (§26.2) —
+// functions, tasks, typedefs, parameters, classes.
+TEST(ParserClause03, Cl3_12_1_CuScopeContainsPackageItems) {
+  auto r = ParseWithPreprocessor(
+      "function int helper(int x); return x + 1; endfunction\n"
+      "task auto_task; endtask\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // Functions and tasks in CU scope are stored in cu_items.
+  ASSERT_EQ(r.cu->cu_items.size(), 2u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "helper");
+  EXPECT_EQ(r.cu->cu_items[1]->kind, ModuleItemKind::kTaskDecl);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
