@@ -182,4 +182,19 @@ TEST(ParserAnnexA053, EdgeIndicator_Parenx1) {
   ASSERT_EQ(udp->table[0].inputs.size(), 2);
 }
 
+// ---------------------------------------------------------------------------
+// Production 12: current_state ::= level_symbol
+// ---------------------------------------------------------------------------
+// current_state as '0'
+TEST(ParserAnnexA053, CurrentState_Zero) {
+  auto r = Parse(
+      "primitive p(output reg q, input s, r);\n"
+      "  table\n"
+      "    1 0 : 0 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->udps[0]->table[0].current_state, '0');
+}
+
 }  // namespace
