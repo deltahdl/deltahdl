@@ -35,4 +35,19 @@ TEST(ParserA27, TaskBodyWithStatements) {
   EXPECT_GE(item->func_body_stmts.size(), 2u);
 }
 
+TEST(ParserA27, TfPortDeclOldStyleVar) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task;\n"
+      "    input var int x;\n"
+      "    $display(\"%0d\", x);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+}
+
 }  // namespace

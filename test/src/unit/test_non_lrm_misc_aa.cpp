@@ -44,21 +44,6 @@ TEST(ParserA27, TfPortItemVar) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-TEST(ParserA27, TfPortDeclOldStyleVar) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task;\n"
-      "    input var int x;\n"
-      "    $display(\"%0d\", x);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 1u);
-  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-}
-
 // typedef in function body
 TEST(ParserA28, TypedefInFunction) {
   EXPECT_TRUE(
