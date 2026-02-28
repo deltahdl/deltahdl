@@ -51,4 +51,16 @@ TEST(ParserSection26, PackageWithFunction) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
+TEST(ParserSection26, MultiplePackages) {
+  auto r = Parse(
+      "package a;\n"
+      "endpackage\n"
+      "package b;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 2u);
+  EXPECT_EQ(r.cu->packages[0]->name, "a");
+  EXPECT_EQ(r.cu->packages[1]->name, "b");
+}
+
 }  // namespace

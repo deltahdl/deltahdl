@@ -7,58 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection26, ModuleImportSpecific) {
-  auto r = Parse(
-      "package p;\n"
-      "  parameter int X = 1;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import p::X;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  const auto* imp =
-      FindItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
-  ASSERT_NE(imp, nullptr);
-  EXPECT_EQ(imp->import_item.package_name, "p");
-  EXPECT_EQ(imp->import_item.item_name, "X");
-}
-
-// =============================================================================
-// LRM section 26.6 -- Exporting from packages
-// =============================================================================
-TEST(ParserSection26, PackageExportWildcard) {
-  auto r = Parse(
-      "package p;\n"
-      "  export *::*;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kExportDecl));
-}
-
-TEST(ParserSection26, PackageExportSpecific) {
-  auto r = Parse(
-      "package p;\n"
-      "  export other_pkg::some_func;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
-TEST(ParserSection26, MultiplePackages) {
-  auto r = Parse(
-      "package a;\n"
-      "endpackage\n"
-      "package b;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 2u);
-  EXPECT_EQ(r.cu->packages[0]->name, "a");
-  EXPECT_EQ(r.cu->packages[1]->name, "b");
-}
-
 // =============================================================================
 // LRM section 26.2 -- Package with struct typedef and class
 // =============================================================================
