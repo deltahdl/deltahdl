@@ -51,25 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.4 -- Procedural timing controls
-// Zero-delay, chained delays, delay expressions.
-// =============================================================================
-TEST(ParserSection9c, ZeroDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #0 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-  EXPECT_NE(stmt->delay, nullptr);
-}
-
 TEST(ParserSection9c, ChainedDelayControls) {
   auto r = Parse(
       "module m;\n"
