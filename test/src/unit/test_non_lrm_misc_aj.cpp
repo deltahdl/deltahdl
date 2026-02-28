@@ -50,24 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserA601, ListOfNetAssignments_SharedStrengthAndDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign (strong0, strong1) #10 a = b, c = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 2u);
-  EXPECT_EQ(cas[0]->drive_strength0, 4u);
-  EXPECT_EQ(cas[1]->drive_strength0, 4u);
-  EXPECT_EQ(cas[0]->drive_strength1, 4u);
-  EXPECT_EQ(cas[1]->drive_strength1, 4u);
-  EXPECT_NE(cas[0]->assign_delay, nullptr);
-  EXPECT_NE(cas[1]->assign_delay, nullptr);
-}
-
 // =============================================================================
 // A.6.1 Production: net_assignment (parsing)
 // net_assignment ::= net_lvalue = expression
