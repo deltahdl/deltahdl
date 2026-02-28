@@ -117,4 +117,11 @@ TEST(ParserSection4, Sec4_6_ProgramWithInitialBlock) {
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
+TEST_F(ProgramTestParse, ProgramAutomaticLifetime) {
+  auto* unit = Parse("program automatic auto_prog; endprogram");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "auto_prog");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+}
+
 }  // namespace

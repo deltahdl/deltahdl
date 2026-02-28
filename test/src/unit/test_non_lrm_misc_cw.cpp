@@ -26,13 +26,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-TEST_F(ProgramTestParse, ProgramAutomaticLifetime) {
-  auto* unit = Parse("program automatic auto_prog; endprogram");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "auto_prog");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-}
-
 TEST_F(ProgramTestParse, ProgramWithMultipleInitialBlocks) {
   auto* unit = Parse(
       "program p;\n"
