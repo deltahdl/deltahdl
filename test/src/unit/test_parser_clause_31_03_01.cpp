@@ -51,4 +51,26 @@ TEST(ParserAnnexA, A7TimingCheckSetup) {
   EXPECT_FALSE(r.has_errors);
 }
 
+ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+  }
+  return nullptr;
+}
+
+TEST(ParserA701, SpecifyItemSystemTimingCheck) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    $setup(data, posedge clk, 10);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kTimingCheck);
+}
+
 }  // namespace

@@ -442,4 +442,23 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountZero) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
+// --- 24. Nonblocking with negedge intra-assignment event ---
+TEST(ParserSection10, Sec10_4_2_IntraAssignEventNegedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, clk;\n"
+      "  initial begin\n"
+      "    q <= @(negedge clk) d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace

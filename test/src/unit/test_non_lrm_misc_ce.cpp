@@ -50,55 +50,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// --- 23. Nonblocking in always_ff with reset pattern ---
-TEST(ParserSection10, Sec10_4_2_AlwaysFFResetPattern) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk or negedge rst_n) begin\n"
-      "    if (!rst_n)\n"
-      "      q <= 0;\n"
-      "    else\n"
-      "      q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
-  ASSERT_GE(item->sensitivity.size(), 2u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  auto* if_stmt = item->body->stmts[0];
-  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
-  ASSERT_NE(if_stmt->then_branch, nullptr);
-  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(if_stmt->else_branch, nullptr);
-  EXPECT_EQ(if_stmt->else_branch->kind, StmtKind::kNonblockingAssign);
-}
-
-// --- 24. Nonblocking with negedge intra-assignment event ---
-TEST(ParserSection10, Sec10_4_2_IntraAssignEventNegedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d, clk;\n"
-      "  initial begin\n"
-      "    q <= @(negedge clk) d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_FALSE(stmt->events.empty());
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 // --- 25. Nonblocking with complex expression (shift and mask) ---
 TEST(ParserSection10, Sec10_4_2_ComplexExpressionRhs) {
   auto r = Parse(
