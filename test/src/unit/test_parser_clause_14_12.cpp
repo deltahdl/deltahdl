@@ -43,4 +43,18 @@ TEST(ParserSection14, DefaultClockingNegedge) {
   ASSERT_EQ(item->clocking_signals.size(), 2u);
 }
 
+// §14.12: default clocking block with end label.
+TEST(ParserSection14, DefaultClockingEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking bus @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking : bus\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_TRUE(item->is_default_clocking);
+  EXPECT_EQ(item->name, "bus");
+}
+
 }  // namespace

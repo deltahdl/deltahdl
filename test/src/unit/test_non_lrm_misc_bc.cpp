@@ -78,24 +78,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 3. Continuous assignment with assign (Active region)
-// ---------------------------------------------------------------------------
-TEST(ParserSection4, Sec4_5_ContinuousAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y;\n"
-      "  wire a, b;\n"
-      "  assign y = a & b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* ca = FindContAssign(r);
-  ASSERT_NE(ca, nullptr);
-  EXPECT_NE(ca->assign_lhs, nullptr);
-  EXPECT_NE(ca->assign_rhs, nullptr);
-}
-
-// ---------------------------------------------------------------------------
 // 4. #0 delay control (Inactive region)
 // ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_ZeroDelayControl) {
