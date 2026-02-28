@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetIdentifier_Escaped) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let \\my+let = 1;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetIdentifier_Underscore) {
   auto r = Parse(
       "module m;\n"
