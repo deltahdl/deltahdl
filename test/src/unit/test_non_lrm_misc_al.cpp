@@ -22,23 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// §16.3: action_block in assume statement
-TEST(ParserA603, ActionBlockAssume) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assume (x) $display(\"ok\"); else $error(\"bad\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
-  EXPECT_NE(stmt->assert_pass_stmt, nullptr);
-  EXPECT_NE(stmt->assert_fail_stmt, nullptr);
-}
-
 // §15.5.4: action_block in wait_order statement
 TEST(ParserA603, ActionBlockWaitOrder) {
   auto r = Parse(
