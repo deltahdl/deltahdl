@@ -261,4 +261,31 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardUnaryNegation) {
   EXPECT_EQ(item->sensitivity[0].iff_condition->kind, ExprKind::kUnary);
 }
 
+// ---------------------------------------------------------------------------
+// iff guard with bitwise-and in guard expression
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardBitwiseAnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff (mask & enable)) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// ParseOk: three events all with iff guards (or-separated)
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardThreeEventsOr) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  always @(posedge a iff g1 or negedge b iff g2 or edge c iff g3)\n"
+      "    q <= d;\n"
+      "endmodule\n"));
+}
+
 }  // namespace
