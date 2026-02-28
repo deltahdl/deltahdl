@@ -72,4 +72,11 @@ TEST(ParserA303, EnableTerminal_PassEnableExpr) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, InoutTerminal_BitSelect) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  tran (a[0], b[1]);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
