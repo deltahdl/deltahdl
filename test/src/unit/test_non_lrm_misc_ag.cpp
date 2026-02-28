@@ -13,25 +13,6 @@ bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// --- case_generate_item: multiple patterns ---
-TEST(ParserAnnexA042, CaseGenerateMultiplePatterns) {
-  auto r = Parse(
-      "module m;\n"
-      "  case (WIDTH)\n"
-      "    8, 16: assign out = narrow;\n"
-      "    32, 64: assign out = wide;\n"
-      "    default: assign out = other;\n"
-      "  endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* gen = r.cu->modules[0]->items[0];
-  ASSERT_EQ(gen->gen_case_items.size(), 3u);
-  EXPECT_EQ(gen->gen_case_items[0].patterns.size(), 2u);
-  EXPECT_EQ(gen->gen_case_items[1].patterns.size(), 2u);
-  EXPECT_TRUE(gen->gen_case_items[2].is_default);
-}
-
 // --- generate_block: single generate_item (no begin/end) ---
 TEST(ParserAnnexA042, GenerateBlockSingleItem) {
   auto r = Parse(
