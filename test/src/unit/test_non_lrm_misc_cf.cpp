@@ -41,21 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, InsideBasicListLhs) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a inside {1, 2, 3}) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* cond = stmt->condition;
-  ASSERT_NE(cond, nullptr);
-  ASSERT_NE(cond->lhs, nullptr);
-  EXPECT_EQ(cond->lhs->kind, ExprKind::kIdentifier);
-}
-
 TEST(ParserSection11, InsideWithRange) {
   auto r = Parse(
       "module t;\n"

@@ -124,4 +124,43 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncReturningVoid) {
   EXPECT_EQ(item->name, "log_msg");
 }
 
+struct ParseResult6f {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6f Parse(const std::string& src) {
+  ParseResult6f result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult6f& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+TEST(ParserSection6, RealInFunction) {
+  // §6.12: real used as function return type.
+  auto r = Parse(
+      "module t;\n"
+      "  function real compute();\n"
+      "    return 1.5;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kReal);
+}
+
 }  // namespace
