@@ -111,11 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_UnsizedHex) {
-  // 'h 837FF -- unsized hexadecimal.
-  EXPECT_TRUE(ParseOk("module m; initial x = 'h837FF; endmodule"));
-}
-
 TEST(ParserCh50701, IntLiteral_SizedOctal) {
   EXPECT_TRUE(ParseOk("module m; initial x = 8'o77; endmodule"));
 }

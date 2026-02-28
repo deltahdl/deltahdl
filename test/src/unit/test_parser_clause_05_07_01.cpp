@@ -132,4 +132,9 @@ TEST(ParserCh50701, IntLiteral_SizedHex) {
   EXPECT_EQ(rhs->int_val, 0xFFu);
 }
 
+TEST(ParserCh50701, IntLiteral_UnsizedHex) {
+  // 'h 837FF -- unsized hexadecimal.
+  EXPECT_TRUE(ParseOk("module m; initial x = 'h837FF; endmodule"));
+}
+
 }  // namespace
