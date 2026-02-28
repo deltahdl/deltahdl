@@ -163,4 +163,16 @@ TEST(ParserA303, InputTerminal_NOutputExpr) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, InputTerminal_MultipleInputs) {
+  // Multiple input_terminals in n-input gate
+  auto r = Parse(
+      "module m;\n"
+      "  nor (out, a, b, c, d, e);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNor);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 6u);
+}
+
 }  // namespace
