@@ -44,24 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// =============================================================================
-// LRM section 13.4 -- Functions (additional tests)
-// =============================================================================
-// Function with no ports (implicit return by function name assignment).
-TEST(ParserSection13, FunctionNoPorts) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int get_magic();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "get_magic");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->func_args.empty());
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
-}
-
 // Function with multiple statements in body.
 TEST(ParserSection13, FunctionMultipleBodyStmts) {
   auto r = Parse(
