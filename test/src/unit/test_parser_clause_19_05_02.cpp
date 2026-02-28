@@ -114,4 +114,18 @@ TEST(ParserA211, TransRangeList_NonConsecutiveRepeat) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// §A.2.11 Production #15: trans_item (alias for covergroup_range_list)
+// =============================================================================
+TEST(ParserA211, TransItem_SingleValue) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (5 => 10);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
