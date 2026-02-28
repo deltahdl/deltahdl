@@ -416,4 +416,29 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectOnLhs) {
   ASSERT_NE(lhs->index_end, nullptr);
 }
 
+static ModuleItem* FirstContAssign(ParseResult11g& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kContAssign) return item;
+  }
+  return nullptr;
+}
+
+// --- Part-select in continuous assignment RHS ---
+TEST(ParserSection11, Sec11_4_1_PartSelectInContAssignRhs) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire [15:0] data;\n"
+      "  wire [7:0] low;\n"
+      "  assign low = data[7:0];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* ca = FirstContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_rhs, nullptr);
+  EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(ca->assign_rhs->index, nullptr);
+  ASSERT_NE(ca->assign_rhs->index_end, nullptr);
+}
+
 }  // namespace

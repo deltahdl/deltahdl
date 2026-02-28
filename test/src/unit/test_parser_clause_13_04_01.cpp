@@ -270,4 +270,35 @@ TEST(ParserSection13, NestedFunctionCalls) {
   EXPECT_EQ(stmt->rhs->args[0]->kind, ExprKind::kCall);
 }
 
+// =============================================================================
+// LRM section 9.3.1 -- Blocks with return statement (inside function).
+// =============================================================================
+TEST(ParserSection9, Sec9_3_1_BlockWithReturnInFunction) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function int compute(input int a, input int b);\n"
+              "    begin\n"
+              "      int tmp;\n"
+              "      tmp = a + b;\n"
+              "      return tmp;\n"
+              "    end\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
+// --- Packed struct as function return type ---
+TEST(ParserSection7, Sec7_2_1_PackedAsFuncReturn) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct packed {\n"
+              "    logic [7:0] a;\n"
+              "    logic [7:0] b;\n"
+              "  } pair_t;\n"
+              "  function pair_t make_pair;\n"
+              "    input logic [7:0] x, y;\n"
+              "    make_pair = {x, y};\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
 }  // namespace
