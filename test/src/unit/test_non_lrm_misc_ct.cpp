@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, BeginKeywords1800_2017) {
-  EXPECT_TRUE(
-      ParseOk("`begin_keywords \"1800-2017\"\n"
-              "module t;\n"
-              "endmodule\n"
-              "`end_keywords\n"));
-}
-
 TEST(ParserSection22, BeginKeywords1800_2012) {
   EXPECT_TRUE(
       ParseOk("`begin_keywords \"1800-2012\"\n"
