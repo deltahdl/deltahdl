@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, CmosSwitchInst_RcmosNamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  rcmos rc1(out, in, nctrl, pctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_inst_name, "rc1");
-}
-
 // =============================================================================
 // A.3.1 Production #3: enable_gate_instance
 // enable_gate_instance ::= [name_of_instance]

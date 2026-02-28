@@ -41,4 +41,15 @@ TEST(ParserA301, CmosSwitchInst_Named) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
+TEST(ParserA301, CmosSwitchInst_RcmosNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  rcmos rc1(out, in, nctrl, pctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_inst_name, "rc1");
+}
+
 }  // namespace
