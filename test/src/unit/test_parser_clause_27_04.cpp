@@ -102,4 +102,19 @@ TEST(ParserAnnexA042, GenvarIterationPostDecrement) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
+// --- generate_block: single generate_item (no begin/end) ---
+TEST(ParserAnnexA042, GenerateBlockSingleItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i++)\n"
+      "    assign out[i] = in[i];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
+  ASSERT_EQ(gen->gen_body.size(), 1u);
+  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
+}
+
 }  // namespace
