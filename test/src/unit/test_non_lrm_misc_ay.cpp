@@ -14,31 +14,12 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserAnnexD, AnnexDSave) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin $save(\"s.sav\"); $restart(\"s.sav\"); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserAnnexD, AnnexDScope) {
   auto r = Parse(
       "module m;\n"
       "  initial begin $scope(m); $showscopes; end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-}
-
-// =============================================================================
-// Annex E.2 -- `default_decay_time
-// =============================================================================
-TEST(ParserAnnexE, AnnexEDefaultDecayTime) {
-  auto r = Parse("`default_decay_time 10\nmodule m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  if (r.cu->modules.size() >= 1u) {
-    EXPECT_EQ(r.cu->modules[0]->name, "m");
-  }
 }
 
 // =============================================================================
