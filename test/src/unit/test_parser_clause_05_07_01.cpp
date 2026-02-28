@@ -161,4 +161,9 @@ TEST(ParserA87, UnbasedUnsizedZero) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
+TEST(ParserCh50701, IntLiteral_SignedLiteral) {
+  // 4'shf is a signed 4-bit number (value -1 in two's complement).
+  EXPECT_TRUE(ParseOk("module m; initial x = 4'shf; endmodule"));
+}
+
 }  // namespace

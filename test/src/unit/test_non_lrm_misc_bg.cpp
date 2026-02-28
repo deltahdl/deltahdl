@@ -111,11 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_SignedLiteral) {
-  // 4'shf is a signed 4-bit number (value -1 in two's complement).
-  EXPECT_TRUE(ParseOk("module m; initial x = 4'shf; endmodule"));
-}
-
 TEST(ParserCh50701, IntLiteral_UnbasedUnsized_One) {
   // '1 sets all bits to 1.
   auto r = Parse(
