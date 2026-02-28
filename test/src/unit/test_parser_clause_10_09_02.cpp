@@ -20,4 +20,16 @@ TEST(ParserSection7, Sec7_2_2_ArrayOfStructsPattern) {
               "endmodule\n"));
 }
 
+// §12.6: named assignment pattern
+TEST(ParserA60701, PatternAssignmentNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = '{a: 1, b: 2};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
