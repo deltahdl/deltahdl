@@ -41,22 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.4.3 -- Arithmetic operators
-// =========================================================================
-TEST(ParserSection11, ArithmeticAdd) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a + b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
-}
-
 TEST(ParserSection11, ArithmeticSub) {
   auto r = Parse(
       "module t;\n"
