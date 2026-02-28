@@ -1,0 +1,26 @@
+// §28.7: MOS switches
+
+#include "fixture_parser.h"
+#include "helpers_parser_verify.h"
+
+using namespace delta;
+
+namespace {
+
+// =============================================================================
+// A.3.1 Production #1: gate_instantiation (mos_switchtype alternative)
+// gate_instantiation ::=
+//   mos_switchtype [delay3] mos_switch_instance {, mos_switch_instance} ;
+// =============================================================================
+TEST(ParserA301, GateInst_NmosBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  nmos (out, in, ctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNmos);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
+}  // namespace

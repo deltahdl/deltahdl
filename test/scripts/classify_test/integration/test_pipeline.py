@@ -3,7 +3,6 @@
 from types import SimpleNamespace
 
 import classify_test
-import classify_test._github
 
 _run = getattr(classify_test, "_run")
 
@@ -54,7 +53,7 @@ def _stub_externals(monkeypatch, tmp_path, classifier):
     )
     monkeypatch.setattr(classify_test, "CMAKE_PATH", cmake)
     monkeypatch.setattr(
-        classify_test._github, "maybe_tick_issue_checkbox",
+        classify_test, "maybe_tick_issue_checkbox",
         lambda args, tests: None,
     )
 
@@ -225,7 +224,7 @@ def test_self_named_source_not_treated_as_duplicate(tmp_path, monkeypatch):
     _run(SimpleNamespace(
         file=str(src), output_dir=str(tmp_path), dry_run=False,
         lrm=str(tmp_path / "lrm.txt"), test="Keeper",
-        issue=None, organization=None, repo=None,
+        issue=1, organization="test-org", repo="test-repo",
     ))
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
