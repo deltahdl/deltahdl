@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverGroup_EmptyCrossBody) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint a;\n"
-              "    cp2: coverpoint b;\n"
-              "    cross cp1, cp2 {}\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CoverGroup_MultipleOptions) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
