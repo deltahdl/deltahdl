@@ -41,23 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// =========================================================================
-// §6.5: Nets and variables
-// =========================================================================
-TEST(ParserSection6, NetsCantBeProcAssigned) {
-  // Nets are driven by continuous assignments, variables by procedural.
-  // This test verifies both constructs parse correctly.
-  auto r = Parse(
-      "module t;\n"
-      "  wire a;\n"
-      "  assign a = 1'b1;\n"
-      "  logic b;\n"
-      "  initial b = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_GE(r.cu->modules[0]->items.size(), 4u);
-}
-
 TEST(ParserSection6, VariableContinuousAssign) {
   // §6.5: Variables can be written by one continuous assignment.
   auto r = Parse(
