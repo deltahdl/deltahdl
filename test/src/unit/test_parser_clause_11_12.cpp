@@ -326,4 +326,15 @@ TEST(ParserA212, LetArgs_SinglePositional) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetArgs_MultiplePositional) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(a, b, c) = a + b + c;\n"
+              "  initial begin\n"
+              "    int z;\n"
+              "    z = f(1, 2, 3);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
