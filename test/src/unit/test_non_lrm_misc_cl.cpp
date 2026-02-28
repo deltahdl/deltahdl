@@ -44,26 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// =============================================================================
-// LRM section 13.5.3 -- Default argument values (additional tests)
-// =============================================================================
-// Mix of default and non-default args (non-default first, default last).
-TEST(ParserSection13, MixedDefaultAndNonDefaultArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int fun(int j, string s = \"no\", int k = 0);\n"
-      "    return j;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "fun");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_EQ(fn->func_args.size(), 3u);
-  EXPECT_EQ(fn->func_args[0].default_value, nullptr);
-  EXPECT_NE(fn->func_args[1].default_value, nullptr);
-  EXPECT_NE(fn->func_args[2].default_value, nullptr);
-}
-
 // Default arg with expression (not just literal).
 TEST(ParserSection13, DefaultArgWithExpression) {
   auto r = Parse(

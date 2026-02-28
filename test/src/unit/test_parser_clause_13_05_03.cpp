@@ -87,4 +87,41 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithDefaultArgs) {
   EXPECT_NE(item->func_args[1].default_value, nullptr);
 }
 
+// --- Test helpers ---
+struct ParseResult14 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult14 Parse(const std::string& src) {
+  ParseResult14 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// LRM section 13.5.3 -- Default argument values (additional tests)
+// =============================================================================
+// Mix of default and non-default args (non-default first, default last).
+TEST(ParserSection13, MixedDefaultAndNonDefaultArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int fun(int j, string s = \"no\", int k = 0);\n"
+      "    return j;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "fun");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 3u);
+  EXPECT_EQ(fn->func_args[0].default_value, nullptr);
+  EXPECT_NE(fn->func_args[1].default_value, nullptr);
+  EXPECT_NE(fn->func_args[2].default_value, nullptr);
+}
+
 }  // namespace

@@ -63,15 +63,6 @@ TEST(ParserSection6, MatchingTypesSameSigningModifier) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, ImplicitNetInContAssign) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  assign out = in1 & in2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection6, ImplicitNetInModuleInst) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
