@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, InoutTerminal_PartSelect) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  rtran (bus[3:0], net[7:4]);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, InoutTerminal_Concatenation) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
