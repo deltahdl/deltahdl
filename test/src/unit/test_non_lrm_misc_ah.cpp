@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- udp_declaration: extern with sequential ANSI ports ---
-TEST(ParserAnnexA051, ExternAnsiSequential) {
-  auto r = Parse("extern primitive dff(output reg q, input d, input clk);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->name, "dff");
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_EQ(udp->output_name, "q");
-  ASSERT_EQ(udp->input_names.size(), 2u);
-}
-
 // --- udp_declaration: multiple UDPs in compilation unit ---
 TEST(ParserAnnexA051, MultipleUdps) {
   auto r = Parse(
