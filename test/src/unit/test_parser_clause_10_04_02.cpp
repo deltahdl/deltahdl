@@ -63,4 +63,17 @@ TEST(ParserA602, NonblockingAssignment_WithIntraEvent) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
+TEST(ParserA602, NonblockingAssignment_ConcatLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin {q, r} <= {d, e}; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
+}
+
 }  // namespace
