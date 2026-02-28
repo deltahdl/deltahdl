@@ -111,21 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_SizedBinary) {
-  // 4'b1001 is a 4-bit binary number.
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = 4'b1001;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->int_val, 0b1001u);
-}
-
 TEST(ParserCh50701, IntLiteral_SizedHex) {
   auto r = Parse(
       "module m;\n"

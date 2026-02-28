@@ -17,4 +17,23 @@ TEST(ParserA23, ListOfSpecparamAssignmentsSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// system_timing_check is a specify_item (mixed with paths)
+TEST(ParserA705, TimingCheckMixedWithPaths) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (a => b) = 5;\n"
+      "  $setup(data, posedge clk, 10);\n"
+      "  (c *> d) = 10;\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 3u);
+  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
+  EXPECT_EQ(spec->specify_items[1]->kind, SpecifyItemKind::kTimingCheck);
+  EXPECT_EQ(spec->specify_items[2]->kind, SpecifyItemKind::kPathDecl);
+}
+
 }  // namespace
