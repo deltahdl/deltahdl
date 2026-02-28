@@ -53,4 +53,22 @@ TEST(ParserA603, SeqBlockNamedWithEndLabel) {
   EXPECT_EQ(body->label, "blockB");
 }
 
+// §9.3.4: Named fork block
+TEST(ParserA603, ForkNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : my_fork\n"
+      "      #10 a = 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "my_fork");
+}
+
 }  // namespace
