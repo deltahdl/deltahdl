@@ -260,4 +260,16 @@ TEST(ParserAnnexA053, NextState_Zero) {
   EXPECT_EQ(r.cu->udps[0]->table[0].output, '0');
 }
 
+// next_state as output_symbol '1'
+TEST(ParserAnnexA053, NextState_One) {
+  auto r = Parse(
+      "primitive p(output reg q, input d, en);\n"
+      "  table\n"
+      "    1 1 : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->udps[0]->table[0].output, '1');
+}
+
 }  // namespace
