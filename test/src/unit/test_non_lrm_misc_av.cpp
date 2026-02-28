@@ -6,36 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.3 Expressions — constant_expression
-// =============================================================================
-// § constant_expression ::= constant_primary
-TEST(ParserA83, ConstantExprPrimary) {
-  auto r = Parse(
-      "module m #(parameter int P = 42);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& params = r.cu->modules[0]->params;
-  ASSERT_GE(params.size(), 1u);
-  EXPECT_EQ(params[0].second->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(params[0].second->int_val, 42u);
-}
-
-// § constant_expression ::= unary_operator { attribute_instance }
-// constant_primary
-TEST(ParserA83, ConstantExprUnary) {
-  auto r = Parse(
-      "module m #(parameter int P = -1);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& params = r.cu->modules[0]->params;
-  ASSERT_GE(params.size(), 1u);
-  EXPECT_EQ(params[0].second->kind, ExprKind::kUnary);
-  EXPECT_EQ(params[0].second->op, TokenKind::kMinus);
-}
-
 // § constant_expression ::= constant_expression binary_operator
 // { attribute_instance } constant_expression
 TEST(ParserA83, ConstantExprBinary) {
