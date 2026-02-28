@@ -5,32 +5,44 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult4e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
 
-// =============================================================================
-// 16. Automatic function with ref argument
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_AutoFuncWithRefArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic void swap(ref int x, ref int y);\n"
-      "    int tmp;\n"
-      "    tmp = x;\n"
-      "    x = y;\n"
-      "    y = tmp;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_automatic);
-  ASSERT_EQ(item->func_args.size(), 2u);
-  EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
-  EXPECT_EQ(item->func_args[0].name, "x");
-  EXPECT_EQ(item->func_args[1].direction, Direction::kRef);
-  EXPECT_EQ(item->func_args[1].name, "y");
+static ParseResult4e Parse(const std::string& src) {
+  ParseResult4e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
 }
+
+// Returns the first function or task declaration from the first module.
+static ModuleItem* FirstFuncOrTask(ParseResult4e& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl)
+      return item;
+  }
+  return nullptr;
+}
+
+static ClassMember* FindClassMethod(ParseResult4e& r) {
+  if (r.cu->classes.empty()) return nullptr;
+  for (auto* m : r.cu->classes[0]->members) {
+    if (m->kind == ClassMemberKind::kMethod) return m;
+  }
+  return nullptr;
+}
+
+namespace {
 
 // =============================================================================
 // 17. Automatic function returning void
@@ -311,43 +323,6 @@ TEST(ParserSection4, Sec4_9_3_TaskInProgramBlock) {
               "    $display(\"x=%0d\", x);\n"
               "  endtask\n"
               "endprogram\n"));
-}
-
-struct ParseResult4e {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult4e Parse(const std::string& src) {
-  ParseResult4e result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-// Returns the first function or task declaration from the first module.
-static ModuleItem* FirstFuncOrTask(ParseResult4e& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl ||
-        item->kind == ModuleItemKind::kTaskDecl)
-      return item;
-  }
-  return nullptr;
-}
-
-static ClassMember* FindClassMethod(ParseResult4e& r) {
-  if (r.cu->classes.empty()) return nullptr;
-  for (auto* m : r.cu->classes[0]->members) {
-    if (m->kind == ClassMemberKind::kMethod) return m;
-  }
-  return nullptr;
 }
 
 // =============================================================================

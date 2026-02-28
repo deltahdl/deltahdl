@@ -68,4 +68,47 @@ TEST(ParserA27, TfPortDeclOldStyleConstRef) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
+struct ParseResult4e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4e Parse(const std::string& src) {
+  ParseResult4e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// 16. Automatic function with ref argument
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_AutoFuncWithRefArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic void swap(ref int x, ref int y);\n"
+      "    int tmp;\n"
+      "    tmp = x;\n"
+      "    x = y;\n"
+      "    y = tmp;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
+  EXPECT_EQ(item->func_args[0].name, "x");
+  EXPECT_EQ(item->func_args[1].direction, Direction::kRef);
+  EXPECT_EQ(item->func_args[1].name, "y");
+}
+
 }  // namespace
