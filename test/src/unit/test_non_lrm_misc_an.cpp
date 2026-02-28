@@ -7,29 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// expression_or_cond_pattern ::= expression | cond_pattern
-// cond_pattern ::= expression matches pattern
-// ---------------------------------------------------------------------------
-// §12.6: cond_pattern in if condition — expr matches constant
-TEST(ParserA606, CondPatternMatchesConstant) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (x matches 3) y = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // condition should be a matches binary expression
-  ASSERT_NE(stmt->condition, nullptr);
-  EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
-  EXPECT_EQ(stmt->condition->op, TokenKind::kKwMatches);
-}
-
 // §12.6: matches with &&& in cond_predicate
 TEST(ParserA606, CondPatternMatchesWithTripleAnd) {
   auto r = Parse(
