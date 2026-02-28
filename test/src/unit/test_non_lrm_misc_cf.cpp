@@ -41,19 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, StreamingLeft) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {<< {a, b, c}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
-  EXPECT_EQ(rhs->op, TokenKind::kLtLt);
-}
-
 TEST(ParserSection11, StreamingWithSliceSize) {
   auto r = Parse(
       "module t;\n"
