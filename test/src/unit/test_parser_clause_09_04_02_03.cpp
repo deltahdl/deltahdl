@@ -299,4 +299,21 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNonblockingAssign) {
               "endmodule\n"));
 }
 
+// ---------------------------------------------------------------------------
+// Verify iff condition absent when not specified
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_NoIffConditionWhenAbsent) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_EQ(item->sensitivity[0].iff_condition, nullptr);
+}
+
 }  // namespace
