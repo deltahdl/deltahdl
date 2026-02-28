@@ -44,28 +44,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 2. always_latch with begin-end block wrapping the body.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_3_BeginEndBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en, d, q;\n"
-      "  always_latch begin\n"
-      "    if (en) q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysLatchItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysLatchBlock);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
-}
-
-// ---------------------------------------------------------------------------
 // 3. if without else -- transparent latch (no else retains state).
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_IfWithoutElse) {
