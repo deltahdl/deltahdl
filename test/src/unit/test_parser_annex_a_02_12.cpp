@@ -142,4 +142,11 @@ TEST(ParserA212, LetFormalType_Real) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetFormalType_SignedImplicit) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(signed [7:0] x) = x;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
