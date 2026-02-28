@@ -40,33 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-// =========================================================================
-// §7.4: Packed and unpacked arrays
-// =========================================================================
-TEST(ParserSection7, UnpackedArraySize) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[8];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "arr");
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
-TEST(ParserSection7, UnpackedArrayRange) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] mem[0:255];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
 TEST(ParserSection7, MultidimensionalArray) {
   auto r = Parse(
       "module t;\n"
