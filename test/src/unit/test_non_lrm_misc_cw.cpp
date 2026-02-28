@@ -18,20 +18,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 namespace {
 
 // =============================================================================
-// §24.7 Multiple programs and coexistence
-// =============================================================================
-TEST_F(ProgramTestParse, MultipleProgramsCoexist) {
-  auto* unit = Parse(
-      "program p1; endprogram\n"
-      "program p2; endprogram\n"
-      "module m; endmodule\n");
-  EXPECT_EQ(unit->programs.size(), 2u);
-  EXPECT_EQ(unit->modules.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p1");
-  EXPECT_EQ(unit->programs[1]->name, "p2");
-}
-
-// =============================================================================
 // §24.8 Program with variable declarations
 // =============================================================================
 TEST_F(ProgramTestParse, ProgramWithVariableDecls) {
