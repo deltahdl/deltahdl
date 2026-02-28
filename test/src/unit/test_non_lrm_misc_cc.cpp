@@ -45,22 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-TEST(ParserSection10, AssignConcatLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    assign {a, b} = 2'b10;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
-}
-
 TEST(ParserSection10, DeassignConcatLhs) {
   auto r = Parse(
       "module m;\n"

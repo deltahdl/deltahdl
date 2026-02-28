@@ -213,4 +213,31 @@ TEST(ParserSection10, AssignInAlwaysBlock) {
   EXPECT_EQ(r.cu->modules[0]->name, "dff");
 }
 
+static Stmt* FirstInitialStmt(ParseResult10b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+TEST(ParserSection10, AssignConcatLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    assign {a, b} = 2'b10;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
+}
+
 }  // namespace
