@@ -143,4 +143,44 @@ TEST(ParserA601, ContinuousAssign_DelayRiseFallDecay) {
   EXPECT_NE(cas[0]->assign_delay_decay, nullptr);
 }
 
+struct ParseResult6h {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6h Parse(const std::string& src) {
+  ParseResult6h result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult6h& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
+}
+
+// §6.7.1: Wire with delay and initializer together.
+TEST(ParserSection6, Sec6_7_1_WireDelayWithInit) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire #3 w = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->int_val, 3u);
+  ASSERT_NE(item->init_expr, nullptr);
+}
+
 }  // namespace

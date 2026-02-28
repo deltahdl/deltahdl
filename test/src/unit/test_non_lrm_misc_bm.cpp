@@ -31,22 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// §6.7.1: Wire with delay and initializer together.
-TEST(ParserSection6, Sec6_7_1_WireDelayWithInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire #3 w = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  ASSERT_NE(item->net_delay, nullptr);
-  EXPECT_EQ(item->net_delay->int_val, 3u);
-  ASSERT_NE(item->init_expr, nullptr);
-}
-
 // =============================================================================
 // LRM section 6.11 -- Integer data types: packed dimensions
 // =============================================================================

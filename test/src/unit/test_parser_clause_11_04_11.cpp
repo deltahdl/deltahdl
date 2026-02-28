@@ -142,4 +142,21 @@ TEST(ParserSection11, Sec11_4_6_TernaryAsFunctionArgument) {
   EXPECT_EQ(rhs->args[0]->kind, ExprKind::kTernary);
 }
 
+// =============================================================================
+// A.8.3 Expressions — conditional_expression
+// =============================================================================
+// § conditional_expression ::= cond_predicate ? { attribute_instance }
+// expression : expression
+TEST(ParserA83, ConditionalExprSimple) {
+  auto r = Parse("module m; initial x = a ? b : c; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->condition, nullptr);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  ASSERT_NE(rhs->false_expr, nullptr);
+}
+
 }  // namespace
