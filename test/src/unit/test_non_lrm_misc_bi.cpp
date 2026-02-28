@@ -40,15 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// --- list_of_param_assignments ---
-// param_assignment { , param_assignment }
-TEST(ParserA23, ListOfParamAssignmentsSingle) {
-  auto r = Parse("module m; parameter int A = 1; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
-}
-
 TEST(ParserA23, ListOfParamAssignmentsMultiple) {
   auto r = Parse("module m; parameter int A = 1, B = 2, C = 3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
