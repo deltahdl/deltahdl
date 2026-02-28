@@ -72,4 +72,17 @@ TEST(ParserSection11, StreamingRight) {
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
 }
 
+TEST(ParserSection11, StreamingWithSliceSize) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {<< 8 {a, b}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
+  EXPECT_NE(rhs->lhs, nullptr);  // slice_size
+}
+
 }  // namespace

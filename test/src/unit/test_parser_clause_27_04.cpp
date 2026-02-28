@@ -263,4 +263,26 @@ TEST(ParserClause03, Cl3_3_GenerateBlocks) {
               "endmodule\n"));
 }
 
+// 14. Generate block scope (for-generate)
+TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
+      "    logic [7:0] data;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  bool found_gen = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) {
+      found_gen = true;
+      EXPECT_FALSE(item->gen_body.empty());
+    }
+  }
+  EXPECT_TRUE(found_gen);
+}
+
 }  // namespace
