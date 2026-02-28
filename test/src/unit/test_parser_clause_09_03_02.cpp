@@ -450,4 +450,26 @@ TEST(ParserSection4, Sec4_6_ForkJoinAllComplete) {
   EXPECT_EQ(body->join_kind, TokenKind::kKwJoin);
 }
 
+// ---------------------------------------------------------------------------
+// 2. Fork-join with three parallel threads
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_ForkJoinThreeThreads) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #5 a = 1;\n"
+      "      #10 b = 2;\n"
+      "      #15 c = 3;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->fork_stmts.size(), 3u);
+}
+
 }  // namespace

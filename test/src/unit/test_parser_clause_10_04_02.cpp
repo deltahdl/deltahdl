@@ -647,4 +647,28 @@ TEST(ParserSection10, Sec10_4_2_PipelinePattern) {
               "endmodule\n"));
 }
 
+// --- 29. Nonblocking swap pattern ---
+TEST(ParserSection10, Sec10_4_2_SwapPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a <= b;\n"
+      "    b <= a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s0 = NthInitialStmt(r, 0);
+  auto* s1 = NthInitialStmt(r, 1);
+  ASSERT_NE(s0, nullptr);
+  ASSERT_NE(s1, nullptr);
+  EXPECT_EQ(s0->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(s1->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(s0->lhs->text, "a");
+  EXPECT_EQ(s0->rhs->text, "b");
+  EXPECT_EQ(s1->lhs->text, "b");
+  EXPECT_EQ(s1->rhs->text, "a");
+}
+
 }  // namespace
