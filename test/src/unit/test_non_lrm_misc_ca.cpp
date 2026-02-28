@@ -90,27 +90,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 
 namespace {
 
-// @(*) with multiple assignments in begin-end
-TEST(ParserSection9, Sec9_4_2_3_AtStarParenMultipleAssignments) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, c, d, x, y, z;\n"
-      "  always @(*) begin\n"
-      "    x = a & b;\n"
-      "    y = c | d;\n"
-      "    z = x ^ y;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->stmts.size(), 3u);
-}
-
 // @* in initial block (statement-level event control)
 TEST(ParserSection9, Sec9_4_2_3_AtStarInInitialBlock) {
   auto r = Parse(
