@@ -1,4 +1,4 @@
-// Non-LRM tests
+// Annex A.4.1.3: Program instantiation
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
