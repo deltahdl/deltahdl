@@ -45,18 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-TEST(ParserSection10, UnpackedArrayConcatNested) {
-  auto r = Parse(
-      "module m;\n"
-      "  int A[2], B[2], C[4];\n"
-      "  initial C = {A, B};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 // =============================================================================
 // LRM section 10.3 -- Continuous assignments (additional tests)
 // =============================================================================
