@@ -195,4 +195,18 @@ TEST(ParserA301, GateInst_AllNInputGateTypes) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// A.3.4 Production #4: n_input_gatetype ::= and | nand | or | nor | xor | xnor
+// =============================================================================
+TEST(ParserA304, NInputGatetype_And) {
+  auto r = Parse(
+      "module m;\n"
+      "  and (out, a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
