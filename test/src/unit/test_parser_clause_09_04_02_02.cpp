@@ -481,4 +481,51 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSensitivityEmpty) {
   ASSERT_NE(item->body, nullptr);
 }
 
+// @* with nested blocks
+TEST(ParserSection9, Sec9_4_2_3_AtStarNestedBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c;\n"
+      "  always @* begin\n"
+      "    begin\n"
+      "      a = b;\n"
+      "    end\n"
+      "    begin\n"
+      "      c = a;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_EQ(item->body->stmts.size(), 2u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kBlock);
+  EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlock);
+}
+
+// @* with variable declarations in body
+TEST(ParserSection9, Sec9_4_2_3_AtStarVarDeclInBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  always @* begin\n"
+      "    int temp;\n"
+      "    temp = a + b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 2u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
+}
+
 }  // namespace
