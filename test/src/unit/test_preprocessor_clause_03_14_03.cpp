@@ -25,4 +25,36 @@ TEST(Preprocessor, Timescale_GlobalPrecision) {
   EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
 }
 
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// 29. Multiple `timescale — preprocessor tracks min; function uses it.
+TEST(ParserClause03, Cl3_14_3_MultipleTimescaleDirectives) {
+  auto r = Parse(
+      "`timescale 1ns / 1ns\n"
+      "module a; endmodule\n"
+      "`timescale 1us / 1ps\n"
+      "module b; endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  // Preprocessor global precision = min(1ns, 1ps) = 1ps.
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+                                       r.preproc_global_precision);
+  EXPECT_EQ(gp, TimeUnit::kPs);
+}
+
 }  // namespace

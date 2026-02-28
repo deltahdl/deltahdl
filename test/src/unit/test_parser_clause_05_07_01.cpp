@@ -108,4 +108,14 @@ TEST(ParserCh50701, IntLiteral_SizedBinary) {
   EXPECT_EQ(rhs->int_val, 0b1001u);
 }
 
+// § z_digit — Z
+TEST(ParserA87, ZDigitUpper) {
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'hZ; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
