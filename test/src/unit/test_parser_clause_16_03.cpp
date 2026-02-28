@@ -195,4 +195,15 @@ TEST(ParserSection16, OverviewAllThreeImmediateKinds) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+TEST(ParserSection16, OverviewAssertWithComplexExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert(a inside {1, 2, 3});\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace

@@ -48,17 +48,6 @@ TEST(ParserSection16, PropertyDeclAndAssertProperty) {
   EXPECT_TRUE(found_assert);
 }
 
-TEST(ParserSection16, OverviewAssertWithComplexExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert(a inside {1, 2, 3});\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // =============================================================================
 // §16.4 Deferred assertions — additional forms
 // =============================================================================
