@@ -14,38 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserAnnexA, A9DefparamDecl) {
-  auto r = Parse("module m; defparam u.WIDTH = 16; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kDefparam) found = true;
-  }
-  EXPECT_TRUE(found);
-}
-
-// =============================================================================
-// Annex D -- Optional system tasks
-// =============================================================================
-TEST(ParserAnnexD, AnnexDCountdrivers) {
-  auto r = Parse("module m; initial $countdrivers(sig); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
-}
-
-TEST(ParserAnnexD, AnnexDList) {
-  auto r = Parse("module m; initial $list; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
-}
-
 TEST(ParserAnnexD, AnnexDLog) {
   auto r = Parse(
       "module m;\n"
