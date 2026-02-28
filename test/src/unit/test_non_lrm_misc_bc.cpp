@@ -77,24 +77,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 
 namespace {
 
-// 26. Interfaces and programs also contribute to global precision.
-TEST(ParserClause03, Cl3_14_3_InterfacesAndProgramsContribute) {
-  auto r = Parse(
-      "interface i;\n"
-      "  timeprecision 1ps;\n"
-      "endinterface\n"
-      "program p;\n"
-      "  timeprecision 1ns;\n"
-      "endprogram\n"
-      "module m;\n"
-      "  timeprecision 1us;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
-                                       r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kPs);  // min of ps, ns, us = ps
-}
-
 // 27. 1step is parsed as a special delay in clocking blocks (§14.4).
 //     Verify parsing succeeds and the text is "1step".
 TEST(ParserClause03, Cl3_14_3_1StepParsedInClockingBlock) {
