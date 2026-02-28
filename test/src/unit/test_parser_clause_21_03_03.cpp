@@ -30,4 +30,12 @@ TEST(ParserSection21, SwritebHexOctal) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, SformatBasic) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  string s;\n"
+              "  initial $sformat(s, \"data is %d\", 123);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
