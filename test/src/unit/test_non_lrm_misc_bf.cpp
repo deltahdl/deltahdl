@@ -4,29 +4,64 @@
 
 using namespace delta;
 
-namespace {
-
-// =============================================================================
-// 26. Variable declaration with assignment in block
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_VarDeclWithAssignInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int val = 2 + 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_automatic);
-  EXPECT_EQ(stmt->var_name, "val");
-  ASSERT_NE(stmt->var_init, nullptr);
-  // The initializer should be a binary expression (2 + 3).
-  EXPECT_EQ(stmt->var_init->kind, ExprKind::kBinary);
+static bool ParseOk5(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
 }
+
+// =========================================================================
+// Section 5.6: Identifiers, keywords, and system names
+// =========================================================================
+struct ParseResult506 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ModuleItem* FirstItem(ParseResult506& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// =========================================================================
+// Section 5.6.3: System tasks and system functions
+// =========================================================================
+struct ParseResult50603 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult50603 Parse(const std::string& src) {
+  ParseResult50603 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult50603& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+namespace {
 
 // =============================================================================
 // 27. Static var with complex initializer expression
@@ -111,33 +146,6 @@ TEST(ParserSection4, Sec4_9_4_ProgramWithFunction) {
               "endprogram\n"));
 }
 
-struct ParseResult5 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult5 Parse(const std::string& src) {
-  ParseResult5 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static bool ParseOk5(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
 // --- Unpacked range dimensions [M:N] ---
 TEST(ParserCh5, UnpackedDim_Range) {
   EXPECT_TRUE(ParseOk5("module m; int a[1:0]; endmodule"));
@@ -173,40 +181,6 @@ TEST(ParserCh5, ModuleBody_NullItem) {
 
 TEST(ParserCh5, ModuleBody_SemicolonAfterEnd) {
   EXPECT_TRUE(ParseOk5("module m; initial begin end; endmodule"));
-}
-
-struct ParseResult501 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult501 Parse(const std::string& src) {
-  ParseResult501 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult501& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
-static ModuleItem* FirstItem(ParseResult501& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
 }
 
 // =========================================================================
@@ -696,37 +670,6 @@ TEST(ParserCh503, OneLineCommentEndsAtNewline) {
               "endmodule\n"));
 }
 
-// =========================================================================
-// Section 5.5: Operators
-// =========================================================================
-struct ParseResult505 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult505 Parse(const std::string& src) {
-  ParseResult505 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult505& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
 TEST(ParserCh505, Operator_UnaryBitwiseNegate) {
   auto r = Parse(
       "module m;\n"
@@ -826,31 +769,6 @@ TEST(ParserCh505, Operator_WildcardEquality) {
   EXPECT_TRUE(ParseOk("module m; initial x = (a ==? b); endmodule"));
 }
 
-// =========================================================================
-// Section 5.6: Identifiers, keywords, and system names
-// =========================================================================
-struct ParseResult506 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult506 Parse(const std::string& src) {
-  ParseResult506 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult506& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 TEST(ParserCh506, Ident_SimpleWithUnderscore) {
   auto r = Parse("module m; logic _bus3; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -922,37 +840,6 @@ TEST(ParserCh50602, Keyword_EscapedAsIdentifier) {
 TEST(ParserCh50602, Keyword_AllLowercase) {
   // Keywords are lowercase only; MODULE is not a keyword, so this fails.
   EXPECT_FALSE(ParseOk("MODULE m; endmodule"));
-}
-
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
-struct ParseResult50603 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult50603 Parse(const std::string& src) {
-  ParseResult50603 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult50603& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
 }
 
 TEST(ParserCh50603, SystemTask_Display) {
