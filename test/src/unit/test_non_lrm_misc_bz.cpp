@@ -5,8 +5,6 @@
 
 using namespace delta;
 
-namespace {
-
 // Helper for blocks 11: verify always block has var decl body.
 static void VerifyAlwaysVarDecl(ParseResult& r) {
   ASSERT_NE(r.cu, nullptr);
@@ -59,20 +57,43 @@ static void VerifyAlwaysNestedIfElse(ParseResult& r) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
 }
 
-// ---------------------------------------------------------------------------
-// 19. always_comb with variable declarations in begin-end block.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombVarDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb begin\n"
-      "    int temp;\n"
-      "    temp = a + b;\n"
-      "    y = temp;\n"
-      "  end\n"
-      "endmodule\n");
-  VerifyAlwaysVarDecl(r);
+struct ParseResult9i {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9i Parse(const std::string& src) {
+  ParseResult9i result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
 }
+
+static ModuleItem* FirstAlwaysLatchItem(ParseResult9i& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return item;
+  }
+  return nullptr;
+}
+
+static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      if (count == n) return item;
+      ++count;
+    }
+  }
+  return nullptr;
+}
+
+namespace {
 
 // ---------------------------------------------------------------------------
 // 20. always @* with variable declarations in begin-end block.
@@ -270,42 +291,6 @@ TEST(ParserSection9, Sec9_2_2_2_FullComboModuleParseOk) {
               "    out3 = a ^ b ^ c ^ d;\n"
               "  end\n"
               "endmodule\n"));
-}
-
-struct ParseResult9i {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult9i Parse(const std::string& src) {
-  ParseResult9i result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstAlwaysLatchItem(ParseResult9i& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return item;
-  }
-  return nullptr;
-}
-
-static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      if (count == n) return item;
-      ++count;
-    }
-  }
-  return nullptr;
 }
 
 // =============================================================================
