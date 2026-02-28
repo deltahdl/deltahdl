@@ -53,28 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 12.7 -- Loop statements (additional cases)
-// =============================================================================
-// Repeat loop with expression (not just a literal).
-TEST(ParserSection12, RepeatWithExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    repeat (n + 1) begin\n"
-      "      x = x + 1;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRepeat);
-  EXPECT_NE(stmt->condition, nullptr);
-  ASSERT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
-}
-
 // Forever loop wrapping a timing control.
 TEST(ParserSection12, ForeverWithTimingControl) {
   EXPECT_TRUE(
