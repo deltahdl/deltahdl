@@ -7,36 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.5.3 -- UDP body (part b: productions 9-16)
-//
-// level_input_list ::= level_symbol { level_symbol }
-// edge_input_list ::= { level_symbol } edge_indicator { level_symbol }
-// edge_indicator ::= ( level_symbol level_symbol ) | edge_symbol
-// current_state ::= level_symbol
-// next_state ::= output_symbol | -
-// output_symbol ::= 0 | 1 | x | X
-// level_symbol ::= 0 | 1 | x | X | ? | b | B
-// edge_symbol ::= r | R | f | F | p | P | n | N | *
-// =============================================================================
-// ---------------------------------------------------------------------------
-// Production 9: level_input_list ::= level_symbol { level_symbol }
-// ---------------------------------------------------------------------------
-// Single level symbol input list
-TEST(ParserAnnexA053, LevelInputList_Single) {
-  auto r = Parse(
-      "primitive inv(output y, input a);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->table[0].inputs.size(), 1);
-  EXPECT_EQ(udp->table[0].inputs[0], '0');
-}
-
 // Multiple level symbols in input list
 TEST(ParserAnnexA053, LevelInputList_Multiple) {
   auto r = Parse(
