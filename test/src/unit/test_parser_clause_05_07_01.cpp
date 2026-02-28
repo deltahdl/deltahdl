@@ -283,4 +283,14 @@ TEST(ParserCh50701, IntLiteral_LargeUnsized) {
               "endmodule"));
 }
 
+// § primary_literal — number (octal)
+TEST(ParserA84, PrimaryLiteralOctalNumber) {
+  auto r = Parse("module m; initial x = 8'o77; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
