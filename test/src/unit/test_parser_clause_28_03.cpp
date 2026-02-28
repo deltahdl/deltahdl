@@ -91,4 +91,14 @@ TEST(ParserA301, GateInst_PulldownMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
+TEST(ParserA301, GateInst_PullupMultipleInstances) {
+  auto r = Parse(
+      "module m;\n"
+      "  pullup pu1(a), pu2(b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gates = FindAllGates(r.cu->modules[0]->items);
+  EXPECT_EQ(gates.size(), 2u);
+}
+
 }  // namespace

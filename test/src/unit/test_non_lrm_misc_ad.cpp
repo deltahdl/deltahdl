@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_PullupMultipleInstances) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup pu1(a), pu2(b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  EXPECT_EQ(gates.size(), 2u);
-}
-
 // =============================================================================
 // A.3.1 Production #2: cmos_switch_instance
 // cmos_switch_instance ::= [name_of_instance]
