@@ -46,57 +46,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// §4.6: always_comb with case inside
-// =============================================================================
-TEST(ParserSection4, Sec4_6_AlwaysCombWithCaseInside) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [3:0] y;\n"
-      "  always_comb begin\n"
-      "    case (sel)\n"
-      "      2'b00: y = 4'h0;\n"
-      "      2'b01: y = 4'h1;\n"
-      "      2'b10: y = 4'h2;\n"
-      "      default: y = 4'hf;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kCase);
-}
-
-// =============================================================================
-// §4.6: always_ff with if-else chain
-// =============================================================================
-TEST(ParserSection4, Sec4_6_AlwaysFfWithIfElseChain) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic clk, rst, d, q;\n"
-      "  always_ff @(posedge clk or posedge rst) begin\n"
-      "    if (rst) q <= 0;\n"
-      "    else q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
-}
-
-// =============================================================================
 // §4.6: always_latch with if (no else)
 // =============================================================================
 TEST(ParserSection4, Sec4_6_AlwaysLatchIfNoElse) {

@@ -182,4 +182,45 @@ TEST(ParserSection10, Sec10_4_2_AlwaysFFResetPattern) {
   EXPECT_EQ(if_stmt->else_branch->kind, StmtKind::kNonblockingAssign);
 }
 
+struct ParseResult4d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4d Parse(const std::string& src) {
+  ParseResult4d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §4.6: always_ff with if-else chain
+// =============================================================================
+TEST(ParserSection4, Sec4_6_AlwaysFfWithIfElseChain) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, rst, d, q;\n"
+      "  always_ff @(posedge clk or posedge rst) begin\n"
+      "    if (rst) q <= 0;\n"
+      "    else q <= d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
+}
+
 }  // namespace
