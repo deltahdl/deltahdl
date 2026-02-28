@@ -166,4 +166,25 @@ TEST(ParserSection13, AutomaticFunctionWithRef) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
 }
 
+// =============================================================================
+// 29. Automatic function with const ref argument
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_AutoFuncWithConstRefArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int read_only(const ref int data);\n"
+      "    return data;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
+  EXPECT_TRUE(item->func_args[0].is_const);
+  EXPECT_EQ(item->func_args[0].name, "data");
+}
+
 }  // namespace
