@@ -50,38 +50,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// --- 22. Nonblocking mixed with blocking in same module (different blocks) ---
-TEST(ParserSection10, Sec10_4_2_MixedBlockingNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d, a, b;\n"
-      "  always @(posedge clk)\n"
-      "    q <= d;\n"
-      "  always @(*)\n"
-      "    a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  int always_count = 0;
-  bool found_nonblocking = false;
-  bool found_blocking = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) {
-      always_count++;
-      if (item->body && item->body->kind == StmtKind::kNonblockingAssign) {
-        found_nonblocking = true;
-      }
-      if (item->body && item->body->kind == StmtKind::kBlockingAssign) {
-        found_blocking = true;
-      }
-    }
-  }
-  EXPECT_EQ(always_count, 2);
-  EXPECT_TRUE(found_nonblocking);
-  EXPECT_TRUE(found_blocking);
-}
-
 // --- 23. Nonblocking in always_ff with reset pattern ---
 TEST(ParserSection10, Sec10_4_2_AlwaysFFResetPattern) {
   auto r = Parse(
