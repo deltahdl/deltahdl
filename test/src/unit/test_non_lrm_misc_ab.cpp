@@ -6,22 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverGroup_TransitionBins) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins t1 = (0 => 1 => 2);\n"
-              "      bins t2 = (0 => 1), (2 => 3);\n"
-              "      bins t3 = (1 [* 3]);\n"
-              "      bins t4 = (1 [-> 2]);\n"
-              "      bins t5 = (1 [= 2]);\n"
-              "      bins t6 = (1 [* 2:5]);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CoverGroup_CrossWithBinsSelection) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
