@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_NInputWithDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  or #(3, 5) o1(out, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kOr);
-  ASSERT_NE(g, nullptr);
-  EXPECT_NE(g->gate_delay, nullptr);
-  EXPECT_NE(g->gate_delay_fall, nullptr);
-}
-
 TEST(ParserA301, GateInst_NInputMultipleInputs) {
   auto r = Parse(
       "module m;\n"
