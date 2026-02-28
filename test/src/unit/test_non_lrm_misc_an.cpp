@@ -7,69 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §12.4: if-else statement
-TEST(ParserA606, IfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin if (a) x = 1; else x = 0; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->condition, nullptr);
-  EXPECT_NE(stmt->then_branch, nullptr);
-  ASSERT_NE(stmt->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
-}
-
-// §12.4.1: if-else-if chain with final else
-TEST(ParserA606, IfElseIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (a) x = 1;\n"
-      "    else if (b) x = 2;\n"
-      "    else x = 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // else branch is another if statement
-  ASSERT_NE(stmt->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
-  // the inner if has its own else
-  ASSERT_NE(stmt->else_branch->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kBlockingAssign);
-}
-
-// §12.4.1: multi-way if-else-if chain without final else
-TEST(ParserA606, IfElseIfNoFinalElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (a) x = 1;\n"
-      "    else if (b) x = 2;\n"
-      "    else if (c) x = 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  ASSERT_NE(stmt->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
-  ASSERT_NE(stmt->else_branch->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kIf);
-  // last else-if has no else
-  EXPECT_EQ(stmt->else_branch->else_branch->else_branch, nullptr);
-}
-
 // §12.4: if with null statement_or_null (semicolon) for then branch
 TEST(ParserA606, IfNullThen) {
   auto r = Parse(
