@@ -172,4 +172,25 @@ TEST(ParserSection27, GenerateIfWithNestedFor) {
   EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
+using ProgramParseTest = ProgramTestParse;
+
+TEST(ParserSection23, GenerateRegionWithIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    if (WIDTH > 8) begin : wide\n"
+      "      assign a = b;\n"
+      "    end else begin : narrow\n"
+      "      assign a = c;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  bool found = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kGenerateIf) found = true;
+  }
+  EXPECT_TRUE(found);
+}
+
 }  // namespace

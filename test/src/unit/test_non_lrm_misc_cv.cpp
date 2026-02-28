@@ -27,25 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserSection23, GenerateRegionWithIf) {
-  auto r = Parse(
-      "module m;\n"
-      "  generate\n"
-      "    if (WIDTH > 8) begin : wide\n"
-      "      assign a = b;\n"
-      "    end else begin : narrow\n"
-      "      assign a = c;\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateIf) found = true;
-  }
-  EXPECT_TRUE(found);
-}
-
 // =========================================================================
 // LRM section 27.3: Generate block syntax (begin/end with labels)
 // =========================================================================
