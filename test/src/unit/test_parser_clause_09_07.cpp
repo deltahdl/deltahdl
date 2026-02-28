@@ -44,4 +44,19 @@ TEST_F(AnnexHParseTest, AnnexGProcessScopeResolution) {
   EXPECT_EQ(items[0]->data_type.type_name, "state_e");
 }
 
+// =============================================================================
+// LRM section 9.7 -- Fine-grain process control
+// The process class: self(), status(), kill(), await(), suspend(), resume().
+// =============================================================================
+TEST(ParserSection9c, ProcessSelfAssignment) {
+  // process p = process::self(); is valid usage.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    process p;\n"
+              "    p = process::self();\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

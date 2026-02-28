@@ -51,21 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.7 -- Fine-grain process control
-// The process class: self(), status(), kill(), await(), suspend(), resume().
-// =============================================================================
-TEST(ParserSection9c, ProcessSelfAssignment) {
-  // process p = process::self(); is valid usage.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    process p;\n"
-              "    p = process::self();\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection9c, ProcessKillCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
