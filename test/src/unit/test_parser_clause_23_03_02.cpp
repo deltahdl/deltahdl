@@ -78,4 +78,23 @@ TEST(ParserAnnexA0411, EmptyParameterValueAssignment) {
   EXPECT_EQ(item->inst_params.size(), 0u);
 }
 
+TEST(ParserAnnexA0411, FullCombination) {
+  // Named params, instance array, named ports, wildcard
+  auto r = Parse(
+      "module m;\n"
+      "  sub #(.W(8)) u0[3:0](.clk(clk), .*);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->inst_module, "sub");
+  EXPECT_EQ(item->inst_name, "u0");
+  EXPECT_EQ(item->inst_params.size(), 1u);
+  EXPECT_EQ(item->inst_params[0].first, "W");
+  EXPECT_NE(item->inst_range_left, nullptr);
+  EXPECT_NE(item->inst_range_right, nullptr);
+  EXPECT_EQ(item->inst_ports.size(), 1u);
+  EXPECT_TRUE(item->inst_wildcard);
+}
+
 }  // namespace
