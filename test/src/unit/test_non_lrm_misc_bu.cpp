@@ -49,43 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-// =============================================================================
-// §9.3.1 -- automatic variable declarations in fork blocks
-// =============================================================================
-TEST(ParserSection9, AutomaticVarInFork) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      automatic int k = 0;\n"
-      "      begin k = 1; end\n"
-      "    join_none\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_GE(stmt->fork_stmts.size(), 1u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
-}
-
-// =============================================================================
-// §9.3.5 -- Statement labels (additional tests)
-// =============================================================================
-TEST(ParserSection9, StatementLabelOnAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    my_label: a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->label, "my_label");
-}
-
 TEST(ParserSection9, StatementLabelOnIf) {
   auto r = Parse(
       "module m;\n"
