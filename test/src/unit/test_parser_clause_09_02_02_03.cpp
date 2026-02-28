@@ -28,4 +28,51 @@ TEST(ParserA602, AlwaysConstruct_AlwaysLatch) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
 }
 
+struct ParseResult9k {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9k Parse(const std::string& src) {
+  ParseResult9k result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// 30. Three always_latch blocks in same module, counting them all.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_ThreeAlwaysLatchBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic en, d1, d2, d3, q1, q2, q3;\n"
+      "  always_latch\n"
+      "    if (en) q1 <= d1;\n"
+      "  always_latch\n"
+      "    if (en) q2 <= d2;\n"
+      "  always_latch\n"
+      "    if (en) q3 <= d3;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      ++count;
+      EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
+      EXPECT_TRUE(item->sensitivity.empty());
+      ASSERT_NE(item->body, nullptr);
+      EXPECT_EQ(item->body->kind, StmtKind::kIf);
+    }
+  }
+  EXPECT_EQ(count, 3);
+}
+
 }  // namespace

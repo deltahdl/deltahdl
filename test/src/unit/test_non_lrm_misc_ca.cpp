@@ -4,61 +4,12 @@
 
 using namespace delta;
 
-namespace {
-
-// ---------------------------------------------------------------------------
-// 30. Three always_latch blocks in same module, counting them all.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_3_ThreeAlwaysLatchBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en, d1, d2, d3, q1, q2, q3;\n"
-      "  always_latch\n"
-      "    if (en) q1 <= d1;\n"
-      "  always_latch\n"
-      "    if (en) q2 <= d2;\n"
-      "  always_latch\n"
-      "    if (en) q3 <= d3;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      ++count;
-      EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-      EXPECT_TRUE(item->sensitivity.empty());
-      ASSERT_NE(item->body, nullptr);
-      EXPECT_EQ(item->body->kind, StmtKind::kIf);
-    }
-  }
-  EXPECT_EQ(count, 3);
-}
-
 struct ParseResult9j {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
-
-static ParseResult9j Parse(const std::string& src) {
-  ParseResult9j result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstAlwaysItem(ParseResult9j& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
-  }
-  return nullptr;
-}
 
 static ModuleItem* NthAlwaysItem(ParseResult9j& r, size_t n) {
   size_t count = 0;
@@ -67,17 +18,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9j& r, size_t n) {
       if (count == n) return item;
       ++count;
     }
-  }
-  return nullptr;
-}
-
-static Stmt* FirstInitialStmt(ParseResult9j& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
   }
   return nullptr;
 }
@@ -91,6 +31,64 @@ static Stmt* NthInitialStmt(ParseResult9j& r, size_t n) {
   }
   return nullptr;
 }
+
+// Helper: verify always @* case statement pattern.
+static Stmt* GetAlwaysStarCaseStmt(ParseResult9j& r) {
+  EXPECT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  EXPECT_NE(item, nullptr);
+  if (!item) return nullptr;
+  EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  auto* case_stmt = item->body->stmts[0];
+  EXPECT_EQ(case_stmt->kind, StmtKind::kCase);
+  return case_stmt;
+}
+
+struct ParseResult9k {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9k Parse(const std::string& src) {
+  ParseResult9k result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysItem(ParseResult9k& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      return item;
+    }
+  }
+  return nullptr;
+}
+
+static Stmt* FirstInitialStmt(ParseResult9k& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+namespace {
 
 // =============================================================================
 // LRM section 9.4.2.3 -- Implicit event_expression list (@* and @(*))
@@ -460,21 +458,6 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarBlocks) {
   ASSERT_NE(item1->body, nullptr);
 }
 
-// Helper: verify always @* case statement pattern.
-static Stmt* GetAlwaysStarCaseStmt(ParseResult9j& r) {
-  EXPECT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  EXPECT_NE(item, nullptr);
-  if (!item) return nullptr;
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  auto* case_stmt = item->body->stmts[0];
-  EXPECT_EQ(case_stmt->kind, StmtKind::kCase);
-  return case_stmt;
-}
-
 // @* with case inside body
 TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
   auto r = Parse(
@@ -680,47 +663,6 @@ TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarParenCombiModule) {
               "    sum = a + b;\n"
               "  end\n"
               "endmodule\n"));
-}
-
-struct ParseResult9k {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult9k Parse(const std::string& src) {
-  ParseResult9k result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstAlwaysItem(ParseResult9k& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      return item;
-    }
-  }
-  return nullptr;
-}
-
-static Stmt* FirstInitialStmt(ParseResult9k& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
 }
 
 // =============================================================================

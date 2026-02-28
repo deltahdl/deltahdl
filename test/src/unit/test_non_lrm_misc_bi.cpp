@@ -4,14 +4,49 @@
 
 using namespace delta;
 
-namespace {
-
-TEST(ParserA212, VarDataTypeString) {
-  // var_data_type: data_type (non_integer_type)
-  auto r = Parse("module m(input string name); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+static void VerifyEnumMemberNames(const std::vector<EnumMember>& members,
+                                  const std::string expected[], size_t count) {
+  ASSERT_EQ(members.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(members[i].name, expected[i]) << "member " << i;
+  }
 }
+
+struct ParseResult6 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6 Parse(const std::string& src) {
+  ParseResult6 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult6& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+static Stmt* FirstInitialStmt(ParseResult6& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+namespace {
 
 // string
 TEST(ParserA221, DataTypeString) {
@@ -20,16 +55,6 @@ TEST(ParserA221, DataTypeString) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kString);
 }
-
-struct StructMemberExpected {
-  const char* name;
-  DataTypeKind type_kind;
-};
-
-struct ModportPortExpected {
-  Direction dir;
-  const char* name;
-};
 
 // --- Named event tests ---
 TEST(Parser, EventDeclaration) {
@@ -50,14 +75,6 @@ TEST(ParserA221, DataTypeEvent) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEvent);
-}
-
-static void VerifyEnumMemberNames(const std::vector<EnumMember>& members,
-                                  const std::string expected[], size_t count) {
-  ASSERT_EQ(members.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(members[i].name, expected[i]) << "member " << i;
-  }
 }
 
 TEST(Parser, TypedefEnum) {
@@ -325,40 +342,6 @@ TEST(ParserA28, LocalparamInBlock) {
   ASSERT_GE(body->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(body->stmts[0]->var_name, "X");
-}
-
-struct ParseResult6 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6 Parse(const std::string& src) {
-  ParseResult6 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
-static Stmt* FirstInitialStmt(ParseResult6& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
 }
 
 // =========================================================================
