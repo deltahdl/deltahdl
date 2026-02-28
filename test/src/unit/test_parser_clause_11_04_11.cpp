@@ -440,4 +440,22 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithStringLiterals) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kStringLiteral);
 }
 
+// --- Ternary with real literal operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithRealLiterals) {
+  auto r = Parse(
+      "module t;\n"
+      "  real r;\n"
+      "  initial r = sel ? 3.14 : 2.71;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kRealLiteral);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kRealLiteral);
+}
+
 }  // namespace
