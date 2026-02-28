@@ -25,4 +25,25 @@ TEST(ParserAnnexA0411, BasicModuleInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
+// --- module_instantiation: multiple hierarchical_instance ---
+// module_identifier [#(...)] inst1(...), inst2(...), inst3(...) ;
+TEST(ParserAnnexA0411, MultipleHierarchicalInstances) {
+  auto r = Parse("module m; sub u0(a), u1(b), u2(c); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+  auto* i0 = r.cu->modules[0]->items[0];
+  auto* i1 = r.cu->modules[0]->items[1];
+  auto* i2 = r.cu->modules[0]->items[2];
+  EXPECT_EQ(i0->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(i0->inst_module, "sub");
+  EXPECT_EQ(i0->inst_name, "u0");
+  EXPECT_EQ(i1->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(i1->inst_module, "sub");
+  EXPECT_EQ(i1->inst_name, "u1");
+  EXPECT_EQ(i2->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(i2->inst_module, "sub");
+  EXPECT_EQ(i2->inst_name, "u2");
+}
+
 }  // namespace
