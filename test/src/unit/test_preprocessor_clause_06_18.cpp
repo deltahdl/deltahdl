@@ -18,4 +18,13 @@ TEST(ParserSection6, TypedefForwardClass) {
   ASSERT_GE(r.cu->classes.size(), 1u);
 }
 
+TEST(ParserSection6, TypedefForwardStruct) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  typedef struct my_struct;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

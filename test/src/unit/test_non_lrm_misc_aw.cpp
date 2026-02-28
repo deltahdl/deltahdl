@@ -14,13 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// § primary_literal — time_literal
-TEST(ParserA84, PrimaryLiteralTimeLiteral) {
-  auto r = Parse("module m; initial #10ns; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § primary_literal — unbased_unsized_literal
 TEST(ParserA84, PrimaryLiteralUnbasedUnsized) {
   auto r = Parse("module m; initial x = '0; endmodule\n");

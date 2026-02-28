@@ -46,4 +46,11 @@ TEST(ParserCh508, TimeLiteral_IntegerNs) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
+// § primary_literal — time_literal
+TEST(ParserA84, PrimaryLiteralTimeLiteral) {
+  auto r = Parse("module m; initial #10ns; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
