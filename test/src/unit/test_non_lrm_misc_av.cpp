@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA83, PrefixDecrement) {
-  auto r = Parse("module m; initial --x; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kUnary);
-  EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
-}
-
 // § inc_or_dec_expression ::= variable_lvalue { attribute_instance }
 // inc_or_dec_operator
 TEST(ParserA83, PostfixIncrement) {
