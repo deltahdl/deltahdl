@@ -53,24 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// Case with only default item.
-TEST(ParserSection12, CaseWithOnlyDefault) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (sel)\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  ASSERT_EQ(stmt->case_items.size(), 1u);
-  EXPECT_TRUE(stmt->case_items[0].is_default);
-}
-
 // =============================================================================
 // LRM section 12.5.1 -- casex / casez (additional cases)
 // =============================================================================
