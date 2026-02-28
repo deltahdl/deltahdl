@@ -56,4 +56,16 @@ TEST(ParserA602, Release_Variable) {
   EXPECT_NE(stmt->lhs, nullptr);
 }
 
+TEST(ParserA602, Release_Net) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin release net_a; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
+}
+
 }  // namespace

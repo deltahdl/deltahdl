@@ -15,18 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, Release_Net) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin release net_a; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
-}
-
 TEST(ParserA602, ProceduralContinuous_AllForms) {
   // All four procedural continuous assignment forms in one block
   auto r = Parse(
