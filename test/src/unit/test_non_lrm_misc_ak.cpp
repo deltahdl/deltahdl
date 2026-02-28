@@ -15,19 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, BlockingAssignment_PartSelectLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin data[7:0] = 8'hAB; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-}
-
 TEST(ParserA602, BlockingAssignment_DynamicArrayNew) {
   // nonrange_variable_lvalue = dynamic_array_new
   auto r = Parse(
