@@ -213,4 +213,14 @@ TEST(ParserSection9, Sec9_2_2_TernaryExpression) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
+TEST(ParserA83, ConditionalExprNested) {
+  auto r = Parse("module m; initial x = a ? b ? c : d : e; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kTernary);
+}
+
 }  // namespace

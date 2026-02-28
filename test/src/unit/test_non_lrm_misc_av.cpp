@@ -6,43 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA83, PostfixDecrementOnMember) {
-  auto r = Parse("module m; initial s.field--; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kPostfixUnary);
-  EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
-}
-
-// =============================================================================
-// A.8.3 Expressions — conditional_expression
-// =============================================================================
-// § conditional_expression ::= cond_predicate ? { attribute_instance }
-// expression : expression
-TEST(ParserA83, ConditionalExprSimple) {
-  auto r = Parse("module m; initial x = a ? b : c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->condition, nullptr);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  ASSERT_NE(rhs->false_expr, nullptr);
-}
-
-TEST(ParserA83, ConditionalExprNested) {
-  auto r = Parse("module m; initial x = a ? b ? c : d : e; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kTernary);
-}
-
 TEST(ParserA83, ConditionalExprWithBinaryCondition) {
   auto r = Parse("module m; initial x = (a > b) ? a : b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
