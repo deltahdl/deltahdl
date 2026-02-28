@@ -27,4 +27,14 @@ TEST(ParserA24, NetDeclAssignmentWithInit) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
+TEST(ParserA24, NetDeclAssignmentDimsAndInit) {
+  auto r = Parse("module m; wire [7:0] mem [0:3] = '{0,1,2,3}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_NE(item->init_expr, nullptr);
+  EXPECT_GE(item->unpacked_dims.size(), 1u);
+}
+
 }  // namespace
