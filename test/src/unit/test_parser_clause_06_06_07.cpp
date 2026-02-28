@@ -62,4 +62,41 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithIntType) {
   EXPECT_EQ(nt->name, "mynet");
 }
 
+struct ParseResult6b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6b Parse(const std::string& src) {
+  ParseResult6b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(ParserSection6, NettypeDeclWithResolveFunc) {
+  // nettype data_type nettype_identifier with tf_identifier ;
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  nettype T wTsum with Tsum;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  ModuleItem* nt = nullptr;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kNettypeDecl) {
+      nt = it;
+      break;
+    }
+  }
+  ASSERT_NE(nt, nullptr);
+  EXPECT_EQ(nt->name, "wTsum");
+  EXPECT_EQ(nt->nettype_resolve_func, "Tsum");
+}
+
 }  // namespace
