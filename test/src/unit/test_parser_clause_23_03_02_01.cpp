@@ -20,4 +20,26 @@ TEST(ParserAnnexA, A4ModuleInstPositional) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
+// =============================================================================
+// list_of_port_connections34 ::=
+//   ordered_port_connection { , ordered_port_connection }
+//   | named_port_connection { , named_port_connection }
+// ordered_port_connection ::= { attribute_instance } [ expression ]
+// named_port_connection ::=
+//   { attribute_instance } . port_identifier [ ( [ expression ] ) ]
+//   | { attribute_instance } . *
+// A.10 note 34: .* shall appear at most once
+// =============================================================================
+TEST(ParserAnnexA0411, OrderedPortConnections) {
+  auto r = Parse("module m; sub u0(a, b, c); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->inst_ports.size(), 3u);
+  // Ordered ports have empty name
+  EXPECT_EQ(item->inst_ports[0].first, "");
+  EXPECT_EQ(item->inst_ports[1].first, "");
+  EXPECT_EQ(item->inst_ports[2].first, "");
+}
+
 }  // namespace
