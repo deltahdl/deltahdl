@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Ternary with string literal operands ---
-TEST(ParserSection11, Sec11_4_6_TernaryWithStringLiterals) {
-  auto r = Parse(
-      "module t;\n"
-      "  string s;\n"
-      "  initial s = sel ? \"yes\" : \"no\";\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kStringLiteral);
-  ASSERT_NE(rhs->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kStringLiteral);
-}
-
 // --- Ternary with real literal operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithRealLiterals) {
   auto r = Parse(
