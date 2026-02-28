@@ -90,4 +90,20 @@ TEST(ParserA603, ForkJoinEmpty) {
   EXPECT_EQ(stmt->fork_stmts.size(), 0u);
 }
 
+// ---------------------------------------------------------------------------
+// 26. Fork with for loop as a thread
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_ForkWithForLoop) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      for (int i = 0; i < 4; i++) begin\n"
+              "        #10 a[i] = i;\n"
+              "      end\n"
+              "    join\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

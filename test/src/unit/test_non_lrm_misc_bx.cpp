@@ -4,23 +4,89 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult9f {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
 
-// ---------------------------------------------------------------------------
-// 26. Fork with for loop as a thread
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_3_2_ForkWithForLoop) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    fork\n"
-              "      for (int i = 0; i < 4; i++) begin\n"
-              "        #10 a[i] = i;\n"
-              "      end\n"
-              "    join\n"
-              "  end\n"
-              "endmodule\n"));
+static Stmt* FirstInitialStmt(ParseResult9f& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
 }
+
+static Stmt* NthInitialStmt(ParseResult9f& r, size_t n) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      if (n < item->body->stmts.size()) return item->body->stmts[n];
+    }
+  }
+  return nullptr;
+}
+
+static Stmt* FirstAlwaysStmt(ParseResult9f& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kAlwaysBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+static Stmt* FirstTaskStmt(ParseResult9f& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kTaskDecl) continue;
+    if (item->func_body_stmts.empty()) return nullptr;
+    return item->func_body_stmts[0];
+  }
+  return nullptr;
+}
+
+struct ParseResult9g {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9g Parse(const std::string& src) {
+  ParseResult9g result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysComb(ParseResult9g& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock) return item;
+  }
+  return nullptr;
+}
+
+static Stmt* FirstAlwaysCombStmt(ParseResult9g& r) {
+  auto* item = FirstAlwaysComb(r);
+  if (!item || !item->body) return nullptr;
+  if (item->body->kind == StmtKind::kBlock) {
+    return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+  }
+  return item->body;
+}
+
+namespace {
 
 // ---------------------------------------------------------------------------
 // 27. Fork-join in program block
@@ -118,65 +184,6 @@ TEST(ParserSection9, Sec9_3_2_ForkThreadWithDelayedAssign) {
     EXPECT_EQ(thread->kind, StmtKind::kBlock);
     EXPECT_EQ(thread->stmts.size(), 3u);
   }
-}
-
-struct ParseResult9f {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult9f Parse(const std::string& src) {
-  ParseResult9f result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult9f& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
-static Stmt* NthInitialStmt(ParseResult9f& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
-}
-
-static Stmt* FirstAlwaysStmt(ParseResult9f& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kAlwaysBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
-static Stmt* FirstTaskStmt(ParseResult9f& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kTaskDecl) continue;
-    if (item->func_body_stmts.empty()) return nullptr;
-    return item->func_body_stmts[0];
-  }
-  return nullptr;
 }
 
 // =============================================================================
@@ -765,51 +772,6 @@ TEST(ParserSection9, Sec9_4_5_IntraDelayNoEventsField) {
   EXPECT_NE(stmt->delay, nullptr);
   EXPECT_TRUE(stmt->events.empty());
   EXPECT_EQ(stmt->repeat_event_count, nullptr);
-}
-
-struct ParseResult9g {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult9g Parse(const std::string& src) {
-  ParseResult9g result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstAlwaysComb(ParseResult9g& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysCombBlock) return item;
-  }
-  return nullptr;
-}
-
-static ModuleItem* NthAlwaysComb(ParseResult9g& r, size_t n) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysCombBlock) {
-      if (count == n) return item;
-      ++count;
-    }
-  }
-  return nullptr;
-}
-
-static Stmt* FirstAlwaysCombStmt(ParseResult9g& r) {
-  auto* item = FirstAlwaysComb(r);
-  if (!item || !item->body) return nullptr;
-  if (item->body->kind == StmtKind::kBlock) {
-    return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-  }
-  return item->body;
 }
 
 // =============================================================================
