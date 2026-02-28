@@ -61,4 +61,14 @@ TEST(ParserAnnexA0411, InstanceArrayWithSize) {
   EXPECT_EQ(item->inst_range_right, nullptr);
 }
 
+TEST(ParserAnnexA0411, EmptyPortList) {
+  // hierarchical_instance ::= name_of_instance ( )
+  auto r = Parse("module m; sub u0(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_ports.size(), 0u);
+}
+
 }  // namespace
