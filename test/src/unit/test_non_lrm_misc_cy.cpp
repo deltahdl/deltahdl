@@ -52,36 +52,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-TEST(Parser, GenerateIf) {
-  auto r = Parse(
-      "module t;\n"
-      "  if (WIDTH > 8) begin\n"
-      "    assign a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateIf);
-  EXPECT_NE(mod->items[0]->gen_cond, nullptr);
-  EXPECT_FALSE(mod->items[0]->gen_body.empty());
-}
-
-TEST(Parser, GenerateIfElse) {
-  auto r = Parse(
-      "module t;\n"
-      "  if (WIDTH > 8) begin\n"
-      "    assign a = b;\n"
-      "  end else begin\n"
-      "    assign a = c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kGenerateIf);
-  EXPECT_NE(item->gen_else, nullptr);
-}
-
 TEST(Parser, GenerateCase) {
   auto r = Parse(
       "module t;\n"

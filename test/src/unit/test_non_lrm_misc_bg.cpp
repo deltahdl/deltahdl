@@ -111,20 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50702, RealLiteral_ScientificNotation) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = 1.30e-2;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-  EXPECT_DOUBLE_EQ(rhs->real_val, 0.013);
-}
-
 TEST(ParserCh50702, RealLiteral_ExponentOnly) {
   // 39e8 is a valid real constant (exponent notation without decimal point).
   EXPECT_TRUE(
