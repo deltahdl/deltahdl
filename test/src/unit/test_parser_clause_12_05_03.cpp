@@ -181,4 +181,50 @@ TEST(ParserSection12, UniqueCasezQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
+// ---------------------------------------------------------------------------
+// 20. always_comb with priority case
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_PriorityCase) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0] req;\n"
+      "  logic [1:0] grant;\n"
+      "  always_comb begin\n"
+      "    priority case (1'b1)\n"
+      "      req[0]: grant = 2'd0;\n"
+      "      req[1]: grant = 2'd1;\n"
+      "      req[2]: grant = 2'd2;\n"
+      "      req[3]: grant = 2'd3;\n"
+      "      default: grant = 2'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstAlwaysCombStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+  ASSERT_EQ(stmt->case_items.size(), 5u);
+}
+
+// priority casex.
+TEST(ParserSection12, PriorityCasex) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    priority casex (sel)\n"
+      "      2'b1?: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
 }  // namespace
