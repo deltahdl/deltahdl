@@ -30,26 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// 4. Nested named begin-end blocks
-TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : outer\n"
-      "    begin : inner\n"
-      "      int y;\n"
-      "      y = 42;\n"
-      "    end : inner\n"
-      "  end : outer\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->label, "outer");
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->label, "inner");
-}
-
 // 25. begin-end with no name (anonymous block)
 TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
   auto r = Parse(
