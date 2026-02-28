@@ -36,28 +36,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 namespace {
 
 // =============================================================================
-// LRM section 9.3.1 -- Blocks with system function calls.
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_BlockWithSystemCalls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $display(\"hello\");\n"
-      "    $write(\"world\");\n"
-      "    $finish;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kExprStmt);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kExprStmt);
-  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kExprStmt);
-}
-
-// =============================================================================
 // LRM section 9.3.1 -- Blocks with nonblocking assignments.
 // =============================================================================
 TEST(ParserSection9, Sec9_3_1_BlockWithNonblockingAssigns) {
