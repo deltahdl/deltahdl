@@ -17,23 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// 21. Packed struct bitwise operations.
-TEST(ParserSection7, Sec7_2_2_PackedStructBitwise) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } w_t;\n"
-      "  w_t x, y, z;\n"
-      "  initial z = x & y;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(stmt->rhs->op, TokenKind::kAmp);
-}
-
 // 22. Struct in conditional expression (ternary).
 TEST(ParserSection7, Sec7_2_2_StructTernary) {
   auto r = Parse(

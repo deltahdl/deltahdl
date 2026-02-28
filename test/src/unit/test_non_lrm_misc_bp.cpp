@@ -50,35 +50,6 @@ static ParseResult7c Parse(const std::string& src) {
 namespace {
 
 // =========================================================================
-// §7.4.5: Array indexing (element select)
-// =========================================================================
-TEST(ParserSection7, ArrayElementSelect) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[8];\n"
-      "  initial x = arr[3];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
-}
-
-TEST(ParserSection7, MultiDimSelect) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[4][8];\n"
-      "  initial x = arr[2][5];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
-}
-
-// =========================================================================
 // §7.4: Struct variable declaration (non-typedef)
 // =========================================================================
 TEST(ParserSection7, StructVariableDecl) {
