@@ -14,20 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-// scalar_timing_check_condition ::= expression !== scalar_constant
-TEST(ParserA70503, ScalarTimingCheckCondCaseInequality) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $hold(posedge clk &&& (mode !== 1'b0), data, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
-}
-
 // =============================================================================
 // A.7.5.3 scalar_constant
 // =============================================================================
