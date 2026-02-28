@@ -62,4 +62,11 @@ TEST(ParserSection21, SformatfMultipleArgs) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, SformatfUsedAsArgument) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $display(\"%s\", $sformatf(\"nested %d\", 7));\n"
+              "endmodule\n"));
+}
+
 }  // namespace

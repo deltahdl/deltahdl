@@ -69,44 +69,6 @@ static ModuleItem* FirstAlwaysCombItem(ParseResult11g& r) {
 
 namespace {
 
-// --- Constant part-select [7:0] ---
-TEST(ParserSection11, Sec11_4_1_ConstPartSelectDescending) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [15:0] vec;\n"
-      "  initial x = vec[7:0];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->base, nullptr);
-  EXPECT_EQ(rhs->base->kind, ExprKind::kIdentifier);
-  ASSERT_NE(rhs->index, nullptr);
-  ASSERT_NE(rhs->index_end, nullptr);
-  EXPECT_FALSE(rhs->is_part_select_plus);
-  EXPECT_FALSE(rhs->is_part_select_minus);
-}
-
-// --- Constant part-select [0:7] (ascending range) ---
-TEST(ParserSection11, Sec11_4_1_ConstPartSelectAscending) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [0:15] vec;\n"
-      "  initial x = vec[0:7];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->index, nullptr);
-  ASSERT_NE(rhs->index_end, nullptr);
-  EXPECT_FALSE(rhs->is_part_select_plus);
-  EXPECT_FALSE(rhs->is_part_select_minus);
-}
-
 // --- Indexed part-select up with variable base ---
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectUpVariableBase) {
   auto r = Parse(

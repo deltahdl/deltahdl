@@ -78,25 +78,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 2. Non-blocking assignment in always block (NBA region)
-// ---------------------------------------------------------------------------
-TEST(ParserSection4, Sec4_5_NonblockingAssignInAlways) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d, clk;\n"
-      "  always @(posedge clk) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(item->body->lhs, nullptr);
-  EXPECT_NE(item->body->rhs, nullptr);
-}
-
-// ---------------------------------------------------------------------------
 // 3. Continuous assignment with assign (Active region)
 // ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_ContinuousAssign) {

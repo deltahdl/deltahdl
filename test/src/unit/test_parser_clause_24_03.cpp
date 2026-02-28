@@ -145,4 +145,20 @@ TEST_F(ProgramTestParse, ProgramWithMultipleInitialBlocks) {
       2);
 }
 
+// =============================================================================
+// 30. Program block with function parses
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_ProgramWithFunction) {
+  EXPECT_TRUE(
+      ParseOk("program p;\n"
+              "  function automatic int get_val();\n"
+              "    automatic int v = 10;\n"
+              "    return v;\n"
+              "  endfunction\n"
+              "  initial begin\n"
+              "    $display(get_val());\n"
+              "  end\n"
+              "endprogram\n"));
+}
+
 }  // namespace

@@ -63,22 +63,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-// =============================================================================
-// 30. Program block with function parses
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_ProgramWithFunction) {
-  EXPECT_TRUE(
-      ParseOk("program p;\n"
-              "  function automatic int get_val();\n"
-              "    automatic int v = 10;\n"
-              "    return v;\n"
-              "  endfunction\n"
-              "  initial begin\n"
-              "    $display(get_val());\n"
-              "  end\n"
-              "endprogram\n"));
-}
-
 // --- Unpacked range dimensions [M:N] ---
 TEST(ParserCh5, UnpackedDim_Range) {
   EXPECT_TRUE(ParseOk5("module m; int a[1:0]; endmodule"));
