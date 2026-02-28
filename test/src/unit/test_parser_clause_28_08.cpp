@@ -168,4 +168,15 @@ TEST(ParserA301, PassEnSwitchInst_Rtranif1Named) {
   EXPECT_EQ(g->gate_inst_name, "rt1");
 }
 
+TEST(ParserA301, PassEnSwitchInst_Unnamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif0 (io1, io2, ctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
+  ASSERT_NE(g, nullptr);
+  EXPECT_TRUE(g->gate_inst_name.empty());
+}
+
 }  // namespace
