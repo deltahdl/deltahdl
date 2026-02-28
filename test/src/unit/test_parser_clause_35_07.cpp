@@ -97,4 +97,21 @@ TEST_F(DpiParseTest, ExportWithCName) {
   EXPECT_EQ(items[0]->name, "sv_func");
 }
 
+// =============================================================================
+// Annex H - DPI export with C name alias
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiExportWithCName) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" my_c_func = function sv_compute;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
+  EXPECT_EQ(items[0]->dpi_c_name, "my_c_func");
+  EXPECT_EQ(items[0]->name, "sv_compute");
+  EXPECT_FALSE(items[0]->dpi_is_task);
+}
+
 }  // namespace
