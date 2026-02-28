@@ -50,24 +50,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// --- 20. Nonblocking with cast RHS ---
-TEST(ParserSection10, Sec10_4_2_CastRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  int q;\n"
-      "  initial begin\n"
-      "    q <= int'(3.14);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
-}
-
 // --- 21. Nonblocking with repeat event control ---
 TEST(ParserSection10, Sec10_4_2_RepeatEventControl) {
   auto r = Parse(
