@@ -58,4 +58,11 @@ TEST(ParserA29, MixedDirImportExport) {
   EXPECT_TRUE(mp->ports[3].is_export);
 }
 
+TEST(ParserA29, AttrOnImportPort) {
+  EXPECT_TRUE(
+      ParseOk("interface bus;\n"
+              "  modport target((* synthesis *) import Read);\n"
+              "endinterface\n"));
+}
+
 }  // namespace
