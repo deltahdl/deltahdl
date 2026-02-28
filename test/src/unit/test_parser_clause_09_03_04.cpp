@@ -71,4 +71,21 @@ TEST(ParserA603, ForkNamed) {
   EXPECT_EQ(stmt->label, "my_fork");
 }
 
+// §9.3.4: Named fork block with matching end label
+TEST(ParserA603, ForkNamedWithEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : my_fork\n"
+      "      #10 a = 1;\n"
+      "    join : my_fork\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->label, "my_fork");
+}
+
 }  // namespace
