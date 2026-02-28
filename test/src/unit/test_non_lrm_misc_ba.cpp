@@ -4,14 +4,6 @@
 
 using namespace delta;
 
-static const ModuleItem* FindItemByKindAndName(
-    const std::vector<ModuleItem*>& items, ModuleItemKind kind,
-    const std::string& name) {
-  for (const auto* item : items)
-    if (item->kind == kind && item->name == name) return item;
-  return nullptr;
-}
-
 static bool HasItemOfKindAndName(const std::vector<ModuleItem*>& items,
                                  ModuleItemKind kind, const std::string& name) {
   for (const auto* item : items)
@@ -28,66 +20,6 @@ static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
 }
 
 namespace {
-
-// 5. Global visibility: modules, primitives, programs, interfaces, packages
-// are visible in all CUs.  Within a single CU, all are accessible.
-TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {
-  auto r = ParseWithPreprocessor(
-      "package pkg; endpackage\n"
-      "interface intf; endinterface\n"
-      "program prog; endprogram\n"
-      "module mod; endmodule\n"
-      "primitive udp_and(output o, input a, b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 0;\n"
-      "    1 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->udps.size(), 1u);
-}
-
-// 6. CU scope can hold classes (valid in a package per §26.2).
-TEST(ParserClause03, Cl3_12_1_CuScopeClassDecl) {
-  auto r = ParseWithPreprocessor(
-      "class my_class;\n"
-      "  int x;\n"
-      "endclass\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "my_class");
-}
-
-// 8. Name resolution: nested scope searched first, then CU scope.
-// A local declaration shadows a CU-scope declaration.
-TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
-  // A function at CU scope and a module that also declares 'helper'.
-  // The parser accepts both — resolution is elaboration's job.
-  auto r = ParseWithPreprocessor(
-      "function int helper(int x); return x; endfunction\n"
-      "module m;\n"
-      "  function int helper(int x); return x * 2; endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  // CU scope has the top-level function.
-  ASSERT_EQ(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->cu_items[0]->name, "helper");
-  // Module has its own 'helper' — shadows the CU-scope one.
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_NE(FindItemByKindAndName(r.cu->modules[0]->items,
-                                  ModuleItemKind::kFunctionDecl, "helper"),
-            nullptr);
-}
 
 // 10. No forward references in CU scope (except task/function names).
 // The LRM says references shall only be made to names already defined.

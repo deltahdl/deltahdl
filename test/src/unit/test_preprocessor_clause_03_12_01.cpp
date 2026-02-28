@@ -121,4 +121,34 @@ TEST(ParserClause03, Cl3_12_1_CuScopeClassDecl) {
   EXPECT_EQ(r.cu->classes[0]->name, "my_class");
 }
 
+static const ModuleItem* FindItemByKindAndName(
+    const std::vector<ModuleItem*>& items, ModuleItemKind kind,
+    const std::string& name) {
+  for (const auto* item : items)
+    if (item->kind == kind && item->name == name) return item;
+  return nullptr;
+}
+
+// 8. Name resolution: nested scope searched first, then CU scope.
+// A local declaration shadows a CU-scope declaration.
+TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
+  // A function at CU scope and a module that also declares 'helper'.
+  // The parser accepts both — resolution is elaboration's job.
+  auto r = ParseWithPreprocessor(
+      "function int helper(int x); return x; endfunction\n"
+      "module m;\n"
+      "  function int helper(int x); return x * 2; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // CU scope has the top-level function.
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "helper");
+  // Module has its own 'helper' — shadows the CU-scope one.
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_NE(FindItemByKindAndName(r.cu->modules[0]->items,
+                                  ModuleItemKind::kFunctionDecl, "helper"),
+            nullptr);
+}
+
 }  // namespace
