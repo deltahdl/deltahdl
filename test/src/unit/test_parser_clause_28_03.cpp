@@ -39,4 +39,16 @@ TEST(ParserA301, GateInst_EnableMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
+TEST(ParserA301, GateInst_NInputMultipleInstances) {
+  auto r = Parse(
+      "module m;\n"
+      "  and a1(o1, i1, i2), a2(o2, i3, i4);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gates = FindAllGates(r.cu->modules[0]->items);
+  EXPECT_EQ(gates.size(), 2u);
+  EXPECT_EQ(gates[0]->gate_inst_name, "a1");
+  EXPECT_EQ(gates[1]->gate_inst_name, "a2");
+}
+
 }  // namespace

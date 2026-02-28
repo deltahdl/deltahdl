@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_NInputMultipleInstances) {
-  auto r = Parse(
-      "module m;\n"
-      "  and a1(o1, i1, i2), a2(o2, i3, i4);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  EXPECT_EQ(gates.size(), 2u);
-  EXPECT_EQ(gates[0]->gate_inst_name, "a1");
-  EXPECT_EQ(gates[1]->gate_inst_name, "a2");
-}
-
 // =============================================================================
 // A.3.1 Production #1: gate_instantiation (n_output_gatetype alternative)
 // gate_instantiation ::=
