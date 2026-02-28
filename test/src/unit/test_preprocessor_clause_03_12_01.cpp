@@ -29,4 +29,21 @@ TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
   EXPECT_TRUE(r2.has_errors);
 }
 
+// =============================================================================
+// LRM §3.12.1 — Compilation units
+// =============================================================================
+// 1. Compilation unit definition: a collection of source files compiled
+// together.  A single Parse() call produces one CompilationUnit.
+TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
+  auto r = ParseWithPreprocessor(
+      "module a; endmodule\n"
+      "module b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // Both modules belong to the same compilation unit.
+  ASSERT_EQ(r.cu->modules.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->name, "a");
+  EXPECT_EQ(r.cu->modules[1]->name, "b");
+}
+
 }  // namespace

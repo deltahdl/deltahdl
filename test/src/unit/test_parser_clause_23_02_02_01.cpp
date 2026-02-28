@@ -71,4 +71,18 @@ TEST(ParserSection23, NonAnsiPortsWithTypesPortA) {
   EXPECT_NE(mod->ports[0].data_type.packed_dim_left, nullptr);
 }
 
+TEST(ParserSection23, NonAnsiPortsWithTypesPortB) {
+  auto r = Parse(
+      "module m(a, b);\n"
+      "  input [7:0] a;\n"
+      "  output reg b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 2);
+  EXPECT_EQ(mod->ports[1].name, "b");
+  EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(mod->ports[1].data_type.kind, DataTypeKind::kReg);
+}
+
 }  // namespace

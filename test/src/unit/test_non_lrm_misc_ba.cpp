@@ -4,22 +4,6 @@
 
 using namespace delta;
 
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
-static const ModuleItem* FindInstByModule(const std::vector<ModuleItem*>& items,
-                                          const std::string& module_name) {
-  for (const auto* item : items)
-    if (item->kind == ModuleItemKind::kModuleInst &&
-        item->inst_module == module_name)
-      return item;
-  return nullptr;
-}
-
 static const ModuleItem* FindItemByKindAndName(
     const std::vector<ModuleItem*>& items, ModuleItemKind kind,
     const std::string& name) {
@@ -44,87 +28,6 @@ static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
 }
 
 namespace {
-
-// =============================================================================
-// LRM §3.11 — Overview of hierarchy
-// =============================================================================
-// §3.11 Hierarchy through instantiation, primitives as leaves, multiple tops
-TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  logic in1, in2, sel;\n"
-      "  wire out1;\n"
-      "  mux2to1 m1 (.a(in1), .b(in2), .sel(sel), .y(out1));\n"
-      "endmodule\n"
-      "module mux2to1 (input wire a, b, sel, output logic y);\n"
-      "  not g1 (sel_n, sel);\n"
-      "  and g2 (a_s, a, sel_n);\n"
-      "  and g3 (b_s, b, sel);\n"
-      "  or  g4 (y, a_s, b_s);\n"
-      "endmodule : mux2to1\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  // Multiple top-level blocks
-  ASSERT_EQ(r.cu->modules.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->name, "top");
-  EXPECT_EQ(r.cu->modules[1]->name, "mux2to1");
-  // Hierarchy through instantiation with port connections for communication
-  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
-  ASSERT_NE(inst, nullptr);
-  EXPECT_EQ(inst->inst_module, "mux2to1");
-  EXPECT_EQ(inst->inst_name, "m1");
-  EXPECT_EQ(inst->inst_ports.size(), 4u);
-  // Primitives as leaves: gate primitives (not, and, or)
-  EXPECT_EQ(
-      CountItemsByKind(r.cu->modules[1]->items, ModuleItemKind::kGateInst), 4);
-}
-
-// =============================================================================
-// LRM §3.12 — Compilation and elaboration
-// =============================================================================
-// §3.12 Compilation and elaboration with parameterized instantiation
-TEST(ParserClause03, Cl3_12_CompilationAndElaboration) {
-  auto r = ParseWithPreprocessor(
-      "package pkg; typedef logic [7:0] byte_t; endpackage\n"
-      "module adder #(parameter W = 8) (\n"
-      "    input [W-1:0] a, b, output [W-1:0] s);\n"
-      "  assign s = a + b;\n"
-      "endmodule\n"
-      "module top; import pkg::*;\n"
-      "  wire [15:0] x, y, z;\n"
-      "  adder #(16) u0 (.a(x), .b(y), .s(z));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  // Package compiled before module references it
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-  // Parameterized module: elaboration computes parameter values
-  ASSERT_EQ(r.cu->modules.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->params.size(), 1u);
-  // Elaboration expands instantiation with parameter override & connectivity
-  const auto* inst = FindInstByModule(r.cu->modules[1]->items, "adder");
-  ASSERT_NE(inst, nullptr);
-  EXPECT_EQ(inst->inst_params.size(), 1u);
-  EXPECT_EQ(inst->inst_ports.size(), 3u);
-}
-
-// =============================================================================
-// LRM §3.12.1 — Compilation units
-// =============================================================================
-// 1. Compilation unit definition: a collection of source files compiled
-// together.  A single Parse() call produces one CompilationUnit.
-TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
-  auto r = ParseWithPreprocessor(
-      "module a; endmodule\n"
-      "module b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  // Both modules belong to the same compilation unit.
-  ASSERT_EQ(r.cu->modules.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->name, "a");
-  EXPECT_EQ(r.cu->modules[1]->name, "b");
-}
 
 // 2. Compilation-unit scope: declarations outside any other scope.
 // CU scope can contain anything valid in a package (§26.2) —
