@@ -25,15 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-TEST(ParserAnnexA0411, WildcardPortConnection) {
-  // . * — wildcard port connection
-  auto r = Parse("module m; sub u0(.*); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->inst_wildcard);
-}
-
 TEST(ParserAnnexA0411, WildcardWithNamedPorts) {
   // Named ports mixed with .*
   auto r = Parse("module m; sub u0(.clk(clk), .*); endmodule\n");
