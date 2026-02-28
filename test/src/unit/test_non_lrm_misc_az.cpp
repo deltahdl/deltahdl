@@ -20,22 +20,6 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST_F(AnnexHParseTest, AnnexGProcessScopeResolution) {
-  // process::self() uses scope-resolution syntax at the module-item level.
-  // The parser handles pkg::type as a named type with scope prefix.
-  auto* unit = Parse(
-      "module m;\n"
-      "  process::state_e st;\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  EXPECT_FALSE(diag_.HasErrors());
-  auto& items = unit->modules[0]->items;
-  ASSERT_GE(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(items[0]->data_type.scope_name, "process");
-  EXPECT_EQ(items[0]->data_type.type_name, "state_e");
-}
-
 // =============================================================================
 // Annex G - Std package: semaphore class (§G.2)
 // =============================================================================

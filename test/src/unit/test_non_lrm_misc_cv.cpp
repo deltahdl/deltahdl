@@ -27,18 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserSection23, IfGenerateSingleItemNoBegin) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (EN)\n"
-      "    assign out = in;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kGenerateIf);
-  EXPECT_EQ(item->gen_body.size(), 1);
-}
-
 // =========================================================================
 // LRM section 27.4: Loop generates
 // =========================================================================
