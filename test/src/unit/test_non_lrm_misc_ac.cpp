@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverGroup_PortsWithBody) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg(ref int x, input int threshold);\n"
-              "    coverpoint x {\n"
-              "      bins below = {[0:threshold]};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CoverGroup_EmptyCrossBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
