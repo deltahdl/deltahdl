@@ -216,4 +216,17 @@ TEST(ParserSection13, VoidFunctionCallAsStatement) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kCall);
 }
 
+// Void function with return type kVoid, verifying no return expr needed.
+TEST(ParserSection13, VoidFunctionReturnTypeKind) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void empty_func();\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "empty_func");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
+}
+
 }  // namespace
