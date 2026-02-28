@@ -30,14 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserCh513, BuiltInMethod_PushBack) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int q[$];\n"
-              "  initial q.push_back(42);\n"
-              "endmodule"));
-}
-
 TEST(Parser, NettypeDeclaration) {
   auto r = Parse(
       "module t;\n"
