@@ -40,39 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-TEST(Parser, InlineEnumVar) {
-  auto r = Parse(
-      "module t;\n"
-      "  enum { X, Y } my_var;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "my_var");
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
-  ASSERT_EQ(item->data_type.enum_members.size(), 2);
-}
-
-// 23. Enum in module scope
-TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
-      "  state_t current_state;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  bool found_typedef = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kTypedef) {
-      found_typedef = true;
-      EXPECT_EQ(item->typedef_type.enum_members.size(), 3u);
-    }
-  }
-  EXPECT_TRUE(found_typedef);
-}
-
 // enum [enum_base_type] { ... } {packed_dimension}
 TEST(ParserA221, DataTypeEnum) {
   auto r = Parse("module m; enum logic [1:0] {A, B, C} x; endmodule");

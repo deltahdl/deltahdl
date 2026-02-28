@@ -88,4 +88,24 @@ TEST(Parser, EnumWithValues) {
   }
 }
 
+// 23. Enum in module scope
+TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
+      "  state_t current_state;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  bool found_typedef = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kTypedef) {
+      found_typedef = true;
+      EXPECT_EQ(item->typedef_type.enum_members.size(), 3u);
+    }
+  }
+  EXPECT_TRUE(found_typedef);
+}
+
 }  // namespace
