@@ -60,4 +60,18 @@ TEST(ParserA603, ForkJoinAny) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
 }
 
+// §9.3.2: fork...join_none
+TEST(ParserA603, ForkJoinNone) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork #10 a = 1; join_none\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
+}
+
 }  // namespace
