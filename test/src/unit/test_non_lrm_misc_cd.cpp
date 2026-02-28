@@ -4,8 +4,6 @@
 
 using namespace delta;
 
-namespace {
-
 // Helper: extract 4 initial statements and verify non-null.
 struct FourStmts {
   Stmt* s0;
@@ -13,6 +11,7 @@ struct FourStmts {
   Stmt* s2;
   Stmt* s3;
 };
+
 static FourStmts Get4InitialStmts(auto& r) {
   FourStmts fs;
   fs.s0 = NthInitialStmt(r, 0);
@@ -26,19 +25,67 @@ static FourStmts Get4InitialStmts(auto& r) {
   return fs;
 }
 
-// --- 28. Assign in task body ---
-TEST(ParserSection10, Sec10_6_1_AssignInTaskBody) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  reg q;\n"
-              "  task set_q;\n"
-              "    assign q = 1;\n"
-              "  endtask\n"
-              "  task clear_q;\n"
-              "    deassign q;\n"
-              "  endtask\n"
-              "endmodule\n"));
+struct ParseResult10d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult10d Parse(const std::string& src) {
+  ParseResult10d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
 }
+
+static Stmt* FirstInitialStmt(ParseResult10d& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+static Stmt* NthInitialStmt(ParseResult10d& r, size_t n) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      if (n < item->body->stmts.size()) return item->body->stmts[n];
+    }
+  }
+  return nullptr;
+}
+
+static ModuleItem* FirstAlwaysItem(ParseResult10d& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      return item;
+    }
+  }
+  return nullptr;
+}
+
+static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
+  auto* item = FirstAlwaysItem(r);
+  if (!item || !item->body) return nullptr;
+  if (item->body->kind == StmtKind::kBlock) {
+    return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+  }
+  return item->body;
+}
+
+namespace {
 
 // --- 29. Assign/deassign interleaved with nonblocking assigns ---
 TEST(ParserSection10, Sec10_6_1_InterleavedWithNonblocking) {
@@ -86,45 +133,6 @@ TEST(ParserSection10, Sec10_6_1_FullDFlipFlopPattern) {
     if (item->kind == ModuleItemKind::kAlwaysBlock) always_count++;
   }
   EXPECT_GE(always_count, 2);
-}
-
-struct ParseResult10c {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult10c Parse(const std::string& src) {
-  ParseResult10c result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult10c& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
-static Stmt* NthInitialStmt(ParseResult10c& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
 }
 
 // =============================================================================
@@ -739,66 +747,6 @@ TEST(ParserSection10, Sec10_4_1_ComplexLhsRhsCombinations) {
   EXPECT_EQ(s1->lhs->kind, ExprKind::kSelect);
   EXPECT_EQ(s0->rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(s1->rhs->kind, ExprKind::kBinary);
-}
-
-struct ParseResult10d {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult10d Parse(const std::string& src) {
-  ParseResult10d result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult10d& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
-static Stmt* NthInitialStmt(ParseResult10d& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
-}
-
-static ModuleItem* FirstAlwaysItem(ParseResult10d& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      return item;
-    }
-  }
-  return nullptr;
-}
-
-static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
-  auto* item = FirstAlwaysItem(r);
-  if (!item || !item->body) return nullptr;
-  if (item->body->kind == StmtKind::kBlock) {
-    return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-  }
-  return item->body;
 }
 
 // =============================================================================

@@ -65,4 +65,18 @@ TEST(ParserA602, ProceduralAssign_WithBitSelect) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
+// --- 28. Assign in task body ---
+TEST(ParserSection10, Sec10_6_1_AssignInTaskBody) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  reg q;\n"
+              "  task set_q;\n"
+              "    assign q = 1;\n"
+              "  endtask\n"
+              "  task clear_q;\n"
+              "    deassign q;\n"
+              "  endtask\n"
+              "endmodule\n"));
+}
+
 }  // namespace
