@@ -170,4 +170,22 @@ TEST(ParserAnnexA052, AttrOnOutputDecl) {
   EXPECT_EQ(udp->output_name, "out");
 }
 
+// Attribute on reg declaration
+TEST(ParserAnnexA052, AttrOnRegDecl) {
+  auto r = Parse(
+      "primitive dff(q, d, clk);\n"
+      "  output q;\n"
+      "  input d, clk;\n"
+      "  (* synthesis = \"off\" *) reg q;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_TRUE(udp->is_sequential);
+}
+
 }  // namespace
