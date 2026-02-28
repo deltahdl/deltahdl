@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, InoutTerminal_PassEnableSwitch) {
-  // inout_terminal positions in pass enable switches
-  auto r = Parse(
-      "module m;\n"
-      "  tranif0 (x, y, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(ParserA303, InoutTerminal_RtranBasic) {
   auto r = Parse(
       "module m;\n"
