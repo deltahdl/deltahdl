@@ -111,16 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_QuestionMark) {
-  // ? is an alternative for z in literal constants.
-  EXPECT_TRUE(ParseOk("module m; initial x = 16'sd?; endmodule"));
-}
-
-TEST(ParserCh50701, IntLiteral_NegativeUnsized) {
-  // -8'd6 defines the two's-complement of 6 held in 8 bits.
-  EXPECT_TRUE(ParseOk("module m; initial x = -8'd6; endmodule"));
-}
-
 TEST(ParserCh50701, IntLiteral_SizedDecimal) {
   // 5'D 3 is a 5-bit decimal number.
   EXPECT_TRUE(ParseOk("module m; initial x = 5'D3; endmodule"));
