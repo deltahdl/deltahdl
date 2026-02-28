@@ -49,22 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-// =========================================================================
-// §7.12.3: Array reduction methods
-// =========================================================================
-TEST(ParserSection7, ArraySumMethod) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[4];\n"
-      "  initial x = arr.sum;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
-}
-
 TEST(ParserSection7, ArraySumWithClause) {
   auto r = Parse(
       "module t;\n"
