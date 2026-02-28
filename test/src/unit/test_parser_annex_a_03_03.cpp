@@ -39,4 +39,11 @@ TEST(ParserA303, EnableTerminal_BitwiseExpr) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, EnableTerminal_TernaryExpr) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  notif1 (out, in, sel ? en1 : en2);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
