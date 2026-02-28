@@ -44,4 +44,22 @@ TEST(ParserAnnexA0414, ElaborationCheckerInstInModule) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
+// --- Elaborator resolves checker instantiation with port bindings ---
+TEST(ParserAnnexA0414, ElaborationCheckerInstPortBindings) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "checker simple_chk(input logic data);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic d;\n"
+      "  simple_chk u0(.data(d));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* top = design->top_modules[0];
+  ASSERT_GE(top->children.size(), 1u);
+  EXPECT_GE(top->children[0].port_bindings.size(), 1u);
+  EXPECT_EQ(top->children[0].port_bindings[0].port_name, "data");
+}
+
 }  // namespace
