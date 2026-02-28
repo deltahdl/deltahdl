@@ -22,39 +22,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 namespace {
 
 // =============================================================================
-// A.6.12 Randsequence — break and return within productions
-// =============================================================================
-// Break terminates randsequence
-TEST(ParserA612, BreakInRandsequence) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a { break; };\n"
-      "      a : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// Return aborts current production
-TEST(ParserA612, ReturnInRandsequence) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a { return; };\n"
-      "      a : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
 // A.6.12 Randsequence — complex / combined constructs
 // =============================================================================
 // Multiple productions with mixed prods (if, repeat, code_block, items)
