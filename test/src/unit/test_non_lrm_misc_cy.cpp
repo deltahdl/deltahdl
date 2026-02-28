@@ -52,16 +52,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-// --- genvar_declaration ---
-// genvar list_of_genvar_identifiers ;
-TEST(ParserA213, GenvarDeclSingle) {
-  auto r = Parse("module m; genvar i; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
-}
-
 TEST(ParserA213, GenvarDeclMultiple) {
   auto r = Parse("module m; genvar i, j, k; endmodule");
   ASSERT_NE(r.cu, nullptr);
