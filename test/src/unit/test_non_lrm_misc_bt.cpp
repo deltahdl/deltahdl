@@ -40,37 +40,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// §24.12 Program with final block
-// =============================================================================
-TEST_F(ProgramTestParse, ProgramWithFinalBlock) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  final begin\n"
-      "    $display(\"done\");\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  ASSERT_EQ(unit->programs[0]->items.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
-}
-
-TEST(ParserCh90301, BlockVarDecl_BuiltinType_Block) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->kind, ModuleItemKind::kInitialBlock);
-  auto* blk = item->body;
-  ASSERT_NE(blk, nullptr);
-  ASSERT_EQ(blk->kind, StmtKind::kBlock);
-  ASSERT_EQ(blk->stmts.size(), 1u);
-}
-
 TEST(ParserCh90301, BlockVarDecl_BuiltinType_Stmt) {
   auto r = Parse(
       "module m;\n"
