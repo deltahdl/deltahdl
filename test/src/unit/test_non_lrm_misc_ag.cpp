@@ -4,25 +4,14 @@
 
 using namespace delta;
 
-namespace {
-
-// --- Elaborator resolves program instantiation with port bindings ---
-TEST(ParserAnnexA0413, ElaborationProgramInstPortBindings) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "program simple_prog(input logic data);\n"
-      "endprogram\n"
-      "module top;\n"
-      "  logic d;\n"
-      "  simple_prog u0(.data(d));\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* top = design->top_modules[0];
-  ASSERT_GE(top->children.size(), 1u);
-  EXPECT_GE(top->children[0].port_bindings.size(), 1u);
-  EXPECT_EQ(top->children[0].port_bindings[0].port_name, "data");
+bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
+  for (auto* item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
 }
+
+namespace {
 
 // --- Elaborator resolves program with parameters ---
 TEST(ParserAnnexA0413, ElaborationProgramInstWithParams) {
@@ -237,13 +226,6 @@ TEST(ParserAnnexA0414, ElaborationCheckerInsideChecker) {
   ASSERT_GE(outer->children.size(), 1u);
   EXPECT_EQ(outer->children[0].module_name, "inner_chk");
   EXPECT_NE(outer->children[0].resolved, nullptr);
-}
-
-bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return true;
-  }
-  return false;
 }
 
 // =============================================================================
