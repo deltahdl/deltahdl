@@ -35,4 +35,12 @@ TEST(Parser, EventDeclaration) {
   EXPECT_EQ(item->name, "ev");
 }
 
+// event
+TEST(ParserA221, DataTypeEvent) {
+  auto r = Parse("module m; event ev; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEvent);
+}
+
 }  // namespace

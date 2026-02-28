@@ -136,4 +136,36 @@ TEST(ParserA601, NetAssignment_ExprRhs) {
   EXPECT_EQ(cas[0]->assign_rhs->kind, ExprKind::kBinary);
 }
 
+struct ParseResult6b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6b Parse(const std::string& src) {
+  ParseResult6b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(ParserSection6, VariableContinuousAssign) {
+  // §6.5: Variables can be written by one continuous assignment.
+  auto r = Parse(
+      "module t;\n"
+      "  logic vw;\n"
+      "  assign vw = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  bool found_ca = false;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kContAssign) found_ca = true;
+  }
+  EXPECT_TRUE(found_ca);
+}
+
 }  // namespace
