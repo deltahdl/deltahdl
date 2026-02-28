@@ -80,4 +80,43 @@ TEST(ParserA602, Integration_InitialFinalCoexistence) {
   ASSERT_NE(fin, nullptr);
 }
 
+struct ParseResult9d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9d Parse(const std::string& src) {
+  ParseResult9d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 9.2.3 -- Final procedures
+// Final blocks with begin/end and multiple statements.
+// =============================================================================
+TEST(ParserSection9c, FinalBlockWithBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  final begin\n"
+      "    $display(\"cycles: %0d\", count);\n"
+      "    $display(\"done\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* final_item = FindItemByKind(r, ModuleItemKind::kFinalBlock);
+  ASSERT_NE(final_item, nullptr);
+  ASSERT_NE(final_item->body, nullptr);
+  EXPECT_EQ(final_item->body->kind, StmtKind::kBlock);
+  EXPECT_GE(final_item->body->stmts.size(), 2u);
+}
+
 }  // namespace
