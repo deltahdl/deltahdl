@@ -253,4 +253,15 @@ TEST(ParserA304, NInputGatetype_Xor) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA304, NInputGatetype_Xnor) {
+  auto r = Parse(
+      "module m;\n"
+      "  xnor (out, a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kXnor);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
