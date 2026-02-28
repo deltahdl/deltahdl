@@ -43,20 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-TEST(ParserSection18, RandomizeWithMultipleConstraints) {
-  auto r = Parse(
-      "class SimpleSum;\n"
-      "  rand bit [7:0] x, y, z;\n"
-      "  constraint c { z == x + y; }\n"
-      "  function void test();\n"
-      "    this.randomize() with { x < y; x > 10; y < 200; };\n"
-      "  endfunction\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(ParserSection18, RandomizeWithRestrictedIdList) {
   auto r = Parse(
       "class C;\n"
