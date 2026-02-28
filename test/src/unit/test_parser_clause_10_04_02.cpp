@@ -153,4 +153,22 @@ TEST(ParserSection10, Sec10_4_2_ConcatenationLhsRhs) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
+// --- 10. Nonblocking with ternary RHS: q <= sel ? a : b ---
+TEST(ParserSection10, Sec10_4_2_TernaryRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, sel, a, b;\n"
+      "  initial begin\n"
+      "    q <= sel ? a : b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
+}
+
 }  // namespace
