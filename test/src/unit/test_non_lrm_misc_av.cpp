@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA83, PrefixIncrementOnSelect) {
-  auto r = Parse("module m; initial ++arr[0]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kUnary);
-  EXPECT_EQ(expr->lhs->kind, ExprKind::kSelect);
-}
-
 TEST(ParserA83, PostfixDecrementOnMember) {
   auto r = Parse("module m; initial s.field--; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

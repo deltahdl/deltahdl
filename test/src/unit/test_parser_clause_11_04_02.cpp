@@ -119,4 +119,14 @@ TEST(ParserA83, PostfixDecrement) {
   EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
 }
 
+TEST(ParserA83, PrefixIncrementOnSelect) {
+  auto r = Parse("module m; initial ++arr[0]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kUnary);
+  EXPECT_EQ(expr->lhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace
