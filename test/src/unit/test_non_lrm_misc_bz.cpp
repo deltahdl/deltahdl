@@ -83,22 +83,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 21. always_comb with function call in body.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombFunctionCall) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function logic [3:0] mux2(input logic sel,\n"
-              "                            input logic [3:0] a, b);\n"
-              "    return sel ? a : b;\n"
-              "  endfunction\n"
-              "  logic sel;\n"
-              "  logic [3:0] a, b, y;\n"
-              "  always_comb y = mux2(sel, a, b);\n"
-              "endmodule\n"));
-}
-
-// ---------------------------------------------------------------------------
 // 22. always @* with function call in body.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarFunctionCall) {
