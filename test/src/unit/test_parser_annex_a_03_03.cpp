@@ -236,4 +236,11 @@ TEST(ParserA303, OutputTerminal_SimpleIdent) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA303, OutputTerminal_BitSelect) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  and (out[0], a, b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
