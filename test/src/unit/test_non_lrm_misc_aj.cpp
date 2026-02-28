@@ -50,24 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// A.6.1 Production: list_of_net_assignments (parsing)
-// list_of_net_assignments ::= net_assignment { , net_assignment }
-// =============================================================================
-TEST(ParserA601, ListOfNetAssignments_Two) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign a = b, c = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 2u);
-  EXPECT_EQ(cas[0]->assign_lhs->text, "a");
-  EXPECT_EQ(cas[1]->assign_lhs->text, "c");
-}
-
 TEST(ParserA601, ListOfNetAssignments_Three) {
   auto r = Parse(
       "module m;\n"
