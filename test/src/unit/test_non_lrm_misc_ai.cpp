@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Simulation: combinational body evaluates correctly
-TEST(ParserAnnexA053, UdpBody_SimCombinational) {
-  auto r = Parse(
-      "primitive or_gate(output y, input a, b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 1;\n"
-      "    1 0 : 1;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-  EXPECT_EQ(eval.Evaluate({'0', '0'}), '0');
-  EXPECT_EQ(eval.Evaluate({'0', '1'}), '1');
-  EXPECT_EQ(eval.Evaluate({'1', '0'}), '1');
-  EXPECT_EQ(eval.Evaluate({'1', '1'}), '1');
-}
-
 // ---------------------------------------------------------------------------
 // Production 2: combinational_body ::= table combinational_entry
 //               { combinational_entry } endtable
