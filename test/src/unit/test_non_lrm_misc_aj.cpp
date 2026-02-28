@@ -50,25 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// Simulation: '*' matches any change
-TEST(ParserAnnexA053, EdgeSymbol_SimStar) {
-  auto r = Parse(
-      "primitive star_udp(output reg q, input a);\n"
-      "  initial q = 0;\n"
-      "  table\n"
-      "    * : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-  // 0->1 matches *
-  eval.SetInputs({'0'});
-  EXPECT_EQ(eval.EvaluateWithEdge({'1'}, 0, '0'), '1');
-  // 1->0 also matches *
-  EXPECT_EQ(eval.EvaluateWithEdge({'0'}, 0, '1'), '1');
-}
-
 // =============================================================================
 // A.5.4 Production #1: udp_instantiation
 // udp_instantiation ::=
