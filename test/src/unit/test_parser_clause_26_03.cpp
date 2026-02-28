@@ -44,4 +44,21 @@ TEST(ParserA213, PackageImportSingle) {
   EXPECT_EQ(item->import_item.item_name, "foo");
 }
 
+// =============================================================================
+// LRM section 26.3 -- Referencing data in packages (import)
+// =============================================================================
+TEST(ParserSection26, ModuleImportPackage) {
+  auto r = Parse(
+      "package p;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
+}
+
 }  // namespace

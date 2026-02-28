@@ -91,4 +91,42 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardBeginEnd) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
+// ---------------------------------------------------------------------------
+// Verify iff_condition field is populated for posedge
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffConditionFieldPosedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff reset == 0) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  const auto& ev = item->sensitivity[0];
+  // The iff_condition should be an equality comparison expression.
+  ASSERT_NE(ev.iff_condition, nullptr);
+  EXPECT_EQ(ev.iff_condition->kind, ExprKind::kBinary);
+}
+
+// ---------------------------------------------------------------------------
+// Verify signal field is populated
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_SignalFieldPopulated) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  const auto& ev = item->sensitivity[0];
+  ASSERT_NE(ev.signal, nullptr);
+  EXPECT_EQ(ev.signal->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(ev.signal->text, "clk");
+}
+
 }  // namespace

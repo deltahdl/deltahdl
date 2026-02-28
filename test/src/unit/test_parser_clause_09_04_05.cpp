@@ -180,4 +180,24 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignDelay) {
   EXPECT_EQ(stmt->rhs->text, "b");
 }
 
+// --- 3. Blocking assignment with intra-assignment event control ---
+TEST(ParserSection10, Sec10_4_1_IntraAssignEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, clk;\n"
+      "  initial begin\n"
+      "    a = @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  ASSERT_NE(stmt->lhs, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace

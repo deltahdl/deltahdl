@@ -18,4 +18,16 @@ TEST(ParserSection21, SwriteBasic) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, SwritebHexOctal) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  string s;\n"
+              "  initial begin\n"
+              "    $swriteb(s, val);\n"
+              "    $swriteh(s, val);\n"
+              "    $swriteo(s, val);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
