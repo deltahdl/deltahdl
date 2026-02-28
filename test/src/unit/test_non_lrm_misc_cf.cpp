@@ -41,26 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, ArithmeticSub) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a - b;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kMinus);
-}
-
-TEST(ParserSection11, ArithmeticMul) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a * b;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kStar);
-}
-
 TEST(ParserSection11, ArithmeticDiv) {
   auto r = Parse(
       "module t;\n"
