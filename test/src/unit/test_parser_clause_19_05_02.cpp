@@ -56,4 +56,15 @@ TEST(ParserA211, TransSet_SingleRange) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, TransSet_MultipleRanges) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 => 3 => 5);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
