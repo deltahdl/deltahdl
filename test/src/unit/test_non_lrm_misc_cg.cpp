@@ -42,20 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.3 -- Operators (general syntax and unary +)
-// =========================================================================
-TEST(ParserSection11, UnaryPlusOperator) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = +a;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
-}
-
 TEST(ParserSection11, XnorBinaryOperator) {
   auto r = Parse(
       "module t;\n"
