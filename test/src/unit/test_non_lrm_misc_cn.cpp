@@ -27,24 +27,6 @@ static ParseResult16b Parse(const std::string& src) {
 namespace {
 
 // =============================================================================
-// §16.5 Concurrent — cover property
-// =============================================================================
-TEST(ParserSection16, CoverPropertyModuleLevel) {
-  auto r = Parse(
-      "module m;\n"
-      "  cover property (@(posedge clk) a && b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kCoverProperty) {
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
-// =============================================================================
 // §16.12 Property declarations
 // =============================================================================
 TEST(ParserSection16, PropertyDeclaration) {

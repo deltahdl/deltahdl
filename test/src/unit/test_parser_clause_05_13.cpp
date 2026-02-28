@@ -57,4 +57,14 @@ TEST(ParserCh513, BuiltInMethodCall_ChainedAccess) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
+// From test_parser_clause_05b.cpp
+TEST(ParserCh513, BuiltInMethod_NoParens) {
+  // When a method has no arguments the parentheses are optional.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial x = q.size;\n"
+              "endmodule"));
+}
+
 }  // namespace
