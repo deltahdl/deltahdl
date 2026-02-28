@@ -44,30 +44,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 5. Nested if-else chain.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_3_NestedIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en1, en2, d1, d2, q;\n"
-      "  always_latch\n"
-      "    if (en1)\n"
-      "      q <= d1;\n"
-      "    else if (en2)\n"
-      "      q <= d2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysLatchItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kIf);
-  // The else branch is itself an if statement.
-  ASSERT_NE(item->body->else_branch, nullptr);
-  EXPECT_EQ(item->body->else_branch->kind, StmtKind::kIf);
-}
-
-// ---------------------------------------------------------------------------
 // 6. Multiple assignments inside a begin-end block.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_MultipleAssignments) {

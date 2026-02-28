@@ -119,4 +119,53 @@ TEST(ParserSection12, IfElseIfElseChain) {
   EXPECT_NE(stmt->else_branch->else_branch, nullptr);
 }
 
+struct ParseResult9i {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9i Parse(const std::string& src) {
+  ParseResult9i result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysLatchItem(ParseResult9i& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return item;
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 5. Nested if-else chain.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_NestedIfElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic en1, en2, d1, d2, q;\n"
+      "  always_latch\n"
+      "    if (en1)\n"
+      "      q <= d1;\n"
+      "    else if (en2)\n"
+      "      q <= d2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kIf);
+  // The else branch is itself an if statement.
+  ASSERT_NE(item->body->else_branch, nullptr);
+  EXPECT_EQ(item->body->else_branch->kind, StmtKind::kIf);
+}
+
 }  // namespace
