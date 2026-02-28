@@ -38,4 +38,17 @@ TEST(ParserSection26, PackageWithParameter) {
   ASSERT_FALSE(r.cu->packages[0]->items.empty());
 }
 
+TEST(ParserSection26, PackageWithFunction) {
+  auto r = Parse(
+      "package util_pkg;\n"
+      "  function int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
+}
+
 }  // namespace
