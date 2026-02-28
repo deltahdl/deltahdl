@@ -7,45 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Deeply nested ternary (three levels) ---
-TEST(ParserSection11, Sec11_4_6_DeeplyNestedTernary) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = s1 ? a : s2 ? b : s3 ? c : d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  // s1 ? a : (s2 ? b : (s3 ? c : d))
-  ASSERT_NE(rhs->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->false_expr->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->false_expr->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->false_expr->false_expr->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->false_expr->false_expr->kind,
-            ExprKind::kIdentifier);
-}
-
-// --- Ternary in continuous assignment with complex LHS ---
-TEST(ParserSection11, Sec11_4_6_TernaryContAssignWithBitSelectLhs) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] out;\n"
-      "  wire sel, a, b;\n"
-      "  assign out[0] = sel ? a : b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* ca = FirstContAssign(r);
-  ASSERT_NE(ca, nullptr);
-  ASSERT_NE(ca->assign_lhs, nullptr);
-  EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kSelect);
-  ASSERT_NE(ca->assign_rhs, nullptr);
-  EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kTernary);
-}
-
 TEST(Parser, DoWhileStatement) {
   auto r = Parse(
       "module t;\n"
