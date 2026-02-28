@@ -25,14 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-TEST(ParserAnnexA0411, SingleOrderedParam) {
-  auto r = Parse("module m; sub #(16) u0(); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_params.size(), 1u);
-}
-
 // =============================================================================
 // hierarchical_instance ::= name_of_instance ( [ list_of_port_connections ] )
 // name_of_instance ::= instance_identifier { unpacked_dimension }

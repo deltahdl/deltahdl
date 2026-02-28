@@ -42,4 +42,12 @@ TEST(ParserAnnexA0411, NamedParameterEmptyExpression) {
   EXPECT_EQ(item->inst_params[0].second, nullptr);
 }
 
+TEST(ParserAnnexA0411, SingleOrderedParam) {
+  auto r = Parse("module m; sub #(16) u0(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->inst_params.size(), 1u);
+}
+
 }  // namespace
