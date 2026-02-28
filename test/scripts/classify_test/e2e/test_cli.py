@@ -15,6 +15,9 @@ _SCRIPTS_DIR = str(
 # ---- Helpers ---------------------------------------------------------------
 
 
+_ISSUE_FLAGS = ("--issue", "1", "--organization", "o", "--repo", "r")
+
+
 def _invoke(*args, cwd=None, env=None):
     """Run classify_test in a child process."""
     run_env = (env or os.environ).copy()
@@ -65,13 +68,14 @@ def _install_fake(tmp_path, name, body):
 
 
 def _env_with_fakes(tmp_path, claude_response):
-    """Build env with fake claude and git binaries on PATH."""
+    """Build env with fake claude, git, and gh binaries on PATH."""
     payload = json.dumps(claude_response)
     bin_dir = _install_fake(
         tmp_path, "claude",
         f"#!/bin/sh\necho '{payload}'\n",
     )
     _install_fake(tmp_path, "git", "#!/bin/sh\nexit 0\n")
+    _install_fake(tmp_path, "gh", "#!/bin/sh\nexit 0\n")
     env = _base_env(tmp_path)
     env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
     return env
@@ -102,6 +106,7 @@ def _run_dry(tmp_path):
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
         "--test", "DryT", "--dry-run",
+        *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=env,
     )
 
@@ -128,6 +133,7 @@ def _run_pipeline(tmp_path):
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
         "--test", "Alpha",
+        *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=env,
     )
 
@@ -169,6 +175,7 @@ def test_nonexistent_file_reports_error(tmp_path):
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
         "--test", "T",
+        *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
 
@@ -186,6 +193,7 @@ def test_file_without_tests_reports_error(tmp_path):
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
         "--test", "T",
+        *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
 
@@ -200,6 +208,7 @@ def test_test_not_found_reports_error(tmp_path):
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
         "--test", "NoSuchTest",
+        *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
 
@@ -304,6 +313,7 @@ def test_named_ns_pipeline_reports_done(tmp_path):
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
         "--test", "Alpha",
+        *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=env,
     )
     assert "Updated `CMakeLists.txt`" in r.stdout
@@ -317,6 +327,7 @@ def _run_named_ns_pipeline(tmp_path):
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
         "--test", "Alpha",
+        *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=env,
     )
 
