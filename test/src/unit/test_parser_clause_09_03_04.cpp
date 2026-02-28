@@ -88,4 +88,22 @@ TEST(ParserA603, ForkNamedWithEndLabel) {
   EXPECT_EQ(stmt->label, "my_fork");
 }
 
+// §9.3.4: Named fork with join_any and end label
+TEST(ParserA603, ForkNamedJoinAnyWithEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : f1\n"
+      "      #10 a = 1;\n"
+      "    join_any : f1\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
+  EXPECT_EQ(stmt->label, "f1");
+}
+
 }  // namespace
