@@ -41,4 +41,11 @@ TEST(ParserA301, GateInst_RnmosBasic) {
               "endmodule\n"));
 }
 
+TEST(ParserA301, GateInst_RpmosBasic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rpmos (out, in, ctrl);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
