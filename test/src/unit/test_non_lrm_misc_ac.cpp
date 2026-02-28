@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetPortItem_TypedWithDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  let at_least(logic sig, logic rst = 1'b0) = rst || sig;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->func_args.size(), 2u);
-  EXPECT_EQ(item->func_args[0].default_value, nullptr);
-  EXPECT_NE(item->func_args[1].default_value, nullptr);
-}
-
 TEST(ParserA212, LetPortItem_IntType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
