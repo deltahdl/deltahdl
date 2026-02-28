@@ -50,4 +50,17 @@ TEST(ParserA26, DpiExportDpiLegacy) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kDpiExport);
 }
 
+TEST_F(AnnexHParseTest, AnnexHDpiExportFunction) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
+  EXPECT_EQ(items[0]->name, "sv_func");
+  EXPECT_FALSE(items[0]->dpi_is_task);
+}
+
 }  // namespace
