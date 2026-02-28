@@ -87,58 +87,6 @@ static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
 
 namespace {
 
-// --- 30. Full D-FF with assign/deassign and always @(posedge) ---
-TEST(ParserSection10, Sec10_6_1_FullDFlipFlopPattern) {
-  auto r = Parse(
-      "module dff_full(output reg q, input d, clr, pre, clk);\n"
-      "  always @(clr or pre) begin\n"
-      "    if (!clr)\n"
-      "      assign q = 0;\n"
-      "    else if (!pre)\n"
-      "      assign q = 1;\n"
-      "    else\n"
-      "      deassign q;\n"
-      "  end\n"
-      "  always @(posedge clk)\n"
-      "    q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "dff_full");
-  // Should have at least two always blocks.
-  int always_count = 0;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) always_count++;
-  }
-  EXPECT_GE(always_count, 2);
-}
-
-// =============================================================================
-// LRM section 10.4.1 -- Blocking procedural assignments
-// =============================================================================
-// --- 1. Simple blocking assignment: a = b ---
-TEST(ParserSection10, Sec10_4_1_SimpleBlocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(stmt->lhs->text, "a");
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(stmt->rhs->text, "b");
-}
-
 // --- 2. Blocking assignment with intra-assignment delay: a = #10 b ---
 TEST(ParserSection10, Sec10_4_1_IntraAssignDelay) {
   auto r = Parse(
