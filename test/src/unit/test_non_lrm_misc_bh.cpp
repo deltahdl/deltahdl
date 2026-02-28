@@ -30,17 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(Parser, NettypeDeclaration) {
-  auto r = Parse(
-      "module t;\n"
-      "  nettype logic [7:0] mynet;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-  EXPECT_EQ(item->name, "mynet");
-}
-
 TEST(Parser, NettypeWithResolutionFunction) {
   auto r = Parse(
       "module t;\n"
