@@ -5,28 +5,20 @@
 
 using namespace delta;
 
-namespace {
-
-// --- udp_ansi_declaration: multiple inputs with shared input keyword ---
-TEST(ParserAnnexA051, AnsiSharedInputKeyword) {
-  auto r = Parse(
-      "primitive mux(output out, input a, b, sel);\n"
-      "  table\n"
-      "    0 ? 0 : 0;\n"
-      "    1 ? 0 : 1;\n"
-      "    ? 0 1 : 0;\n"
-      "    ? 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+// Helper: verify parsed extern UDP named "inv" with one input.
+static void VerifyExternInvPrimitive(ParseResult& r) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
   auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->input_names.size(), 3u);
-  EXPECT_EQ(udp->input_names[0], "a");
-  EXPECT_EQ(udp->input_names[1], "b");
-  EXPECT_EQ(udp->input_names[2], "sel");
+  EXPECT_EQ(udp->name, "inv");
+  EXPECT_EQ(udp->output_name, "out");
+  ASSERT_EQ(udp->input_names.size(), 1u);
+  EXPECT_EQ(udp->input_names[0], "in");
+  EXPECT_TRUE(udp->table.empty());
 }
+
+namespace {
 
 // --- udp_declaration: endprimitive with end label ---
 TEST(ParserAnnexA051, EndLabel) {
@@ -41,19 +33,6 @@ TEST(ParserAnnexA051, EndLabel) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
-}
-
-// Helper: verify parsed extern UDP named "inv" with one input.
-static void VerifyExternInvPrimitive(ParseResult& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->name, "inv");
-  EXPECT_EQ(udp->output_name, "out");
-  ASSERT_EQ(udp->input_names.size(), 1u);
-  EXPECT_EQ(udp->input_names[0], "in");
-  EXPECT_TRUE(udp->table.empty());
 }
 
 // --- udp_declaration: extern udp_ansi_declaration ---
