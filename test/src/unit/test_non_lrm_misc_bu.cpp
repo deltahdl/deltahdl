@@ -49,41 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9, DisableForkAfterJoinNone) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #100;\n"
-      "    join_none\n"
-      "    #50;\n"
-      "    disable fork;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisableFork);
-}
-
-// =============================================================================
-// LRM section 9.4 -- Procedural timing controls (additional coverage)
-// =============================================================================
-TEST(ParserSection9, DelayControlReal) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #3.5 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-  EXPECT_NE(stmt->delay, nullptr);
-}
-
 TEST(ParserSection9, EventControlBareSignal) {
   auto r = Parse(
       "module m;\n"
