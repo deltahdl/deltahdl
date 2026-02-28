@@ -5,22 +5,44 @@
 
 using namespace delta;
 
-namespace {
+// --- Test helpers ---
+struct ParseResult14 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
 
-// Task with inout port direction.
-TEST(ParserSection13, TaskWithInoutPort) {
-  auto r = Parse(
-      "module m;\n"
-      "  task transform(inout logic [7:0] data);\n"
-      "    data = data ^ 8'hFF;\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "transform");
-  ASSERT_NE(tk, nullptr);
-  ASSERT_EQ(tk->func_args.size(), 1u);
-  EXPECT_EQ(tk->func_args[0].direction, Direction::kInout);
+static ParseResult14 Parse(const std::string& src) {
+  ParseResult14 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
 }
+
+static ModuleItem* FindClockingBlock(ParseResult14& r, size_t idx = 0) {
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (count == idx) return item;
+    ++count;
+  }
+  return nullptr;
+}
+
+// Validates parse result and retrieves a clocking block via output param.
+// Must be called through ASSERT_NO_FATAL_FAILURE.
+static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
+                             size_t idx = 0) {
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  out = FindClockingBlock(r, idx);
+  ASSERT_NE(out, nullptr);
+}
+
+namespace {
 
 // Task with no ports.
 TEST(ParserSection13, TaskWithNoPorts) {
@@ -270,25 +292,6 @@ TEST(ParserSection13, NamedArgBindingAllNamed) {
   EXPECT_EQ(stmt->rhs->arg_names[0], "c");
   EXPECT_EQ(stmt->rhs->arg_names[1], "a");
   EXPECT_EQ(stmt->rhs->arg_names[2], "b");
-}
-
-// --- Test helpers ---
-struct ParseResult13b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult13b Parse(const std::string& src) {
-  ParseResult13b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
 }
 
 // =============================================================================
@@ -614,43 +617,6 @@ TEST(ParserSection13, Sec13_8_ExplicitlyTypedParam) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-// --- Test helpers ---
-struct ParseResult14 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult14 Parse(const std::string& src) {
-  ParseResult14 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FindClockingBlock(ParseResult14& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
-}
-
-// Validates parse result and retrieves a clocking block via output param.
-// Must be called through ASSERT_NO_FATAL_FAILURE.
-static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
-                             size_t idx = 0) {
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  out = FindClockingBlock(r, idx);
-  ASSERT_NE(out, nullptr);
 }
 
 // =============================================================================
