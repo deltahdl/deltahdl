@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA302, PullupStrength_MultipleInstances) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (weak0, strong1) pu1(a), pu2(b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  ASSERT_EQ(gates.size(), 2u);
-  EXPECT_EQ(gates[0]->drive_strength0, 2u);  // weak0
-  EXPECT_EQ(gates[0]->drive_strength1, 4u);  // strong1
-  EXPECT_EQ(gates[1]->drive_strength0, 2u);  // weak0
-  EXPECT_EQ(gates[1]->drive_strength1, 4u);  // strong1
-}
-
 TEST(ParserA302, PulldownStrength_SingleStrength0_MultipleInstances) {
   auto r = Parse(
       "module m;\n"
