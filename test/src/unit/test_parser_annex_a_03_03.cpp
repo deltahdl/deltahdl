@@ -288,4 +288,11 @@ TEST(ParserA303, PcontrolTerminal_SimpleIdent) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
+TEST(ParserA303, PcontrolTerminal_ComplexExpr) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rcmos (out, in, nctrl, x | y);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
