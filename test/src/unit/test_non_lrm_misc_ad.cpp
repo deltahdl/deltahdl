@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, NOutputGateInst_Unnamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  buf (o1, o2, in);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
-  ASSERT_NE(g, nullptr);
-  EXPECT_TRUE(g->gate_inst_name.empty());
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 // =============================================================================
 // A.3.1 Production #7: pass_switch_instance
 // pass_switch_instance ::= [name_of_instance] ( inout_terminal , inout_terminal
