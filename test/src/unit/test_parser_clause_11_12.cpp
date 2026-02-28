@@ -99,4 +99,11 @@ TEST(ParserA212, LetDecl_InProgram) {
               "endprogram\n"));
 }
 
+TEST(ParserA212, LetDecl_InChecker) {
+  EXPECT_TRUE(
+      ParseOk("checker chk;\n"
+              "  let valid(a, b) = a | b;\n"
+              "endchecker\n"));
+}
+
 }  // namespace

@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetDecl_InChecker) {
-  EXPECT_TRUE(
-      ParseOk("checker chk;\n"
-              "  let valid(a, b) = a | b;\n"
-              "endchecker\n"));
-}
-
 TEST(ParserA212, LetDecl_AsBlockItem) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
