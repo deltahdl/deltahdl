@@ -53,4 +53,16 @@ TEST(ParserA23, ListOfTfVariableIdentifiersSingle) {
   EXPECT_EQ(item->func_args.size(), 1u);
 }
 
+TEST(ParserA23, ListOfTypeAssignmentsMultiple) {
+  auto r = Parse(
+      "module m; parameter type T1 = int, T2 = real, T3 = string; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kParamDecl) count++;
+  }
+  EXPECT_GE(count, 3);
+}
+
 }  // namespace
