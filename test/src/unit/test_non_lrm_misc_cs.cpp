@@ -20,17 +20,6 @@ TEST(ParserSection21, FeofFerror) {
               "endmodule\n"));
 }
 
-// ============================================================================
-// LRM section 21.7.1 -- Creating 4-state VCD file ($dumpfile, $dumpvars,
-//                        $dumpoff, $dumpon, $dumpall, $dumpflush, $dumplimit)
-// ============================================================================
-TEST(ParserSection21, DumpfileBasic) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $dumpfile(\"dump.vcd\");\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, DumpfileDefaultName) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
