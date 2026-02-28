@@ -45,4 +45,23 @@ TEST(ParserSection4, Sec4_6_UniqueIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
+// =============================================================================
+// §4.6: unique0 if statement
+// =============================================================================
+TEST(ParserSection4, Sec4_6_Unique0If) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
 }  // namespace
