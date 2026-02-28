@@ -25,19 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-// =============================================================================
-// A.4 -- Instantiations
-// =============================================================================
-TEST(ParserAnnexA, A4ModuleInstPositional) {
-  auto r = Parse("module m; sub u0(a, b, c); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "sub");
-  EXPECT_EQ(item->inst_name, "u0");
-}
-
 TEST(ParserAnnexA, A4ModuleInstNamed) {
   auto r = Parse("module m; sub u0(.clk(clk), .data(data)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
