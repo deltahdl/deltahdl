@@ -9,6 +9,15 @@
 
 using namespace delta;
 
+// Capture src and schedule an NBA update that assigns the captured value to dst.
+static void ScheduleNbaAssign(Scheduler& sched, const int& src, int& dst) {
+  int rhs_val = src;
+  auto* nba = sched.GetEventPool().Acquire();
+  nba->kind = EventKind::kUpdate;
+  nba->callback = [&, rhs_val]() { dst = rhs_val; };
+  sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
+}
+
 // ===========================================================================
 // §4.9.4 Nonblocking assignment
 // ===========================================================================
@@ -25,13 +34,7 @@ TEST(SimCh4094, AlwaysComputesUpdatedValue) {
   // Model: dst <= src;  (src=42 at evaluation time)
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    int rhs_val = src;  // Compute the updated value.
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&, rhs_val]() { dst = rhs_val; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-  };
+  eval->callback = [&]() { ScheduleNbaAssign(sched, src, dst); };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
   sched.Run();
@@ -143,11 +146,7 @@ TEST(SimCh4094, RhsComputedAtScheduleTime) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int rhs_val = src;  // Capture RHS now (src=10).
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&, rhs_val]() { dst = rhs_val; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
+    ScheduleNbaAssign(sched, src, dst);
     // Change src after scheduling the NBA but before it executes.
     src = 99;
   };

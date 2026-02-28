@@ -147,28 +147,6 @@ TEST(ParserClause03, Cl3_14_2_1_KeywordsOverrideTimescale) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kNs);
 }
 
-// Helper: parse source and return the compilation unit.
-struct ParseResult3140202 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult3140202 ParseTimescale31402(const std::string& src) {
-  ParseResult3140202 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.PreprocessTimescale(fid);
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // =============================================================================
 // LRM §3.14.2.2 — The timeunit and timeprecision keywords
 // =============================================================================
@@ -859,34 +837,6 @@ TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
   // inner has own timeunit/timeprecision — these override.
   EXPECT_EQ(inner_resolved.unit, TimeUnit::kFs);
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
-}
-
-// Helper: preprocess and parse, returning CU + preprocessor state.
-struct ParseResult31403 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-  TimeScale preproc_timescale;
-  bool has_preproc_timescale = false;
-  TimeUnit preproc_global_precision = TimeUnit::kNs;
-};
-
-static ParseResult31403 ParseTimescale31402(const std::string& src) {
-  ParseResult31403 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.PreprocessTimescale(fid);
-  result.preproc_timescale = preproc.CurrentTimescale();
-  result.has_preproc_timescale = preproc.HasTimescale();
-  result.preproc_global_precision = preproc.GlobalPrecision();
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
 }
 
 // =============================================================================

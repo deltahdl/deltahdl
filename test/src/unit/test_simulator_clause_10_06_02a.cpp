@@ -243,61 +243,56 @@ TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
 }
 
 // --- Normative example (§10.6.2) ---
+struct TwoNets {
+  Arena arena;
+  Variable* vd = nullptr;
+  Variable* ve = nullptr;
+  Net net_d;
+  Net net_e;
+};
+
+static TwoNets MakeTwoWireNets() {
+  TwoNets tn;
+  tn.vd = tn.arena.Create<Variable>();
+  tn.vd->value = MakeLogic4Vec(tn.arena, 1);
+  tn.ve = tn.arena.Create<Variable>();
+  tn.ve->value = MakeLogic4Vec(tn.arena, 1);
+  tn.net_d.type = NetType::kWire;
+  tn.net_d.resolved = tn.vd;
+  tn.net_d.drivers.push_back(MakeLogic4VecVal(tn.arena, 1, 0));
+  tn.net_e.type = NetType::kWire;
+  tn.net_e.resolved = tn.ve;
+  tn.net_e.drivers.push_back(MakeLogic4VecVal(tn.arena, 1, 0));
+  return tn;
+}
+
 // §10.6.2 example: at time 0, d=0 (a&b&c=1&0&1=0), e=0 (and gate).
 // At time 10, force d and e to a|b|c=1. At time 20, release both back
 // to driver values (0).
 TEST(ForceRelease, NormativeExampleForceAndRelease_InitialState) {
-  Arena arena;
-  auto* vd = arena.Create<Variable>();
-  vd->value = MakeLogic4Vec(arena, 1);
-  auto* ve = arena.Create<Variable>();
-  ve->value = MakeLogic4Vec(arena, 1);
-
-  Net net_d;
-  net_d.type = NetType::kWire;
-  net_d.resolved = vd;
-  net_d.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-
-  Net net_e;
-  net_e.type = NetType::kWire;
-  net_e.resolved = ve;
-  net_e.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  auto tn = MakeTwoWireNets();
 
   // Time 0: d=0, e=0.
-  ReleaseNet(net_d, arena);
-  ReleaseNet(net_e, arena);
-  EXPECT_EQ(ValOf(*vd), kVal0);
-  EXPECT_EQ(ValOf(*ve), kVal0);
+  ReleaseNet(tn.net_d, tn.arena);
+  ReleaseNet(tn.net_e, tn.arena);
+  EXPECT_EQ(ValOf(*tn.vd), kVal0);
+  EXPECT_EQ(ValOf(*tn.ve), kVal0);
 }
 
 TEST(ForceRelease, NormativeExampleForceAndRelease_ForceAndRelease) {
-  Arena arena;
-  auto* vd = arena.Create<Variable>();
-  vd->value = MakeLogic4Vec(arena, 1);
-  auto* ve = arena.Create<Variable>();
-  ve->value = MakeLogic4Vec(arena, 1);
-
-  Net net_d;
-  net_d.type = NetType::kWire;
-  net_d.resolved = vd;
-  net_d.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-
-  Net net_e;
-  net_e.type = NetType::kWire;
-  net_e.resolved = ve;
-  net_e.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  auto tn = MakeTwoWireNets();
 
   // Time 10: force both to a|b|c = 1.
-  ForceNet(net_d, MakeLogic4VecVal(arena, 1, 1), arena);
-  ForceNet(net_e, MakeLogic4VecVal(arena, 1, 1), arena);
-  EXPECT_EQ(ValOf(*vd), kVal1);
-  EXPECT_EQ(ValOf(*ve), kVal1);
+  ForceNet(tn.net_d, MakeLogic4VecVal(tn.arena, 1, 1), tn.arena);
+  ForceNet(tn.net_e, MakeLogic4VecVal(tn.arena, 1, 1), tn.arena);
+  EXPECT_EQ(ValOf(*tn.vd), kVal1);
+  EXPECT_EQ(ValOf(*tn.ve), kVal1);
 
   // Time 20: release both — should revert to driver value 0.
-  ReleaseNet(net_d, arena);
-  ReleaseNet(net_e, arena);
-  EXPECT_EQ(ValOf(*vd), kVal0);
-  EXPECT_EQ(ValOf(*ve), kVal0);
+  ReleaseNet(tn.net_d, tn.arena);
+  ReleaseNet(tn.net_e, tn.arena);
+  EXPECT_EQ(ValOf(*tn.vd), kVal0);
+  EXPECT_EQ(ValOf(*tn.ve), kVal0);
 }
 
 }  // namespace

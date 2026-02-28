@@ -460,6 +460,21 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarBlocks) {
   ASSERT_NE(item1->body, nullptr);
 }
 
+// Helper: verify always @* case statement pattern.
+static Stmt* GetAlwaysStarCaseStmt(ParseResult9j& r) {
+  EXPECT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  EXPECT_NE(item, nullptr);
+  if (!item) return nullptr;
+  EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  auto* case_stmt = item->body->stmts[0];
+  EXPECT_EQ(case_stmt->kind, StmtKind::kCase);
+  return case_stmt;
+}
+
 // @* with case inside body
 TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
   auto r = Parse(
@@ -475,15 +490,8 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  auto* case_stmt = item->body->stmts[0];
-  EXPECT_EQ(case_stmt->kind, StmtKind::kCase);
+  auto* case_stmt = GetAlwaysStarCaseStmt(r);
+  ASSERT_NE(case_stmt, nullptr);
   EXPECT_EQ(case_stmt->case_items.size(), 4u);
 }
 
@@ -501,15 +509,8 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarUniqueCase) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  auto* case_stmt = item->body->stmts[0];
-  EXPECT_EQ(case_stmt->kind, StmtKind::kCase);
+  auto* case_stmt = GetAlwaysStarCaseStmt(r);
+  ASSERT_NE(case_stmt, nullptr);
   EXPECT_EQ(case_stmt->qualifier, CaseQualifier::kUnique);
 }
 
@@ -526,15 +527,8 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarPriorityCase) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  auto* case_stmt = item->body->stmts[0];
-  EXPECT_EQ(case_stmt->kind, StmtKind::kCase);
+  auto* case_stmt = GetAlwaysStarCaseStmt(r);
+  ASSERT_NE(case_stmt, nullptr);
   EXPECT_EQ(case_stmt->qualifier, CaseQualifier::kPriority);
 }
 

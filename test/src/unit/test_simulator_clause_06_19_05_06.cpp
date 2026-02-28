@@ -13,6 +13,17 @@ using namespace delta;
 // =============================================================================
 // Test fixture: sets up SimContext with an enum type and variable
 // =============================================================================
+static std::string ExtractEnumName(const Logic4Vec& result) {
+  std::string name_str;
+  uint64_t v = result.ToUint64();
+  uint32_t nbytes = (result.width + 7) / 8;
+  for (uint32_t i = nbytes; i > 0; --i) {
+    auto ch = static_cast<char>((v >> ((i - 1) * 8)) & 0xFF);
+    if (ch != 0) name_str += ch;
+  }
+  return name_str;
+}
+
 namespace {
 
 // =============================================================================
@@ -25,16 +36,7 @@ TEST(EnumMethods, NameReturnsStringRep) {
   var->value = MakeLogic4VecVal(f.arena, 32, 1);  // GREEN
   auto* call = f.MakeEnumMethodCall("color", "name");
   auto result = EvalExpr(call, f.ctx, f.arena);
-
-  // Extract string from result.
-  std::string name_str;
-  uint64_t v = result.ToUint64();
-  uint32_t nbytes = (result.width + 7) / 8;
-  for (uint32_t i = nbytes; i > 0; --i) {
-    auto ch = static_cast<char>((v >> ((i - 1) * 8)) & 0xFF);
-    if (ch != 0) name_str += ch;
-  }
-  EXPECT_EQ(name_str, "GREEN");
+  EXPECT_EQ(ExtractEnumName(result), "GREEN");
 }
 
 TEST(EnumMethods, NameForFirstMember) {
@@ -44,14 +46,7 @@ TEST(EnumMethods, NameForFirstMember) {
   var->value = MakeLogic4VecVal(f.arena, 32, 0);  // RED
   auto* call = f.MakeEnumMethodCall("color", "name");
   auto result = EvalExpr(call, f.ctx, f.arena);
-  std::string name_str;
-  uint64_t v = result.ToUint64();
-  uint32_t nbytes = (result.width + 7) / 8;
-  for (uint32_t i = nbytes; i > 0; --i) {
-    auto ch = static_cast<char>((v >> ((i - 1) * 8)) & 0xFF);
-    if (ch != 0) name_str += ch;
-  }
-  EXPECT_EQ(name_str, "RED");
+  EXPECT_EQ(ExtractEnumName(result), "RED");
 }
 
 }  // namespace

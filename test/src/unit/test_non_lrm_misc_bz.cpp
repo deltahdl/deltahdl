@@ -6,6 +6,58 @@ using namespace delta;
 
 namespace {
 
+// Helper for blocks 11: verify always block has var decl body.
+static void VerifyAlwaysVarDecl(ParseResult& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 3u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(item->body->stmts[0]->var_name, "temp");
+}
+
+// Helper for block 12: verify always block has 3 blocking assigns.
+static void VerifyAlwaysMultiAssigns(ParseResult& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_EQ(item->body->stmts.size(), 3u);
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
+  }
+}
+
+// Helper for block 18: verify star event control.
+static void VerifyStarEventControl(ParseResult& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  auto* stmt = body->stmts[0];
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_TRUE(stmt->is_star_event);
+  EXPECT_TRUE(stmt->events.empty());
+}
+
+// Helper for block 24: verify always block has nested if-else.
+static void VerifyAlwaysNestedIfElse(ParseResult& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
+}
+
 // ---------------------------------------------------------------------------
 // 19. always_comb with variable declarations in begin-end block.
 // ---------------------------------------------------------------------------
@@ -18,15 +70,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombVarDecls) {
       "    y = temp;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 3u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(item->body->stmts[0]->var_name, "temp");
+  VerifyAlwaysVarDecl(r);
 }
 
 // ---------------------------------------------------------------------------
@@ -41,15 +85,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarVarDecls) {
       "    y = temp;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 3u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(item->body->stmts[0]->var_name, "temp");
+  VerifyAlwaysVarDecl(r);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,16 +132,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombMultipleAssigns) {
       "    z = a ^ d;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_EQ(item->body->stmts.size(), 3u);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
-  }
+  VerifyAlwaysMultiAssigns(r);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,16 +147,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarMultipleAssigns) {
       "    z = a ^ d;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_EQ(item->body->stmts.size(), 3u);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
-  }
+  VerifyAlwaysMultiAssigns(r);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,15 +161,7 @@ TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarEventIsStarTrue) {
       "    @* a = b;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  auto* stmt = body->stmts[0];
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(stmt->is_star_event);
-  EXPECT_TRUE(stmt->events.empty());
+  VerifyStarEventControl(r);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,15 +174,7 @@ TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarParenEventIsStarTrue) {
       "    @(*) a = b;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  auto* stmt = body->stmts[0];
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(stmt->is_star_event);
-  EXPECT_TRUE(stmt->events.empty());
+  VerifyStarEventControl(r);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,14 +191,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombNestedIfElseInBlock) {
       "      y = 0;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
+  VerifyAlwaysNestedIfElse(r);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,14 +208,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarNestedIfElseInBlock) {
       "      y = 0;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
+  VerifyAlwaysNestedIfElse(r);
 }
 
 // ---------------------------------------------------------------------------

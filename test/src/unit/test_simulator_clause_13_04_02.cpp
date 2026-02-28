@@ -8,6 +8,16 @@
 
 using namespace delta;
 
+static ModuleItem* MakeCounterFunc(Arena& arena) {
+  auto* func = arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "counter";
+  auto* rhs = MakeBinary(arena, TokenKind::kPlus,
+                         MakeId(arena, "counter"), MakeInt(arena, 1));
+  func->func_body_stmts.push_back(MakeAssign(arena, "counter", rhs));
+  return func;
+}
+
 namespace {
 
 // =============================================================================
@@ -19,14 +29,9 @@ TEST(Functions, StaticFunctionPersistsVariables) {
   // function static int counter();
   //   counter = counter + 1;
   // endfunction
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "counter";
+  auto* func = MakeCounterFunc(f.arena);
   func->is_static = true;
   func->is_automatic = false;
-  auto* rhs = MakeBinary(f.arena, TokenKind::kPlus,
-                         MakeId(f.arena, "counter"), MakeInt(f.arena, 1));
-  func->func_body_stmts.push_back(MakeAssign(f.arena, "counter", rhs));
   f.ctx.RegisterFunction("counter", func);
 
   auto* call = MakeCall(f.arena, "counter", {});
@@ -45,14 +50,9 @@ TEST(Functions, AutomaticFunctionFreshVariables) {
   // function automatic int counter();
   //   counter = counter + 1;
   // endfunction
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "counter";
+  auto* func = MakeCounterFunc(f.arena);
   func->is_automatic = true;
   func->is_static = false;
-  auto* rhs = MakeBinary(f.arena, TokenKind::kPlus,
-                         MakeId(f.arena, "counter"), MakeInt(f.arena, 1));
-  func->func_body_stmts.push_back(MakeAssign(f.arena, "counter", rhs));
   f.ctx.RegisterFunction("counter", func);
 
   auto* call = MakeCall(f.arena, "counter", {});

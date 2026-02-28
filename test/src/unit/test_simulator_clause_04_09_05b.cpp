@@ -189,24 +189,35 @@ static constexpr uint8_t kVal1 = 1;
 static constexpr uint8_t kValX = 2;
 static constexpr uint8_t kValZ = 3;
 
+struct NetPair {
+  Arena arena;
+  Variable* va = nullptr;
+  Variable* vb = nullptr;
+  Net a;
+  Net b;
+};
+
+static NetPair MakeNetPair(uint64_t a_val) {
+  NetPair np;
+  np.va = np.arena.Create<Variable>();
+  np.va->value = MakeLogic4Vec(np.arena, 1);
+  np.vb = np.arena.Create<Variable>();
+  np.vb->value = MakeLogic4Vec(np.arena, 1);
+  np.a = MakeNet1(np.arena, np.va, a_val);
+  np.b = MakeUndrivenNet(np.arena, np.vb);
+  return np;
+}
+
 namespace {
 
 // --- Bidirectional signal flow ---
 
 TEST(SwitchProcessing, TranPropagatesDrivenToUndriven) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTran, {}, false});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kVal1);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTran, {}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
 }
 
 TEST(SwitchProcessing, TranBidirectionalPropagation) {
@@ -251,171 +262,91 @@ TEST(SwitchProcessing, NetworkResolvesAllDevicesTogether) {
 // --- tranif1 / tranif0 control semantics ---
 
 TEST(SwitchProcessing, Tranif1ConductsWhenControlHigh) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTranif1, {1, 0}, false});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kVal1);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
 }
 
 TEST(SwitchProcessing, Tranif1BlocksWhenControlLow) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTranif1, {0, 0}, false});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kValZ);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
 TEST(SwitchProcessing, Tranif0ConductsWhenControlLow) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTranif0, {0, 0}, false});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kVal1);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif0, {0, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
 }
 
 TEST(SwitchProcessing, Tranif0BlocksWhenControlHigh) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTranif0, {1, 0}, false});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kValZ);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif0, {1, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
 // --- Built-in net type, x/z control: exhaustive combination ---
 
 TEST(SwitchProcessing, BuiltinNetXControlNonUniqueProducesX) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(1);
   // control = x: on->b=1, off->b=z. Not unique -> x.
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTranif1, {0, 1}, false});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kValX);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 1}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValX);
 }
 
 TEST(SwitchProcessing, BuiltinNetZControlNonUniqueProducesX) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 0);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(0);
   // control = z: on->b=0, off->b=z. Not unique -> x.
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTranif1, {1, 1}, false});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kValX);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 1}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValX);
 }
 
 // --- User-defined net type, x/z control: treated as off ---
 
 TEST(SwitchProcessing, UserDefinedNetXControlTreatedAsOff) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTranif1, {0, 1}, true});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kValZ);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 1}, true});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
 TEST(SwitchProcessing, UserDefinedNetZControlTreatedAsOff) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTranif1, {1, 1}, true});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kValZ);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 1}, true});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
 // --- User-defined net type: on -> single net, off -> separate ---
 
 TEST(SwitchProcessing, UserDefinedNetControlOnSingleNet) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTranif1, {1, 0}, true});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kVal1);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 0}, true});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
 }
 
 TEST(SwitchProcessing, UserDefinedNetControlOffSeparate) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeNet1(arena, va, 1);
-  Net b = MakeUndrivenNet(arena, vb);
-
+  auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTranif1, {0, 0}, true});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*vb), kValZ);
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 0}, true});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
 }  // namespace

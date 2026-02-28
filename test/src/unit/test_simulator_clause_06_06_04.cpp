@@ -17,6 +17,18 @@ static Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
   }
   return vec;
 }
+static Net MakeTriregNet(Arena& arena, Variable*& var, Strength strength,
+                         uint8_t width, uint64_t initial_val) {
+  var = arena.Create<Variable>();
+  var->value = MakeLogic4VecVal(arena, width, initial_val);
+  Net net;
+  net.type = NetType::kTrireg;
+  net.resolved = var;
+  net.charge_strength = strength;
+  net.drivers.push_back(MakeAllZ(arena, width));
+  return net;
+}
+
 namespace {
 
 // --- §6.6.4: Trireg charge retention ---
@@ -123,21 +135,10 @@ TEST(ChargeDecay, NoDecayScheduledWithoutScheduler) {
 // --- §6.6.4.1: Capacitive network propagation ---
 TEST(CapacitiveNetwork, LargerOverridesSmaller) {
   Arena arena;
-  auto* var_a = arena.Create<Variable>();
-  var_a->value = MakeLogic4VecVal(arena, 8, 1);
-  Net a;
-  a.type = NetType::kTrireg;
-  a.resolved = var_a;
-  a.charge_strength = Strength::kLarge;
-  a.drivers.push_back(MakeAllZ(arena, 8));
-
-  auto* var_b = arena.Create<Variable>();
-  var_b->value = MakeLogic4VecVal(arena, 8, 0);
-  Net b;
-  b.type = NetType::kTrireg;
-  b.resolved = var_b;
-  b.charge_strength = Strength::kSmall;
-  b.drivers.push_back(MakeAllZ(arena, 8));
+  Variable* var_a = nullptr;
+  Variable* var_b = nullptr;
+  Net a = MakeTriregNet(arena, var_a, Strength::kLarge, 8, 1);
+  Net b = MakeTriregNet(arena, var_b, Strength::kSmall, 8, 0);
 
   PropagateCharge(a, b);
   EXPECT_EQ(var_b->value.ToUint64(), 1u);
@@ -146,21 +147,10 @@ TEST(CapacitiveNetwork, LargerOverridesSmaller) {
 
 TEST(CapacitiveNetwork, EqualStrengthDifferentValuesToX) {
   Arena arena;
-  auto* var_a = arena.Create<Variable>();
-  var_a->value = MakeLogic4VecVal(arena, 8, 1);
-  Net a;
-  a.type = NetType::kTrireg;
-  a.resolved = var_a;
-  a.charge_strength = Strength::kMedium;
-  a.drivers.push_back(MakeAllZ(arena, 8));
-
-  auto* var_b = arena.Create<Variable>();
-  var_b->value = MakeLogic4VecVal(arena, 8, 0);
-  Net b;
-  b.type = NetType::kTrireg;
-  b.resolved = var_b;
-  b.charge_strength = Strength::kMedium;
-  b.drivers.push_back(MakeAllZ(arena, 8));
+  Variable* var_a = nullptr;
+  Variable* var_b = nullptr;
+  Net a = MakeTriregNet(arena, var_a, Strength::kMedium, 8, 1);
+  Net b = MakeTriregNet(arena, var_b, Strength::kMedium, 8, 0);
 
   PropagateCharge(a, b);
   // Both should be x (aval=0, bval=0xFF for 8 bits).
@@ -172,21 +162,10 @@ TEST(CapacitiveNetwork, EqualStrengthDifferentValuesToX) {
 
 TEST(CapacitiveNetwork, EqualStrengthSameValueRetained) {
   Arena arena;
-  auto* var_a = arena.Create<Variable>();
-  var_a->value = MakeLogic4VecVal(arena, 8, 55);
-  Net a;
-  a.type = NetType::kTrireg;
-  a.resolved = var_a;
-  a.charge_strength = Strength::kMedium;
-  a.drivers.push_back(MakeAllZ(arena, 8));
-
-  auto* var_b = arena.Create<Variable>();
-  var_b->value = MakeLogic4VecVal(arena, 8, 55);
-  Net b;
-  b.type = NetType::kTrireg;
-  b.resolved = var_b;
-  b.charge_strength = Strength::kMedium;
-  b.drivers.push_back(MakeAllZ(arena, 8));
+  Variable* var_a = nullptr;
+  Variable* var_b = nullptr;
+  Net a = MakeTriregNet(arena, var_a, Strength::kMedium, 8, 55);
+  Net b = MakeTriregNet(arena, var_b, Strength::kMedium, 8, 55);
 
   PropagateCharge(a, b);
   EXPECT_EQ(var_a->value.ToUint64(), 55u);
@@ -195,14 +174,10 @@ TEST(CapacitiveNetwork, EqualStrengthSameValueRetained) {
 
 TEST(CapacitiveNetwork, OnlyWhenBothCapacitive) {
   Arena arena;
-  auto* var_a = arena.Create<Variable>();
-  var_a->value = MakeLogic4VecVal(arena, 8, 1);
-  Net a;
-  a.type = NetType::kTrireg;
-  a.resolved = var_a;
-  a.charge_strength = Strength::kLarge;
-  a.drivers.push_back(MakeAllZ(arena, 8));  // Capacitive.
+  Variable* var_a = nullptr;
+  Net a = MakeTriregNet(arena, var_a, Strength::kLarge, 8, 1);
 
+  // B is actively driven (non-Z driver), not capacitive.
   auto* var_b = arena.Create<Variable>();
   var_b->value = MakeLogic4VecVal(arena, 8, 0);
   Net b;

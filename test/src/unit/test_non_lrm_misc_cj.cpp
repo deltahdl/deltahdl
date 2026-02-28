@@ -859,12 +859,8 @@ TEST(ParserA27, TaskBodyNewStyleEmptyPorts) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
-TEST(ParserA27, TaskBodyNewStyleWithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task(input int a, input int b);\n"
-      "  endtask\n"
-      "endmodule\n");
+// Helper: verify first item has 2 func_args: a(input), b.
+static void VerifyTwoArgTask(ParseResult12b& r) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
@@ -872,6 +868,15 @@ TEST(ParserA27, TaskBodyNewStyleWithArgs) {
   EXPECT_EQ(item->func_args[0].name, "a");
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
   EXPECT_EQ(item->func_args[1].name, "b");
+}
+
+TEST(ParserA27, TaskBodyNewStyleWithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(input int a, input int b);\n"
+      "  endtask\n"
+      "endmodule\n");
+  VerifyTwoArgTask(r);
 }
 
 TEST(ParserA27, TaskBodyNewStyleMultipleDirections) {
@@ -921,13 +926,7 @@ TEST(ParserA27, TaskBodyOldStylePorts) {
       "    $display(\"a=%0d b=%0d\", a, b);\n"
       "  endtask\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 2u);
-  EXPECT_EQ(item->func_args[0].name, "a");
-  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-  EXPECT_EQ(item->func_args[1].name, "b");
+  VerifyTwoArgTask(r);
 }
 
 TEST(ParserA27, TaskBodyOldStyleOutputPort) {

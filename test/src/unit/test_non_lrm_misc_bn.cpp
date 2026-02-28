@@ -782,6 +782,15 @@ TEST(ParserSection6, Sec6_11_1_TypeRefPackedArray) {
               "endmodule\n"));
 }
 
+// Helper: find a module item by name.
+static ModuleItem* FindItemByName(ParseResult6i& r,
+                                  std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->name == name) return item;
+  }
+  return nullptr;
+}
+
 // 22. var type(expr) with ternary expression.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefTernary) {
   auto r = Parse(
@@ -792,13 +801,7 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefTernary) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  ModuleItem* c_item = nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->name == "c") {
-      c_item = item;
-      break;
-    }
-  }
+  auto* c_item = FindItemByName(r, "c");
   ASSERT_NE(c_item, nullptr);
   EXPECT_EQ(c_item->kind, ModuleItemKind::kVarDecl);
   auto* ref = c_item->data_type.type_ref_expr;
@@ -867,13 +870,7 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefConcat) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  ModuleItem* c_item = nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->name == "c") {
-      c_item = item;
-      break;
-    }
-  }
+  auto* c_item = FindItemByName(r, "c");
   ASSERT_NE(c_item, nullptr);
   EXPECT_EQ(c_item->kind, ModuleItemKind::kVarDecl);
   auto* ref = c_item->data_type.type_ref_expr;

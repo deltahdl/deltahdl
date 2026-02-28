@@ -6,6 +6,17 @@
 
 using namespace delta;
 
+static void LowerRunAndFindQ1Q2(SimFixture& f, RtlirDesign* design,
+                                Variable*& q1_out, Variable*& q2_out) {
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  q1_out = f.ctx.FindVariable("q1");
+  q2_out = f.ctx.FindVariable("q2");
+  ASSERT_NE(q1_out, nullptr);
+  ASSERT_NE(q2_out, nullptr);
+}
+
 // =============================================================================
 // §9.2.3: always_latch executes at time 0
 // The always_latch procedure executes once automatically at time 0.
@@ -165,14 +176,9 @@ TEST(SimCh9c, MultipleLatchesInOneBlock) {
       f);
   ASSERT_NE(design, nullptr);
 
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q1 = f.ctx.FindVariable("q1");
-  auto* q2 = f.ctx.FindVariable("q2");
-  ASSERT_NE(q1, nullptr);
-  ASSERT_NE(q2, nullptr);
+  Variable* q1 = nullptr;
+  Variable* q2 = nullptr;
+  LowerRunAndFindQ1Q2(f, design, q1, q2);
   EXPECT_EQ(q1->value.ToUint64(), 0xAAu);
   EXPECT_EQ(q2->value.ToUint64(), 0x55u);
 }
@@ -197,14 +203,9 @@ TEST(SimCh9c, MultipleLatchesEnableLow) {
       f);
   ASSERT_NE(design, nullptr);
 
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q1 = f.ctx.FindVariable("q1");
-  auto* q2 = f.ctx.FindVariable("q2");
-  ASSERT_NE(q1, nullptr);
-  ASSERT_NE(q2, nullptr);
+  Variable* q1 = nullptr;
+  Variable* q2 = nullptr;
+  LowerRunAndFindQ1Q2(f, design, q1, q2);
   EXPECT_EQ(q1->value.ToUint64(), 0u);
   EXPECT_EQ(q2->value.ToUint64(), 0u);
 }

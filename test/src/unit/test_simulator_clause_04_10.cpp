@@ -9,6 +9,30 @@
 
 using namespace delta;
 
+// Schedule an Active event whose callback pushes "active" and schedules an NBA.
+static void ScheduleActiveWithNba(Scheduler& sched,
+                                  std::vector<std::string>& order) {
+  auto* active = sched.GetEventPool().Acquire();
+  active->kind = EventKind::kEvaluation;
+  active->callback = [&]() {
+    order.push_back("active");
+    auto* nba = sched.GetEventPool().Acquire();
+    nba->kind = EventKind::kUpdate;
+    nba->callback = [&]() { order.push_back("nba"); };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+}
+
+// Schedule an Active event whose callback pushes "active".
+static void ScheduleActiveEvent(Scheduler& sched,
+                                std::vector<std::string>& order) {
+  auto* active = sched.GetEventPool().Acquire();
+  active->kind = EventKind::kEvaluation;
+  active->callback = [&]() { order.push_back("active"); };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+}
+
 // ===========================================================================
 // §4.10 PLI callback control points
 // ===========================================================================
@@ -154,17 +178,7 @@ TEST(SimCh410, CbNbaSynchInPreNba) {
   std::vector<std::string> order;
 
   // Schedule Active, Pre-NBA, and NBA events to verify ordering.
-  auto* active = sched.GetEventPool().Acquire();
-  active->kind = EventKind::kEvaluation;
-  active->callback = [&]() {
-    order.push_back("active");
-    // Schedule NBA from Active region.
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&]() { order.push_back("nba"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
+  ScheduleActiveWithNba(sched, order);
 
   // cbNBASynch → Pre-NBA.
   auto* cb = sched.GetEventPool().Acquire();
@@ -190,16 +204,7 @@ TEST(SimCh410, CbReadWriteSynchInPreNbaOrPostNba) {
   std::vector<std::string> order;
 
   // Active event that schedules an NBA.
-  auto* active = sched.GetEventPool().Acquire();
-  active->kind = EventKind::kEvaluation;
-  active->callback = [&]() {
-    order.push_back("active");
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&]() { order.push_back("nba"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
+  ScheduleActiveWithNba(sched, order);
 
   // cbReadWriteSynch in Pre-NBA.
   auto* pre = sched.GetEventPool().Acquire();
@@ -231,10 +236,7 @@ TEST(SimCh410, CbAtEndOfSimTimeInPrePostponed) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* active = sched.GetEventPool().Acquire();
-  active->kind = EventKind::kEvaluation;
-  active->callback = [&]() { order.push_back("active"); };
-  sched.ScheduleEvent({0}, Region::kActive, active);
+  ScheduleActiveEvent(sched, order);
 
   // cbAtEndOfSimTime → Pre-Postponed.
   auto* cb = sched.GetEventPool().Acquire();
@@ -266,10 +268,7 @@ TEST(SimCh410, CbReadOnlySynchInPostponed) {
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  auto* active = sched.GetEventPool().Acquire();
-  active->kind = EventKind::kEvaluation;
-  active->callback = [&]() { order.push_back("active"); };
-  sched.ScheduleEvent({0}, Region::kActive, active);
+  ScheduleActiveEvent(sched, order);
 
   // cbReadOnlySynch → Postponed.
   auto* cb = sched.GetEventPool().Acquire();

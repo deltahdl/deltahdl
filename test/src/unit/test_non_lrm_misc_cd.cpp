@@ -6,6 +6,21 @@ using namespace delta;
 
 namespace {
 
+// Helper: extract 4 initial statements and verify non-null.
+struct FourStmts { Stmt* s0; Stmt* s1; Stmt* s2; Stmt* s3; };
+static FourStmts Get4InitialStmts(auto& r) {
+  FourStmts fs;
+  fs.s0 = NthInitialStmt(r, 0);
+  fs.s1 = NthInitialStmt(r, 1);
+  fs.s2 = NthInitialStmt(r, 2);
+  fs.s3 = NthInitialStmt(r, 3);
+  EXPECT_NE(fs.s0, nullptr);
+  EXPECT_NE(fs.s1, nullptr);
+  EXPECT_NE(fs.s2, nullptr);
+  EXPECT_NE(fs.s3, nullptr);
+  return fs;
+}
+
 // --- 28. Assign in task body ---
 TEST(ParserSection10, Sec10_6_1_AssignInTaskBody) {
   EXPECT_TRUE(
@@ -34,14 +49,7 @@ TEST(ParserSection10, Sec10_6_1_InterleavedWithNonblocking) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
-  auto* s2 = NthInitialStmt(r, 2);
-  auto* s3 = NthInitialStmt(r, 3);
-  ASSERT_NE(s0, nullptr);
-  ASSERT_NE(s1, nullptr);
-  ASSERT_NE(s2, nullptr);
-  ASSERT_NE(s3, nullptr);
+  auto [s0, s1, s2, s3] = Get4InitialStmts(r);
   EXPECT_EQ(s0->kind, StmtKind::kAssign);
   EXPECT_EQ(s1->kind, StmtKind::kNonblockingAssign);
   EXPECT_EQ(s2->kind, StmtKind::kDeassign);
@@ -435,14 +443,7 @@ TEST(ParserSection10, Sec10_4_1_MultipleSequential) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
-  auto* s2 = NthInitialStmt(r, 2);
-  auto* s3 = NthInitialStmt(r, 3);
-  ASSERT_NE(s0, nullptr);
-  ASSERT_NE(s1, nullptr);
-  ASSERT_NE(s2, nullptr);
-  ASSERT_NE(s3, nullptr);
+  auto [s0, s1, s2, s3] = Get4InitialStmts(r);
   EXPECT_EQ(s0->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(s1->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(s2->kind, StmtKind::kBlockingAssign);

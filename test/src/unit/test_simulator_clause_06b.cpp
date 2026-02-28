@@ -6,6 +6,18 @@
 
 using namespace delta;
 
+static void LowerRunAndCompareWidths(SimFixture& f, RtlirDesign* design,
+                                     Variable*& va_out, Variable*& vb_out) {
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  va_out = f.ctx.FindVariable("a");
+  vb_out = f.ctx.FindVariable("b");
+  ASSERT_NE(va_out, nullptr);
+  ASSERT_NE(vb_out, nullptr);
+  EXPECT_EQ(va_out->value.width, vb_out->value.width);
+}
+
 // --------------------------------------------------------------------------
 // §6.11.1: type(expression) used in `var type(expr) name;` declarations.
 // The type operator resolves to the same type, width, and signedness as
@@ -319,15 +331,9 @@ TEST(SimCh6b, TypeOpIntDifferentValues) {
       f);
   ASSERT_NE(design, nullptr);
 
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.width, vb->value.width);
+  Variable* va = nullptr;
+  Variable* vb = nullptr;
+  LowerRunAndCompareWidths(f, design, va, vb);
   EXPECT_EQ(va->value.ToUint64(), 1000u);
   EXPECT_EQ(vb->value.ToUint64(), 2000u);
 }
@@ -506,15 +512,9 @@ TEST(SimCh6b, TypeOpMatchingWidths) {
       f);
   ASSERT_NE(design, nullptr);
 
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.width, vb->value.width);
+  Variable* va = nullptr;
+  Variable* vb = nullptr;
+  LowerRunAndCompareWidths(f, design, va, vb);
   EXPECT_EQ(va->is_signed, vb->is_signed);
 }
 

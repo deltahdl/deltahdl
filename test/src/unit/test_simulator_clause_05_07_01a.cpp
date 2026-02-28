@@ -8,6 +8,19 @@
 
 using namespace delta;
 
+static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
+                                          uint32_t mask) {
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.words[0].aval & mask, vb->value.words[0].aval & mask);
+  EXPECT_EQ(va->value.words[0].bval & mask, vb->value.words[0].bval & mask);
+}
+
 // ===========================================================================
 // §5.7.1 Integer literal constants
 // ===========================================================================
@@ -309,15 +322,7 @@ TEST(SimCh50701, QuestionMarkAsZ) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.words[0].aval & 0xF, vb->value.words[0].aval & 0xF);
-  EXPECT_EQ(va->value.words[0].bval & 0xF, vb->value.words[0].bval & 0xF);
+  LowerRunAndCompareBitPatterns(f, design, 0xF);
 }
 
 // ---------------------------------------------------------------------------
@@ -457,16 +462,9 @@ TEST(SimCh50701, SignedDesignatorBitPattern) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerRunAndCompareBitPatterns(f, design, 0xF);
   auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.words[0].aval & 0xF, 0xFu);
-  EXPECT_EQ(vb->value.words[0].aval & 0xF, 0xFu);
-  EXPECT_EQ(va->value.words[0].aval, vb->value.words[0].aval);
 }
 
 // ---------------------------------------------------------------------------
@@ -485,15 +483,7 @@ TEST(SimCh50701, XZCaseInsensitive) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.words[0].aval & 0xF, vb->value.words[0].aval & 0xF);
-  EXPECT_EQ(va->value.words[0].bval & 0xF, vb->value.words[0].bval & 0xF);
+  LowerRunAndCompareBitPatterns(f, design, 0xF);
 }
 
 // ---------------------------------------------------------------------------

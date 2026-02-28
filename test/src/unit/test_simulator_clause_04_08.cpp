@@ -9,6 +9,21 @@
 
 using namespace delta;
 
+// Process callback: q = 0, schedule update (p = q), schedule display read.
+static void ScheduleAssignAndDisplay(Scheduler& sched, int& q, int& p,
+                                     int& display_out) {
+  q = 0;
+  auto* update_p = sched.GetEventPool().Acquire();
+  update_p->kind = EventKind::kUpdate;
+  update_p->callback = [&]() { p = q; };
+  sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);
+
+  auto* display = sched.GetEventPool().Acquire();
+  display->kind = EventKind::kEvaluation;
+  display->callback = [&]() { display_out = p; };
+  sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, display);
+}
+
 // ===========================================================================
 // §4.8 Race conditions
 // ===========================================================================
@@ -89,18 +104,7 @@ TEST(SimCh48, UpdateEventRacesWithProcessContinuation) {
   auto* process = sched.GetEventPool().Acquire();
   process->kind = EventKind::kEvaluation;
   process->callback = [&]() {
-    q = 0;
-    // Schedule update event for p (from continuous assignment).
-    auto* update_p = sched.GetEventPool().Acquire();
-    update_p->kind = EventKind::kUpdate;
-    update_p->callback = [&]() { p = q; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);
-
-    // Schedule process continuation ($display(p)).
-    auto* display = sched.GetEventPool().Acquire();
-    display->kind = EventKind::kEvaluation;
-    display->callback = [&]() { display_value = p; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, display);
+    ScheduleAssignAndDisplay(sched, q, p, display_value);
   };
   sched.ScheduleEvent({1}, Region::kActive, process);
 
@@ -165,18 +169,7 @@ TEST(SimCh48, LRMExampleAssignPEqualsQ) {
   auto* assign_zero = sched.GetEventPool().Acquire();
   assign_zero->kind = EventKind::kEvaluation;
   assign_zero->callback = [&]() {
-    q = 0;
-    // Continuous assignment: assign p = q → schedule update.
-    auto* update_p = sched.GetEventPool().Acquire();
-    update_p->kind = EventKind::kUpdate;
-    update_p->callback = [&]() { p = q; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update_p);
-
-    // $display(p) — races with the update.
-    auto* display = sched.GetEventPool().Acquire();
-    display->kind = EventKind::kEvaluation;
-    display->callback = [&]() { display_result = p; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, display);
+    ScheduleAssignAndDisplay(sched, q, p, display_result);
   };
   sched.ScheduleEvent({1}, Region::kActive, assign_zero);
 

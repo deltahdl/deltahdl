@@ -18,6 +18,28 @@ using namespace delta;
 
 // Schedule negedge at a given time through the scheduler.
 
+template <typename Fixture>
+static void TestEdgeCallbackPosedge(Fixture& f) {
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
+  cmgr.Register(block);
+  uint32_t count = 0;
+  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&count]() { count++; });
+  cmgr.Attach(f.ctx, f.scheduler);
+  SchedulePosedge(f, clk, 10);
+  ScheduleNegedge(f, clk, 15);
+  SchedulePosedge(f, clk, 20);
+  f.scheduler.Run();
+  EXPECT_EQ(count, 2u);
+}
+
 namespace {
 
 // =============================================================================
@@ -60,56 +82,13 @@ TEST(ClockingSim, ClockingBlockEvent) {
 // =============================================================================
 TEST(ClockingSim, EdgeCallbackOnPosedge) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-
-  ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
-
-  uint32_t count = 0;
-  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&count]() { count++; });
-
-  cmgr.Attach(f.ctx, f.scheduler);
-
-  SchedulePosedge(f, clk, 10);
-  ScheduleNegedge(f, clk, 15);
-  SchedulePosedge(f, clk, 20);
-
-  f.scheduler.Run();
-  EXPECT_EQ(count, 2u);
+  TestEdgeCallbackPosedge(f);
 }
 
 // --- edge callback registration ---
 TEST(SimA611, EdgeCallbackPosedge) {
   SimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-
-  ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
-  cmgr.Register(block);
-
-  uint32_t count = 0;
-  cmgr.RegisterEdgeCallback("cb", f.ctx, f.scheduler, [&count]() { count++; });
-  cmgr.Attach(f.ctx, f.scheduler);
-
-  SchedulePosedge(f, clk, 10);
-  ScheduleNegedge(f, clk, 15);
-  SchedulePosedge(f, clk, 20);
-  f.scheduler.Run();
-
-  EXPECT_EQ(count, 2u);
+  TestEdgeCallbackPosedge(f);
 }
 
 }  // namespace

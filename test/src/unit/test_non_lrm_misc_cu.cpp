@@ -4,6 +4,19 @@
 
 using namespace delta;
 
+// Verify a 2-port module has expected names and directions.
+static void VerifyTwoPortModule(ParseResult& r,
+                                const char* n0, Direction d0,
+                                const char* n1, Direction d1) {
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 2);
+  EXPECT_EQ(mod->ports[0].name, n0);
+  EXPECT_EQ(mod->ports[0].direction, d0);
+  EXPECT_EQ(mod->ports[1].name, n1);
+  EXPECT_EQ(mod->ports[1].direction, d1);
+}
+
 namespace {
 
 // Bind with parameterized instantiation.
@@ -59,18 +72,7 @@ TEST(ParserSection23, NonAnsiPortsBasic) {
       "  output b;\n"
       "  assign b = a;\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 2);
-  struct Expected {
-    const char* name;
-    Direction dir;
-  };
-  Expected expected[] = {{"a", Direction::kInput}, {"b", Direction::kOutput}};
-  for (size_t i = 0; i < 2; ++i) {
-    EXPECT_EQ(mod->ports[i].name, expected[i].name);
-    EXPECT_EQ(mod->ports[i].direction, expected[i].dir);
-  }
+  VerifyTwoPortModule(r, "a", Direction::kInput, "b", Direction::kOutput);
 }
 
 TEST(ParserSection23, NonAnsiPortsWithTypesPortA) {
@@ -168,18 +170,7 @@ TEST(ParserSection23, ExternModuleHeader) {
 
 TEST(ParserSection23, ExternModulePorts) {
   auto r = Parse("extern module foo(input logic a, output logic b);\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 2);
-  struct Expected {
-    const char* name;
-    Direction dir;
-  };
-  Expected expected[] = {{"a", Direction::kInput}, {"b", Direction::kOutput}};
-  for (size_t i = 0; i < 2; ++i) {
-    EXPECT_EQ(mod->ports[i].name, expected[i].name);
-    EXPECT_EQ(mod->ports[i].direction, expected[i].dir);
-  }
+  VerifyTwoPortModule(r, "a", Direction::kInput, "b", Direction::kOutput);
 }
 
 TEST(ParserSection23, ExternModuleNoBody) {

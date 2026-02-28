@@ -2,7 +2,23 @@
 
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+#include <tuple>
+
 #include "model_gate_logic.h"
+
+using GateTruthEntry = std::tuple<Val4, Val4, Val4>;
+
+static void RunGateTruthTable(
+    GateKind kind,
+    std::initializer_list<GateTruthEntry> cases,
+    const char* label) {
+  for (auto& [a, b, expected] : cases) {
+    EXPECT_EQ(EvalNInputGate(kind, a, b), expected)
+        << label << " a=" << static_cast<int>(a)
+        << " b=" << static_cast<int>(b);
+  }
+}
 
 namespace {
 
@@ -11,12 +27,7 @@ namespace {
 // =============================================================
 // §28.4: Truth tables (Table 28-3)
 TEST(LogicGates, AndGateTruthTable) {
-  struct Case {
-    Val4 a;
-    Val4 b;
-    Val4 expected;
-  };
-  Case cases[] = {
+  RunGateTruthTable(GateKind::kAnd, {
       // Row 0
       {Val4::kV0, Val4::kV0, Val4::kV0},
       {Val4::kV0, Val4::kV1, Val4::kV0},
@@ -37,21 +48,11 @@ TEST(LogicGates, AndGateTruthTable) {
       {Val4::kZ, Val4::kV1, Val4::kX},
       {Val4::kZ, Val4::kX, Val4::kX},
       {Val4::kZ, Val4::kZ, Val4::kX},
-  };
-  for (const auto& c : cases) {
-    EXPECT_EQ(EvalNInputGate(GateKind::kAnd, c.a, c.b), c.expected)
-        << "And(" << static_cast<int>(c.a) << ", " << static_cast<int>(c.b)
-        << ")";
-  }
+  }, "And");
 }
 
 TEST(LogicGates, OrGateTruthTable) {
-  struct Case {
-    Val4 a;
-    Val4 b;
-    Val4 expected;
-  };
-  Case cases[] = {
+  RunGateTruthTable(GateKind::kOr, {
       {Val4::kV0, Val4::kV0, Val4::kV0}, {Val4::kV0, Val4::kV1, Val4::kV1},
       {Val4::kV0, Val4::kX, Val4::kX},   {Val4::kV0, Val4::kZ, Val4::kX},
       {Val4::kV1, Val4::kV0, Val4::kV1}, {Val4::kV1, Val4::kV1, Val4::kV1},
@@ -60,21 +61,11 @@ TEST(LogicGates, OrGateTruthTable) {
       {Val4::kX, Val4::kX, Val4::kX},    {Val4::kX, Val4::kZ, Val4::kX},
       {Val4::kZ, Val4::kV0, Val4::kX},   {Val4::kZ, Val4::kV1, Val4::kV1},
       {Val4::kZ, Val4::kX, Val4::kX},    {Val4::kZ, Val4::kZ, Val4::kX},
-  };
-  for (const auto& c : cases) {
-    EXPECT_EQ(EvalNInputGate(GateKind::kOr, c.a, c.b), c.expected)
-        << "Or(" << static_cast<int>(c.a) << ", " << static_cast<int>(c.b)
-        << ")";
-  }
+  }, "Or");
 }
 
 TEST(LogicGates, XorGateTruthTable) {
-  struct Case {
-    Val4 a;
-    Val4 b;
-    Val4 expected;
-  };
-  Case cases[] = {
+  RunGateTruthTable(GateKind::kXor, {
       {Val4::kV0, Val4::kV0, Val4::kV0}, {Val4::kV0, Val4::kV1, Val4::kV1},
       {Val4::kV0, Val4::kX, Val4::kX},   {Val4::kV0, Val4::kZ, Val4::kX},
       {Val4::kV1, Val4::kV0, Val4::kV1}, {Val4::kV1, Val4::kV1, Val4::kV0},
@@ -83,12 +74,7 @@ TEST(LogicGates, XorGateTruthTable) {
       {Val4::kX, Val4::kX, Val4::kX},    {Val4::kX, Val4::kZ, Val4::kX},
       {Val4::kZ, Val4::kV0, Val4::kX},   {Val4::kZ, Val4::kV1, Val4::kX},
       {Val4::kZ, Val4::kX, Val4::kX},    {Val4::kZ, Val4::kZ, Val4::kX},
-  };
-  for (const auto& c : cases) {
-    EXPECT_EQ(EvalNInputGate(GateKind::kXor, c.a, c.b), c.expected)
-        << "Xor(" << static_cast<int>(c.a) << ", " << static_cast<int>(c.b)
-        << ")";
-  }
+  }, "Xor");
 }
 
 // §28.4: nand = NOT(and), nor = NOT(or), xnor = NOT(xor)

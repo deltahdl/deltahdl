@@ -19,6 +19,18 @@ static bool RunSim(SimFixture& f, const std::string& src) {
   return true;
 }
 
+static bool LowerRunAndFindIR(SimFixture& f, RtlirDesign* design,
+                              Variable*& vi_out, Variable*& vr_out) {
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  vi_out = f.ctx.FindVariable("i");
+  vr_out = f.ctx.FindVariable("r");
+  EXPECT_NE(vi_out, nullptr);
+  EXPECT_NE(vr_out, nullptr);
+  return vi_out && vr_out;
+}
+
 // ===========================================================================
 // §5.7 Numbers
 // ===========================================================================
@@ -41,14 +53,9 @@ TEST(SimCh507, NumberBothFormsCoexist) {
       f);
   EXPECT_NE(design, nullptr);
   if (!design) return;
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vi = f.ctx.FindVariable("i");
-  auto* vr = f.ctx.FindVariable("r");
-  EXPECT_NE(vi, nullptr);
-  EXPECT_NE(vr, nullptr);
-  if (!vi || !vr) return;
+  Variable* vi = nullptr;
+  Variable* vr = nullptr;
+  if (!LowerRunAndFindIR(f, design, vi, vr)) return;
   EXPECT_EQ(vi->value.ToUint64(), 42u);
   double d = 0.0;
   uint64_t bits = vr->value.ToUint64();
@@ -164,14 +171,9 @@ TEST(SimCh507, NumberMixedInExpression) {
       f);
   EXPECT_NE(design, nullptr);
   if (!design) return;
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vi = f.ctx.FindVariable("i");
-  auto* vr = f.ctx.FindVariable("r");
-  EXPECT_NE(vi, nullptr);
-  EXPECT_NE(vr, nullptr);
-  if (!vi || !vr) return;
+  Variable* vi = nullptr;
+  Variable* vr = nullptr;
+  if (!LowerRunAndFindIR(f, design, vi, vr)) return;
   EXPECT_EQ(vi->value.ToUint64(), 30u);
   double d = 0.0;
   uint64_t bits = vr->value.ToUint64();

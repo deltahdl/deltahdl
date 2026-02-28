@@ -122,26 +122,7 @@ TEST(CellMap, NoMatchingCell) {
   auto c = g.AddXor(a, b);
   g.AddOutput(c);
 
-  // Library with only INV and AND2 (no XOR).
-  Liberty lib;
-  lib.library_name = "limited";
-  {
-    LibCell cell;
-    cell.name = "INV";
-    cell.area = 1.0f;
-    cell.pins.push_back({"A", "input", ""});
-    cell.pins.push_back({"Y", "output", "!A"});
-    lib.cells.push_back(std::move(cell));
-  }
-  {
-    LibCell cell;
-    cell.name = "AND2";
-    cell.area = 2.0f;
-    cell.pins.push_back({"A", "input", ""});
-    cell.pins.push_back({"B", "input", ""});
-    cell.pins.push_back({"Y", "output", "A * B"});
-    lib.cells.push_back(std::move(cell));
-  }
+  auto lib = MakeTestLib();
 
   CellMapper mapper(lib);
   auto mapping = mapper.Map(g);
