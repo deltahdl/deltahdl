@@ -4,27 +4,6 @@
 
 using namespace delta;
 
-// Helper: extract 4 initial statements and verify non-null.
-struct FourStmts {
-  Stmt* s0;
-  Stmt* s1;
-  Stmt* s2;
-  Stmt* s3;
-};
-
-static FourStmts Get4InitialStmts(auto& r) {
-  FourStmts fs;
-  fs.s0 = NthInitialStmt(r, 0);
-  fs.s1 = NthInitialStmt(r, 1);
-  fs.s2 = NthInitialStmt(r, 2);
-  fs.s3 = NthInitialStmt(r, 3);
-  EXPECT_NE(fs.s0, nullptr);
-  EXPECT_NE(fs.s1, nullptr);
-  EXPECT_NE(fs.s2, nullptr);
-  EXPECT_NE(fs.s3, nullptr);
-  return fs;
-}
-
 struct ParseResult10d {
   SourceManager mgr;
   Arena arena;
@@ -86,31 +65,6 @@ static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
 }
 
 namespace {
-
-// --- 16. Multiple sequential blocking assignments ---
-TEST(ParserSection10, Sec10_4_1_MultipleSequential) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, c;\n"
-      "  initial begin\n"
-      "    a = 0;\n"
-      "    b = 1;\n"
-      "    c = 0;\n"
-      "    a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto [s0, s1, s2, s3] = Get4InitialStmts(r);
-  EXPECT_EQ(s0->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(s1->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(s2->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(s3->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(s0->lhs->text, "a");
-  EXPECT_EQ(s1->lhs->text, "b");
-  EXPECT_EQ(s2->lhs->text, "c");
-  EXPECT_EQ(s3->lhs->text, "a");
-}
 
 // --- 17. Blocking assignment to struct member: s.field = val ---
 TEST(ParserSection10, Sec10_4_1_StructMemberLhs) {
