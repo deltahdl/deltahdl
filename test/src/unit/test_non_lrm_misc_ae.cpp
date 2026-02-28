@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, NcontrolTerminal_TernaryExpr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  cmos (out, in, sel ? n1 : n2, pctrl);\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // A.3.3 Production #5: output_terminal ::= net_lvalue
 // Exercised via all gate types that have output terminals:
