@@ -23,4 +23,15 @@ TEST(ParserA301, GateInst_CmosBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
+TEST(ParserA301, GateInst_RcmosBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  rcmos (out, in, nctrl, pctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 4u);
+}
+
 }  // namespace
