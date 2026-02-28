@@ -1,0 +1,39 @@
+// §8.25: Parameterized classes
+
+#include "fixture_parser.h"
+
+using namespace delta;
+
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+namespace {
+
+// §8.5 — Parameterized classes
+TEST(ParserSection8, ParameterizedClass) {
+  auto r = Parse(
+      "class stack #(parameter int DEPTH = 8);\n"
+      "  int data;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  EXPECT_EQ(cls->name, "stack");
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "DEPTH");
+}
+
+}  // namespace
