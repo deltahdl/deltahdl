@@ -42,4 +42,17 @@ TEST(ParserAnnexA0411, OrderedPortConnections) {
   EXPECT_EQ(item->inst_ports[2].first, "");
 }
 
+TEST(ParserAnnexA0411, OrderedPortBlankPosition) {
+  // ordered_port_connection ::= { attribute_instance } [ expression ]
+  // A blank position (empty optional expression) is valid
+  auto r = Parse("module m; sub u0(a, , c); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->inst_ports.size(), 3u);
+  EXPECT_NE(item->inst_ports[0].second, nullptr);  // a
+  EXPECT_EQ(item->inst_ports[1].second, nullptr);  // blank
+  EXPECT_NE(item->inst_ports[2].second, nullptr);  // c
+}
+
 }  // namespace
