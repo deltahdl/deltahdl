@@ -251,4 +251,30 @@ TEST(ParserAnnexA053, CombBody_SimFirstMatch) {
   EXPECT_EQ(eval.Evaluate({'1', '1'}), '0');
 }
 
+// ---------------------------------------------------------------------------
+// Production 3: combinational_entry ::= level_input_list : output_symbol ;
+// ---------------------------------------------------------------------------
+// Verify structure of a parsed combinational entry
+TEST(ParserAnnexA053, CombEntry_Structure) {
+  auto r = Parse(
+      "primitive buf_prim(output y, input a);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->table.size(), 2);
+  // Row 0: input '0', output '0'
+  EXPECT_EQ(udp->table[0].inputs.size(), 1);
+  EXPECT_EQ(udp->table[0].inputs[0], '0');
+  EXPECT_EQ(udp->table[0].output, '0');
+  EXPECT_EQ(udp->table[0].current_state, 0);
+  // Row 1: input '1', output '1'
+  EXPECT_EQ(udp->table[1].inputs[0], '1');
+  EXPECT_EQ(udp->table[1].output, '1');
+}
+
 }  // namespace
