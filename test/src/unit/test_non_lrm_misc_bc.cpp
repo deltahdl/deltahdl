@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -872,28 +873,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
         item->kind == ModuleItemKind::kAlwaysBlock)
       return item;
-  }
-  return nullptr;
-}
-
-// Returns the first statement inside the first initial block's begin-end.
-static Stmt* FirstInitialStmt(ParseResult4c& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
-// Returns the body of the first initial block.
-static Stmt* InitialBody(ParseResult4c& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
   }
   return nullptr;
 }

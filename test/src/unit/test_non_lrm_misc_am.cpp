@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -811,12 +812,7 @@ TEST(ParserA605, JumpBreak) {
   EXPECT_FALSE(r.has_errors);
   auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
-  auto* forever_stmt = body->stmts[0];
-  ASSERT_NE(forever_stmt, nullptr);
-  EXPECT_EQ(forever_stmt->kind, StmtKind::kForever);
-  auto* loop_body = forever_stmt->body;
-  ASSERT_NE(loop_body, nullptr);
-  EXPECT_EQ(loop_body->stmts[0]->kind, StmtKind::kBreak);
+  VerifyForeverLoopJump(body, StmtKind::kBreak);
 }
 
 // §12.8: continue statement
@@ -833,10 +829,7 @@ TEST(ParserA605, JumpContinue) {
   EXPECT_FALSE(r.has_errors);
   auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
-  auto* forever_stmt = body->stmts[0];
-  auto* loop_body = forever_stmt->body;
-  ASSERT_NE(loop_body, nullptr);
-  EXPECT_EQ(loop_body->stmts[0]->kind, StmtKind::kContinue);
+  VerifyForeverLoopJump(body, StmtKind::kContinue);
 }
 
 // ---------------------------------------------------------------------------

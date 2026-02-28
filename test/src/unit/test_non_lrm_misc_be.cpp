@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -341,28 +342,6 @@ static ModuleItem* FirstFuncOrTask(ParseResult4e& r) {
   return nullptr;
 }
 
-// Returns the first statement inside the first initial block's begin-end.
-static Stmt* FirstInitialStmt(ParseResult4e& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
-// Returns the body of the first initial block.
-static Stmt* InitialBody(ParseResult4e& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
-  }
-  return nullptr;
-}
-
 static ClassMember* FindClassMethod(ParseResult4e& r) {
   if (r.cu->classes.empty()) return nullptr;
   for (auto* m : r.cu->classes[0]->members) {
@@ -521,7 +500,7 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInBeginEnd) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmtT(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->var_is_static);
@@ -541,7 +520,7 @@ TEST(ParserSection4, Sec4_9_4_AutoVarInBeginEnd) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmtT(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->var_is_automatic);
@@ -569,7 +548,7 @@ TEST(ParserSection4, Sec4_9_4_AutoVarInForkBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmtT(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   ASSERT_GE(stmt->fork_stmts.size(), 2u);
@@ -595,7 +574,7 @@ TEST(ParserSection4, Sec4_9_4_ForLoopVarDecl) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmtT(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
@@ -613,7 +592,7 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInInitialBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmtT(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->var_is_static);
@@ -711,7 +690,7 @@ TEST(ParserSection4, Sec4_9_4_MixedStaticAutoInBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
+  auto* body = InitialBodyT(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   ASSERT_GE(body->stmts.size(), 2u);
@@ -787,7 +766,7 @@ TEST(ParserSection4, Sec4_9_4_StaticVarPackedDims) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmtT(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->var_is_static);
@@ -856,7 +835,7 @@ TEST(ParserSection4, Sec4_9_4_VarInNestedBeginEnd) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmtT(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlock);
   ASSERT_GE(stmt->stmts.size(), 1u);

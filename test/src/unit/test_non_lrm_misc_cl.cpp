@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -752,22 +753,11 @@ TEST(ParserSection14, SignalDirections) {
   ModuleItem* item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
 
-  struct Expected {
-    Direction dir;
-    std::string name;
-  };
-  Expected expected[] = {
+  VerifyClockingSignalDirections(item, {
       {Direction::kInput, "data_in"},
       {Direction::kOutput, "data_out"},
       {Direction::kInout, "bidir"},
-  };
-  ASSERT_EQ(item->clocking_signals.size(), std::size(expected));
-  for (size_t i = 0; i < std::size(expected); ++i) {
-    EXPECT_EQ(item->clocking_signals[i].direction, expected[i].dir)
-        << "signal " << i;
-    EXPECT_EQ(item->clocking_signals[i].name, expected[i].name)
-        << "signal " << i;
-  }
+  });
 }
 
 // =============================================================================

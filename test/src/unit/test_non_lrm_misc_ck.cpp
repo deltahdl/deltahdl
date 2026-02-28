@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -219,12 +220,8 @@ TEST(ParserA26, FuncBodyNewStyleMultipleDirections) {
       "  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 4u);
-  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
-  EXPECT_EQ(item->func_args[2].direction, Direction::kInout);
-  EXPECT_EQ(item->func_args[3].direction, Direction::kRef);
+  VerifyFuncArgDirections(r.cu->modules[0]->items[0],
+      {Direction::kInput, Direction::kOutput, Direction::kInout, Direction::kRef});
 }
 
 TEST(ParserA26, FuncBodyNewStyleStickyDirection) {
@@ -234,11 +231,8 @@ TEST(ParserA26, FuncBodyNewStyleStickyDirection) {
       "  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 3u);
-  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-  EXPECT_EQ(item->func_args[1].direction, Direction::kInput);
-  EXPECT_EQ(item->func_args[2].direction, Direction::kInput);
+  VerifyFuncArgDirections(r.cu->modules[0]->items[0],
+      {Direction::kInput, Direction::kInput, Direction::kInput});
 }
 
 TEST(ParserA26, FuncBodyWithBlockItemDecl) {

@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -742,14 +743,7 @@ TEST(ParserSection11, Sec11_1_TernaryConditionalFields) {
       "  initial x = en ? val_a : val_b;\n"
       "endmodule\n");
   auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->condition, nullptr);
-  EXPECT_EQ(rhs->condition->kind, ExprKind::kIdentifier);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kIdentifier);
-  ASSERT_NE(rhs->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIdentifier);
+  VerifyTernaryFieldsAllIdentifier(rhs);
 }
 
 // --- Concatenation ---

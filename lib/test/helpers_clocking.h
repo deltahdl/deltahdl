@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <cstdint>
 
 #include "fixture_simulator.h"
@@ -48,4 +50,19 @@ inline void SetupClockingBlock(
   block.signals.push_back(sig);
   cmgr.Register(block);
   cmgr.Attach(f.ctx, f.scheduler);
+}
+
+// Full negedge sampling test: create clk + data, setup clocking, schedule
+// negedge, run, verify sampled value.
+template <typename Fixture>
+inline void TestNegedgeSampling(Fixture& f, ClockingManager& cmgr) {
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 1);
+  auto* data = f.ctx.CreateVariable("neg_data", 8);
+  data->value = MakeLogic4VecVal(f.arena, 8, 0xDD);
+  SetupClockingBlock(f, cmgr, "cb_neg", Edge::kNegedge,
+                     {0}, {0}, "neg_data", ClockingDir::kInput);
+  ScheduleNegedge(f, clk, 10);
+  f.scheduler.Run();
+  EXPECT_EQ(cmgr.GetSampledValue("cb_neg", "neg_data"), 0xDDu);
 }

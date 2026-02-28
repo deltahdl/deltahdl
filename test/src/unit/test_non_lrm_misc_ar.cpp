@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -673,14 +674,7 @@ TEST(ParserA702, SimplePathFullMultiplePorts) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
-  ASSERT_EQ(si->path.src_ports.size(), 3u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[1].name, "b");
-  EXPECT_EQ(si->path.src_ports[2].name, "c");
-  ASSERT_EQ(si->path.dst_ports.size(), 2u);
-  EXPECT_EQ(si->path.dst_ports[0].name, "x");
-  EXPECT_EQ(si->path.dst_ports[1].name, "y");
+  VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
 }
 
 // =============================================================================

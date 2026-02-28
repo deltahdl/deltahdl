@@ -46,18 +46,8 @@ TEST(ClockingSim, DeclareWithClockEvent) {
 // =============================================================================
 TEST(ClockingSim, NegedgeClockEvent) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 1);
-  auto* data = f.ctx.CreateVariable("neg_data", 8);
-  data->value = MakeLogic4VecVal(f.arena, 8, 0xDD);
-
   ClockingManager cmgr;
-  SetupClockingBlock(f, cmgr, "cb_neg", Edge::kNegedge, {0}, {0}, "neg_data", ClockingDir::kInput);
-
-  ScheduleNegedge(f, clk, 10);
-  f.scheduler.Run();
-
-  EXPECT_EQ(cmgr.GetSampledValue("cb_neg", "neg_data"), 0xDDu);
+  TestNegedgeSampling(f, cmgr);
 }
 
 // =============================================================================

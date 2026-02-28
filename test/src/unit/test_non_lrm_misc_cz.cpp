@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -875,14 +876,7 @@ TEST(ParserSection28, Sec28_12_MultipleSourceDestPorts) {
   ASSERT_NE(sp.sole_item, nullptr);
   auto* si = sp.sole_item;
   EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
-  ASSERT_EQ(si->path.src_ports.size(), 3u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[1].name, "b");
-  EXPECT_EQ(si->path.src_ports[2].name, "c");
-  ASSERT_EQ(si->path.dst_ports.size(), 2u);
-  EXPECT_EQ(si->path.dst_ports[0].name, "x");
-  EXPECT_EQ(si->path.dst_ports[1].name, "y");
+  VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
 }
 
 TEST(ParserSection28, Sec28_12_PosedgeFullPath) {
