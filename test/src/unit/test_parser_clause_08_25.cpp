@@ -60,4 +60,20 @@ TEST(ParserSection8, ParameterizedClassTypeParam) {
   EXPECT_EQ(cls->params[0].first, "T");
 }
 
+// §8.5 — Parameterized class with extends
+TEST(ParserSection8, ParameterizedClassExtendsName) {
+  auto r = Parse(
+      "class Base;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Derived #(parameter int N = 4) extends Base;\n"
+      "  int y;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  auto* cls = r.cu->classes[1];
+  EXPECT_EQ(cls->name, "Derived");
+  EXPECT_EQ(cls->base_class, "Base");
+}
+
 }  // namespace
