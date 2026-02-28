@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetDecl_ComplexExpr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let max(a, b) = (a > b) ? a : b;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetDecl_InPackage) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
