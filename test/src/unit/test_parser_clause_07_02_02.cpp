@@ -44,4 +44,23 @@ TEST(ParserSection7, StructMemberInit) {
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
+// 23. Struct variable declaration with initializer in initial block.
+TEST(ParserSection7, Sec7_2_2_VarDeclWithInit) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int a; int b; } pair_t;\n"
+      "  initial begin\n"
+      "    pair_t p = '{5, 10};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmt->var_name, "p");
+  ASSERT_NE(stmt->var_init, nullptr);
+  EXPECT_EQ(stmt->var_init->kind, ExprKind::kAssignmentPattern);
+}
+
 }  // namespace

@@ -61,4 +61,54 @@ TEST(ParserSection10, AssignmentPatternStruct) {
   ASSERT_GE(mod->items.size(), 2u);
 }
 
+struct ParseResult7e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult7e Parse(const std::string& src) {
+  ParseResult7e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult7e& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+// --- Packed struct assigned from assignment pattern ---
+TEST(ParserSection7, Sec7_2_1_PackedAssignFromPattern) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] opcode;\n"
+      "    logic [7:0] data;\n"
+      "  } cmd_t;\n"
+      "  cmd_t c;\n"
+      "  initial c = '{8'h01, 8'hFF};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
+  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
+}
+
 }  // namespace

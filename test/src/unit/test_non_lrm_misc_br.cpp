@@ -17,25 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// 23. Struct variable declaration with initializer in initial block.
-TEST(ParserSection7, Sec7_2_2_VarDeclWithInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { int a; int b; } pair_t;\n"
-      "  initial begin\n"
-      "    pair_t p = '{5, 10};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(stmt->var_name, "p");
-  ASSERT_NE(stmt->var_init, nullptr);
-  EXPECT_EQ(stmt->var_init->kind, ExprKind::kAssignmentPattern);
-}
-
 // 24. Struct assigned in for loop body.
 TEST(ParserSection7, Sec7_2_2_AssignInForLoop) {
   EXPECT_TRUE(
