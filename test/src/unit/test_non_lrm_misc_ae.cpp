@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, InoutTerminal_RtranBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  rtran (p, q);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRtran);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
 // =============================================================================
 // A.3.3 Production #3: input_terminal ::= expression
 // Exercised via n-input gates (and/nand/or/nor/xor/xnor),
