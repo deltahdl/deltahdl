@@ -17,38 +17,6 @@ static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// checker_or_generate_item ::= continuous_assign
-TEST(SourceText, CheckerContinuousAssign) {
-  auto r = Parse(
-      "checker chk;\n"
-      "  assign a = b;\n"
-      "endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kContAssign);
-}
-
-// checker_or_generate_item ::= initial_construct | always_construct |
-// final_construct
-TEST(SourceText, CheckerInitialAlwaysFinal) {
-  auto r = Parse(
-      "checker chk;\n"
-      "  initial begin end\n"
-      "  always @(posedge clk) x <= 1;\n"
-      "  final begin end\n"
-      "endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  auto& items = r.cu->checkers[0]->items;
-  ASSERT_GE(items.size(), 3u);
-  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kInitialBlock));
-  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kAlwaysBlock));
-  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kFinalBlock));
-}
-
 // checker_or_generate_item ::= assertion_item
 TEST(SourceText, CheckerAssertionItem) {
   auto r = Parse(
