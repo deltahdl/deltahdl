@@ -125,4 +125,21 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithUnaryOperands) {
   EXPECT_EQ(rhs->false_expr->op, TokenKind::kAmp);
 }
 
+// --- Ternary as function argument ---
+TEST(ParserSection11, Sec11_4_6_TernaryAsFunctionArgument) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = func(sel ? a : b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(rhs->callee, "func");
+  ASSERT_EQ(rhs->args.size(), 1u);
+  ASSERT_NE(rhs->args[0], nullptr);
+  EXPECT_EQ(rhs->args[0]->kind, ExprKind::kTernary);
+}
+
 }  // namespace

@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Ternary as function argument ---
-TEST(ParserSection11, Sec11_4_6_TernaryAsFunctionArgument) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = func(sel ? a : b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCall);
-  EXPECT_EQ(rhs->callee, "func");
-  ASSERT_EQ(rhs->args.size(), 1u);
-  ASSERT_NE(rhs->args[0], nullptr);
-  EXPECT_EQ(rhs->args[0]->kind, ExprKind::kTernary);
-}
-
 // --- Ternary with cast operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithCast) {
   auto r = Parse(
