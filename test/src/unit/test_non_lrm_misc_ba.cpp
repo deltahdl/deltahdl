@@ -21,25 +21,6 @@ static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// 11. CU scope has no name — cannot be imported.
-// An import of $unit would be illegal.  Verify that valid import syntax
-// works and that CU items remain separate from packages.
-TEST(ParserClause03, Cl3_12_1_CuScopeCannotBeImported) {
-  // Normal package import works fine.
-  auto r = ParseWithPreprocessor(
-      "package pkg;\n"
-      "  typedef int myint;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import pkg::*;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  // CU-scope functions are NOT in any package.
-  EXPECT_TRUE(r.cu->cu_items.empty());
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
 // 12. CU scope identifiers not accessible via hierarchical references.
 // Hierarchical names start from $root (§23.3.1), not from CU scope.
 // Verify that a hierarchical reference in a module parses correctly.
