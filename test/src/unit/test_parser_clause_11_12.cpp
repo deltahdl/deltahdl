@@ -348,4 +348,15 @@ TEST(ParserA212, LetArgs_Named) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetArgs_DefaultOmitted) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(a, b = 10) = a + b;\n"
+              "  initial begin\n"
+              "    int z;\n"
+              "    z = f(5);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
