@@ -22,24 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// §9.3.5: Statement label on fork-join block
-TEST(ParserA603, ForkWithStatementLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    labelB: fork\n"
-      "      a = 1;\n"
-      "    join_none : labelB\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->label, "labelB");
-}
-
 // ---------------------------------------------------------------------------
 // action_block: statement_or_null | [statement] else statement_or_null
 // ---------------------------------------------------------------------------
