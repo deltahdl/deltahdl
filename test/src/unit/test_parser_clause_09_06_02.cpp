@@ -260,4 +260,21 @@ TEST(ParserSection9c, DisableWithIfCondition) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kIf);
 }
 
+TEST(ParserSection9c, DisableHierarchicalTaskName) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task my_task;\n"
+              "    begin\n"
+              "      #100 x = 1;\n"
+              "    end\n"
+              "  endtask\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      my_task;\n"
+              "    join_none\n"
+              "    #50 disable my_task;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

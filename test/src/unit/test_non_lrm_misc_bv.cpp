@@ -51,23 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-TEST(ParserSection9c, DisableHierarchicalTaskName) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  task my_task;\n"
-              "    begin\n"
-              "      #100 x = 1;\n"
-              "    end\n"
-              "  endtask\n"
-              "  initial begin\n"
-              "    fork\n"
-              "      my_task;\n"
-              "    join_none\n"
-              "    #50 disable my_task;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // LRM section 9.7 -- Fine-grain process control
 // The process class: self(), status(), kill(), await(), suspend(), resume().

@@ -161,4 +161,18 @@ TEST(SourceText, CheckerPortList) {
   EXPECT_EQ(chk->ports[1].name, "valid");
 }
 
+// checker_port_item with default value (= property_actual_arg)
+TEST(SourceText, CheckerPortDefaultValue) {
+  auto r = Parse(
+      "checker chk(input logic clk = 1'b0);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_EQ(r.cu->checkers[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].name, "clk");
+  EXPECT_NE(r.cu->checkers[0]->ports[0].default_value, nullptr);
+}
+
 }  // namespace

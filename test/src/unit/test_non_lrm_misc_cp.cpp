@@ -17,41 +17,6 @@ static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// A.1.8 Checker items
-// =============================================================================
-// checker_port_list / checker_port_item / checker_port_direction
-TEST(SourceText, CheckerPortList) {
-  auto r = Parse(
-      "checker chk(input logic clk, output bit valid);\n"
-      "endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  auto* chk = r.cu->checkers[0];
-  EXPECT_EQ(chk->name, "chk");
-  EXPECT_EQ(chk->decl_kind, ModuleDeclKind::kChecker);
-  ASSERT_EQ(chk->ports.size(), 2u);
-  EXPECT_EQ(chk->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(chk->ports[0].name, "clk");
-  EXPECT_EQ(chk->ports[1].direction, Direction::kOutput);
-  EXPECT_EQ(chk->ports[1].name, "valid");
-}
-
-// checker_port_item with default value (= property_actual_arg)
-TEST(SourceText, CheckerPortDefaultValue) {
-  auto r = Parse(
-      "checker chk(input logic clk = 1'b0);\n"
-      "endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  ASSERT_EQ(r.cu->checkers[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(r.cu->checkers[0]->ports[0].name, "clk");
-  EXPECT_NE(r.cu->checkers[0]->ports[0].default_value, nullptr);
-}
-
 // checker_or_generate_item ::= continuous_assign
 TEST(SourceText, CheckerContinuousAssign) {
   auto r = Parse(
