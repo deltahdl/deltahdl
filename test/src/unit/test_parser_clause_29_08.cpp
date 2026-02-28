@@ -288,4 +288,23 @@ TEST(ParserA504, UdpInst_ManyInputs) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 5u);
 }
 
+// --- Attributes ---
+TEST(ParserA504, UdpInst_WithAttributes) {
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  (* synthesis *) my_udp u1(out, in1, in2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto insts = FindUdpInsts(r.cu->modules[0]->items);
+  ASSERT_EQ(insts.size(), 1u);
+  EXPECT_FALSE(insts[0]->attrs.empty());
+}
+
 }  // namespace
