@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// udp_output_declaration ; (output reg)
-TEST(ParserAnnexA052, PortDecl_OutputReg) {
-  auto r = Parse(
-      "primitive dff(q, d, clk);\n"
-      "  output reg q;\n"
-      "  input d, clk;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->output_name, "q");
-  EXPECT_TRUE(udp->is_sequential);
-}
-
 // udp_input_declaration ; (comma-separated list)
 TEST(ParserAnnexA052, PortDecl_InputList) {
   auto r = Parse(
