@@ -66,4 +66,21 @@ TEST(ParserSection11, Sec11_4_1_BitSelectConstantIndex) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
+// --- Bit-select with variable index ---
+TEST(ParserSection11, Sec11_4_1_BitSelectVariableIndex) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] vec;\n"
+      "  initial x = vec[idx];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->index, nullptr);
+  EXPECT_EQ(rhs->index->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(rhs->index_end, nullptr);
+}
+
 }  // namespace
