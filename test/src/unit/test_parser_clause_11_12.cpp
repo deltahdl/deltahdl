@@ -46,4 +46,17 @@ TEST(ParserA212, LetDecl_EmptyParens) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
+TEST(ParserA212, LetDecl_WithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  let op(x, y, z) = |((x | y) & z);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "op");
+  ASSERT_EQ(item->func_args.size(), 3u);
+}
+
 }  // namespace
