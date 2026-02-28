@@ -929,7 +929,7 @@ jobs:
             fi
           done
           exit $fail
-      - name: Detect copy-paste
+      - name: Detect copy-paste (src)
         run: >-
           pmd cpd
           --minimum-tokens 100
