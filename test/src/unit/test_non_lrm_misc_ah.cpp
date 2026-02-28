@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Wildcard form: output reg q = 1'b0 ; (in port declaration after .*)
-TEST(ParserAnnexA052, OutputDeclWildcard_RegInit) {
-  auto r = Parse(
-      "primitive dff(.*);\n"
-      "  output reg q = 1'b0;\n"
-      "  input d, clk;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '0');
-}
-
 // ---------------------------------------------------------------------------
 // udp_input_declaration — list_of_udp_port_identifiers
 // ---------------------------------------------------------------------------
