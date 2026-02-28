@@ -203,4 +203,17 @@ TEST(ParserA211, BinsExpression_Variable) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, BinsExpression_CoverPointDotBin) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      bins sel = binsof(cp1.low);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
