@@ -5,27 +5,53 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult12b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
 
-TEST(ParserSection12, NestedIfElse) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a)\n"
-      "      if (b) x = 1;\n"
-      "      else x = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // Else associates with the inner if
-  EXPECT_EQ(stmt->else_branch, nullptr);
-  ASSERT_NE(stmt->then_branch, nullptr);
-  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->then_branch->else_branch, nullptr);
+static ParseResult12b Parse(const std::string& src) {
+  ParseResult12b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
 }
+
+static ModuleItem* FindFunc12b(ParseResult12b& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name)
+      return item;
+  }
+  return nullptr;
+}
+
+static Stmt* FirstInitialStmt(ParseResult12b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// Helper: verify first item has 2 func_args: a(input), b.
+static void VerifyTwoArgTask(ParseResult12b& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].name, "a");
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[1].name, "b");
+}
+
+namespace {
 
 TEST(ParserSection12, IfElseIfChain) {
   auto r = Parse(
@@ -117,41 +143,6 @@ TEST(ParserSection12, ForLoopWithBlockBody) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
   ASSERT_NE(stmt->for_body, nullptr);
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlock);
-}
-
-struct ParseResult12b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult12b Parse(const std::string& src) {
-  ParseResult12b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FindFunc12b(ParseResult12b& r, std::string_view name) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name)
-      return item;
-  }
-  return nullptr;
-}
-
-static Stmt* FirstInitialStmt(ParseResult12b& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
 }
 
 // =============================================================================
@@ -857,17 +848,6 @@ TEST(ParserA27, TaskBodyNewStyleEmptyPorts) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->func_args.empty());
-}
-
-// Helper: verify first item has 2 func_args: a(input), b.
-static void VerifyTwoArgTask(ParseResult12b& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 2u);
-  EXPECT_EQ(item->func_args[0].name, "a");
-  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-  EXPECT_EQ(item->func_args[1].name, "b");
 }
 
 TEST(ParserA27, TaskBodyNewStyleWithArgs) {

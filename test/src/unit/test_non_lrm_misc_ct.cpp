@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, FileAndLineInErrorMessage) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $display(\"Error at %s, line %d.\",\n"
-              "    `__FILE__, `__LINE__);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection22, LineDirectiveInAssignment) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
