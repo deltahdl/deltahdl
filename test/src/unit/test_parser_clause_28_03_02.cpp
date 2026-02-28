@@ -293,4 +293,16 @@ TEST(ParserA302, PulldownStrength_AllStrength0Values) {
   EXPECT_TRUE(ParseOk("module m; pulldown (supply0) (out); endmodule"));
 }
 
+// -----------------------------------------------------------------------------
+// All strength1 values exercised in pullup_strength
+// -----------------------------------------------------------------------------
+TEST(ParserA302, PullupStrength_AllStrength1Values) {
+  // highz1=1, weak1=2, pull1=3, strong1=4, supply1=5
+  EXPECT_TRUE(ParseOk("module m; pullup (highz1) (out); endmodule"));
+  EXPECT_TRUE(ParseOk("module m; pullup (weak1) (out); endmodule"));
+  EXPECT_TRUE(ParseOk("module m; pullup (pull1) (out); endmodule"));
+  EXPECT_TRUE(ParseOk("module m; pullup (strong1) (out); endmodule"));
+  EXPECT_TRUE(ParseOk("module m; pullup (supply1) (out); endmodule"));
+}
+
 }  // namespace

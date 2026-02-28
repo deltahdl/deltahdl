@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-// -----------------------------------------------------------------------------
-// All strength1 values exercised in pullup_strength
-// -----------------------------------------------------------------------------
-TEST(ParserA302, PullupStrength_AllStrength1Values) {
-  // highz1=1, weak1=2, pull1=3, strong1=4, supply1=5
-  EXPECT_TRUE(ParseOk("module m; pullup (highz1) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pullup (weak1) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pullup (pull1) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pullup (strong1) (out); endmodule"));
-  EXPECT_TRUE(ParseOk("module m; pullup (supply1) (out); endmodule"));
-}
-
 // =============================================================================
 // A.3.3 Production #1: enable_terminal ::= expression
 // Exercised via enable gates (bufif0/bufif1/notif0/notif1) and
