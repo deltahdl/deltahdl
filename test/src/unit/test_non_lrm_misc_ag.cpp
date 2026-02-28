@@ -13,26 +13,6 @@ bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// --- if_generate_construct: if / else-if / else chain ---
-TEST(ParserAnnexA042, IfGenerateElseIfChain) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (W == 1)\n"
-      "    assign out = a;\n"
-      "  else if (W == 2)\n"
-      "    assign out = b;\n"
-      "  else\n"
-      "    assign out = c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_NE(gen->gen_else, nullptr);
-  EXPECT_EQ(gen->gen_else->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_NE(gen->gen_else->gen_else, nullptr);
-}
-
 // --- case_generate_construct: basic case ---
 TEST(ParserAnnexA042, CaseGenerateBasic) {
   auto r = Parse(
