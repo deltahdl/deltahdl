@@ -84,4 +84,22 @@ TEST(ParserA701, SpecifyBlockMultipleItems) {
   ASSERT_EQ(spec->specify_items.size(), 3u);
 }
 
+// =============================================================================
+// A.7.1 specify_item — all 5 alternatives
+// =============================================================================
+TEST(ParserA701, SpecifyItemSpecparamDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam tPD = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kSpecparam);
+}
+
 }  // namespace
