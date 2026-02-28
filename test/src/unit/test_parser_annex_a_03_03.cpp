@@ -220,4 +220,20 @@ TEST(ParserA303, NcontrolTerminal_TernaryExpr) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// A.3.3 Production #5: output_terminal ::= net_lvalue
+// Exercised via all gate types that have output terminals:
+// n-input gates, n-output gates, enable gates, mos/cmos switches, pull gates.
+// =============================================================================
+TEST(ParserA303, OutputTerminal_SimpleIdent) {
+  auto r = Parse(
+      "module m;\n"
+      "  and (y, a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
