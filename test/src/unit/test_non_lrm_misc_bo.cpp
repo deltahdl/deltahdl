@@ -4,25 +4,50 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult7 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
 
-// 2. wire addressT w1; — user-defined type after net keyword (§6.7.1 example).
-TEST(ParserSection6, Sec6_7_1_WireWithUserDefinedType) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef logic [31:0] addressT;\n"
-      "  wire addressT w1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 2u);
-  EXPECT_EQ(items[1]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(items[1]->data_type.is_net);
-  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kNamed);
-  EXPECT_EQ(items[1]->data_type.type_name, "addressT");
-  EXPECT_EQ(items[1]->name, "w1");
+static ParseResult7 Parse(const std::string& src) {
+  ParseResult7 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
 }
+
+static ModuleItem* FirstItem(ParseResult7& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+static Stmt* FirstInitialStmt(ParseResult7& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+static void VerifyStructMemberNames(const std::vector<StructMember>& members,
+                                    const std::string expected_names[],
+                                    size_t count) {
+  ASSERT_EQ(members.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(members[i].name, expected_names[i]) << "member " << i;
+  }
+}
+
+namespace {
 
 // 3. wire struct packed { ... } memsig; — struct type after net keyword.
 TEST(ParserSection6, Sec6_7_1_WireWithPackedStructType) {
@@ -210,16 +235,6 @@ TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
               "endprogram\n"));
 }
 
-static void VerifyStructMembers(const std::vector<StructMember>& members,
-                                const StructMemberExpected expected[],
-                                size_t count) {
-  ASSERT_EQ(members.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(members[i].name, expected[i].name) << "member " << i;
-    EXPECT_EQ(members[i].type_kind, expected[i].type_kind) << "member " << i;
-  }
-}
-
 TEST(Parser, TypedefStructPacked) {
   auto r = Parse(
       "module t;\n"
@@ -246,49 +261,6 @@ TEST(Parser, InlineStructVar) {
   EXPECT_EQ(item->name, "point");
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
   ASSERT_EQ(item->data_type.struct_members.size(), 2);
-}
-
-struct ParseResult7 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult7 Parse(const std::string& src) {
-  ParseResult7 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult7& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
-static Stmt* FirstInitialStmt(ParseResult7& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
-static void VerifyStructMemberNames(const std::vector<StructMember>& members,
-                                    const std::string expected_names[],
-                                    size_t count) {
-  ASSERT_EQ(members.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(members[i].name, expected_names[i]) << "member " << i;
-  }
 }
 
 // =========================================================================

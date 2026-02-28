@@ -185,4 +185,38 @@ TEST(ParserA25, NetWithUnpackedDim) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
 
+struct ParseResult7 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult7 Parse(const std::string& src) {
+  ParseResult7 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// 2. wire addressT w1; — user-defined type after net keyword (§6.7.1 example).
+TEST(ParserSection6, Sec6_7_1_WireWithUserDefinedType) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef logic [31:0] addressT;\n"
+      "  wire addressT w1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(items[1]->data_type.is_net);
+  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(items[1]->data_type.type_name, "addressT");
+  EXPECT_EQ(items[1]->name, "w1");
+}
+
 }  // namespace
