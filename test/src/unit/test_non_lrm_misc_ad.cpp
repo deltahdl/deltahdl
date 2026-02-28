@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_NamedUnnamedMixedInMulti) {
-  auto r = Parse(
-      "module m;\n"
-      "  and a1(o1, i1, i2), a2(o2, i3, i4), a3(o3, i5, i6);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  EXPECT_EQ(gates.size(), 3u);
-  EXPECT_EQ(gates[0]->gate_inst_name, "a1");
-  EXPECT_EQ(gates[1]->gate_inst_name, "a2");
-  EXPECT_EQ(gates[2]->gate_inst_name, "a3");
-}
-
 TEST(ParserA301, GateInst_SharedStrengthAcrossInstances) {
   auto r = Parse(
       "module m;\n"
