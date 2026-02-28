@@ -63,4 +63,18 @@ TEST(ParserA601, ContinuousAssign_DriveStrength) {
   EXPECT_EQ(cas[0]->drive_strength1, 2u);
 }
 
+TEST(ParserA601, ContinuousAssign_DriveStrengthReversed) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (pull1, supply0) w = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto cas = FindContAssigns(r.cu->modules[0]->items);
+  ASSERT_EQ(cas.size(), 1u);
+  EXPECT_EQ(cas[0]->drive_strength0, 5u);
+  EXPECT_EQ(cas[0]->drive_strength1, 3u);
+}
+
 }  // namespace
