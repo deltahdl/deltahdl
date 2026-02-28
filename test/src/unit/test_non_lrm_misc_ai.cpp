@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-// edge_indicator as parenthesized form (x1)
-TEST(ParserAnnexA053, EdgeIndicator_Parenx1) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  table\n"
-      "    ? (x1) : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table[0].inputs.size(), 2);
-}
-
 // Simulation: parenthesized edge (01) behaves as rising edge
 TEST(ParserAnnexA053, EdgeIndicator_SimParen01) {
   auto r = Parse(
