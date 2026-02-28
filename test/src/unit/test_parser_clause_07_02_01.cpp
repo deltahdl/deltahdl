@@ -255,4 +255,23 @@ TEST(Parser, TypedefStructPacked) {
   ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
 }
 
+// --- Packed struct member access on LHS ---
+TEST(ParserSection7, Sec7_2_1_PackedMemberAccessWrite) {
+  auto r = Parse(
+      "module t;\n"
+      "  struct packed {\n"
+      "    logic [7:0] hi;\n"
+      "    logic [7:0] lo;\n"
+      "  } s;\n"
+      "  initial s.hi = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
+}
+
 }  // namespace

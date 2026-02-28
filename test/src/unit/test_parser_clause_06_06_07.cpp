@@ -112,4 +112,21 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithLogicType) {
   EXPECT_EQ(nt->name, "mylogic");
 }
 
+TEST(ParserSection6, NettypeDeclAlias) {
+  // nettype nettype_identifier nettype_identifier ;  (alias form)
+  auto r = Parse(
+      "module t;\n"
+      "  typedef real TR[5];\n"
+      "  nettype TR wTR;\n"
+      "  nettype wTR nettypeid2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  int nettype_count = 0;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kNettypeDecl) nettype_count++;
+  }
+  EXPECT_GE(nettype_count, 2);
+}
+
 }  // namespace
