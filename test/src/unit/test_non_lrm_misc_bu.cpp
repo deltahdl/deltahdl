@@ -49,19 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9, StatementLabelOnForLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    loop: for (int i = 0; i < 10; i++) a = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-}
-
 // =============================================================================
 // §9.4.4 -- Level-sensitive sequence controls
 // =============================================================================

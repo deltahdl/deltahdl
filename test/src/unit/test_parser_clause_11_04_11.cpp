@@ -264,4 +264,16 @@ TEST(ParserSection11, Sec11_4_6_VerifyExprKindTernary) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
+// --- Verify condition, true_expr, false_expr fields ---
+TEST(ParserSection11, Sec11_4_6_VerifyTernaryFields) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = cond_sig ? true_val : false_val;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  VerifyTernaryFieldsAllIdentifier(rhs);
+}
+
 }  // namespace
