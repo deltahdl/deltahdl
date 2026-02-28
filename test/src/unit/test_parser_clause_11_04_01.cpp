@@ -86,4 +86,17 @@ TEST(ParserA602, OperatorAssignment_PercentEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kPercentEq);
 }
 
+TEST(ParserA602, OperatorAssignment_AmpEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a &= 8'hFF; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->rhs->op, TokenKind::kAmpEq);
+}
+
 }  // namespace
