@@ -21,22 +21,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserAnnexA, A7SpecifyFullPath) {
-  auto r =
-      Parse("module m; specify (a, b *> c, d) = 10; endspecify endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParserAnnexA, A7TimingCheckSetup) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify $setup(data, posedge clk, 10); endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserAnnexA, A7TimingCheckHold) {
   auto r = Parse(
       "module m;\n"

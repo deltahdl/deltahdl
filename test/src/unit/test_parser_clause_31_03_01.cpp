@@ -28,4 +28,27 @@ TEST(ParserA70501, SetupTimingCheck) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
+// $setup with notifier
+TEST(ParserA70501, SetupWithNotifier) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk, 10, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->notifier, "ntfr");
+}
+
+TEST(ParserAnnexA, A7TimingCheckSetup) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify $setup(data, posedge clk, 10); endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
