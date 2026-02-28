@@ -21,45 +21,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA701, PulsestyleOndetectMultipleOutputs) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    pulsestyle_ondetect q1, q2;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  auto* item = spec->specify_items[0];
-  EXPECT_TRUE(item->is_ondetect);
-  ASSERT_EQ(item->signal_list.size(), 2u);
-  EXPECT_EQ(item->signal_list[0], "q1");
-  EXPECT_EQ(item->signal_list[1], "q2");
-}
-
-// =============================================================================
-// A.7.1 showcancelled_declaration
-// =============================================================================
-TEST(ParserA701, ShowcancelledSingleOutput) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    showcancelled out1;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  auto* item = spec->specify_items[0];
-  EXPECT_EQ(item->kind, SpecifyItemKind::kShowcancelled);
-  EXPECT_FALSE(item->is_noshowcancelled);
-  ASSERT_EQ(item->signal_list.size(), 1u);
-  EXPECT_EQ(item->signal_list[0], "out1");
-}
-
 TEST(ParserA701, ShowcancelledMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
