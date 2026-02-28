@@ -21,4 +21,18 @@ TEST(ParserA27, TaskBodyNewStyleBlockItemDecl) {
   EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
+TEST(ParserA27, TaskBodyWithStatements) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(input int x);\n"
+      "    #10;\n"
+      "    $display(\"x=%0d\", x);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_GE(item->func_body_stmts.size(), 2u);
+}
+
 }  // namespace
