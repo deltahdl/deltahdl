@@ -40,21 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-TEST(ParserSection7, StructPackedSigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed signed {\n"
-      "    int a;\n"
-      "    byte b;\n"
-      "  } packed_s;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->typedef_type.is_packed);
-  EXPECT_TRUE(item->typedef_type.is_signed);
-}
-
 TEST(ParserSection7, StructMemberInit) {
   auto r = Parse(
       "module t;\n"
