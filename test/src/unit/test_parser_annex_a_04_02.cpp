@@ -52,4 +52,19 @@ TEST(ParserAnnexA042, CaseGenerateWithDefault) {
   EXPECT_TRUE(gen->gen_case_items[1].is_default);
 }
 
+// --- generate_item: module_or_generate_item (always block) ---
+TEST(ParserAnnexA042, GenerateItemAlwaysBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i++) begin : blk\n"
+      "    always @(posedge clk) q[i] <= d[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* gen = r.cu->modules[0]->items[0];
+  ASSERT_EQ(gen->gen_body.size(), 1u);
+  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kAlwaysBlock);
+}
+
 }  // namespace
