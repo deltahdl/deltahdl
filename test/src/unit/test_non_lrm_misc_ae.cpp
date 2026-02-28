@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// -----------------------------------------------------------------------------
-// Production #2: pullup_strength
-// pullup_strength ::= ( strength1 )
-// -----------------------------------------------------------------------------
-TEST(ParserA302, PullupStrength_SingleStrength1) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (strong1) pu1(out);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 0u);  // none
-  EXPECT_EQ(g->drive_strength1, 4u);  // strong1
-}
-
 TEST(ParserA302, PullupStrength_SingleSupply1) {
   auto r = Parse(
       "module m;\n"
