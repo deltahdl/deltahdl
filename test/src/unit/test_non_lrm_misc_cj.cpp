@@ -53,30 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 12.5 -- Case statement (additional cases)
-// =============================================================================
-// Case with multiple expressions in a single item (comma-separated).
-TEST(ParserSection12, CaseMultipleExprsPerItem) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (sel)\n"
-      "      0, 1: x = 1;\n"
-      "      2, 3: x = 2;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  ASSERT_GE(stmt->case_items.size(), 3u);
-  // First item has two patterns (0, 1).
-  EXPECT_EQ(stmt->case_items[0].patterns.size(), 2u);
-}
-
 // Case with only default item.
 TEST(ParserSection12, CaseWithOnlyDefault) {
   auto r = Parse(
