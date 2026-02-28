@@ -45,43 +45,42 @@ static NetType DataTypeToNetType(DataTypeKind kind) {
   }
 }
 
+// §5.12: Evaluate a single AST attribute into a ResolvedAttribute.
+static ResolvedAttribute EvalAttribute(const Attribute& attr) {
+  ResolvedAttribute ra;
+  ra.name = attr.name;
+  if (!attr.value) {
+    ra.resolved_value = 1;
+    return ra;
+  }
+  if (attr.value->kind == ExprKind::kStringLiteral) {
+    auto txt = attr.value->text;
+    if (txt.size() >= 2 && txt.front() == '"' && txt.back() == '"') {
+      ra.string_value = txt.substr(1, txt.size() - 2);
+    } else {
+      ra.string_value = txt;
+    }
+  } else {
+    ra.resolved_value = ConstEvalInt(attr.value);
+  }
+  return ra;
+}
+
 // §5.12: Resolve AST attributes into RTLIR ResolvedAttributes.
 // Deduplicates (last wins) and evaluates constant expressions.
 static std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag) {
   std::vector<ResolvedAttribute> result;
   for (const auto& attr : attrs) {
-    ResolvedAttribute ra;
-    ra.name = attr.name;
-    if (attr.value) {
-      if (attr.value->kind == ExprKind::kStringLiteral) {
-        // Strip surrounding quotes from string literal text.
-        auto txt = attr.value->text;
-        if (txt.size() >= 2 && txt.front() == '"' && txt.back() == '"') {
-          ra.string_value = txt.substr(1, txt.size() - 2);
-        } else {
-          ra.string_value = txt;
-        }
-      } else {
-        ra.resolved_value = ConstEvalInt(attr.value);
-      }
+    auto ra = EvalAttribute(attr);
+    auto it = std::find_if(result.begin(), result.end(),
+                           [&](const auto& e) { return e.name == ra.name; });
+    if (it != result.end()) {
+      diag.Warning(attr.loc,
+                   std::format("duplicate attribute '{}'; last value used",
+                               attr.name));
+      *it = ra;
     } else {
-      // §5.12: default type is bit, value 1.
-      ra.resolved_value = 1;
-    }
-    // §5.12: duplicate name -> last value wins, emit warning.
-    bool replaced = false;
-    for (auto& existing : result) {
-      if (existing.name == ra.name) {
-        diag.Warning(attr.loc,
-                     std::format("duplicate attribute '{}'; last value used",
-                                 attr.name));
-        existing = ra;
-        replaced = true;
-        break;
-      }
-    }
-    if (!replaced) {
       result.push_back(ra);
     }
   }
