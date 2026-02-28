@@ -420,4 +420,15 @@ TEST(ParserA212, LetActualArg_BinaryExpr) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetActualArg_Ternary) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(x) = x;\n"
+              "  initial begin\n"
+              "    int a, z;\n"
+              "    z = f(a > 0 ? a : -a);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
