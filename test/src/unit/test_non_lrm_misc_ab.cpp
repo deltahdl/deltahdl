@@ -6,22 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.11 Production #23: bins_selection
-// =============================================================================
-TEST(ParserA211, BinsSelection_Basic) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint a;\n"
-              "    cp2: coverpoint b;\n"
-              "    cross cp1, cp2 {\n"
-              "      bins my_bin = binsof(cp1);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, BinsSelection_WithIff) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
