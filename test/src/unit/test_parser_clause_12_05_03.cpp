@@ -69,4 +69,26 @@ TEST(ParserSection4, Sec4_6_Unique0CaseAtMostOneMatch) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
+// =============================================================================
+// §4.6: priority case statement — first match
+// =============================================================================
+TEST(ParserSection4, Sec4_6_PriorityCaseFirstMatch) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority case (sel)\n"
+      "      0: x = 1;\n"
+      "      1: x = 2;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
 }  // namespace
