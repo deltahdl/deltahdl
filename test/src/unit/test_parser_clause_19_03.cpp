@@ -149,7 +149,6 @@ TEST(ParserA211, HierarchicalBtfIdentifier_Simple) {
               "endmodule\n"));
 }
 
-
 TEST(ParserAnnexA, A2CovergroupDecl) {
   auto r = Parse(
       "module m;\n"

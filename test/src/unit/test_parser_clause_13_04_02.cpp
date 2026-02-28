@@ -44,7 +44,6 @@ TEST(ParserA213, LifetimeInFunction) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-
 // ---------------------------------------------------------------------------
 // function_declaration ::=
 //   function [ dynamic_override_specifiers ] [ lifetime ]
