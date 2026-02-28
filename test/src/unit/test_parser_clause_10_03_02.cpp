@@ -72,4 +72,19 @@ TEST(ParserA601, ListOfNetAssignments_Two) {
   EXPECT_EQ(cas[1]->assign_lhs->text, "c");
 }
 
+TEST(ParserA601, ListOfNetAssignments_Three) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, c, d, e, f;\n"
+      "  assign a = b, c = d, e = f;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto cas = FindContAssigns(r.cu->modules[0]->items);
+  ASSERT_EQ(cas.size(), 3u);
+  EXPECT_EQ(cas[0]->assign_lhs->text, "a");
+  EXPECT_EQ(cas[1]->assign_lhs->text, "c");
+  EXPECT_EQ(cas[2]->assign_lhs->text, "e");
+}
+
 }  // namespace
