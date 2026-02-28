@@ -49,18 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7, ArrayShuffleMethod) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[4];\n"
-      "  initial arr.shuffle();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
 // =========================================================================
 // §7.12.3: Array reduction methods
 // =========================================================================

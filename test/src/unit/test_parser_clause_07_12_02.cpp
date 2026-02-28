@@ -58,4 +58,16 @@ TEST(ParserSection7, ArrayReverseMethod) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
+TEST(ParserSection7, ArrayShuffleMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial arr.shuffle();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
 }  // namespace
