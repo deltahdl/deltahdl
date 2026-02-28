@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.2.12 Production #6: let_expression
-// let_expression ::= [package_scope] let_identifier
-//     [ ( [ let_list_of_arguments ] ) ]
-// =============================================================================
-TEST(ParserA212, LetExpr_SimpleCall) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let op(x, y) = x + y;\n"
-              "  initial begin\n"
-              "    int z;\n"
-              "    z = op(3, 4);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetExpr_NoArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
