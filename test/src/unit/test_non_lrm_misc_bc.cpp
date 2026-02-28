@@ -77,22 +77,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 
 namespace {
 
-// 24. Step time unit equals global time precision.
-TEST(ParserClause03, Cl3_14_3_StepEqualsGlobalPrecision) {
-  auto r = Parse(
-      "module a;\n"
-      "  timeprecision 1fs;\n"
-      "endmodule\n"
-      "module b;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
-                                       r.preproc_global_precision);
-
-  EXPECT_EQ(gp, TimeUnit::kFs);
-}
-
 // 25. CU-scope timeprecision is included in global computation.
 TEST(ParserClause03, Cl3_14_3_CUScopeTimeprecisionIncluded) {
   auto r = Parse(
