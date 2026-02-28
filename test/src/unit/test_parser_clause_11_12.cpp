@@ -383,4 +383,19 @@ TEST(ParserA212, LetArgs_ExprInArgs) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// A.2.12 Production #8: let_actual_arg
+// let_actual_arg ::= expression
+// =============================================================================
+TEST(ParserA212, LetActualArg_Literal) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(x) = x;\n"
+              "  initial begin\n"
+              "    int z;\n"
+              "    z = f(42);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
