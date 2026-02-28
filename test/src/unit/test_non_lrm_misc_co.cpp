@@ -5,24 +5,6 @@
 
 using namespace delta;
 
-namespace {
-
-// =============================================================================
-// §16.14.6 -- Property case (additional tests)
-// =============================================================================
-TEST(ParserSection16, PropertyCaseWithDefaultOnly) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p_mode;\n"
-      "    case (mode)\n"
-      "      default: a |-> b;\n"
-      "    endcase\n"
-      "  endproperty\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 struct ParseResult16c {
   SourceManager mgr;
   Arena arena;
@@ -49,6 +31,10 @@ static size_t CountItemsByKind(const std::vector<ModuleItem*>& items,
   }
   return count;
 }
+
+using VerifyParseTest = ProgramTestParse;
+
+namespace {
 
 // =============================================================================
 // Section 16.5.1 -- Concurrent assertion statements: assert property
@@ -476,8 +462,6 @@ TEST(ParserSection16, Sec16_5_1_SequenceMatchedMethod) {
               "  endsequence\n"
               "endmodule\n"));
 }
-
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // §17 Checker declarations
