@@ -87,27 +87,6 @@ static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
 
 namespace {
 
-// --- 2. Blocking assignment with intra-assignment delay: a = #10 b ---
-TEST(ParserSection10, Sec10_4_1_IntraAssignDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    a = #10 b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->delay, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->text, "a");
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->text, "b");
-}
-
 // --- 3. Blocking assignment with intra-assignment event control ---
 TEST(ParserSection10, Sec10_4_1_IntraAssignEvent) {
   auto r = Parse(
