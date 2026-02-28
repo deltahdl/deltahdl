@@ -39,4 +39,13 @@ TEST_F(ApiParseTest, AssertOnSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
+TEST_F(ApiParseTest, AssertOffSystemCall) {
+  auto* unit = Parse(R"(
+    module m;
+      initial $assertOff;
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+}
+
 }  // namespace
