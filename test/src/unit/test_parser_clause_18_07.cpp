@@ -37,4 +37,18 @@ TEST(ParserSection18, RandomizeWithMultipleConstraints) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
+TEST(ParserSection18, RandomizeWithRestrictedIdList) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand integer x;\n"
+      "endclass\n"
+      "function int F(int y);\n"
+      "  C obj;\n"
+      "  F = obj.randomize() with (x) { x < y; };\n"
+      "endfunction\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
 }  // namespace
