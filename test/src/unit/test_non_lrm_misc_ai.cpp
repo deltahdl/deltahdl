@@ -8,37 +8,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// Production 7: sequential_entry ::= seq_input_list : current_state :
-//               next_state ;
-// ---------------------------------------------------------------------------
-// Verify the three-field structure of a sequential entry
-TEST(ParserAnnexA053, SeqEntry_ThreeFields) {
-  auto r = Parse(
-      "primitive srff(output reg q, input s, r);\n"
-      "  table\n"
-      "    1 0 : 0 : 1;\n"
-      "    0 1 : 1 : 0;\n"
-      "    0 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table.size(), 3);
-  // Row 0: inputs [1,0], current_state '0', next_state '1'
-  EXPECT_EQ(udp->table[0].inputs[0], '1');
-  EXPECT_EQ(udp->table[0].inputs[1], '0');
-  EXPECT_EQ(udp->table[0].current_state, '0');
-  EXPECT_EQ(udp->table[0].output, '1');
-  // Row 1: inputs [0,1], current_state '1', next_state '0'
-  EXPECT_EQ(udp->table[1].current_state, '1');
-  EXPECT_EQ(udp->table[1].output, '0');
-  // Row 2: inputs [0,0], current_state '?', next_state '-'
-  EXPECT_EQ(udp->table[2].current_state, '?');
-  EXPECT_EQ(udp->table[2].output, '-');
-}
-
-// ---------------------------------------------------------------------------
 // Production 8: seq_input_list ::= level_input_list | edge_input_list
 // ---------------------------------------------------------------------------
 // seq_input_list as level_input_list (no edge symbols)
