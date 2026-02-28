@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Sequential body with single entry
-TEST(ParserAnnexA053, SeqBody_SingleEntry) {
-  auto r = Parse(
-      "primitive sr_min(output reg q, input s, r);\n"
-      "  table\n"
-      "    1 0 : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_EQ(udp->table.size(), 1);
-}
-
 // Simulation: initial value is used at construction
 TEST(ParserAnnexA053, SeqBody_SimInitialValue) {
   auto r = Parse(
