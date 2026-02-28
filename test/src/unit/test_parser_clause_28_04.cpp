@@ -147,4 +147,15 @@ TEST(ParserA301, NInputGateInst_TwoInputs) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA301, NInputGateInst_FourInputs) {
+  auto r = Parse(
+      "module m;\n"
+      "  nand n1(out, a, b, c, d);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNand);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 5u);
+}
+
 }  // namespace
