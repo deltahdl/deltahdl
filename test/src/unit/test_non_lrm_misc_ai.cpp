@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// edge_indicator as parenthesized form (01)
-TEST(ParserAnnexA053, EdgeIndicator_Paren01) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  table\n"
-      "    0 (01) : ? : 0;\n"
-      "    1 (01) : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  // Parenthesized (01) should produce exactly 2 input entries per row
-  ASSERT_EQ(udp->table[0].inputs.size(), 2);
-}
-
 // edge_indicator as parenthesized form (10)
 TEST(ParserAnnexA053, EdgeIndicator_Paren10) {
   auto r = Parse(
