@@ -121,4 +121,12 @@ TEST(ParserA303, InputTerminal_SimpleIdent) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA303, InputTerminal_ComplexExpr) {
+  // input_terminal accepts any expression
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  or (out, a & b, c | d);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

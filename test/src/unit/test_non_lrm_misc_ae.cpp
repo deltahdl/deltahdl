@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, InputTerminal_ComplexExpr) {
-  // input_terminal accepts any expression
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  or (out, a & b, c | d);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, InputTerminal_TernaryExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
