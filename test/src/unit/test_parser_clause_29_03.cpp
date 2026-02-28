@@ -48,4 +48,45 @@ TEST(ParserAnnexA051, WildcardPortSequential) {
   ASSERT_EQ(udp->input_names.size(), 2u);
 }
 
+static std::vector<ModuleItem*> FindUdpInsts(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> insts;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
+  }
+  return insts;
+}
+
+static std::vector<ModuleItem*> FindContAssigns(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
+  }
+  return result;
+}
+
+static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
+                                          ModuleItemKind kind) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == kind) result.push_back(item);
+  }
+  return result;
+}
+
+// --- Extern UDP declaration used for instantiation ---
+TEST(ParserA504, UdpInst_ExternUdp) {
+  auto r = Parse(
+      "extern primitive my_udp(output y, input a, input b);\n"
+      "module m;\n"
+      "  my_udp u1(out, in1, in2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto insts = FindUdpInsts(r.cu->modules[0]->items);
+  ASSERT_EQ(insts.size(), 1u);
+  EXPECT_EQ(insts[0]->inst_module, "my_udp");
+}
+
 }  // namespace
