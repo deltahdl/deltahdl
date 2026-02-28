@@ -25,16 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-TEST(ParserAnnexA0411, NamedPortConnections) {
-  auto r = Parse("module m; sub u0(.clk(clk), .data(d)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_ports.size(), 2u);
-  EXPECT_EQ(item->inst_ports[0].first, "clk");
-  EXPECT_EQ(item->inst_ports[1].first, "data");
-}
-
 TEST(ParserAnnexA0411, NamedPortEmptyExpression) {
   // . port_identifier ( ) — unconnected named port
   auto r = Parse("module m; sub u0(.clk(clk), .nc()); endmodule\n");

@@ -71,4 +71,14 @@ TEST(ParserAnnexA0411, EmptyPortList) {
   EXPECT_EQ(item->inst_ports.size(), 0u);
 }
 
+TEST(ParserAnnexA0411, NamedPortConnections) {
+  auto r = Parse("module m; sub u0(.clk(clk), .data(d)); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->inst_ports.size(), 2u);
+  EXPECT_EQ(item->inst_ports[0].first, "clk");
+  EXPECT_EQ(item->inst_ports[1].first, "data");
+}
+
 }  // namespace
