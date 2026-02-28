@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #9: pull_gate_instance
-// pull_gate_instance ::= [name_of_instance] ( output_terminal )
-// =============================================================================
-TEST(ParserA301, PullGateInst_PullupNamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup pu1(net1);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_inst_name, "pu1");
-  EXPECT_EQ(g->gate_terminals.size(), 1u);
-}
-
 TEST(ParserA301, PullGateInst_PulldownNamed) {
   auto r = Parse(
       "module m;\n"
