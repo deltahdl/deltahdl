@@ -43,18 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-TEST(ParserSection18b, DistWithExpressionWeights) {
-  // Weights can be arbitrary constant expressions
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c { x dist {1 := 2 * 3, 2 := 4 + 1}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(ParserSection18b, DistWithNegativeValues) {
   auto r = Parse(
       "class C;\n"

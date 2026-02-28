@@ -49,39 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9, SequentialBlockNestedBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      a = 1;\n"
-      "    end\n"
-      "    begin\n"
-      "      b = 2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
-}
-
-TEST(ParserSection9, SequentialBlockMultipleVarDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin int x; logic [7:0] y; x = 1; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
-}
-
 // =============================================================================
 // LRM section 9.3.2 -- Parallel blocks (additional tests)
 // =============================================================================

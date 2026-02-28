@@ -612,4 +612,17 @@ TEST(ParserSection9, Sec9_2_2_LocalVarDecl) {
   EXPECT_EQ(item->body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
+TEST(ParserSection9, SequentialBlockMultipleVarDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin int x; logic [7:0] y; x = 1; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
+}
+
 }  // namespace
