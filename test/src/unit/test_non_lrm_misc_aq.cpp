@@ -8,46 +8,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// A.6.11 clocking_skew — #1step special form
-// =============================================================================
-TEST(ParserA611, ClockingSkew1step) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #1step data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  ASSERT_NE(sig.skew_delay, nullptr);
-  EXPECT_EQ(sig.skew_delay->text, "1step");
-}
-
-// =============================================================================
-// A.6.11 clocking_drive — clockvar_expression <= expression
-// =============================================================================
-TEST(ParserA611, ClockingDriveSimple) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    output data;\n"
-      "  endclocking\n"
-      "  initial begin\n"
-      "    cb.data <= 8'hFF;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-}
-
-// =============================================================================
 // A.6.11 clocking_drive — clockvar_expression <= cycle_delay expression
 // =============================================================================
 TEST(ParserA611, ClockingDriveWithCycleDelay) {

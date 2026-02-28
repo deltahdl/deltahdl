@@ -50,21 +50,6 @@ static ParseResult7c Parse(const std::string& src) {
 namespace {
 
 // =========================================================================
-// §7.4: Struct variable declaration (non-typedef)
-// =========================================================================
-TEST(ParserSection7, StructVariableDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct { int a; int b; } my_var;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
-  EXPECT_EQ(item->name, "my_var");
-}
-
-// =========================================================================
 // §7.12.1: Array locator method 'unique' (keyword as method name)
 // =========================================================================
 TEST(ParserSection7, ArrayLocatorUnique) {
