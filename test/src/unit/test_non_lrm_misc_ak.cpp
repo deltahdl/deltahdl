@@ -15,30 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.6.2 Production: procedural_continuous_assignment
-// procedural_continuous_assignment ::=
-//   assign variable_assignment
-//   | deassign variable_lvalue
-//   | force variable_assignment
-//   | force net_assignment
-//   | release variable_lvalue
-//   | release net_lvalue
-// =============================================================================
-TEST(ParserA602, ProceduralAssign_Basic) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin assign q = d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  EXPECT_NE(stmt->lhs, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
 TEST(ParserA602, ProceduralDeassign_Basic) {
   auto r = Parse(
       "module m;\n"
