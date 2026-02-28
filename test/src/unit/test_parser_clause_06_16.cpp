@@ -37,4 +37,41 @@ TEST(ParserA221, DataTypeString) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kString);
 }
 
+struct ParseResult6f {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6f Parse(const std::string& src) {
+  ParseResult6f result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =========================================================================
+// §6.16: String in block scope
+// =========================================================================
+TEST(ParserSection6, StringBlockDecl) {
+  // §6.16: string declared inside an initial block.
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    string msg;\n"
+      "    msg = \"test\";\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
+}
+
 }  // namespace

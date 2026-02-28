@@ -301,4 +301,17 @@ TEST(ParserSection10, OperatorAssignPercentEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
+TEST(ParserSection10, OperatorAssignAmpEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a &= 8'hFF;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace

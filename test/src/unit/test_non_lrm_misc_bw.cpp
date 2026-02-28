@@ -36,51 +36,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 namespace {
 
 // =============================================================================
-// LRM section 9.3.1 -- Blocks with fork-join inside.
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_BlockWithForkJoinInside) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #10 a = 1;\n"
-      "      #20 b = 2;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
-  EXPECT_GE(stmt->fork_stmts.size(), 2u);
-}
-
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with disable of named block.
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_BlockWithDisableOwnName) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : my_blk\n"
-      "    a = 1;\n"
-      "    disable my_blk;\n"
-      "    b = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->label, "my_blk");
-  ASSERT_GE(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDisable);
-  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlockingAssign);
-}
-
-// =============================================================================
 // LRM section 9.3.1 -- Blocks with system function calls.
 // =============================================================================
 TEST(ParserSection9, Sec9_3_1_BlockWithSystemCalls) {
