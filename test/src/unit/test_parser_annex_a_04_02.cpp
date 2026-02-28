@@ -35,4 +35,21 @@ TEST(ParserAnnexA042, GenvarIterationCompoundAssign) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
+// --- case_generate_item: default ---
+TEST(ParserAnnexA042, CaseGenerateWithDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (WIDTH)\n"
+      "    8: assign out = in8;\n"
+      "    default: assign out = in_def;\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* gen = r.cu->modules[0]->items[0];
+  ASSERT_EQ(gen->gen_case_items.size(), 2u);
+  EXPECT_FALSE(gen->gen_case_items[0].is_default);
+  EXPECT_TRUE(gen->gen_case_items[1].is_default);
+}
+
 }  // namespace
