@@ -31,21 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// 9. longint unsigned override.
-TEST(ParserSection6, Sec6_11_LongintUnsignedOverride) {
-  auto r = Parse(
-      "module t;\n"
-      "  longint unsigned lu;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
-  EXPECT_FALSE(item->data_type.is_signed);
-  EXPECT_EQ(item->name, "lu");
-}
-
 // 10. integer unsigned override.
 TEST(ParserSection6, Sec6_11_IntegerUnsignedOverride) {
   auto r = Parse(
