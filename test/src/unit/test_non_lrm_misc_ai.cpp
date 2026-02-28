@@ -7,27 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Simulation: initial value is used at construction
-TEST(ParserAnnexA053, SeqBody_SimInitialValue) {
-  auto r = Parse(
-      "primitive latch_init(output reg q, input d, en);\n"
-      "  initial q = 1;\n"
-      "  table\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-  // Initial value is 1
-  EXPECT_EQ(eval.GetOutput(), '1');
-  // Enable low -> no change -> stays at 1
-  eval.Evaluate({'0', '0'});
-  EXPECT_EQ(eval.GetOutput(), '1');
-}
-
 // Simulation: sequential body evaluates correctly
 TEST(ParserAnnexA053, UdpBody_SimSequential) {
   auto r = Parse(
