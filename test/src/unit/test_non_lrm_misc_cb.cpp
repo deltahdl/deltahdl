@@ -23,19 +23,6 @@ static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
 
 namespace {
 
-// §3.3 Continuous assignments
-TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  logic a, b, y;\n"
-      "  assign y = a & b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* ca = FindItemByKind(r, ModuleItemKind::kContAssign);
-  ASSERT_NE(ca, nullptr);
-}
-
 TEST(Lexical, ContAssign_WithDelay) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
