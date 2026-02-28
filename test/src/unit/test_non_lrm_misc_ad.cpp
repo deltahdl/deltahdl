@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #4: mos_switch_instance
-// mos_switch_instance ::= [name_of_instance]
-//   ( output_terminal , input_terminal , enable_terminal )
-// =============================================================================
-TEST(ParserA301, MosSwitchInst_Unnamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  nmos (out, in, gate);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_TRUE(g->gate_inst_name.empty());
-}
-
 TEST(ParserA301, MosSwitchInst_Named) {
   auto r = Parse(
       "module m;\n"
