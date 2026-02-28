@@ -81,4 +81,11 @@ TEST(ParserA212, LetPortItem_BitType) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetPortItem_RegType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(reg [3:0] r) = r;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
