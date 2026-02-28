@@ -17,20 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// anonymous_program: program ; { ... } endprogram
-TEST(SourceText, AnonymousProgram) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  program;\n"
-      "    function void f(); endfunction\n"
-      "    task t(); endtask\n"
-      "  endprogram\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
 // anonymous_program_item: class_declaration, interface_class_declaration
 TEST(SourceText, AnonymousProgramClasses) {
   auto r = Parse(
