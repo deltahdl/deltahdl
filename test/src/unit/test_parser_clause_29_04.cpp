@@ -277,4 +277,106 @@ TEST(ParserAnnexA053, CombEntry_Structure) {
   EXPECT_EQ(udp->table[1].output, '1');
 }
 
+static void VerifyUdpRowInputs(const UdpTableRow& row,
+                               const std::string& expected) {
+  ASSERT_EQ(row.inputs.size(), expected.size());
+  for (size_t j = 0; j < expected.size(); ++j) {
+    EXPECT_EQ(row.inputs[j], expected[j]);
+  }
+}
+
+struct CombUdpRow {
+  std::string inputs;
+  char output;
+};
+
+static void VerifyCombUdpTable(const UdpDecl* udp, const CombUdpRow expected[],
+                               size_t count) {
+  ASSERT_EQ(udp->table.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    VerifyUdpRowInputs(udp->table[i], expected[i].inputs);
+    EXPECT_EQ(udp->table[i].output, expected[i].output);
+  }
+}
+
+static void VerifyUdpInputNames(const UdpDecl* udp,
+                                const std::string expected[], size_t count) {
+  ASSERT_EQ(udp->input_names.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(udp->input_names[i], expected[i]);
+  }
+}
+
+using SpecifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Parser test fixture
+// =============================================================================
+struct SpecifyTest : ::testing::Test {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
+    source_ = src;
+    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
+    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
+    return parser_->Parse();
+  }
+
+  // Helper: get first specify block from first module.
+  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
+    for (auto* item : cu->modules[0]->items) {
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+    }
+    return nullptr;
+  }
+
+  SourceManager mgr_;
+  Arena arena_;
+  DiagEngine diag_{mgr_};
+  std::string source_;
+  std::unique_ptr<Lexer> lexer_;
+  std::unique_ptr<Parser> parser_;
+};
+
+struct ParseResult30 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult30 Parse(const std::string& src) {
+  ParseResult30 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection29, CombinationalUdp) {
+  auto r = Parse(
+      "primitive mux(output out, input a, b, sel);\n"
+      "  table\n"
+      "    0 ? 0 : 0;\n"
+      "    1 ? 0 : 1;\n"
+      "    ? 0 1 : 0;\n"
+      "    ? 1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 1);
+  auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->name, "mux");
+  EXPECT_EQ(udp->output_name, "out");
+  EXPECT_FALSE(udp->is_sequential);
+  std::string expected_inputs[] = {"a", "b", "sel"};
+  VerifyUdpInputNames(udp, expected_inputs, std::size(expected_inputs));
+  CombUdpRow expected_rows[] = {
+      {"0?0", '0'}, {"1?0", '1'}, {"?01", '0'}, {"?11", '1'}};
+  VerifyCombUdpTable(udp, expected_rows, std::size(expected_rows));
+  EXPECT_EQ(udp->table[0].current_state, 0);
+}
+
 }  // namespace

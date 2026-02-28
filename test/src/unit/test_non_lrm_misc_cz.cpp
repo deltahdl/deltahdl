@@ -6,24 +6,6 @@
 
 using namespace delta;
 
-namespace {
-
-// delay2: two values on n_input gate (rise, fall).
-TEST(ParserA223, Delay2NInputGateTwoValues) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  or #(3, 5) g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->int_val, 3u);
-  ASSERT_NE(item->gate_delay_fall, nullptr);
-  EXPECT_EQ(item->gate_delay_fall->int_val, 5u);
-}
-
 static void VerifyUdpRowInputs(const UdpTableRow& row,
                                const std::string& expected) {
   ASSERT_EQ(row.inputs.size(), expected.size());
@@ -32,51 +14,146 @@ static void VerifyUdpRowInputs(const UdpTableRow& row,
   }
 }
 
-struct CombUdpRow {
+struct SeqUdpRow {
   std::string inputs;
+  char state;
   char output;
 };
 
-static void VerifyCombUdpTable(const UdpDecl* udp, const CombUdpRow expected[],
-                               size_t count) {
+static void VerifySeqUdpTable(const UdpDecl* udp, const SeqUdpRow expected[],
+                              size_t count) {
   ASSERT_EQ(udp->table.size(), count);
   for (size_t i = 0; i < count; ++i) {
     VerifyUdpRowInputs(udp->table[i], expected[i].inputs);
+    EXPECT_EQ(udp->table[i].current_state, expected[i].state);
     EXPECT_EQ(udp->table[i].output, expected[i].output);
   }
 }
 
-static void VerifyUdpInputNames(const UdpDecl* udp,
-                                const std::string expected[], size_t count) {
-  ASSERT_EQ(udp->input_names.size(), count);
+static bool FindModuleInst(const std::vector<ModuleItem*>& items,
+                           std::string_view module_name,
+                           std::string_view expected_inst_name) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kModuleInst &&
+        item->inst_module == module_name) {
+      EXPECT_EQ(item->inst_name, expected_inst_name);
+      return true;
+    }
+  }
+  return false;
+}
+
+struct UdpSpotCheck {
+  size_t row;
+  char input0;
+  char output;
+};
+
+static void VerifyUdpTableSpotChecks(const UdpDecl* udp,
+                                     const UdpSpotCheck checks[],
+                                     size_t count) {
   for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(udp->input_names[i], expected[i]);
+    EXPECT_EQ(udp->table[checks[i].row].inputs[0], checks[i].input0);
+    EXPECT_EQ(udp->table[checks[i].row].output, checks[i].output);
   }
 }
 
-TEST(ParserSection29, CombinationalUdp) {
-  auto r = Parse(
-      "primitive mux(output out, input a, b, sel);\n"
-      "  table\n"
-      "    0 ? 0 : 0;\n"
-      "    1 ? 0 : 1;\n"
-      "    ? 0 1 : 0;\n"
-      "    ? 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->udps.size(), 1);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->name, "mux");
-  EXPECT_EQ(udp->output_name, "out");
-  EXPECT_FALSE(udp->is_sequential);
-  std::string expected_inputs[] = {"a", "b", "sel"};
-  VerifyUdpInputNames(udp, expected_inputs, std::size(expected_inputs));
-  CombUdpRow expected_rows[] = {
-      {"0?0", '0'}, {"1?0", '1'}, {"?01", '0'}, {"?11", '1'}};
-  VerifyCombUdpTable(udp, expected_rows, std::size(expected_rows));
-  EXPECT_EQ(udp->table[0].current_state, 0);
+using SpecifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Parser test fixture
+// =============================================================================
+struct SpecifyTest : ::testing::Test {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
+    source_ = src;
+    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
+    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
+    return parser_->Parse();
+  }
+
+  // Helper: get first specify block from first module.
+  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
+    for (auto* item : cu->modules[0]->items) {
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+    }
+    return nullptr;
+  }
+
+  SourceManager mgr_;
+  Arena arena_;
+  DiagEngine diag_{mgr_};
+  std::string source_;
+  std::unique_ptr<Lexer> lexer_;
+  std::unique_ptr<Parser> parser_;
+};
+
+struct ParseResult30 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult30 Parse(const std::string& src) {
+  ParseResult30 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
 }
+
+static ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+  }
+  return nullptr;
+}
+
+static SpecifyItem* GetSoleSpecifyItem(ModuleItem* spec_block) {
+  EXPECT_EQ(spec_block->specify_items.size(), 1u);
+  if (spec_block->specify_items.empty()) return nullptr;
+  return spec_block->specify_items[0];
+}
+
+struct SpecifyParseResult {
+  ParseResult30 pr;
+  ModuleItem* spec_block = nullptr;
+  SpecifyItem* sole_item = nullptr;
+};
+
+static SpecifyParseResult ParseSpecifySingle(const std::string& src) {
+  SpecifyParseResult result;
+  result.pr = Parse(src);
+  if (result.pr.cu == nullptr) return result;
+  result.spec_block = FindSpecifyBlock(result.pr.cu->modules[0]->items);
+  if (result.spec_block != nullptr) {
+    result.sole_item = GetSoleSpecifyItem(result.spec_block);
+  }
+  return result;
+}
+
+static bool HasFullPathDecl(ModuleItem* spec_block) {
+  for (auto* si : spec_block->specify_items) {
+    if (si->kind == SpecifyItemKind::kPathDecl &&
+        si->path.path_kind == SpecifyPathKind::kFull) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
+  for (auto* si : spec_block->specify_items) {
+    if (si->kind == kind) return true;
+  }
+  return false;
+}
+
+namespace {
 
 TEST(ParserSection29, UdpTableSpecialChars) {
   auto r = Parse(
@@ -116,22 +193,6 @@ TEST(SourceText, DescriptionUdp) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
   EXPECT_EQ(r.cu->udps[0]->name, "my_udp");
-}
-
-struct ParseResult29 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult29 Parse(const std::string& src) {
-  ParseResult29 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
 }
 
 // =============================================================================
@@ -325,22 +386,6 @@ TEST(ParserSection29, SequentialCurrentStateField) {
   EXPECT_EQ(udp->table[3].output, '-');
 }
 
-struct SeqUdpRow {
-  std::string inputs;
-  char state;
-  char output;
-};
-
-static void VerifySeqUdpTable(const UdpDecl* udp, const SeqUdpRow expected[],
-                              size_t count) {
-  ASSERT_EQ(udp->table.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    VerifyUdpRowInputs(udp->table[i], expected[i].inputs);
-    EXPECT_EQ(udp->table[i].current_state, expected[i].state);
-    EXPECT_EQ(udp->table[i].output, expected[i].output);
-  }
-}
-
 TEST(ParserSection29, SequentialUdp) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -467,19 +512,6 @@ TEST(ParserSection29, SequentialUdpInitial) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-static bool FindModuleInst(const std::vector<ModuleItem*>& items,
-                           std::string_view module_name,
-                           std::string_view expected_inst_name) {
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kModuleInst &&
-        item->inst_module == module_name) {
-      EXPECT_EQ(item->inst_name, expected_inst_name);
-      return true;
-    }
-  }
-  return false;
-}
-
 TEST(ParserSection29, UdpInstance) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -496,21 +528,6 @@ TEST(ParserSection29, UdpInstance) {
   ASSERT_EQ(r.cu->udps.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);
   EXPECT_TRUE(FindModuleInst(r.cu->modules[0]->items, "inv", "u1"));
-}
-
-struct UdpSpotCheck {
-  size_t row;
-  char input0;
-  char output;
-};
-
-static void VerifyUdpTableSpotChecks(const UdpDecl* udp,
-                                     const UdpSpotCheck checks[],
-                                     size_t count) {
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(udp->table[checks[i].row].inputs[0], checks[i].input0);
-    EXPECT_EQ(udp->table[checks[i].row].output, checks[i].output);
-  }
 }
 
 TEST(ParserSection29, MixedLevelEdgeSensitive) {
@@ -536,8 +553,6 @@ TEST(ParserSection29, MixedLevelEdgeSensitive) {
   };
   VerifyUdpTableSpotChecks(udp, checks, std::size(checks));
 }
-
-using SpecifyParseTest = ProgramTestParse;
 
 TEST_F(SpecifyParseTest, SpecparamDeclaration) {
   auto* unit = Parse("module m; specparam tRISE = 10; endmodule");
@@ -599,34 +614,6 @@ TEST_F(SpecifyParseTest, SpecifyBlockCoexistsWithOtherItems) {
 }
 
 // =============================================================================
-// Parser test fixture
-// =============================================================================
-struct SpecifyTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
-    source_ = src;
-    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
-    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
-    return parser_->Parse();
-  }
-
-  // Helper: get first specify block from first module.
-  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
-    for (auto* item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
-    }
-    return nullptr;
-  }
-
-  SourceManager mgr_;
-  Arena arena_;
-  DiagEngine diag_{mgr_};
-  std::string source_;
-  std::unique_ptr<Lexer> lexer_;
-  std::unique_ptr<Parser> parser_;
-};
-
-// =============================================================================
 // §30.2 Specparam declarations (inside specify)
 // =============================================================================
 TEST_F(SpecifyTest, SpecparamInsideSpecify) {
@@ -678,71 +665,6 @@ TEST(ParserClause03, Cl3_3_SpecifyBlock) {
               "    (a => y) = 1.5;\n"
               "  endspecify\n"
               "endmodule\n"));
-}
-
-struct ParseResult30 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult30 Parse(const std::string& src) {
-  ParseResult30 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
-  }
-  return nullptr;
-}
-
-static SpecifyItem* GetSoleSpecifyItem(ModuleItem* spec_block) {
-  EXPECT_EQ(spec_block->specify_items.size(), 1u);
-  if (spec_block->specify_items.empty()) return nullptr;
-  return spec_block->specify_items[0];
-}
-
-struct SpecifyParseResult {
-  ParseResult30 pr;
-  ModuleItem* spec_block = nullptr;
-  SpecifyItem* sole_item = nullptr;
-};
-
-static SpecifyParseResult ParseSpecifySingle(const std::string& src) {
-  SpecifyParseResult result;
-  result.pr = Parse(src);
-  if (result.pr.cu == nullptr) return result;
-  result.spec_block = FindSpecifyBlock(result.pr.cu->modules[0]->items);
-  if (result.spec_block != nullptr) {
-    result.sole_item = GetSoleSpecifyItem(result.spec_block);
-  }
-  return result;
-}
-
-static bool HasFullPathDecl(ModuleItem* spec_block) {
-  for (auto* si : spec_block->specify_items) {
-    if (si->kind == SpecifyItemKind::kPathDecl &&
-        si->path.path_kind == SpecifyPathKind::kFull) {
-      return true;
-    }
-  }
-  return false;
-}
-
-static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
-  for (auto* si : spec_block->specify_items) {
-    if (si->kind == kind) return true;
-  }
-  return false;
 }
 
 TEST(ParserSection28, SpecifyBlockSimplePath) {
