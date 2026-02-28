@@ -20,13 +20,6 @@ TEST(ParserSection21, FeofFerror) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, DumpfileDefaultName) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $dumpfile;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, DumpvarsNoArgs) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

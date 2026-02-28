@@ -17,4 +17,11 @@ TEST(ParserSection21, DumpfileBasic) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, DumpfileDefaultName) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $dumpfile;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
