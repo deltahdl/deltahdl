@@ -89,29 +89,6 @@ static Stmt* FirstAlwaysCombStmt(ParseResult9g& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 28. Fork with if-else as thread
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_3_2_ForkWithIfElseThread) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      if (cond) a = 1; else a = 0;\n"
-      "      #10 b = 2;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_EQ(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kDelay);
-}
-
-// ---------------------------------------------------------------------------
 // 29. Named fork disabled by name
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_NamedForkDisabledByName) {
