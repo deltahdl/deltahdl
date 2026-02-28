@@ -303,4 +303,14 @@ TEST(ParserA84, PrimaryLiteralBinaryNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
+// § primary_literal — unbased_unsized_literal
+TEST(ParserA84, PrimaryLiteralUnbasedUnsized) {
+  auto r = Parse("module m; initial x = '0; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
+}
+
 }  // namespace

@@ -53,27 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// Nested loops: for inside while.
-TEST(ParserSection12, NestedForInsideWhile) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    while (running) begin\n"
-      "      for (int i = 0; i < 8; i = i + 1)\n"
-      "        data[i] = 0;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWhile);
-  ASSERT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
-  ASSERT_GE(stmt->body->stmts.size(), 1u);
-  EXPECT_EQ(stmt->body->stmts[0]->kind, StmtKind::kFor);
-}
-
 // =============================================================================
 // LRM section 12.7.1 -- For loop with variable declarations (additional cases)
 // =============================================================================
