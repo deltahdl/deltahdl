@@ -45,28 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// LRM section 13.5.2 -- Pass by reference (additional tests)
-// =============================================================================
-// Automatic function with ref arg (LRM: ref requires automatic lifetime).
-TEST(ParserSection13, AutomaticFunctionWithRef) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int crc(ref byte packet[]);\n"
-      "    crc = 0;\n"
-      "    for (int j = 0; j < 10; j++) begin\n"
-      "      crc ^= packet[j];\n"
-      "    end\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "crc");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_automatic);
-  ASSERT_EQ(fn->func_args.size(), 1u);
-  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
-}
-
-// =============================================================================
 // LRM section 13.5.3 -- Default argument values (additional tests)
 // =============================================================================
 // Mix of default and non-default args (non-default first, default last).

@@ -127,4 +127,43 @@ TEST(ParserA27, TfPortDirectionRefStatic) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
+// --- Test helpers ---
+struct ParseResult14 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult14 Parse(const std::string& src) {
+  ParseResult14 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// LRM section 13.5.2 -- Pass by reference (additional tests)
+// =============================================================================
+// Automatic function with ref arg (LRM: ref requires automatic lifetime).
+TEST(ParserSection13, AutomaticFunctionWithRef) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int crc(ref byte packet[]);\n"
+      "    crc = 0;\n"
+      "    for (int j = 0; j < 10; j++) begin\n"
+      "      crc ^= packet[j];\n"
+      "    end\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "crc");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_TRUE(fn->is_automatic);
+  ASSERT_EQ(fn->func_args.size(), 1u);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
+}
+
 }  // namespace
