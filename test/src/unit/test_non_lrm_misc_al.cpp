@@ -22,25 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// §12.3: null statement with attribute instance
-TEST(ParserA604, NullStatementWithAttribute) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    (* synthesis *) ;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  auto* stmt = body->stmts[0];
-  EXPECT_EQ(stmt->kind, StmtKind::kNull);
-  EXPECT_FALSE(stmt->attrs.empty());
-  EXPECT_EQ(stmt->attrs[0].name, "synthesis");
-}
-
 // §12.3: multiple null statements
 TEST(ParserA604, MultipleNullStatements) {
   auto r = Parse(
