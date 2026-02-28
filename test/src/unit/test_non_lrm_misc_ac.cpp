@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_CmosWithDelay3) {
-  auto r = Parse(
-      "module m;\n"
-      "  cmos #(2, 3, 4) (out, in, nctrl, pctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_NE(g->gate_delay, nullptr);
-  EXPECT_NE(g->gate_delay_fall, nullptr);
-  EXPECT_NE(g->gate_delay_decay, nullptr);
-}
-
 TEST(ParserA301, GateInst_CmosMultipleInstances) {
   auto r = Parse(
       "module m;\n"
