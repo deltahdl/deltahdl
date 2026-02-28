@@ -5,61 +5,6 @@
 
 using namespace delta;
 
-namespace {
-
-// --- Additional all-operator coverage ---
-TEST(ParserSection11, Sec11_1_AllBinaryOperatorsParse) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    x = a + b;\n"
-              "    x = a - b;\n"
-              "    x = a * b;\n"
-              "    x = a / b;\n"
-              "    x = a % b;\n"
-              "    x = a ** b;\n"
-              "    x = a == b;\n"
-              "    x = a != b;\n"
-              "    x = a === b;\n"
-              "    x = a !== b;\n"
-              "    x = a < b;\n"
-              "    x = a <= b;\n"
-              "    x = a > b;\n"
-              "    x = a >= b;\n"
-              "    x = a && b;\n"
-              "    x = a || b;\n"
-              "    x = a & b;\n"
-              "    x = a | b;\n"
-              "    x = a ^ b;\n"
-              "    x = a ~^ b;\n"
-              "    x = a ^~ b;\n"
-              "    x = a << b;\n"
-              "    x = a >> b;\n"
-              "    x = a <<< b;\n"
-              "    x = a >>> b;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection11, Sec11_1_AllUnaryOperatorsParse) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    x = +a;\n"
-              "    x = -a;\n"
-              "    x = ~a;\n"
-              "    x = !a;\n"
-              "    x = &a;\n"
-              "    x = |a;\n"
-              "    x = ^a;\n"
-              "    x = ~&a;\n"
-              "    x = ~|a;\n"
-              "    x = ~^a;\n"
-              "    x = ^~a;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 struct ParseResult11f {
   SourceManager mgr;
   Arena arena;
@@ -67,8 +12,21 @@ struct ParseResult11f {
   bool has_errors = false;
 };
 
-static ParseResult11f Parse(const std::string& src) {
-  ParseResult11f result;
+static Expr* FirstAssignLhs(ParseResult11f& r) {
+  auto* stmt = FirstInitialStmt(r);
+  if (!stmt) return nullptr;
+  return stmt->lhs;
+}
+
+struct ParseResult11g {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11g Parse(const std::string& src) {
+  ParseResult11g result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
   Lexer lexer(result.mgr.FileContent(fid), fid, diag);
@@ -78,7 +36,7 @@ static ParseResult11f Parse(const std::string& src) {
   return result;
 }
 
-static Stmt* FirstInitialStmt(ParseResult11f& r) {
+static Stmt* FirstInitialStmt(ParseResult11g& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kInitialBlock) continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
@@ -89,31 +47,27 @@ static Stmt* FirstInitialStmt(ParseResult11f& r) {
   return nullptr;
 }
 
-static Expr* FirstAssignRhs(ParseResult11f& r) {
+static Expr* FirstAssignRhs(ParseResult11g& r) {
   auto* stmt = FirstInitialStmt(r);
   if (!stmt) return nullptr;
   return stmt->rhs;
 }
 
-static Expr* FirstAssignLhs(ParseResult11f& r) {
-  auto* stmt = FirstInitialStmt(r);
-  if (!stmt) return nullptr;
-  return stmt->lhs;
-}
-
-static ModuleItem* FirstContAssign(ParseResult11f& r) {
+static ModuleItem* FirstContAssign(ParseResult11g& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kContAssign) return item;
   }
   return nullptr;
 }
 
-static ModuleItem* FirstAlwaysCombItem(ParseResult11f& r) {
+static ModuleItem* FirstAlwaysCombItem(ParseResult11g& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAlwaysCombBlock) return item;
   }
   return nullptr;
 }
+
+namespace {
 
 // =========================================================================
 // LRM section 11.4.1 -- Vector bit-select and part-select addressing
@@ -644,69 +598,6 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectParamWidth) {
               "  logic [31:0] vec;\n"
               "  initial x = vec[0 +: W];\n"
               "endmodule\n"));
-}
-
-struct ParseResult11g {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult11g Parse(const std::string& src) {
-  ParseResult11g result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult11g& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
-static Expr* FirstAssignRhs(ParseResult11g& r) {
-  auto* stmt = FirstInitialStmt(r);
-  if (!stmt) return nullptr;
-  return stmt->rhs;
-}
-
-static ModuleItem* FirstContAssign(ParseResult11g& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) return item;
-  }
-  return nullptr;
-}
-
-static ModuleItem* FirstAlwaysCombItem(ParseResult11g& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysCombBlock) return item;
-  }
-  return nullptr;
-}
-
-static ModuleItem* FirstModuleInst(ParseResult11g& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kModuleInst) return item;
-  }
-  return nullptr;
-}
-
-static ModuleItem* FirstGenerateIf(ParseResult11g& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateIf) return item;
-  }
-  return nullptr;
 }
 
 // =========================================================================

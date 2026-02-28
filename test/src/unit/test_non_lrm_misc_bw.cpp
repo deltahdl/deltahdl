@@ -35,28 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with nonblocking assignments.
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_BlockWithNonblockingAssigns) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= 1;\n"
-      "    b <= 2;\n"
-      "    c <= 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->stmts.size(), 3u);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(body->stmts[i]->kind, StmtKind::kNonblockingAssign);
-  }
-}
-
 TEST(ParserSection9, Sec9_3_1_BlockWithMixedBlockingNonblocking) {
   auto r = Parse(
       "module m;\n"

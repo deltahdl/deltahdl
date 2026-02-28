@@ -41,4 +41,23 @@ TEST(ParserSection11, Sec11_1_AllBinaryOperatorsParse) {
               "endmodule\n"));
 }
 
+TEST(ParserSection11, Sec11_1_AllUnaryOperatorsParse) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    x = +a;\n"
+              "    x = -a;\n"
+              "    x = ~a;\n"
+              "    x = !a;\n"
+              "    x = &a;\n"
+              "    x = |a;\n"
+              "    x = ^a;\n"
+              "    x = ~&a;\n"
+              "    x = ~|a;\n"
+              "    x = ~^a;\n"
+              "    x = ^~a;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

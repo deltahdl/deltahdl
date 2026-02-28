@@ -212,4 +212,44 @@ TEST(ParserSection10, Sec10_4_2_IfElseMuxPattern) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNonblockingAssign);
 }
 
+struct ParseResult9e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9e Parse(const std::string& src) {
+  ParseResult9e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 9.3.1 -- Blocks with nonblocking assignments.
+// =============================================================================
+TEST(ParserSection9, Sec9_3_1_BlockWithNonblockingAssigns) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= 1;\n"
+      "    b <= 2;\n"
+      "    c <= 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 3u);
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(body->stmts[i]->kind, StmtKind::kNonblockingAssign);
+  }
+}
+
 }  // namespace
