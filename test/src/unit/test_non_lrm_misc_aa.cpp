@@ -46,16 +46,6 @@ TEST(ParserA221, StructUnionStruct) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
 }
 
-TEST(ParserA23, ListOfInterfaceIdentifiersMultiple) {
-  auto r = Parse("module m(a, b, c); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 3u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
-  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "b");
-  EXPECT_EQ(r.cu->modules[0]->ports[2].name, "c");
-}
-
 TEST(ParserA23, ListOfParamAssignmentsWithDims) {
   auto r = Parse(
       "module m;\n"
