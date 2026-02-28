@@ -264,4 +264,12 @@ TEST(ParserA303, OutputTerminal_PullGateBitSelect) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, OutputTerminal_EnableGate) {
+  // output_terminal as first terminal of enable gate
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  bufif0 (out[7:0], in, en);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, OutputTerminal_EnableGate) {
-  // output_terminal as first terminal of enable gate
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  bufif0 (out[7:0], in, en);\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // A.3.3 Production #6: pcontrol_terminal ::= expression
 // Exercised via cmos switches (cmos/rcmos).
