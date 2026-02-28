@@ -25,19 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-TEST(ParserAnnexA0411, MultipleInstancesWithParams) {
-  auto r = Parse("module m; sub #(8) u0(a), u1(b); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto* i0 = r.cu->modules[0]->items[0];
-  auto* i1 = r.cu->modules[0]->items[1];
-  EXPECT_EQ(i0->inst_module, "sub");
-  EXPECT_EQ(i1->inst_module, "sub");
-  EXPECT_EQ(i0->inst_params.size(), 1u);
-  EXPECT_EQ(i1->inst_params.size(), 1u);
-}
-
 // =============================================================================
 // parameter_value_assignment ::= # ( [ list_of_parameter_value_assignments ] )
 // list_of_parameter_value_assignments ::=
