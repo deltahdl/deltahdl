@@ -82,4 +82,48 @@ TEST(ParserA26, FuncLifetimeDefault) {
   EXPECT_FALSE(item->is_static);
 }
 
+struct ParseResult4e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4e Parse(const std::string& src) {
+  ParseResult4e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// 18. Recursive automatic function with base case (Fibonacci)
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_RecursiveAutoFuncFibonacci) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int fibonacci(int n);\n"
+      "    if (n == 0)\n"
+      "      return 0;\n"
+      "    else if (n == 1)\n"
+      "      return 1;\n"
+      "    else\n"
+      "      return fibonacci(n - 1) + fibonacci(n - 2);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  EXPECT_EQ(item->name, "fibonacci");
+  ASSERT_GE(item->func_body_stmts.size(), 1u);
+  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kIf);
+  EXPECT_NE(item->func_body_stmts[0]->else_branch, nullptr);
+}
+
 }  // namespace

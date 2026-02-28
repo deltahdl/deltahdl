@@ -37,4 +37,15 @@ TEST(ParserSection18, DistConstraintEqualWeight) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
+TEST(ParserSection18, DistConstraintDivideWeight) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c { x dist {100:/1, 200:/2, 300:/5}; }\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
 }  // namespace

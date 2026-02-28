@@ -45,32 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 18. Recursive automatic function with base case (Fibonacci)
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_RecursiveAutoFuncFibonacci) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int fibonacci(int n);\n"
-      "    if (n == 0)\n"
-      "      return 0;\n"
-      "    else if (n == 1)\n"
-      "      return 1;\n"
-      "    else\n"
-      "      return fibonacci(n - 1) + fibonacci(n - 2);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_EQ(item->name, "fibonacci");
-  ASSERT_GE(item->func_body_stmts.size(), 1u);
-  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kIf);
-  EXPECT_NE(item->func_body_stmts[0]->else_branch, nullptr);
-}
-
-// =============================================================================
 // 19. Automatic task with delay control
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
