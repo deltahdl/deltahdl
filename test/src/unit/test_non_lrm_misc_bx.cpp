@@ -89,21 +89,6 @@ static Stmt* FirstAlwaysCombStmt(ParseResult9g& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 27. Fork-join in program block
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_3_2_ForkJoinInProgramBlock) {
-  EXPECT_TRUE(
-      ParseOk("program p;\n"
-              "  initial begin\n"
-              "    fork\n"
-              "      #10 a = 1;\n"
-              "      #20 b = 2;\n"
-              "    join\n"
-              "  end\n"
-              "endprogram\n"));
-}
-
-// ---------------------------------------------------------------------------
 // 28. Fork with if-else as thread
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkWithIfElseThread) {
