@@ -195,4 +195,23 @@ TEST(ParserSection10, Sec10_4_1_ExprAddition) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
+// --- 6. Blocking assignment to bit-select: a[3] = 1 ---
+TEST(ParserSection10, Sec10_4_1_BitSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] a;\n"
+      "  initial begin\n"
+      "    a[3] = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace

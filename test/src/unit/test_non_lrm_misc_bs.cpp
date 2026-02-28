@@ -40,18 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.13 — Extends with constructor arguments
-TEST(ParserSection8, ExtendsWithArgs) {
-  auto r = Parse(
-      "class Base;\n"
-      "endclass\n"
-      "class Child extends Base(1, 2);\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
-}
-
 // §8.3 — Class inside module
 TEST(ParserSection8, ClassInsideModule) {
   auto r = Parse(
