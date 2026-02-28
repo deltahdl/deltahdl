@@ -128,4 +128,24 @@ TEST(ParserSection12, Unique0IfChainElseIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
+// ---------------------------------------------------------------------------
+// unique_priority ::= unique | unique0 | priority
+// ---------------------------------------------------------------------------
+// §12.4.2: unique if
+TEST(ParserA606, UniqueIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
 }  // namespace

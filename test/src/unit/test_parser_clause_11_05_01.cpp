@@ -207,4 +207,23 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectUpVariableBase) {
   EXPECT_EQ(rhs->index_end->kind, ExprKind::kIntegerLiteral);
 }
 
+// --- Indexed part-select down with variable base ---
+TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownVariableBase) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [31:0] vec;\n"
+      "  initial x = vec[offset -: 8];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  EXPECT_TRUE(rhs->is_part_select_minus);
+  EXPECT_FALSE(rhs->is_part_select_plus);
+  ASSERT_NE(rhs->index, nullptr);
+  EXPECT_EQ(rhs->index->kind, ExprKind::kIdentifier);
+  ASSERT_NE(rhs->index_end, nullptr);
+}
+
 }  // namespace
