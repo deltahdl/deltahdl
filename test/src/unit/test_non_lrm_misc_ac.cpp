@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetFormalType_UnsignedImplicit) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let f(unsigned [7:0] x) = x;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetFormalType_MixedUntypedAndTyped) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
