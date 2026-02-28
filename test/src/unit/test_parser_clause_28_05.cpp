@@ -46,4 +46,20 @@ TEST(ParserA301, GateInst_NOutputMultipleOutputs) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
+// =============================================================================
+// A.3.1 Production #6: n_output_gate_instance
+// n_output_gate_instance ::= [name_of_instance]
+//   ( output_terminal {, output_terminal} , input_terminal )
+// =============================================================================
+TEST(ParserA301, NOutputGateInst_SingleOutput) {
+  auto r = Parse(
+      "module m;\n"
+      "  buf b1(out, in);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
 }  // namespace
