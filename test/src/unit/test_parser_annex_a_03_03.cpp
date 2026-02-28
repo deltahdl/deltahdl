@@ -302,4 +302,11 @@ TEST(ParserA303, PcontrolTerminal_BitSelect) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, PcontrolTerminal_TernaryExpr) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rcmos (out, in, nctrl, sel ? p1 : p2);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
