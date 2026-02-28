@@ -58,4 +58,17 @@ TEST(ParserA601, NetAlias_TwoNets) {
   ASSERT_EQ(alias->alias_nets.size(), 2u);
 }
 
+TEST(ParserA601, NetAlias_ThreeNets) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, c;\n"
+      "  alias a = b = c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* alias = FindAlias(r.cu->modules[0]->items);
+  ASSERT_NE(alias, nullptr);
+  ASSERT_EQ(alias->alias_nets.size(), 3u);
+}
+
 }  // namespace
