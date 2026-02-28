@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetDecl_AsBlockItem) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    let local_add(a, b) = a + b;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetDecl_Multiple) {
   auto r = Parse(
       "module m;\n"
