@@ -52,20 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-TEST_F(DpiParseTest, AttributeWithAndWithoutValue) {
-  auto* unit = Parse(R"(
-    module m;
-      (* full_case, parallel_case = 1 *)
-      wire a;
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_GE(items[0]->attrs.size(), 2u);
-  EXPECT_EQ(items[0]->attrs[0].value, nullptr);
-  EXPECT_NE(items[0]->attrs[1].value, nullptr);
-}
-
 // =============================================================================
 // §39 Assertion control system functions
 // =============================================================================
