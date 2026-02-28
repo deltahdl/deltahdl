@@ -54,4 +54,12 @@ TEST(ParserSection21, SformatfInExpression) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, SformatfMultipleArgs) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  string s;\n"
+              "  initial s = $sformatf(\"a=%0d b=%0h\", 10, 20);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
