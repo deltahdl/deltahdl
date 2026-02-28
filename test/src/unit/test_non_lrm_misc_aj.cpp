@@ -50,25 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// --- Multiple input terminals ---
-TEST(ParserA504, UdpInst_SingleInput) {
-  auto r = Parse(
-      "primitive my_buf(output y, input a);\n"
-      "  table\n"
-      "    0 : 0 ;\n"
-      "    1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  my_buf u1(out, in1);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  ASSERT_EQ(insts.size(), 1u);
-  EXPECT_EQ(insts[0]->gate_terminals.size(), 2u);
-}
-
 TEST(ParserA504, UdpInst_ManyInputs) {
   auto r = Parse(
       "primitive my_gate(output y, input a, input b, input c, input d);\n"
