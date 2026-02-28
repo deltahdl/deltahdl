@@ -455,4 +455,20 @@ TEST(ParserSection29, TableEdgeSymbolsRAndF) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
+TEST(ParserSection29, TableEdgeSymbolStar) {
+  auto r = Parse(
+      "primitive any_change(output reg q, input d, clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "    * ? : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->table.size(), 3);
+  EXPECT_EQ(udp->table[2].inputs[0], '*');
+  EXPECT_EQ(udp->table[2].output, '-');
+}
+
 }  // namespace
