@@ -49,23 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-// =============================================================================
-// §9.4.4 -- Level-sensitive sequence controls
-// =============================================================================
-TEST(ParserSection9, WaitSequenceTriggered) {
-  auto r = Parse(
-      "module m;\n"
-      "  sequence abc;\n"
-      "    @(posedge clk) a ##1 b ##1 c;\n"
-      "  endsequence\n"
-      "  initial begin\n"
-      "    wait(abc.triggered);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(ParserSection9, WaitSequenceTriggeredOr) {
   auto r = Parse(
       "module m;\n"
