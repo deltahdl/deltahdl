@@ -64,27 +64,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 namespace {
 
 // =============================================================================
-// 28. Function without explicit lifetime (default — static in module)
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_FuncNoExplicitLifetime) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int adder(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
-  // No explicit lifetime — both flags should be false.
-  EXPECT_FALSE(fn->is_static);
-  EXPECT_FALSE(fn->is_automatic);
-  EXPECT_EQ(fn->name, "adder");
-}
-
-// =============================================================================
 // 29. Block-level var decl without explicit lifetime (plain int in block)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_BlockVarDeclNoLifetime) {

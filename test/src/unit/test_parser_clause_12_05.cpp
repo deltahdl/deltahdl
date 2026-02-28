@@ -54,4 +54,60 @@ TEST(ParserSection9, Sec9_3_1_BlockWithCaseStatement) {
   EXPECT_GE(stmt->case_items.size(), 3u);
 }
 
+struct ParseResult11 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11 Parse(const std::string& src) {
+  ParseResult11 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult11& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// --- 13. Nonblocking in case statement (decoder pattern) ---
+TEST(ParserSection10, Sec10_4_2_CaseDecoderPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [1:0] sel;\n"
+      "  reg [7:0] q;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      2'b00: q <= 8'h00;\n"
+      "      2'b01: q <= 8'h01;\n"
+      "      2'b10: q <= 8'h10;\n"
+      "      default: q <= 8'hFF;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  ASSERT_GE(stmt->case_items.size(), 4u);
+  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(stmt->case_items[1].body->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(stmt->case_items[2].body->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(stmt->case_items[3].body->kind, StmtKind::kNonblockingAssign);
+}
+
 }  // namespace

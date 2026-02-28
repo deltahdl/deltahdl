@@ -138,4 +138,44 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncInClass) {
               "endclass\n"));
 }
 
+// =========================================================================
+// Section 5.6.3: System tasks and system functions
+// =========================================================================
+struct ParseResult50603 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult50603 Parse(const std::string& src) {
+  ParseResult50603 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// 28. Function without explicit lifetime (default — static in module)
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_FuncNoExplicitLifetime) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int adder(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FirstFuncOrTask(r);
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
+  // No explicit lifetime — both flags should be false.
+  EXPECT_FALSE(fn->is_static);
+  EXPECT_FALSE(fn->is_automatic);
+  EXPECT_EQ(fn->name, "adder");
+}
+
 }  // namespace
