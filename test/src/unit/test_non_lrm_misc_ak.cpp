@@ -16,43 +16,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 namespace {
 
 // =============================================================================
-// A.6.2 Production: assignment_operator
-// assignment_operator ::= = | += | -= | *= | /= | %= | &= | |= | ^=
-//                        | <<= | >>= | <<<= | >>>=
-// (The simple '=' is tested by blocking_assignment tests above; compound
-// operators are tested by operator_assignment tests above. This section
-// tests that all 13 operators work correctly in sequence.)
-// =============================================================================
-TEST(ParserA602, AssignmentOperator_AllThirteen) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 0;\n"
-      "    a += 1;\n"
-      "    a -= 1;\n"
-      "    a *= 2;\n"
-      "    a /= 2;\n"
-      "    a %= 3;\n"
-      "    a &= 8'hFF;\n"
-      "    a |= 8'h01;\n"
-      "    a ^= 8'hAA;\n"
-      "    a <<= 1;\n"
-      "    a >>= 1;\n"
-      "    a <<<= 1;\n"
-      "    a >>>= 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto stmts = AllInitialStmts(r);
-  ASSERT_EQ(stmts.size(), 13u);
-  // All should be blocking assignments
-  for (auto* s : stmts) {
-    EXPECT_EQ(s->kind, StmtKind::kBlockingAssign);
-  }
-}
-
-// =============================================================================
 // A.6.2 Production: nonblocking_assignment
 // nonblocking_assignment ::= variable_lvalue <= [delay_or_event_control]
 // expression
