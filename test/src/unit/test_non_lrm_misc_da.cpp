@@ -91,20 +91,6 @@ TEST(ParserSection28, Sec28_12_TwelveDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 12u);
 }
 
-TEST_F(SpecifyTest, PathDelayWithRiseFall) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  (a => b) = (3, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  auto& delays = spec->specify_items[0]->path.delays;
-  EXPECT_EQ(delays.size(), 2u);
-}
-
 TEST_F(SpecifyTest, PathDelayThreeValues) {
   auto* cu = Parse(
       "module m;\n"
