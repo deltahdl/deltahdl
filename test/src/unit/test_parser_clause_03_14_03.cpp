@@ -38,4 +38,32 @@ TEST(ParserClause03, Cl3_14_3_ConsidersTimescalePrec) {
   EXPECT_EQ(gp, TimeUnit::kPs);  // min of ns, ps = ps
 }
 
+// 22. Global precision across all three sources: timeprecision, timeunit
+//     precision arg, and `timescale.
+TEST(ParserClause03, Cl3_14_3_MinAcrossAllThreeSources) {
+  auto r = Parse(
+      "`timescale 1us / 1ns\n"
+      "module a;\n"
+      "  timeunit 1ms / 1us;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+                                       r.preproc_global_precision);
+  EXPECT_EQ(gp, TimeUnit::kPs);  // min of ns(`ts), us(tu/), ps(tp) = ps
+}
+
+// 23. With no time declarations, default is implementation-specific (kNs).
+TEST(ParserClause03, Cl3_14_3_DefaultWhenNoneSpecified) {
+  auto r = Parse(
+      "module a;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+                                       r.preproc_global_precision);
+  EXPECT_EQ(gp, TimeUnit::kNs);  // default
+}
+
 }  // namespace
