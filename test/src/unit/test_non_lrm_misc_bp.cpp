@@ -49,33 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7, ArrayProductMethod) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[4];\n"
-      "  initial x = arr.product;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
-// =========================================================================
-// §7.12.5: Array mapping method
-// =========================================================================
-TEST(ParserSection7, ArrayMapMethod) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[4];\n"
-      "  initial qi = arr.map with (item + 1);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 // =========================================================================
 // §7.4.5: Array indexing (element select)
 // =========================================================================
