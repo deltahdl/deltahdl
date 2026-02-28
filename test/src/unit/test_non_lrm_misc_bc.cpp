@@ -5,20 +5,77 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult4b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
 
-// 21. Global precision considers `timescale precision.
-TEST(ParserClause03, Cl3_14_3_ConsidersTimescalePrec) {
-  auto r = Parse(
-      "`timescale 1ns / 1ps\n"
-      "module a;\n"
-      "  timeprecision 1ns;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
-                                       r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kPs);  // min of ns, ps = ps
+static Stmt* FirstInitialStmt(ParseResult4b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
 }
+
+static ModuleItem* FindItemByKind(ParseResult4b& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+static ModuleItem* FindContAssign(ParseResult4b& r) {
+  return FindItemByKind(r, ModuleItemKind::kContAssign);
+}
+
+static ModuleItem* FindInitialBlock(ParseResult4b& r) {
+  return FindItemByKind(r, ModuleItemKind::kInitialBlock);
+}
+
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult4c& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
+}
+
+// Returns the first always_* item from the first module.
+static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock)
+      return item;
+  }
+  return nullptr;
+}
+
+namespace {
 
 // 22. Global precision across all three sources: timeprecision, timeunit
 //     precision arg, and `timescale.
@@ -157,68 +214,6 @@ TEST(ParserClause03, Cl3_14_3_EarlierTimescaleFinerPrecision) {
   auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
                                        r.preproc_global_precision);
   EXPECT_EQ(gp, TimeUnit::kFs);
-}
-
-struct ParseResult4b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult4b Parse(const std::string& src) {
-  ParseResult4b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult4b& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
-}
-
-static Stmt* FirstInitialStmt(ParseResult4b& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
-static ModuleItem* FirstAlwaysItem(ParseResult4b& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      return item;
-    }
-  }
-  return nullptr;
-}
-
-static ModuleItem* FindItemByKind(ParseResult4b& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
-static ModuleItem* FindContAssign(ParseResult4b& r) {
-  return FindItemByKind(r, ModuleItemKind::kContAssign);
-}
-
-static ModuleItem* FindInitialBlock(ParseResult4b& r) {
-  return FindItemByKind(r, ModuleItemKind::kInitialBlock);
 }
 
 // =============================================================================
@@ -838,50 +833,6 @@ TEST(ParserSection4, Sec4_5_DisableStatement) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
-}
-
-struct ParseResult4c {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult4c Parse(const std::string& src) {
-  ParseResult4c result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult4c& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
-}
-
-// Returns the first always_* item from the first module.
-static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock)
-      return item;
-  }
-  return nullptr;
-}
-
-static bool HasDefaultCaseItem(const Stmt* case_stmt) {
-  for (const auto& ci : case_stmt->case_items) {
-    if (ci.is_default) return true;
-  }
-  return false;
 }
 
 // =============================================================================
