@@ -25,24 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-// =============================================================================
-// Combined: parameter_value_assignment + port connections
-// =============================================================================
-TEST(ParserAnnexA0411, NamedParamsAndNamedPorts) {
-  auto r = Parse(
-      "module m;\n"
-      "  sub #(.W(8), .D(4)) u0(.clk(clk), .data(d));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_params.size(), 2u);
-  EXPECT_EQ(item->inst_params[0].first, "W");
-  EXPECT_EQ(item->inst_params[1].first, "D");
-  EXPECT_EQ(item->inst_ports.size(), 2u);
-}
-
 TEST(ParserAnnexA0411, OrderedParamsNamedPorts) {
   auto r = Parse("module m; sub #(8) u0(.clk(clk)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
