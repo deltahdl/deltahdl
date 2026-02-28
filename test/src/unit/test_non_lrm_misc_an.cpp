@@ -7,44 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.1: nonblocking event trigger
-TEST(ParserA605, EventTriggerNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    ->> ev;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
-// ---------------------------------------------------------------------------
-// disable_statement ::=
-//   disable hierarchical_task_identifier ;
-//   | disable hierarchical_block_identifier ;
-//   | disable fork ;
-// ---------------------------------------------------------------------------
-// §9.6.2: disable named block
-TEST(ParserA605, DisableBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    disable my_block;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
 // §9.6.3: disable fork
 TEST(ParserA605, DisableFork) {
   auto r = Parse(
