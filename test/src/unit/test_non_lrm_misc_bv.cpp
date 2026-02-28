@@ -51,27 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-TEST(ParserSection9c, DisableWithIfCondition) {
-  // LRM 9.6.2 example 2: conditional disable as a forward goto.
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : block_name\n"
-      "    a = 1;\n"
-      "    if (a == 0)\n"
-      "      disable block_name;\n"
-      "    b = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->label, "block_name");
-  ASSERT_GE(body->stmts.size(), 3u);
-  // The if statement contains the disable.
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kIf);
-}
-
 TEST(ParserSection9c, DisableHierarchicalTaskName) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
