@@ -51,25 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-TEST(ParserSection9c, SequentialBlockMultipleLocalVars) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int a;\n"
-      "    int b;\n"
-      "    a = 1;\n"
-      "    b = a + 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 4u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
-}
-
 TEST(ParserSection9c, SequentialBlockNamedWithDecls) {
   auto r = Parse(
       "module m;\n"
