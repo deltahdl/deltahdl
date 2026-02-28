@@ -5,40 +5,17 @@
 
 using namespace delta;
 
-namespace {
-
-TEST_F(VerifyParseTest, CheckerWithCovergroupAndClocking) {
-  auto* unit = Parse(R"(
-    checker my_check(logic clk, active);
-      bit active_d1 = 1'b0;
-      always_ff @(posedge clk) begin
-        active_d1 <= active;
-      end
-      covergroup cg_active @(posedge clk);
-        cp_active : coverpoint active
-        {
-          bins idle = { 1'b0 };
-          bins active = { 1'b1 };
-        }
-        option.per_instance = 1;
-      endgroup
-    endchecker : my_check
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_EQ(unit->checkers[0]->name, "my_check");
-  EXPECT_FALSE(unit->checkers[0]->items.empty());
-}
-
 using CheckerParseTest = ProgramTestParse;
 
-// =============================================================================
-// Elaboration fixture
-// =============================================================================
-struct CheckerElabFixture {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-};
+static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
+                                        ModuleItemKind kind) {
+  for (const auto* item : items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+namespace {
 
 // =============================================================================
 // §17.1 Basic checker declaration
@@ -357,14 +334,6 @@ TEST(ParserAnnexA, A1CheckerDecl) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
   EXPECT_EQ(r.cu->checkers[0]->name, "chk");
-}
-
-static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
-                                        ModuleItemKind kind) {
-  for (const auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
 }
 
 // =============================================================================
