@@ -176,4 +176,41 @@ TEST(ParserSection10, Sec10_6_1_FullDFlipFlopPattern) {
   EXPECT_GE(always_count, 2);
 }
 
+struct ParseResult10b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult10b Parse(const std::string& src) {
+  ParseResult10b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 10.6.1 -- Assign/deassign additional patterns
+// =============================================================================
+TEST(ParserSection10, AssignInAlwaysBlock) {
+  // LRM example: D-type flip-flop with clear/preset using assign/deassign.
+  auto r = Parse(
+      "module dff(output q, input d, clear, preset, clock);\n"
+      "  logic q;\n"
+      "  always @(clear or preset)\n"
+      "    if (!clear) assign q = 0;\n"
+      "    else if (!preset) assign q = 1;\n"
+      "    else deassign q;\n"
+      "  always @(posedge clock) q = d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "dff");
+}
+
 }  // namespace

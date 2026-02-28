@@ -45,25 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-// =============================================================================
-// LRM section 10.6.1 -- Assign/deassign additional patterns
-// =============================================================================
-TEST(ParserSection10, AssignInAlwaysBlock) {
-  // LRM example: D-type flip-flop with clear/preset using assign/deassign.
-  auto r = Parse(
-      "module dff(output q, input d, clear, preset, clock);\n"
-      "  logic q;\n"
-      "  always @(clear or preset)\n"
-      "    if (!clear) assign q = 0;\n"
-      "    else if (!preset) assign q = 1;\n"
-      "    else deassign q;\n"
-      "  always @(posedge clock) q = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "dff");
-}
-
 TEST(ParserSection10, AssignConcatLhs) {
   auto r = Parse(
       "module m;\n"

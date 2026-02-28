@@ -204,4 +204,17 @@ TEST_F(ProgramTestParse, MultipleProgramsCoexist) {
   EXPECT_EQ(unit->programs[1]->name, "p2");
 }
 
+// =============================================================================
+// §24.8 Program with variable declarations
+// =============================================================================
+TEST_F(ProgramTestParse, ProgramWithVariableDecls) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  logic [31:0] data;\n"
+      "  logic [7:0] addr;\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_GE(unit->programs[0]->items.size(), 2u);
+}
+
 }  // namespace
