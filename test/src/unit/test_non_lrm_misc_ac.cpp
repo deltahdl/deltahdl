@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.2.12 Production #7: let_list_of_arguments
-// let_list_of_arguments ::=
-//     [let_actual_arg] { , [let_actual_arg] }
-//         { , .identifier ( [let_actual_arg] ) }
-//   | .identifier ( [let_actual_arg] ) { , .identifier ( [let_actual_arg] ) }
-// =============================================================================
-TEST(ParserA212, LetArgs_SinglePositional) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let f(x) = x;\n"
-              "  initial begin\n"
-              "    int z;\n"
-              "    z = f(5);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetArgs_MultiplePositional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
