@@ -203,4 +203,27 @@ TEST(ParserA606, PriorityIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
+// §12.4.2: unique if with else-if chain and final else
+TEST(ParserA606, UniqueIfElseIfElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "    else if (a == 2) x = 3;\n"
+      "    else x = 4;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+  // qualifier only on outermost if; else-if branches are plain if stmts
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->else_branch->qualifier, CaseQualifier::kNone);
+}
+
 }  // namespace
