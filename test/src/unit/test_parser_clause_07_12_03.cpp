@@ -83,4 +83,20 @@ TEST(ParserSection7, ArrayProductMethod) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
+// =========================================================================
+// §7.12.3: Array reduction methods 'and', 'or', 'xor' (keywords as names)
+// =========================================================================
+TEST(ParserSection7, ArrayReductionAnd) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[] = '{1, 3, 5, 7};\n"
+      "  initial y = b.and;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
+}
+
 }  // namespace

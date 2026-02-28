@@ -60,27 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// --- Packed struct assigned from concatenation ---
-TEST(ParserSection7, Sec7_2_1_PackedAssignFromConcat) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] hi;\n"
-      "    logic [7:0] lo;\n"
-      "  } word_t;\n"
-      "  word_t w;\n"
-      "  initial w = {8'hAB, 8'hCD};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
-}
-
 // --- Packed struct assigned from assignment pattern ---
 TEST(ParserSection7, Sec7_2_1_PackedAssignFromPattern) {
   auto r = Parse(

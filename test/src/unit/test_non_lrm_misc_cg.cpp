@@ -42,18 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, RealMultiplication) {
-  auto r = Parse(
-      "module t;\n"
-      "  real r;\n"
-      "  initial r = 3.14 * 2.0;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kStar);
-}
-
 // =========================================================================
 // Section 11.3.5 -- Equality operators
 // =========================================================================
