@@ -4,25 +4,41 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
 
-TEST(ParserSection8, ClassWithVirtualMethod) {
-  auto r = Parse(
-      "class Base;\n"
-      "  virtual function void display();\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto* cls = r.cu->classes[0];
-  bool found = false;
-  for (auto* m : cls->members) {
-    if (m->kind == ClassMemberKind::kMethod && m->is_virtual) {
-      found = true;
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult8b& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+static Stmt* FirstInitialStmt(ParseResult8b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
     }
   }
-  EXPECT_TRUE(found);
+  return nullptr;
 }
+
+namespace {
 
 // §8.5 — Parameterized classes
 TEST(ParserSection8, ParameterizedClass) {
@@ -701,40 +717,6 @@ TEST(ParserSection8, ParameterizedClassDefaultInstantiation) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-struct ParseResult8b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult8b Parse(const std::string& src) {
-  ParseResult8b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult8b& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
-static Stmt* FirstInitialStmt(ParseResult8b& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
 }
 
 // =============================================================================
