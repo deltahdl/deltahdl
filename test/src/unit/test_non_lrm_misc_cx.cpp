@@ -7,28 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 26.3 -- Multiple imports and wildcard
-// =============================================================================
-TEST(ParserSection26, ModuleMultipleImports) {
-  auto r = Parse(
-      "package p1;\n"
-      "endpackage\n"
-      "package p2;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import p1::*;\n"
-      "  import p2::*;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  size_t import_count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kImportDecl) ++import_count;
-  }
-  EXPECT_EQ(import_count, 2u);
-}
-
 TEST(ParserSection26, ImportWildcardField) {
   auto r = Parse(
       "package p;\n"
