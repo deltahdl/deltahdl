@@ -39,4 +39,20 @@ TEST(Lexical, ContAssign_NoDelay) {
   }
 }
 
+TEST(Parser, ContinuousAssignment) {
+  auto r = ParseWithPreprocessor(
+      "module top;\n"
+      "  logic a, b;\n"
+      "  assign a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  bool found_assign = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      found_assign = true;
+    }
+  }
+  EXPECT_TRUE(found_assign);
+}
+
 }  // namespace
