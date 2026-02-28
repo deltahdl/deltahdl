@@ -64,4 +64,68 @@ TEST(ParserSection4, Sec4_6_Unique0If) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
+// =============================================================================
+// §4.6: priority if statement
+// =============================================================================
+TEST(ParserSection4, Sec4_6_PriorityIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
+struct ParseResult12b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult12b Parse(const std::string& src) {
+  ParseResult12b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult12b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// unique0 if with else-if chain (no violation when none match).
+TEST(ParserSection12, Unique0IfChainElseIf) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique0 if (a == 0) x = 0;\n"
+      "    else if (a == 1) x = 1;\n"
+      "    else if (a == 2) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
 }  // namespace

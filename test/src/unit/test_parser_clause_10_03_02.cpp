@@ -204,4 +204,58 @@ TEST(ParserSection10, ContinuousAssignMultipleTargets) {
   EXPECT_GE(count, 1);
 }
 
+struct ParseResult4b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ModuleItem* FindItemByKind(ParseResult4b& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+static ModuleItem* FindContAssign(ParseResult4b& r) {
+  return FindItemByKind(r, ModuleItemKind::kContAssign);
+}
+
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// 3. Continuous assignment with assign (Active region)
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_ContinuousAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y;\n"
+      "  wire a, b;\n"
+      "  assign y = a & b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* ca = FindContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  EXPECT_NE(ca->assign_lhs, nullptr);
+  EXPECT_NE(ca->assign_rhs, nullptr);
+}
+
 }  // namespace

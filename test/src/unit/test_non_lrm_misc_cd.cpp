@@ -87,28 +87,6 @@ static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
 
 namespace {
 
-// --- 8. Blocking assignment to concatenation: {a, b} = {c, d} ---
-TEST(ParserSection10, Sec10_4_1_Concatenation) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [3:0] a, b, c, d;\n"
-      "  initial begin\n"
-      "    {a, b} = {c, d};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(stmt->lhs->elements.size(), 2u);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
-}
-
 // --- 9. Blocking assignment with ternary RHS ---
 TEST(ParserSection10, Sec10_4_1_TernaryRhs) {
   auto r = Parse(
