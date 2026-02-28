@@ -58,4 +58,23 @@ TEST_F(SpecifyTest, NegedgePath) {
   EXPECT_EQ(spec->specify_items[0]->path.edge, SpecifyEdge::kNegedge);
 }
 
+// =============================================================================
+// A.7.2 data_source_expression with output polarity
+// =============================================================================
+// Edge-sensitive path with output-side polarity and data source
+TEST(ParserA702, DataSourceWithOutputPolarity) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => (q + : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_NE(si->path.data_source, nullptr);
+  EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kPositive);
+}
+
 }  // namespace

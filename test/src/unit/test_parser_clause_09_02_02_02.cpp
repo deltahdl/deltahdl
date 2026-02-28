@@ -129,4 +129,43 @@ TEST(ParserSection9, Sec9_2_2_ForLoop) {
   EXPECT_NE(stmt->for_body, nullptr);
 }
 
+struct ParseResult9e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9e Parse(const std::string& src) {
+  ParseResult9e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 9.3.1 -- Blocks in various procedural contexts.
+// =============================================================================
+TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb begin\n"
+      "    x = a & b;\n"
+      "    y = a | c;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_EQ(item->body->stmts.size(), 2u);
+}
+
 }  // namespace
