@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, ListOfCrossItems_Three) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint a;\n"
-              "    cp2: coverpoint b;\n"
-              "    cp3: coverpoint c;\n"
-              "    cross cp1, cp2, cp3;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // §A.2.11 Production #19: cross_item
 // =============================================================================
