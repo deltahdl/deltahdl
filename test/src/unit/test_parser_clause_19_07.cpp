@@ -39,4 +39,20 @@ TEST(ParserA211, CoverageOption_Goal) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// §A.2.11 Production #22: bins_selection_or_option
+// =============================================================================
+TEST(ParserA211, BinsSelectionOrOption_CoverageOption) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      option.weight = 5;\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
