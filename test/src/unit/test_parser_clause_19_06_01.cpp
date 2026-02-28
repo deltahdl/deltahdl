@@ -216,4 +216,20 @@ TEST(ParserA211, BinsExpression_CoverPointDotBin) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, CoverGroup_CrossWithBinsSelection) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2 {\n"
+              "      bins sel1 = binsof(cp1) intersect {[0:3]};\n"
+              "      bins sel2 = !binsof(cp2);\n"
+              "      bins sel3 = binsof(cp1) && binsof(cp2);\n"
+              "      ignore_bins ig = binsof(cp1) intersect {255};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
