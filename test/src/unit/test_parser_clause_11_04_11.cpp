@@ -223,4 +223,13 @@ TEST(ParserA83, ConditionalExprNested) {
   EXPECT_EQ(rhs->true_expr->kind, ExprKind::kTernary);
 }
 
+TEST(ParserA83, ConditionalExprWithBinaryCondition) {
+  auto r = Parse("module m; initial x = (a > b) ? a : b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+}
+
 }  // namespace
