@@ -297,4 +297,33 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarCaseBody) {
   EXPECT_EQ(item->body->case_items.size(), 3u);
 }
 
+// Helper for block 12: verify always block has 3 blocking assigns.
+static void VerifyAlwaysMultiAssigns(ParseResult& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_EQ(item->body->stmts.size(), 3u);
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 24. always @* with multiple assignment statements.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysStarMultipleAssigns) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @* begin\n"
+      "    x = a & b;\n"
+      "    y = a | c;\n"
+      "    z = a ^ d;\n"
+      "  end\n"
+      "endmodule\n");
+  VerifyAlwaysMultiAssigns(r);
+}
+
 }  // namespace

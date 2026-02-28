@@ -55,4 +55,24 @@ TEST(ParserSection16, ImmediateCoverWithPass) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
+// ---------------------------------------------------------------------------
+// action_block: statement_or_null | [statement] else statement_or_null
+// ---------------------------------------------------------------------------
+// §16.3: action_block in immediate assert — pass statement only
+TEST(ParserA603, ActionBlockAssertPassOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert (a) $display(\"pass\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_NE(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+}
+
 }  // namespace
