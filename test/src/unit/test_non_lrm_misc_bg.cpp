@@ -111,20 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50702, RealLiteral_DecimalNotation) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = 14.72;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-  EXPECT_DOUBLE_EQ(rhs->real_val, 14.72);
-}
-
 TEST(ParserCh50702, RealLiteral_ScientificNotation) {
   auto r = Parse(
       "module m;\n"

@@ -35,4 +35,47 @@ TEST(ParserSection11, RealLiteralWithExponent) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// --- §5.12 Attributes ---
+struct ParseResult512 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult512 Parse(const std::string& src) {
+  ParseResult512 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult512& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+TEST(ParserCh50702, RealLiteral_DecimalNotation) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 14.72;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+  EXPECT_DOUBLE_EQ(rhs->real_val, 14.72);
+}
+
 }  // namespace
