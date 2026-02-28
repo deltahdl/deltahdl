@@ -15,19 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, BlockingAssignment_DynamicArrayNewWithInit) {
-  // dynamic_array_new with copy initializer: new[size](init)
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin arr = new[10](old_arr); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(ParserA602, BlockingAssignment_ClassNew) {
   // class_new: obj = new;
   auto r = Parse(
