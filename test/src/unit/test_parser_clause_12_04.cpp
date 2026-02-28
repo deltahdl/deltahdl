@@ -54,4 +54,27 @@ TEST(ParserSection12, NestedIfElse) {
   EXPECT_NE(stmt->then_branch->else_branch, nullptr);
 }
 
+TEST(ParserSection12, IfWithBlockBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      x = 1;\n"
+      "      y = 2;\n"
+      "    end else begin\n"
+      "      x = 3;\n"
+      "      y = 4;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
+}
+
 }  // namespace

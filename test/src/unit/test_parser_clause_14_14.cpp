@@ -39,4 +39,13 @@ TEST(ParserSection19, GlobalClocking_Basic) {
   EXPECT_TRUE(item->clocking_signals.empty());
 }
 
+// Global clocking with compound event expression (or).
+TEST(ParserSection19, GlobalClocking_CompoundEvent) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  global clocking sys @(clk1 or clk2);\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace

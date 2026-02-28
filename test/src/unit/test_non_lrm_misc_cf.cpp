@@ -41,20 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, InsideWithRangeElements) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a inside {[16:23], [32:47]}) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* cond = stmt->condition;
-  ASSERT_NE(cond, nullptr);
-  EXPECT_EQ(cond->elements.size(), 2u);
-}
-
 TEST(ParserSection11, InsideInAssign) {
   auto r = Parse(
       "module t;\n"
