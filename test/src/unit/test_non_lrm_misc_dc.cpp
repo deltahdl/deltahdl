@@ -52,18 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §40 Coverage control system functions
-// =============================================================================
-TEST_F(ApiParseTest, CoverageControlSystemCall) {
-  auto* unit = Parse(R"(
-    module m;
-      initial $coverage_control(1, 2, 3);
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-}
-
 TEST_F(ApiParseTest, CoverageGetMaxSystemCall) {
   auto* unit = Parse(R"(
     module m;

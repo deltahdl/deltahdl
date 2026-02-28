@@ -588,4 +588,42 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarForLoop) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kFor);
 }
 
+struct ParseResult9j {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ModuleItem* NthAlwaysItem(ParseResult9j& r, size_t n) {
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) {
+      if (count == n) return item;
+      ++count;
+    }
+  }
+  return nullptr;
+}
+
+// Multiple @* blocks in same module
+TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c, x, y;\n"
+      "  always @* x = a & b;\n"
+      "  always @* y = b | c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item0 = NthAlwaysItem(r, 0);
+  auto* item1 = NthAlwaysItem(r, 1);
+  ASSERT_NE(item0, nullptr);
+  ASSERT_NE(item1, nullptr);
+  EXPECT_TRUE(item0->sensitivity.empty());
+  EXPECT_TRUE(item1->sensitivity.empty());
+  ASSERT_NE(item0->body, nullptr);
+  ASSERT_NE(item1->body, nullptr);
+}
+
 }  // namespace
