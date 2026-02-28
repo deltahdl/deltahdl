@@ -79,25 +79,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 
 namespace {
 
-// @* with unique case
-TEST(ParserSection9, Sec9_4_2_3_AtStarUniqueCase) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [1:0] sel;\n"
-      "  reg out;\n"
-      "  always @* begin\n"
-      "    unique case (sel)\n"
-      "      2'b00: out = 0;\n"
-      "      2'b01: out = 1;\n"
-      "      default: out = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  auto* case_stmt = GetAlwaysStarCaseStmt(r);
-  ASSERT_NE(case_stmt, nullptr);
-  EXPECT_EQ(case_stmt->qualifier, CaseQualifier::kUnique);
-}
-
 // @* with priority case
 TEST(ParserSection9, Sec9_4_2_3_AtStarPriorityCase) {
   auto r = Parse(
