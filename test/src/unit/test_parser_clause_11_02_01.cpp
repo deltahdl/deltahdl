@@ -67,4 +67,18 @@ TEST(ParserA83, ConstantExprUnary) {
   EXPECT_EQ(params[0].second->op, TokenKind::kMinus);
 }
 
+// § constant_expression ::= constant_expression binary_operator
+// { attribute_instance } constant_expression
+TEST(ParserA83, ConstantExprBinary) {
+  auto r = Parse(
+      "module m #(parameter int P = 3 + 4);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& params = r.cu->modules[0]->params;
+  ASSERT_GE(params.size(), 1u);
+  EXPECT_EQ(params[0].second->kind, ExprKind::kBinary);
+  EXPECT_EQ(params[0].second->op, TokenKind::kPlus);
+}
+
 }  // namespace
