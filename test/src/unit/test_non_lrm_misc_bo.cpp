@@ -49,43 +49,6 @@ static void VerifyStructMemberNames(const std::vector<StructMember>& members,
 
 namespace {
 
-// 5. Multiple nets with explicit type: wire logic a, b, c;
-TEST(ParserSection6, Sec6_7_1_MultipleNetsExplicitType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire logic a, b, c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 3u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(items[0]->data_type.is_net);
-  EXPECT_EQ(items[0]->name, "a");
-  EXPECT_EQ(items[1]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(items[1]->data_type.is_net);
-  EXPECT_EQ(items[1]->name, "b");
-  EXPECT_EQ(items[2]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(items[2]->data_type.is_net);
-  EXPECT_EQ(items[2]->name, "c");
-}
-
-// 6. wire vectored logic [7:0] v; — vectored with explicit type.
-TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire vectored logic [7:0] v;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_TRUE(item->data_type.is_vectored);
-  EXPECT_EQ(item->name, "v");
-}
-
 // 7. wire scalared logic [7:0] s; — scalared with explicit type.
 TEST(ParserSection6, Sec6_7_1_ScalaredWithExplicitType) {
   auto r = Parse(

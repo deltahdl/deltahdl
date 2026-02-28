@@ -27,27 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =========================================================================
-// LRM section 27.3: Generate construct syntax / generate regions
-// =========================================================================
-TEST(ParserSection23, GenerateRegionWithFor) {
-  auto r = Parse(
-      "module m;\n"
-      "  genvar i;\n"
-      "  generate\n"
-      "    for (i = 0; i < 4; i = i + 1) begin : blk\n"
-      "      assign a[i] = b[i];\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) found = true;
-  }
-  EXPECT_TRUE(found);
-}
-
 TEST(ParserSection23, GenerateRegionWithIf) {
   auto r = Parse(
       "module m;\n"

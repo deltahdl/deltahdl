@@ -50,23 +50,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 namespace {
 
 // =============================================================================
-// §9.4.2 -- edge keyword in event control
-// =============================================================================
-TEST(ParserSection9, EventControlEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [3:0] a;\n"
-      "  wire clk;\n"
-      "  always @(edge clk) a = ~a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kEdge);
-}
-
-// =============================================================================
 // §9.3.1 -- automatic variable declarations in fork blocks
 // =============================================================================
 TEST(ParserSection9, AutomaticVarInFork) {
