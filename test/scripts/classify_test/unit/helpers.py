@@ -63,6 +63,6 @@ def stub_classifier(monkeypatch, response):
         lambda args, tests: None,
     )
     monkeypatch.setattr(
-        classify_test, "commit_and_push",
-        lambda changed, deleted, msg: None,
+        classify_test, "commit_classification",
+        lambda *a, **kw: None,
     )

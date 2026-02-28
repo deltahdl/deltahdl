@@ -789,8 +789,8 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier,
         lambda args, tests: None,
     )
     monkeypatch.setattr(
-        classify_test, "commit_and_push",
-        lambda changed, deleted, msg: None,
+        classify_test, "commit_classification",
+        lambda *a, **kw: None,
     )
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(

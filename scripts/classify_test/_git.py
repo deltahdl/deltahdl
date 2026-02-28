@@ -48,3 +48,23 @@ def commit_and_push(changed_files, deleted_files, message):
         _run_git(["git", "rm", str(f)])
     _run_git(["git", "commit", "-F", "-"], input=message)
     _run_git(["git", "push"])
+
+
+def commit_classification(ctx):
+    """Build file lists and commit+push the classification result.
+
+    *ctx* is a dict with keys: filepath, target, to_merge, new_names,
+    test_dir, cmake_path.
+    """
+    filepath = ctx["filepath"]
+    changed = [ctx["test_dir"] / f"{n}.cpp" for n in ctx["new_names"]]
+    changed.extend(mp for mp, _ in ctx["to_merge"])
+    changed.append(ctx["cmake_path"])
+    deleted = []
+    if filepath.exists():
+        changed.append(filepath)
+    else:
+        deleted.append(filepath)
+    t = ctx["target"][0]
+    msg = build_commit_message(t.test_name, t.clause, t.rationale)
+    commit_and_push(changed, deleted, msg)

@@ -25,7 +25,7 @@ from ._github import (
     tick_checkbox,
     update_issue_body,
 )
-from ._git import build_commit_message, commit_and_push
+from ._git import commit_classification
 from ._output import (
     print_classification_table,
     print_summary,
@@ -923,14 +923,6 @@ def _update_source(filepath, parsed, ctx):
     return 0
 
 
-def _count_kept(groups, test_name):
-    """Count tests that stay in the source file."""
-    return sum(
-        len(ts) for (p, c), ts in groups.items()
-        if clause_to_filename(p, c) == test_name
-    )
-
-
 def _run(args):
     """Execute the split operation."""
     _validate_issue_args(args)
@@ -954,21 +946,20 @@ def _run(args):
         groups, Path(args.output_dir).resolve(),
         exclude_path=filepath, dry_run=args.dry_run,
     )
-    n_kept = _count_kept(groups, test_name)
-    n_others = sum(
-        1 for t in parsed.all_tests if t.test_name != args.test
-    )
+    n_kept = sum(len(ts) for (p, c), ts in groups.items()
+                 if clause_to_filename(p, c) == test_name)
+    n_others = sum(1 for t in parsed.all_tests
+                   if t.test_name != args.test)
+    skw = {"n_kept": n_kept, "n_removed": n_removed,
+           "n_others": n_others}
     if args.dry_run:
         print_summary(to_create, to_merge, test_name,
-                       source_is_target, n_kept=n_kept,
-                       n_removed=n_removed, n_others=n_others,
-                       dry_run=True)
+                       source_is_target, dry_run=True, **skw)
         return
     if not to_create and not to_merge and source_is_target \
             and n_removed == 0:
         print_summary(to_create, to_merge, test_name,
-                       source_is_target, n_kept=n_kept,
-                       n_removed=n_removed, n_others=n_others)
+                       source_is_target, **skw)
         return
     titles = load_lrm_titles(Path(args.lrm).resolve())
     new_names = _write_files(to_create, to_merge, parsed, {
@@ -988,23 +979,13 @@ def _run(args):
         ),
     )
     print_summary(to_create, to_merge, test_name,
-                   source_is_target, n_kept=n_kept,
-                   n_removed=n_removed, n_others=n_others)
+                   source_is_target, **skw)
     if not getattr(args, "no_commit", False):
-        test_dir = Path(args.output_dir).resolve()
-        changed = [test_dir / f"{n}.cpp" for n in new_names]
-        changed.extend(mp for mp, _ in to_merge)
-        changed.append(CMAKE_PATH)
-        deleted = []
-        if filepath.exists():
-            changed.append(filepath)
-        else:
-            deleted.append(filepath)
-        msg = build_commit_message(
-            target[0].test_name, target[0].clause,
-            target[0].rationale,
-        )
-        commit_and_push(changed, deleted, msg)
+        commit_classification({
+            "filepath": filepath, "target": target,
+            "to_merge": to_merge, "new_names": new_names,
+            "test_dir": Path(args.output_dir).resolve(),
+            "cmake_path": CMAKE_PATH})
 
 
 def main():
