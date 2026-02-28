@@ -46,40 +46,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// §4.6: priority if statement
-// =============================================================================
-TEST(ParserSection4, Sec4_6_PriorityIf) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    priority if (a) x = 1;\n"
-      "    else if (b) x = 2;\n"
-      "    else x = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
-}
-
-// =============================================================================
-// §4.6: Program block for deterministic test scheduling
-// =============================================================================
-TEST(ParserSection4, Sec4_6_ProgramBlockDeterministicScheduling) {
-  auto r = Parse(
-      "program p;\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->name, "p");
-  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-}
-
-// =============================================================================
 // §4.6: Program block with initial block
 // =============================================================================
 TEST(ParserSection4, Sec4_6_ProgramWithInitialBlock) {

@@ -57,4 +57,36 @@ TEST(SourceText, ProgramParamsAndPorts) {
   EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
 }
 
+struct ParseResult4d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4d Parse(const std::string& src) {
+  ParseResult4d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §4.6: Program block for deterministic test scheduling
+// =============================================================================
+TEST(ParserSection4, Sec4_6_ProgramBlockDeterministicScheduling) {
+  auto r = Parse(
+      "program p;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "p");
+  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+}
+
 }  // namespace
