@@ -228,4 +228,22 @@ TEST(ParserA602, AssignmentOperator_AllThirteen) {
   }
 }
 
+TEST(ParserA602, Integration_AlwaysCombWithOperatorAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb begin\n"
+      "    sum = a + b;\n"
+      "    sum += carry_in;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_EQ(item->body->stmts.size(), 2u);
+}
+
 }  // namespace
