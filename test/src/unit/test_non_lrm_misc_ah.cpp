@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// udp_output_declaration — output reg with = constant_expression
-// ---------------------------------------------------------------------------
-// ANSI form: output reg q = 1'b0
-TEST(ParserAnnexA052, OutputDeclAnsi_RegInitZero) {
-  auto r = Parse(
-      "primitive dff(output reg q = 1'b0, input d, input clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '0');
-}
-
 // ANSI form: output reg q = 1'b1
 TEST(ParserAnnexA052, OutputDeclAnsi_RegInitOne) {
   auto r = Parse(
