@@ -39,4 +39,19 @@ TEST(ParserA602, BlockingAssignment_Simple) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
+TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
+  // §10.4.1: blocking with intra-assignment delay
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = #10 b; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
