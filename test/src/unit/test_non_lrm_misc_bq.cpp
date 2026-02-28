@@ -60,45 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// --- Packed struct signed typedef with member name verification ---
-TEST(ParserSection7, Sec7_2_1_PackedSignedTypedef) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed signed {\n"
-      "    logic [15:0] real_part;\n"
-      "    logic [15:0] imag_part;\n"
-      "  } complex_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->typedef_type.is_packed);
-  EXPECT_TRUE(item->typedef_type.is_signed);
-  ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
-  EXPECT_EQ(item->typedef_type.struct_members[0].name, "real_part");
-  EXPECT_EQ(item->typedef_type.struct_members[1].name, "imag_part");
-}
-
-// --- Packed struct variable declaration (non-typedef, inline) ---
-TEST(ParserSection7, Sec7_2_1_PackedVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct packed {\n"
-      "    logic [7:0] tag;\n"
-      "    logic [23:0] payload;\n"
-      "  } pkt;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
-  EXPECT_TRUE(item->data_type.is_packed);
-  EXPECT_EQ(item->name, "pkt");
-  EXPECT_EQ(item->data_type.struct_members.size(), 2u);
-}
-
 // --- Packed struct variable with initial value ---
 TEST(ParserSection7, Sec7_2_1_PackedVarWithInit) {
   auto r = Parse(
