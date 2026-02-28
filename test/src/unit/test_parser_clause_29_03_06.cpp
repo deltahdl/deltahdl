@@ -436,4 +436,23 @@ TEST(ParserSection29, TableSymbolDashNoChange) {
   EXPECT_EQ(udp->table[2].current_state, '?');
 }
 
+TEST(ParserSection29, TableEdgeSymbolsRAndF) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "    ? f : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* udp = r.cu->udps[0];
+  EXPECT_TRUE(udp->is_sequential);
+  ASSERT_EQ(udp->table.size(), 3);
+  EXPECT_EQ(udp->table[0].inputs[1], 'r');
+  EXPECT_EQ(udp->table[1].inputs[1], 'r');
+  EXPECT_EQ(udp->table[2].inputs[1], 'f');
+  EXPECT_EQ(udp->table[2].output, '-');
+}
+
 }  // namespace
