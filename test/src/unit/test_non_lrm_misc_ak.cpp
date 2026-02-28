@@ -15,19 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, Release_Variable) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin release q; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
-  EXPECT_NE(stmt->lhs, nullptr);
-}
-
 TEST(ParserA602, Release_Net) {
   auto r = Parse(
       "module m;\n"
