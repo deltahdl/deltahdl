@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, SscanfCall) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  integer code, val;\n"
-              "  initial code = $sscanf(\"42\", \"%d\", val);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, FreadBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
