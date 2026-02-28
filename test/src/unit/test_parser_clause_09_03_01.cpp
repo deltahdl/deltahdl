@@ -189,4 +189,22 @@ TEST(ParserA603, SeqBlockEmpty) {
   EXPECT_EQ(body->stmts.size(), 0u);
 }
 
+// §A.2.8: Sequential block with block_item_declaration (variable)
+TEST(ParserA603, SeqBlockWithVarDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "    x = 5;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_GE(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+}
+
 }  // namespace
