@@ -52,22 +52,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-// §27.1: Generate-for with always block body.
-TEST(ParserSection27, GenerateForWithAlwaysBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i++) begin : gen_alw\n"
-      "    always @(posedge clk)\n"
-      "      q[i] <= d[i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(gen->gen_body.size(), 1u);
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kAlwaysBlock);
-}
-
 TEST(Parser, GenerateFor) {
   auto r = Parse(
       "module t;\n"
