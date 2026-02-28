@@ -221,4 +221,9 @@ TEST(ParserCh50701, IntLiteral_Underscore) {
       ParseOk("module m; initial x = 16'b0011_0101_0001_1111; endmodule"));
 }
 
+TEST(ParserCh50701, IntLiteral_XValue) {
+  // 12'hx -- 12-bit unknown.
+  EXPECT_TRUE(ParseOk("module m; initial x = 12'hx; endmodule"));
+}
+
 }  // namespace

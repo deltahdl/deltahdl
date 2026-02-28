@@ -99,4 +99,18 @@ TEST(ParserSection11, XnorBinaryOperator) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
+// =============================================================================
+// A.8.6 Operators — binary_operator (bitwise)
+// =============================================================================
+// § binary_operator ::= &
+TEST(ParserA86, BinaryBitwiseAnd) {
+  auto r = Parse("module m; initial x = a & b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kAmp);
+}
+
 }  // namespace
