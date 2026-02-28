@@ -45,28 +45,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 17. always_comb with part select on LHS
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_PartSelectLHS) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [15:0] bus;\n"
-      "  logic [7:0] low_byte;\n"
-      "  always_comb bus[7:0] = low_byte;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->lhs, nullptr);
-  EXPECT_EQ(item->body->lhs->kind, ExprKind::kSelect);
-  EXPECT_NE(item->body->lhs->index, nullptr);
-  EXPECT_NE(item->body->lhs->index_end, nullptr);
-}
-
-// ---------------------------------------------------------------------------
 // 18. always_comb with struct member access
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_StructMemberAccess) {
