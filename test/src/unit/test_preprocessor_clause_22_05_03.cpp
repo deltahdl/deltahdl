@@ -6,15 +6,7 @@
 
 using namespace delta;
 
-static std::string Preprocess(const std::string& src, PreprocFixture& f,
-                              PreprocConfig config = {}) {
-  auto fid = f.mgr.AddFile("<test>", src);
-
-  Preprocessor pp(f.mgr, f.diag, std::move(config));
-
-  return pp.Preprocess(fid);
-
-  namespace {
+namespace {
 
   // --- §22.5.3 `undefineall ---
   TEST(Preprocessor, UndefineAll) {
