@@ -105,4 +105,18 @@ TEST(ParserSection8, ParameterizedClassInsideModuleName) {
   EXPECT_EQ(cls->name, "test_cls");
 }
 
+TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
+  auto r = Parse(
+      "module class_tb;\n"
+      "  class test_cls #(parameter a = 12);\n"
+      "  endclass\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
+  ASSERT_NE(cls, nullptr);
+  ASSERT_EQ(cls->params.size(), 1u);
+  EXPECT_EQ(cls->params[0].first, "a");
+}
+
 }  // namespace

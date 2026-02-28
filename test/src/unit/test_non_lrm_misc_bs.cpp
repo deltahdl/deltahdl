@@ -40,20 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
-  auto r = Parse(
-      "module class_tb;\n"
-      "  class test_cls #(parameter a = 12);\n"
-      "  endclass\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
-  ASSERT_NE(cls, nullptr);
-  ASSERT_EQ(cls->params.size(), 1u);
-  EXPECT_EQ(cls->params[0].first, "a");
-}
-
 // §8.26 — Typedef class (forward declaration)
 TEST(ParserSection8, TypedefClass) {
   auto r = Parse(
