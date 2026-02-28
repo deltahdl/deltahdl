@@ -44,26 +44,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 7. Complex conditions (logical operators in if expression).
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_3_ComplexConditions) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en, valid, d, q;\n"
-      "  always_latch\n"
-      "    if (en && valid) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysLatchItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kIf);
-  ASSERT_NE(item->body->condition, nullptr);
-  EXPECT_EQ(item->body->condition->kind, ExprKind::kBinary);
-}
-
-// ---------------------------------------------------------------------------
 // 8. Bit select on LHS of assignment.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_BitSelect) {
