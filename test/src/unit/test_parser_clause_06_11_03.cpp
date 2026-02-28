@@ -77,4 +77,20 @@ TEST(ParserSection6, Sec6_11_LogicSignedWithPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
+// 5b. Unsigned with packed dims: bit unsigned [7:0].
+TEST(ParserSection6, Sec6_11_BitUnsignedWithPackedDims) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit unsigned [7:0] uv;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
+  EXPECT_FALSE(item->data_type.is_signed);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
+}
+
 }  // namespace
