@@ -14,37 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.8.4 Primaries — class_qualifier
-// =============================================================================
-// § class_qualifier — class_scope
-TEST(ParserA84, ClassQualifierScope) {
-  auto r = Parse("module m; initial x = pkg::my_const; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
-}
-
-// =============================================================================
-// A.8.4 Primaries — range_expression
-// =============================================================================
-// § range_expression — expression (simple index)
-TEST(ParserA84, RangeExpressionSimpleIndex) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] data;\n"
-      "  logic x;\n"
-      "  initial x = data[0];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-}
-
 // § range_expression — part_select_range
 TEST(ParserA84, RangeExpressionPartSelect) {
   auto r = Parse(

@@ -264,4 +264,22 @@ TEST(ParserSection9, Sec9_2_2_BitSelectLHS) {
   EXPECT_EQ(item->body->lhs->kind, ExprKind::kSelect);
 }
 
+// =============================================================================
+// A.8.4 Primaries — range_expression
+// =============================================================================
+// § range_expression — expression (simple index)
+TEST(ParserA84, RangeExpressionSimpleIndex) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  logic x;\n"
+      "  initial x = data[0];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace
