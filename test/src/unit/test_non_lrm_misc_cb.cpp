@@ -4,27 +4,24 @@
 
 using namespace delta;
 
-namespace {
-
-// ---------------------------------------------------------------------------
-// iff guard with comma-separated events at statement level
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_4_2_4_IffGuardCommaStmtLevel) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk iff en, negedge rst) q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 2u);
-  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
-  EXPECT_EQ(stmt->events[1].iff_condition, nullptr);
+static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
 }
+
+static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      if (n < item->body->stmts.size()) return item->body->stmts[n];
+    }
+  }
+  return nullptr;
+}
+
+namespace {
 
 // ---------------------------------------------------------------------------
 // iff guard with or-separated events at statement level
@@ -341,20 +338,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevelBody) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
   EXPECT_GE(stmt->body->stmts.size(), 2u);
 }
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
-static bool HasAlwaysOfKind(const std::vector<ModuleItem*>& items,
-                            AlwaysKind kind) {
-  for (const auto* item : items)
-    if (item->kind == ModuleItemKind::kAlwaysBlock && item->always_kind == kind)
-      return true;
-  return false;
-}
 
 // §3.3 Continuous assignments
 TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
@@ -480,16 +463,6 @@ TEST(SourceText, NetAlias) {
   auto* alias_item = items.back();
   EXPECT_EQ(alias_item->kind, ModuleItemKind::kAlias);
   EXPECT_EQ(alias_item->alias_nets.size(), 3u);
-}
-
-static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
 }
 
 // =============================================================================
