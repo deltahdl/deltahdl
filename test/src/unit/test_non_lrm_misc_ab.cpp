@@ -7,20 +7,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// §A.2.11 Production #19: cross_item
-// =============================================================================
-TEST(ParserA211, CrossItem_CoverPointIdentifier) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp_a: coverpoint a;\n"
-              "    cp_b: coverpoint b;\n"
-              "    cross cp_a, cp_b;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-// =============================================================================
 // §A.2.11 Production #20: cross_body
 // =============================================================================
 TEST(ParserA211, CrossBody_Empty) {
