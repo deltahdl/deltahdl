@@ -119,4 +119,23 @@ TEST(ParserClause03, Cl3_14_3_1StepParsedInClockingBlock) {
   ASSERT_NE(clk_item, nullptr);
 }
 
+// §14.10: clocking block with output negedge skew (from LRM example).
+TEST(ParserSection14, ClockingBlockEventOutputNegedgeSkew) {
+  auto r = Parse(
+      "module foo(input phi1, input [7:0] data);\n"
+      "  clocking dram @(posedge phi1);\n"
+      "    input data;\n"
+      "    output negedge #1 address;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 2u);
+  auto& out_sig = item->clocking_signals[1];
+  EXPECT_EQ(out_sig.direction, Direction::kOutput);
+  EXPECT_EQ(out_sig.name, "address");
+  EXPECT_EQ(out_sig.skew_edge, Edge::kNegedge);
+  ASSERT_NE(out_sig.skew_delay, nullptr);
+}
+
 }  // namespace

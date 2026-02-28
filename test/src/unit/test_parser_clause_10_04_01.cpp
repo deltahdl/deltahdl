@@ -177,4 +177,22 @@ TEST(ParserSection10, Sec10_4_1_SimpleBlocking) {
   EXPECT_EQ(stmt->rhs->text, "b");
 }
 
+// --- 4. Blocking assignment with addition expression ---
+TEST(ParserSection10, Sec10_4_1_ExprAddition) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = b + c;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
+}
+
 }  // namespace
