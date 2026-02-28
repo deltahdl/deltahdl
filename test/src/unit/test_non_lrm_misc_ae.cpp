@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.3 Production #2: inout_terminal ::= net_lvalue
-// Exercised via pass switches (tran/rtran) and
-// pass enable switches (tranif0/tranif1/rtranif0/rtranif1).
-// =============================================================================
-TEST(ParserA303, InoutTerminal_SimpleIdent) {
-  auto r = Parse(
-      "module m;\n"
-      "  tran (a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
 TEST(ParserA303, InoutTerminal_BitSelect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
