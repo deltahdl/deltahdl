@@ -97,4 +97,18 @@ TEST(ParserA301, GateInst_AllMosSwitchTypes) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// A.3.4 Production #3: mos_switchtype ::= nmos | pmos | rnmos | rpmos
+// =============================================================================
+TEST(ParserA304, MosSwitchtype_Nmos) {
+  auto r = Parse(
+      "module m;\n"
+      "  nmos (out, in, ctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNmos);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
