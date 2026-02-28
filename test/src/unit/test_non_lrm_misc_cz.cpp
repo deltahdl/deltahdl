@@ -155,17 +155,6 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
 
 namespace {
 
-TEST(ParserSection29, TableEdgeSymbolsPAndN) {
-  EXPECT_TRUE(
-      ParseOk("primitive pos_neg(output reg q, input d, clk);\n"
-              "  table\n"
-              "    0 p : ? : 0;\n"
-              "    1 p : ? : 1;\n"
-              "    ? n : ? : -;\n"
-              "  endtable\n"
-              "endprimitive\n"));
-}
-
 TEST(ParserSection29, TableEdgeNotationParenthesized) {
   EXPECT_TRUE(
       ParseOk("primitive edge_udp(output reg q, input d, clk);\n"

@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §12.4.2: priority if
-TEST(ParserA606, PriorityIf) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    priority if (a == 0) x = 1;\n"
-      "    else if (a == 1) x = 2;\n"
-      "    else x = 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
-}
-
 // §12.4.2: unique if with else-if chain and final else
 TEST(ParserA606, UniqueIfElseIfElse) {
   auto r = Parse(

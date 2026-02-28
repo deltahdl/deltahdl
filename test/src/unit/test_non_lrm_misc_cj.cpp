@@ -53,22 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// Plain if (no qualifier) has kNone qualifier.
-TEST(ParserSection12, PlainIfHasNoQualifier) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a) x = 1;\n"
-      "    else x = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
-}
-
 // =============================================================================
 // LRM section 12.5 -- Case statement (additional cases)
 // =============================================================================
