@@ -196,4 +196,23 @@ TEST(ParserAnnexA053, UdpBody_SimCombinational) {
   EXPECT_EQ(eval.Evaluate({'1', '1'}), '1');
 }
 
+// ---------------------------------------------------------------------------
+// Production 2: combinational_body ::= table combinational_entry
+//               { combinational_entry } endtable
+// ---------------------------------------------------------------------------
+// Single combinational entry
+TEST(ParserAnnexA053, CombBody_SingleEntry) {
+  auto r = Parse(
+      "primitive buf_prim(output y, input a);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_FALSE(udp->is_sequential);
+  EXPECT_EQ(udp->table.size(), 1);
+}
+
 }  // namespace
