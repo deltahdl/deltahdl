@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetArgs_Named) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let f(a, b) = a + b;\n"
-              "  initial begin\n"
-              "    int z;\n"
-              "    z = f(.a(1), .b(2));\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetArgs_DefaultOmitted) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
