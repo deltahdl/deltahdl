@@ -72,4 +72,11 @@ TEST(ParserA301, GateInst_TranBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
+TEST(ParserA301, GateInst_RtranBasic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rtran (io1, io2);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
