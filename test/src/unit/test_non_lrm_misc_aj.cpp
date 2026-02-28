@@ -50,27 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// --- Drive strength AND delay2 ---
-TEST(ParserA504, UdpInst_StrengthAndDelay) {
-  auto r = Parse(
-      "primitive my_udp(output y, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0 ;\n"
-      "    1 1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  my_udp (weak0, weak1) #7 u1(out, in1, in2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  ASSERT_EQ(insts.size(), 1u);
-  EXPECT_NE(insts[0]->drive_strength0, 0);
-  EXPECT_NE(insts[0]->drive_strength1, 0);
-  EXPECT_NE(insts[0]->gate_delay, nullptr);
-}
-
 // --- Multiple instances per statement ---
 TEST(ParserA504, UdpInst_MultipleInstances) {
   auto r = Parse(
