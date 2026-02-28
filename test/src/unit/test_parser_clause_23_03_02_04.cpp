@@ -72,4 +72,36 @@ TEST(ParserAnnexA0413, ProgramInstWildcardPort) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// --- Wildcard .* port connections (LRM §23.3.2.4) ---
+TEST(ParserSection23, WildcardConnection) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub m1(.*);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "sub");
+  EXPECT_EQ(item->inst_name, "m1");
+  EXPECT_TRUE(item->inst_wildcard);
+}
+
 }  // namespace

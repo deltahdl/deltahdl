@@ -36,20 +36,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// --- Wildcard .* port connections (LRM §23.3.2.4) ---
-TEST(ParserSection23, WildcardConnection) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub m1(.*);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "sub");
-  EXPECT_EQ(item->inst_name, "m1");
-  EXPECT_TRUE(item->inst_wildcard);
-}
-
 TEST(ParserSection23, WildcardWithNamed) {
   auto r = Parse(
       "module top;\n"
