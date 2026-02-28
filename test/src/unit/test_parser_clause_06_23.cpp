@@ -62,4 +62,17 @@ TEST(ParserA221, IncompleteClassScopedType) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// Section 8.23 -- Type-reference operator
+// =============================================================================
+// var type(expr) declaration.
+TEST(ParserSection8, TypeRefVarDecl) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real a = 1.0;\n"
+              "  real b = 2.0;\n"
+              "  var type(a + b) c;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

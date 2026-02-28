@@ -5,20 +5,40 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
 
-// =============================================================================
-// Section 8.23 -- Type-reference operator
-// =============================================================================
-// var type(expr) declaration.
-TEST(ParserSection8, TypeRefVarDecl) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real a = 1.0;\n"
-              "  real b = 2.0;\n"
-              "  var type(a + b) c;\n"
-              "endmodule\n"));
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
 }
+
+static void VerifyBlockVarDecls(const Stmt* blk,
+                                const std::string expected_names[],
+                                size_t count) {
+  ASSERT_EQ(blk->stmts.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(blk->stmts[i]->kind, StmtKind::kVarDecl) << "stmt " << i;
+    EXPECT_EQ(blk->stmts[i]->var_name, expected_names[i]) << "stmt " << i;
+  }
+}
+
+static ModuleItem* FirstAlwaysItem(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
+  }
+  return nullptr;
+}
+
+namespace {
 
 // type(data_type) in parameter default.
 TEST(ParserSection8, TypeRefDataTypeParam) {
@@ -157,32 +177,6 @@ TEST_F(ProgramTestParse, ProgramWithFinalBlock) {
   ASSERT_EQ(unit->programs.size(), 1u);
   ASSERT_EQ(unit->programs[0]->items.size(), 1u);
   EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
-}
-
-struct ParseResult90301 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult90301 Parse(const std::string& src) {
-  ParseResult90301 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static void VerifyBlockVarDecls(const Stmt* blk,
-                                const std::string expected_names[],
-                                size_t count) {
-  ASSERT_EQ(blk->stmts.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(blk->stmts[i]->kind, StmtKind::kVarDecl) << "stmt " << i;
-    EXPECT_EQ(blk->stmts[i]->var_name, expected_names[i]) << "stmt " << i;
-  }
 }
 
 TEST(ParserCh90301, BlockVarDecl_BuiltinType_Block) {
@@ -531,13 +525,6 @@ TEST(Parser, DisableStatement) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
   EXPECT_NE(stmt->expr, nullptr);
-}
-
-static ModuleItem* FirstAlwaysItem(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
-  }
-  return nullptr;
 }
 
 // =============================================================================

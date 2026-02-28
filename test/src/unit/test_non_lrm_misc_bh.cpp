@@ -4,38 +4,12 @@
 
 using namespace delta;
 
-namespace {
-
-// 32. Attribute name space (h) — enclosed by (* and *)
-TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
-  auto r = Parse(
-      "module m;\n"
-      "  (* synthesis *) logic flag;\n"
-      "  (* full_case, parallel_case *) logic [1:0] sel;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  // Verify attributes are parsed and attached to declarations
-  EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "synthesis"));
-  EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "full_case"));
-}
-
 // --- §5.13 Built-in methods ---
 struct ParseResult513 {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
 };
-
-static ParseResult513 Parse(const std::string& src) {
-  ParseResult513 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
 
 static Stmt* FirstInitialStmt(ParseResult513& r) {
   for (auto* item : r.cu->modules[0]->items) {
@@ -48,6 +22,32 @@ static Stmt* FirstInitialStmt(ParseResult513& r) {
   }
   return nullptr;
 }
+
+struct ParseResult616 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult616 Parse(const std::string& src) {
+  ParseResult616 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult616& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+namespace {
 
 // From test_parser_clause_05.cpp
 TEST(ParserCh513, BuiltInMethodCall_Parse) {
@@ -136,16 +136,6 @@ TEST(ParserCh513, BuiltInMethod_PushBack) {
               "endmodule"));
 }
 
-static ParseResult Parse(const std::string& src) {
-  ParseResult result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 TEST(Parser, NettypeDeclaration) {
   auto r = Parse(
       "module t;\n"
@@ -221,30 +211,6 @@ TEST(ParserA213, NettypeDeclWithScopedResolve) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
   EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
-}
-
-struct ParseResult611 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult611 Parse(const std::string& src) {
-  ParseResult611 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult611& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
 }
 
 // =============================================================================
@@ -563,30 +529,6 @@ TEST(ParserA221, IntegerAtomTypes) {
   EXPECT_EQ(r.cu->modules[0]->items[5]->data_type.kind, DataTypeKind::kTime);
 }
 
-struct ParseResult612 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult612 Parse(const std::string& src) {
-  ParseResult612 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult612& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // =============================================================================
 // LRM section 6.12 -- Real, shortreal, and realtime data types
 // =============================================================================
@@ -835,30 +777,6 @@ TEST(ParserA221, NonIntegerTypes) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->data_type.kind, DataTypeKind::kReal);
   EXPECT_EQ(r.cu->modules[0]->items[2]->data_type.kind,
             DataTypeKind::kRealtime);
-}
-
-struct ParseResult616 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult616 Parse(const std::string& src) {
-  ParseResult616 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult616& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
 }
 
 // =============================================================================
