@@ -205,4 +205,23 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNotEqual) {
   EXPECT_EQ(item->sensitivity[0].iff_condition->kind, ExprKind::kBinary);
 }
 
+// ---------------------------------------------------------------------------
+// iff guard at always_ff level with single posedge (no reset)
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFFSingleEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk iff en)\n"
+      "    q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
 }  // namespace
