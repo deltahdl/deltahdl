@@ -246,4 +246,17 @@ TEST(ParserCh50701, IntLiteral_SizedDecimal) {
   EXPECT_TRUE(ParseOk("module m; initial x = 5'D3; endmodule"));
 }
 
+// =============================================================================
+// A.8.4 Primaries — primary_literal
+// =============================================================================
+// § primary_literal — number (decimal)
+TEST(ParserA84, PrimaryLiteralDecimalNumber) {
+  auto r = Parse("module m; initial x = 100; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace

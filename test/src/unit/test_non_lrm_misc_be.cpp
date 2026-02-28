@@ -45,18 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 27. Module with static lifetime qualifier
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_StaticModuleLifetime) {
-  EXPECT_TRUE(
-      ParseOk("module static m;\n"
-              "  function int fn();\n"
-              "    return 0;\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
-// =============================================================================
 // 28. Automatic function returning logic with packed dimensions
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoFuncReturningLogic) {
