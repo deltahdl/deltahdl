@@ -51,4 +51,15 @@ TEST(ParserA211, CoverPoint_WithDataType) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, BinsOrEmpty_WithBraces) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins a = {1};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
