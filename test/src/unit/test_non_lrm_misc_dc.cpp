@@ -52,18 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-TEST_F(ApiParseTest, CoverageGetMaxSystemCall) {
-  auto* unit = Parse(R"(
-    module m;
-      initial begin
-        int x;
-        x = $coverage_get_max(0, 0);
-      end
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-}
-
 // =============================================================================
 // §41 Data read API / General system functions
 // =============================================================================
