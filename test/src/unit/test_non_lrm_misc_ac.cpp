@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetPortItem_WithUnpackedDim) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let f(logic x [3:0]) = x[0];\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA212, LetPortItem_TypedWithDefault) {
   auto r = Parse(
       "module m;\n"

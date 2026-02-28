@@ -46,4 +46,11 @@ TEST(ParserA212, LetPortItem_NoDefault) {
   EXPECT_EQ(item->func_args[0].default_value, nullptr);
 }
 
+TEST(ParserA212, LetPortItem_WithUnpackedDim) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(logic x [3:0]) = x[0];\n"
+              "endmodule\n"));
+}
+
 }  // namespace
