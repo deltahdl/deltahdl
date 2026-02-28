@@ -333,4 +333,19 @@ TEST(ParserSection23, LoopGenerateWithModuleInst) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
+// =========================================================================
+// LRM section 27.4: Genvar declarations
+// =========================================================================
+TEST(ParserSection23, GenvarDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(mod->items[0]->name, "i");
+}
+
 }  // namespace

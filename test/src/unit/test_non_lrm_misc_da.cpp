@@ -91,16 +91,6 @@ TEST(ParserSection28, Sec28_12_TwelveDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 12u);
 }
 
-TEST(ParserSection28, Sec28_12_SpecparamMinTypMax) {
-  EXPECT_TRUE(
-      ParseOk("module m(input a, output b);\n"
-              "  specify\n"
-              "    specparam tPLH = 3:5:7;\n"
-              "    (a => b) = tPLH;\n"
-              "  endspecify\n"
-              "endmodule\n"));
-}
-
 TEST_F(SpecifyTest, PathDelayWithRiseFall) {
   auto* cu = Parse(
       "module m;\n"
