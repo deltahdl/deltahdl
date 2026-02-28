@@ -27,4 +27,22 @@ TEST(ParserA612, ComplexMixedProds) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// Nested randsequence (randsequence inside code block)
+TEST(ParserA612, NestedRandsequence) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(outer)\n"
+      "      outer : {\n"
+      "        randsequence(inner)\n"
+      "          inner : { ; };\n"
+      "        endsequence\n"
+      "      };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

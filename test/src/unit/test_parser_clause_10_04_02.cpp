@@ -189,4 +189,27 @@ TEST(ParserSection10, Sec10_4_2_InBeginEndBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
 }
 
+// --- 12. Nonblocking in if-else branches (mux pattern) ---
+TEST(ParserSection10, Sec10_4_2_IfElseMuxPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, sel, a, b;\n"
+      "  initial begin\n"
+      "    if (sel)\n"
+      "      q <= a;\n"
+      "    else\n"
+      "      q <= b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNonblockingAssign);
+}
+
 }  // namespace

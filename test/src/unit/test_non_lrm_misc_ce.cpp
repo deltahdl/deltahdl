@@ -50,47 +50,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// --- 11. Nonblocking in begin-end block ---
-TEST(ParserSection10, Sec10_4_2_InBeginEndBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d;\n"
-      "  initial begin\n"
-      "    q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_EQ(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
-}
-
-// --- 12. Nonblocking in if-else branches (mux pattern) ---
-TEST(ParserSection10, Sec10_4_2_IfElseMuxPattern) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, sel, a, b;\n"
-      "  initial begin\n"
-      "    if (sel)\n"
-      "      q <= a;\n"
-      "    else\n"
-      "      q <= b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  ASSERT_NE(stmt->then_branch, nullptr);
-  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNonblockingAssign);
-}
-
 // --- 13. Nonblocking in case statement (decoder pattern) ---
 TEST(ParserSection10, Sec10_4_2_CaseDecoderPattern) {
   auto r = Parse(
