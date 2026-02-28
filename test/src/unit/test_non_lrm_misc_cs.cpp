@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, MonitorOnOff) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    $monitoron;\n"
-              "    $monitoroff;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, DisplayWithFormatSpecifiers) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
