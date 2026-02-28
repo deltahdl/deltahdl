@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "elaborator/type_eval.h"
 
 using namespace delta;
 

@@ -7,6 +7,7 @@
 #include "parser/ast.h"
 #include "simulator/eval.h"
 #include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "helpers_eval_op.h"
 
 using namespace delta;
 

@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -795,24 +796,6 @@ TEST(ParserAnnexA, A3GateInstWithStrengthAndDelay) {
   auto r = Parse("module m; and (strong0, weak1) #5 g(y, a, b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-static ModuleItem* FindGateByKind(const std::vector<ModuleItem*>& items,
-                                  GateKind kind) {
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kGateInst && item->gate_kind == kind)
-      return item;
-  }
-  return nullptr;
-}
-
-static std::vector<ModuleItem*> FindAllGates(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> gates;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kGateInst) gates.push_back(item);
-  }
-  return gates;
 }
 
 // =============================================================================
