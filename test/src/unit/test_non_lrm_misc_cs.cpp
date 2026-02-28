@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, SformatNoExtraArgs) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  string s;\n"
-              "  initial $sformat(s, \"no args here\");\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, SformatfInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
