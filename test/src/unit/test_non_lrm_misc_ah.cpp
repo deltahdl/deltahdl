@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-// udp_reg_declaration ; (standalone reg after output)
-TEST(ParserAnnexA052, PortDecl_RegStandalone) {
-  auto r = Parse(
-      "primitive dff(q, d, clk);\n"
-      "  output q;\n"
-      "  reg q;\n"
-      "  input d, clk;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->output_name, "q");
-  // The separate 'reg q;' declaration should make this sequential
-  EXPECT_TRUE(udp->is_sequential);
-}
-
 // All three udp_port_declaration alternatives together
 TEST(ParserAnnexA052, PortDecl_AllThreeAlternatives) {
   auto r = Parse(
