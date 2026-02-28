@@ -31,4 +31,15 @@ TEST(ParserAnnexA0411, NamedParameterAssignment) {
   EXPECT_NE(item->inst_params[1].second, nullptr);
 }
 
+TEST(ParserAnnexA0411, NamedParameterEmptyExpression) {
+  // . parameter_identifier ( ) — empty param_expression
+  auto r = Parse("module m; sub #(.WIDTH()) u0(a); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->inst_params.size(), 1u);
+  EXPECT_EQ(item->inst_params[0].first, "WIDTH");
+  EXPECT_EQ(item->inst_params[0].second, nullptr);
+}
+
 }  // namespace
