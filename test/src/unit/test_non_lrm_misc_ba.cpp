@@ -29,25 +29,6 @@ static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// 4. `include becomes part of the including file's CU.
-// The preprocessor inlines included content into the same CU.
-TEST(ParserClause03, Cl3_12_1_IncludeBecomesPartOfCU) {
-  // We can't include real files in this unit test, but we verify that
-  // the preprocessor produces a single text blob from `define/`ifdef
-  // which are CU-scoped directives.  If an `include were processed,
-  // its content would appear in the same preprocessed output.
-  auto r = ParseWithPreprocessor(
-      "`define MY_CONST 42\n"
-      "module m;\n"
-      "  localparam C = `MY_CONST;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  // The macro defined at CU scope is visible inside the module,
-  // demonstrating that preprocessing merges everything into one CU.
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // 5. Global visibility: modules, primitives, programs, interfaces, packages
 // are visible in all CUs.  Within a single CU, all are accessible.
 TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {

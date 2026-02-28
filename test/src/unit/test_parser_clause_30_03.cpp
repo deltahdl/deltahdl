@@ -48,4 +48,24 @@ TEST(ParserAnnexA, A7SpecparamInSpecify) {
   EXPECT_FALSE(r.has_errors);
 }
 
+ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// A.7.1 specify_block ::= specify { specify_item } endspecify
+// =============================================================================
+TEST(ParserA701, SpecifyBlockEmpty) {
+  auto r = Parse("module m; specify endspecify endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_EQ(spec->kind, ModuleItemKind::kSpecifyBlock);
+  EXPECT_EQ(spec->specify_items.size(), 0u);
+}
+
 }  // namespace
