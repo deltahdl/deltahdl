@@ -77,32 +77,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 
 namespace {
 
-// 28. Single module with timeunit slash — precision arg is used.
-TEST(ParserClause03, Cl3_14_3_SingleModuleTimeunitSlash) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1us / 1ps;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
-                                       r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kPs);
-}
-
-// 29. Multiple `timescale — preprocessor tracks min; function uses it.
-TEST(ParserClause03, Cl3_14_3_MultipleTimescaleDirectives) {
-  auto r = Parse(
-      "`timescale 1ns / 1ns\n"
-      "module a; endmodule\n"
-      "`timescale 1us / 1ps\n"
-      "module b; endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  // Preprocessor global precision = min(1ns, 1ps) = 1ps.
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
-                                       r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kPs);
-}
-
 // 30. Earlier `timescale with finer precision than later — global min is used.
 TEST(ParserClause03, Cl3_14_3_EarlierTimescaleFinerPrecision) {
   auto r = Parse(

@@ -52,21 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// Coexistence with package imports/exports
-// =============================================================================
-TEST_F(DpiParseTest, PackageImportStillWorks) {
-  auto* unit = Parse(R"(
-    module m;
-      import pkg::*;
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kImportDecl);
-}
-
 TEST_F(DpiParseTest, DpiImportCoexistsWithPackageImport) {
   auto* unit = Parse(R"(
     module m;

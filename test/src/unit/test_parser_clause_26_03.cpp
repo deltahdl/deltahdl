@@ -61,4 +61,56 @@ TEST(ParserSection26, ModuleImportPackage) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
 }
 
+TEST(ParserSection26, ModuleImportSpecific) {
+  auto r = Parse(
+      "package p;\n"
+      "  parameter int X = 1;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::X;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  const auto* imp =
+      FindItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
+  ASSERT_NE(imp, nullptr);
+  EXPECT_EQ(imp->import_item.package_name, "p");
+  EXPECT_EQ(imp->import_item.item_name, "X");
+}
+
+using DpiParseTest = ProgramTestParse;
+
+using ApiParseTest = ProgramTestParse;
+
+struct ParseResult40 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult40 Parse(const std::string& src) {
+  ParseResult40 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// Coexistence with package imports/exports
+// =============================================================================
+TEST_F(DpiParseTest, PackageImportStillWorks) {
+  auto* unit = Parse(R"(
+    module m;
+      import pkg::*;
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kImportDecl);
+}
+
 }  // namespace
