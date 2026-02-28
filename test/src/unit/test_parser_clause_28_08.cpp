@@ -118,4 +118,21 @@ TEST(ParserA301, PassSwitchInst_Unnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
+// =============================================================================
+// A.3.1 Production #8: pass_enable_switch_instance
+// pass_enable_switch_instance ::= [name_of_instance]
+//   ( inout_terminal , inout_terminal , enable_terminal )
+// =============================================================================
+TEST(ParserA301, PassEnSwitchInst_Tranif0Named) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif0 t1(io1, io2, ctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_inst_name, "t1");
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
