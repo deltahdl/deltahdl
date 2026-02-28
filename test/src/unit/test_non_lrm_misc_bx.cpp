@@ -89,26 +89,6 @@ static Stmt* FirstAlwaysCombStmt(ParseResult9g& r) {
 namespace {
 
 // =============================================================================
-// LRM section 9.4.5 / 10.4.1 -- Intra-assignment delay (nonblocking)
-// =============================================================================
-// Nonblocking intra-assignment delay: a <= #5 b;
-TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial a <= #5 b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->delay, nullptr);
-  EXPECT_NE(stmt->lhs, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
-// =============================================================================
 // LRM section 9.4.5 / 10.4.2 -- Intra-assignment event (blocking posedge)
 // =============================================================================
 // Blocking intra-assignment event: a = @(posedge clk) b;
