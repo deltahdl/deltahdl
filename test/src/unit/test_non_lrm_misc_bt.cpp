@@ -40,16 +40,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserCh90301, BlockVarDecl_UserDefinedType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct {int a, b[4];} ab_t;\n"
-              "  initial begin\n"
-              "    ab_t v1[1:0] [2:0];\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserCh90301, BlockVarDecl_CommaSeparated) {
   auto r = Parse(
       "module m;\n"

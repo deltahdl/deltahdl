@@ -428,4 +428,14 @@ TEST(ParserCh90301, BlockVarDecl_BuiltinType_Stmt) {
   EXPECT_EQ(blk->stmts[0]->var_name, "x");
 }
 
+TEST(ParserCh90301, BlockVarDecl_UserDefinedType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {int a, b[4];} ab_t;\n"
+              "  initial begin\n"
+              "    ab_t v1[1:0] [2:0];\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -41,19 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, WireWithRange) {
-  // wire [15:0] ww; — equivalent to "wire logic [15:0] ww;"
-  auto r = Parse(
-      "module t;\n"
-      "  wire [15:0] ww;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
-}
-
 TEST(ParserSection6, WireExplicitLogicType) {
   auto r = Parse(
       "module t;\n"
