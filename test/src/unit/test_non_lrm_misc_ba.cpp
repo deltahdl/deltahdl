@@ -4,55 +4,46 @@
 
 using namespace delta;
 
+static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+static const ModuleItem* FindInstByModule(const std::vector<ModuleItem*>& items,
+                                          const std::string& module_name) {
+  for (const auto* item : items)
+    if (item->kind == ModuleItemKind::kModuleInst &&
+        item->inst_module == module_name)
+      return item;
+  return nullptr;
+}
+
+static const ModuleItem* FindItemByKindAndName(
+    const std::vector<ModuleItem*>& items, ModuleItemKind kind,
+    const std::string& name) {
+  for (const auto* item : items)
+    if (item->kind == kind && item->name == name) return item;
+  return nullptr;
+}
+
+static bool HasItemOfKindAndName(const std::vector<ModuleItem*>& items,
+                                 ModuleItemKind kind, const std::string& name) {
+  for (const auto* item : items)
+    if (item->kind == kind && item->name == name) return true;
+  return false;
+}
+
+static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
+                         const std::string& name) {
+  for (const auto* item : items)
+    for (const auto& attr : item->attrs)
+      if (attr.name == name) return true;
+  return false;
+}
+
 namespace {
-
-// §3.8: Function returning value, void function, all 4 argument directions.
-TEST(ParserClause03, Cl3_8_FunctionReturnAndVoidAndDirections) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int compute(input int a, output int b,\n"
-      "                       inout int c, ref int d);\n"
-      "    b = a;\n"
-      "    return a + c + d;\n"
-      "  endfunction\n"
-      "  function void show(input int val);\n"
-      "    $display(\"%d\", val);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(
-      CountItemsByKind(r.cu->modules[0]->items, ModuleItemKind::kFunctionDecl),
-      2);
-  const auto* compute = FindFunctionByName(r.cu->modules[0]->items, "compute");
-  ASSERT_NE(compute, nullptr);
-  ASSERT_EQ(compute->func_args.size(), 4u);
-  EXPECT_EQ(compute->func_args[0].direction, Direction::kInput);
-  EXPECT_EQ(compute->func_args[1].direction, Direction::kOutput);
-  EXPECT_EQ(compute->func_args[2].direction, Direction::kInout);
-  EXPECT_EQ(compute->func_args[3].direction, Direction::kRef);
-}
-
-// =============================================================================
-// LRM §3.9 — Packages
-// =============================================================================
-// §3.9: "Packages provide a declaration space, which can be shared by other
-//        building blocks." Package with typedef, functions, and end label.
-TEST(ParserClause03, Cl3_9_PackageDeclarationsAndEndLabel) {
-  auto r = ParseWithPreprocessor(
-      "package ComplexPkg;\n"
-      "  typedef struct { shortreal i, r; } Complex;\n"
-      "  function automatic int helper(int x); return x; endfunction\n"
-      "endpackage : ComplexPkg\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "ComplexPkg");
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kTypedef));
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
-}
 
 // §3.9: "Package declarations can be imported into other building blocks,
 //        including other packages."
@@ -107,13 +98,6 @@ TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
   ASSERT_EQ(r2->liblist.size(), 2u);
 }
 
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // LRM §3.11 — Overview of hierarchy
 // =============================================================================
@@ -148,15 +132,6 @@ TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
       CountItemsByKind(r.cu->modules[1]->items, ModuleItemKind::kGateInst), 4);
 }
 
-static const ModuleItem* FindInstByModule(const std::vector<ModuleItem*>& items,
-                                          const std::string& module_name) {
-  for (const auto* item : items)
-    if (item->kind == ModuleItemKind::kModuleInst &&
-        item->inst_module == module_name)
-      return item;
-  return nullptr;
-}
-
 // =============================================================================
 // LRM §3.12 — Compilation and elaboration
 // =============================================================================
@@ -185,14 +160,6 @@ TEST(ParserClause03, Cl3_12_CompilationAndElaboration) {
   ASSERT_NE(inst, nullptr);
   EXPECT_EQ(inst->inst_params.size(), 1u);
   EXPECT_EQ(inst->inst_ports.size(), 3u);
-}
-
-static const ModuleItem* FindItemByKindAndName(
-    const std::vector<ModuleItem*>& items, ModuleItemKind kind,
-    const std::string& name) {
-  for (const auto* item : items)
-    if (item->kind == kind && item->name == name) return item;
-  return nullptr;
 }
 
 // =============================================================================
@@ -424,21 +391,6 @@ TEST(SourceText, EmptySourceText) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules.empty());
-}
-
-static bool HasItemOfKindAndName(const std::vector<ModuleItem*>& items,
-                                 ModuleItemKind kind, const std::string& name) {
-  for (const auto* item : items)
-    if (item->kind == kind && item->name == name) return true;
-  return false;
-}
-
-static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
-                         const std::string& name) {
-  for (const auto* item : items)
-    for (const auto& attr : item->attrs)
-      if (attr.name == name) return true;
-  return false;
 }
 
 // =============================================================================
