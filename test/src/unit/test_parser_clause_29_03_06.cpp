@@ -27,4 +27,23 @@ TEST(ParserAnnexA051, TableEdgeSymbols) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
+// --- udp_declaration: table with wildcard symbols ---
+TEST(ParserAnnexA051, TableWildcardSymbols) {
+  auto r = Parse(
+      "primitive wild(output out, input a, input b);\n"
+      "  table\n"
+      "    ? ? : 0;\n"
+      "    b b : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->table.size(), 2u);
+  EXPECT_EQ(udp->table[0].inputs[0], '?');
+  EXPECT_EQ(udp->table[0].inputs[1], '?');
+  EXPECT_EQ(udp->table[1].inputs[0], 'b');
+  EXPECT_EQ(udp->table[1].inputs[1], 'b');
+}
+
 }  // namespace
