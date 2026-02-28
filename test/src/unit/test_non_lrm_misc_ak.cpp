@@ -15,23 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, AlwaysConstruct_WithBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk) begin\n"
-      "    q <= d;\n"
-      "    r <= e;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->stmts.size(), 2u);
-}
-
 // =============================================================================
 // A.6.2 Production: always_keyword
 // always_keyword ::= always | always_comb | always_latch | always_ff

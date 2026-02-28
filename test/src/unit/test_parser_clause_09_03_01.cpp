@@ -98,4 +98,29 @@ TEST(ParserA602, InitialConstruct_BeginEnd) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
+// Return all statements from the first initial block's begin/end.
+static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  if (!item || !item->body) return {};
+  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
+  return {item->body};
+}
+
+TEST(ParserA602, AlwaysConstruct_WithBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) begin\n"
+      "    q <= d;\n"
+      "    r <= e;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_EQ(item->body->stmts.size(), 2u);
+}
+
 }  // namespace
