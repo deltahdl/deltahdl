@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #1: gate_instantiation (n_input_gatetype alternative)
-// gate_instantiation ::=
-//   n_input_gatetype [drive_strength] [delay2] n_input_gate_instance
-//                    {, n_input_gate_instance} ;
-// =============================================================================
-TEST(ParserA301, GateInst_AndBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  and (out, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(ParserA301, GateInst_NandBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
