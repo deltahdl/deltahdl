@@ -100,4 +100,23 @@ TEST(ParserA606, IfElseIfNoFinalElse) {
   EXPECT_EQ(stmt->else_branch->else_branch->else_branch, nullptr);
 }
 
+// Chained if-else-if-else produces nested kIf on else_branch.
+TEST(ParserSection12, IfElseIfElseChain) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a == 0) x = 0;\n"
+      "    else if (a == 1) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->else_branch->else_branch, nullptr);
+}
+
 }  // namespace
