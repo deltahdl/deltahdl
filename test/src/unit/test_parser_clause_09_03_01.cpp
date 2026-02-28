@@ -207,4 +207,26 @@ TEST(ParserA603, SeqBlockWithVarDecl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
+// §9.3.1: Nested sequential blocks
+TEST(ParserA603, SeqBlockNested) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      a = 1;\n"
+      "    end\n"
+      "    begin\n"
+      "      b = 2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
+}
+
 }  // namespace
