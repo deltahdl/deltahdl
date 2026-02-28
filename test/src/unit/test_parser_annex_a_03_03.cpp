@@ -206,4 +206,11 @@ TEST(ParserA303, NcontrolTerminal_ComplexExpr) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, NcontrolTerminal_BitSelect) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rcmos (out, in, ctrl[0], ctrl[1]);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
