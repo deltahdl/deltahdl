@@ -482,4 +482,17 @@ TEST(ParserSection29, TableEdgeSymbolsPAndN) {
               "endprimitive\n"));
 }
 
+TEST(ParserSection29, TableEdgeNotationParenthesized) {
+  EXPECT_TRUE(
+      ParseOk("primitive edge_udp(output reg q, input d, clk);\n"
+              "  table\n"
+              "    0 (01) : ? : 0;\n"
+              "    1 (01) : ? : 1;\n"
+              "    ? (10) : ? : -;\n"
+              "    ? (0x) : ? : -;\n"
+              "    ? (x1) : ? : -;\n"
+              "  endtable\n"
+              "endprimitive\n"));
+}
+
 }  // namespace
