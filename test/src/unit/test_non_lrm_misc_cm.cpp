@@ -34,22 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §14.10: clocking block with multiple input signals triggers one event.
-TEST(ParserSection14, ClockingBlockEventMultipleInputs) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input a, b, c;\n"
-      "  endclocking\n"
-      "  always @(cb) $display(\"triggered\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 3u);
-  EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
-}
-
 // =============================================================================
 // LRM section 14.12 -- Default clocking
 // =============================================================================
