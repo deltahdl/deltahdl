@@ -36,27 +36,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 namespace {
 
 // =============================================================================
-// LRM section 9.3.1 -- Block with only variable declarations (no statements).
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_BlockWithOnlyVarDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int a;\n"
-      "    logic [3:0] b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_EQ(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
-}
-
-// =============================================================================
 // LRM section 9.3.1 -- ParseOk smoke tests for complex block scenarios.
 // =============================================================================
 TEST(ParserSection9, Sec9_3_1_MultipleSequentialBlocksInSameInitial) {

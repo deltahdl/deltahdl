@@ -438,4 +438,49 @@ TEST(ParserCh90301, BlockVarDecl_UserDefinedType) {
               "endmodule\n"));
 }
 
+static void VerifyBlockVarDecls(const Stmt* blk,
+                                const std::string expected_names[],
+                                size_t count) {
+  ASSERT_EQ(blk->stmts.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(blk->stmts[i]->kind, StmtKind::kVarDecl) << "stmt " << i;
+    EXPECT_EQ(blk->stmts[i]->var_name, expected_names[i]) << "stmt " << i;
+  }
+}
+
+TEST(ParserCh90301, BlockVarDecl_CommaSeparated) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int a, b, c;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* blk = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(blk, nullptr);
+  std::string expected_names[] = {"a", "b", "c"};
+  VerifyBlockVarDecls(blk, expected_names, std::size(expected_names));
+}
+
+// =============================================================================
+// LRM section 9.3.1 -- Block with only variable declarations (no statements).
+// =============================================================================
+TEST(ParserSection9, Sec9_3_1_BlockWithOnlyVarDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int a;\n"
+      "    logic [3:0] b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_EQ(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
+}
+
 }  // namespace
