@@ -124,4 +124,25 @@ TEST_F(ProgramTestParse, ProgramAutomaticLifetime) {
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
+static int CountItemsOfKind(const std::vector<ModuleItem*>& items,
+                            ModuleItemKind kind) {
+  int count = 0;
+  for (const auto* item : items) {
+    if (item->kind == kind) ++count;
+  }
+  return count;
+}
+
+TEST_F(ProgramTestParse, ProgramWithMultipleInitialBlocks) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  initial $display(\"init1\");\n"
+      "  initial $display(\"init2\");\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(
+      CountItemsOfKind(unit->programs[0]->items, ModuleItemKind::kInitialBlock),
+      2);
+}
+
 }  // namespace
