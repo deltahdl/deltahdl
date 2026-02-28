@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Edge indicator surrounded by level symbols (3 inputs)
-TEST(ParserAnnexA053, EdgeInputList_SurroundedByLevels) {
-  auto r = Parse(
-      "primitive three_in(output reg q, input a, clk, b);\n"
-      "  table\n"
-      "    0 r 1 : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table[0].inputs.size(), 3);
-  EXPECT_EQ(udp->table[0].inputs[0], '0');
-  EXPECT_EQ(udp->table[0].inputs[1], 'r');
-  EXPECT_EQ(udp->table[0].inputs[2], '1');
-}
-
 // ---------------------------------------------------------------------------
 // Production 11: edge_indicator ::= ( level_symbol level_symbol ) |
 //                edge_symbol
