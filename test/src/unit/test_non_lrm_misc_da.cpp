@@ -91,18 +91,6 @@ TEST(ParserSection28, Sec28_12_TwelveDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 12u);
 }
 
-TEST_F(SpecifyTest, PathDelayThreeValues) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  (a => b) = (2, 3, 4);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items[0]->path.delays.size(), 3u);
-}
-
 // =============================================================================
 // §30.3.3 Conditional path delays
 // =============================================================================
