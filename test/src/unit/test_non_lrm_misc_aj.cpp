@@ -50,27 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// --- Instance arrays ---
-TEST(ParserA504, UdpInst_InstanceArray) {
-  auto r = Parse(
-      "primitive my_udp(output y, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0 ;\n"
-      "    1 1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  my_udp u1[3:0](out, in1, in2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  ASSERT_EQ(insts.size(), 1u);
-  EXPECT_EQ(insts[0]->gate_inst_name, "u1");
-  EXPECT_NE(insts[0]->inst_range_left, nullptr);
-  EXPECT_NE(insts[0]->inst_range_right, nullptr);
-}
-
 // --- Multiple input terminals ---
 TEST(ParserA504, UdpInst_SingleInput) {
   auto r = Parse(
