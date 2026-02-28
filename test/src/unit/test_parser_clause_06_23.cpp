@@ -82,4 +82,15 @@ TEST(ParserSection8, TypeRefDataTypeParam) {
               "endmodule\n"));
 }
 
+// type() comparison in expressions.
+TEST(ParserSection8, TypeRefComparison) {
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter type T = int)\n"
+              "  ();\n"
+              "  initial begin\n"
+              "    if (type(T) == type(int)) $display(\"int\");\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

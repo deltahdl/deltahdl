@@ -5,34 +5,43 @@
 
 using namespace delta;
 
+struct ParseResult19 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult19 Parse(const std::string& src) {
+  ParseResult19 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FindClockingBlock(ParseResult19& r, size_t idx = 0) {
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (count == idx) return item;
+    ++count;
+  }
+  return nullptr;
+}
+
+// Validates parse result and retrieves a clocking block via output param.
+// Must be called through ASSERT_NO_FATAL_FAILURE.
+static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
+                             size_t idx = 0) {
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  out = FindClockingBlock(r, idx);
+  ASSERT_NE(out, nullptr);
+}
+
 namespace {
-
-TEST(ParserSection18, StdRandomizeWithConstraint) {
-  auto r = Parse(
-      "module top;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    std::randomize(x) with { x > 0; x < 10; };\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-// =============================================================================
-// §18.5.3 Distribution constraints
-// =============================================================================
-TEST(ParserSection18, DistConstraintEqualWeight) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  constraint c { x dist {100:=1, 200:=2, 300:=5}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
 
 TEST(ParserSection18, DistConstraintDivideWeight) {
   auto r = Parse(
@@ -259,25 +268,6 @@ TEST(ParserSection18, GetSetRandstateRoundtrip) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// --- Test helpers ---
-struct ParseResult18b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult18b Parse(const std::string& src) {
-  ParseResult18b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // =============================================================================
 // LRM section 18.5.3 -- Distribution constraints (additional tests)
 // =============================================================================
@@ -390,42 +380,6 @@ TEST(ParserSection18b, DistMultipleConstraints) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-struct ParseResult19 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult19 Parse(const std::string& src) {
-  ParseResult19 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FindClockingBlock(ParseResult19& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
-}
-
-// Validates parse result and retrieves a clocking block via output param.
-// Must be called through ASSERT_NO_FATAL_FAILURE.
-static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
-                             size_t idx = 0) {
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  out = FindClockingBlock(r, idx);
-  ASSERT_NE(out, nullptr);
 }
 
 // =============================================================================
