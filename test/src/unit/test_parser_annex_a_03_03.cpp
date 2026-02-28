@@ -183,4 +183,20 @@ TEST(ParserA303, InputTerminal_CmosSwitch) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// A.3.3 Production #4: ncontrol_terminal ::= expression
+// Exercised via cmos switches (cmos/rcmos).
+// The ncontrol_terminal is the third terminal.
+// =============================================================================
+TEST(ParserA303, NcontrolTerminal_SimpleIdent) {
+  auto r = Parse(
+      "module m;\n"
+      "  cmos (out, in, nctrl, pctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 4u);
+}
+
 }  // namespace
