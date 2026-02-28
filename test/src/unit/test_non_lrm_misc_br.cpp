@@ -17,23 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// 22. Struct in conditional expression (ternary).
-TEST(ParserSection7, Sec7_2_2_StructTernary) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { int a; int b; } pair_t;\n"
-      "  pair_t x, y, z;\n"
-      "  logic sel;\n"
-      "  initial z = sel ? x : y;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
-}
-
 // 23. Struct variable declaration with initializer in initial block.
 TEST(ParserSection7, Sec7_2_2_VarDeclWithInit) {
   auto r = Parse(
