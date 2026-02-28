@@ -3,7 +3,10 @@
 #include <cstdint>
 #include <string_view>
 
+#include "builders_ast.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
+#include "helpers_stmt_exec.h"
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
 #include "simulator/exec_task.h"
@@ -11,10 +14,6 @@
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_result.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
-#include "helpers_stmt_exec.h"
 
 using namespace delta;
 

@@ -1,11 +1,9 @@
 // §30.4.6: Declaring multiple module paths in a single statement
 
-
-#include "simulator/lowerer.h"
-#include "simulator/variable.h"
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 

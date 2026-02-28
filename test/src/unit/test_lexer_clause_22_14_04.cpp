@@ -2,8 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include "lexer/keywords.h"
 #include "fixture_lexer.h"
+#include "lexer/keywords.h"
 
 using namespace delta;
 

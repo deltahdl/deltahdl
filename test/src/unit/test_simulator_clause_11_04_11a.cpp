@@ -1,9 +1,7 @@
 // §11.4.11: Conditional operator
 
-
-#include "simulator/eval.h"
-
 #include "fixture_simulator.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 

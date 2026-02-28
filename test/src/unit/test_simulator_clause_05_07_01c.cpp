@@ -1,14 +1,12 @@
 // §5.7.1: Integer literal constants
 
-
 #include <cstring>
 
+#include "fixture_simulator.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
 #include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

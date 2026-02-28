@@ -783,8 +783,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefPackedArray) {
 }
 
 // Helper: find a module item by name.
-static ModuleItem* FindItemByName(ParseResult6i& r,
-                                  std::string_view name) {
+static ModuleItem* FindItemByName(ParseResult6i& r, std::string_view name) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->name == name) return item;
   }

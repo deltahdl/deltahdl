@@ -3,9 +3,7 @@
 
 using namespace delta;
 
-namespace {
-
-}  // namespace
+namespace {}  // namespace
 
 // =============================================================================
 // A.2.1.1 Module parameter declarations

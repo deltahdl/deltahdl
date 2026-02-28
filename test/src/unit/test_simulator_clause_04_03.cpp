@@ -1,11 +1,10 @@
 
-#include "simulator/lowerer.h"
-#include "simulator/process.h"
-#include "simulator/variable.h"
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "helpers_scheduler_event.h"
+#include "simulator/lowerer.h"
+#include "simulator/process.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -579,9 +578,7 @@ TEST(SimCh43, EventPoolRecycles) {
 // §4.3 Scheduler low-level: events scheduled at the same time and region
 // execute in FIFO order.
 // ---------------------------------------------------------------------------
-TEST(SimCh43, SameTimeAndRegionFIFO) {
-  VerifyActiveRegionFIFO();
-}
+TEST(SimCh43, SameTimeAndRegionFIFO) { VerifyActiveRegionFIFO(); }
 
 // ---------------------------------------------------------------------------
 // §4.3 Scheduler low-level: time ordering — earlier time executes first.

@@ -4,9 +4,7 @@
 
 using namespace delta;
 
-namespace {
-
-}  // namespace
+namespace {}  // namespace
 
 // =============================================================================
 // A.8.5 Expression left-side values — Elaboration

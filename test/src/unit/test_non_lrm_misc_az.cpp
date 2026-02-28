@@ -632,10 +632,9 @@ TEST(ParserClause03, Cl3_4_RejectsDisallowedItems) {
   EXPECT_TRUE(
       ParseWithPreprocessor("program p; always_comb begin end endprogram\n")
           .has_errors);
-  EXPECT_TRUE(
-      ParseWithPreprocessor(
-          "program p; always_ff @(posedge clk) begin end endprogram\n")
-          .has_errors);
+  EXPECT_TRUE(ParseWithPreprocessor(
+                  "program p; always_ff @(posedge clk) begin end endprogram\n")
+                  .has_errors);
   EXPECT_TRUE(
       ParseWithPreprocessor("program p; always_latch begin end endprogram\n")
           .has_errors);

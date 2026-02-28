@@ -1,10 +1,8 @@
 // §12.7.3: The foreach-loop
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

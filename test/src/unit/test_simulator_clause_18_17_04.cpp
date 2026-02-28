@@ -1,10 +1,8 @@
 // §18.17.4: Repeat production statements
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

@@ -1,11 +1,10 @@
 // §8.11: This
 
+#include "fixture_simulator.h"
+#include "helpers_class_object.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "helpers_class_object.h"
 
 using namespace delta;
 

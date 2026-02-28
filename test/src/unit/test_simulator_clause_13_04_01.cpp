@@ -1,11 +1,10 @@
 // §13.4.1: Return values and void functions
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
-#include "helpers_scheduler.h"
 
 using namespace delta;
 

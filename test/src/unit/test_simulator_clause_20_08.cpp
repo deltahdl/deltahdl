@@ -4,10 +4,9 @@
 
 #include <cmath>
 
+#include "fixture_real.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_real.h"
 
 using namespace delta;
 

@@ -1,14 +1,12 @@
 // §7.10.5: Bounded queues
 
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-
 #include "fixture_parser.h"
 
 using namespace delta;
-
-};
+}
+;
 
 namespace {
 

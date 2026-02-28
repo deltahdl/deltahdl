@@ -1,12 +1,11 @@
 // §8.6: Object methods
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
+#include "helpers_class_object.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
-#include "helpers_class_object.h"
 
 using namespace delta;
 
@@ -49,7 +48,8 @@ TEST(ClassSim, SimpleMethodCall) {
   auto* method = f.arena.Create<ModuleItem>();
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "get_count";
-  method->func_body_stmts.push_back(MakeReturn(f.arena, MkId(f.arena, "count")));
+  method->func_body_stmts.push_back(
+      MakeReturn(f.arena, MkId(f.arena, "count")));
   type->methods["get_count"] = method;
 
   auto [handle, obj] = MakeObj(f, type);

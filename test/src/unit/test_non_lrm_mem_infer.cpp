@@ -2,9 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include "synthesizer/mem_infer.h"
-
 #include "fixture_synthesizer.h"
+#include "synthesizer/mem_infer.h"
 
 using namespace delta;
 

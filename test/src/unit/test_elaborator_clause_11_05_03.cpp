@@ -2,11 +2,10 @@
 
 #include <gtest/gtest.h>
 
+#include "builders_ast.h"
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "parser/ast.h"
-
-#include "builders_ast.h"
 
 using namespace delta;
 

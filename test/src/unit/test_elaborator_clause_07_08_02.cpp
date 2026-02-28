@@ -1,9 +1,7 @@
 // §7.8.2: String index
 
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-
 #include "fixture_elaborator.h"
 
 using namespace delta;

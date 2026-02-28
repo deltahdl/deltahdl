@@ -1,12 +1,10 @@
 // §23.3.2.2: Connecting module instance ports by name
 
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
-#include "lexer/token.h"
-
 #include "fixture_elaborator.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

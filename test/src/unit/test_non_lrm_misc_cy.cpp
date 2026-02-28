@@ -677,7 +677,8 @@ TEST(Parser, GateAndInst) {
 }
 
 TEST(Parser, GateNandWithDelay) {
-  auto r = ParseWithPreprocessor("module t; nand #(5) g2(out, a, b); endmodule");
+  auto r =
+      ParseWithPreprocessor("module t; nand #(5) g2(out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kNand);
@@ -831,7 +832,8 @@ TEST(ParserSection28, StrengthSpec) {
 }
 
 TEST(Parser, GateCmos) {
-  auto r = ParseWithPreprocessor("module t; cmos (out, in, nctrl, pctrl); endmodule");
+  auto r = ParseWithPreprocessor(
+      "module t; cmos (out, in, nctrl, pctrl); endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);

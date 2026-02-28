@@ -1,11 +1,10 @@
 // §non-lrm:queue_ref
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
+#include "helpers_queue.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
-#include "helpers_queue.h"
 
 using namespace delta;
 
@@ -57,13 +56,14 @@ TEST(QueueRef, OutdatedByWholeAssign) {
   // (A real whole-queue assign goes through stmt_assign.cpp, which is harder to
   //  invoke from a function body in a unit test. This achieves the same effect:
   //  all element IDs are replaced → ref is outdated.)
-  RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
-              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete", {})),
-               MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_back",
-                                                {MakeInt(f.arena, 100)})),
-               MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_back",
-                                                {MakeInt(f.arena, 200)})),
-               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
+  RegAutoFunc(
+      f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
+      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete", {})),
+       MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_back",
+                                            {MakeInt(f.arena, 100)})),
+       MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_back",
+                                            {MakeInt(f.arena, 200)})),
+       MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
   auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 1)});
   EvalExpr(call, f.ctx, f.arena);
@@ -103,7 +103,7 @@ TEST(QueueRef, SurvivesPushFront) {
   // endfunction
   RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
               {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_front",
-                                                {MakeInt(f.arena, 5)})),
+                                                    {MakeInt(f.arena, 5)})),
                MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
   auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 1)});

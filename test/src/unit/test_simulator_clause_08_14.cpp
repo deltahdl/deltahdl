@@ -1,12 +1,11 @@
 // §8.14: Overridden members
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
+#include "helpers_class_object.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
-#include "helpers_class_object.h"
 
 using namespace delta;
 
@@ -34,7 +33,8 @@ TEST(ClassSim, ChildMethodOverridesParent) {
   auto* base_method = f.arena.Create<ModuleItem>();
   base_method->kind = ModuleItemKind::kFunctionDecl;
   base_method->name = "greet";
-  base_method->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 1)));
+  base_method->func_body_stmts.push_back(
+      MakeReturn(f.arena, MkInt(f.arena, 1)));
   base->methods["greet"] = base_method;
 
   auto* derived = MakeClassType(f, "Derived", {});
@@ -42,7 +42,8 @@ TEST(ClassSim, ChildMethodOverridesParent) {
   auto* child_method = f.arena.Create<ModuleItem>();
   child_method->kind = ModuleItemKind::kFunctionDecl;
   child_method->name = "greet";
-  child_method->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 2)));
+  child_method->func_body_stmts.push_back(
+      MakeReturn(f.arena, MkInt(f.arena, 2)));
   derived->methods["greet"] = child_method;
 
   auto [handle, obj] = MakeObj(f, derived);

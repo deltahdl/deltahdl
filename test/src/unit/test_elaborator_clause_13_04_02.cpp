@@ -1,9 +1,7 @@
 // §13.4.2: Static and automatic functions
 
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-
 #include "fixture_elaborator.h"
 
 using namespace delta;

@@ -5,9 +5,8 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "simulator/scheduler.h"
-
 #include "helpers_scheduler_event.h"
+#include "simulator/scheduler.h"
 
 using namespace delta;
 
@@ -286,13 +285,15 @@ TEST(SimCh49, AllAssignmentTypesUseSchedulerInfrastructure) {
 
   // Schedule one event per assignment type to show they all use the same
   // scheduler infrastructure (ScheduleEvent -> Region -> EventQueue -> Run).
-  ScheduleLabeled(sched, Region::kActive, "continuous", executed);       // §4.9.1
-  ScheduleLabeled(sched, Region::kActive, "proc_continuous", executed);  // §4.9.2
-  ScheduleLabeled(sched, Region::kInactive, "blocking", executed);      // §4.9.3 (zero delay)
-  ScheduleLabeled(sched, Region::kNBA, "nonblocking", executed);        // §4.9.4
-  ScheduleLabeled(sched, Region::kActive, "switch", executed);          // §4.9.5
-  ScheduleLabeled(sched, Region::kActive, "port", executed);            // §4.9.6
-  ScheduleLabeled(sched, Region::kActive, "subroutine", executed);      // §4.9.7
+  ScheduleLabeled(sched, Region::kActive, "continuous", executed);  // §4.9.1
+  ScheduleLabeled(sched, Region::kActive, "proc_continuous",
+                  executed);  // §4.9.2
+  ScheduleLabeled(sched, Region::kInactive, "blocking",
+                  executed);  // §4.9.3 (zero delay)
+  ScheduleLabeled(sched, Region::kNBA, "nonblocking", executed);    // §4.9.4
+  ScheduleLabeled(sched, Region::kActive, "switch", executed);      // §4.9.5
+  ScheduleLabeled(sched, Region::kActive, "port", executed);        // §4.9.6
+  ScheduleLabeled(sched, Region::kActive, "subroutine", executed);  // §4.9.7
 
   sched.Run();
   EXPECT_EQ(executed.size(), 7u);

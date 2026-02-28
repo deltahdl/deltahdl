@@ -4,10 +4,10 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "fixture_preprocessor.h"
 #include "fixture_preprocessor_timescale.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 
 using namespace delta;
 

@@ -1,11 +1,10 @@
 
 
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

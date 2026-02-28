@@ -1,10 +1,9 @@
 // §13.4.2: Static and automatic functions
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
 
 using namespace delta;
 
@@ -12,8 +11,8 @@ static ModuleItem* MakeCounterFunc(Arena& arena) {
   auto* func = arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "counter";
-  auto* rhs = MakeBinary(arena, TokenKind::kPlus,
-                         MakeId(arena, "counter"), MakeInt(arena, 1));
+  auto* rhs = MakeBinary(arena, TokenKind::kPlus, MakeId(arena, "counter"),
+                         MakeInt(arena, 1));
   func->func_body_stmts.push_back(MakeAssign(arena, "counter", rhs));
   return func;
 }

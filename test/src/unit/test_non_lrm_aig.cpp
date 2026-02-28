@@ -2,9 +2,9 @@
 
 #include <gtest/gtest.h>
 
+#include "fixture_synthesizer.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/aig_opt.h"
-#include "fixture_synthesizer.h"
 
 using namespace delta;
 

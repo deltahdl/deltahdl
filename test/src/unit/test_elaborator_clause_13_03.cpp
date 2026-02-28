@@ -1,9 +1,7 @@
 // §13.3: Tasks
 
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-
 #include "fixture_elaborator.h"
 
 using namespace delta;

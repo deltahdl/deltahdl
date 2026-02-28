@@ -1,10 +1,8 @@
 // §21.2.1.2: Size of displayed data
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

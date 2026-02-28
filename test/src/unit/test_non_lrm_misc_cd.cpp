@@ -7,7 +7,12 @@ using namespace delta;
 namespace {
 
 // Helper: extract 4 initial statements and verify non-null.
-struct FourStmts { Stmt* s0; Stmt* s1; Stmt* s2; Stmt* s3; };
+struct FourStmts {
+  Stmt* s0;
+  Stmt* s1;
+  Stmt* s2;
+  Stmt* s3;
+};
 static FourStmts Get4InitialStmts(auto& r) {
   FourStmts fs;
   fs.s0 = NthInitialStmt(r, 0);

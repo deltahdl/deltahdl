@@ -3,13 +3,12 @@
 #include <cstdint>
 #include <cstring>
 
+#include "builders_ast.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/adv_sim.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
 
 using namespace delta;
 

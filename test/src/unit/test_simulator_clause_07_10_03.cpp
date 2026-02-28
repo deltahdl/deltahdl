@@ -1,11 +1,10 @@
 // §7.10.3: Persistence of references to elements of a queue
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
+#include "helpers_queue.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
-#include "helpers_queue.h"
 
 using namespace delta;
 
@@ -26,7 +25,7 @@ TEST(QueueRef, OutdatedByDelete) {
   // endfunction
   RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
               {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete",
-                                                {MakeInt(f.arena, 1)})),
+                                                    {MakeInt(f.arena, 1)})),
                MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
   auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 1)});
@@ -48,9 +47,10 @@ TEST(QueueRef, OutdatedByPopFront) {
   //   q.pop_front();   // removes q[0] (the bound element)
   //   v = 99;
   // endfunction
-  RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
-              {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_front", {})),
-               MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
+  RegAutoFunc(
+      f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
+      {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "pop_front", {})),
+       MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
   auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 0)});
   EvalExpr(call, f.ctx, f.arena);
@@ -72,7 +72,7 @@ TEST(QueueRef, SurvivesPushBack) {
   // endfunction
   RegAutoFunc(f, "test_fn", {{Direction::kRef, false, {}, "v", nullptr, {}}},
               {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_back",
-                                                {MakeInt(f.arena, 40)})),
+                                                    {MakeInt(f.arena, 40)})),
                MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
   auto* call = MakeCall(f.arena, "test_fn", {MakeSelect(f.arena, "q", 1)});

@@ -1,14 +1,12 @@
 // §7.4.3: Memories
 
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-
 #include "fixture_parser.h"
 
 using namespace delta;
-
-};
+}
+;
 
 namespace {
 

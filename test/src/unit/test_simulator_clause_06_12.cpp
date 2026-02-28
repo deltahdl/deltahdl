@@ -3,12 +3,11 @@
 #include <cmath>
 
 #include "common/types.h"
+#include "fixture_real.h"
+#include "fixture_simulator.h"
+#include "helpers_eval_op.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "fixture_real.h"
-#include "helpers_eval_op.h"
 
 using namespace delta;
 

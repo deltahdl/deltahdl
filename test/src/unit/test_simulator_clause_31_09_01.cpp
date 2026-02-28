@@ -1,10 +1,8 @@
 // §31.9.1: Requirements for accurate simulation
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

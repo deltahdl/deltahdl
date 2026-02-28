@@ -4,12 +4,11 @@
 #include <string_view>
 
 #include "common/types.h"
+#include "fixture_simulator.h"
+#include "helpers_clocking.h"
 #include "parser/ast.h"
 #include "simulator/clocking.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
-#include "helpers_clocking.h"
 
 using namespace delta;
 
@@ -62,7 +61,8 @@ TEST(ClockingSim, SampledValueUpdatesOnEachEdge) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0x11);
 
   ClockingManager cmgr;
-  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput);
+  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data",
+                     ClockingDir::kInput);
 
   // First posedge: data = 0x11
   auto* ev1 = f.scheduler.GetEventPool().Acquire();

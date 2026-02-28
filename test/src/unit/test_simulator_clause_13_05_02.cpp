@@ -1,11 +1,10 @@
 // §13.5.2: Pass by reference
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
+#include "helpers_queue.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
-#include "helpers_queue.h"
 
 using namespace delta;
 
@@ -55,8 +54,8 @@ TEST(Functions, PassByRefReadsCaller) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
   func->func_args = {{Direction::kRef, false, {}, "r", nullptr, {}}};
-  auto* body_expr = MakeBinary(f.arena, TokenKind::kStar,
-                               MakeId(f.arena, "r"), MakeInt(f.arena, 3));
+  auto* body_expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "r"),
+                               MakeInt(f.arena, 3));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body_expr));
   f.ctx.RegisterFunction("read_ref", func);
 

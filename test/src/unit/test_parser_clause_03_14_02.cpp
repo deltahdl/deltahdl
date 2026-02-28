@@ -18,9 +18,12 @@ TEST(ParserClause03, Cl3_14_2_BothMechanismsMagnitudes) {
   auto r100 = PreprocessTimescale("`timescale 100ns / 100ps\n");
   EXPECT_EQ(r100.timescale.magnitude, 100);
   // timeunit with magnitudes: all three parse successfully.
-  EXPECT_FALSE(ParseTimescale31402("module m; timeunit 1ns; endmodule\n").has_errors);
-  EXPECT_FALSE(ParseTimescale31402("module m; timeunit 10ns; endmodule\n").has_errors);
-  EXPECT_FALSE(ParseTimescale31402("module m; timeunit 100ns; endmodule\n").has_errors);
+  EXPECT_FALSE(
+      ParseTimescale31402("module m; timeunit 1ns; endmodule\n").has_errors);
+  EXPECT_FALSE(
+      ParseTimescale31402("module m; timeunit 10ns; endmodule\n").has_errors);
+  EXPECT_FALSE(
+      ParseTimescale31402("module m; timeunit 100ns; endmodule\n").has_errors);
 }
 
 }  // namespace

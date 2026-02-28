@@ -1,12 +1,11 @@
 // §11.4.12: Concatenation operators
 
-#include "parser/ast.h"
-#include "simulator/eval.h"
-
-#include "fixture_simulator.h"
 #include "builders_ast.h"
+#include "fixture_simulator.h"
 #include "helpers_eval_op.h"
 #include "helpers_scheduler.h"
+#include "parser/ast.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 

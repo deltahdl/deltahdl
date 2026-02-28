@@ -9,7 +9,8 @@
 
 using namespace delta;
 
-// Capture src and schedule an NBA update that assigns the captured value to dst.
+// Capture src and schedule an NBA update that assigns the captured value to
+// dst.
 static void ScheduleNbaAssign(Scheduler& sched, const int& src, int& dst) {
   int rhs_val = src;
   auto* nba = sched.GetEventPool().Acquire();

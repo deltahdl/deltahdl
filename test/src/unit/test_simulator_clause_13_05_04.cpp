@@ -1,10 +1,9 @@
 // §13.5.4: Argument binding by name
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
 
 using namespace delta;
 
@@ -38,16 +37,14 @@ TEST(Functions, NamedArguments) {
       {Direction::kInput, false, {}, "x", nullptr, {}},
       {Direction::kInput, false, {}, "y", nullptr, {}},
   };
-  auto* body_expr =
-      MakeBinary(f.arena, TokenKind::kMinus, MakeId(f.arena, "x"),
-                 MakeId(f.arena, "y"));
+  auto* body_expr = MakeBinary(f.arena, TokenKind::kMinus, MakeId(f.arena, "x"),
+                               MakeId(f.arena, "y"));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body_expr));
   f.ctx.RegisterFunction("sub", func);
 
   // Call with named args in reversed order: sub(.y(3), .x(10)) => 10 - 3 = 7
-  auto* call = MakeNamedCall(f.arena, "sub",
-                             {MakeInt(f.arena, 3), MakeInt(f.arena, 10)},
-                             {"y", "x"});
+  auto* call = MakeNamedCall(
+      f.arena, "sub", {MakeInt(f.arena, 3), MakeInt(f.arena, 10)}, {"y", "x"});
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 7u);
 }
 
@@ -64,15 +61,13 @@ TEST(Functions, NamedArgsWithDefaults) {
       {Direction::kInput, false, {}, "a", nullptr, {}},
       {Direction::kInput, false, {}, "w", MakeInt(f.arena, 2), {}},
   };
-  auto* body_expr =
-      MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "a"),
-                 MakeId(f.arena, "w"));
+  auto* body_expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "a"),
+                               MakeId(f.arena, "w"));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body_expr));
   f.ctx.RegisterFunction("weighted", func);
 
   // Named call providing only "a", defaulting "w" => 7 * 2 = 14
-  auto* call =
-      MakeNamedCall(f.arena, "weighted", {MakeInt(f.arena, 7)}, {"a"});
+  auto* call = MakeNamedCall(f.arena, "weighted", {MakeInt(f.arena, 7)}, {"a"});
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 14u);
 }
 
@@ -96,9 +91,8 @@ TEST(Functions, NamedArgsReorderedWithRef) {
       {Direction::kRef, false, {}, "target", nullptr, {}},
       {Direction::kInput, false, {}, "amount", nullptr, {}},
   };
-  auto* rhs =
-      MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "target"),
-                 MakeId(f.arena, "amount"));
+  auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "target"),
+                         MakeId(f.arena, "amount"));
   func->func_body_stmts.push_back(MakeAssign(f.arena, "target", rhs));
   f.ctx.RegisterFunction("swap_add", func);
 
@@ -132,8 +126,7 @@ TEST(Functions, DefaultsAndNamedArgsCombined) {
 
   // Named call with only "val", defaulting "factor":
   // scale(.val(7)) => 7 * 3 = 21
-  auto* call =
-      MakeNamedCall(f.arena, "scale", {MakeInt(f.arena, 7)}, {"val"});
+  auto* call = MakeNamedCall(f.arena, "scale", {MakeInt(f.arena, 7)}, {"val"});
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 21u);
 }
 

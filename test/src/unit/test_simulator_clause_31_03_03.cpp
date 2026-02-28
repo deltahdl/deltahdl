@@ -1,11 +1,9 @@
 // §31.3.3: $setuphold
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

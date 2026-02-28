@@ -1,12 +1,10 @@
 // §7.4: Packed and unpacked arrays
 
-
+#include "fixture_simulator.h"
+#include "helpers_array.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
 #include "simulator/eval_array.h"
-
-#include "fixture_simulator.h"
-#include "helpers_array.h"
 
 using namespace delta;
 

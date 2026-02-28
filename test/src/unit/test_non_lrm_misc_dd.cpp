@@ -1,11 +1,11 @@
 // Non-LRM tests
 
-#include "fixture_simulator.h"
 #include "builders_ast.h"
+#include "fixture_enum_methods.h"
 #include "fixture_evaluator.h"
 #include "fixture_lexer.h"
-#include "fixture_enum_methods.h"
 #include "fixture_preprocessor.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
 

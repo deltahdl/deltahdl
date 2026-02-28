@@ -1,10 +1,8 @@
 // §5.12 Attributes — elaboration-level semantics (A.9.1 BNF)
 
-
 #include "common/types.h"
-#include "parser/ast.h"
-
 #include "fixture_elaborator.h"
+#include "parser/ast.h"
 
 using namespace delta;
 

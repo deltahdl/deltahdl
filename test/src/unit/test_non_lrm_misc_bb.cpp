@@ -317,35 +317,48 @@ TEST(ParserClause03, Cl3_14_2_2_WorksInProgram) {
 // 54. All six time units are accepted as time literals for timeunit.
 // §3.14.2.2 / §5.8: time literals can use s, ms, us, ns, ps, fs.
 TEST(ParserClause03, Cl3_14_2_2_AllSixUnitsAccepted) {
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1s; endmodule").cu->modules[0]->time_unit,
+  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1s; endmodule")
+                .cu->modules[0]
+                ->time_unit,
             TimeUnit::kS);
-  EXPECT_EQ(
-      ParseTimescale31402("module m; timeunit 1ms; endmodule").cu->modules[0]->time_unit,
-      TimeUnit::kMs);
-  EXPECT_EQ(
-      ParseTimescale31402("module m; timeunit 1us; endmodule").cu->modules[0]->time_unit,
-      TimeUnit::kUs);
-  EXPECT_EQ(
-      ParseTimescale31402("module m; timeunit 1ns; endmodule").cu->modules[0]->time_unit,
-      TimeUnit::kNs);
-  EXPECT_EQ(
-      ParseTimescale31402("module m; timeunit 1ps; endmodule").cu->modules[0]->time_unit,
-      TimeUnit::kPs);
-  EXPECT_EQ(
-      ParseTimescale31402("module m; timeunit 1fs; endmodule").cu->modules[0]->time_unit,
-      TimeUnit::kFs);
+  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1ms; endmodule")
+                .cu->modules[0]
+                ->time_unit,
+            TimeUnit::kMs);
+  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1us; endmodule")
+                .cu->modules[0]
+                ->time_unit,
+            TimeUnit::kUs);
+  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1ns; endmodule")
+                .cu->modules[0]
+                ->time_unit,
+            TimeUnit::kNs);
+  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1ps; endmodule")
+                .cu->modules[0]
+                ->time_unit,
+            TimeUnit::kPs);
+  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1fs; endmodule")
+                .cu->modules[0]
+                ->time_unit,
+            TimeUnit::kFs);
 }
 
 // 55. All three magnitudes (1, 10, 100) are accepted in timeunit.
 // §3.14.2.2 / §5.8: time literals include magnitude.
 TEST(ParserClause03, Cl3_14_2_2_AllThreeMagnitudes) {
-  EXPECT_FALSE(ParseTimescale31402("module m; timeunit 1ns; endmodule").has_errors);
-  EXPECT_FALSE(ParseTimescale31402("module m; timeunit 10ns; endmodule").has_errors);
-  EXPECT_FALSE(ParseTimescale31402("module m; timeunit 100ns; endmodule").has_errors);
+  EXPECT_FALSE(
+      ParseTimescale31402("module m; timeunit 1ns; endmodule").has_errors);
+  EXPECT_FALSE(
+      ParseTimescale31402("module m; timeunit 10ns; endmodule").has_errors);
+  EXPECT_FALSE(
+      ParseTimescale31402("module m; timeunit 100ns; endmodule").has_errors);
   // timeprecision with magnitudes.
-  EXPECT_FALSE(ParseTimescale31402("module m; timeprecision 1ps; endmodule").has_errors);
-  EXPECT_FALSE(ParseTimescale31402("module m; timeprecision 10ps; endmodule").has_errors);
-  EXPECT_FALSE(ParseTimescale31402("module m; timeprecision 100ps; endmodule").has_errors);
+  EXPECT_FALSE(
+      ParseTimescale31402("module m; timeprecision 1ps; endmodule").has_errors);
+  EXPECT_FALSE(ParseTimescale31402("module m; timeprecision 10ps; endmodule")
+                   .has_errors);
+  EXPECT_FALSE(ParseTimescale31402("module m; timeprecision 100ps; endmodule")
+                   .has_errors);
 }
 
 // 56. timeunit keyword alone: only has_timeunit is set, not

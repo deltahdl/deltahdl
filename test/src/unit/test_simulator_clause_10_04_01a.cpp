@@ -1,10 +1,8 @@
 // §10.4.1: Blocking procedural assignments
 
-
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/compiled_sim.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

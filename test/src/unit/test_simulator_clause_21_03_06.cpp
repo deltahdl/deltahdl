@@ -2,11 +2,10 @@
 
 #include <cstdio>
 
+#include "builders_systask.h"
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_systask.h"
 
 using namespace delta;
 

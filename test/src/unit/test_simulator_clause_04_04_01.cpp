@@ -4,10 +4,9 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "helpers_scheduler_event.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
-
-#include "helpers_scheduler_event.h"
 
 using namespace delta;
 

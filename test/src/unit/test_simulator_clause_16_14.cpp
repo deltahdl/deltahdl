@@ -1,11 +1,9 @@
 // §16.14: Concurrent assertions
 
-
 #include <cstdint>
 
-#include "simulator/assertion.h"
-
 #include "fixture_simulator.h"
+#include "simulator/assertion.h"
 
 using namespace delta;
 

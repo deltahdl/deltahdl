@@ -1,8 +1,8 @@
 // §21.7.1.2: $dumpvars
 
+#include "fixture_vcd.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
-#include "fixture_vcd.h"
 
 namespace delta {
 namespace {

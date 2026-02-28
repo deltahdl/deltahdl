@@ -437,7 +437,8 @@ TEST(ParserA212, InoutNonAnsi) {
 
 TEST(ParserA212, InputNonAnsiMultiple) {
   // Non-ANSI: input net_port_type list_of_port_identifiers (comma list)
-  auto r = ParseWithPreprocessor("module m(a, b); input wire [7:0] a, b; endmodule");
+  auto r =
+      ParseWithPreprocessor("module m(a, b); input wire [7:0] a, b; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   for (auto& port : r.cu->modules[0]->ports) {
@@ -454,7 +455,8 @@ TEST(ParserA212, OutputNonAnsi) {
 
 TEST(ParserA212, OutputNonAnsiUnpackedDim) {
   // Non-ANSI: list_of_port_identifiers with unpacked_dimension
-  auto r = ParseWithPreprocessor("module m(q); output logic q [3:0]; endmodule");
+  auto r =
+      ParseWithPreprocessor("module m(q); output logic q [3:0]; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
@@ -474,7 +476,8 @@ TEST(ParserA23, ListOfInterfaceIdentifiersSingle) {
 }
 
 TEST(ParserA23, ListOfPortIdentifiersMultipleNonAnsi) {
-  auto r = ParseWithPreprocessor("module m(a, b); input wire [7:0] a, b; endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module m(a, b); input wire [7:0] a, b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
@@ -485,7 +488,8 @@ TEST(ParserA23, ListOfPortIdentifiersMultipleNonAnsi) {
 
 // Module with ANSI header (list_of_port_declarations).
 TEST(SourceText, ModuleAnsiHeader) {
-  auto r = ParseWithPreprocessor("module m(input logic a, output logic b); endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module m(input logic a, output logic b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
@@ -510,7 +514,8 @@ TEST(SourceText, PortDirectionAllFour) {
 
 // net_port_header: [port_direction] net_port_type — inout wire
 TEST(SourceText, NetPortHeader) {
-  auto r = ParseWithPreprocessor("module m(inout wire [7:0] data); endmodule\n");
+  auto r =
+      ParseWithPreprocessor("module m(inout wire [7:0] data); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
@@ -520,7 +525,8 @@ TEST(SourceText, NetPortHeader) {
 
 // variable_port_header: [port_direction] variable_port_type — input logic
 TEST(SourceText, VariablePortHeader) {
-  auto r = ParseWithPreprocessor("module m(input logic [3:0] sel); endmodule\n");
+  auto r =
+      ParseWithPreprocessor("module m(input logic [3:0] sel); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
@@ -616,7 +622,8 @@ TEST(ParserA212, NetPortTypeTriType) {
 // var_data_type ::= data_type | var data_type_or_implicit
 TEST(ParserA212, VarDataTypeExplicit) {
   // var_data_type: data_type (integer_vector_type)
-  auto r = ParseWithPreprocessor("module m(input logic signed [15:0] val); endmodule");
+  auto r = ParseWithPreprocessor(
+      "module m(input logic signed [15:0] val); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
@@ -688,7 +695,8 @@ TEST(ParserA23, ListOfVariablePortIdentifiersMultipleAnsi) {
 }
 
 TEST(ParserA23, ListOfVariablePortIdentifiersWithDim) {
-  auto r = ParseWithPreprocessor("module m(output logic q [1:0] = '{0, 0}); endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module m(output logic q [1:0] = '{0, 0}); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto& port = r.cu->modules[0]->ports[0];
@@ -697,7 +705,8 @@ TEST(ParserA23, ListOfVariablePortIdentifiersWithDim) {
 }
 
 TEST(ParserA25, PortWithPackedDim) {
-  auto r = ParseWithPreprocessor("module m(input logic [15:0] data); endmodule\n");
+  auto r =
+      ParseWithPreprocessor("module m(input logic [15:0] data); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
@@ -912,7 +921,8 @@ TEST(ParserA24, DefparamAssignmentMintypmax) {
 // =============================================================================
 // Form 1: bind target_scope bind_instantiation
 TEST(SourceText, BindDirectiveBasic) {
-  auto r = ParseWithPreprocessor("bind target_mod checker_mod chk_inst(.a(sig));\n");
+  auto r =
+      ParseWithPreprocessor("bind target_mod checker_mod chk_inst(.a(sig));\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);

@@ -593,7 +593,8 @@ TEST(ParserClause03, Cl3_14_TimeunitsAndTimescale) {
   auto r2 = ParseWithPreprocessor("module m; timeprecision 1ps; endmodule\n");
   EXPECT_FALSE(r2.has_errors);
   EXPECT_TRUE(r2.cu->modules[0]->has_timeprecision);
-  auto r3 = ParseWithPreprocessor("module m; timeunit 1ns; timeprecision 1ps; endmodule\n");
+  auto r3 = ParseWithPreprocessor(
+      "module m; timeunit 1ns; timeprecision 1ps; endmodule\n");
   EXPECT_FALSE(r3.has_errors);
   EXPECT_TRUE(r3.cu->modules[0]->has_timeunit);
   EXPECT_TRUE(r3.cu->modules[0]->has_timeprecision);

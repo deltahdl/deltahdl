@@ -1,12 +1,11 @@
 // §8.7: Constructors
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
+#include "helpers_class_object.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
-#include "helpers_class_object.h"
 
 using namespace delta;
 
@@ -66,7 +65,8 @@ TEST(ClassSim, ConstructorBodyExecutesStatements) {
   ctor->name = "new";
   ctor->return_type.kind = DataTypeKind::kVoid;
   ctor->func_args = {{Direction::kInput, false, {}, "v", nullptr, {}}};
-  ctor->func_body_stmts.push_back(MakeAssign(f.arena, "val", MkId(f.arena, "v")));
+  ctor->func_body_stmts.push_back(
+      MakeAssign(f.arena, "val", MkId(f.arena, "v")));
   type->methods["new"] = ctor;
 
   // Simulate constructor execution manually.

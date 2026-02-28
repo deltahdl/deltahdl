@@ -1,14 +1,12 @@
 // §35.7: Exported functions
 
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-
 #include "fixture_parser.h"
 
 using namespace delta;
-
-};
+}
+;
 
 namespace {
 

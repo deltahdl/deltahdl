@@ -1,12 +1,11 @@
 // §8.20: Virtual methods
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
+#include "helpers_class_object.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
-#include "helpers_class_object.h"
 
 using namespace delta;
 
@@ -39,7 +38,8 @@ TEST(ClassSim, VirtualMethodDispatch) {
   auto* base_method = f.arena.Create<ModuleItem>();
   base_method->kind = ModuleItemKind::kFunctionDecl;
   base_method->name = "speak";
-  base_method->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 0)));
+  base_method->func_body_stmts.push_back(
+      MakeReturn(f.arena, MkInt(f.arena, 0)));
 
   auto* derived_method = f.arena.Create<ModuleItem>();
   derived_method->kind = ModuleItemKind::kFunctionDecl;

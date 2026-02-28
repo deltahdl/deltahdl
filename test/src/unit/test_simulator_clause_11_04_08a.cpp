@@ -1,9 +1,7 @@
 // §11.4.8: Bitwise operators
 
-
-#include "simulator/eval.h"
-
 #include "fixture_simulator.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 

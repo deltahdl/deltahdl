@@ -1,9 +1,8 @@
 
-#include "simulator/lowerer.h"
-#include "simulator/variable.h"
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -499,7 +498,8 @@ TEST(SimCh10, BlockingAssignBitwiseOps) {
       "  end\n"
       "endmodule\n",
       f);
-  LowerRunAndCheck(f, design, {{"r_and", 48u}, {"r_or", 252u}, {"r_xor", 204u}});
+  LowerRunAndCheck(f, design,
+                   {{"r_and", 48u}, {"r_or", 252u}, {"r_xor", 204u}});
 }
 
 // ---------------------------------------------------------------------------

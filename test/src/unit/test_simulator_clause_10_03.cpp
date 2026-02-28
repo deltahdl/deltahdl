@@ -1,11 +1,9 @@
 // §10.3: Continuous assignments
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

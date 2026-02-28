@@ -1,6 +1,5 @@
 // §28.15.2: trireg strength
 
-
 // --- Local types for net type strengths (§28.15) ---
 enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
 

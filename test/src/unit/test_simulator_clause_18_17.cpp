@@ -1,15 +1,13 @@
 // §18.17: Random sequence generation—randsequence
 
-
 #include <algorithm>
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-#include "simulator/constraint_solver.h"
-
 #include "fixture_simulator.h"
+#include "simulator/constraint_solver.h"
 
 using namespace delta;
 

@@ -1,10 +1,8 @@
 // §9.4.3: Level-sensitive event control
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

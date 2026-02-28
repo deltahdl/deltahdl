@@ -1,10 +1,8 @@
 // §14.16: Synchronous drives
 
-
 #include "common/types.h"
-#include "simulator/clocking.h"
-
 #include "fixture_simulator.h"
+#include "simulator/clocking.h"
 
 using namespace delta;
 

@@ -1,11 +1,10 @@
 // §11.4.6: Wildcard equality operators
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
+#include "helpers_eval_op.h"
 #include "simulator/eval.h"
 #include "simulator/eval_array.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
-#include "helpers_eval_op.h"
 
 using namespace delta;
 

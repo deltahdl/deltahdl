@@ -496,10 +496,10 @@ TEST(ParserSection19, ClockingBlock_AllDirections) {
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
 
   VerifyClockingSignalDirections(item, {
-      {Direction::kInput, "data_in"},
-      {Direction::kOutput, "data_out"},
-      {Direction::kInout, "bidir"},
-  });
+                                           {Direction::kInput, "data_in"},
+                                           {Direction::kOutput, "data_out"},
+                                           {Direction::kInout, "bidir"},
+                                       });
 }
 
 // Multiple signals in a single direction group, comma-separated.

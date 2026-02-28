@@ -5,9 +5,8 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "simulator/scheduler.h"
-
 #include "helpers_scheduler_event.h"
+#include "simulator/scheduler.h"
 
 using namespace delta;
 
@@ -210,9 +209,7 @@ TEST(SimCh443, PrePostponedExecutesBeforePostponed) {
 // Full PLI region ordering: all 9 PLI regions execute in their specified
 // positions relative to each other and the simulation regions.
 // ---------------------------------------------------------------------------
-TEST(SimCh443, FullPLIRegionOrderingPerFigure41) {
-  VerifyAllRegionOrder();
-}
+TEST(SimCh443, FullPLIRegionOrderingPerFigure41) { VerifyAllRegionOrder(); }
 
 // ---------------------------------------------------------------------------
 // §4.4.3 PLI regions execute in their respective positions across multiple

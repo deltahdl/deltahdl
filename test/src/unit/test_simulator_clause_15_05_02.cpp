@@ -5,14 +5,14 @@
 #include <cstdint>
 #include <string_view>
 
+#include "fixture_simulator.h"
+#include "helpers_stmt_exec.h"
 #include "simulator/awaiters.h"
 #include "simulator/exec_task.h"
 #include "simulator/process.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_result.h"
 #include "simulator/sync_objects.h"
-#include "helpers_stmt_exec.h"
-#include "fixture_simulator.h"
 
 namespace {
 
@@ -55,7 +55,7 @@ TEST(IpcSync, EventTriggerSetsTriggeredState) {
   trigger_stmt->expr->text = "my_event";
 
   // Execute trigger via a driver coroutine.
-    auto driver = [](const Stmt* stmt, SimContext& ctx, Arena& arena,
+  auto driver = [](const Stmt* stmt, SimContext& ctx, Arena& arena,
                    DriverResult* out) -> SimCoroutine {
     out->value = co_await ExecStmt(stmt, ctx, arena);
   };

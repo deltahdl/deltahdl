@@ -1,12 +1,10 @@
 // §9.2.2.2.1: Implicit always_comb sensitivities
 
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
-#include "lexer/token.h"
-
 #include "fixture_elaborator.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

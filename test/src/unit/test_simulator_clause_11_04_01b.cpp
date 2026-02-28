@@ -1,10 +1,8 @@
 // §11.4.1: Assignment operators
 
-
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/compiled_sim.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

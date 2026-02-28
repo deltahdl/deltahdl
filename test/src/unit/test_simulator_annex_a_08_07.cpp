@@ -1,10 +1,9 @@
 // Annex A.8.7: Numbers
 
-#include "simulator/lowerer.h"
-#include "simulator/variable.h"
-
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 

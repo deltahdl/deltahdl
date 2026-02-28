@@ -1,14 +1,12 @@
 // §35.7: Exported functions
 
-
 #include <cstdint>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/dpi.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

@@ -1,9 +1,9 @@
 // Non-LRM tests
 
 #include "fixture_simulator.h"
+#include "helpers_clocking.h"
 #include "helpers_eval_op.h"
 #include "helpers_scheduler.h"
-#include "helpers_clocking.h"
 
 using namespace delta;
 
@@ -331,7 +331,8 @@ TEST(SimA611, OutputDrivingWithSkew) {
   out->value = MakeLogic4VecVal(f.arena, 8, 0);
 
   ClockingManager cmgr;
-  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, SimTime{3}, "data_out", ClockingDir::kOutput);
+  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, SimTime{3}, "data_out",
+                     ClockingDir::kOutput);
 
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&cmgr, &f]() {

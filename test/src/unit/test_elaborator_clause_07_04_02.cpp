@@ -1,9 +1,7 @@
 // §7.4.2: Unpacked arrays
 
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-
 #include "fixture_elaborator.h"
 
 using namespace delta;

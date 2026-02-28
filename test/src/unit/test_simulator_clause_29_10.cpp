@@ -2,9 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include "simulator/udp_eval.h"
-
 #include "builders_udp.h"
+#include "simulator/udp_eval.h"
 
 using namespace delta;
 

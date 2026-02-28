@@ -3,9 +3,7 @@
 
 using namespace delta;
 
-namespace {
-
-}  // namespace
+namespace {}  // namespace
 
 // =============================================================================
 // §10.11 Net alias — elaboration

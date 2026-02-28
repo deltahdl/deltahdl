@@ -1,10 +1,9 @@
 // §12.6: Pattern matching conditional statements
 
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
 #include "simulator/eval_array.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

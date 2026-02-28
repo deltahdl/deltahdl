@@ -1,10 +1,8 @@
 // §16.4.1: Deferred assertion reporting
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

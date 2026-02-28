@@ -2,10 +2,8 @@
 // Tests scope resolution, hierarchical path elaboration, package scope
 // resolution, and semantic validation of identifier usage.
 
-
-#include "parser/ast.h"
-
 #include "fixture_elaborator.h"
+#include "parser/ast.h"
 
 using namespace delta;
 

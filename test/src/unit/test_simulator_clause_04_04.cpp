@@ -1,11 +1,10 @@
 
 #include "common/types.h"
-#include "simulator/lowerer.h"
-#include "simulator/variable.h"
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "helpers_scheduler_event.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -264,9 +263,7 @@ TEST(SimCh44, All17RegionsNamedAndOrdered) {
 // §4.4 All 17 regions execute within a single time slot in the correct
 // monotonically increasing order.
 // ---------------------------------------------------------------------------
-TEST(SimCh44, AllRegionsExecuteInOrder) {
-  VerifyAllRegionsExecuteInOrder();
-}
+TEST(SimCh44, AllRegionsExecuteInOrder) { VerifyAllRegionsExecuteInOrder(); }
 
 // ---------------------------------------------------------------------------
 // §4.4 TimeSlot data structure: AnyNonemptyIn detects events in a range.

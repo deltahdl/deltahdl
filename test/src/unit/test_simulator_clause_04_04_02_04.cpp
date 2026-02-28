@@ -5,9 +5,8 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "simulator/scheduler.h"
-
 #include "helpers_scheduler_event.h"
+#include "simulator/scheduler.h"
 
 using namespace delta;
 
@@ -138,8 +137,9 @@ TEST(SimCh4424, NBAToActiveIteration) {
 // This confirms its position in the region ordering per §4.4.2.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAExecutesAfterActiveAndInactiveBeforeObserved) {
-  VerifyFourRegionOrder(Region::kActive, "active", Region::kInactive, "inactive",
-                        Region::kNBA, "nba", Region::kObserved, "observed");
+  VerifyFourRegionOrder(Region::kActive, "active", Region::kInactive,
+                        "inactive", Region::kNBA, "nba", Region::kObserved,
+                        "observed");
 }
 
 // ---------------------------------------------------------------------------

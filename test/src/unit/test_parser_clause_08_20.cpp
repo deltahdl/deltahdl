@@ -1,14 +1,12 @@
 // §8.20: Virtual methods
 
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-
 #include "fixture_parser.h"
 
 using namespace delta;
-
-};
+}
+;
 
 namespace {
 

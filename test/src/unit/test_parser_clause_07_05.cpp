@@ -1,14 +1,12 @@
 // §7.5: Dynamic arrays
 
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-
 #include "fixture_parser.h"
 
 using namespace delta;
-
-};
+}
+;
 
 namespace {
 

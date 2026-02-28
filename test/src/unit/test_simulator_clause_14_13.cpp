@@ -3,12 +3,11 @@
 #include <cstdint>
 
 #include "common/types.h"
+#include "fixture_simulator.h"
+#include "helpers_clocking.h"
 #include "parser/ast.h"
 #include "simulator/clocking.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
-#include "helpers_clocking.h"
 
 using namespace delta;
 
@@ -23,7 +22,8 @@ TEST(SimA611, InputSamplingPosedge) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
 
   ClockingManager cmgr;
-  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data_in", ClockingDir::kInput);
+  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data_in",
+                     ClockingDir::kInput);
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
@@ -47,7 +47,8 @@ TEST(SimA611, SampledValueUpdatesAcrossEdges) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0x11);
 
   ClockingManager cmgr;
-  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput);
+  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data",
+                     ClockingDir::kInput);
 
   // First posedge at t=10 samples 0x11
   SchedulePosedge(f, clk, 10);

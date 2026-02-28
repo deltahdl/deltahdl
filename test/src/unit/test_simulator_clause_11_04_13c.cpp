@@ -1,10 +1,8 @@
 // §11.4.13: for an explanation of range list syntax.
 
-
+#include "fixture_simulator.h"
 #include "simulator/eval.h"
 #include "simulator/eval_array.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

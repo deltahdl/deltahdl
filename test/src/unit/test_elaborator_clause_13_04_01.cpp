@@ -1,9 +1,7 @@
 // §13.4.1: Return values and void functions
 
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-
 #include "fixture_elaborator.h"
 
 using namespace delta;

@@ -1,10 +1,8 @@
 // §12.5.3: unique-case, unique0-case, and priority-case
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

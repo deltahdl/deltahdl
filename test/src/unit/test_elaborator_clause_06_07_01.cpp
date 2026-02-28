@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+
 #include "model_net_declaration.h"
 
 using namespace delta;

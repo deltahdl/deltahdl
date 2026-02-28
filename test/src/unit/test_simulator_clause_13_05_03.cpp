@@ -1,10 +1,9 @@
 // §13.5.3: Default argument values
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
 
 using namespace delta;
 
@@ -26,15 +25,14 @@ TEST(Functions, DefaultArgumentValue) {
       {Direction::kInput, false, {}, "a", nullptr, {}},
       {Direction::kInput, false, {}, "b", MakeInt(f.arena, 10), {}},
   };
-  auto* body_expr =
-      MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
-                 MakeId(f.arena, "b"));
+  auto* body_expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
+                               MakeId(f.arena, "b"));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body_expr));
   f.ctx.RegisterFunction("add", func);
 
   // Call with both args: add(5, 20) => 25
-  auto* call1 = MakeCall(f.arena, "add",
-                         {MakeInt(f.arena, 5), MakeInt(f.arena, 20)});
+  auto* call1 =
+      MakeCall(f.arena, "add", {MakeInt(f.arena, 5), MakeInt(f.arena, 20)});
   EXPECT_EQ(EvalExpr(call1, f.ctx, f.arena).ToUint64(), 25u);
 
   // Call with only first arg: add(5) => 5 + 10 = 15
@@ -58,8 +56,7 @@ TEST(Functions, DefaultArgumentMultiple) {
   };
   auto* ab = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
                         MakeId(f.arena, "b"));
-  auto* abc =
-      MakeBinary(f.arena, TokenKind::kPlus, ab, MakeId(f.arena, "c"));
+  auto* abc = MakeBinary(f.arena, TokenKind::kPlus, ab, MakeId(f.arena, "c"));
   func->func_body_stmts.push_back(MakeReturn(f.arena, abc));
   f.ctx.RegisterFunction("compute", func);
 

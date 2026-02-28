@@ -888,7 +888,8 @@ TEST(ParserA27, TaskBodyNewStyleMultipleDirections) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   VerifyFuncArgDirections(r.cu->modules[0]->items[0],
-      {Direction::kInput, Direction::kOutput, Direction::kInout, Direction::kRef});
+                          {Direction::kInput, Direction::kOutput,
+                           Direction::kInout, Direction::kRef});
 }
 
 TEST(ParserA27, TaskBodyNewStyleStickyDirection) {
@@ -899,7 +900,8 @@ TEST(ParserA27, TaskBodyNewStyleStickyDirection) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  VerifyFuncArgDirections(r.cu->modules[0]->items[0],
+  VerifyFuncArgDirections(
+      r.cu->modules[0]->items[0],
       {Direction::kInput, Direction::kInput, Direction::kInput});
 }
 

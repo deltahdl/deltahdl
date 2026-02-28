@@ -2,13 +2,12 @@
 
 #include <cstring>
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/adv_sim.h"
 #include "simulator/eval.h"
 #include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
 
 using namespace delta;
 

@@ -4,12 +4,11 @@
 #include <string_view>
 
 #include "common/types.h"
+#include "fixture_simulator.h"
+#include "helpers_clocking.h"
 #include "parser/ast.h"
 #include "simulator/clocking.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
-#include "helpers_clocking.h"
 
 using namespace delta;
 
@@ -31,7 +30,8 @@ TEST(ClockingSim, HierarchicalAccess) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0xCC);
 
   ClockingManager cmgr;
-  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data_in", ClockingDir::kInput);
+  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data_in",
+                     ClockingDir::kInput);
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();

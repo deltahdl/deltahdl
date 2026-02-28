@@ -5,9 +5,9 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_evaluator.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include "fixture_evaluator.h"
 
 using namespace delta;
 

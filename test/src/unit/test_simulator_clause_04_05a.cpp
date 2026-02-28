@@ -5,9 +5,8 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "simulator/scheduler.h"
-
 #include "helpers_scheduler_event.h"
+#include "simulator/scheduler.h"
 
 using namespace delta;
 
@@ -97,9 +96,7 @@ TEST(SimCh45, ExecuteSimulationStopsWhenAllTimeSlotsEmpty) {
 // §4.5 execute_time_slot: full region chain ordering.
 // Preponed -> Pre-Active -> Active set -> Reactive set -> Postponed.
 // ---------------------------------------------------------------------------
-TEST(SimCh45, ExecuteTimeSlotFullRegionOrdering) {
-  VerifyAllRegionOrder();
-}
+TEST(SimCh45, ExecuteTimeSlotFullRegionOrdering) { VerifyAllRegionOrder(); }
 
 // ---------------------------------------------------------------------------
 // §4.5 Active set iteration: "execute_region (Active); R = first nonempty

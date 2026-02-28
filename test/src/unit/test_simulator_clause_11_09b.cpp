@@ -1,10 +1,9 @@
 // §11.9: Tagged union expressions and member access
 
+#include "builders_ast.h"
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-
-#include "fixture_simulator.h"
-#include "builders_ast.h"
 
 using namespace delta;
 

@@ -1,8 +1,8 @@
 // §21.7.2.1: Syntax of 4-state VCD file
 
+#include "fixture_vcd.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
-#include "fixture_vcd.h"
 
 namespace delta {
 namespace {

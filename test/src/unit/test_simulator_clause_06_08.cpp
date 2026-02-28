@@ -1,12 +1,10 @@
 // §6.8: on variable initialization). This is roughly equivalent to a C
 // automatic variable.
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

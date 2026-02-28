@@ -1,10 +1,8 @@
 // §30.4.5: Full connection and parallel connection paths
 
-
+#include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
-
-#include "fixture_simulator.h"
 
 using namespace delta;
 

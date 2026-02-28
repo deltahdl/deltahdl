@@ -1,10 +1,8 @@
 // §14.13: Input sampling
 
-
 #include "common/types.h"
-#include "simulator/clocking.h"
-
 #include "fixture_simulator.h"
+#include "simulator/clocking.h"
 
 using namespace delta;
 
