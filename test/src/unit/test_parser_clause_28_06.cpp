@@ -98,4 +98,15 @@ TEST(ParserA304, EnableGatetype_Bufif0) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA304, EnableGatetype_Bufif1) {
+  auto r = Parse(
+      "module m;\n"
+      "  bufif1 (out, in, en);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif1);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
