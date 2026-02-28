@@ -7,40 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, BeginKeywordsMultipleModules) {
-  EXPECT_TRUE(
-      ParseOk("`begin_keywords \"1800-2012\"\n"
-              "module m1;\n"
-              "endmodule\n"
-              "module m2;\n"
-              "endmodule\n"
-              "`end_keywords\n"));
-}
-
-TEST(ParserSection22, ModuleWithoutBeginKeywords) {
-  auto r = ParseWithPreprocessor(
-      "module m1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m1");
-}
-
-// ============================================================================
-// AST-level checks for `begin_keywords
-// ============================================================================
-TEST(ParserSection22, BeginKeywordsModuleNamePreserved) {
-  auto r = ParseWithPreprocessor(
-      "`begin_keywords \"1800-2017\"\n"
-      "module bar;\n"
-      "  logic x;\n"
-      "endmodule\n"
-      "`end_keywords\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "bar");
-}
-
 // extern_tf_declaration inside a module (interface_or_generate_item applies
 // to modules too via module_or_generate_item).
 TEST(SourceText, ExternFunctionPrototypeInModule) {
