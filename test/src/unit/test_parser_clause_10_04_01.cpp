@@ -67,4 +67,17 @@ TEST(ParserA602, BlockingAssignment_ConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
+TEST(ParserA602, BlockingAssignment_BitSelectLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin mem[3] = 8'hFF; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace
