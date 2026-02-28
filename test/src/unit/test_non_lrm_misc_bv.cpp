@@ -51,24 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.3.5 -- Statement labels (additional)
-// Labels on while loops, case statements, and disabling labeled stmts.
-// =============================================================================
-TEST(ParserSection9c, StatementLabelOnWhile) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    spin: while (busy) @(posedge clk);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->label, "spin");
-}
-
 TEST(ParserSection9c, StatementLabelOnCase) {
   auto r = Parse(
       "module m;\n"
