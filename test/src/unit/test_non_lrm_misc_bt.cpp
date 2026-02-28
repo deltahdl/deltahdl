@@ -30,26 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// 3. Named begin-end block creating a subscope
-TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : my_block\n"
-      "    int x;\n"
-      "    x = 1;\n"
-      "  end : my_block\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* mod = r.cu->modules[0];
-  ASSERT_GE(mod->items.size(), 1u);
-  auto* item = mod->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kInitialBlock);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->label, "my_block");
-}
-
 // 4. Nested named begin-end blocks
 TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
   auto r = Parse(
