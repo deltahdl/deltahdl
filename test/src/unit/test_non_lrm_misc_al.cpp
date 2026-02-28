@@ -22,22 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// §9.3.4: Named sequential block
-TEST(ParserA603, SeqBlockNamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : my_block\n"
-      "    a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->label, "my_block");
-}
-
 // §9.3.4: Named sequential block with matching end label
 TEST(ParserA603, SeqBlockNamedWithEndLabel) {
   auto r = Parse(

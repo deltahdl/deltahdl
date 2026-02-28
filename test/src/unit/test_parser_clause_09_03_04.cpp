@@ -13,4 +13,28 @@ TEST(SourceText, CheckerEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
+static Stmt* InitialBody(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    return item->body;
+  }
+  return nullptr;
+}
+
+// §9.3.4: Named sequential block
+TEST(ParserA603, SeqBlockNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "my_block");
+}
+
 }  // namespace
