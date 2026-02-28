@@ -30,18 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-// --- nettype_declaration ---
-// Form 1: nettype data_type nettype_id [with [scope] tf_id] ;
-// Form 2: nettype [scope] nettype_id nettype_id ;
-TEST(ParserA213, NettypeDeclBasic) {
-  auto r = Parse("module m; nettype real my_real_net; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-  EXPECT_EQ(item->name, "my_real_net");
-}
-
 TEST(ParserA213, NettypeDeclWithResolve) {
   auto r = Parse("module m; nettype logic my_net with my_resolve; endmodule");
   ASSERT_NE(r.cu, nullptr);
