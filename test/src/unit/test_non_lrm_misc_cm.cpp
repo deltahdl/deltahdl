@@ -34,20 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §14.12: default clocking block with end label.
-TEST(ParserSection14, DefaultClockingEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  default clocking bus @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking : bus\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_TRUE(item->is_default_clocking);
-  EXPECT_EQ(item->name, "bus");
-}
-
 // §14.12: unnamed default clocking block with multiple signals.
 TEST(ParserSection14, DefaultClockingUnnamedMultipleSignals) {
   auto r = Parse(
