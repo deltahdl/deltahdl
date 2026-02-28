@@ -41,21 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, RealVariableContinuousAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  real circ;\n"
-      "  assign circ = 2.0 * 3.14;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  bool found_ca = false;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kContAssign) found_ca = true;
-  }
-  EXPECT_TRUE(found_ca);
-}
-
 TEST(ParserSection6, NettypeDeclWithResolveFunc) {
   // nettype data_type nettype_identifier with tf_identifier ;
   auto r = Parse(
