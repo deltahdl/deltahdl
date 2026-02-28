@@ -25,4 +25,36 @@ TEST(ParserA213, TypedefEnum) {
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
 }
 
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// Typedef enum used as a named type for variable declarations.
+TEST(ParserSection8, EnumTypedefUsage) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum {NO, YES} boolean;\n"
+      "  boolean flag;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(items[0]->name, "boolean");
+  EXPECT_EQ(items[0]->typedef_type.enum_members.size(), 2u);
+  EXPECT_EQ(items[1]->name, "flag");
+}
+
 }  // namespace

@@ -40,22 +40,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// Typedef enum used as a named type for variable declarations.
-TEST(ParserSection8, EnumTypedefUsage) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef enum {NO, YES} boolean;\n"
-      "  boolean flag;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 2u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(items[0]->name, "boolean");
-  EXPECT_EQ(items[0]->typedef_type.enum_members.size(), 2u);
-  EXPECT_EQ(items[1]->name, "flag");
-}
-
 // Class implementing multiple interface classes.
 TEST(ParserSection8, ClassImplementsMultipleInterfaces) {
   EXPECT_TRUE(
