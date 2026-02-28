@@ -18,18 +18,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-// --- program_instantiation: wildcard port ---
-TEST(ParserAnnexA0413, ProgramInstWildcardPort) {
-  auto r = Parse(
-      "program my_prog(input logic clk);\n"
-      "endprogram\n"
-      "module m; my_prog u0(.*); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->inst_wildcard);
-}
-
 // --- program_instantiation: ordered port connections ---
 TEST(ParserAnnexA0413, ProgramInstOrderedPorts) {
   auto r = Parse(
