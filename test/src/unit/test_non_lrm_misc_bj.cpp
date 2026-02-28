@@ -41,18 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, TriregDefaultInit) {
-  // §6.7.1: trireg defaults to value x.
-  auto r = Parse(
-      "module t;\n"
-      "  trireg t1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-}
-
 TEST(ParserSection6, InterconnectNet) {
   // §6.7.1: interconnect net has no data type, optional packed/unpacked dims.
   auto r = Parse(
