@@ -6,41 +6,11 @@ using namespace delta;
 
 namespace {
 
-// property_list_of_arguments — mixed positional + named
-TEST(ParserA210, PropertyListOfArguments_Mixed) {
+TEST(ParserA29, AttrOnImportPort) {
   EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  property p(x, y, z); x |-> y ##1 z; endproperty\n"
-              "  assert property (p(a, .y(b), .z(c)));\n"
-              "endmodule\n"));
-}
-
-TEST(ParserA211, CovergroupDecl_WithEmptyPortList) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg();\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-TEST(ParserA211, CoverageSpecOrOption_CoverSpec) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-TEST(ParserA211, CoverPoint_WithDataType) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint x {\n"
-              "      bins low = {[0:3]};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
+      ParseOk("interface bus;\n"
+              "  modport target((* synthesis *) import Read);\n"
+              "endinterface\n"));
 }
 
 TEST(ParserA211, BinsOrEmpty_WithBraces) {

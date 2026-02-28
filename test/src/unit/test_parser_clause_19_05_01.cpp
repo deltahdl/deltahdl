@@ -40,4 +40,15 @@ TEST(ParserA211, BinsOrOptions_WithIff) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, CoverPoint_WithDataType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint x {\n"
+              "      bins low = {[0:3]};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
