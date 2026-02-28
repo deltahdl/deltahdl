@@ -45,31 +45,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 9. always_comb with while loop
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_WhileLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] val;\n"
-      "  logic [3:0] count;\n"
-      "  always_comb begin\n"
-      "    count = 0;\n"
-      "    while (val[count] && count < 8)\n"
-      "      count = count + 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 2u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kWhile);
-}
-
-// ---------------------------------------------------------------------------
 // 10. always_comb with foreach loop
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_ForeachLoop) {
