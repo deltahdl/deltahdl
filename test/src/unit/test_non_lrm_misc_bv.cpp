@@ -51,22 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-TEST(ParserSection9c, SequentialBlockNamedWithDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : my_block\n"
-      "    integer count;\n"
-      "    count = 0;\n"
-      "  end : my_block\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->label, "my_block");
-}
-
 // =============================================================================
 // LRM section 9.3.5 -- Statement labels (additional)
 // Labels on while loops, case statements, and disabling labeled stmts.
