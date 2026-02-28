@@ -113,4 +113,15 @@ TEST(ParserA86, BinaryBitwiseAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
+// § binary_operator ::= |
+TEST(ParserA86, BinaryBitwiseOr) {
+  auto r = Parse("module m; initial x = a | b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPipe);
+}
+
 }  // namespace
