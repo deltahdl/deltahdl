@@ -137,4 +137,35 @@ TEST(ParserAnnexA042, GenerateBlockMultipleItems) {
   EXPECT_GE(gen->gen_body.size(), 2u);
 }
 
+bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
+  for (auto* item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+// --- generate_region with mixed constructs ---
+TEST(ParserAnnexA042, GenerateRegionMixedConstructs) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    for (genvar i = 0; i < 2; i++) begin\n"
+      "      wire w;\n"
+      "    end\n"
+      "    if (W > 0)\n"
+      "      wire a;\n"
+      "    case (SEL)\n"
+      "      0: wire x;\n"
+      "      default: wire y;\n"
+      "    endcase\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  EXPECT_TRUE(HasItemOfKind(mod->items, ModuleItemKind::kGenerateFor));
+  EXPECT_TRUE(HasItemOfKind(mod->items, ModuleItemKind::kGenerateIf));
+  EXPECT_TRUE(HasItemOfKind(mod->items, ModuleItemKind::kGenerateCase));
+}
+
 }  // namespace
