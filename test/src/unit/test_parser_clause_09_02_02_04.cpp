@@ -98,4 +98,40 @@ TEST(ParserSection9, Sec9_3_1_BlockInAlwaysFFWithSensitivity) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
 }
 
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(Parser, AlwaysFFBlock) {
+  auto r = Parse(
+      "module counter(input logic clk, rst);\n"
+      "  logic [7:0] count;\n"
+      "  always_ff @(posedge clk or posedge rst)\n"
+      "    if (rst) count <= '0;\n"
+      "    else count <= count + 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found_ff = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock &&
+        item->always_kind == AlwaysKind::kAlwaysFF) {
+      found_ff = true;
+    }
+  }
+  EXPECT_TRUE(found_ff);
+}
+
 }  // namespace

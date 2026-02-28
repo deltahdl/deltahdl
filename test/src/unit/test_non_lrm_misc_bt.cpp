@@ -40,50 +40,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// Forward typedef class followed by full class definition.
-TEST(ParserSection8, ForwardTypedefClassSelfRef) {
-  auto r = Parse(
-      "typedef class Node;\n"
-      "class Node;\n"
-      "  Node next;\n"
-      "  int data;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "Node");
-}
-
-TEST(Parser, ModuleWithInitialBlock) {
-  auto r = Parse(
-      "module hello;\n"
-      "  initial $display(\"Hello\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
-}
-
-TEST(Parser, AlwaysFFBlock) {
-  auto r = Parse(
-      "module counter(input logic clk, rst);\n"
-      "  logic [7:0] count;\n"
-      "  always_ff @(posedge clk or posedge rst)\n"
-      "    if (rst) count <= '0;\n"
-      "    else count <= count + 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  bool found_ff = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock &&
-        item->always_kind == AlwaysKind::kAlwaysFF) {
-      found_ff = true;
-    }
-  }
-  EXPECT_TRUE(found_ff);
-}
-
 // =============================================================================
 // §24.12 Program with final block
 // =============================================================================

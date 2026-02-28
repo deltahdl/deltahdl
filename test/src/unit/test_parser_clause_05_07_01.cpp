@@ -166,4 +166,14 @@ TEST(ParserCh50701, IntLiteral_SignedLiteral) {
   EXPECT_TRUE(ParseOk("module m; initial x = 4'shf; endmodule"));
 }
 
+// § unbased_unsized_literal — '1
+TEST(ParserA87, UnbasedUnsizedOne) {
+  auto r = Parse("module m; logic x; initial x = '1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
+}
+
 }  // namespace
