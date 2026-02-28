@@ -40,4 +40,23 @@ TEST(ParserAnnexA051, SimSequentialEdgeSensitive) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
+// ---------------------------------------------------------------------------
+// Production 11: edge_indicator ::= ( level_symbol level_symbol ) |
+//                edge_symbol
+// ---------------------------------------------------------------------------
+// edge_indicator as edge_symbol
+TEST(ParserAnnexA053, EdgeIndicator_EdgeSymbol) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->table[0].inputs[1], 'r');
+}
+
 }  // namespace
