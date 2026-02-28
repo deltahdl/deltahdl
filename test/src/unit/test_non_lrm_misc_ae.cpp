@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, InputTerminal_BitSelect) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  nand (out, data[0], data[1], data[2]);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, InputTerminal_NOutputGate) {
   // input_terminal in n-output gate (last terminal is input)
   auto r = Parse(

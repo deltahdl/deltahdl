@@ -136,4 +136,11 @@ TEST(ParserA303, InputTerminal_TernaryExpr) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, InputTerminal_BitSelect) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nand (out, data[0], data[1], data[2]);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
