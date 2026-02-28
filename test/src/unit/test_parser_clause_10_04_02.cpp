@@ -279,4 +279,22 @@ TEST(ParserSection10, Sec10_4_2_MultipleInSameBlock) {
   EXPECT_EQ(s2->lhs->text, "b");
 }
 
+// --- 15. Nonblocking with function call RHS ---
+TEST(ParserSection10, Sec10_4_2_FunctionCallRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] q;\n"
+      "  initial begin\n"
+      "    q <= compute(a, b);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+}
+
 }  // namespace
