@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, InoutTerminal_Concatenation) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  tran ({a, b}, {c, d});\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, InoutTerminal_PassEnableSwitch) {
   // inout_terminal positions in pass enable switches
   auto r = Parse(

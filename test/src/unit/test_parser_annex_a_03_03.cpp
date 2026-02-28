@@ -86,4 +86,11 @@ TEST(ParserA303, InoutTerminal_PartSelect) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, InoutTerminal_Concatenation) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  tran ({a, b}, {c, d});\n"
+              "endmodule\n"));
+}
+
 }  // namespace
