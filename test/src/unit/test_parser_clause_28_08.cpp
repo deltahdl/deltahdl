@@ -31,4 +31,11 @@ TEST(ParserA301, GateInst_Tranif1Basic) {
               "endmodule\n"));
 }
 
+TEST(ParserA301, GateInst_Rtranif0Basic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rtranif0 (io1, io2, ctrl);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
