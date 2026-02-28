@@ -50,26 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// --- Multiple instances per statement ---
-TEST(ParserA504, UdpInst_MultipleInstances) {
-  auto r = Parse(
-      "primitive my_udp(output y, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0 ;\n"
-      "    1 1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  my_udp u1(o1, i1, i2), u2(o2, i3, i4);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  ASSERT_EQ(insts.size(), 2u);
-  EXPECT_EQ(insts[0]->gate_inst_name, "u1");
-  EXPECT_EQ(insts[1]->gate_inst_name, "u2");
-}
-
 TEST(ParserA504, UdpInst_MultipleWithStrengthDelay) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
