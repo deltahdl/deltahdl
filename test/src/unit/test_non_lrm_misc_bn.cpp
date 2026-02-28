@@ -54,23 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 12. Net driven by assign statement produces kContAssign.
-TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire out;\n"
-      "  assign out = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 2u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(items[1]->kind, ModuleItemKind::kContAssign);
-  ASSERT_NE(items[1]->assign_lhs, nullptr);
-  ASSERT_NE(items[1]->assign_rhs, nullptr);
-}
-
 // 13. Variable driven by initial block (procedural assignment).
 TEST(ParserSection6, Sec6_5_VarDrivenByInitialBlock) {
   auto r = Parse(

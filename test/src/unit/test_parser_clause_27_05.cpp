@@ -273,4 +273,33 @@ TEST(Parser, GenerateIfElse) {
   EXPECT_NE(item->gen_else, nullptr);
 }
 
+static void VerifyGenerateCaseItem(const GenerateCaseItem& ci, size_t idx,
+                                   bool expect_default,
+                                   size_t expect_pattern_count) {
+  EXPECT_EQ(ci.is_default, expect_default) << "case item " << idx;
+  EXPECT_EQ(ci.patterns.size(), expect_pattern_count) << "case item " << idx;
+  EXPECT_FALSE(ci.body.empty()) << "case item " << idx;
+}
+
+TEST(Parser, GenerateCase) {
+  auto r = Parse(
+      "module t;\n"
+      "  case (WIDTH)\n"
+      "    1: begin\n"
+      "      assign a = b;\n"
+      "    end\n"
+      "    2: begin\n"
+      "      assign a = c;\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
+  EXPECT_NE(item->gen_cond, nullptr);
+  ASSERT_EQ(item->gen_case_items.size(), 2);
+  VerifyGenerateCaseItem(item->gen_case_items[0], 0, false, 1);
+  VerifyGenerateCaseItem(item->gen_case_items[1], 1, false, 1);
+}
+
 }  // namespace

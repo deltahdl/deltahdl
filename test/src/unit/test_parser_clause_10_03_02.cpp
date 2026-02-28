@@ -303,4 +303,39 @@ TEST(ParserSection10, ContinuousAssignTernary) {
   ASSERT_NE(ca->assign_rhs, nullptr);
 }
 
+struct ParseResult6j {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6j Parse(const std::string& src) {
+  ParseResult6j result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// 12. Net driven by assign statement produces kContAssign.
+TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire out;\n"
+      "  assign out = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kContAssign);
+  ASSERT_NE(items[1]->assign_lhs, nullptr);
+  ASSERT_NE(items[1]->assign_rhs, nullptr);
+}
+
 }  // namespace
