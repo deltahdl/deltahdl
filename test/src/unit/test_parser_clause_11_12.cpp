@@ -398,4 +398,15 @@ TEST(ParserA212, LetActualArg_Literal) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetActualArg_Variable) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(x) = x;\n"
+              "  initial begin\n"
+              "    int a, z;\n"
+              "    z = f(a);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
