@@ -83,21 +83,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 23. always_comb with multiple assignment statements.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombMultipleAssigns) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb begin\n"
-      "    x = a & b;\n"
-      "    y = a | c;\n"
-      "    z = a ^ d;\n"
-      "  end\n"
-      "endmodule\n");
-  VerifyAlwaysMultiAssigns(r);
-}
-
-// ---------------------------------------------------------------------------
 // 24. always @* with multiple assignment statements.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarMultipleAssigns) {

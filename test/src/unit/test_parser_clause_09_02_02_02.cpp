@@ -168,4 +168,51 @@ TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
+// Helper for block 12: verify always block has 3 blocking assigns.
+static void VerifyAlwaysMultiAssigns(ParseResult& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_EQ(item->body->stmts.size(), 3u);
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
+  }
+}
+
+struct ParseResult9i {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9i Parse(const std::string& src) {
+  ParseResult9i result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// 23. always_comb with multiple assignment statements.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysCombMultipleAssigns) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb begin\n"
+      "    x = a & b;\n"
+      "    y = a | c;\n"
+      "    z = a ^ d;\n"
+      "  end\n"
+      "endmodule\n");
+  VerifyAlwaysMultiAssigns(r);
+}
+
 }  // namespace
