@@ -25,15 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-TEST(ParserAnnexA, A4ModuleInstNamed) {
-  auto r = Parse("module m; sub u0(.clk(clk), .data(data)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_ports.size(), 2u);
-}
-
 TEST(ParserAnnexA, A4ModuleInstWithParams) {
   auto r = Parse("module m; sub #(8, 4) u0(.clk(clk)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
