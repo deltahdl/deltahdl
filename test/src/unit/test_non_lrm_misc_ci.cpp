@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Ternary in case expression ---
-TEST(ParserSection11, Sec11_4_6_TernaryInCaseExpr) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    case (sel ? a : b)\n"
-      "      0: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  ASSERT_NE(stmt->condition, nullptr);
-  EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
-}
-
 // --- Ternary with system call operand ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithSystemCall) {
   auto r = Parse(

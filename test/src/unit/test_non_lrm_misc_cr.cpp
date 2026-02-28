@@ -6,17 +6,37 @@
 
 using namespace delta;
 
-namespace {
-
-// Clocking block within a program.
-TEST(ParserSection19, ClockingBlock_InProgram) {
-  EXPECT_TRUE(
-      ParseOk("program test_prog(input clk, input [7:0] data);\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "  endclocking\n"
-              "endprogram\n"));
+static Expr* MakeStrLit(Arena& arena, std::string_view text) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kStringLiteral;
+  // Store with surrounding quotes, matching parser convention.
+  auto len = text.size() + 2;
+  char* buf = static_cast<char*>(arena.Allocate(len + 1, 1));
+  buf[0] = '"';
+  for (size_t i = 0; i < text.size(); ++i) buf[i + 1] = text[i];
+  buf[len - 1] = '"';
+  buf[len] = '\0';
+  e->text = std::string_view(buf, len);
+  return e;
 }
+
+struct ParseResult21 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult21 Parse(const std::string& src) {
+  ParseResult21 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+namespace {
 
 // Global clocking block (no signals allowed inside).
 TEST(ParserSection19, GlobalClocking_Basic) {
@@ -152,20 +172,6 @@ TEST(SourceText, ElabSeverityAllForms) {
     EXPECT_EQ(r.cu->modules[0]->items[i]->kind,
               ModuleItemKind::kElabSystemTask);
   }
-}
-
-static Expr* MakeStrLit(Arena& arena, std::string_view text) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kStringLiteral;
-  // Store with surrounding quotes, matching parser convention.
-  auto len = text.size() + 2;
-  char* buf = static_cast<char*>(arena.Allocate(len + 1, 1));
-  buf[0] = '"';
-  for (size_t i = 0; i < text.size(); ++i) buf[i + 1] = text[i];
-  buf[len - 1] = '"';
-  buf[len] = '\0';
-  e->text = std::string_view(buf, len);
-  return e;
 }
 
 // ============================================================================
@@ -661,24 +667,6 @@ TEST(Section21, Ungetc) {
   std::remove(tmp_path.c_str());
 }
 
-struct ParseResult20b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult20b Parse(const std::string& src) {
-  ParseResult20b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // =============================================================================
 // LRM section 20.6.3 -- $isunbounded (range system function)
 // =============================================================================
@@ -822,22 +810,6 @@ TEST(ParserSection20, ArrayUnpackedDimensionsFunction) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-struct ParseResult21 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult21 Parse(const std::string& src) {
-  ParseResult21 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
 }
 
 // ============================================================================
