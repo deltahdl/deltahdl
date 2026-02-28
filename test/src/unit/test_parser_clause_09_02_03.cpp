@@ -134,4 +134,39 @@ TEST(ParserSection9c, MultipleFinalBlocks) {
   EXPECT_EQ(count, 2);
 }
 
+struct ParseResult4d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4d Parse(const std::string& src) {
+  ParseResult4d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §4.6: Program block with final block
+// =============================================================================
+TEST(ParserSection4, Sec4_6_ProgramWithFinalBlock) {
+  auto r = Parse(
+      "program p;\n"
+      "  final begin\n"
+      "    $display(\"done\");\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  ASSERT_EQ(r.cu->programs[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
+}
+
 }  // namespace

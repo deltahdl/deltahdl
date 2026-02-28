@@ -59,4 +59,16 @@ TEST(ParserSection7, ArraySumMethod) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
+TEST(ParserSection7, ArraySumWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial x = arr.sum with (item * 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
