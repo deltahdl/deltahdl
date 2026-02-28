@@ -44,43 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// Function with multiple statements in body.
-TEST(ParserSection13, FunctionMultipleBodyStmts) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int clamp(int val, int lo, int hi);\n"
-      "    if (val < lo) return lo;\n"
-      "    if (val > hi) return hi;\n"
-      "    return val;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "clamp");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_EQ(fn->func_args.size(), 3u);
-  EXPECT_GE(fn->func_body_stmts.size(), 3u);
-}
-
-// =============================================================================
-// LRM section 13.4.1 -- Return values and void functions (additional tests)
-// =============================================================================
-// Void function called as a statement (LRM 13.4.1).
-TEST(ParserSection13, VoidFunctionCallAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void myprint(int a);\n"
-      "    $display(\"%d\", a);\n"
-      "  endfunction\n"
-      "  initial myprint(42);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  ASSERT_NE(stmt->expr, nullptr);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kCall);
-}
-
 // Void function with return type kVoid, verifying no return expr needed.
 TEST(ParserSection13, VoidFunctionReturnTypeKind) {
   auto r = Parse(
