@@ -56,4 +56,28 @@ TEST_F(DpiParseTest, AttributeOnModuleInstantiation) {
   EXPECT_EQ(items[0]->attrs[0].name, "dont_touch");
 }
 
+TEST_F(DpiParseTest, AttributeWithValueOnInstance) {
+  auto* unit = Parse(R"(
+    module m;
+      (* optimize_power = 0 *)
+      sub u1(.a(x));
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  ASSERT_FALSE(items[0]->attrs.empty());
+  EXPECT_EQ(items[0]->attrs[0].name, "optimize_power");
+  EXPECT_NE(items[0]->attrs[0].value, nullptr);
+}
+
+// =============================================================================
+// A.9 -- General (attributes, identifiers)
+// =============================================================================
+TEST(ParserAnnexA, A9AttributeOnContAssign) {
+  auto r = Parse("module m; wire y; (* synthesis *) assign y = 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
