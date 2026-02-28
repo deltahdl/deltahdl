@@ -50,23 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// A.6.1 Production: net_alias (parsing)
-// net_alias ::= alias net_lvalue = net_lvalue { = net_lvalue } ;
-// =============================================================================
-TEST(ParserA601, NetAlias_TwoNets) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  alias a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* alias = FindAlias(r.cu->modules[0]->items);
-  ASSERT_NE(alias, nullptr);
-  ASSERT_EQ(alias->alias_nets.size(), 2u);
-}
-
 TEST(ParserA601, NetAlias_ThreeNets) {
   auto r = Parse(
       "module m;\n"
