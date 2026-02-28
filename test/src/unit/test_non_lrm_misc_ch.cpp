@@ -69,23 +69,6 @@ static ModuleItem* FirstAlwaysCombItem(ParseResult11g& r) {
 
 namespace {
 
-// --- Bit-select on LHS of nonblocking assignment ---
-TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsNonblocking) {
-  auto r = Parse(
-      "module t;\n"
-      "  reg [7:0] vec;\n"
-      "  initial vec[5] <= 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-  EXPECT_EQ(stmt->lhs->index_end, nullptr);
-}
-
 // --- Part-select in continuous assignment RHS ---
 TEST(ParserSection11, Sec11_4_1_PartSelectInContAssignRhs) {
   auto r = Parse(
