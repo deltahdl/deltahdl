@@ -56,4 +56,20 @@ TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
   EXPECT_EQ(item->name, "v");
 }
 
+// 7. wire scalared logic [7:0] s; — scalared with explicit type.
+TEST(ParserSection6, Sec6_7_1_ScalaredWithExplicitType) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire scalared logic [7:0] s;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_TRUE(item->data_type.is_scalared);
+  EXPECT_EQ(item->name, "s");
+}
+
 }  // namespace
