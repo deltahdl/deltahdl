@@ -163,4 +163,26 @@ TEST(ParserSection4, Sec4_9_4_StaticVarComplexInit) {
   EXPECT_EQ(var_stmt->var_init->kind, ExprKind::kBinary);
 }
 
+// =============================================================================
+// 29. Block-level var decl without explicit lifetime (plain int in block)
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_BlockVarDeclNoLifetime) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int plain_var = 99;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_FALSE(stmt->var_is_static);
+  EXPECT_FALSE(stmt->var_is_automatic);
+  EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(stmt->var_name, "plain_var");
+  EXPECT_NE(stmt->var_init, nullptr);
+}
+
 }  // namespace

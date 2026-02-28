@@ -169,4 +169,44 @@ TEST(ParserSection4, Sec4_6_ProgramWithFinalBlock) {
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
 
+struct ParseResult9e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9e Parse(const std::string& src) {
+  ParseResult9e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection9, Sec9_3_1_BlockInFinalBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  final begin\n"
+      "    $display(\"sim done\");\n"
+      "    $display(\"cycles: %0d\", cnt);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool found = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kFinalBlock) {
+      found = true;
+      ASSERT_NE(item->body, nullptr);
+      EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+      EXPECT_GE(item->body->stmts.size(), 2u);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 }  // namespace
