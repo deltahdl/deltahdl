@@ -199,4 +199,11 @@ TEST(ParserA303, NcontrolTerminal_SimpleIdent) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
+TEST(ParserA303, NcontrolTerminal_ComplexExpr) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  cmos (out, in, a & b, pctrl);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

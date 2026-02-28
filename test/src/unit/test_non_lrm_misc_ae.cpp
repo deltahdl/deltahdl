@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, NcontrolTerminal_ComplexExpr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  cmos (out, in, a & b, pctrl);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, NcontrolTerminal_BitSelect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
