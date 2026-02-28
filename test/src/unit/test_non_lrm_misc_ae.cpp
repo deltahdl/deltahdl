@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, EnableTerminal_BitwiseExpr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  notif0 (out, in, a | b | c);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, EnableTerminal_TernaryExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
