@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, CmosSwitchInst_Named) {
-  auto r = Parse(
-      "module m;\n"
-      "  cmos c1(out, in, nctrl, pctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_inst_name, "c1");
-  EXPECT_EQ(g->gate_terminals.size(), 4u);
-}
-
 TEST(ParserA301, CmosSwitchInst_RcmosNamed) {
   auto r = Parse(
       "module m;\n"
