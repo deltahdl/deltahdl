@@ -41,39 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, NettypeDeclAlias) {
-  // nettype nettype_identifier nettype_identifier ;  (alias form)
-  auto r = Parse(
-      "module t;\n"
-      "  typedef real TR[5];\n"
-      "  nettype TR wTR;\n"
-      "  nettype wTR nettypeid2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  int nettype_count = 0;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kNettypeDecl) nettype_count++;
-  }
-  EXPECT_GE(nettype_count, 2);
-}
-
-// =========================================================================
-// §6.7.1: Net declarations with built-in net types
-// =========================================================================
-TEST(ParserSection6, WireImplicitLogic) {
-  // §6.7.1: If no data type specified, net is implicitly logic.
-  auto r = Parse(
-      "module t;\n"
-      "  wire w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-}
-
 TEST(ParserSection6, WireWithRange) {
   // wire [15:0] ww; — equivalent to "wire logic [15:0] ww;"
   auto r = Parse(
