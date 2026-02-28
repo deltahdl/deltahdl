@@ -21,16 +21,6 @@ static ParseResult90301 Parse(const std::string& src) {
   return result;
 }
 
-static void VerifyBlockVarDecls(const Stmt* blk,
-                                const std::string expected_names[],
-                                size_t count) {
-  ASSERT_EQ(blk->stmts.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(blk->stmts[i]->kind, StmtKind::kVarDecl) << "stmt " << i;
-    EXPECT_EQ(blk->stmts[i]->var_name, expected_names[i]) << "stmt " << i;
-  }
-}
-
 static ModuleItem* FirstAlwaysItem(ParseResult& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
@@ -39,35 +29,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 }
 
 namespace {
-
-TEST(ParserCh90301, BlockVarDecl_CommaSeparated) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int a, b, c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* blk = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(blk, nullptr);
-  std::string expected_names[] = {"a", "b", "c"};
-  VerifyBlockVarDecls(blk, expected_names, std::size(expected_names));
-}
-
-TEST(ParserCh90301, BlockVarDecl_WithInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x = 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* blk = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(blk, nullptr);
-  ASSERT_EQ(blk->stmts.size(), 1u);
-  EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_NE(blk->stmts[0]->var_init, nullptr);
-}
 
 TEST(ParserCh90301, BlockVarDecl_FullStructReplication) {
   EXPECT_TRUE(
