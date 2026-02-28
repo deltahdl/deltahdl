@@ -22,4 +22,20 @@ TEST(ParserA702, StateDependentIfSimpleFull) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
 }
 
+// Polarity with conditional path
+TEST(ParserA702, PolarityWithConditionalPath) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    if (sel) (a + => b) = 8;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_NE(si->path.condition, nullptr);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
+}
+
 }  // namespace

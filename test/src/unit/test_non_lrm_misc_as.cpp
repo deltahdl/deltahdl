@@ -15,22 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// Polarity with conditional path
-TEST(ParserA702, PolarityWithConditionalPath) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (sel) (a + => b) = 8;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_NE(si->path.condition, nullptr);
-  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
-}
-
 // =============================================================================
 // A.7.2 data_source_expression with output polarity
 // =============================================================================
