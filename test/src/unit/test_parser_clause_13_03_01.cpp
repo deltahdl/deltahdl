@@ -67,4 +67,66 @@ TEST(ParserA27, TaskLifetimeDefault) {
   EXPECT_FALSE(item->is_static);
 }
 
+struct ParseResult4e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4e Parse(const std::string& src) {
+  ParseResult4e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// 19. Automatic task with delay control
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic delayed_write(input int val);\n"
+      "    #10;\n"
+      "    $display(\"val=%0d\", val);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->is_automatic);
+  ASSERT_GE(item->func_body_stmts.size(), 1u);
+  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kDelay);
+}
+
+// =============================================================================
+// 24. Automatic task with event control
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_AutoTaskWithEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic wait_clk(input logic clk);\n"
+      "    @(posedge clk);\n"
+      "    $display(\"clock edge\");\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->is_automatic);
+  ASSERT_GE(item->func_body_stmts.size(), 1u);
+  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kEventControl);
+  ASSERT_FALSE(item->func_body_stmts[0]->events.empty());
+  EXPECT_EQ(item->func_body_stmts[0]->events[0].edge, Edge::kPosedge);
+}
+
 }  // namespace

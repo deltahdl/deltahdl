@@ -45,29 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 24. Automatic task with event control
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_AutoTaskWithEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic wait_clk(input logic clk);\n"
-      "    @(posedge clk);\n"
-      "    $display(\"clock edge\");\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(item->is_automatic);
-  ASSERT_GE(item->func_body_stmts.size(), 1u);
-  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kEventControl);
-  ASSERT_FALSE(item->func_body_stmts[0]->events.empty());
-  EXPECT_EQ(item->func_body_stmts[0]->events[0].edge, Edge::kPosedge);
-}
-
-// =============================================================================
 // 25. Function without explicit lifetime (implicit static in module)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_FuncNoLifetimeQualifier) {
