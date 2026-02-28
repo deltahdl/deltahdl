@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 26.2 -- Package with struct typedef and class
-// =============================================================================
-TEST(ParserSection26, PackageWithStructTypedef) {
-  auto r = Parse(
-      "package types_pkg;\n"
-      "  typedef struct {\n"
-      "    shortreal i, r;\n"
-      "  } Complex;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kTypedef));
-}
-
 TEST(ParserSection26, PackageWithClassDecl) {
   auto r = Parse(
       "package cls_pkg;\n"
