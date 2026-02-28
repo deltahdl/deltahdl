@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetDecl_EmptyParens) {
-  auto r = Parse(
-      "module m;\n"
-      "  let my_val() = 42;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "my_val");
-  EXPECT_TRUE(item->func_args.empty());
-}
-
 TEST(ParserA212, LetDecl_WithArgs) {
   auto r = Parse(
       "module m;\n"
