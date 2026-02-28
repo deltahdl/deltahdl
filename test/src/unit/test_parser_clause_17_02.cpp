@@ -207,4 +207,17 @@ TEST(SourceText, CheckerInitialAlwaysFinal) {
   EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kFinalBlock));
 }
 
+// checker_or_generate_item ::= assertion_item
+TEST(SourceText, CheckerAssertionItem) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  assert property (@(posedge clk) a |-> b);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kAssertProperty);
+}
+
 }  // namespace
