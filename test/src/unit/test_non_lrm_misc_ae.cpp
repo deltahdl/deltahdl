@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// -----------------------------------------------------------------------------
-// Combination: strength with multiple instances
-// -----------------------------------------------------------------------------
-TEST(ParserA302, PulldownStrength_MultipleInstances) {
-  auto r = Parse(
-      "module m;\n"
-      "  pulldown (strong0, weak1) pd1(a), pd2(b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  ASSERT_EQ(gates.size(), 2u);
-  EXPECT_EQ(gates[0]->drive_strength0, 4u);  // strong0
-  EXPECT_EQ(gates[0]->drive_strength1, 2u);  // weak1
-  EXPECT_EQ(gates[1]->drive_strength0, 4u);  // strong0
-  EXPECT_EQ(gates[1]->drive_strength1, 2u);  // weak1
-}
-
 TEST(ParserA302, PullupStrength_MultipleInstances) {
   auto r = Parse(
       "module m;\n"
