@@ -14,16 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// § primary_literal — number (hex)
-TEST(ParserA84, PrimaryLiteralHexNumber) {
-  auto r = Parse("module m; initial x = 16'hDEAD; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-}
-
 // § primary_literal — number (octal)
 TEST(ParserA84, PrimaryLiteralOctalNumber) {
   auto r = Parse("module m; initial x = 8'o77; endmodule\n");

@@ -264,4 +264,14 @@ TEST(ParserCh50701, IntLiteral_SpaceBetweenBaseAndDigits) {
   EXPECT_TRUE(ParseOk("module m; initial x = 32 'h 12ab_f001; endmodule"));
 }
 
+// § primary_literal — number (hex)
+TEST(ParserA84, PrimaryLiteralHexNumber) {
+  auto r = Parse("module m; initial x = 16'hDEAD; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
