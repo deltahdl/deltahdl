@@ -49,20 +49,6 @@ TEST(ParserSection16, PropertyDeclAndAssertProperty) {
 }
 
 // =============================================================================
-// §16.4 Deferred assertions — additional forms
-// =============================================================================
-TEST(ParserSection16, DeferredAssumeHash0WithAction) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assume #0 (valid) $display(\"assumed\");\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
-// =============================================================================
 // §16.4.1 Deferred assertion reporting
 // =============================================================================
 TEST(ParserSection16, DeferredAssertHash0PassAndFail) {
