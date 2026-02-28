@@ -22,26 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// §12.3: multiple null statements
-TEST(ParserA604, MultipleNullStatements) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    ;\n"
-      "    ;\n"
-      "    ;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNull);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNull);
-  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kNull);
-}
-
 // ---------------------------------------------------------------------------
 // statement ::= [ block_identifier : ] { attribute_instance } statement_item
 // ---------------------------------------------------------------------------

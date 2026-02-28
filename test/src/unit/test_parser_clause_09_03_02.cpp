@@ -382,4 +382,35 @@ TEST(ParserSection9, Sec9_3_2_ForkThreadWithDelayedAssign) {
   }
 }
 
+// =============================================================================
+// LRM section 9.3.2 -- Parallel blocks (fork-join)
+//
+// This file provides extended coverage of fork...join / join_any / join_none
+// parallel block constructs beyond the basics already tested in
+// test_parser_clause09.cpp.
+// =============================================================================
+// ---------------------------------------------------------------------------
+// 1. Basic fork-join with two delay-controlled statements
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_ForkJoinTwoDelayedStmts) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #5 a = 1;\n"
+      "      #10 b = 2;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
+  EXPECT_EQ(stmt->fork_stmts.size(), 2u);
+  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kDelay);
+  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kDelay);
+}
+
 }  // namespace
