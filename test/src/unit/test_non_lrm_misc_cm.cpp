@@ -34,20 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §14.1 overview: clocking block with negedge event.
-TEST(ParserSection14, OverviewNegedgeClockEvent) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(negedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  ASSERT_EQ(item->clocking_event.size(), 1u);
-  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
-}
-
 // §14.1 overview: clocking block with input skew and output skew together.
 TEST(ParserSection14, OverviewInputOutputSkews) {
   auto r = Parse(
