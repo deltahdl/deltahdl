@@ -89,4 +89,17 @@ TEST(ParserA602, NonblockingAssignment_BitSelectLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
+TEST(ParserA602, NonblockingAssignment_ParenthesizedIntraDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin q <= #(5:10:15) d; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
 }  // namespace
