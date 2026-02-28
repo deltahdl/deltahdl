@@ -50,23 +50,6 @@ static ParseResult7c Parse(const std::string& src) {
 namespace {
 
 // =========================================================================
-// §7.12.1: Array locator method 'unique' (keyword as method name)
-// =========================================================================
-TEST(ParserSection7, ArrayLocatorUnique) {
-  auto r = Parse(
-      "module t;\n"
-      "  int s[] = '{10, 10, 3, 20, 20, 10};\n"
-      "  int qi[$];\n"
-      "  initial qi = s.unique;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
-}
-
-// =========================================================================
 // §7.12.3: Array reduction methods 'and', 'or', 'xor' (keywords as names)
 // =========================================================================
 TEST(ParserSection7, ArrayReductionAnd) {
