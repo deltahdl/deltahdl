@@ -145,4 +145,20 @@ TEST(ParserAnnexA052, PortDecl_RegStandalone) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
+// ANSI form: output reg q = 1'b1
+TEST(ParserAnnexA052, OutputDeclAnsi_RegInitOne) {
+  auto r = Parse(
+      "primitive dff(output reg q = 1'b1, input d, input clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_TRUE(udp->has_initial);
+  EXPECT_EQ(udp->initial_value, '1');
+}
+
 }  // namespace
