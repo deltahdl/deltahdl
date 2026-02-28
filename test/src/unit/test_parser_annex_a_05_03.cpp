@@ -76,4 +76,21 @@ TEST(ParserAnnexA053, SeqInputList_WithEdge) {
   EXPECT_EQ(udp->table[2].inputs[1], 'f');
 }
 
+// Multiple level symbols in input list
+TEST(ParserAnnexA053, LevelInputList_Multiple) {
+  auto r = Parse(
+      "primitive four_in(output y, input a, b, c, d);\n"
+      "  table\n"
+      "    0 1 0 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->table[0].inputs.size(), 4);
+  EXPECT_EQ(udp->table[0].inputs[0], '0');
+  EXPECT_EQ(udp->table[0].inputs[1], '1');
+  EXPECT_EQ(udp->table[0].inputs[2], '0');
+  EXPECT_EQ(udp->table[0].inputs[3], '1');
+}
+
 }  // namespace
