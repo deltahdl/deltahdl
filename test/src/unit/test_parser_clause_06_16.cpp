@@ -74,4 +74,13 @@ TEST(ParserSection6, StringBlockDecl) {
   EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
 }
 
+TEST(ParserSection6, StringFunctionArg) {
+  // §6.16: string as a function argument type.
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  function void print_msg(string s);\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
 }  // namespace

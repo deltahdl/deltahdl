@@ -53,34 +53,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 namespace {
 
 // =========================================================================
-// §6.16: String in block scope
-// =========================================================================
-TEST(ParserSection6, StringBlockDecl) {
-  // §6.16: string declared inside an initial block.
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    string msg;\n"
-      "    msg = \"test\";\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
-}
-
-TEST(ParserSection6, StringFunctionArg) {
-  // §6.16: string as a function argument type.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  function void print_msg(string s);\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
-// =========================================================================
 // §6.20: Constants — const variable
 // =========================================================================
 TEST(ParserSection6, ConstRealDecl) {
