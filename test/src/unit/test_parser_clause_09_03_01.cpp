@@ -412,4 +412,20 @@ TEST(ParserSection9, Sec9_3_1_StaticVarDeclInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "call_count");
 }
 
+TEST(ParserCh90301, BlockVarDecl_BuiltinType_Stmt) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* blk = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(blk, nullptr);
+  ASSERT_EQ(blk->stmts.size(), 1u);
+  EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(blk->stmts[0]->var_decl_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(blk->stmts[0]->var_name, "x");
+}
+
 }  // namespace

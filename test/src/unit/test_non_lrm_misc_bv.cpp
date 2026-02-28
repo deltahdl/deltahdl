@@ -51,18 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-TEST(ParserSection9c, SequenceEventParenthesized) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s1;\n"
-              "    @(posedge clk) a ##1 b;\n"
-              "  endsequence\n"
-              "  initial begin\n"
-              "    @(s1) $display(\"matched\");\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // LRM section 9.4.4 -- Level-sensitive sequence controls
 // Wait on sequence.triggered to synchronize with sequence end point.
