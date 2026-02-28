@@ -46,4 +46,16 @@ TEST_F(SpecifyTest, PosedgePath) {
   EXPECT_EQ(path->path.dst_ports[0].name, "q");
 }
 
+TEST_F(SpecifyTest, NegedgePath) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (negedge clk => q) = 8;\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_EQ(spec->specify_items[0]->path.edge, SpecifyEdge::kNegedge);
+}
+
 }  // namespace

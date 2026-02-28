@@ -38,18 +38,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-TEST_F(SpecifyTest, NegedgePath) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  (negedge clk => q) = 8;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  EXPECT_EQ(spec->specify_items[0]->path.edge, SpecifyEdge::kNegedge);
-}
-
 TEST(ParserSection28, Sec28_12_TwoDelayPath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"
