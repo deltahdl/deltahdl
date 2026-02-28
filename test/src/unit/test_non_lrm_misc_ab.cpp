@@ -13,31 +13,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-TEST(ParserA211, BinsOrOptions_WithWithClause) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins b = {[0:15]} with (item > 5);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-// =============================================================================
-// §A.2.11 Production #11: bins_keyword
-// =============================================================================
-TEST(ParserA211, BinsKeyword_Bins) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins a = {0};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, BinsKeyword_IllegalBins) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

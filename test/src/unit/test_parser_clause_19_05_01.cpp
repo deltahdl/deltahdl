@@ -100,4 +100,18 @@ TEST(ParserA211, BinsOrOptions_Default) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// §A.2.11 Production #11: bins_keyword
+// =============================================================================
+TEST(ParserA211, BinsKeyword_Bins) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins a = {0};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
