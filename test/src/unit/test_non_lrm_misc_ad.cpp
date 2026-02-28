@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_XorBasic) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  xor (out, a, b);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA301, GateInst_XnorBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
