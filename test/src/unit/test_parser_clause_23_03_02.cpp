@@ -97,4 +97,24 @@ TEST(ParserAnnexA0411, FullCombination) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
+TEST(ParserAnnexA0411, MultipleInstancesSharedParams) {
+  auto r = Parse(
+      "module sub #(parameter W = 1)(input [W-1:0] d);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub #(.W(8)) u0(.d(8'd0)), u1(.d(8'd1));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[1]->items.size(), 2u);
+  auto* i0 = r.cu->modules[1]->items[0];
+  auto* i1 = r.cu->modules[1]->items[1];
+  EXPECT_EQ(i0->inst_module, "sub");
+  EXPECT_EQ(i0->inst_params.size(), 1u);
+  EXPECT_EQ(i0->inst_params[0].first, "W");
+  EXPECT_EQ(i1->inst_module, "sub");
+  EXPECT_EQ(i1->inst_params.size(), 1u);
+  EXPECT_EQ(i1->inst_params[0].first, "W");
+}
+
 }  // namespace
