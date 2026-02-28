@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, EnableTerminal_BitSelect) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  bufif0 (out, in, ctrl[2]);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, EnableTerminal_PassEnableSwitch) {
   // enable_terminal in pass enable switch context
   auto r = Parse(

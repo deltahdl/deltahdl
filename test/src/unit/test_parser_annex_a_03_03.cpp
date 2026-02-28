@@ -46,4 +46,11 @@ TEST(ParserA303, EnableTerminal_TernaryExpr) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, EnableTerminal_BitSelect) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  bufif0 (out, in, ctrl[2]);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
