@@ -14,12 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserAnnexA, A9AttributeWithValue) {
-  auto r = Parse("module m; (* max_fanout = 8 *) wire w; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserAnnexA, A9DefparamDecl) {
   auto r = Parse("module m; defparam u.WIDTH = 16; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

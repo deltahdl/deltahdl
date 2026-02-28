@@ -98,4 +98,10 @@ TEST_F(DpiParseTest, MultipleAttributesOnDecl) {
   EXPECT_EQ(items[0]->attrs[1].name, "parallel_case");
 }
 
+TEST(ParserAnnexA, A9AttributeWithValue) {
+  auto r = Parse("module m; (* max_fanout = 8 *) wire w; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
