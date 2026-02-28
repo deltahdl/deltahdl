@@ -53,4 +53,18 @@ TEST(ParserA211, CoverCross_WithIff) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// §A.2.11 Production #18: list_of_cross_items
+// =============================================================================
+TEST(ParserA211, ListOfCrossItems_Two) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    cp1: coverpoint a;\n"
+              "    cp2: coverpoint b;\n"
+              "    cross cp1, cp2;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
