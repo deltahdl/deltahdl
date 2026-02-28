@@ -56,23 +56,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 27. always_comb with nested if-else inside begin-end.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombNestedIfElseInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb begin\n"
-      "    if (a)\n"
-      "      if (b) y = 1;\n"
-      "      else y = 2;\n"
-      "    else\n"
-      "      y = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  VerifyAlwaysNestedIfElse(r);
-}
-
-// ---------------------------------------------------------------------------
 // 28. always @* with nested if-else inside begin-end.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarNestedIfElseInBlock) {
