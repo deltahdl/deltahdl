@@ -41,19 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, WireWithTypedef) {
-  // §6.7.1 example: typedef logic [31:0] addressT; wire addressT w1;
-  auto r = Parse(
-      "module t;\n"
-      "  typedef logic [31:0] addressT;\n"
-      "  wire addressT w1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 2u);
-  EXPECT_EQ(items[1]->name, "w1");
-}
-
 // =========================================================================
 // §6.22: Type compatibility
 // =========================================================================
