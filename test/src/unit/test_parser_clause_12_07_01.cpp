@@ -51,4 +51,18 @@ TEST(ParserSection12, ForLoopPostIncrementStep) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
+TEST(ParserSection12, ForLoopPostDecrementStep) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 255; i >= 0; i--) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_NE(stmt->for_step, nullptr);
+}
+
 }  // namespace
