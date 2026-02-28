@@ -348,4 +348,11 @@ TEST(ParserSection23, GenvarDeclaration) {
   EXPECT_EQ(mod->items[0]->name, "i");
 }
 
+TEST(ParserA213, GenvarDeclMultiple) {
+  auto r = Parse("module m; genvar i, j, k; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
 }  // namespace

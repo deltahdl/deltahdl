@@ -7,48 +7,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// A.7.5.1 $fullskew_timing_check
-// =============================================================================
-// $fullskew with two limits, event_based_flag and remain_active_flag
-TEST(ParserA70501, FullskewWithFlags) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $fullskew(posedge clk1, negedge clk2, 4, 6, ntfr, 1, 0);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
-  ASSERT_GE(tc->limits.size(), 2u);
-  EXPECT_EQ(tc->notifier, "ntfr");
-  ASSERT_NE(tc->event_based_flag, nullptr);
-  ASSERT_NE(tc->remain_active_flag, nullptr);
-}
-
-// =============================================================================
-// A.7.5.1 $period_timing_check
-// =============================================================================
-// $period ( controlled_reference_event , timing_check_limit [ , [ notifier ] ]
-// )
-TEST(ParserA70501, PeriodTimingCheck) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $period(posedge clk, 50, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kPeriod);
-  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->ref_terminal.name, "clk");
-  EXPECT_EQ(tc->notifier, "ntfr");
-}
-
-// =============================================================================
 // A.7.5.1 $width_timing_check
 // =============================================================================
 // $width ( controlled_reference_event , timing_check_limit , threshold [ , [

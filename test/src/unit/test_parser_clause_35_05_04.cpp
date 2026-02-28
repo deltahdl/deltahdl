@@ -261,4 +261,22 @@ TEST_F(DpiParseTest, DpiImportCoexistsWithPackageImport) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kDpiExport);
 }
 
+// =============================================================================
+// Annex H - DPI import task
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportTask) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" task c_wait(int cycles);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "c_wait");
+  EXPECT_TRUE(items[0]->dpi_is_task);
+  ASSERT_EQ(items[0]->func_args.size(), 1u);
+  EXPECT_EQ(items[0]->func_args[0].name, "cycles");
+}
+
 }  // namespace
