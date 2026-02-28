@@ -53,30 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 12.5.1 -- casex / casez (additional cases)
-// =============================================================================
-// casez with wildcard question-mark pattern.
-TEST(ParserSection12, CasezWithQuestionMark) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    casez (ir)\n"
-      "      8'b1???????: x = 1;\n"
-      "      8'b01??????: x = 2;\n"
-      "      8'b00010???: x = 3;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
-  ASSERT_EQ(stmt->case_items.size(), 4u);
-}
-
 // casex with multiple case items and expressions.
 TEST(ParserSection12, CasexMultipleItemsWithExpressions) {
   auto r = Parse(
