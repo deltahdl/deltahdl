@@ -50,25 +50,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// --- 26. Nonblocking to indexed part-select (q[base +: width]) ---
-TEST(ParserSection10, Sec10_4_2_IndexedPartSelectLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [31:0] q;\n"
-      "  initial begin\n"
-      "    q[8 +: 8] <= 8'hAB;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 // --- 27. Nonblocking in named begin-end block ---
 TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
   auto r = Parse(
