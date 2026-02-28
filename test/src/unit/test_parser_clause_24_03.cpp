@@ -177,4 +177,17 @@ TEST_F(ProgramTestParse, ProgramWithTask) {
   EXPECT_EQ(unit->programs[0]->items[0]->name, "run_test");
 }
 
+TEST_F(ProgramTestParse, ProgramWithFunction) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  function int compute(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  ASSERT_GE(unit->programs[0]->items.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(unit->programs[0]->items[0]->name, "compute");
+}
+
 }  // namespace
