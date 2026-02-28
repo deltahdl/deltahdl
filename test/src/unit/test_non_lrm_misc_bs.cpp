@@ -40,20 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.5 — Parameterized class inside module (the sv-tests TIMEOUT case)
-TEST(ParserSection8, ParameterizedClassInsideModuleName) {
-  auto r = Parse(
-      "module class_tb;\n"
-      "  class test_cls #(parameter a = 12);\n"
-      "  endclass\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
-  ASSERT_NE(cls, nullptr);
-  EXPECT_EQ(cls->name, "test_cls");
-}
-
 TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
   auto r = Parse(
       "module class_tb;\n"
