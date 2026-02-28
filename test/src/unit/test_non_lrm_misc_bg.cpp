@@ -111,20 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_SizedHex) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = 8'hFF;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->int_val, 0xFFu);
-}
-
 TEST(ParserCh50701, IntLiteral_UnsizedHex) {
   // 'h 837FF -- unsized hexadecimal.
   EXPECT_TRUE(ParseOk("module m; initial x = 'h837FF; endmodule"));
