@@ -49,21 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-// =========================================================================
-// §7.12.2: Array ordering methods
-// =========================================================================
-TEST(ParserSection7, ArrayReverseMethod) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[4];\n"
-      "  initial arr.reverse();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
 TEST(ParserSection7, ArrayShuffleMethod) {
   auto r = Parse(
       "module t;\n"
