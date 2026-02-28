@@ -15,18 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, FinalConstruct_Multiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"a\");\n"
-      "  final $display(\"b\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto finals = FindItems(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
-  EXPECT_EQ(finals.size(), 2u);
-}
-
 // =============================================================================
 // A.6.2 Production: blocking_assignment
 // blocking_assignment ::=

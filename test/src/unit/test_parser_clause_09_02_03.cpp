@@ -48,4 +48,16 @@ TEST(ParserA602, FinalConstruct_BeginEnd) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
+TEST(ParserA602, FinalConstruct_Multiple) {
+  auto r = Parse(
+      "module m;\n"
+      "  final $display(\"a\");\n"
+      "  final $display(\"b\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto finals = FindItems(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
+  EXPECT_EQ(finals.size(), 2u);
+}
+
 }  // namespace
