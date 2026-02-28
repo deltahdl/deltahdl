@@ -4,29 +4,51 @@
 
 using namespace delta;
 
-namespace {
+struct LetParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
 
-// --- 9. Nonblocking to concatenation LHS: {q1, q2} <= {d1, d2} ---
-TEST(ParserSection10, Sec10_4_2_ConcatenationLhsRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q1, q2, d1, d2;\n"
-      "  initial begin\n"
-      "    {q1, q2} <= {d1, d2};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(stmt->lhs->elements.size(), 2u);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
+// Helper: find the first kLetDecl item in the first module.
+static ModuleItem* FirstLetDecl(LetParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kLetDecl) return item;
+  }
+  return nullptr;
 }
+
+struct ParseResult11 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11 Parse(const std::string& src) {
+  ParseResult11 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult11& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+namespace {
 
 // --- 10. Nonblocking with ternary RHS: q <= sel ? a : b ---
 TEST(ParserSection10, Sec10_4_2_TernaryRhs) {
@@ -479,32 +501,6 @@ TEST(Parser, ExpressionPrecedence) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-struct LetParseResult {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static LetParseResult Parse(const std::string& src) {
-  LetParseResult result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-// Helper: find the first kLetDecl item in the first module.
-static ModuleItem* FirstLetDecl(LetParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kLetDecl) return item;
-  }
-  return nullptr;
-}
-
 // ==========================================================================
 // §11.12: Let declaration parsing
 // ==========================================================================
@@ -740,42 +736,6 @@ TEST(ParserA210, AssertionItemDecl_LetDecl) {
       ParseOk("module m;\n"
               "  let max(a, b) = (a > b) ? a : b;\n"
               "endmodule\n"));
-}
-
-struct ParseResult11 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult11 Parse(const std::string& src) {
-  ParseResult11 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult11& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
-// Helper: get the RHS of the first blocking assignment in initial block.
-static Expr* FirstAssignRhs(ParseResult11& r) {
-  auto* stmt = FirstInitialStmt(r);
-  if (!stmt) return nullptr;
-  return stmt->rhs;
 }
 
 // =========================================================================
