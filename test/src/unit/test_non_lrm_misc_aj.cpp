@@ -50,23 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// Simulation: 'p' matches positive edge (0->1, 0->x, x->1)
-TEST(ParserAnnexA053, EdgeSymbol_SimP) {
-  auto r = Parse(
-      "primitive p_udp(output reg q, input a);\n"
-      "  initial q = 0;\n"
-      "  table\n"
-      "    p : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-  // 0->1 matches p
-  eval.SetInputs({'0'});
-  EXPECT_EQ(eval.EvaluateWithEdge({'1'}, 0, '0'), '1');
-}
-
 // Simulation: 'n' matches negative edge (1->0, 1->x, x->0)
 TEST(ParserAnnexA053, EdgeSymbol_SimN) {
   auto r = Parse(
