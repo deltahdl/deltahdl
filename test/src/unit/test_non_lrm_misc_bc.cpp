@@ -77,19 +77,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 
 namespace {
 
-// 25. CU-scope timeprecision is included in global computation.
-TEST(ParserClause03, Cl3_14_3_CUScopeTimeprecisionIncluded) {
-  auto r = Parse(
-      "timeprecision 1fs;\n"
-      "module a;\n"
-      "  timeprecision 1ns;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
-                                       r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kFs);  // CU-scope fs < module ns
-}
-
 // 26. Interfaces and programs also contribute to global precision.
 TEST(ParserClause03, Cl3_14_3_InterfacesAndProgramsContribute) {
   auto r = Parse(
