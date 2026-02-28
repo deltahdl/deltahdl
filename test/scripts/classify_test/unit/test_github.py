@@ -1,6 +1,5 @@
 """Unit tests for GitHub integration functions in classify_test."""
 
-import json
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -16,7 +15,7 @@ from classify_test._github import (
     tick_checkbox,
     update_issue_body,
 )
-from helpers import make_test_block as _tb
+from helpers import make_test_block as _tb, stub_subprocess_failure
 
 _parse_args = getattr(classify_test, "_parse_args")
 
@@ -181,13 +180,7 @@ def test_update_issue_body_targets_correct_endpoint(monkeypatch):
 
 def test_update_issue_body_failure_exits(monkeypatch):
     """Exits on non-zero return code."""
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-    mock_result.stderr = "error"
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_a, **_kw: mock_result,
-    )
+    stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
         update_issue_body("org", "repo", 42, "body")
 

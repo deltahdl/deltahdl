@@ -9,6 +9,7 @@ import pytest
 import classify_test
 from helpers import make_parsed_file as _parsed
 from helpers import make_test_block as _tb
+from helpers import stub_subprocess_failure
 
 _detect_prefix = getattr(classify_test, "_detect_prefix")
 _build_clause_prompt = getattr(classify_test, "_build_clause_prompt")
@@ -276,13 +277,7 @@ def test_call_claude_structured_output(monkeypatch):
 
 def test_call_claude_failure(monkeypatch):
     """Exits on non-zero return code."""
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-    mock_result.stderr = "error"
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_a, **_kw: mock_result,
-    )
+    stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
         _call_claude("prompt")
 
