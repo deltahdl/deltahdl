@@ -178,4 +178,23 @@ TEST(ParserA603, ForkWithVarDecl) {
   EXPECT_TRUE(stmt->fork_stmts[0]->var_is_automatic);
 }
 
+// §9.3.2: Fork with multiple concurrent statements
+TEST(ParserA603, ForkMultipleStmts) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 2;\n"
+      "      c = 3;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->fork_stmts.size(), 3u);
+}
+
 }  // namespace

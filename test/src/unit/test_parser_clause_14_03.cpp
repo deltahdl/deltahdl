@@ -93,4 +93,18 @@ TEST(ParserA611, ClockingDirectionInout) {
   EXPECT_EQ(item->clocking_signals[0].name, "bidir");
 }
 
+// §14.1 overview: clocking block with negedge event.
+TEST(ParserSection14, OverviewNegedgeClockEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(negedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
+}
+
 }  // namespace
