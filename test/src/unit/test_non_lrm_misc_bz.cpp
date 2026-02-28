@@ -44,31 +44,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 4. always_latch with case statement body.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_3_CaseStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [3:0] q, a, b;\n"
-      "  always_latch\n"
-      "    case (sel)\n"
-      "      2'b00: q <= a;\n"
-      "      2'b01: q <= b;\n"
-      "      default: q <= q;\n"
-      "    endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysLatchItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kCase);
-  EXPECT_EQ(item->body->case_kind, TokenKind::kKwCase);
-  EXPECT_GE(item->body->case_items.size(), 3u);
-}
-
-// ---------------------------------------------------------------------------
 // 5. Nested if-else chain.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_NestedIfElse) {

@@ -14,17 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-// scalar_constant ::= 0
-TEST(ParserA70503, ScalarConstantDecimal0) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en != 0), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.7.5.3 &&& condition on both reference and data events
 // =============================================================================
