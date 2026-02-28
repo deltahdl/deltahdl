@@ -45,23 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-// =============================================================================
-// LRM section 10.3 -- Continuous assignments (additional tests)
-// =============================================================================
-TEST(ParserSection10, ContinuousAssignExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [3:0] a, b, sum;\n"
-      "  assign sum = a + b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* ca =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
-  ASSERT_NE(ca, nullptr);
-  ASSERT_NE(ca->assign_rhs, nullptr);
-  EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kBinary);
-}
-
 TEST(ParserSection10, ContinuousAssignTernary) {
   auto r = Parse(
       "module m;\n"
