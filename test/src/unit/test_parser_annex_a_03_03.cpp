@@ -243,4 +243,11 @@ TEST(ParserA303, OutputTerminal_BitSelect) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, OutputTerminal_PartSelect) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  buf (out[3:0], in);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
