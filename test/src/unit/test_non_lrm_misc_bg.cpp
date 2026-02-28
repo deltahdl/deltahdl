@@ -111,15 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_LargeUnsized) {
-  // 'h7_0000_0000 requires at least 35 bits.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic [63:0] big;\n"
-              "  initial big = 'h7_0000_0000;\n"
-              "endmodule"));
-}
-
 TEST(ParserCh50702, RealLiteral_DecimalNotation) {
   auto r = Parse(
       "module m;\n"

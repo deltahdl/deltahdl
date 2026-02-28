@@ -274,4 +274,13 @@ TEST(ParserA84, PrimaryLiteralHexNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
+TEST(ParserCh50701, IntLiteral_LargeUnsized) {
+  // 'h7_0000_0000 requires at least 35 bits.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [63:0] big;\n"
+              "  initial big = 'h7_0000_0000;\n"
+              "endmodule"));
+}
+
 }  // namespace
