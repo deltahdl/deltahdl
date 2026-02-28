@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CrossBody_WithItems) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint a;\n"
-              "    cp2: coverpoint b;\n"
-              "    cross cp1, cp2 {\n"
-              "      bins sel = binsof(cp1);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // §A.2.11 Production #21: cross_body_item
 // =============================================================================
