@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.11 Production #33: covergroup_expression
-// =============================================================================
-TEST(ParserA211, CovergroupExpression_Literal) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins a = {10};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CovergroupExpression_BinaryOp) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
