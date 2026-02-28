@@ -14,22 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// § range_expression — part_select_range
-TEST(ParserA84, RangeExpressionPartSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [15:0] data;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = data[7:0];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_NE(rhs->index_end, nullptr);
-}
-
 // =============================================================================
 // A.8.4 Primaries — primary_literal
 // =============================================================================

@@ -25,4 +25,20 @@ TEST(ParserA223, Delay2MintypMaxSingleValue) {
   EXPECT_EQ(item->assign_delay->kind, ExprKind::kMinTypMax);
 }
 
+// =============================================================================
+// A.8.3 Expressions — constant_mintypmax_expression
+// =============================================================================
+// § constant_mintypmax_expression ::= constant_expression :
+// constant_expression : constant_expression
+TEST(ParserA83, ConstantMinTypMaxInSpecparam) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam tpd = 1:2:3;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
