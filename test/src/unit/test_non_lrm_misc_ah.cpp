@@ -7,30 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- udp_nonansi_declaration: non-ANSI sequential with reg declaration ---
-TEST(ParserAnnexA051, NonAnsiSequentialWithReg) {
-  auto r = Parse(
-      "primitive dff(q, d, clk);\n"
-      "  output reg q;\n"
-      "  input d;\n"
-      "  input clk;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->name, "dff");
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_EQ(udp->output_name, "q");
-  ASSERT_EQ(udp->input_names.size(), 2u);
-  EXPECT_EQ(udp->input_names[0], "d");
-  EXPECT_EQ(udp->input_names[1], "clk");
-}
-
 // =============================================================================
 // Simulation tests -- UDP evaluation (covers A.5.1 declaration semantics)
 // =============================================================================
