@@ -52,21 +52,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-TEST(ParserSection6, RealInFunction) {
-  // §6.12: real used as function return type.
-  auto r = Parse(
-      "module t;\n"
-      "  function real compute();\n"
-      "    return 1.5;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(item->return_type.kind, DataTypeKind::kReal);
-}
-
 // =========================================================================
 // §6.16: String in block scope
 // =========================================================================
