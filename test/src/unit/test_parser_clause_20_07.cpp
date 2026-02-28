@@ -60,4 +60,18 @@ TEST(ParserSection7, ArrayDimensionsQuery) {
   EXPECT_EQ(stmt->rhs->callee, "$dimensions");
 }
 
+TEST(ParserSection7, ArraySizeQuery) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial x = $size(arr);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(stmt->rhs->callee, "$size");
+}
+
 }  // namespace
