@@ -129,4 +129,44 @@ TEST(ParserA83, PrefixIncrementOnSelect) {
   EXPECT_EQ(expr->lhs->kind, ExprKind::kSelect);
 }
 
+TEST(ParserA83, PostfixDecrementOnMember) {
+  auto r = Parse("module m; initial s.field--; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kPostfixUnary);
+  EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
+}
+
+struct ParseResult11d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11d Parse(const std::string& src) {
+  ParseResult11d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection11, PrefixDecrementInForStep) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 10; i > 0; --i)\n"
+      "      x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
