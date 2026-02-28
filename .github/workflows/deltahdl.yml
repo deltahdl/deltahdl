@@ -941,6 +941,7 @@ jobs:
           --minimum-tokens 100
           --language cpp
           --dir test/src/
+          --dir lib/test/
       # DO NOT disable this step. Inline suppression comments (NOLINT,
       # clang-format off, etc.) hide problems instead of fixing them and
       # make the codebase progressively harder to maintain.
