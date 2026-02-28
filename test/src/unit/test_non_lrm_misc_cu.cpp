@@ -24,20 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, InstanceArraySingle) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub inst[8] (.a(a));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_name, "inst");
-  EXPECT_NE(item->inst_range_left, nullptr);
-  // Single dimension: only left is set, right is nullptr.
-  EXPECT_EQ(item->inst_range_right, nullptr);
-}
-
 // --- End labels on design elements (LRM section 3) ---
 TEST(ParserSection23, EndLabelModule) {
   auto r = Parse("module foo; endmodule : foo\n");

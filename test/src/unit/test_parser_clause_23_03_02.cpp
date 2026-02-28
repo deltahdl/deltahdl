@@ -140,4 +140,36 @@ TEST(ParserAnnexA0413, ProgramInstEmptyParam) {
   EXPECT_TRUE(item->inst_params.empty());
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection23, InstanceArraySingle) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub inst[8] (.a(a));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_name, "inst");
+  EXPECT_NE(item->inst_range_left, nullptr);
+  // Single dimension: only left is set, right is nullptr.
+  EXPECT_EQ(item->inst_range_right, nullptr);
+}
+
 }  // namespace
