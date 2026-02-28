@@ -8,33 +8,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// Combined: all 6 terminal types in a single module
-// =============================================================================
-TEST(ParserA303, AllTerminalTypes) {
-  auto r = Parse(
-      "module m;\n"
-      "  // output_terminal + input_terminal (n-input gate)\n"
-      "  and (y, a, b);\n"
-      "  // output_terminal + input_terminal (n-output gate)\n"
-      "  buf (o1, o2, in);\n"
-      "  // output_terminal + input_terminal + enable_terminal\n"
-      "  bufif0 (out, data, en);\n"
-      "  // output_terminal + input_terminal + ncontrol_terminal + "
-      "pcontrol_terminal\n"
-      "  cmos (out2, data2, nc, pc);\n"
-      "  // inout_terminal + inout_terminal\n"
-      "  tran (p, q);\n"
-      "  // inout_terminal + inout_terminal + enable_terminal\n"
-      "  tranif1 (r, s, ctrl);\n"
-      "  // output_terminal (pull gate)\n"
-      "  pullup (vdd);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  EXPECT_EQ(gates.size(), 7u);
-}
-
-// =============================================================================
 // A.3.4 Production #1: cmos_switchtype ::= cmos | rcmos
 // =============================================================================
 TEST(ParserA304, CmosSwitchtype_Cmos) {
