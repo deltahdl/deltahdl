@@ -497,4 +497,24 @@ TEST(ParserSection11, Sec11_4_6_TernaryContAssignWithBitSelectLhs) {
   EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kTernary);
 }
 
+// ---------------------------------------------------------------------------
+// cond_predicate ::=
+//   expression_or_cond_pattern { &&& expression_or_cond_pattern }
+// ---------------------------------------------------------------------------
+// §12.6: cond_predicate with &&& operator
+TEST(ParserA606, CondPredicateTripleAnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a &&& b) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->condition, nullptr);
+}
+
 }  // namespace

@@ -134,4 +134,52 @@ TEST(Parser, AlwaysFFBlock) {
   EXPECT_TRUE(found_ff);
 }
 
+struct ParseResult11 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11 Parse(const std::string& src) {
+  ParseResult11 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// --- 23. Nonblocking in always_ff with reset pattern ---
+TEST(ParserSection10, Sec10_4_2_AlwaysFFResetPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk or negedge rst_n) begin\n"
+      "    if (!rst_n)\n"
+      "      q <= 0;\n"
+      "    else\n"
+      "      q <= d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
+  ASSERT_GE(item->sensitivity.size(), 2u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  auto* if_stmt = item->body->stmts[0];
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  ASSERT_NE(if_stmt->then_branch, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(if_stmt->else_branch, nullptr);
+  EXPECT_EQ(if_stmt->else_branch->kind, StmtKind::kNonblockingAssign);
+}
+
 }  // namespace
