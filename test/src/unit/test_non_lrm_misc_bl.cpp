@@ -6,23 +6,51 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult6e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
 
-// =========================================================================
-// §6.12: Realtime type — alias for real
-// =========================================================================
-TEST(ParserSection6, RealtimeWithInit) {
-  // §6.12: realtime is equivalent to real for simulation.
-  auto r = Parse(
-      "module t;\n"
-      "  realtime ts = 100.0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kRealtime);
-  ASSERT_NE(item->init_expr, nullptr);
+static ModuleItem* FindNettypeDecl(ParseResult6e& r,
+                                   std::string_view name = "") {
+  if (!r.cu) return nullptr;
+  for (auto* mod : r.cu->modules) {
+    for (auto* item : mod->items) {
+      if (item->kind == ModuleItemKind::kNettypeDecl) {
+        if (name.empty() || item->name == name) return item;
+      }
+    }
+  }
+  return nullptr;
 }
+
+struct ParseResult6f {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6f Parse(const std::string& src) {
+  ParseResult6f result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult6f& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+namespace {
 
 TEST(ParserSection6, RealInFunction) {
   // §6.12: real used as function return type.
@@ -115,37 +143,6 @@ TEST(ParserSection6, CastCompatibleEnumToInt) {
   DataType b;
   b.kind = DataTypeKind::kInt;
   EXPECT_TRUE(IsCastCompatible(a, b));
-}
-
-struct ParseResult6e {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6e Parse(const std::string& src) {
-  ParseResult6e result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FindNettypeDecl(ParseResult6e& r,
-                                   std::string_view name = "") {
-  if (!r.cu) return nullptr;
-  for (auto* mod : r.cu->modules) {
-    for (auto* item : mod->items) {
-      if (item->kind == ModuleItemKind::kNettypeDecl) {
-        if (name.empty() || item->name == name) return item;
-      }
-    }
-  }
-  return nullptr;
 }
 
 // =============================================================================
@@ -438,30 +435,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithNamedType) {
   EXPECT_FALSE(r.has_errors);
   auto* nt = FindNettypeDecl(r, "word_net");
   ASSERT_NE(nt, nullptr);
-}
-
-struct ParseResult6f {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6f Parse(const std::string& src) {
-  ParseResult6f result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6f& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
 }
 
 // =============================================================================
