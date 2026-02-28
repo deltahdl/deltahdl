@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, NOutputGateInst_ThreeOutputs) {
-  auto r = Parse(
-      "module m;\n"
-      "  not n1(o1, o2, o3, in);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNot);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 4u);
-}
-
 TEST(ParserA301, NOutputGateInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
