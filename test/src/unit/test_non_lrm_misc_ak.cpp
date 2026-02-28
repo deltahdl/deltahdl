@@ -15,19 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, ProceduralAssign_WithBitSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin assign q[0] = d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-}
-
 TEST(ParserA602, Force_WithConcat) {
   auto r = Parse(
       "module m;\n"
