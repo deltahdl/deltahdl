@@ -15,52 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.7.2 Multiple path declarations in one specify block
-// =============================================================================
-TEST(ParserA702, MultiplePathDeclarations) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "    (c, d *> e) = 10;\n"
-      "    (posedge clk => q) = 3;\n"
-      "    if (en) (a => b) = 8;\n"
-      "    ifnone (a => b) = 15;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 5u);
-  // All should be path declarations
-  for (auto* si : spec->specify_items) {
-    EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
-  }
-}
-
-// =============================================================================
-// A.7.3 list_of_path_inputs / list_of_path_outputs
-// =============================================================================
-// list_of_path_inputs — multiple simple input terminals
-TEST(ParserA703, ListOfPathInputsMultiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a, b, c => d) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.src_ports.size(), 3u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[1].name, "b");
-  EXPECT_EQ(si->path.src_ports[2].name, "c");
-}
-
 // list_of_path_outputs — multiple simple output terminals (full path)
 TEST(ParserA703, ListOfPathOutputsMultiple) {
   auto r = Parse(

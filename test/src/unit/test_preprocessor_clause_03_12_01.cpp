@@ -108,4 +108,17 @@ TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {
   EXPECT_EQ(r.cu->udps.size(), 1u);
 }
 
+// 6. CU scope can hold classes (valid in a package per §26.2).
+TEST(ParserClause03, Cl3_12_1_CuScopeClassDecl) {
+  auto r = ParseWithPreprocessor(
+      "class my_class;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "my_class");
+}
+
 }  // namespace

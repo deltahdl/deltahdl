@@ -14,4 +14,25 @@ TEST(ParserAnnexA, A7SpecifyFullPath) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// A.7.3 list_of_path_inputs / list_of_path_outputs
+// =============================================================================
+// list_of_path_inputs — multiple simple input terminals
+TEST(ParserA703, ListOfPathInputsMultiple) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b, c => d) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.src_ports.size(), 3u);
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+  EXPECT_EQ(si->path.src_ports[1].name, "b");
+  EXPECT_EQ(si->path.src_ports[2].name, "c");
+}
+
 }  // namespace
