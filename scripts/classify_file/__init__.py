@@ -79,6 +79,23 @@ def print_summary(
             print(f"  - {name}")
 
 
+def close_issue(args: argparse.Namespace) -> None:
+    """Close the GitHub issue using gh api."""
+    result = subprocess.run(
+        ["gh", "api",
+         f"repos/{args.organization}/{args.repo}/issues/{args.issue}",
+         "-X", "PATCH", "-f", "state=closed"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: Failed to close issue #{args.issue}:"
+              f"\n{result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Closed issue #{args.issue}")
+
+
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -147,6 +164,8 @@ def _run(args: argparse.Namespace) -> None:
     print_summary(succeeded, failed, failed_names)
     if failed:
         sys.exit(1)
+    if not args.dry_run:
+        close_issue(args)
 
 
 def main():

@@ -64,6 +64,16 @@ def _mock_run_selective(monkeypatch, fail_set):
     monkeypatch.setattr(subprocess, "run", sel_run)
 
 
+def _stub_close(monkeypatch):
+    """Stub close_issue; return True-appending call log."""
+    called: list[bool] = []
+    monkeypatch.setattr(
+        classify_file, "close_issue",
+        lambda _a: called.append(True),
+    )
+    return called
+
+
 # ---- Multi-test batch processing -------------------------------------------
 
 
@@ -75,6 +85,7 @@ def test_processes_all_three_tests(tmp_path, monkeypatch):
         "TEST(S, Gamma) {\n}\n"
     )
     log = _mock_run_ok(monkeypatch)
+    _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, body))
     assert len(log) == 3
 
@@ -86,6 +97,7 @@ def test_each_call_has_distinct_test_name(tmp_path, monkeypatch):
         "TEST(S, Beta) {\n}\n"
     )
     log = _mock_run_ok(monkeypatch)
+    _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, body))
     names = [c[c.index("--test") + 1] for c in log]
     assert names == ["Alpha", "Beta"]
@@ -133,5 +145,14 @@ def test_summary_counts_correct(tmp_path, monkeypatch, capsys):
 def test_single_test_file(tmp_path, monkeypatch, capsys):
     """Single-test file succeeds without error."""
     _mock_run_ok(monkeypatch)
+    _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, "TEST(S, Only) {\n}\n"))
     assert "1/1 tests succeeded" in capsys.readouterr().out
+
+
+def test_closes_issue_after_all_pass(tmp_path, monkeypatch):
+    """Pipeline closes the issue after all tests succeed."""
+    _mock_run_ok(monkeypatch)
+    log = _stub_close(monkeypatch)
+    _run(_write_and_args(tmp_path, "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"))
+    assert len(log) == 1

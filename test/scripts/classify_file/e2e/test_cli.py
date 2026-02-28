@@ -1,6 +1,7 @@
 """End-to-end tests for the classify_file CLI."""
 
 import os
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -30,6 +31,16 @@ def _install_fake_classify_test(tmp_path, exit_code=0):
     return str(fake_scripts)
 
 
+def _install_fake_gh(tmp_path):
+    """Install a fake gh command that always exits 0."""
+    fake_bin = tmp_path / "fake_bin"
+    fake_bin.mkdir(exist_ok=True)
+    gh_script = fake_bin / "gh"
+    gh_script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    gh_script.chmod(gh_script.stat().st_mode | stat.S_IEXEC)
+    return str(fake_bin)
+
+
 def _base_env(tmp_path, fake_scripts_dir):
     """Build subprocess env with fake classify_test before real scripts."""
     env = os.environ.copy()
@@ -39,6 +50,8 @@ def _base_env(tmp_path, fake_scripts_dir):
         [fake_scripts_dir, _SCRIPTS_DIR]
         + ([pypath] if pypath else []),
     )
+    fake_bin = _install_fake_gh(tmp_path)
+    env["PATH"] = fake_bin + os.pathsep + env.get("PATH", "")
     return env
 
 

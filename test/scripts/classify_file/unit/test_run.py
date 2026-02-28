@@ -11,6 +11,7 @@ import classify_file
 
 from helpers import (
     make_test_file,
+    stub_close_issue,
     stub_subprocess_failure,
     stub_subprocess_mixed,
     stub_subprocess_success,
@@ -384,6 +385,30 @@ def test_print_summary_lists_all_failures(capsys):
     assert "B" in out
 
 
+# ---- close_issue -----------------------------------------------------------
+
+
+def test_close_issue_calls_gh_api(monkeypatch):
+    """Invokes gh api with correct repo path and PATCH method."""
+    captured = stub_subprocess_success(monkeypatch)
+    classify_file.close_issue(_make_args(issue=42))
+    assert "repos/testorg/testrepo/issues/42" in captured[0][2]
+
+
+def test_close_issue_prints_confirmation(monkeypatch, capsys):
+    """Prints confirmation message after closing."""
+    stub_subprocess_success(monkeypatch)
+    classify_file.close_issue(_make_args(issue=99))
+    assert "Closed issue #99" in capsys.readouterr().out
+
+
+def test_close_issue_exits_on_failure(monkeypatch):
+    """Exits when gh api fails."""
+    stub_subprocess_failure(monkeypatch)
+    with pytest.raises(SystemExit):
+        classify_file.close_issue(_make_args())
+
+
 # ---- _run ------------------------------------------------------------------
 
 
@@ -450,8 +475,39 @@ def test_run_invokes_per_test(tmp_path, monkeypatch):
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\nTEST(S, C) {\n}\n"
     make_test_file(tmp_path, body)
     captured = stub_subprocess_success(monkeypatch)
+    stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path))
     assert len(captured) == 3
+
+
+def test_run_closes_issue_on_success(tmp_path, monkeypatch):
+    """Closes issue when all tests succeed."""
+    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    stub_subprocess_success(monkeypatch)
+    log = stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path))
+    assert len(log) == 1
+
+
+def test_run_skips_close_on_failure(tmp_path, monkeypatch):
+    """Does not close issue when tests fail."""
+    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    stub_subprocess_failure(monkeypatch)
+    log = stub_close_issue(monkeypatch)
+    try:
+        _run(_make_run_args(tmp_path))
+    except SystemExit:
+        pass
+    assert len(log) == 0
+
+
+def test_run_skips_close_on_dry_run(tmp_path, monkeypatch):
+    """Does not close issue in dry-run mode."""
+    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    stub_subprocess_success(monkeypatch)
+    log = stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path, dry_run=True))
+    assert len(log) == 0
 
 
 # ---- main ------------------------------------------------------------------

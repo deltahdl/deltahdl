@@ -4,6 +4,8 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import classify_file
+
 
 def make_test_file(tmp_path: Path, body: str) -> Path:
     """Write *body* to test_input.cpp and return its path."""
@@ -55,3 +57,12 @@ def stub_subprocess_mixed(monkeypatch, fail_names):
 
     monkeypatch.setattr(subprocess, "run", mixed_run)
     return captured
+
+
+def stub_close_issue(monkeypatch):
+    """Stub classify_file.close_issue; return call log."""
+    log: list = []
+    monkeypatch.setattr(
+        classify_file, "close_issue", log.append,
+    )
+    return log
