@@ -229,4 +229,20 @@ TEST(ParserA603, SeqBlockNested) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
 }
 
+// §A.2.8: Sequential block with parameter declaration
+TEST(ParserA603, SeqBlockWithParamDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    parameter int P = 42;\n"
+      "    a = P;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_GE(body->stmts.size(), 2u);
+}
+
 }  // namespace
