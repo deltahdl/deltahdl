@@ -365,4 +365,17 @@ TEST(ParserA23, ListOfGenvarIdentifiersSingle) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
 }
 
+TEST(ParserSection23, GenvarMultipleDeclarations) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i, j, k;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 3);
+  EXPECT_EQ(mod->items[0]->name, "i");
+  EXPECT_EQ(mod->items[1]->name, "j");
+  EXPECT_EQ(mod->items[2]->name, "k");
+}
+
 }  // namespace

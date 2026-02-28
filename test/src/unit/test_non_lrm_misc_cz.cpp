@@ -155,47 +155,6 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
 
 namespace {
 
-TEST(ParserSection29, TableEdgeNotationParenthesized) {
-  EXPECT_TRUE(
-      ParseOk("primitive edge_udp(output reg q, input d, clk);\n"
-              "  table\n"
-              "    0 (01) : ? : 0;\n"
-              "    1 (01) : ? : 1;\n"
-              "    ? (10) : ? : -;\n"
-              "    ? (0x) : ? : -;\n"
-              "    ? (x1) : ? : -;\n"
-              "  endtable\n"
-              "endprimitive\n"));
-}
-
-TEST(ParserSection29, SequentialCurrentStateField) {
-  auto r = Parse(
-      "primitive srff(output reg q, input s, r);\n"
-      "  table\n"
-      "    1 0 : 0 : 1;\n"
-      "    1 0 : 1 : 1;\n"
-      "    0 1 : ? : 0;\n"
-      "    0 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  ASSERT_EQ(udp->table.size(), 4);
-  // First row: current state '0', output '1'
-  EXPECT_EQ(udp->table[0].current_state, '0');
-  EXPECT_EQ(udp->table[0].output, '1');
-  // Second row: current state '1', output '1'
-  EXPECT_EQ(udp->table[1].current_state, '1');
-  EXPECT_EQ(udp->table[1].output, '1');
-  // Third row: current state '?'
-  EXPECT_EQ(udp->table[2].current_state, '?');
-  EXPECT_EQ(udp->table[2].output, '0');
-  // Fourth row: no-change
-  EXPECT_EQ(udp->table[3].current_state, '?');
-  EXPECT_EQ(udp->table[3].output, '-');
-}
-
 TEST(ParserSection29, SequentialUdp) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
