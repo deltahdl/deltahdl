@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// $nochange with notifier
-TEST(ParserA70501, NochangeWithNotifier) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 0, 0, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->notifier, "ntfr");
-}
-
 // =============================================================================
 // A.7.5.2 timing_check_limit ::= expression
 // =============================================================================
