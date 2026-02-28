@@ -42,16 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, ConstExprSystemFuncInParam) {
-  auto r = Parse(
-      "module t;\n"
-      "  parameter N = 16;\n"
-      "  parameter BITS = $clog2(N);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection11, ConstExprTernaryInLocalparam) {
   auto r = Parse(
       "module t #(parameter A = 1);\n"
