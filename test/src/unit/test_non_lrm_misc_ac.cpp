@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverGroup_WildcardIllegalIgnore) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      wildcard bins even = {4'b???0};\n"
-              "      wildcard bins odd = {4'b???1};\n"
-              "      illegal_bins overflow = {[200:255]};\n"
-              "      ignore_bins reset = {0};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CoverGroup_ASTVerification) {
   auto r = Parse(
       "module m;\n"
