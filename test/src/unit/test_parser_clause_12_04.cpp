@@ -294,4 +294,30 @@ TEST(ParserSection12, PlainIfHasNoQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
 }
 
+// ---------------------------------------------------------------------------
+// Structural tests: nested conditionals, complex conditions
+// ---------------------------------------------------------------------------
+// §12.4: nested if inside begin-end
+TEST(ParserA606, NestedIfInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "    end else begin\n"
+      "      if (c) x = 3;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  // both branches are blocks
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
+}
+
 }  // namespace
