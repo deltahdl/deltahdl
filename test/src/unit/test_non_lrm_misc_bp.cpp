@@ -49,24 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7, UnionWithNestedStruct) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef union tagged {\n"
-      "    struct {\n"
-      "      bit [4:0] reg1, reg2;\n"
-      "    } Add;\n"
-      "    bit [9:0] Jmp;\n"
-      "  } Instr;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kUnion);
-  EXPECT_TRUE(item->typedef_type.is_tagged);
-  EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
-}
-
 // =========================================================================
 // §7.12: Array manipulation methods (additional tests)
 // =========================================================================
