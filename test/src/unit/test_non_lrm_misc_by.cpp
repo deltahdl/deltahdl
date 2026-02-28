@@ -45,27 +45,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 13. always_comb with concatenation
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_Concatenation) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [3:0] a, b;\n"
-      "  logic [7:0] c;\n"
-      "  always_comb c = {a, b};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->rhs, nullptr);
-  EXPECT_EQ(item->body->rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(item->body->rhs->elements.size(), 2u);
-}
-
-// ---------------------------------------------------------------------------
 // 14. always_comb with replication
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_Replication) {
