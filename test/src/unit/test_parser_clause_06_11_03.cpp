@@ -168,4 +168,19 @@ TEST(ParserSection6, Sec6_11_IntegerUnsignedOverride) {
   EXPECT_EQ(item->name, "iu");
 }
 
+// 11. time signed override.
+TEST(ParserSection6, Sec6_11_TimeSignedOverride) {
+  auto r = Parse(
+      "module t;\n"
+      "  time signed ts;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
+  EXPECT_TRUE(item->data_type.is_signed);
+  EXPECT_EQ(item->name, "ts");
+}
+
 }  // namespace
