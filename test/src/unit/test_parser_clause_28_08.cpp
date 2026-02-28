@@ -250,4 +250,15 @@ TEST(ParserA304, PassEnSwitchtype_Tranif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA304, PassEnSwitchtype_Rtranif0) {
+  auto r = Parse(
+      "module m;\n"
+      "  rtranif0 (a, b, ctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRtranif0);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
