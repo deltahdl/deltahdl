@@ -51,4 +51,17 @@ TEST(ParserAnnexA0414, CheckerInstWildcardPort) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
+// --- list_of_checker_port_connections: empty ---
+TEST(ParserAnnexA0414, CheckerInstEmptyPorts) {
+  auto r = Parse(
+      "checker my_chk;\n"
+      "endchecker\n"
+      "module m; my_chk u0(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_TRUE(item->inst_ports.empty());
+}
+
 }  // namespace
