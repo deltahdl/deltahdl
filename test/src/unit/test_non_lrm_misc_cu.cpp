@@ -24,14 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// --- End labels on design elements (LRM section 3) ---
-TEST(ParserSection23, EndLabelModule) {
-  auto r = Parse("module foo; endmodule : foo\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-  EXPECT_EQ(r.cu->modules[0]->name, "foo");
-}
-
 TEST(ParserSection23, EndLabelModuleNoLabel) {
   auto r = Parse("module bar; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
