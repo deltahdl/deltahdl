@@ -112,4 +112,17 @@ TEST(ParserSection7, ArrayReductionOr) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
+TEST(ParserSection7, ArrayReductionXor) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[] = '{1, 2, 3, 4};\n"
+      "  initial y = b.xor;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
+}
+
 }  // namespace

@@ -243,4 +243,19 @@ TEST(ParserSection23, IfGenerateSingleItemNoBegin) {
   EXPECT_EQ(item->gen_body.size(), 1);
 }
 
+TEST(Parser, GenerateIf) {
+  auto r = Parse(
+      "module t;\n"
+      "  if (WIDTH > 8) begin\n"
+      "    assign a = b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_NE(mod->items[0]->gen_cond, nullptr);
+  EXPECT_FALSE(mod->items[0]->gen_body.empty());
+}
+
 }  // namespace
