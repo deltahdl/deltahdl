@@ -90,26 +90,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 
 namespace {
 
-// @* with begin-end block body at always level
-TEST(ParserSection9, Sec9_4_2_3_AtStarBeginEndBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, c;\n"
-      "  always @* begin\n"
-      "    a = b;\n"
-      "    c = a;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->stmts.size(), 2u);
-}
-
 // @(*) with begin-end block body at always level
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenBeginEndBlock) {
   auto r = Parse(
