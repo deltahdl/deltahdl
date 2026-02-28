@@ -177,4 +177,23 @@ TEST(ParserA211, CoverageSpecOrOption_CoverSpec) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// Additional comprehensive tests
+// =============================================================================
+TEST(ParserA211, FullCovergroup_MultipleElements) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg @(posedge clk);\n"
+              "    option.auto_bin_max = 64;\n"
+              "    cp_addr: coverpoint addr {\n"
+              "      bins low = {[0:63]};\n"
+              "      bins mid = {[64:191]};\n"
+              "      bins high = {[192:255]};\n"
+              "    }\n"
+              "    cp_data: coverpoint data;\n"
+              "    cross cp_addr, cp_data;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
