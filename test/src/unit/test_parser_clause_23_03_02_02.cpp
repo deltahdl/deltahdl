@@ -56,4 +56,48 @@ TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
   EXPECT_EQ(inst->inst_ports.size(), 2u);
 }
 
+struct ParseResult4d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4d Parse(const std::string& src) {
+  ParseResult4d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Returns the first module item from the first module.
+static ModuleItem* FirstItem(ParseResult4d& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
+}
+
+// =============================================================================
+// §4.6: Named port connections — deterministic mapping
+// =============================================================================
+TEST(ParserSection4, Sec4_6_NamedPortConnections) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1 (.clk(clk), .rst(rst), .d(data));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  ASSERT_EQ(item->inst_ports.size(), 3u);
+  EXPECT_EQ(item->inst_ports[0].first, "clk");
+  EXPECT_EQ(item->inst_ports[1].first, "rst");
+  EXPECT_EQ(item->inst_ports[2].first, "d");
+}
+
 }  // namespace

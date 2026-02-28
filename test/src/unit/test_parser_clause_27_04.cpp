@@ -318,4 +318,19 @@ TEST(ParserSection23, LoopGenerateInlineGenvar) {
   EXPECT_NE(gen->gen_init, nullptr);
 }
 
+TEST(ParserSection23, LoopGenerateWithModuleInst) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin : stage\n"
+      "    sub u (.a(in[i]), .b(out[i]));\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = FindItemByKind(r, ModuleItemKind::kGenerateFor);
+  ASSERT_NE(gen, nullptr);
+  ASSERT_EQ(gen->gen_body.size(), 1);
+  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
+}
+
 }  // namespace
