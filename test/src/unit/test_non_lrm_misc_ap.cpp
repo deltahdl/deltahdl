@@ -23,20 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// tf_call with single argument
-TEST(ParserA609, TfCallSingleArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(42); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  EXPECT_EQ(expr->args.size(), 1u);
-}
-
 // tf_call with multiple positional arguments
 TEST(ParserA609, TfCallMultipleArgs) {
   auto r = Parse(

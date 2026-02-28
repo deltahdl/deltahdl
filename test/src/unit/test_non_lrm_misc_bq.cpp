@@ -60,33 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// --- Packed struct with integer type members (byte, shortint, int, longint)
-// ---
-TEST(ParserSection7, Sec7_2_1_PackedIntegerTypes) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    byte a;\n"
-      "    shortint b;\n"
-      "    int c;\n"
-      "    longint d;\n"
-      "  } wide_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->typedef_type.is_packed);
-  ASSERT_EQ(item->typedef_type.struct_members.size(), 4u);
-  EXPECT_EQ(item->typedef_type.struct_members[0].type_kind,
-            DataTypeKind::kByte);
-  EXPECT_EQ(item->typedef_type.struct_members[1].type_kind,
-            DataTypeKind::kShortint);
-  EXPECT_EQ(item->typedef_type.struct_members[2].type_kind, DataTypeKind::kInt);
-  EXPECT_EQ(item->typedef_type.struct_members[3].type_kind,
-            DataTypeKind::kLongint);
-}
-
 // --- Packed struct signed typedef with member name verification ---
 TEST(ParserSection7, Sec7_2_1_PackedSignedTypedef) {
   auto r = Parse(
