@@ -39,4 +39,17 @@ TEST(ParserA602, ProceduralAssign_Basic) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
+TEST(ParserA602, ProceduralDeassign_Basic) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin deassign q; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
+  EXPECT_NE(stmt->lhs, nullptr);
+}
+
 }  // namespace
