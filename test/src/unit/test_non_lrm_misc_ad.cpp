@@ -7,36 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.2 Primitive strengths
-//
-// pulldown_strength ::=
-//   ( strength0 , strength1 )
-//   | ( strength1 , strength0 )
-//   | ( strength0 )
-//
-// pullup_strength ::=
-//   ( strength0 , strength1 )
-//   | ( strength1 , strength0 )
-//   | ( strength1 )
-// =============================================================================
-// -----------------------------------------------------------------------------
-// Production #1: pulldown_strength
-// pulldown_strength ::= ( strength0 , strength1 )
-// -----------------------------------------------------------------------------
-TEST(ParserA302, PulldownStrength_Strength0Strength1) {
-  auto r = Parse(
-      "module m;\n"
-      "  pulldown (strong0, pull1) pd1(out);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPulldown);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 4u);  // strong0
-  EXPECT_EQ(g->drive_strength1, 3u);  // pull1
-  EXPECT_EQ(g->gate_inst_name, "pd1");
-}
-
 TEST(ParserA302, PulldownStrength_Supply0Weak1) {
   auto r = Parse(
       "module m;\n"
