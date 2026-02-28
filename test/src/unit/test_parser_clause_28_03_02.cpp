@@ -80,4 +80,16 @@ TEST(ParserA301, GateInst_NOutputWithStrength) {
   EXPECT_NE(g->drive_strength1, 0);
 }
 
+TEST(ParserA301, GateInst_StrengthOrder_Strength1First) {
+  auto r = Parse(
+      "module m;\n"
+      "  and (pull1, strong0) a1(out, in1, in2);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
+  ASSERT_NE(g, nullptr);
+  EXPECT_NE(g->drive_strength0, 0);
+  EXPECT_NE(g->drive_strength1, 0);
+}
+
 }  // namespace
