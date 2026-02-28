@@ -36,20 +36,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// Assert property with overlapped implication (|->).
-TEST(ParserSection16, Sec16_5_1_AssertPropertyOverlappedImplication) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) req |-> ack);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  auto* ap =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
-  ASSERT_NE(ap, nullptr);
-  EXPECT_NE(ap->assert_expr, nullptr);
-}
-
 // Assert property with non-overlapped implication (|=>).
 TEST(ParserSection16, Sec16_5_1_AssertPropertyNonOverlappedImplication) {
   auto r = Parse(

@@ -37,4 +37,38 @@ TEST(ParserA210, SequenceInstance_InProperty) {
               "endmodule\n"));
 }
 
+struct ParseResult16c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16c Parse(const std::string& src) {
+  ParseResult16c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using VerifyParseTest = ProgramTestParse;
+
+// Assert property with overlapped implication (|->).
+TEST(ParserSection16, Sec16_5_1_AssertPropertyOverlappedImplication) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req |-> ack);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  auto* ap =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(ap, nullptr);
+  EXPECT_NE(ap->assert_expr, nullptr);
+}
+
 }  // namespace

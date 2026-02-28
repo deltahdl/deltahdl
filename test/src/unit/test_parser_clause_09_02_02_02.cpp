@@ -215,4 +215,29 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombMultipleAssigns) {
   VerifyAlwaysMultiAssigns(r);
 }
 
+// ---------------------------------------------------------------------------
+// 15. always_comb with multiple variable assignments
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_MultipleAssignments) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c, x, y, z;\n"
+      "  always_comb begin\n"
+      "    x = a & b;\n"
+      "    y = a | c;\n"
+      "    z = b ^ c;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysComb(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_EQ(item->body->stmts.size(), 3u);
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
+  }
+}
+
 }  // namespace
