@@ -14,16 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// § unbased_unsized_literal — '0
-TEST(ParserA87, UnbasedUnsizedZero) {
-  auto r = Parse("module m; logic x; initial x = '0; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
-}
-
 // § unbased_unsized_literal — '1
 TEST(ParserA87, UnbasedUnsizedOne) {
   auto r = Parse("module m; logic x; initial x = '1; endmodule\n");

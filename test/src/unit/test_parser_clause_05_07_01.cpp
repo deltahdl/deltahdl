@@ -151,4 +151,14 @@ TEST(ParserCh50701, IntLiteral_SizedOctal) {
   EXPECT_TRUE(ParseOk("module m; initial x = 8'o77; endmodule"));
 }
 
+// § unbased_unsized_literal — '0
+TEST(ParserA87, UnbasedUnsizedZero) {
+  auto r = Parse("module m; logic x; initial x = '0; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
+}
+
 }  // namespace
