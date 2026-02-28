@@ -12,6 +12,7 @@ import classify_file
 from helpers import (
     make_test_file,
     stub_close_issue,
+    stub_create_issue,
     stub_subprocess_failure,
     stub_subprocess_mixed,
     stub_subprocess_success,
@@ -43,6 +44,7 @@ def _make_args(**overrides):
         "output_dir": "/out",
         "lrm": "/lrm.txt",
         "issue": 99,
+        "create_issue": False,
         "organization": "testorg",
         "repo": "testrepo",
         "dry_run": False,
@@ -60,6 +62,7 @@ def _make_run_args(tmp_path, **overrides):
         "output_dir": str(tmp_path),
         "lrm": str(tmp_path / "lrm.txt"),
         "issue": 99,
+        "create_issue": False,
         "organization": "testorg",
         "repo": "testrepo",
         "dry_run": False,
@@ -109,11 +112,36 @@ def test_parse_args_issue(monkeypatch):
     assert _parse_args().issue == 42
 
 
-def test_parse_args_issue_required(monkeypatch):
-    """Rejects missing --issue flag."""
+def test_parse_args_create_issue(monkeypatch):
+    """Parses --create-issue flag."""
+    argv = [v for i, v in enumerate(_BASE_ARGV)
+            if _BASE_ARGV[max(0, i - 1)] != "--issue" and v != "--issue"]
+    monkeypatch.setattr(
+        sys, "argv", [*argv, "--create-issue"],
+    )
+    assert _parse_args().create_issue is True
+
+
+def test_parse_args_create_issue_default_false(monkeypatch):
+    """Defaults --create-issue to False when --issue is given."""
+    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
+    assert _parse_args().create_issue is False
+
+
+def test_parse_args_neither_issue_flag_rejects(monkeypatch):
+    """Rejects when neither --issue nor --create-issue is given."""
     argv = [v for i, v in enumerate(_BASE_ARGV)
             if _BASE_ARGV[max(0, i - 1)] != "--issue" and v != "--issue"]
     monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        _parse_args()
+
+
+def test_parse_args_both_issue_flags_reject(monkeypatch):
+    """Rejects when both --issue and --create-issue are given."""
+    monkeypatch.setattr(
+        sys, "argv", [*_BASE_ARGV, "--create-issue"],
+    )
     with pytest.raises(SystemExit):
         _parse_args()
 
@@ -385,6 +413,47 @@ def test_print_summary_lists_all_failures(capsys):
     assert "B" in out
 
 
+# ---- build_issue_body ------------------------------------------------------
+
+
+build_issue_body = classify_file.build_issue_body
+
+
+def test_build_issue_body_summary_section():
+    """Body contains the summary heading."""
+    assert "## Summary" in build_issue_body("f.cpp", ["A"])
+
+
+def test_build_issue_body_filename_in_path():
+    """Body embeds filename in the test/src/unit path."""
+    assert "test/src/unit/foo.cpp" in build_issue_body(
+        "foo.cpp", ["A"],
+    )
+
+
+def test_build_issue_body_progress_line():
+    """Body shows Progress: 0/N for N tests."""
+    assert "Progress: 0/3" in build_issue_body(
+        "f.cpp", ["A", "B", "C"],
+    )
+
+
+def test_build_issue_body_checkboxes():
+    """Body contains unchecked checkboxes for each test name."""
+    body = build_issue_body("f.cpp", ["Alpha", "Beta"])
+    assert "- [ ] Alpha" in body
+
+
+def test_build_issue_body_tests_header():
+    """Body contains the Tests heading."""
+    assert "## Tests" in build_issue_body("f.cpp", ["A"])
+
+
+def test_build_issue_body_single_test():
+    """Body works correctly with a single test."""
+    assert "Progress: 0/1" in build_issue_body("f.cpp", ["Only"])
+
+
 # ---- close_issue -----------------------------------------------------------
 
 
@@ -407,6 +476,45 @@ def test_close_issue_exits_on_failure(monkeypatch):
     stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
         classify_file.close_issue(_make_args())
+
+
+# ---- create_issue ----------------------------------------------------------
+
+
+def test_create_issue_calls_gh_api_post(monkeypatch):
+    """Invokes gh api with POST method and correct endpoint."""
+    captured = stub_create_issue(monkeypatch, 42)
+    classify_file.create_issue(
+        _make_args(file="/p/test_foo.cpp"), ["A"],
+    )
+    assert "-X" in captured[0]["cmd"]
+
+
+def test_create_issue_returns_number(monkeypatch):
+    """Returns the issue number from the API response."""
+    stub_create_issue(monkeypatch, 77)
+    result = classify_file.create_issue(
+        _make_args(file="/p/test_foo.cpp"), ["A"],
+    )
+    assert result == 77
+
+
+def test_create_issue_prints_confirmation(monkeypatch, capsys):
+    """Prints confirmation with the created issue number."""
+    stub_create_issue(monkeypatch, 42)
+    classify_file.create_issue(
+        _make_args(file="/p/test_foo.cpp"), ["A"],
+    )
+    assert "Created issue #42" in capsys.readouterr().out
+
+
+def test_create_issue_exits_on_failure(monkeypatch):
+    """Exits when gh api returns non-zero."""
+    stub_subprocess_failure(monkeypatch)
+    with pytest.raises(SystemExit):
+        classify_file.create_issue(
+            _make_args(file="/p/test_foo.cpp"), ["A"],
+        )
 
 
 # ---- _run ------------------------------------------------------------------
@@ -508,6 +616,47 @@ def test_run_skips_close_on_dry_run(tmp_path, monkeypatch):
     log = stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path, dry_run=True))
     assert len(log) == 0
+
+
+def _stub_create_and_run(tmp_path, monkeypatch, **run_overrides):
+    """Stub create_issue, subprocess, and close_issue; run pipeline."""
+    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    create_log: list[bool] = []
+    monkeypatch.setattr(
+        classify_file, "create_issue",
+        lambda _a, _n: (create_log.append(True), 42)[1],
+    )
+    captured = stub_subprocess_success(monkeypatch)
+    stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path, **run_overrides))
+    return create_log, captured
+
+
+def test_run_creates_issue_when_flag_set(tmp_path, monkeypatch):
+    """Calls create_issue when --create-issue is set."""
+    create_log, _ = _stub_create_and_run(
+        tmp_path, monkeypatch, issue=None, create_issue=True,
+    )
+    assert len(create_log) == 1
+
+
+def test_run_sets_issue_from_creation(tmp_path, monkeypatch):
+    """Subprocess commands use the issue number from create_issue."""
+    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    monkeypatch.setattr(
+        classify_file, "create_issue",
+        lambda _a, _n: 77,
+    )
+    captured = stub_subprocess_success(monkeypatch)
+    stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path, issue=None, create_issue=True))
+    assert captured[0][captured[0].index("--issue") + 1] == "77"
+
+
+def test_run_skips_create_when_issue_given(tmp_path, monkeypatch):
+    """Does not call create_issue when --issue is provided."""
+    create_log, _ = _stub_create_and_run(tmp_path, monkeypatch)
+    assert len(create_log) == 0
 
 
 # ---- main ------------------------------------------------------------------

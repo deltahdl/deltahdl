@@ -1,5 +1,6 @@
 """Shared test helpers for classify_file unit tests."""
 
+import json
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -66,3 +67,21 @@ def stub_close_issue(monkeypatch):
         classify_file, "close_issue", log.append,
     )
     return log
+
+
+def stub_create_issue(monkeypatch, issue_number=42):
+    """Stub subprocess.run for create_issue; return captured calls."""
+    captured: list[dict] = []
+
+    def capture_run(cmd, **kwargs):
+        captured.append(
+            {"cmd": list(cmd), "input": kwargs.get("input", "")},
+        )
+        result = MagicMock()
+        result.returncode = 0
+        result.stdout = json.dumps({"number": issue_number})
+        result.stderr = ""
+        return result
+
+    monkeypatch.setattr(subprocess, "run", capture_run)
+    return captured

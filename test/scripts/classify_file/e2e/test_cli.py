@@ -32,11 +32,21 @@ def _install_fake_classify_test(tmp_path, exit_code=0):
 
 
 def _install_fake_gh(tmp_path):
-    """Install a fake gh command that always exits 0."""
+    """Install a fake gh that returns issue JSON for POST requests."""
     fake_bin = tmp_path / "fake_bin"
     fake_bin.mkdir(exist_ok=True)
     gh_script = fake_bin / "gh"
-    gh_script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    gh_script.write_text(
+        '#!/bin/sh\n'
+        'for arg in "$@"; do\n'
+        '  if [ "$arg" = "POST" ]; then\n'
+        '    echo \'{"number": 999}\'\n'
+        '    exit 0\n'
+        '  fi\n'
+        'done\n'
+        'exit 0\n',
+        encoding="utf-8",
+    )
     gh_script.chmod(gh_script.stat().st_mode | stat.S_IEXEC)
     return str(fake_bin)
 
@@ -88,6 +98,19 @@ def _all_flags(tmp_path):
         "--output-dir", str(tmp_path),
         "--lrm", str(tmp_path / "lrm.txt"),
         "--issue", "1",
+        "--organization", "org",
+        "--repo", "repo",
+        "--max-lines", "500",
+    ]
+
+
+def _all_flags_create(tmp_path):
+    """Return CLI flags with --create-issue instead of --issue."""
+    return [
+        "--file", str(tmp_path / "test_input.cpp"),
+        "--output-dir", str(tmp_path),
+        "--lrm", str(tmp_path / "lrm.txt"),
+        "--create-issue",
         "--organization", "org",
         "--repo", "repo",
         "--max-lines", "500",
@@ -197,3 +220,61 @@ def test_batch_progress_output(tmp_path):
         "TEST(S, Alpha) {\n}\nTEST(S, Beta) {\n}\n",
     )
     assert "Processing test 1/2: Alpha" in result.stdout
+
+
+# ---- --create-issue --------------------------------------------------------
+
+
+def test_create_issue_batch_exits_zero(tmp_path):
+    """Exits 0 when --create-issue is used and all tests pass."""
+    fake = _install_fake_classify_test(tmp_path)
+    env = _base_env(tmp_path, fake)
+    _write_test_file(tmp_path, "TEST(S, A) {\n}\nTEST(S, B) {\n}\n")
+    result = _invoke(
+        *_all_flags_create(tmp_path),
+        cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode == 0
+
+
+def test_create_issue_prints_created(tmp_path):
+    """Stdout contains the created issue number."""
+    fake = _install_fake_classify_test(tmp_path)
+    env = _base_env(tmp_path, fake)
+    _write_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    result = _invoke(
+        *_all_flags_create(tmp_path),
+        cwd=str(tmp_path), env=env,
+    )
+    assert "Created issue #999" in result.stdout
+
+
+def test_both_issue_flags_rejects(tmp_path):
+    """Both --issue and --create-issue are rejected."""
+    fake = _install_fake_classify_test(tmp_path)
+    env = _base_env(tmp_path, fake)
+    result = _invoke(
+        "--issue", "1", "--create-issue",
+        "--file", str(tmp_path / "f.cpp"),
+        "--output-dir", str(tmp_path),
+        "--lrm", "lrm.txt",
+        "--organization", "org", "--repo", "repo",
+        "--max-lines", "500",
+        cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode != 0
+
+
+def test_neither_issue_flag_rejects(tmp_path):
+    """Neither --issue nor --create-issue is rejected."""
+    fake = _install_fake_classify_test(tmp_path)
+    env = _base_env(tmp_path, fake)
+    result = _invoke(
+        "--file", str(tmp_path / "f.cpp"),
+        "--output-dir", str(tmp_path),
+        "--lrm", "lrm.txt",
+        "--organization", "org", "--repo", "repo",
+        "--max-lines", "500",
+        cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode != 0

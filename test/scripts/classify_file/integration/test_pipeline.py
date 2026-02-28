@@ -13,7 +13,8 @@ _run = getattr(classify_file, "_run")
 
 
 _ARGS_DEFAULTS = {
-    "issue": 99, "organization": "testorg", "repo": "testrepo",
+    "issue": 99, "create_issue": False,
+    "organization": "testorg", "repo": "testrepo",
     "dry_run": False, "no_commit": False, "max_lines": 1000,
 }
 
@@ -71,6 +72,18 @@ def _stub_close(monkeypatch):
         classify_file, "close_issue",
         lambda _a: called.append(True),
     )
+    return called
+
+
+def _stub_create(monkeypatch, number=42):
+    """Stub create_issue; return number-appending call log."""
+    called: list[int] = []
+
+    def fake(_args, _names):
+        called.append(number)
+        return number
+
+    monkeypatch.setattr(classify_file, "create_issue", fake)
     return called
 
 
@@ -156,3 +169,15 @@ def test_closes_issue_after_all_pass(tmp_path, monkeypatch):
     log = _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"))
     assert len(log) == 1
+
+
+def test_create_issue_then_process(tmp_path, monkeypatch):
+    """Pipeline creates issue then processes all tests."""
+    body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
+    log = _mock_run_ok(monkeypatch)
+    _stub_close(monkeypatch)
+    _stub_create(monkeypatch, 55)
+    _run(_write_and_args(
+        tmp_path, body, issue=None, create_issue=True,
+    ))
+    assert len(log) == 2

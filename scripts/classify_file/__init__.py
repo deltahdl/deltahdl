@@ -1,6 +1,7 @@
 """Batch-classify all tests in a file by invoking classify_test per test."""
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -17,6 +18,47 @@ def extract_test_names(filepath: Path) -> list[str]:
     """Extract all test names from TEST/TEST_F/TEST_P blocks in a file."""
     text = filepath.read_text(encoding="utf-8")
     return _TEST_RE.findall(text)
+
+
+def build_issue_body(filename: str, test_names: list[str]) -> str:
+    """Build the GitHub issue body with checkboxes for each test."""
+    total = len(test_names)
+    checkboxes = "\n".join(f"- [ ] {name}" for name in test_names)
+    return (
+        f"## Summary\n\n"
+        f"Classify each test in `test/src/unit/{filename}` "
+        f"into the correct per-LRM-clause file using `classify_test`.\n\n"
+        f"## Tests\n"
+        f"Progress: 0/{total}\n\n"
+        f"{checkboxes}\n"
+    )
+
+
+def create_issue(
+    args: argparse.Namespace,
+    test_names: list[str],
+) -> int:
+    """Create a GitHub issue and return its number."""
+    filename = Path(args.file).name
+    title = f"Classify tests in {filename}"
+    body = build_issue_body(filename, test_names)
+    payload = json.dumps({"title": title, "body": body})
+    result = subprocess.run(
+        ["gh", "api",
+         f"repos/{args.organization}/{args.repo}/issues",
+         "-X", "POST", "--input", "-"],
+        input=payload,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: Failed to create issue:"
+              f"\n{result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    issue_number = json.loads(result.stdout)["number"]
+    print(f"Created issue #{issue_number}")
+    return issue_number
 
 
 def _build_command(
@@ -114,9 +156,14 @@ def _parse_args() -> argparse.Namespace:
         "--lrm", required=True,
         help="Path to IEEE 1800-2023 LRM text file",
     )
-    parser.add_argument(
-        "--issue", type=int, required=True,
+    issue_group = parser.add_mutually_exclusive_group(required=True)
+    issue_group.add_argument(
+        "--issue", type=int,
         help="GitHub issue number to update",
+    )
+    issue_group.add_argument(
+        "--create-issue", action="store_true", default=False,
+        help="Create a new GitHub issue for tracking",
     )
     parser.add_argument(
         "--organization", required=True,
@@ -151,6 +198,8 @@ def _run(args: argparse.Namespace) -> None:
     if not test_names:
         print("ERROR: No TEST blocks found")
         sys.exit(1)
+    if args.create_issue:
+        args.issue = create_issue(args, test_names)
     total = len(test_names)
     succeeded = 0
     failed = 0
