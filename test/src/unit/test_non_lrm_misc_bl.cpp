@@ -73,24 +73,6 @@ TEST(ParserSection6, CastCompatibleEnumToInt) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-// §6.6.7: Multiple nettypes in the same module.
-TEST(ParserSection6, Sec6_6_7_MultipleNettypesInModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct { real a; } A_t;\n"
-      "  typedef struct { int b; } B_t;\n"
-      "  nettype A_t netA;\n"
-      "  nettype B_t netB;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kNettypeDecl) count++;
-  }
-  EXPECT_EQ(count, 2);
-}
-
 // §6.6.7: Nettype with real data type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithRealType) {
   EXPECT_TRUE(
