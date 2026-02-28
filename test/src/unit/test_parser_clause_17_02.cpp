@@ -125,4 +125,19 @@ TEST_F(CheckerParseTest, CheckerWithAssertProperty) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kAssertProperty));
 }
 
+// =============================================================================
+// §17.13 Checker with continuous assignment
+// =============================================================================
+TEST_F(CheckerParseTest, CheckerWithContAssign) {
+  auto* unit = Parse(R"(
+    checker assign_check;
+      logic a, b;
+      assign a = b;
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kContAssign));
+}
+
 }  // namespace
