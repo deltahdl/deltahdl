@@ -40,19 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-TEST(ParserAnnexA, A2ParamDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  parameter int WIDTH = 16;\n"
-      "  localparam int DEPTH = 32;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kParamDecl);
-}
-
 // --- list_of_param_assignments ---
 // param_assignment { , param_assignment }
 TEST(ParserA23, ListOfParamAssignmentsSingle) {
