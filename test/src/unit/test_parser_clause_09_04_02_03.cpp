@@ -46,4 +46,27 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardOrStmtLevel) {
   EXPECT_EQ(stmt->events[1].iff_condition, nullptr);
 }
 
+// ---------------------------------------------------------------------------
+// iff guard in always_ff context
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFF) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clock iff reset == 0 or posedge reset) begin\n"
+      "    r1 <= reset ? 0 : r2 + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
+  ASSERT_EQ(item->sensitivity.size(), 2u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+  EXPECT_EQ(item->sensitivity[1].edge, Edge::kPosedge);
+  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
+}
+
 }  // namespace
