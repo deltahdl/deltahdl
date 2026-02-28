@@ -110,4 +110,17 @@ TEST(ParserA602, VariableAssignment_SimpleExpr) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
+TEST(ParserA602, VariableAssignment_CallRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = func(a, b); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+}
+
 }  // namespace
