@@ -51,4 +51,13 @@ TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
   EXPECT_EQ(inst->inst_ports.size(), 0u);
 }
 
+// --- interface_instantiation: wildcard port ---
+TEST(ParserAnnexA0412, InterfaceInstWildcardPort) {
+  auto r = Parse("module m; my_if u0(.*); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->inst_wildcard);
+}
+
 }  // namespace
