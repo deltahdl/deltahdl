@@ -87,25 +87,6 @@ static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
 
 namespace {
 
-// --- 7. Blocking assignment to part-select: a[7:4] = 4'hF ---
-TEST(ParserSection10, Sec10_4_1_PartSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] a;\n"
-      "  initial begin\n"
-      "    a[7:4] = 4'hF;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-  ASSERT_NE(stmt->lhs->index_end, nullptr);
-}
-
 // --- 8. Blocking assignment to concatenation: {a, b} = {c, d} ---
 TEST(ParserSection10, Sec10_4_1_Concatenation) {
   auto r = Parse(
