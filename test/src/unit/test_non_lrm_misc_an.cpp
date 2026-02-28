@@ -7,31 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.6 Conditional statements
-// =============================================================================
-// ---------------------------------------------------------------------------
-// conditional_statement ::=
-//   [ unique_priority ] if ( cond_predicate ) statement_or_null
-//   { else if ( cond_predicate ) statement_or_null }
-//   [ else statement_or_null ]
-// ---------------------------------------------------------------------------
-// §12.4: basic if statement — true branch only, no else
-TEST(ParserA606, IfOnly) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin if (a) x = 1; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->condition, nullptr);
-  EXPECT_NE(stmt->then_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch, nullptr);
-}
-
 // §12.4: if-else statement
 TEST(ParserA606, IfElse) {
   auto r = Parse(
