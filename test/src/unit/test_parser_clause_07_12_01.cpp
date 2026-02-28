@@ -59,4 +59,16 @@ TEST(ParserSection7, ArrayFindWithClause) {
   ASSERT_NE(rhs, nullptr);
 }
 
+TEST(ParserSection7, ArrayFindIndexMethod) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[8];\n"
+      "  initial qi = arr.find_index with (item == 0);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
