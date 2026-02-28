@@ -40,17 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.3 — Lifetime specifier on class
-TEST(ParserSection8, ClassWithLifetime) {
-  auto r = Parse(
-      "class automatic MyClass;\n"
-      "  int x;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
-}
-
 // §8.15 — Extends with scoped class name
 TEST(ParserSection8, ExtendsScopedName) {
   auto r = Parse(

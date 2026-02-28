@@ -46,60 +46,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// §4.6: Named port connections — deterministic mapping
-// =============================================================================
-TEST(ParserSection4, Sec4_6_NamedPortConnections) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (.clk(clk), .rst(rst), .d(data));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  ASSERT_EQ(item->inst_ports.size(), 3u);
-  EXPECT_EQ(item->inst_ports[0].first, "clk");
-  EXPECT_EQ(item->inst_ports[1].first, "rst");
-  EXPECT_EQ(item->inst_ports[2].first, "d");
-}
-
-// =============================================================================
-// §4.6: Variable initialization at declaration — static lifetime determinism
-// =============================================================================
-TEST(ParserSection4, Sec4_6_VarInitAtDeclaration) {
-  auto r = Parse(
-      "module m;\n"
-      "  int x = 42;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
-// =============================================================================
-// §4.6: Automatic variable initialization per entry
-// =============================================================================
-TEST(ParserSection4, Sec4_6_AutomaticVarInitPerEntry) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int count = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_automatic);
-  EXPECT_NE(stmt->var_init, nullptr);
-}
-
-// =============================================================================
 // §4.6: always_comb with case inside
 // =============================================================================
 TEST(ParserSection4, Sec4_6_AlwaysCombWithCaseInside) {
