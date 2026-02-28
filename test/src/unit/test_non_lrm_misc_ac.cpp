@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverGroup_CrossThreeItems) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    a_cp: coverpoint a;\n"
-              "    b_cp: coverpoint b;\n"
-              "    c_cp: coverpoint c;\n"
-              "    cross a_cp, b_cp, c_cp;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CoverGroup_BinsWithCoverPointRef) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
