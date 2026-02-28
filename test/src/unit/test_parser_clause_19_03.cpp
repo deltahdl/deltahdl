@@ -196,4 +196,19 @@ TEST(ParserA211, FullCovergroup_MultipleElements) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, CoverGroup_MultipleCoverpoints) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg @(posedge clk);\n"
+              "    type_option.weight = 2;\n"
+              "    cp1: coverpoint a iff (enable);\n"
+              "    cp2: coverpoint b;\n"
+              "    cp3: coverpoint c {\n"
+              "      bins low = {[0:3]};\n"
+              "      bins high = {[4:7]};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
