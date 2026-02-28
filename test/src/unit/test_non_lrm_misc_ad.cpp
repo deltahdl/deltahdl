@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA302, PulldownStrength_Pull0Highz1) {
-  auto r = Parse(
-      "module m;\n"
-      "  pulldown (pull0, highz1) pd1(out);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPulldown);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 3u);  // pull0
-  EXPECT_EQ(g->drive_strength1, 1u);  // highz1
-}
-
 // -----------------------------------------------------------------------------
 // Production #1: pulldown_strength
 // pulldown_strength ::= ( strength1 , strength0 )

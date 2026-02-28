@@ -146,4 +146,16 @@ TEST(ParserA302, PulldownStrength_Supply0Weak1) {
   EXPECT_EQ(g->drive_strength1, 2u);  // weak1
 }
 
+TEST(ParserA302, PulldownStrength_Pull0Highz1) {
+  auto r = Parse(
+      "module m;\n"
+      "  pulldown (pull0, highz1) pd1(out);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPulldown);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->drive_strength0, 3u);  // pull0
+  EXPECT_EQ(g->drive_strength1, 1u);  // highz1
+}
+
 }  // namespace
