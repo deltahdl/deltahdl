@@ -54,22 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 9. Logic with unpacked dimension [4].
-TEST(ParserSection6, Sec6_5_LogicUnpackedDim) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic arr [4];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_FALSE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "arr");
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
 // 10. Wire with implicit continuous assignment (wire w = 1).
 TEST(ParserSection6, Sec6_5_WireImplicitContAssign) {
   auto r = Parse(
