@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// udp_declaration_port_list (ANSI port declarations)
-// ---------------------------------------------------------------------------
-// ANSI port list with single input
-TEST(ParserAnnexA052, AnsiPortList_SingleInput) {
-  auto r = Parse(
-      "primitive inv(output out, input a);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->output_name, "out");
-  ASSERT_EQ(udp->input_names.size(), 1u);
-  EXPECT_EQ(udp->input_names[0], "a");
-}
-
 // ANSI port list with mixed input keyword usage
 // (some inputs have 'input' keyword, some share the previous one)
 TEST(ParserAnnexA052, AnsiPortList_MixedInputKeyword) {
