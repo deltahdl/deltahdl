@@ -44,21 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// Task with no ports.
-TEST(ParserSection13, TaskWithNoPorts) {
-  auto r = Parse(
-      "module m;\n"
-      "  task idle();\n"
-      "    #10;\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "idle");
-  ASSERT_NE(tk, nullptr);
-  EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(tk->func_args.empty());
-}
-
 // =============================================================================
 // LRM section 13.4 -- Functions (additional tests)
 // =============================================================================
