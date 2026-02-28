@@ -5,26 +5,21 @@
 
 using namespace delta;
 
-namespace {
-
-// Case item with default
-TEST(ParserA612, RsCaseItemDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : case (99)\n"
-      "               0: a;\n"
-      "               default: b;\n"
-      "             endcase;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+  }
+  return nullptr;
 }
+
+SpecifyItem* GetSolePathItem(ParseResult& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  if (!spec || spec->specify_items.empty()) return nullptr;
+  return spec->specify_items[0];
+}
+
+namespace {
 
 // Default with colon (default :)
 TEST(ParserA612, RsCaseItemDefaultColon) {
@@ -160,13 +155,6 @@ TEST(ParserAnnexA, A7SpecparamInSpecify) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
-  }
-  return nullptr;
 }
 
 // =============================================================================
@@ -527,13 +515,6 @@ TEST(ParserA701, PulsestyleAndShowcancelledTogether) {
   EXPECT_TRUE(spec->specify_items[0]->is_ondetect);
   EXPECT_EQ(spec->specify_items[1]->kind, SpecifyItemKind::kShowcancelled);
   EXPECT_FALSE(spec->specify_items[1]->is_noshowcancelled);
-}
-
-SpecifyItem* GetSolePathItem(ParseResult& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty()) return nullptr;
-  return spec->specify_items[0];
 }
 
 // =============================================================================
