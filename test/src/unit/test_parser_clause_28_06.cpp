@@ -31,4 +31,11 @@ TEST(ParserA301, GateInst_Bufif1Basic) {
               "endmodule\n"));
 }
 
+TEST(ParserA301, GateInst_Notif0Basic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  notif0 (out, in, ctrl);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

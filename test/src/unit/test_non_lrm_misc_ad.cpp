@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_Notif0Basic) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  notif0 (out, in, ctrl);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA301, GateInst_Notif1Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
