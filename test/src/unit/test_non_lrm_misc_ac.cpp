@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverGroup_InPackage) {
-  EXPECT_TRUE(
-      ParseOk("package p;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endpackage\n"));
-}
-
 TEST(ParserA211, CoverGroup_NegedgeEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

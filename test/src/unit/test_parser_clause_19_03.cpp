@@ -222,4 +222,13 @@ TEST(ParserA211, CoverGroup_PortsWithBody) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, CoverGroup_InPackage) {
+  EXPECT_TRUE(
+      ParseOk("package p;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x;\n"
+              "  endgroup\n"
+              "endpackage\n"));
+}
+
 }  // namespace
