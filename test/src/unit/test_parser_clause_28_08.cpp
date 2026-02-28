@@ -272,4 +272,18 @@ TEST(ParserA304, PassEnSwitchtype_Rtranif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+// =============================================================================
+// A.3.4 Production #7: pass_switchtype ::= tran | rtran
+// =============================================================================
+TEST(ParserA304, PassSwitchtype_Tran) {
+  auto r = Parse(
+      "module m;\n"
+      "  tran (a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
 }  // namespace
