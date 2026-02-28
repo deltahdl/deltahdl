@@ -224,4 +224,19 @@ TEST(ParserA303, InoutTerminal_RtranBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
+// =============================================================================
+// A.3.4 Production #6: pass_en_switchtype ::= tranif0 | tranif1 | rtranif1 |
+// rtranif0
+// =============================================================================
+TEST(ParserA304, PassEnSwitchtype_Tranif0) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif0 (a, b, ctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
