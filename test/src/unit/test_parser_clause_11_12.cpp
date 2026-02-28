@@ -162,4 +162,20 @@ TEST(ParserA212, LetPortList_Single) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
+TEST(ParserA212, LetPortList_Multiple) {
+  auto r = Parse(
+      "module m;\n"
+      "  let f(a, b, c, d) = a + b + c + d;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 4u);
+  EXPECT_EQ(item->func_args[0].name, "a");
+  EXPECT_EQ(item->func_args[1].name, "b");
+  EXPECT_EQ(item->func_args[2].name, "c");
+  EXPECT_EQ(item->func_args[3].name, "d");
+}
+
 }  // namespace
