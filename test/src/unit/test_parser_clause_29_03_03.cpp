@@ -158,4 +158,17 @@ TEST(ParserAnnexA053, InitVal_1b1) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
+// init_val = 1'bx
+TEST(ParserAnnexA053, InitVal_1bx) {
+  auto r = Parse(
+      "primitive p(output reg q, input d, clk);\n"
+      "  initial q = 1'bx;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
+}
+
 }  // namespace
