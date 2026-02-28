@@ -100,4 +100,20 @@ TEST(ParserA70503, ConditionBothEvents) {
   EXPECT_NE(tc->data_condition, nullptr);
 }
 
+// Terminal with bit select + &&& condition combined
+TEST(ParserA70503, TerminalBitSelectWithCondition) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data[0] &&& en, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_terminal.name, "data");
+  EXPECT_EQ(tc->ref_terminal.range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_NE(tc->ref_condition, nullptr);
+}
+
 }  // namespace
