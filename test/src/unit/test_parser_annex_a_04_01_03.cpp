@@ -22,4 +22,17 @@ TEST(ParserAnnexA0413, ProgramInstWithOrderedParams) {
   ASSERT_EQ(item->inst_params.size(), 1u);
 }
 
+// --- program_instantiation: empty port list ---
+TEST(ParserAnnexA0413, ProgramInstEmptyPorts) {
+  auto r = Parse(
+      "program my_prog;\n"
+      "endprogram\n"
+      "module m; my_prog u0(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_TRUE(item->inst_ports.empty());
+}
+
 }  // namespace

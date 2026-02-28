@@ -18,19 +18,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-// --- program_instantiation: empty port list ---
-TEST(ParserAnnexA0413, ProgramInstEmptyPorts) {
-  auto r = Parse(
-      "program my_prog;\n"
-      "endprogram\n"
-      "module m; my_prog u0(); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_TRUE(item->inst_ports.empty());
-}
-
 // --- program_instantiation: wildcard port ---
 TEST(ParserAnnexA0413, ProgramInstWildcardPort) {
   auto r = Parse(
