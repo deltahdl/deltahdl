@@ -22,24 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// §6.21: Sequential block with automatic lifetime variable
-TEST(ParserA603, SeqBlockWithAutomaticVar) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int k = 10;\n"
-      "    a = k;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(body->stmts[0]->var_is_automatic);
-}
-
 // §9.3.1: Nested sequential blocks
 TEST(ParserA603, SeqBlockNested) {
   auto r = Parse(

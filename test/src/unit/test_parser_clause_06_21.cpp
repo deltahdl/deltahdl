@@ -60,4 +60,30 @@ TEST(ParserA28, DataDeclStaticInBlock) {
   EXPECT_EQ(body->stmts[0]->var_is_static, true);
 }
 
+static Stmt* InitialBody(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    return item->body;
+  }
+  return nullptr;
+}
+
+// §6.21: Sequential block with automatic lifetime variable
+TEST(ParserA603, SeqBlockWithAutomaticVar) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int k = 10;\n"
+      "    a = k;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_GE(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(body->stmts[0]->var_is_automatic);
+}
+
 }  // namespace
