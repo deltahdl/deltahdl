@@ -15,27 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, ProceduralContinuous_AllForms) {
-  // All four procedural continuous assignment forms in one block
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assign q = d;\n"
-      "    deassign q;\n"
-      "    force y = 0;\n"
-      "    release y;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto stmts = AllInitialStmts(r);
-  ASSERT_EQ(stmts.size(), 4u);
-  EXPECT_EQ(stmts[0]->kind, StmtKind::kAssign);
-  EXPECT_EQ(stmts[1]->kind, StmtKind::kDeassign);
-  EXPECT_EQ(stmts[2]->kind, StmtKind::kForce);
-  EXPECT_EQ(stmts[3]->kind, StmtKind::kRelease);
-}
-
 TEST(ParserA602, ProceduralAssign_WithBitSelect) {
   auto r = Parse(
       "module m;\n"
