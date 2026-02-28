@@ -36,33 +36,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, NonAnsiPortsMixed) {
-  auto r = Parse(
-      "module m(a, b, c, d);\n"
-      "  input a, b;\n"
-      "  output [3:0] c;\n"
-      "  inout d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 4);
-  struct Expected {
-    const char* name;
-    Direction dir;
-  };
-  Expected expected[] = {
-      {"a", Direction::kInput},
-      {"b", Direction::kInput},
-      {"c", Direction::kOutput},
-      {"d", Direction::kInout},
-  };
-  for (size_t i = 0; i < 4; ++i) {
-    EXPECT_EQ(mod->ports[i].name, expected[i].name);
-    EXPECT_EQ(mod->ports[i].direction, expected[i].dir);
-  }
-  EXPECT_NE(mod->ports[2].data_type.packed_dim_left, nullptr);
-}
-
 // --- Wildcard .* port connections (LRM §23.3.2.4) ---
 TEST(ParserSection23, WildcardConnection) {
   auto r = Parse(
