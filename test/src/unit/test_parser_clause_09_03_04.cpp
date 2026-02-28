@@ -158,4 +158,78 @@ TEST(ParserSection9c, SequentialBlockNamedWithDecls) {
   EXPECT_EQ(body->label, "my_block");
 }
 
+struct ParseResult4d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4d Parse(const std::string& src) {
+  ParseResult4d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §4.6: Named begin-end block for deterministic scoping
+// =============================================================================
+TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : seq_blk\n"
+      "    x = 1;\n"
+      "    y = 2;\n"
+      "  end : seq_blk\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "seq_blk");
+}
+
+struct ParseResult9c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9c Parse(const std::string& src) {
+  ParseResult9c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 9.3.1 -- Sequential blocks (additional tests)
+// =============================================================================
+TEST(ParserSection9, SequentialBlockNamedBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_seq\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  end : my_seq\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_EQ(item->body->label, "my_seq");
+  EXPECT_EQ(item->body->stmts.size(), 2u);
+}
+
 }  // namespace

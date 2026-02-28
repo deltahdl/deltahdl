@@ -49,25 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.3.1 -- Sequential blocks (additional tests)
-// =============================================================================
-TEST(ParserSection9, SequentialBlockNamedBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : my_seq\n"
-      "    a = 1;\n"
-      "    b = 2;\n"
-      "  end : my_seq\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->label, "my_seq");
-  EXPECT_EQ(item->body->stmts.size(), 2u);
-}
-
 TEST(ParserSection9, SequentialBlockVarDecl) {
   auto r = Parse(
       "module m;\n"
