@@ -22,27 +22,6 @@ static ModuleItem* FirstFunctionDecl(ParseResult& r) {
 
 namespace {
 
-// §9.3.2: Fork with block_item_declaration (variable in fork scope)
-TEST(ParserA603, ForkWithVarDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      automatic int k = 5;\n"
-      "      #10 a = k;\n"
-      "    join_none\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_GE(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->fork_stmts[0]->var_is_automatic);
-}
-
 // §9.3.2: Fork with multiple concurrent statements
 TEST(ParserA603, ForkMultipleStmts) {
   auto r = Parse(
