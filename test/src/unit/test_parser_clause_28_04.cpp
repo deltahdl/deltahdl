@@ -86,4 +86,11 @@ TEST(ParserA301, GateInst_OrBasic) {
               "endmodule\n"));
 }
 
+TEST(ParserA301, GateInst_NorBasic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nor (out, a, b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
