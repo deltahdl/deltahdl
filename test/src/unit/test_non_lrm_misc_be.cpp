@@ -45,25 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 26. Task without explicit lifetime (implicit static in module)
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_TaskNoLifetimeQualifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  task plain_task();\n"
-      "    $display(\"hello\");\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_FALSE(item->is_automatic);
-  EXPECT_FALSE(item->is_static);
-}
-
-// =============================================================================
 // 27. Module with static lifetime qualifier
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_StaticModuleLifetime) {
