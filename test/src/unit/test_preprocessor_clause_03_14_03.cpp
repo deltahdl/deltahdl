@@ -57,4 +57,19 @@ TEST(ParserClause03, Cl3_14_3_MultipleTimescaleDirectives) {
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
+// 30. Earlier `timescale with finer precision than later — global min is used.
+TEST(ParserClause03, Cl3_14_3_EarlierTimescaleFinerPrecision) {
+  auto r = Parse(
+      "`timescale 1ns / 1fs\n"
+      "module a; endmodule\n"
+      "`timescale 1us / 1ps\n"
+      "module b; endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  // Preprocessor global precision = min(1fs, 1ps) = 1fs.
+  // Even though the last `timescale has 1ps, the earlier 1fs wins.
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+                                       r.preproc_global_precision);
+  EXPECT_EQ(gp, TimeUnit::kFs);
+}
+
 }  // namespace
