@@ -255,4 +255,62 @@ TEST(ParserSection4, Sec4_6_BlockingAssignOrdering) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Returns the first always_* item from the first module.
+static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock)
+      return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 4.5 -- Simulation scheduling semantics
+//
+// These tests verify that all syntactic constructs related to the simulation
+// scheduling regions (Active, Inactive, NBA, Observed, Reactive, Preponed,
+// Postponed) parse correctly.
+// =============================================================================
+// ---------------------------------------------------------------------------
+// 1. Blocking assignment in always block (Active region)
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_BlockingAssignInAlways) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  always @(b) a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(item->body->lhs, nullptr);
+  EXPECT_NE(item->body->rhs, nullptr);
+}
+
 }  // namespace

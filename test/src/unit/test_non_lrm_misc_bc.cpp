@@ -77,33 +77,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 4.5 -- Simulation scheduling semantics
-//
-// These tests verify that all syntactic constructs related to the simulation
-// scheduling regions (Active, Inactive, NBA, Observed, Reactive, Preponed,
-// Postponed) parse correctly.
-// =============================================================================
-// ---------------------------------------------------------------------------
-// 1. Blocking assignment in always block (Active region)
-// ---------------------------------------------------------------------------
-TEST(ParserSection4, Sec4_5_BlockingAssignInAlways) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  always @(b) a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  EXPECT_NE(item->body->lhs, nullptr);
-  EXPECT_NE(item->body->rhs, nullptr);
-}
-
 // ---------------------------------------------------------------------------
 // 2. Non-blocking assignment in always block (NBA region)
 // ---------------------------------------------------------------------------
