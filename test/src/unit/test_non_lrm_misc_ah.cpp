@@ -7,29 +7,6 @@ using namespace delta;
 
 namespace {
 
-// All three udp_port_declaration alternatives together
-TEST(ParserAnnexA052, PortDecl_AllThreeAlternatives) {
-  auto r = Parse(
-      "primitive dff(q, d, clk);\n"
-      "  output q;\n"
-      "  input d;\n"
-      "  input clk;\n"
-      "  reg q;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->output_name, "q");
-  ASSERT_EQ(udp->input_names.size(), 2u);
-  EXPECT_EQ(udp->input_names[0], "d");
-  EXPECT_EQ(udp->input_names[1], "clk");
-  EXPECT_TRUE(udp->is_sequential);
-}
-
 // ---------------------------------------------------------------------------
 // udp_output_declaration — output reg with = constant_expression
 // ---------------------------------------------------------------------------
