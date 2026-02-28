@@ -123,4 +123,17 @@ TEST(ParserA601, NetAssignment_ConcatLhs) {
   EXPECT_EQ(cas[0]->assign_lhs->kind, ExprKind::kConcatenation);
 }
 
+TEST(ParserA601, NetAssignment_ExprRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [3:0] a, b, sum;\n"
+      "  assign sum = a + b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto cas = FindContAssigns(r.cu->modules[0]->items);
+  ASSERT_EQ(cas.size(), 1u);
+  EXPECT_EQ(cas[0]->assign_rhs->kind, ExprKind::kBinary);
+}
+
 }  // namespace
