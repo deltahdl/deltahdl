@@ -336,4 +336,54 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountVariable) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
+struct ParseResult11 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11 Parse(const std::string& src) {
+  ParseResult11 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult11& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// --- 21. Nonblocking with repeat event control ---
+TEST(ParserSection10, Sec10_4_2_RepeatEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, clk;\n"
+      "  initial begin\n"
+      "    q <= repeat(3) @(posedge clk) d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->text, "d");
+}
+
 }  // namespace

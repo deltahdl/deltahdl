@@ -50,27 +50,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// --- 21. Nonblocking with repeat event control ---
-TEST(ParserSection10, Sec10_4_2_RepeatEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d, clk;\n"
-      "  initial begin\n"
-      "    q <= repeat(3) @(posedge clk) d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->repeat_event_count, nullptr);
-  ASSERT_FALSE(stmt->events.empty());
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->text, "d");
-}
-
 // --- 22. Nonblocking mixed with blocking in same module (different blocks) ---
 TEST(ParserSection10, Sec10_4_2_MixedBlockingNonblocking) {
   auto r = Parse(
