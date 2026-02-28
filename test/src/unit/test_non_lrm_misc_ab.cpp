@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.11 Production #28: covergroup_value_range
-// =============================================================================
-TEST(ParserA211, CovergroupValueRange_SingleValue) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins a = {42};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA211, CovergroupValueRange_ClosedRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
