@@ -35,4 +35,15 @@ TEST(ParserA301, GateInst_NotBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
+TEST(ParserA301, GateInst_NOutputMultipleOutputs) {
+  auto r = Parse(
+      "module m;\n"
+      "  buf (o1, o2, o3, in);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 4u);
+}
+
 }  // namespace
