@@ -61,4 +61,21 @@ TEST(ParserSection13, FunctionNoPorts) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
 }
 
+// Function with multiple statements in body.
+TEST(ParserSection13, FunctionMultipleBodyStmts) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int clamp(int val, int lo, int hi);\n"
+      "    if (val < lo) return lo;\n"
+      "    if (val > hi) return hi;\n"
+      "    return val;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "clamp");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 3u);
+  EXPECT_GE(fn->func_body_stmts.size(), 3u);
+}
+
 }  // namespace

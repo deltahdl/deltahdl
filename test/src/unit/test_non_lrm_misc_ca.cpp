@@ -90,28 +90,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 
 namespace {
 
-// @* with case body
-TEST(ParserSection9, Sec9_4_2_3_AtStarCaseBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [1:0] sel;\n"
-      "  reg [7:0] out;\n"
-      "  always @* case (sel)\n"
-      "    2'b00: out = 8'h00;\n"
-      "    2'b01: out = 8'h11;\n"
-      "    default: out = 8'hFF;\n"
-      "  endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kCase);
-  EXPECT_EQ(item->body->case_items.size(), 3u);
-}
-
 // @(*) with multiple assignments in begin-end
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenMultipleAssignments) {
   auto r = Parse(

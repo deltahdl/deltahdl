@@ -35,4 +35,13 @@ TEST(ParserSection26, PackageExportWildcard) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kExportDecl));
 }
 
+TEST(ParserSection26, PackageExportSpecific) {
+  auto r = Parse(
+      "package p;\n"
+      "  export other_pkg::some_func;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
 }  // namespace
