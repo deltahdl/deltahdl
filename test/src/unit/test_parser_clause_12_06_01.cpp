@@ -96,4 +96,19 @@ TEST(ParserA60701, PatternTaggedVoidMember) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
 
+// §10.9: assignment pattern with dot-identifier pattern bindings
+TEST(ParserA60701, PatternAssignmentWithDotBindings) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(s) matches\n"
+      "      '{.a, .b}: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
