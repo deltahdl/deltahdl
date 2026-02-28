@@ -31,4 +31,15 @@ TEST(ParserA211, TransList_Single) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, TransList_Multiple) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 => 2), (3 => 4);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
