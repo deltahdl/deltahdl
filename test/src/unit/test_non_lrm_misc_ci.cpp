@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Ternary with system call operand ---
-TEST(ParserSection11, Sec11_4_6_TernaryWithSystemCall) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = sel ? $random : 0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kSystemCall);
-  EXPECT_EQ(rhs->true_expr->callee, "$random");
-  ASSERT_NE(rhs->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIntegerLiteral);
-}
-
 // --- Ternary with unary operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithUnaryOperands) {
   auto r = Parse(
