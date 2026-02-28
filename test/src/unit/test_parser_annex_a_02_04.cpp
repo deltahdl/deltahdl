@@ -28,4 +28,16 @@ TEST(ParserA24, NetDeclAssignmentWithUnpackedDims) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
+// --- param_assignment ---
+// parameter_identifier { variable_dimension } [ = constant_param_expression ]
+TEST(ParserA24, ParamAssignmentBasic) {
+  auto r = Parse("module m; parameter WIDTH = 8; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "WIDTH");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
 }  // namespace

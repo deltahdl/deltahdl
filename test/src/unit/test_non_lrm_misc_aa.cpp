@@ -33,18 +33,6 @@ TEST(ParserA221, StructUnionStruct) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
 }
 
-// --- param_assignment ---
-// parameter_identifier { variable_dimension } [ = constant_param_expression ]
-TEST(ParserA24, ParamAssignmentBasic) {
-  auto r = Parse("module m; parameter WIDTH = 8; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "WIDTH");
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
 TEST(ParserA24, ParamAssignmentWithUnpackedDim) {
   auto r = Parse("module m; parameter int ARR [3:0] = '{1,2,3,4}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
