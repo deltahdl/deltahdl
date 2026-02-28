@@ -168,4 +168,27 @@ TEST(ParserAnnexA042, GenerateRegionMixedConstructs) {
   EXPECT_TRUE(HasItemOfKind(mod->items, ModuleItemKind::kGenerateCase));
 }
 
+// §27.1: Multiple generate constructs in sequence.
+TEST(ParserSection27, MultipleGenerateConstructs) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i++) begin : g1\n"
+      "    assign a[i] = b[i];\n"
+      "  end\n"
+      "  if (MODE) begin\n"
+      "    assign x = y;\n"
+      "  end\n"
+      "  case (SEL)\n"
+      "    0: assign out = a;\n"
+      "    default: assign out = b;\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 3u);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateFor);
+  EXPECT_EQ(mod->items[1]->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_EQ(mod->items[2]->kind, ModuleItemKind::kGenerateCase);
+}
+
 }  // namespace
