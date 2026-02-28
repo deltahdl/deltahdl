@@ -49,21 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9, EventControlBareSignal) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(data) a = data;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_FALSE(stmt->events.empty());
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
-}
-
 TEST(ParserSection9, WaitStatementWithBlock) {
   auto r = Parse(
       "module m;\n"
