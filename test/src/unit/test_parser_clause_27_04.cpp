@@ -150,4 +150,24 @@ TEST(ParserAnnexA042, NestedForInsideFor) {
   EXPECT_EQ(outer->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
+// =============================================================================
+// LRM section 27.1 -- General (generate constructs overview)
+// =============================================================================
+// §27.1: Generate-for with module instantiation (structural repetition).
+TEST(ParserSection27, GenerateForWithModuleInst2) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i++) begin : gen_inst\n"
+      "    sub u(.a(w[i]));\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  auto* gen = mod->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
+  ASSERT_EQ(gen->gen_body.size(), 1u);
+  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
+}
+
 }  // namespace

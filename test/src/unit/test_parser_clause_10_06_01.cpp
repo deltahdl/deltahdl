@@ -79,4 +79,74 @@ TEST(ParserSection10, Sec10_6_1_AssignInTaskBody) {
               "endmodule\n"));
 }
 
+// Helper: extract 4 initial statements and verify non-null.
+struct FourStmts {
+  Stmt* s0;
+  Stmt* s1;
+  Stmt* s2;
+  Stmt* s3;
+};
+
+static FourStmts Get4InitialStmts(auto& r) {
+  FourStmts fs;
+  fs.s0 = NthInitialStmt(r, 0);
+  fs.s1 = NthInitialStmt(r, 1);
+  fs.s2 = NthInitialStmt(r, 2);
+  fs.s3 = NthInitialStmt(r, 3);
+  EXPECT_NE(fs.s0, nullptr);
+  EXPECT_NE(fs.s1, nullptr);
+  EXPECT_NE(fs.s2, nullptr);
+  EXPECT_NE(fs.s3, nullptr);
+  return fs;
+}
+
+struct ParseResult10d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult10d Parse(const std::string& src) {
+  ParseResult10d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* NthInitialStmt(ParseResult10d& r, size_t n) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      if (n < item->body->stmts.size()) return item->body->stmts[n];
+    }
+  }
+  return nullptr;
+}
+
+// --- 29. Assign/deassign interleaved with nonblocking assigns ---
+TEST(ParserSection10, Sec10_6_1_InterleavedWithNonblocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d;\n"
+      "  initial begin\n"
+      "    assign q = 1;\n"
+      "    q <= 0;\n"
+      "    deassign q;\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto [s0, s1, s2, s3] = Get4InitialStmts(r);
+  EXPECT_EQ(s0->kind, StmtKind::kAssign);
+  EXPECT_EQ(s1->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(s2->kind, StmtKind::kDeassign);
+  EXPECT_EQ(s3->kind, StmtKind::kNonblockingAssign);
+}
+
 }  // namespace

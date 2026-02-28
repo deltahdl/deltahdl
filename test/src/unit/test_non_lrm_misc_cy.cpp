@@ -5,27 +5,52 @@
 
 using namespace delta;
 
-namespace {
-
-// =============================================================================
-// LRM section 27.1 -- General (generate constructs overview)
-// =============================================================================
-// §27.1: Generate-for with module instantiation (structural repetition).
-TEST(ParserSection27, GenerateForWithModuleInst2) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i++) begin : gen_inst\n"
-      "    sub u(.a(w[i]));\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1u);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(gen->gen_body.size(), 1u);
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
+static void VerifyGenerateCaseItem(const GenerateCaseItem& ci, size_t idx,
+                                   bool expect_default,
+                                   size_t expect_pattern_count) {
+  EXPECT_EQ(ci.is_default, expect_default) << "case item " << idx;
+  EXPECT_EQ(ci.patterns.size(), expect_pattern_count) << "case item " << idx;
+  EXPECT_FALSE(ci.body.empty()) << "case item " << idx;
 }
+
+static bool HasGateOfKind(const std::vector<ModuleItem*>& items,
+                          GateKind kind) {
+  for (const auto* item : items)
+    if (item->kind == ModuleItemKind::kGateInst && item->gate_kind == kind)
+      return true;
+  return false;
+}
+
+static void VerifyGateInstances(const std::vector<ModuleItem*>& items,
+                                GateKind kind,
+                                const std::string expected_names[],
+                                size_t count) {
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(items[i]->gate_kind, kind);
+    EXPECT_EQ(items[i]->gate_inst_name, expected_names[i]);
+    EXPECT_EQ(items[i]->gate_terminals.size(), 3);
+  }
+}
+
+static void VerifyStrengthDelayInstances(const std::vector<ModuleItem*>& items,
+                                         size_t count, int str0, int str1) {
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(items[i]->drive_strength0, str0);
+    EXPECT_EQ(items[i]->drive_strength1, str1);
+    EXPECT_NE(items[i]->gate_delay, nullptr);
+  }
+}
+
+static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  return elab.Elaborate(cu->modules.back()->name);
+}
+
+namespace {
 
 // §27.1: Generate-if with nested generate-for (hierarchical conditional).
 TEST(ParserSection27, GenerateIfWithNestedFor) {
@@ -164,14 +189,6 @@ TEST(ParserA23, ListOfGenvarIdentifiersSingle) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
 }
 
-static void VerifyGenerateCaseItem(const GenerateCaseItem& ci, size_t idx,
-                                   bool expect_default,
-                                   size_t expect_pattern_count) {
-  EXPECT_EQ(ci.is_default, expect_default) << "case item " << idx;
-  EXPECT_EQ(ci.patterns.size(), expect_pattern_count) << "case item " << idx;
-  EXPECT_FALSE(ci.body.empty()) << "case item " << idx;
-}
-
 TEST(Parser, GenerateIf) {
   auto r = Parse(
       "module t;\n"
@@ -299,14 +316,6 @@ TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
     }
   }
   EXPECT_TRUE(found_gen_if);
-}
-
-static bool HasGateOfKind(const std::vector<ModuleItem*>& items,
-                          GateKind kind) {
-  for (const auto* item : items)
-    if (item->kind == ModuleItemKind::kGateInst && item->gate_kind == kind)
-      return true;
-  return false;
 }
 
 // =============================================================================
@@ -439,26 +448,6 @@ TEST(ParserSection28, GateArrayWithDelay) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-static void VerifyGateInstances(const std::vector<ModuleItem*>& items,
-                                GateKind kind,
-                                const std::string expected_names[],
-                                size_t count) {
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(items[i]->gate_kind, kind);
-    EXPECT_EQ(items[i]->gate_inst_name, expected_names[i]);
-    EXPECT_EQ(items[i]->gate_terminals.size(), 3);
-  }
-}
-
-static void VerifyStrengthDelayInstances(const std::vector<ModuleItem*>& items,
-                                         size_t count, int str0, int str1) {
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(items[i]->drive_strength0, str0);
-    EXPECT_EQ(items[i]->drive_strength1, str1);
-    EXPECT_NE(items[i]->gate_delay, nullptr);
-  }
-}
-
 TEST(ParserSection28, MultipleInstances) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -528,15 +517,6 @@ TEST(Parser, GateNoInstanceName) {
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
   EXPECT_TRUE(item->gate_inst_name.empty());
   EXPECT_EQ(item->gate_terminals.size(), 3);
-}
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
 }
 
 TEST(ParserSection28, ElaborateAndGate) {

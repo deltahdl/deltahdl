@@ -87,27 +87,6 @@ static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
 
 namespace {
 
-// --- 29. Assign/deassign interleaved with nonblocking assigns ---
-TEST(ParserSection10, Sec10_6_1_InterleavedWithNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d;\n"
-      "  initial begin\n"
-      "    assign q = 1;\n"
-      "    q <= 0;\n"
-      "    deassign q;\n"
-      "    q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto [s0, s1, s2, s3] = Get4InitialStmts(r);
-  EXPECT_EQ(s0->kind, StmtKind::kAssign);
-  EXPECT_EQ(s1->kind, StmtKind::kNonblockingAssign);
-  EXPECT_EQ(s2->kind, StmtKind::kDeassign);
-  EXPECT_EQ(s3->kind, StmtKind::kNonblockingAssign);
-}
-
 // --- 30. Full D-FF with assign/deassign and always @(posedge) ---
 TEST(ParserSection10, Sec10_6_1_FullDFlipFlopPattern) {
   auto r = Parse(
