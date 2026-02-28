@@ -117,4 +117,14 @@ TEST(ParserAnnexA0411, MultipleInstancesSharedParams) {
   EXPECT_EQ(i1->inst_params[0].first, "W");
 }
 
+// --- interface_instantiation: with empty parameter ---
+TEST(ParserAnnexA0412, InterfaceInstEmptyParam) {
+  auto r = Parse("module m; my_if #() u0(.a(a)); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->inst_module, "my_if");
+  EXPECT_TRUE(item->inst_params.empty());
+}
+
 }  // namespace
