@@ -145,4 +145,21 @@ TEST(ParserA212, LetIdentifier_Simple) {
   EXPECT_EQ(item->name, "foo");
 }
 
+// =============================================================================
+// A.2.12 Production #3: let_port_list
+// let_port_list ::= let_port_item { , let_port_item }
+// =============================================================================
+TEST(ParserA212, LetPortList_Single) {
+  auto r = Parse(
+      "module m;\n"
+      "  let f(x) = x;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].name, "x");
+}
+
 }  // namespace
