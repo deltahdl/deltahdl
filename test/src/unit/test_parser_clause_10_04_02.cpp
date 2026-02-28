@@ -615,4 +615,23 @@ TEST(ParserSection10, Sec10_4_2_IndexedPartSelectLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
+// --- 27. Nonblocking in named begin-end block ---
+TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d;\n"
+      "  initial begin : my_block\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "my_block");
+  ASSERT_EQ(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
+}
+
 }  // namespace

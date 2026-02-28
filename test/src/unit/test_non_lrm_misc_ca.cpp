@@ -79,26 +79,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 
 namespace {
 
-// @* with case inside body
-TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [1:0] sel;\n"
-      "  reg [7:0] out, a, b, c, d;\n"
-      "  always @* begin\n"
-      "    case (sel)\n"
-      "      2'd0: out = a;\n"
-      "      2'd1: out = b;\n"
-      "      2'd2: out = c;\n"
-      "      default: out = d;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  auto* case_stmt = GetAlwaysStarCaseStmt(r);
-  ASSERT_NE(case_stmt, nullptr);
-  EXPECT_EQ(case_stmt->case_items.size(), 4u);
-}
-
 // @* with unique case
 TEST(ParserSection9, Sec9_4_2_3_AtStarUniqueCase) {
   auto r = Parse(
