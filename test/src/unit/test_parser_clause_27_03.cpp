@@ -16,4 +16,15 @@ TEST(ParserA23, ListOfGenvarIdentifiersMultiple) {
   EXPECT_EQ(r.cu->modules[0]->items[2]->name, "k");
 }
 
+TEST(ParserAnnexA, A4GenerateRegion) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    wire w;\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

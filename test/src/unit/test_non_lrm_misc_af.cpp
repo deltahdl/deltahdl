@@ -25,17 +25,6 @@ RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 
 namespace {
 
-TEST(ParserAnnexA, A4GenerateRegion) {
-  auto r = Parse(
-      "module m;\n"
-      "  generate\n"
-      "    wire w;\n"
-      "  endgenerate\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.4.1.1 -- Module instantiation
 //
