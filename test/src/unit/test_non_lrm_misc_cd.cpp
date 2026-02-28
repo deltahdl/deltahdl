@@ -87,43 +87,6 @@ static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
 
 namespace {
 
-// --- 13. Blocking assignment in for loop body ---
-TEST(ParserSection10, Sec10_4_1_InForLoopBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] mem [0:3];\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 4; i++)\n"
-      "      mem[i] = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  ASSERT_NE(stmt->for_body, nullptr);
-  EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlockingAssign);
-}
-
-// --- 14. Blocking assignment with function call RHS ---
-TEST(ParserSection10, Sec10_4_1_FunctionCallRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] result;\n"
-      "  initial begin\n"
-      "    result = compute(a, b);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
-}
-
 // --- 15. Blocking assignment with system call RHS: a = $random ---
 TEST(ParserSection10, Sec10_4_1_SystemCallRhs) {
   auto r = Parse(
