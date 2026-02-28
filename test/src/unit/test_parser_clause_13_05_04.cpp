@@ -26,4 +26,60 @@ TEST(ParserA609, ListOfArgsAllNamed) {
   EXPECT_EQ(expr->args.size(), 2u);
 }
 
+// Named argument with empty expression
+TEST(ParserA609, ListOfArgsNamedEmpty) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(.a(), .b(1)); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  EXPECT_EQ(expr->arg_names.size(), 2u);
+  EXPECT_EQ(expr->args[0], nullptr);
+  ASSERT_NE(expr->args[1], nullptr);
+}
+
+// --- Test helpers ---
+struct ParseResult14 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult14 Parse(const std::string& src) {
+  ParseResult14 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// LRM section 13.5.5 -- Optional argument list / binding by name (additional)
+// =============================================================================
+// Named arg binding on a task call.
+TEST(ParserSection13, NamedArgBindingOnTaskCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  task drive(input int addr, input int data);\n"
+      "  endtask\n"
+      "  initial drive(.data(42), .addr(100));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+  auto* call = stmt->expr;
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(call->kind, ExprKind::kCall);
+  ASSERT_EQ(call->arg_names.size(), 2u);
+  EXPECT_EQ(call->arg_names[0], "data");
+  EXPECT_EQ(call->arg_names[1], "addr");
+}
+
 }  // namespace

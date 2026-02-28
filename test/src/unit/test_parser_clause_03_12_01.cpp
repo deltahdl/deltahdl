@@ -27,4 +27,15 @@ TEST(ParserClause03, Cl3_12_1_ForwardRefSyntaxValid) {
               "endmodule\n"));
 }
 
+TEST(Parser, PackageAndModule) {
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module top; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+  EXPECT_EQ(r.cu->modules[0]->name, "top");
+}
+
 }  // namespace

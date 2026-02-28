@@ -45,19 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-TEST(ParserSection10, ContinuousAssignTernary) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, sel, y;\n"
-      "  assign y = sel ? a : b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* ca =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
-  ASSERT_NE(ca, nullptr);
-  ASSERT_NE(ca->assign_rhs, nullptr);
-}
-
 TEST(ParserSection10, NetDeclAssignmentWithRange) {
   auto r = Parse(
       "module m;\n"

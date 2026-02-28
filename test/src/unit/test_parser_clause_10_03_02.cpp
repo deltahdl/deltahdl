@@ -273,4 +273,34 @@ TEST(ParserSection6, RealVariableContinuousAssign) {
   EXPECT_TRUE(found_ca);
 }
 
+// =============================================================================
+// LRM section 10.3 -- Continuous assignments (additional tests)
+// =============================================================================
+TEST(ParserSection10, ContinuousAssignExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [3:0] a, b, sum;\n"
+      "  assign sum = a + b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* ca =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_rhs, nullptr);
+  EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kBinary);
+}
+
+TEST(ParserSection10, ContinuousAssignTernary) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, sel, y;\n"
+      "  assign y = sel ? a : b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* ca =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_rhs, nullptr);
+}
+
 }  // namespace

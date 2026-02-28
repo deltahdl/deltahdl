@@ -7,28 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Parser, PackageWithParam) {
-  auto r = Parse(
-      "package my_pkg;\n"
-      "  parameter int WIDTH = 8;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1);
-  ASSERT_EQ(r.cu->packages[0]->items.size(), 1);
-  EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kParamDecl);
-}
-
-TEST(Parser, PackageAndModule) {
-  auto r = Parse(
-      "package pkg; endpackage\n"
-      "module top; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-  EXPECT_EQ(r.cu->modules[0]->name, "top");
-}
-
 // =============================================================================
 // A.1.11 Package items
 // =============================================================================
