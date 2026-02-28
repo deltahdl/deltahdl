@@ -100,4 +100,11 @@ TEST(ParserA301, GateInst_XorBasic) {
               "endmodule\n"));
 }
 
+TEST(ParserA301, GateInst_XnorBasic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  xnor (out, a, b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
