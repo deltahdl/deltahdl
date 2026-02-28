@@ -240,4 +240,33 @@ TEST(ParserSection9, Sec9_2_2_MultipleAssignments) {
   }
 }
 
+// Helper for block 24: verify always block has nested if-else.
+static void VerifyAlwaysNestedIfElse(ParseResult& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
+}
+
+// ---------------------------------------------------------------------------
+// 27. always_comb with nested if-else inside begin-end.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysCombNestedIfElseInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb begin\n"
+      "    if (a)\n"
+      "      if (b) y = 1;\n"
+      "      else y = 2;\n"
+      "    else\n"
+      "      y = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  VerifyAlwaysNestedIfElse(r);
+}
+
 }  // namespace
