@@ -74,4 +74,20 @@ TEST(ParserA603, ForkJoinNone) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
 }
 
+// §9.3.2: Empty fork...join
+TEST(ParserA603, ForkJoinEmpty) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->fork_stmts.size(), 0u);
+}
+
 }  // namespace
