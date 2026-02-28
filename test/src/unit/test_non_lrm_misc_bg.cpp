@@ -111,11 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_UnbasedUnsized_Zero) {
-  // '0 sets all bits to 0.
-  EXPECT_TRUE(ParseOk("module m; initial x = '0; endmodule"));
-}
-
 TEST(ParserCh50701, IntLiteral_Underscore) {
   // Underscores are legal anywhere except as first character.
   EXPECT_TRUE(

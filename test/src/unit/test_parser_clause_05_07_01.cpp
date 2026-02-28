@@ -200,4 +200,9 @@ TEST(ParserA87, UnbasedUnsizedX) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
+TEST(ParserCh50701, IntLiteral_UnbasedUnsized_Zero) {
+  // '0 sets all bits to 0.
+  EXPECT_TRUE(ParseOk("module m; initial x = '0; endmodule"));
+}
+
 }  // namespace
