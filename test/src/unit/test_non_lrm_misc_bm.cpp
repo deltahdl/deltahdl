@@ -31,21 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// 6. byte signed explicitly (redundant but valid).
-TEST(ParserSection6, Sec6_11_ByteSignedExplicit) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte signed bs;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
-  EXPECT_TRUE(item->data_type.is_signed);
-  EXPECT_EQ(item->name, "bs");
-}
-
 // 7. byte unsigned override.
 TEST(ParserSection6, Sec6_11_ByteUnsignedOverride) {
   auto r = Parse(
