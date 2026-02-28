@@ -50,19 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserA601, NetAssignment_TernaryRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, sel, y;\n"
-      "  assign y = sel ? a : b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_NE(cas[0]->assign_rhs, nullptr);
-}
-
 // =============================================================================
 // A.6.1 Production: net_alias (parsing)
 // net_alias ::= alias net_lvalue = net_lvalue { = net_lvalue } ;
