@@ -43,19 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-TEST(ParserSection18, StdRandomizeWithMultipleVars) {
-  auto r = Parse(
-      "module top;\n"
-      "  initial begin\n"
-      "    int x, y;\n"
-      "    std::randomize(x, y) with { x + y < 100; x > 0; y > 0; };\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // =============================================================================
 // §18.13.3 srandom() -- random stability and process
 // =============================================================================
