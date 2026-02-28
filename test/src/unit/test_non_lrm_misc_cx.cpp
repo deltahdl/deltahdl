@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection26, ImportWildcardField) {
-  auto r = Parse(
-      "package p;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import p::*;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  const auto* imp =
-      FindItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
-  ASSERT_NE(imp, nullptr);
-  EXPECT_EQ(imp->import_item.package_name, "p");
-  EXPECT_TRUE(imp->import_item.is_wildcard);
-}
-
 TEST(ParserSection26, ImportSpecificNotWildcard) {
   auto r = Parse(
       "package p;\n"
