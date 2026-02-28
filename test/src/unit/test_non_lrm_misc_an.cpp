@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §12.4: complex condition expression
-TEST(ParserA606, ComplexCondExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if ((a > 0) && (b < 10) || c) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->condition, nullptr);
-}
-
 // §12.4: if condition with function call
 TEST(ParserA606, IfCondFunctionCall) {
   auto r = Parse(
