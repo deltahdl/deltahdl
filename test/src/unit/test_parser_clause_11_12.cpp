@@ -431,4 +431,15 @@ TEST(ParserA212, LetActualArg_Ternary) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetActualArg_Concatenation) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(x) = x;\n"
+              "  initial begin\n"
+              "    logic [7:0] z;\n"
+              "    z = f({4'b0, 4'b1});\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
