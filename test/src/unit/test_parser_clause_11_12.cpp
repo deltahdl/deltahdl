@@ -16,4 +16,21 @@ TEST(ParserA28, LetDeclInFunction) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// A.2.12 Production #1: let_declaration
+// let_declaration ::= let let_identifier [ ( [ let_port_list ] ) ] = expression
+// ;
+// =============================================================================
+TEST(ParserA212, LetDecl_NoArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  let addr = base + offset;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "addr");
+}
+
 }  // namespace
