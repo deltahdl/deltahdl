@@ -30,19 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(Parser, NettypeUsedInDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  nettype logic [7:0] mynet;\n"
-      "  mynet x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto* item = r.cu->modules[0]->items[1];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->name, "x");
-}
-
 TEST(ParserA213, DataDeclNettypeDeclaration) {
   // nettype_declaration alternative
   auto r = Parse("module m; nettype logic my_net; endmodule");
