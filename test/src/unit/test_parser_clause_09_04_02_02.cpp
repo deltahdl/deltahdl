@@ -548,4 +548,22 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenComplexCombLogic) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
+// @* with function calls in body
+TEST(ParserSection9, Sec9_4_2_3_AtStarFunctionCalls) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] a, result;\n"
+      "  always @* begin\n"
+      "    result = $clog2(a);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+}
+
 }  // namespace
