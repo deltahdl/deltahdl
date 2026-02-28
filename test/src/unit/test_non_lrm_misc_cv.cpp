@@ -27,26 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =========================================================================
-// LRM section 27.4: Loop generates
-// =========================================================================
-TEST(ParserSection23, LoopGenerateForStructure) {
-  auto r = Parse(
-      "module m;\n"
-      "  genvar i;\n"
-      "  for (i = 0; i < 8; i = i + 1) begin : bits\n"
-      "    assign out[i] = ^in[7:i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = FindItemByKind(r, ModuleItemKind::kGenerateFor);
-  ASSERT_NE(gen, nullptr);
-  EXPECT_NE(gen->gen_init, nullptr);
-  EXPECT_NE(gen->gen_cond, nullptr);
-  EXPECT_NE(gen->gen_step, nullptr);
-  EXPECT_FALSE(gen->gen_body.empty());
-}
-
 TEST(ParserSection23, LoopGenerateInlineGenvar) {
   auto r = Parse(
       "module m;\n"
