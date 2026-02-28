@@ -137,4 +137,47 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithPackedVector) {
               "endmodule\n"));
 }
 
+// §6.6.7: Nettype with a struct data type.
+TEST(ParserSection6, Sec6_6_7_NettypeWithStruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  nettype T wT;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* nt = FindNettypeDecl(r, "wT");
+  ASSERT_NE(nt, nullptr);
+  EXPECT_EQ(nt->name, "wT");
+}
+
+struct ParseResult616 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult616 Parse(const std::string& src) {
+  ParseResult616 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(Parser, NettypeDeclaration) {
+  auto r = Parse(
+      "module t;\n"
+      "  nettype logic [7:0] mynet;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
+  EXPECT_EQ(item->name, "mynet");
+}
+
 }  // namespace

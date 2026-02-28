@@ -23,32 +23,6 @@ static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Verify body is preserved under iff guard at statement level
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevelBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(negedge clk iff active) begin\n"
-      "      a = 1;\n"
-      "      b = 2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
-  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
-  ASSERT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
-  EXPECT_GE(stmt->body->stmts.size(), 2u);
-}
-
 // §3.3 Continuous assignments
 TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
   auto r = ParseWithPreprocessor(
