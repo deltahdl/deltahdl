@@ -58,4 +58,18 @@ TEST(ParserA602, BlockingAssignment_WithRepeatEvent) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
+TEST(ParserA602, BlockingAssignment_ParenthesizedIntraDelay) {
+  // Parenthesized intra-assignment delay with min:typ:max
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = #(1:2:3) b; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
 }  // namespace
