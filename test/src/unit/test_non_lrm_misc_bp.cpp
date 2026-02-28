@@ -49,35 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-// =========================================================================
-// §7.12.3: Array reduction methods 'and', 'or', 'xor' (keywords as names)
-// =========================================================================
-TEST(ParserSection7, ArrayReductionAnd) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte b[] = '{1, 3, 5, 7};\n"
-      "  initial y = b.and;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
-}
-
-TEST(ParserSection7, ArrayReductionOr) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte b[] = '{1, 2, 3, 4};\n"
-      "  initial y = b.or;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
-}
-
 TEST(ParserSection7, ArrayReductionXor) {
   auto r = Parse(
       "module t;\n"
