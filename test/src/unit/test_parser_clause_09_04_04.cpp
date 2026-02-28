@@ -58,4 +58,22 @@ TEST(ParserSection9, WaitSequenceTriggeredOr) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+// =============================================================================
+// LRM section 9.4.4 -- Level-sensitive sequence controls
+// Wait on sequence.triggered to synchronize with sequence end point.
+// =============================================================================
+TEST(ParserSection9c, WaitSequenceTriggeredWithAction) {
+  // After wait(seq.triggered), execute a procedural statement.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sequence req_ack;\n"
+              "    @(posedge clk) req ##[1:5] ack;\n"
+              "  endsequence\n"
+              "  initial begin\n"
+              "    wait(req_ack.triggered);\n"
+              "    $display(\"handshake complete\");\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
