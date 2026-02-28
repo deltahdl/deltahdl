@@ -74,4 +74,11 @@ TEST(ParserA212, LetPortItem_IntType) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetPortItem_BitType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(bit [7:0] x) = x;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
