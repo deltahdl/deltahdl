@@ -297,4 +297,15 @@ TEST(ParserA212, LetExpr_Nested) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetExpr_InConditional) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let valid(x) = x != 0;\n"
+              "  initial begin\n"
+              "    int a;\n"
+              "    if (valid(a)) a = 0;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

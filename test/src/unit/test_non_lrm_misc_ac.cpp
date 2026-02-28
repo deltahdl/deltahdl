@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetExpr_InConditional) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let valid(x) = x != 0;\n"
-              "  initial begin\n"
-              "    int a;\n"
-              "    if (valid(a)) a = 0;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // A.2.12 Production #7: let_list_of_arguments
 // let_list_of_arguments ::=
