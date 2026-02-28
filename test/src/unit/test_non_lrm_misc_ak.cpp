@@ -15,21 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
-  // §10.4.2: blocking with intra-assignment event
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin a = @(posedge clk) b; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_FALSE(stmt->events.empty());
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
 TEST(ParserA602, BlockingAssignment_WithRepeatEvent) {
   // §9.4.5: repeat(N) @(event) intra-assignment timing
   auto r = Parse(

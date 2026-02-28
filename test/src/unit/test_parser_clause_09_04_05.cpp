@@ -20,4 +20,27 @@ TEST(ParserA223, IntraAssignmentDelay) {
               "endmodule"));
 }
 
+// Return all statements from the first initial block's begin/end.
+static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  if (!item || !item->body) return {};
+  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
+  return {item->body};
+}
+
+TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
+  // §10.4.2: blocking with intra-assignment event
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = @(posedge clk) b; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_FALSE(stmt->events.empty());
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
