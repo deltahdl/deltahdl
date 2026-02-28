@@ -26,4 +26,17 @@ TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
   ASSERT_NE(ca, nullptr);
 }
 
+TEST(Lexical, ContAssign_NoDelay) {
+  auto r = ParseWithPreprocessor(
+      "module top;\n"
+      "  wire a, b;\n"
+      "  assign a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kContAssign) continue;
+    EXPECT_EQ(item->assign_delay, nullptr);
+  }
+}
+
 }  // namespace

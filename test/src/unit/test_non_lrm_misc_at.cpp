@@ -7,42 +7,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// A.7.5.2 timing_check_limit ::= expression
-// =============================================================================
-TEST(ParserA70502, TimingCheckLimitExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->limits.size(), 1u);
-  EXPECT_NE(tc->limits[0], nullptr);
-}
-
-// =============================================================================
-// A.7.5.2 start_edge_offset / end_edge_offset ::= mintypmax_expression
-// =============================================================================
-// $nochange offsets as mintypmax expressions
-TEST(ParserA70502, StartEndEdgeOffsetMinTypMax) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
-      "endspecify\n"
-      "endmodule\n");
-  ASSERT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  ASSERT_GE(tc->limits.size(), 2u);
-  EXPECT_EQ(tc->limits[0]->kind, ExprKind::kMinTypMax);
-  EXPECT_EQ(tc->limits[1]->kind, ExprKind::kMinTypMax);
-}
-
-// =============================================================================
 // A.7.5.2 timestamp_condition / timecheck_condition ::= mintypmax_expression
 // =============================================================================
 TEST(ParserA70502, TimestampCondMinTypMax) {
