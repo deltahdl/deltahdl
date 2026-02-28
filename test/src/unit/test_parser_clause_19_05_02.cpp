@@ -17,4 +17,18 @@ TEST(ParserA211, BinsOrOptions_DefaultSequence) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// §A.2.11 Production #12: trans_list
+// =============================================================================
+TEST(ParserA211, TransList_Single) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1 => 2);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
