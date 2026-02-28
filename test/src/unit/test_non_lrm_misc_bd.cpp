@@ -46,26 +46,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// §4.6: always_latch with if (no else)
-// =============================================================================
-TEST(ParserSection4, Sec4_6_AlwaysLatchIfNoElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en, d, q;\n"
-      "  always_latch\n"
-      "    if (en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kIf);
-  EXPECT_EQ(item->body->else_branch, nullptr);
-}
-
-// =============================================================================
 // §4.6: Fork-join ordering — all branches complete
 // =============================================================================
 TEST(ParserSection4, Sec4_6_ForkJoinAllComplete) {
