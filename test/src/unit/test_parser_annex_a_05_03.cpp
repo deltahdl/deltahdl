@@ -366,4 +366,38 @@ TEST(ParserAnnexA053, LevelSymbol_AllValues) {
   EXPECT_TRUE(udp->table[6].inputs[0] == 'B' || udp->table[6].inputs[0] == 'b');
 }
 
+// ---------------------------------------------------------------------------
+// Production 16: edge_symbol ::= r | R | f | F | p | P | n | N | *
+// ---------------------------------------------------------------------------
+// All edge symbols parsed
+TEST(ParserAnnexA053, EdgeSymbol_AllValues) {
+  auto r = Parse(
+      "primitive p(output reg q, input a);\n"
+      "  table\n"
+      "    r : ? : 1;\n"
+      "    R : ? : 1;\n"
+      "    f : ? : 0;\n"
+      "    F : ? : 0;\n"
+      "    p : ? : 1;\n"
+      "    P : ? : 1;\n"
+      "    n : ? : 0;\n"
+      "    N : ? : 0;\n"
+      "    * : ? : x;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->table.size(), 9);
+  EXPECT_EQ(udp->table[0].inputs[0], 'r');
+  EXPECT_TRUE(udp->table[1].inputs[0] == 'R' || udp->table[1].inputs[0] == 'r');
+  EXPECT_EQ(udp->table[2].inputs[0], 'f');
+  EXPECT_TRUE(udp->table[3].inputs[0] == 'F' || udp->table[3].inputs[0] == 'f');
+  EXPECT_EQ(udp->table[4].inputs[0], 'p');
+  EXPECT_TRUE(udp->table[5].inputs[0] == 'P' || udp->table[5].inputs[0] == 'p');
+  EXPECT_EQ(udp->table[6].inputs[0], 'n');
+  EXPECT_TRUE(udp->table[7].inputs[0] == 'N' || udp->table[7].inputs[0] == 'n');
+  EXPECT_EQ(udp->table[8].inputs[0], '*');
+}
+
 }  // namespace
