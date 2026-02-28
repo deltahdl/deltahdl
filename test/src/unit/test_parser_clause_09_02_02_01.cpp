@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §9.2.2.1: General purpose always procedure
 
 #include "fixture_parser.h"
 #include "simulator/udp_eval.h"
@@ -43,16 +43,21 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserA602, AlwaysConstruct_AlwaysComb) {
+// =============================================================================
+// A.6.2 Production: always_construct
+// always_construct ::= always_keyword statement
+// =============================================================================
+TEST(ParserA602, AlwaysConstruct_PlainAlways) {
   auto r = Parse(
       "module m;\n"
-      "  always_comb y = a & b;\n"
+      "  always @(posedge clk) q <= d;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
+  ASSERT_NE(item->body, nullptr);
 }
 
 }  // namespace
