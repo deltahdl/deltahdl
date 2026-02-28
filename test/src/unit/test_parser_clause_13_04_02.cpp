@@ -178,4 +178,28 @@ TEST(ParserSection4, Sec4_9_4_FuncNoExplicitLifetime) {
   EXPECT_EQ(fn->name, "adder");
 }
 
+// =============================================================================
+// 22. Mixed static and automatic functions in same module
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_MixedStaticAutoFuncsInModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int auto_fn(int x);\n"
+      "    return x + 1;\n"
+      "  endfunction\n"
+      "  function static int static_fn(int x);\n"
+      "    return x - 1;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+  auto* auto_fn = r.cu->modules[0]->items[0];
+  auto* static_fn = r.cu->modules[0]->items[1];
+  EXPECT_TRUE(auto_fn->is_automatic);
+  EXPECT_FALSE(auto_fn->is_static);
+  EXPECT_TRUE(static_fn->is_static);
+  EXPECT_FALSE(static_fn->is_automatic);
+}
+
 }  // namespace
