@@ -175,7 +175,6 @@ TEST(ParserA23, ListOfNetDeclAssignmentsWithUnpackedDim) {
   EXPECT_GE(count, 2);
 }
 
-};
 
 TEST(ParserA25, NetWithUnpackedDim) {
   auto r = Parse("module m; wire [7:0] bus [0:3]; endmodule\n");

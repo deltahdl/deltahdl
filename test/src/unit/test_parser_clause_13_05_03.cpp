@@ -21,7 +21,6 @@ TEST(ParserA23, ListOfTfVariableIdentifiersWithDefaults) {
   EXPECT_NE(item->func_args[1].default_value, nullptr);
 }
 
-};
 
 TEST(ParserA26, FuncBodyNewStyleWithDefaultValue) {
   auto r = Parse(

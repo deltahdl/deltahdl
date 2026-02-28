@@ -15,7 +15,6 @@ TEST(ParserA24, VarDeclAssignmentQueueDim) {
   EXPECT_EQ(item->name, "q");
 }
 
-};
 
 // ---------------------------------------------------------------------------
 // variable_dimension ::= unsized_dimension | unpacked_dimension

@@ -15,7 +15,6 @@ TEST(ParserA24, VarDeclAssignmentAssocArray) {
   EXPECT_EQ(item->name, "aa");
 }
 
-};
 
 TEST(ParserA25, AssocDimBuiltinType) {
   auto r = Parse("module m; int aa [string]; endmodule\n");

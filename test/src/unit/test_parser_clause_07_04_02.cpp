@@ -16,7 +16,6 @@ TEST(ParserA24, VarDeclAssignmentWithDims) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-};
 
 // =============================================================================
 // A.2.5 Declaration ranges

@@ -20,7 +20,6 @@ TEST(ParserA221, DataTypeOrVoidReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-};
 
 // =============================================================================
 // A.2.6 Function declarations

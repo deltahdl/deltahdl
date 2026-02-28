@@ -107,7 +107,6 @@ TEST(ParserA28, DataDeclMultiVarsInBlock) {
   EXPECT_EQ(body->stmts[2]->var_name, "c");
 }
 
-};
 
 TEST(ParserAnnexA, A2VarDeclWithInit) {
   auto r = Parse("module m; logic [7:0] data = 8'hFF; endmodule\n");
