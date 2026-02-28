@@ -78,4 +78,45 @@ TEST(ParserSection14, OverviewInputOutputSkews) {
   ASSERT_NE(item->clocking_signals[1].skew_delay, nullptr);
 }
 
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// 27. 1step is parsed as a special delay in clocking blocks (§14.4).
+//     Verify parsing succeeds and the text is "1step".
+TEST(ParserClause03, Cl3_14_3_1StepParsedInClockingBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #1step a;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* mod = r.cu->modules[0];
+  // Find the clocking declaration.
+  ModuleItem* clk_item = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kClockingBlock) {
+      clk_item = item;
+      break;
+    }
+  }
+  ASSERT_NE(clk_item, nullptr);
+}
+
 }  // namespace

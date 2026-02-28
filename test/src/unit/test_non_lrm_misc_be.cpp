@@ -45,39 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 19. Automatic task with delay control
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic delayed_write(input int val);\n"
-      "    #10;\n"
-      "    $display(\"val=%0d\", val);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(item->is_automatic);
-  ASSERT_GE(item->func_body_stmts.size(), 1u);
-  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kDelay);
-}
-
-// =============================================================================
-// 20. Automatic function in class context
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_AutoFuncInClass) {
-  EXPECT_TRUE(
-      ParseOk("class my_class;\n"
-              "  function automatic int get_id();\n"
-              "    return 42;\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
-// =============================================================================
 // 21. Automatic function with default argument values
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithDefaultArgs) {

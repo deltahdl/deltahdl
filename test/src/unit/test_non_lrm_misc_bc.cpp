@@ -77,29 +77,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 
 namespace {
 
-// 27. 1step is parsed as a special delay in clocking blocks (§14.4).
-//     Verify parsing succeeds and the text is "1step".
-TEST(ParserClause03, Cl3_14_3_1StepParsedInClockingBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #1step a;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* mod = r.cu->modules[0];
-  // Find the clocking declaration.
-  ModuleItem* clk_item = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kClockingBlock) {
-      clk_item = item;
-      break;
-    }
-  }
-  ASSERT_NE(clk_item, nullptr);
-}
-
 // 28. Single module with timeunit slash — precision arg is used.
 TEST(ParserClause03, Cl3_14_3_SingleModuleTimeunitSlash) {
   auto r = Parse(

@@ -126,4 +126,16 @@ TEST(ParserSection4, Sec4_9_3_RecursiveAutoFuncFibonacci) {
   EXPECT_NE(item->func_body_stmts[0]->else_branch, nullptr);
 }
 
+// =============================================================================
+// 20. Automatic function in class context
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_AutoFuncInClass) {
+  EXPECT_TRUE(
+      ParseOk("class my_class;\n"
+              "  function automatic int get_id();\n"
+              "    return 42;\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
 }  // namespace
