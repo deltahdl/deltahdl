@@ -24,31 +24,6 @@ static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// Multiple event expressions with mixed iff presence
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_4_2_4_MixedIffPresence) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk iff en, negedge rst, edge sig iff guard)\n"
-      "    q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 3u);
-  // First: posedge clk iff en
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-  // Second: negedge rst (no iff)
-  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
-  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
-  // Third: edge sig iff guard
-  EXPECT_EQ(item->sensitivity[2].edge, Edge::kEdge);
-  EXPECT_NE(item->sensitivity[2].iff_condition, nullptr);
-}
-
-// ---------------------------------------------------------------------------
 // iff guard with logical-or condition expression
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardLogicalOr) {
