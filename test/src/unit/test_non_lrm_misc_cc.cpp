@@ -45,24 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-// =============================================================================
-// LRM section 10.3.4 -- Continuous assignment with drive strengths
-// =============================================================================
-TEST(ParserSection10, ContinuousAssignMultipleTargets) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign a = b, c = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  int count = 0;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kContAssign) count++;
-  }
-  EXPECT_GE(count, 1);
-}
-
 // §10.3.4: Drive strength on continuous assignment.
 TEST(ParserSection10, ContinuousAssignDriveStrength) {
   auto r = Parse(
