@@ -305,4 +305,17 @@ TEST(ParserSection23, LoopGenerateForStructure) {
   EXPECT_FALSE(gen->gen_body.empty());
 }
 
+TEST(ParserSection23, LoopGenerateInlineGenvar) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i = i + 1) begin : g\n"
+      "    assign a[i] = b[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = FindItemByKind(r, ModuleItemKind::kGenerateFor);
+  ASSERT_NE(gen, nullptr);
+  EXPECT_NE(gen->gen_init, nullptr);
+}
+
 }  // namespace

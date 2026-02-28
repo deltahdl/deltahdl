@@ -224,4 +224,41 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFFSingleEdge) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
+// ---------------------------------------------------------------------------
+// iff guard on no-edge event at statement level with comparison
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardNoEdgeStmtComparison) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(data iff enable == 1) y = data;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// iff guard with unary negation in guard expression
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardUnaryNegation) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff !bypass) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  ASSERT_NE(item->sensitivity[0].iff_condition, nullptr);
+  EXPECT_EQ(item->sensitivity[0].iff_condition->kind, ExprKind::kUnary);
+}
+
 }  // namespace
