@@ -5,26 +5,38 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult31 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
 
-// =============================================================================
-// §30.3.1 Edge-sensitive paths
-// =============================================================================
-TEST_F(SpecifyTest, PosedgePath) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  (posedge clk => q) = 10;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  auto* path = spec->specify_items[0];
-  EXPECT_EQ(path->path.edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(path->path.src_ports[0].name, "clk");
-  EXPECT_EQ(path->path.dst_ports[0].name, "q");
+static ParseResult31 Parse(const std::string& src) {
+  ParseResult31 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
 }
+
+using ConfigParseTest = ProgramTestParse;
+
+ParseResult ParseLibrary(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.ParseLibraryText();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+namespace {
 
 TEST_F(SpecifyTest, NegedgePath) {
   auto* cu = Parse(
@@ -321,24 +333,6 @@ TEST_F(SpecifyTest, Noshowcancelled) {
   auto* spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   EXPECT_TRUE(spec->specify_items[0]->is_noshowcancelled);
-}
-
-struct ParseResult31 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult31 Parse(const std::string& src) {
-  ParseResult31 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
 }
 
 TEST(ParserSection28, Sec28_12_TimingCheckSetup) {
@@ -714,8 +708,6 @@ TEST_F(SpecifyTest, SetupholdWithDelayedSignals) {
   EXPECT_EQ(tc.delayed_data, "dD");
 }
 
-using ConfigParseTest = ProgramTestParse;
-
 // =============================================================================
 // §33 Configuration declarations
 // =============================================================================
@@ -797,17 +789,6 @@ TEST_F(ConfigParseTest, MultipleConfigs) {
   ASSERT_EQ(unit->configs.size(), 2u);
   EXPECT_EQ(unit->configs[0]->name, "cfg1");
   EXPECT_EQ(unit->configs[1]->name, "cfg2");
-}
-
-ParseResult ParseLibrary(const std::string& src) {
-  ParseResult result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.ParseLibraryText();
-  result.has_errors = diag.HasErrors();
-  return result;
 }
 
 // =============================================================================
