@@ -42,13 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, ComplexMixedExpressionParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial x = (a + b) * c - d / e % f;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection11, LiteralAsExpression) {
   auto r = Parse(
       "module t;\n"

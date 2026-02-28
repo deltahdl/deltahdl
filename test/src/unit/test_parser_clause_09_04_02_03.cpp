@@ -69,4 +69,26 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFF) {
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
 
+// ---------------------------------------------------------------------------
+// iff guard with begin-end body
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en) begin\n"
+      "    a <= b;\n"
+      "    c <= d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_GE(item->body->stmts.size(), 2u);
+}
+
 }  // namespace

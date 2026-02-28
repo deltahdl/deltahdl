@@ -171,4 +171,22 @@ TEST(ParserSection10, Sec10_4_2_TernaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
+// --- 11. Nonblocking in begin-end block ---
+TEST(ParserSection10, Sec10_4_2_InBeginEndBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d;\n"
+      "  initial begin\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_EQ(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
+}
+
 }  // namespace

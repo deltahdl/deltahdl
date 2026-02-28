@@ -39,4 +39,11 @@ TEST(ParserA86, BinaryPower) {
   EXPECT_EQ(rhs->op, TokenKind::kPower);
 }
 
+TEST(ParserSection11, ComplexMixedExpressionParses) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = (a + b) * c - d / e % f;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
