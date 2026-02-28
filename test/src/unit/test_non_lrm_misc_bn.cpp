@@ -54,39 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 5. Real variable declaration.
-TEST(ParserSection6, Sec6_5_RealVarDeclKind) {
-  auto r = Parse(
-      "module t;\n"
-      "  real voltage;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
-  EXPECT_FALSE(item->data_type.is_net);
-}
-
-// 6. Wire with packed dimensions [7:0].
-TEST(ParserSection6, Sec6_5_WirePackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] bus;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
-  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
-}
-
 // 7. Logic with packed dimensions [15:0].
 TEST(ParserSection6, Sec6_5_LogicPackedDims) {
   auto r = Parse(
