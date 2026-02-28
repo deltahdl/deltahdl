@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, EnableTerminal_PassEnableExpr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  rtranif0 (a, b, x ^ y);\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // A.3.3 Production #2: inout_terminal ::= net_lvalue
 // Exercised via pass switches (tran/rtran) and

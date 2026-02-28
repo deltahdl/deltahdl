@@ -65,4 +65,11 @@ TEST(ParserA303, EnableTerminal_PassEnableSwitch) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA303, EnableTerminal_PassEnableExpr) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rtranif0 (a, b, x ^ y);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
