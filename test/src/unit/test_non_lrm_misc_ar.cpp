@@ -21,26 +21,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA701, PulsestyleOneventMultipleOutputs) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    pulsestyle_onevent out1, out2, out3;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  auto* item = spec->specify_items[0];
-  EXPECT_EQ(item->kind, SpecifyItemKind::kPulsestyle);
-  EXPECT_FALSE(item->is_ondetect);
-  ASSERT_EQ(item->signal_list.size(), 3u);
-  EXPECT_EQ(item->signal_list[0], "out1");
-  EXPECT_EQ(item->signal_list[1], "out2");
-  EXPECT_EQ(item->signal_list[2], "out3");
-}
-
 TEST(ParserA701, PulsestyleOndetectSingleOutput) {
   auto r = Parse(
       "module m;\n"

@@ -49,22 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9, SequentialBlockVarDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int temp;\n"
-      "    temp = 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-}
-
 TEST(ParserSection9, SequentialBlockNestedBeginEnd) {
   auto r = Parse(
       "module m;\n"

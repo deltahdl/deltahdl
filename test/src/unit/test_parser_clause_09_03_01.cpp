@@ -483,4 +483,38 @@ TEST(ParserSection9, Sec9_3_1_BlockWithOnlyVarDecls) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
 }
 
+struct ParseResult9c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9c Parse(const std::string& src) {
+  ParseResult9c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection9, SequentialBlockVarDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int temp;\n"
+      "    temp = 42;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_GE(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+}
+
 }  // namespace
