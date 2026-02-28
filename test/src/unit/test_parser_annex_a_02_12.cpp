@@ -67,4 +67,11 @@ TEST(ParserA212, LetPortItem_TypedWithDefault) {
   EXPECT_NE(item->func_args[1].default_value, nullptr);
 }
 
+TEST(ParserA212, LetPortItem_IntType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(int a, int b) = a * b;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
