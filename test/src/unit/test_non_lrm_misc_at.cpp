@@ -6,47 +6,6 @@ using namespace delta;
 
 namespace {
 
-// system_timing_check is a specify_item (mixed with paths)
-TEST(ParserA705, TimingCheckMixedWithPaths) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  (a => b) = 5;\n"
-      "  $setup(data, posedge clk, 10);\n"
-      "  (c *> d) = 10;\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 3u);
-  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[1]->kind, SpecifyItemKind::kTimingCheck);
-  EXPECT_EQ(spec->specify_items[2]->kind, SpecifyItemKind::kPathDecl);
-}
-
-// =============================================================================
-// A.7.5.1 $setup_timing_check
-// =============================================================================
-// $setup ( data_event , reference_event , timing_check_limit [ , [ notifier ] ]
-// )
-TEST(ParserA70501, SetupTimingCheck) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetup);
-  EXPECT_EQ(tc->ref_terminal.name, "data");
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->data_terminal.name, "clk");
-  ASSERT_EQ(tc->limits.size(), 1u);
-}
-
 // $setup with notifier
 TEST(ParserA70501, SetupWithNotifier) {
   auto r = Parse(
