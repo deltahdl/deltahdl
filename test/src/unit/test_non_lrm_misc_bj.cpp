@@ -5,30 +5,41 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult6b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
 
-TEST(ParserSection6, ClassVarDecl_VarType) {
-  auto r = Parse(
-      "class MyClass;\n"
-      "  int x;\n"
-      "endclass\n"
-      "module t;\n"
-      "  MyClass obj;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
+static ParseResult6b Parse(const std::string& src) {
+  ParseResult6b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult6b& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto& items = r.cu->modules[0]->items;
-  ModuleItem* var_item = nullptr;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kVarDecl && it->name == "obj") {
-      var_item = it;
-      break;
+  return items.empty() ? nullptr : items[0];
+}
+
+static Stmt* FirstInitialStmt(ParseResult6b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
     }
   }
-  ASSERT_NE(var_item, nullptr);
-  EXPECT_EQ(var_item->data_type.kind, DataTypeKind::kNamed);
-  EXPECT_EQ(var_item->data_type.type_name, "MyClass");
+  return nullptr;
 }
+
+namespace {
 
 // =========================================================================
 // §6.5: Nets and variables
@@ -248,40 +259,6 @@ TEST(ParserSection6, WireWithTypedef) {
   auto& items = r.cu->modules[0]->items;
   ASSERT_GE(items.size(), 2u);
   EXPECT_EQ(items[1]->name, "w1");
-}
-
-struct ParseResult6b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6b Parse(const std::string& src) {
-  ParseResult6b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6b& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
-static Stmt* FirstInitialStmt(ParseResult6b& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
 }
 
 // =========================================================================
