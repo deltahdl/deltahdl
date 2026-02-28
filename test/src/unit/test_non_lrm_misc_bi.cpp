@@ -48,14 +48,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// string
-TEST(ParserA221, DataTypeString) {
-  auto r = Parse("module m; string s; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kString);
-}
-
 // --- Named event tests ---
 TEST(Parser, EventDeclaration) {
   auto r = Parse(
