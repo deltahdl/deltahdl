@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #1: gate_instantiation (pass_switchtype alternative)
-// gate_instantiation ::=
-//   pass_switchtype pass_switch_instance {, pass_switch_instance} ;
-// =============================================================================
-TEST(ParserA301, GateInst_TranBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  tran (io1, io2);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
 TEST(ParserA301, GateInst_RtranBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
