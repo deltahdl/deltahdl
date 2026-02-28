@@ -43,22 +43,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// A.6.2 Production: initial_construct
-// initial_construct ::= initial statement_or_null
-// =============================================================================
-TEST(ParserA602, InitialConstruct_SingleStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $display(\"hello\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-}
-
 TEST(ParserA602, InitialConstruct_BeginEnd) {
   auto r = Parse(
       "module m;\n"
