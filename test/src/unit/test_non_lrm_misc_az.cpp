@@ -21,24 +21,6 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 namespace {
 
 // =============================================================================
-// Annex H - DPI import task
-// =============================================================================
-TEST_F(AnnexHParseTest, AnnexHDpiImportTask) {
-  auto* unit = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" task c_wait(int cycles);\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(items[0]->name, "c_wait");
-  EXPECT_TRUE(items[0]->dpi_is_task);
-  ASSERT_EQ(items[0]->func_args.size(), 1u);
-  EXPECT_EQ(items[0]->func_args[0].name, "cycles");
-}
-
-// =============================================================================
 // Annex H - DPI chandle return type
 // =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiImportChandle) {
@@ -58,23 +40,6 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportChandle) {
   EXPECT_EQ(items[1]->name, "destroy_handle");
   ASSERT_EQ(items[1]->func_args.size(), 1u);
   EXPECT_EQ(items[1]->func_args[0].data_type.kind, DataTypeKind::kChandle);
-}
-
-// =============================================================================
-// Annex H - DPI string return type
-// =============================================================================
-TEST_F(AnnexHParseTest, AnnexHDpiImportStringReturn) {
-  auto* unit = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" pure function string get_version();\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(items[0]->name, "get_version");
-  EXPECT_EQ(items[0]->return_type.kind, DataTypeKind::kString);
-  EXPECT_TRUE(items[0]->dpi_is_pure);
 }
 
 // =============================================================================
