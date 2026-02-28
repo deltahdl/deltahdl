@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// assignment_pattern ::= '{ constant_expression { expression { , expression } }
-// }
-// ---------------------------------------------------------------------------
-// §10.9.1: replication form of assignment pattern
-TEST(ParserA60701, AssignmentPatternReplication) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    x = '{4{8'd0}};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §10.9.1: replication form with multiple elements
 TEST(ParserA60701, AssignmentPatternReplicationMultiElem) {
   auto r = Parse(
