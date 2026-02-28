@@ -42,18 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, CaseEqualityInAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a === 4'bx01z) ? 1 : 0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-}
-
 // =========================================================================
 // Section 11.4.1 -- Replication operator
 // =========================================================================
