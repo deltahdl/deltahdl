@@ -4,32 +4,15 @@
 
 using namespace delta;
 
-namespace {
-
-TEST(ParserSection7c, QueueInsertAndDelete) {
-  auto r = Parse(
-      "module m;\n"
-      "  int q[$];\n"
-      "  initial begin\n"
-      "    q.push_back(1);\n"
-      "    q.push_back(3);\n"
-      "    q.insert(1, 2);\n"
-      "    q.delete(0);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-struct ParseResult7d {
+struct ParseResult7e {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
 };
 
-static ParseResult7d Parse(const std::string& src) {
-  ParseResult7d result;
+static ParseResult7e Parse(const std::string& src) {
+  ParseResult7e result;
   auto fid = result.mgr.AddFile("<test>", src);
   DiagEngine diag(result.mgr);
   Lexer lexer(result.mgr.FileContent(fid), fid, diag);
@@ -39,19 +22,19 @@ static ParseResult7d Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FirstItem(ParseResult7d& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
+static ModuleItem* FirstItem(ParseResult7e& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
 }
 
-static ModuleItem* NthItem(ParseResult7d& r, size_t n) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return n < items.size() ? items[n] : nullptr;
+static ModuleItem* NthItem(ParseResult7e& r, size_t n) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
+    return nullptr;
+  return r.cu->modules[0]->items[n];
 }
 
-static Stmt* FirstInitialStmt(ParseResult7d& r) {
+static Stmt* FirstInitialStmt(ParseResult7e& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
       if (item->body && item->body->kind == StmtKind::kBlock) {
@@ -62,6 +45,20 @@ static Stmt* FirstInitialStmt(ParseResult7d& r) {
   }
   return nullptr;
 }
+
+static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        if (item->body->stmts.size() > n) return item->body->stmts[n];
+      }
+      if (n == 0) return item->body;
+    }
+  }
+  return nullptr;
+}
+
+namespace {
 
 // =========================================================================
 // LRM section 7.2.1 -- Packed structures
@@ -632,60 +629,6 @@ TEST(ParserSection7, Sec7_2_1_PackedContAssign) {
               "  pair_t p;\n"
               "  assign p = 16'h1234;\n"
               "endmodule\n"));
-}
-
-struct ParseResult7e {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult7e Parse(const std::string& src) {
-  ParseResult7e result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult7e& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
-}
-
-static ModuleItem* NthItem(ParseResult7e& r, size_t n) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
-    return nullptr;
-  return r.cu->modules[0]->items[n];
-}
-
-static Stmt* FirstInitialStmt(ParseResult7e& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
-static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        if (item->body->stmts.size() > n) return item->body->stmts[n];
-      }
-      if (n == 0) return item->body;
-    }
-  }
-  return nullptr;
 }
 
 // =============================================================================

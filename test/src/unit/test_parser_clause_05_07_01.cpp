@@ -18,4 +18,15 @@ TEST(ParserA87, OctalDigitAll) {
   EXPECT_EQ(rhs->int_val, 01234567u);
 }
 
+// § hex_digit — 0-9, a-f, A-F
+TEST(ParserA87, HexDigitLowercase) {
+  auto r =
+      Parse("module m; logic [23:0] x; initial x = 24'habcdef; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->int_val, 0xABCDEFu);
+}
+
 }  // namespace
