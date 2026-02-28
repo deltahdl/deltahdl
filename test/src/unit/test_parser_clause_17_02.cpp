@@ -66,4 +66,21 @@ TEST_F(CheckerParseTest, CheckerWithEmptyParenPorts) {
   EXPECT_TRUE(unit->checkers[0]->ports.empty());
 }
 
+// =============================================================================
+// §17.3 Checker body with properties and sequences
+// =============================================================================
+TEST_F(CheckerParseTest, CheckerWithPropertyDecl) {
+  auto* unit = Parse(R"(
+    checker prop_check(input logic clk, input logic a, input logic b);
+      property p1;
+        a |-> b;
+      endproperty
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_FALSE(unit->checkers[0]->items.empty());
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kPropertyDecl));
+}
+
 }  // namespace

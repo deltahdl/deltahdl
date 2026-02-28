@@ -17,23 +17,6 @@ static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// §17.3 Checker body with properties and sequences
-// =============================================================================
-TEST_F(CheckerParseTest, CheckerWithPropertyDecl) {
-  auto* unit = Parse(R"(
-    checker prop_check(input logic clk, input logic a, input logic b);
-      property p1;
-        a |-> b;
-      endproperty
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_FALSE(unit->checkers[0]->items.empty());
-  EXPECT_TRUE(
-      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kPropertyDecl));
-}
-
 TEST_F(CheckerParseTest, CheckerWithSequenceDecl) {
   auto* unit = Parse(R"(
     checker seq_check(input logic clk, input logic a);
