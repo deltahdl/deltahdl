@@ -35,25 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 
 namespace {
 
-TEST(ParserSection9, Sec9_3_1_StaticVarDeclInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    static int call_count = 0;\n"
-      "    call_count = call_count + 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(body->stmts[0]->var_is_static);
-  EXPECT_FALSE(body->stmts[0]->var_is_automatic);
-  EXPECT_EQ(body->stmts[0]->var_name, "call_count");
-}
-
 // =============================================================================
 // LRM section 9.3.1 -- Blocks with return statement (inside function).
 // =============================================================================

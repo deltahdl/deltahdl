@@ -316,4 +316,24 @@ TEST(ParserSection9, Sec9_4_5_RepeatBareSignal) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
+// =============================================================================
+// LRM section 9.4.5 -- Repeat count is a variable
+// =============================================================================
+// Repeat count is a variable: a = repeat(n) @(posedge clk) b;
+TEST(ParserSection9, Sec9_4_5_RepeatCountVariable) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  int n;\n"
+      "  initial a = repeat(n) @(posedge clk) b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
