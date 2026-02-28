@@ -170,4 +170,20 @@ TEST(ParserClause03, Cl3_12_1_CuScopeCannotBeImported) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
+// 12. CU scope identifiers not accessible via hierarchical references.
+// Hierarchical names start from $root (§23.3.1), not from CU scope.
+// Verify that a hierarchical reference in a module parses correctly.
+TEST(ParserClause03, Cl3_12_1_HierRefFromCUScope) {
+  auto r = ParseWithPreprocessor(
+      "module top;\n"
+      "  module_a u1();\n"
+      "endmodule\n"
+      "module module_a;\n"
+      "  logic sig;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 2u);
+}
+
 }  // namespace

@@ -51,4 +51,16 @@ TEST_F(SpecifyTest, PathDelayWithRiseFall) {
   EXPECT_EQ(delays.size(), 2u);
 }
 
+TEST_F(SpecifyTest, PathDelayThreeValues) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (a => b) = (2, 3, 4);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items[0]->path.delays.size(), 3u);
+}
+
 }  // namespace

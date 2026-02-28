@@ -532,4 +532,22 @@ TEST(ParserSection4, Sec4_5_MultipleNonblockingAssigns) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
+// --- 25. Nonblocking with complex expression (shift and mask) ---
+TEST(ParserSection10, Sec10_4_2_ComplexExpressionRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] q, data;\n"
+      "  initial begin\n"
+      "    q <= (data << 2) | 8'h03;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
+}
+
 }  // namespace

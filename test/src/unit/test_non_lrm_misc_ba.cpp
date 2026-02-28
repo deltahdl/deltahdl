@@ -21,22 +21,6 @@ static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// 12. CU scope identifiers not accessible via hierarchical references.
-// Hierarchical names start from $root (§23.3.1), not from CU scope.
-// Verify that a hierarchical reference in a module parses correctly.
-TEST(ParserClause03, Cl3_12_1_HierRefFromCUScope) {
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  module_a u1();\n"
-      "endmodule\n"
-      "module module_a;\n"
-      "  logic sig;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 2u);
-}
-
 // 13. CU allows type sharing without packages (§3.12.1 last paragraph).
 // Users can share types across a CU without declaring a package.
 // Top-level typedef is parsed as a module item (discarded at top level
