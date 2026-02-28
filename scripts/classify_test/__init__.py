@@ -50,7 +50,6 @@ from ._split import (
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
-
 @dataclass
 class TestBlock:
     """A single TEST/TEST_F/TEST_P block with classification metadata."""
@@ -881,7 +880,6 @@ def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
     content = generate_file(clause, title, parsed, staying)
     filepath.write_text(content, encoding="utf-8")
     return len(staying)
-
 
 
 def _validate_input(filepath, test_name):
