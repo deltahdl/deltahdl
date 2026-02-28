@@ -368,4 +368,52 @@ TEST(ParserSection9, Sec9_2_2_PartSelectLHS) {
   EXPECT_NE(item->body->lhs->index_end, nullptr);
 }
 
+struct ParseResult11f {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static Expr* FirstAssignLhs(ParseResult11f& r) {
+  auto* stmt = FirstInitialStmt(r);
+  if (!stmt) return nullptr;
+  return stmt->lhs;
+}
+
+// --- Part-select on LHS of blocking assignment ---
+TEST(ParserSection11, Sec11_4_1_PartSelectOnLhsBlocking) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [15:0] vec;\n"
+      "  initial vec[7:0] = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* lhs = FirstAssignLhs(r);
+  ASSERT_NE(lhs, nullptr);
+  EXPECT_EQ(lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(lhs->index, nullptr);
+  ASSERT_NE(lhs->index_end, nullptr);
+  EXPECT_FALSE(lhs->is_part_select_plus);
+  EXPECT_FALSE(lhs->is_part_select_minus);
+}
+
+// --- Indexed part-select on LHS ---
+TEST(ParserSection11, Sec11_4_1_IndexedPartSelectOnLhs) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [31:0] vec;\n"
+      "  initial vec[i +: 4] = 4'hA;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* lhs = FirstAssignLhs(r);
+  ASSERT_NE(lhs, nullptr);
+  EXPECT_EQ(lhs->kind, ExprKind::kSelect);
+  EXPECT_TRUE(lhs->is_part_select_plus);
+  ASSERT_NE(lhs->index, nullptr);
+  ASSERT_NE(lhs->index_end, nullptr);
+}
+
 }  // namespace

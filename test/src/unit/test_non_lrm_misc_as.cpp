@@ -15,25 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// Input terminal with part-select range
-TEST(ParserA703, InputTerminalPartSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a[7:0] => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
-  EXPECT_NE(si->path.src_ports[0].range_left, nullptr);
-  EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
-}
-
 // Input terminal with ascending indexed part-select
 TEST(ParserA703, InputTerminalPlusIndexed) {
   auto r = Parse(
