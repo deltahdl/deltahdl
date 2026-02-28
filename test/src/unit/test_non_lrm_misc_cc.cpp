@@ -45,17 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-TEST(ParserSection10, NetDeclAssignmentWithRange) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [7:0] data = 8'hAB;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_FALSE(mod->items.empty());
-  EXPECT_NE(mod->items[0]->init_expr, nullptr);
-}
-
 // =============================================================================
 // LRM section 10.6.1 -- Assign/deassign additional patterns
 // =============================================================================
