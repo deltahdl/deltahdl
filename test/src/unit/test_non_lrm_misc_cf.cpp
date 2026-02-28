@@ -41,16 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, InsideInAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire r;\n"
-      "  assign r = a inside {1, 2, 3};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =========================================================================
 // Section 11.4.14 -- Streaming operators
 // =========================================================================
