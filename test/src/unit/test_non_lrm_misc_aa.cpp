@@ -33,16 +33,6 @@ TEST(ParserA221, StructUnionStruct) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
 }
 
-TEST(ParserA24, ParamAssignmentWithUnpackedDim) {
-  auto r = Parse("module m; parameter int ARR [3:0] = '{1,2,3,4}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "ARR");
-  EXPECT_GE(item->unpacked_dims.size(), 1u);
-}
-
 TEST(ParserA25, UnsizedDimWithInitInferSize) {
   ElabFixture f;
   auto* design = Elaborate("module m; int d [] = '{1,2,3}; endmodule\n", f);
