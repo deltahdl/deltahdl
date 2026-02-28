@@ -238,4 +238,16 @@ TEST(ParserA302, PulldownStrength_SinglePull0) {
   EXPECT_EQ(g->drive_strength1, 0u);  // none
 }
 
+TEST(ParserA302, PulldownStrength_SingleHighz0) {
+  auto r = Parse(
+      "module m;\n"
+      "  pulldown (highz0) pd1(out);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPulldown);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->drive_strength0, 1u);  // highz0
+  EXPECT_EQ(g->drive_strength1, 0u);  // none
+}
+
 }  // namespace
