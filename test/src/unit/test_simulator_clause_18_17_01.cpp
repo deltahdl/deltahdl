@@ -1,8 +1,8 @@
 // §18.17.1: Random production weights
 
 
-#include "simulation/lowerer.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 

@@ -1,6 +1,6 @@
 // §31.3: Timing checks using a stability window
 
-#include "simulation/specify.h"
+#include "simulator/specify.h"
 #include "fixture_specify.h"
 
 namespace {

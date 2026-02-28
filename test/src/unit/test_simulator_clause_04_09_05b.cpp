@@ -3,8 +3,8 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
-#include "simulation/net.h"
-#include "simulation/variable.h"
+#include "simulator/net.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 

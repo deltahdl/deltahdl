@@ -1,7 +1,7 @@
 // §11.4.6: Wildcard equality operators
 
-#include "simulation/eval.h"
-#include "simulation/eval_array.h"
+#include "simulator/eval.h"
+#include "simulator/eval_array.h"
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"

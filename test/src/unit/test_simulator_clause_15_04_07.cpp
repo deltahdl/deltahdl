@@ -5,12 +5,12 @@
 #include <cstdint>
 #include <string_view>
 
-#include "simulation/awaiters.h"
-#include "simulation/exec_task.h"
-#include "simulation/process.h"
-#include "simulation/stmt_exec.h"
-#include "simulation/stmt_result.h"
-#include "simulation/sync_objects.h"
+#include "simulator/awaiters.h"
+#include "simulator/exec_task.h"
+#include "simulator/process.h"
+#include "simulator/stmt_exec.h"
+#include "simulator/stmt_result.h"
+#include "simulator/sync_objects.h"
 #include "fixture_simulator.h"
 
 namespace {

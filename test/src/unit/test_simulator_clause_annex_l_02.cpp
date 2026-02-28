@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "vpi/vpi_compatibility.h"
+#include "simulator/vpi_compatibility.h"
 
 namespace {
 

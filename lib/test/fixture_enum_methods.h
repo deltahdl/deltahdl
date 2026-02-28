@@ -9,9 +9,9 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
-#include "simulation/eval.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
+#include "simulator/eval.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
 
 #include <gtest/gtest.h>
 

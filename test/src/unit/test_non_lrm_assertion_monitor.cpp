@@ -7,8 +7,8 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "simulation/assertion.h"
-#include "simulation/sim_context.h"
+#include "simulator/assertion.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 

@@ -1,7 +1,7 @@
 // §11.4.3: Arithmetic operators
 
 #include "parser/ast.h"
-#include "simulation/eval.h"
+#include "simulator/eval.h"
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"

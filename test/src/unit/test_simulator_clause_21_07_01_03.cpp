@@ -1,6 +1,6 @@
 // §21.7.1.3: $dumpoff / $dumpon
 
-#include "simulation/vcd_writer.h"
+#include "simulator/vcd_writer.h"
 #include "fixture_vcd.h"
 
 namespace delta {

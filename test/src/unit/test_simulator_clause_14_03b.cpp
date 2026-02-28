@@ -6,8 +6,8 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
-#include "simulation/clocking.h"
-#include "simulation/sim_context.h"
+#include "simulator/clocking.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 

@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "simulation/process.h"
+#include "simulator/process.h"
 
 using namespace delta;
 

@@ -5,8 +5,8 @@
 
 #include "common/types.h"
 #include "parser/ast.h"
-#include "simulation/clocking.h"
-#include "simulation/variable.h"
+#include "simulator/clocking.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"

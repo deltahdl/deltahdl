@@ -4,12 +4,12 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "simulation/adv_sim.h"
-#include "simulation/compiled_sim.h"
-#include "simulation/mt_sim.h"
-#include "simulation/process.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
+#include "simulator/adv_sim.h"
+#include "simulator/compiled_sim.h"
+#include "simulator/mt_sim.h"
+#include "simulator/process.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
 #include "fixture_lexer.h"
 #include "fixture_parser.h"
 

@@ -1,9 +1,9 @@
 // §6.14: Chandle data type
 
 
-#include "simulation/lowerer.h"
-#include "simulation/net.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/net.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 

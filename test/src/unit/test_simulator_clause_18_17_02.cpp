@@ -1,8 +1,8 @@
 // §18.17.2: if–else production statements
 
 
-#include "simulation/lowerer.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 

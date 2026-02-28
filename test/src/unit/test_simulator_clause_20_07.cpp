@@ -1,7 +1,7 @@
 // §20.7: Array query functions
 
 #include "parser/ast.h"
-#include "simulation/eval.h"
+#include "simulator/eval.h"
 
 #include "fixture_simulator.h"
 #include "builders_systask.h"

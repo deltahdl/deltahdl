@@ -2,8 +2,8 @@
 
 
 #include "common/types.h"
-#include "elaboration/sensitivity.h"
-#include "elaboration/type_eval.h"
+#include "elaborator/sensitivity.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 
 #include "fixture_elaborator.h"

@@ -1,8 +1,8 @@
 // §7.4.5: Indexing and slicing of arrays
 
 #include "parser/ast.h"
-#include "simulation/eval.h"
-#include "simulation/eval_array.h"
+#include "simulator/eval.h"
+#include "simulator/eval_array.h"
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"

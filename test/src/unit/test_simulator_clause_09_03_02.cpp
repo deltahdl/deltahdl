@@ -1,9 +1,9 @@
 // §9.3.2: Parallel blocks
 
 
-#include "simulation/lowerer.h"
-#include "simulation/net.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/net.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"

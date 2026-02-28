@@ -3,7 +3,7 @@
 #include <string>
 
 #include "fixture_parser.h"
-#include "elaboration/const_eval.h"
+#include "elaborator/const_eval.h"
 
 using namespace delta;
 

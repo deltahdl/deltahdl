@@ -1,6 +1,6 @@
 // §30.5: Assigning delays to module paths
 
-#include "simulation/specify.h"
+#include "simulator/specify.h"
 
 #include "fixture_specify.h"
 

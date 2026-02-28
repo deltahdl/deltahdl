@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-#include "simulation/assertion.h"
+#include "simulator/assertion.h"
 
 #include "fixture_simulator.h"
 

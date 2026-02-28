@@ -7,7 +7,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "simulation/adv_sim.h"
+#include "simulator/adv_sim.h"
 
 using namespace delta;
 

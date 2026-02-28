@@ -2,7 +2,7 @@
 
 
 #include "common/types.h"
-#include "simulation/clocking.h"
+#include "simulator/clocking.h"
 
 #include "fixture_simulator.h"
 

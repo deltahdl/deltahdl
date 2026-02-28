@@ -2,8 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include "simulation/sdf_parser.h"
-#include "simulation/specify.h"
+#include "simulator/sdf_parser.h"
+#include "simulator/specify.h"
 
 using namespace delta;
 

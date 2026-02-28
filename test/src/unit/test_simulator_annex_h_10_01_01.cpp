@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "simulation/dpi_runtime.h"
+#include "simulator/dpi_runtime.h"
 
 using namespace delta;
 

@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "synthesis/mem_infer.h"
+#include "synthesizer/mem_infer.h"
 
 #include "fixture_synthesizer.h"
 

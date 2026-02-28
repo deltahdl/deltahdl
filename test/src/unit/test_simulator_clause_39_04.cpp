@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "simulation/dpi_runtime.h"
-#include "vpi/sv_vpi_user.h"
+#include "simulator/dpi_runtime.h"
+#include "simulator/sv_vpi_user.h"
 
 using namespace delta;
 

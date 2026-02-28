@@ -1,8 +1,8 @@
 // §21.2.1.2: Size of displayed data
 
 
-#include "simulation/lowerer.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 

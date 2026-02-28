@@ -1,8 +1,8 @@
 // §30.7.4.2: Negative pulse detection
 
 
-#include "simulation/lowerer.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 

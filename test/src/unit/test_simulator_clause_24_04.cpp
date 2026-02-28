@@ -5,9 +5,9 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "simulation/process.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
+#include "simulator/process.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 

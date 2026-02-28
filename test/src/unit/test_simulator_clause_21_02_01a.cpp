@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "simulation/eval.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 

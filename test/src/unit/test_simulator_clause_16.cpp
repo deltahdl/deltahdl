@@ -8,9 +8,9 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
-#include "simulation/sva_engine.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
+#include "simulator/sva_engine.h"
 
 using namespace delta;
 

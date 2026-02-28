@@ -6,9 +6,9 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "simulation/net.h"
-#include "simulation/sim_context.h"
-#include "simulation/vpi.h"
+#include "simulator/net.h"
+#include "simulator/sim_context.h"
+#include "simulator/vpi.h"
 
 namespace delta {
 namespace {

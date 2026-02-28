@@ -2,9 +2,9 @@
 
 #include <gtest/gtest.h>
 
-#include "synthesis/adv_synth.h"
-#include "synthesis/aig.h"
-#include "synthesis/aig_opt.h"
+#include "synthesizer/adv_synth.h"
+#include "synthesizer/aig.h"
+#include "synthesizer/aig_opt.h"
 
 using namespace delta;
 

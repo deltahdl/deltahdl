@@ -6,8 +6,8 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
-#include "simulation/compiled_sim.h"
-#include "simulation/sim_context.h"
+#include "simulator/compiled_sim.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 

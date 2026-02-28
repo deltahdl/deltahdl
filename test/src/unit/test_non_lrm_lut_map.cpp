@@ -4,9 +4,9 @@
 
 #include <cstdint>
 
-#include "synthesis/adv_synth.h"
-#include "synthesis/aig.h"
-#include "synthesis/lut_map.h"
+#include "synthesizer/adv_synth.h"
+#include "synthesizer/aig.h"
+#include "synthesizer/lut_map.h"
 
 using namespace delta;
 

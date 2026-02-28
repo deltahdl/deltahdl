@@ -1,8 +1,8 @@
 // §12.3: Syntax
 
 
-#include "simulation/lowerer.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"

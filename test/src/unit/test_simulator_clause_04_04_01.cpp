@@ -4,8 +4,8 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "simulation/process.h"
-#include "simulation/scheduler.h"
+#include "simulator/process.h"
+#include "simulator/scheduler.h"
 
 #include "helpers_scheduler_event.h"
 

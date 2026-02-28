@@ -1,0 +1,151 @@
+#pragma once
+
+#include <coroutine>
+#include <cstdint>
+#include <string_view>
+#include <vector>
+
+#include "common/types.h"
+#include "parser/ast.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
+#include "simulator/variable.h"
+
+namespace delta {
+
+// Awaiter for #N delay control. Suspends the coroutine and schedules a
+// wakeup event at current_time + delay_ticks. For #0, targets the
+// Inactive region per IEEE 1800-2023 §4.5.
+struct DelayAwaiter {
+  SimContext& ctx;
+  uint64_t delay_ticks;
+
+  bool await_ready() const noexcept { return false; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    auto time = ctx.CurrentTime() + SimTime{delay_ticks};
+    auto region = SelectDelayRegion();
+    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+    event->callback = [h]() mutable { h.resume(); };
+    ctx.GetScheduler().ScheduleEvent(time, region, event);
+  }
+
+  Region SelectDelayRegion() const {
+    if (delay_ticks != 0) return Region::kActive;
+    return ctx.IsReactiveContext() ? Region::kReInactive : Region::kInactive;
+  }
+
+  void await_resume() const noexcept {}
+};
+
+// Awaiter for @(posedge/negedge/any-change) event control. Suspends the
+// coroutine until the specified edge condition is detected on any of the
+// watched signals.
+struct EventAwaiter {
+  SimContext& ctx;
+  const std::vector<EventExpr>& events;
+
+  bool await_ready() const noexcept { return false; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    for (const auto& ev : events) {
+      if (!ev.signal || ev.signal->kind != ExprKind::kIdentifier) continue;
+      auto* var = ctx.FindVariable(ev.signal->text);
+      if (!var) continue;
+      // Named events: resume unconditionally on trigger (no edge check).
+      if (var->is_event) {
+        var->AddWatcher([h]() mutable {
+          h.resume();
+          return true;
+        });
+        continue;
+      }
+      var->prev_value = var->value;
+      Edge edge = ev.edge;
+      var->AddWatcher([h, var, edge]() mutable {
+        if (!CheckEdge(var, edge)) {
+          var->prev_value = var->value;
+          return false;  // Keep watcher; edge not detected.
+        }
+        h.resume();
+        return true;
+      });
+    }
+  }
+
+  void await_resume() const noexcept {}
+
+  static bool CheckEdge(const Variable* var, Edge edge) {
+    uint64_t prev = var->prev_value.ToUint64();
+    uint64_t cur = var->value.ToUint64();
+    if (edge == Edge::kPosedge) return (prev & 1) == 0 && (cur & 1) == 1;
+    if (edge == Edge::kNegedge) return (prev & 1) == 1 && (cur & 1) == 0;
+    return prev != cur;  // any change
+  }
+};
+
+// Awaiter for named event wait (@ev). Suspends the coroutine until the
+// event variable is triggered via ->ev (NotifyWatchers). No edge check;
+// resumes unconditionally on trigger.
+struct NamedEventAwaiter {
+  SimContext& ctx;
+  std::string_view event_name;
+
+  bool await_ready() const noexcept { return false; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    auto* var = ctx.FindVariable(event_name);
+    if (!var) return;
+    var->AddWatcher([h]() mutable {
+      h.resume();
+      return true;
+    });
+  }
+
+  void await_resume() const noexcept {}
+};
+
+// Awaiter that watches a set of variables and resumes on any value change.
+// Used for always_comb sensitivity inference.
+struct AnyChangeAwaiter {
+  SimContext& ctx;
+  const std::vector<std::string_view>& var_names;
+
+  bool await_ready() const noexcept { return false; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    for (auto name : var_names) {
+      auto* var = ctx.FindVariable(name);
+      if (!var) continue;
+      var->prev_value = var->value;
+      var->AddWatcher([h]() mutable {
+        h.resume();
+        return true;
+      });
+    }
+  }
+
+  void await_resume() const noexcept {}
+};
+
+// Shared state for fork/join synchronization.
+struct ForkJoinState {
+  uint32_t remaining = 0;
+  std::coroutine_handle<> parent;
+  bool join_any = false;
+  bool resumed = false;
+};
+
+// Awaiter for fork/join and fork/join_any. Suspends the parent coroutine
+// until all (join) or any (join_any) children complete.
+struct ForkJoinAwaiter {
+  ForkJoinState* state;
+
+  bool await_ready() const noexcept { return state->remaining == 0; }
+
+  void await_suspend(std::coroutine_handle<> h) noexcept { state->parent = h; }
+
+  void await_resume() const noexcept {}
+};
+
+}  // namespace delta

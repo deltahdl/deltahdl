@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "parser/ast.h"
-#include "simulation/dpi.h"
-#include "simulation/eval.h"
+#include "simulator/dpi.h"
+#include "simulator/eval.h"
 
 #include "fixture_simulator.h"
 

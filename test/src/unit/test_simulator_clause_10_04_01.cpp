@@ -1,7 +1,7 @@
 // §10.4.1: Blocking procedural assignments
 
-#include "simulation/lowerer.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"

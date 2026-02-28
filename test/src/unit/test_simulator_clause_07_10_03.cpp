@@ -1,7 +1,7 @@
 // §7.10.3: Persistence of references to elements of a queue
 
 #include "parser/ast.h"
-#include "simulation/eval.h"
+#include "simulator/eval.h"
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"

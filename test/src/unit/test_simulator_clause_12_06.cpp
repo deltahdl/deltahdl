@@ -1,8 +1,8 @@
 // §12.6: Pattern matching conditional statements
 
 #include "parser/ast.h"
-#include "simulation/eval.h"
-#include "simulation/eval_array.h"
+#include "simulator/eval.h"
+#include "simulator/eval_array.h"
 
 #include "fixture_simulator.h"
 

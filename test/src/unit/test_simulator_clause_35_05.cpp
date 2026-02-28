@@ -9,9 +9,9 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "parser/ast.h"
-#include "simulation/dpi.h"
-#include "simulation/eval.h"
-#include "simulation/sim_context.h"
+#include "simulator/dpi.h"
+#include "simulator/eval.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 

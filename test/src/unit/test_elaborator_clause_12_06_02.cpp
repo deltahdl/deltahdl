@@ -1,10 +1,10 @@
 // §12.6.2: Pattern matching in if statements
 
 
-#include "simulation/lowerer.h"
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 

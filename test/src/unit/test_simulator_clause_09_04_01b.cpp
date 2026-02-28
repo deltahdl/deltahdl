@@ -1,9 +1,9 @@
 // §9.4.1: Delay control
 
 
-#include "simulation/lowerer.h"
-#include "simulation/net.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/net.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 

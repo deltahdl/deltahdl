@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "simulation/scheduler.h"
+#include "simulator/scheduler.h"
 
 using namespace delta;
 

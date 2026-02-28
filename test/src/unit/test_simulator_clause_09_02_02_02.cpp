@@ -1,8 +1,8 @@
 // §9.2.2.2: Combinational logic always_comb procedure
 
-#include "simulation/lowerer.h"
-#include "simulation/net.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/net.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"

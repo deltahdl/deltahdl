@@ -4,7 +4,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "simulation/scheduler.h"
+#include "simulator/scheduler.h"
 
 using namespace delta;
 

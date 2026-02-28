@@ -1,7 +1,7 @@
 // §20.16: Programmable logic array modeling system tasks
 
 #include "parser/ast.h"
-#include "simulation/eval.h"
+#include "simulator/eval.h"
 
 #include "fixture_simulator.h"
 #include "builders_systask.h"

@@ -2,8 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include "synthesis/aig.h"
-#include "synthesis/synth_lower.h"
+#include "synthesizer/aig.h"
+#include "synthesizer/synth_lower.h"
 #include "fixture_synthesizer.h"
 
 using namespace delta;

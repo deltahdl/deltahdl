@@ -1,8 +1,8 @@
 // §20.13: Coverage system functions
 
 #include "parser/ast.h"
-#include "simulation/coverage.h"
-#include "simulation/eval.h"
+#include "simulator/coverage.h"
+#include "simulator/eval.h"
 
 #include "fixture_simulator.h"
 #include "builders_systask.h"

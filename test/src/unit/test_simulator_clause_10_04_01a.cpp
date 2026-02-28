@@ -2,7 +2,7 @@
 
 
 #include "parser/ast.h"
-#include "simulation/compiled_sim.h"
+#include "simulator/compiled_sim.h"
 
 #include "fixture_simulator.h"
 

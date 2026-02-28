@@ -1,7 +1,7 @@
 // §32: (MSB) is reserved to represent a file descriptor (fd) returned from the
 // SystemVerilog $fopen system
 
-#include "simulation/specify.h"
+#include "simulator/specify.h"
 #include "fixture_specify.h"
 
 namespace {

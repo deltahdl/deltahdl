@@ -1,7 +1,7 @@
 // §21.7.2.2: Formats of variable values
 
-#include "simulation/variable.h"
-#include "simulation/vcd_writer.h"
+#include "simulator/variable.h"
+#include "simulator/vcd_writer.h"
 #include "fixture_vcd.h"
 
 namespace delta {

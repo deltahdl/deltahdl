@@ -1,8 +1,8 @@
 // §7.10: Queues
 
 
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 
 #include "fixture_elaborator.h"
 

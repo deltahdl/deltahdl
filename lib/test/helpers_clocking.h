@@ -5,7 +5,7 @@
 #include <cstdint>
 
 #include "fixture_simulator.h"
-#include "simulation/clocking.h"
+#include "simulator/clocking.h"
 
 using namespace delta;
 

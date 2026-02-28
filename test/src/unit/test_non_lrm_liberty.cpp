@@ -4,7 +4,7 @@
 
 #include <string_view>
 
-#include "synthesis/liberty.h"
+#include "synthesizer/liberty.h"
 
 using namespace delta;
 

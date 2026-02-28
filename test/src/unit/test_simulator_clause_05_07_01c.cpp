@@ -5,8 +5,8 @@
 
 #include "lexer/token.h"
 #include "parser/ast.h"
-#include "simulation/eval.h"
-#include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulator/eval.h"
+#include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
 #include "fixture_simulator.h"
 

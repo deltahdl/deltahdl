@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-#include "simulation/sv_callable.h"
+#include "simulator/sv_callable.h"
 
 using namespace delta;
 

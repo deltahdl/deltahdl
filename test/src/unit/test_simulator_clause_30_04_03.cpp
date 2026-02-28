@@ -1,8 +1,8 @@
 // §30.4.3: Edge-sensitive paths
 
 
-#include "simulation/lowerer.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 

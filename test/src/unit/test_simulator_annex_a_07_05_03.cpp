@@ -1,9 +1,9 @@
 // Annex A.7.5.3: System timing check event definitions
 
 
-#include "simulation/lowerer.h"
-#include "simulation/specify.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/specify.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 

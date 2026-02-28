@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "simulation/coverage.h"
+#include "simulator/coverage.h"
 
 #include "helpers_coverage.h"
 

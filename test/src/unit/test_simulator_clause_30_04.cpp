@@ -1,6 +1,6 @@
 // §30.4: Module path declarations
 
-#include "simulation/specify.h"
+#include "simulator/specify.h"
 
 #include "fixture_simulator.h"
 #include "fixture_specify.h"

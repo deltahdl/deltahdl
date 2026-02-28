@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "simulation/coverage.h"
+#include "simulator/coverage.h"
 
 using namespace delta;
 

@@ -1,7 +1,7 @@
 // §21.7.2.3: Description of keyword commands
 
-#include "simulation/variable.h"
-#include "simulation/vcd_writer.h"
+#include "simulator/variable.h"
+#include "simulator/vcd_writer.h"
 #include "fixture_vcd.h"
 
 namespace delta {

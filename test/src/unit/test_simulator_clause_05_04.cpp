@@ -1,6 +1,6 @@
 
 #include "preprocessor/preprocessor.h"
-#include "simulation/variable.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"

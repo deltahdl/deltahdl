@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "simulation/vpi.h"
+#include "simulator/vpi.h"
 
 namespace delta {
 namespace {

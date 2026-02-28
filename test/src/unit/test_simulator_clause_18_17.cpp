@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "simulation/constraint_solver.h"
+#include "simulator/constraint_solver.h"
 
 #include "fixture_simulator.h"
 

@@ -3,8 +3,8 @@
 
 #include <cstdint>
 
-#include "simulation/assertion.h"
-#include "simulation/eval.h"
+#include "simulator/assertion.h"
+#include "simulator/eval.h"
 
 #include "fixture_simulator.h"
 

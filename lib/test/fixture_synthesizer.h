@@ -7,8 +7,8 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 

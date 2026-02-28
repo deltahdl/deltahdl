@@ -4,8 +4,8 @@
 
 #include <string>
 
-#include "synthesis/aig.h"
-#include "synthesis/netlist_writer.h"
+#include "synthesizer/aig.h"
+#include "synthesizer/netlist_writer.h"
 
 using namespace delta;
 

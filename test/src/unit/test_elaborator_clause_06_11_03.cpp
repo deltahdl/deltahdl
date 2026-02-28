@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "elaboration/type_eval.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
 using namespace delta;

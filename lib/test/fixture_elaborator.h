@@ -2,8 +2,8 @@
 
 #include "fixture_parser.h"
 
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "preprocessor/preprocessor.h"
 
 struct ElabFixture {

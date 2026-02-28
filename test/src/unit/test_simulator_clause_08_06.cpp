@@ -1,8 +1,8 @@
 // §8.6: Object methods
 
 #include "parser/ast.h"
-#include "simulation/class_object.h"
-#include "simulation/eval.h"
+#include "simulator/class_object.h"
+#include "simulator/eval.h"
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"

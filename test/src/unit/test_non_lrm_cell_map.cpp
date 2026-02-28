@@ -4,9 +4,9 @@
 
 #include <string>
 
-#include "synthesis/aig.h"
-#include "synthesis/cell_map.h"
-#include "synthesis/liberty.h"
+#include "synthesizer/aig.h"
+#include "synthesizer/cell_map.h"
+#include "synthesizer/liberty.h"
 
 using namespace delta;
 

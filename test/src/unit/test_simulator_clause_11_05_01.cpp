@@ -1,8 +1,8 @@
 // §11.5.1: Vector bit-select and part-select addressing
 
 #include "parser/ast.h"
-#include "simulation/eval.h"
-#include "simulation/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulator/eval.h"
+#include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"

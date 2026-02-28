@@ -1,7 +1,7 @@
 
-#include "simulation/lowerer.h"
-#include "simulation/process.h"
-#include "simulation/variable.h"
+#include "simulator/lowerer.h"
+#include "simulator/process.h"
+#include "simulator/variable.h"
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"

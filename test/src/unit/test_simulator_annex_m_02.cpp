@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "vpi/sv_vpi_user.h"
+#include "simulator/sv_vpi_user.h"
 
 namespace {
 

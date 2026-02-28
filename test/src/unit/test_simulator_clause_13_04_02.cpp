@@ -1,7 +1,7 @@
 // §13.4.2: Static and automatic functions
 
 #include "parser/ast.h"
-#include "simulation/eval.h"
+#include "simulator/eval.h"
 
 #include "fixture_simulator.h"
 #include "builders_ast.h"

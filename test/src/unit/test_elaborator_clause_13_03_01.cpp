@@ -1,8 +1,8 @@
 // §13.3.1: Static and automatic tasks
 
 
-#include "elaboration/elaborator.h"
-#include "elaboration/rtlir.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 
 #include "fixture_elaborator.h"
 

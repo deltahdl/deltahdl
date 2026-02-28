@@ -1,8 +1,8 @@
 // §8.25: Parameterized classes
 
 #include "parser/ast.h"
-#include "simulation/class_object.h"
-#include "simulation/eval.h"
+#include "simulator/class_object.h"
+#include "simulator/eval.h"
 
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"

@@ -2,8 +2,8 @@
 
 #include "fixture_elaborator.h"
 
-#include "simulation/scheduler.h"
-#include "simulation/sim_context.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
 
 struct SimFixture {
   SourceManager mgr;
