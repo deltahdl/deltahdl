@@ -59,4 +59,31 @@ TEST(ParserAnnexA053, EdgeIndicator_EdgeSymbol) {
   EXPECT_EQ(udp->table[0].inputs[1], 'r');
 }
 
+// Simulation: parenthesized edge (01) behaves as rising edge
+TEST(ParserAnnexA053, EdgeIndicator_SimParen01) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  initial q = 0;\n"
+      "  table\n"
+      "    0 (01) : ? : 0;\n"
+      "    1 (01) : ? : 1;\n"
+      "    ? (10) : ? : -;\n"
+      "    ? (0x) : ? : -;\n"
+      "    ? (x1) : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* udp = r.cu->udps[0];
+  UdpEvalState eval(*udp);
+  EXPECT_EQ(eval.GetOutput(), '0');
+  // Rising edge with d=1 -> output=1
+  eval.SetInputs({'1', '0'});
+  EXPECT_EQ(eval.EvaluateWithEdge({'1', '1'}, 1, '0'), '1');
+  // Falling edge -> no change
+  EXPECT_EQ(eval.EvaluateWithEdge({'1', '0'}, 1, '1'), '1');
+  // Rising edge with d=0 -> output=0
+  eval.SetInputs({'0', '0'});
+  EXPECT_EQ(eval.EvaluateWithEdge({'0', '1'}, 1, '0'), '0');
+}
+
 }  // namespace
