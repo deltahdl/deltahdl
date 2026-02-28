@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, InputTerminal_TernaryExpr) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  xor (out, sel ? a : b, c);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, InputTerminal_BitSelect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

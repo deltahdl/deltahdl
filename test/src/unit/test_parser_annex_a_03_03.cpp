@@ -129,4 +129,11 @@ TEST(ParserA303, InputTerminal_ComplexExpr) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, InputTerminal_TernaryExpr) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  xor (out, sel ? a : b, c);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
