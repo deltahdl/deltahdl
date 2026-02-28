@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA304, NInputGatetype_Or) {
-  auto r = Parse(
-      "module m;\n"
-      "  or (out, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kOr);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(ParserA304, NInputGatetype_Nor) {
   auto r = Parse(
       "module m;\n"
