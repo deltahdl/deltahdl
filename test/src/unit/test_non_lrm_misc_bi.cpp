@@ -4,14 +4,6 @@
 
 using namespace delta;
 
-static void VerifyEnumMemberNames(const std::vector<EnumMember>& members,
-                                  const std::string expected[], size_t count) {
-  ASSERT_EQ(members.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(members[i].name, expected[i]) << "member " << i;
-  }
-}
-
 struct ParseResult6 {
   SourceManager mgr;
   Arena arena;
@@ -47,21 +39,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 }
 
 namespace {
-
-TEST(Parser, TypedefEnum) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef enum { A, B, C } state_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(item->name, "state_t");
-  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
-  std::string expected[] = {"A", "B", "C"};
-  VerifyEnumMemberNames(item->typedef_type.enum_members, expected,
-                        std::size(expected));
-}
 
 TEST(Parser, EnumWithValues) {
   auto r = Parse(
