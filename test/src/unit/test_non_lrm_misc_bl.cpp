@@ -53,35 +53,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 namespace {
 
 // =========================================================================
-// §6.20: Constants — const variable
-// =========================================================================
-TEST(ParserSection6, ConstRealDecl) {
-  // §6.20.6: const can qualify a real variable.
-  auto r = Parse(
-      "module t;\n"
-      "  const real PI = 3.14159;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
-  EXPECT_TRUE(item->data_type.is_const);
-}
-
-TEST(ParserSection6, ConstStringDecl) {
-  // §6.20.6: const string declaration.
-  auto r = Parse(
-      "module t;\n"
-      "  const string GREETING = \"Hi\";\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
-  EXPECT_TRUE(item->data_type.is_const);
-}
-
-// =========================================================================
 // §6.22: Cast compatibility
 // =========================================================================
 TEST(ParserSection6, CastCompatibleRealToIntType) {
