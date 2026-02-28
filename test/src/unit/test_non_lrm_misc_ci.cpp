@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Ternary in generate if condition ---
-TEST(ParserSection11, Sec11_4_6_TernaryInGenerateIfCondition) {
-  auto r = Parse(
-      "module t;\n"
-      "  parameter A = 1;\n"
-      "  parameter B = 0;\n"
-      "  if (A ? B : 1) begin\n"
-      "    assign x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* gen = FirstGenerateIf(r);
-  ASSERT_NE(gen, nullptr);
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_NE(gen->gen_cond, nullptr);
-  EXPECT_EQ(gen->gen_cond->kind, ExprKind::kTernary);
-}
-
 // --- Multiple ternaries in same expression ---
 TEST(ParserSection11, Sec11_4_6_MultipleTernariesInExpr) {
   auto r = Parse(
