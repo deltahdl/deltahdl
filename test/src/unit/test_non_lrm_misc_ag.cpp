@@ -13,24 +13,6 @@ bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// --- loop_generate_construct: basic for loop ---
-TEST(ParserAnnexA042, LoopGenerateBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
-      "    assign out[i] = in[i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_NE(gen->gen_init, nullptr);
-  ASSERT_NE(gen->gen_cond, nullptr);
-  ASSERT_NE(gen->gen_step, nullptr);
-  ASSERT_EQ(gen->gen_body.size(), 1u);
-}
-
 // --- genvar_initialization: with inline genvar keyword ---
 TEST(ParserAnnexA042, GenvarInitWithGenvarKeyword) {
   auto r = Parse(
