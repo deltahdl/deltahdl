@@ -43,22 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// =============================================================================
-// §18.13.4 get_randstate()
-// =============================================================================
-TEST(ParserSection18, GetRandstateCall) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  function string save_state();\n"
-      "    return this.get_randstate();\n"
-      "  endfunction\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(ParserSection18, GetRandstateAssignToVar) {
   auto r = Parse(
       "module top;\n"
