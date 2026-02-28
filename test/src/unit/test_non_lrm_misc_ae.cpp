@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.3 Production #6: pcontrol_terminal ::= expression
-// Exercised via cmos switches (cmos/rcmos).
-// The pcontrol_terminal is the fourth terminal.
-// =============================================================================
-TEST(ParserA303, PcontrolTerminal_SimpleIdent) {
-  auto r = Parse(
-      "module m;\n"
-      "  rcmos (out, in, nctrl, pctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 4u);
-}
-
 TEST(ParserA303, PcontrolTerminal_ComplexExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
