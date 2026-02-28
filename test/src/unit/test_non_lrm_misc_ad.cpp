@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_PulldownNamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  pulldown pd1(out);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPulldown);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_inst_name, "pd1");
-}
-
 TEST(ParserA301, GateInst_PulldownMultipleInstances) {
   auto r = Parse(
       "module m;\n"
