@@ -50,31 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Production 14: output_symbol ::= 0 | 1 | x | X
-// ---------------------------------------------------------------------------
-// All four output_symbol values in combinational entries
-TEST(ParserAnnexA053, OutputSymbol_AllFour) {
-  auto r = Parse(
-      "primitive p(output y, input a, b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 1;\n"
-      "    1 0 : x;\n"
-      "    1 1 : X;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->table.size(), 4);
-  EXPECT_EQ(udp->table[0].output, '0');
-  EXPECT_EQ(udp->table[1].output, '1');
-  EXPECT_EQ(udp->table[2].output, 'x');
-  // 'X' is stored as-is by UdpCharFromToken (first char)
-  EXPECT_TRUE(udp->table[3].output == 'X' || udp->table[3].output == 'x');
-}
-
 // Simulation: output_symbol values
 TEST(ParserAnnexA053, OutputSymbol_SimValues) {
   auto r = Parse(

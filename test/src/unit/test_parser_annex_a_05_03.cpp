@@ -284,4 +284,56 @@ TEST(ParserAnnexA053, NextState_X) {
   EXPECT_EQ(r.cu->udps[0]->table[0].output, 'x');
 }
 
+static std::vector<ModuleItem*> FindUdpInsts(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> insts;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
+  }
+  return insts;
+}
+
+static std::vector<ModuleItem*> FindContAssigns(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
+  }
+  return result;
+}
+
+static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
+                                          ModuleItemKind kind) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == kind) result.push_back(item);
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Production 14: output_symbol ::= 0 | 1 | x | X
+// ---------------------------------------------------------------------------
+// All four output_symbol values in combinational entries
+TEST(ParserAnnexA053, OutputSymbol_AllFour) {
+  auto r = Parse(
+      "primitive p(output y, input a, b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 1;\n"
+      "    1 0 : x;\n"
+      "    1 1 : X;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->table.size(), 4);
+  EXPECT_EQ(udp->table[0].output, '0');
+  EXPECT_EQ(udp->table[1].output, '1');
+  EXPECT_EQ(udp->table[2].output, 'x');
+  // 'X' is stored as-is by UdpCharFromToken (first char)
+  EXPECT_TRUE(udp->table[3].output == 'X' || udp->table[3].output == 'x');
+}
+
 }  // namespace
