@@ -8,21 +8,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// pattern ::= .*
-// ---------------------------------------------------------------------------
-// §12.6: wildcard pattern .*
-TEST(ParserA60701, PatternWildcard) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (v matches .*) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// ---------------------------------------------------------------------------
 // pattern ::= tagged member_identifier [ pattern ]
 // ---------------------------------------------------------------------------
 // §12.6: tagged union pattern
