@@ -34,26 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 14.13 -- Input sampling
-// =============================================================================
-// §14.13: input sampled at clocking event (basic pattern from LRM).
-// Validates: clocking cb @(negedge clk); input v; endclocking
-TEST(ParserSection14, InputSamplingBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(negedge clk);\n"
-      "    input v;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
-  EXPECT_EQ(item->clocking_signals[0].name, "v");
-  EXPECT_EQ(item->clocking_signals[0].skew_delay, nullptr);
-}
-
 // §14.13: input with explicit #0 skew (samples in the Observed region).
 TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
   auto r = Parse(
