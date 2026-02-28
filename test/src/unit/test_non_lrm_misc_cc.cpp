@@ -45,17 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-TEST(ParserSection10, AssignmentPatternStruct) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct { int x; int y; } point_t;\n"
-      "  point_t p = '{x: 1, y: 2};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_GE(mod->items.size(), 2u);
-}
-
 TEST(ParserSection10, AssignmentPatternTypePrefixed) {
   auto r = Parse(
       "module m;\n"

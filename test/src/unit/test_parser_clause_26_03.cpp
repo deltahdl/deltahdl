@@ -135,4 +135,17 @@ TEST(ParserSection26, ModuleMultipleImports) {
   EXPECT_EQ(import_count, 2u);
 }
 
+// =============================================================================
+// A.8.4 Primaries — class_qualifier
+// =============================================================================
+// § class_qualifier — class_scope
+TEST(ParserA84, ClassQualifierScope) {
+  auto r = Parse("module m; initial x = pkg::my_const; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
+}
+
 }  // namespace

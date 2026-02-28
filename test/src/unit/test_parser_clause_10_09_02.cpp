@@ -32,4 +32,33 @@ TEST(ParserA60701, PatternAssignmentNamed) {
   EXPECT_FALSE(r.has_errors);
 }
 
+struct ParseResult10b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult10b Parse(const std::string& src) {
+  ParseResult10b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection10, AssignmentPatternStruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { int x; int y; } point_t;\n"
+      "  point_t p = '{x: 1, y: 2};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 2u);
+}
+
 }  // namespace
