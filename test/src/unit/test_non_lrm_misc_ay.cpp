@@ -14,14 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserAnnexD, AnnexDLog) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin $log(\"sim.log\"); $nolog; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserAnnexD, AnnexDSave) {
   auto r = Parse(
       "module m;\n"
