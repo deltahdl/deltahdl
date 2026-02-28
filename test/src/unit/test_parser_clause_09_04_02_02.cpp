@@ -387,4 +387,23 @@ TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarParenEventIsStarTrue) {
   VerifyStarEventControl(r);
 }
 
+// @* in initial block (statement-level event control)
+TEST(ParserSection9, Sec9_4_2_3_AtStarInInitialBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial @* a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kInitialBlock);
+  auto* stmt = item->body;
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_TRUE(stmt->is_star_event);
+  EXPECT_TRUE(stmt->events.empty());
+}
+
 }  // namespace
