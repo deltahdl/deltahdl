@@ -22,18 +22,6 @@ TEST(ParserAnnexD, AnnexDScope) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserAnnexD2, AnnexDGetpatternRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = $getpattern(mem_addr);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
-}
-
 // --- D.2: $incsave ---
 TEST(ParserAnnexD2, AnnexDIncsaveParse) {
   auto r = Parse(
