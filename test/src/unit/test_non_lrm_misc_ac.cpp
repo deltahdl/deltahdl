@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetArgs_ExprInArgs) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let f(x, y) = x + y;\n"
-              "  initial begin\n"
-              "    int a, b, z;\n"
-              "    z = f(a * 2, b + 1);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // A.2.12 Production #8: let_actual_arg
 // let_actual_arg ::= expression

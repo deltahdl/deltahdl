@@ -372,4 +372,15 @@ TEST(ParserA212, LetArgs_AllNamed) {
               "endmodule\n"));
 }
 
+TEST(ParserA212, LetArgs_ExprInArgs) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(x, y) = x + y;\n"
+              "  initial begin\n"
+              "    int a, b, z;\n"
+              "    z = f(a * 2, b + 1);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
