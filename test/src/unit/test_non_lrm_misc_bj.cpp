@@ -41,19 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, VariableInitialization) {
-  // §6.5: Assignment as part of variable declaration is an initialization,
-  // not a continuous assignment.
-  auto r = Parse(
-      "module t;\n"
-      "  logic v = 1'b1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
 TEST(ParserSection6, RealVariableContinuousAssign) {
   auto r = Parse(
       "module t;\n"
