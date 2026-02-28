@@ -232,4 +232,22 @@ TEST(ParserSection23, GenerateBlockNamedBeginEnd) {
   EXPECT_TRUE(found);
 }
 
+TEST(Parser, GenerateFor) {
+  auto r = Parse(
+      "module t;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin\n"
+      "    assign a[i] = b[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor);
+  ASSERT_NE(gen, nullptr);
+  EXPECT_NE(gen->gen_init, nullptr);
+  EXPECT_NE(gen->gen_cond, nullptr);
+  EXPECT_NE(gen->gen_step, nullptr);
+  EXPECT_FALSE(gen->gen_body.empty());
+}
+
 }  // namespace
