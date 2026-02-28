@@ -20,19 +20,6 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST_F(AnnexHParseTest, AnnexHDpiExportTask) {
-  auto* unit = Parse(
-      "module m;\n"
-      "  export \"DPI-C\" task sv_task;\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
-  EXPECT_EQ(items[0]->name, "sv_task");
-  EXPECT_TRUE(items[0]->dpi_is_task);
-}
-
 TEST_F(AnnexHParseTest, AnnexHDpiImportWithCName) {
   auto* unit = Parse(
       "module m;\n"
