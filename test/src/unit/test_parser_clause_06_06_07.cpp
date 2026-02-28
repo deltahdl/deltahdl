@@ -248,4 +248,12 @@ TEST(ParserA213, DataDeclNettypeDeclaration) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
 }
 
+// §6.6.7: Nettype with real data type.
+TEST(ParserSection6, Sec6_6_7_NettypeWithRealType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype real real_net;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

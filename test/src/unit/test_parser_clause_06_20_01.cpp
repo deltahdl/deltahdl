@@ -55,4 +55,13 @@ TEST(SourceText, ParamPortMixedForms) {
   EXPECT_EQ(r.cu->modules[0]->params[3].first, "C");
 }
 
+TEST(ParserA83, ParamExprBinaryOp) {
+  auto r = Parse(
+      "module m #(parameter int P = 2 * 8);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->params[0].second->kind, ExprKind::kBinary);
+}
+
 }  // namespace

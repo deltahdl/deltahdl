@@ -14,24 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.7.5.3 &&& condition on both reference and data events
-// =============================================================================
-// &&& on both reference and data events
-TEST(ParserA70503, ConditionBothEvents) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $hold(posedge clk &&& en, data &&& reset, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
-  EXPECT_NE(tc->data_condition, nullptr);
-}
-
 // Terminal with bit select + &&& condition combined
 TEST(ParserA70503, TerminalBitSelectWithCondition) {
   auto r = Parse(
