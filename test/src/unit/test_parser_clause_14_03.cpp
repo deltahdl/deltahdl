@@ -125,4 +125,72 @@ TEST(ParserA611, ListOfClockingDeclAssignSingle) {
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
+struct ParseResult21 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult21 Parse(const std::string& src) {
+  ParseResult21 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// Full LRM example: bus clocking block with default skew,
+// hierarchical expression, per-signal overrides, and 1step.
+TEST(ParserSection19, FullExample_BusClockingBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  clocking bus @(posedge clock1);\n"
+      "    default input #10ns output #2ns;\n"
+      "    input data, ready, enable = top.mem1.enable;\n"
+      "    output negedge ack;\n"
+      "    input #1step addr;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_EQ(item->name, "bus");
+  // Note: default skew is parsed but not stored in the AST.
+  ASSERT_EQ(item->clocking_signals.size(), 5u);
+
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
+  EXPECT_EQ(item->clocking_signals[1].name, "ready");
+  EXPECT_EQ(item->clocking_signals[1].direction, Direction::kInput);
+  EXPECT_EQ(item->clocking_signals[2].name, "enable");
+  EXPECT_EQ(item->clocking_signals[2].direction, Direction::kInput);
+  ASSERT_NE(item->clocking_signals[2].hier_expr, nullptr);
+  EXPECT_EQ(item->clocking_signals[3].name, "ack");
+  EXPECT_EQ(item->clocking_signals[3].direction, Direction::kOutput);
+  EXPECT_EQ(item->clocking_signals[3].skew_edge, Edge::kNegedge);
+  EXPECT_EQ(item->clocking_signals[4].name, "addr");
+  EXPECT_EQ(item->clocking_signals[4].direction, Direction::kInput);
+}
+
+// =============================================================================
+// A.6.11 list_of_clocking_decl_assign — multiple comma-separated signals
+// =============================================================================
+TEST(ParserA611, ListOfClockingDeclAssignMultiple) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input a, b, c;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 3u);
+  EXPECT_EQ(item->clocking_signals[0].name, "a");
+  EXPECT_EQ(item->clocking_signals[1].name, "b");
+  EXPECT_EQ(item->clocking_signals[2].name, "c");
+}
+
 }  // namespace

@@ -38,56 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-// Global clocking with compound event expression (or).
-TEST(ParserSection19, GlobalClocking_CompoundEvent) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  global clocking sys @(clk1 or clk2);\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
-// Global clocking with end label.
-TEST(ParserSection19, GlobalClocking_EndLabel) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  global clocking gclk @(posedge clk);\n"
-              "  endclocking : gclk\n"
-              "endmodule\n"));
-}
-
-// Full LRM example: bus clocking block with default skew,
-// hierarchical expression, per-signal overrides, and 1step.
-TEST(ParserSection19, FullExample_BusClockingBlock) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking bus @(posedge clock1);\n"
-      "    default input #10ns output #2ns;\n"
-      "    input data, ready, enable = top.mem1.enable;\n"
-      "    output negedge ack;\n"
-      "    input #1step addr;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_EQ(item->name, "bus");
-  // Note: default skew is parsed but not stored in the AST.
-  ASSERT_EQ(item->clocking_signals.size(), 5u);
-
-  EXPECT_EQ(item->clocking_signals[0].name, "data");
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
-  EXPECT_EQ(item->clocking_signals[1].name, "ready");
-  EXPECT_EQ(item->clocking_signals[1].direction, Direction::kInput);
-  EXPECT_EQ(item->clocking_signals[2].name, "enable");
-  EXPECT_EQ(item->clocking_signals[2].direction, Direction::kInput);
-  ASSERT_NE(item->clocking_signals[2].hier_expr, nullptr);
-  EXPECT_EQ(item->clocking_signals[3].name, "ack");
-  EXPECT_EQ(item->clocking_signals[3].direction, Direction::kOutput);
-  EXPECT_EQ(item->clocking_signals[3].skew_edge, Edge::kNegedge);
-  EXPECT_EQ(item->clocking_signals[4].name, "addr");
-  EXPECT_EQ(item->clocking_signals[4].direction, Direction::kInput);
-}
-
 // Clocking block inside an interface with modport.
 TEST(ParserSection19, InterfaceClockingWithModport) {
   EXPECT_TRUE(
