@@ -69,4 +69,25 @@ TEST(ParserAnnexA042, ElaborationGenerateCase) {
   EXPECT_TRUE(found_bus1);
 }
 
+// --- Elaborator resolves case_generate_construct (default branch) ---
+TEST(ParserAnnexA042, ElaborationGenerateCaseDefault) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter SEL = 99) ();\n"
+      "  case (SEL)\n"
+      "    0: logic [7:0] bus0;\n"
+      "    1: logic [15:0] bus1;\n"
+      "    default: logic [31:0] bus_def;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  bool found_def = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "bus_def") found_def = true;
+  }
+  EXPECT_TRUE(found_def);
+}
+
 }  // namespace
