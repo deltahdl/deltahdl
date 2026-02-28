@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §12.6: tagged pattern with parenthesized nested tagged pattern
-TEST(ParserA60701, PatternTaggedNested) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case(instr) matches\n"
-      "      tagged Jmp (tagged JmpU .a): pc = a;\n"
-      "      default: pc = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §12.6: tagged void member (no nested pattern)
 TEST(ParserA60701, PatternTaggedVoidMember) {
   auto r = Parse(

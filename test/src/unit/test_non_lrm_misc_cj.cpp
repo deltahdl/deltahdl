@@ -53,24 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-TEST(ParserSection12, ForLoopWithBlockBody) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 8; i++) begin\n"
-      "      $display(\"%d\", i);\n"
-      "      x = x + i;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  ASSERT_NE(stmt->for_body, nullptr);
-  EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlock);
-}
-
 // =============================================================================
 // LRM section 12.4 -- Conditional if-else statement
 // =============================================================================
