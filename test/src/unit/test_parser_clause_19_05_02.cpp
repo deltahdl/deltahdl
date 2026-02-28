@@ -128,4 +128,15 @@ TEST(ParserA211, TransItem_SingleValue) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, TransItem_MultipleValues) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins t = (1, 2, 3 => 4, 5);\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, TransItem_MultipleValues) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      bins t = (1, 2, 3 => 4, 5);\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // §A.2.11 Production #16: repeat_range
 // =============================================================================
