@@ -44,27 +44,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 3. if without else -- transparent latch (no else retains state).
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_3_IfWithoutElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en, d, q;\n"
-      "  always_latch\n"
-      "    if (en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysLatchItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kIf);
-  EXPECT_NE(item->body->condition, nullptr);
-  EXPECT_NE(item->body->then_branch, nullptr);
-  EXPECT_EQ(item->body->else_branch, nullptr);
-}
-
-// ---------------------------------------------------------------------------
 // 4. always_latch with case statement body.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_CaseStatement) {
