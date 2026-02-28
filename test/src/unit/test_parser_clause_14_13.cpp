@@ -43,4 +43,21 @@ TEST(ParserSection14, InputSamplingBasic) {
   EXPECT_EQ(item->clocking_signals[0].skew_delay, nullptr);
 }
 
+// §14.13: input with explicit #0 skew (samples in the Observed region).
+TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #0 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  auto& sig = item->clocking_signals[0];
+  EXPECT_EQ(sig.direction, Direction::kInput);
+  ASSERT_NE(sig.skew_delay, nullptr);
+  EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
