@@ -143,4 +143,16 @@ TEST(ParserA303, InputTerminal_BitSelect) {
               "endmodule\n"));
 }
 
+TEST(ParserA303, InputTerminal_NOutputGate) {
+  // input_terminal in n-output gate (last terminal is input)
+  auto r = Parse(
+      "module m;\n"
+      "  buf (o1, o2, in);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
