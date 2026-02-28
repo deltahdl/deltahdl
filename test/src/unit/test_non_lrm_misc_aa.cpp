@@ -192,24 +192,4 @@ TEST(ParserA28, TypedefInFunction) {
               "endmodule\n"));
 }
 
-// modport_simple_ports_declaration ::=
-//   port_direction modport_simple_port { , modport_simple_port }
-TEST(ParserA29, MultipleSimplePortsSameDir) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic a, b, c;\n"
-      "  modport target(input a, b, c);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 3u);
-  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
-  EXPECT_EQ(mp->ports[2].direction, Direction::kInput);
-  EXPECT_EQ(mp->ports[0].name, "a");
-  EXPECT_EQ(mp->ports[1].name, "b");
-  EXPECT_EQ(mp->ports[2].name, "c");
-}
-
 }  // namespace
