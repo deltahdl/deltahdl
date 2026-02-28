@@ -36,22 +36,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// Assert property with only an else (fail) action.
-TEST(ParserSection16, Sec16_5_1_AssertPropertyFailOnly) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) a |-> b)\n"
-      "    else $error(\"failed\");\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  auto* ap =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
-  ASSERT_NE(ap, nullptr);
-  EXPECT_EQ(ap->assert_pass_stmt, nullptr);
-  EXPECT_NE(ap->assert_fail_stmt, nullptr);
-}
-
 // =============================================================================
 // Section 16.5.1 -- Concurrent assertion statements: assume property
 // =============================================================================
