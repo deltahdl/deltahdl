@@ -121,4 +121,27 @@ TEST(ParserSection13, NamedArgBindingEmptyArg) {
   EXPECT_EQ(stmt->rhs->arg_names[1], "j");
 }
 
+// Named and positional arguments cannot be mixed in the same call.
+// This test verifies that a purely named call parses with correct count.
+TEST(ParserSection13, NamedArgBindingAllNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int add(int a, int b, int c);\n"
+      "    return a + b + c;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = add(.c(3), .a(1), .b(2));\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  ASSERT_EQ(stmt->rhs->arg_names.size(), 3u);
+  EXPECT_EQ(stmt->rhs->arg_names[0], "c");
+  EXPECT_EQ(stmt->rhs->arg_names[1], "a");
+  EXPECT_EQ(stmt->rhs->arg_names[2], "b");
+}
+
 }  // namespace
