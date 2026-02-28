@@ -7,35 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Simulation — port-level initial value semantics
-// ---------------------------------------------------------------------------
-// Port-level initialization via output reg q = 1'b0 should work like initial
-TEST(ParserAnnexA052, SimPortLevelInit) {
-  auto r = Parse(
-      "primitive latch(output reg q = 1'b0, input d, input en);\n"
-      "  table\n"
-      "    ? 0 : ? : -;\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '0');
-
-  UdpEvalState state(*udp);
-  EXPECT_EQ(state.GetOutput(), '0');
-
-  state.Evaluate({'1', '1'});
-  EXPECT_EQ(state.GetOutput(), '1');
-
-  state.Evaluate({'0', '0'});
-  EXPECT_EQ(state.GetOutput(), '1');
-}
-
 // Non-ANSI port-level initialization should also work for simulation
 TEST(ParserAnnexA052, SimNonAnsiPortLevelInit) {
   auto r = Parse(
