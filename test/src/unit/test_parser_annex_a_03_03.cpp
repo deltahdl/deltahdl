@@ -24,4 +24,12 @@ TEST(ParserA303, EnableTerminal_SimpleIdent) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(ParserA303, EnableTerminal_ComplexExpr) {
+  // enable_terminal accepts any expression
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  bufif1 (out, in, a & b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

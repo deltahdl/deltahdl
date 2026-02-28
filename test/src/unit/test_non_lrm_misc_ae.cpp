@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, EnableTerminal_ComplexExpr) {
-  // enable_terminal accepts any expression
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  bufif1 (out, in, a & b);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA303, EnableTerminal_BitwiseExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
