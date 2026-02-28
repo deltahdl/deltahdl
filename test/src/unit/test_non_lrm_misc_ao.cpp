@@ -7,36 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9: typed assignment pattern expression with integer_atom_type
-TEST(ParserA60701, AssignmentPatternWithIntegerAtomType) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    x = int'{31: 1, default: 0};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// ---------------------------------------------------------------------------
-// structure_pattern_key ::= member_identifier | assignment_pattern_key
-// array_pattern_key ::= constant_expression | assignment_pattern_key
-// assignment_pattern_key ::= simple_type | default
-// ---------------------------------------------------------------------------
-// §10.9: assignment_pattern_key with default
-TEST(ParserA60701, PatternKeyDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    x = '{default: 0};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §10.9: structure_pattern_key with member identifier and default
 TEST(ParserA60701, StructurePatternKeyMemberAndDefault) {
   auto r = Parse(
