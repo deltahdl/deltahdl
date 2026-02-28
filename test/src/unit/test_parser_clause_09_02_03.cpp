@@ -1,0 +1,34 @@
+// §9.2.3: Final procedures
+
+#include "fixture_parser.h"
+#include "helpers_parser_verify.h"
+
+using namespace delta;
+
+// Return all statements from the first initial block's begin/end.
+static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  if (!item || !item->body) return {};
+  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
+  return {item->body};
+}
+
+namespace {
+
+// =============================================================================
+// A.6.2 Production: final_construct
+// final_construct ::= final function_statement
+// =============================================================================
+TEST(ParserA602, FinalConstruct_SingleStmt) {
+  auto r = Parse(
+      "module m;\n"
+      "  final $display(\"done\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+}
+
+}  // namespace

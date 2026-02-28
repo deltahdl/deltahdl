@@ -15,22 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.6.2 Production: final_construct
-// final_construct ::= final function_statement
-// =============================================================================
-TEST(ParserA602, FinalConstruct_SingleStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-}
-
 TEST(ParserA602, FinalConstruct_BeginEnd) {
   auto r = Parse(
       "module m;\n"
