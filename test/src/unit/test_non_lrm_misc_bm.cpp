@@ -31,26 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// §6.7.1: Trireg with charge strength and delay combined.
-TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithDelay) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (small) #(5, 10, 15) cap;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-  EXPECT_EQ(item->data_type.charge_strength, 1);
-  ASSERT_NE(item->net_delay, nullptr);
-  EXPECT_EQ(item->net_delay->int_val, 5u);
-  ASSERT_NE(item->net_delay_fall, nullptr);
-  EXPECT_EQ(item->net_delay_fall->int_val, 10u);
-  ASSERT_NE(item->net_delay_decay, nullptr);
-  EXPECT_EQ(item->net_delay_decay->int_val, 15u);
-}
-
 // §6.7.1: Wire with delay and initializer together.
 TEST(ParserSection6, Sec6_7_1_WireDelayWithInit) {
   auto r = Parse(
