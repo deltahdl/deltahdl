@@ -49,21 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9, StatementLabelOnForkBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial\n"
-      "    name: fork\n"
-      "      a = 1;\n"
-      "    join: name\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->label, "name");
-}
-
 // =============================================================================
 // §9.4.2 -- edge keyword in event control
 // =============================================================================

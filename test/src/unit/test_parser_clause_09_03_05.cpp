@@ -43,4 +43,30 @@ TEST(ParserSection9, StatementLabelOnBeginBlock) {
   EXPECT_EQ(item->body->label, "name");
 }
 
+static Stmt* FirstInitialStmt(ParseResult9c& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+TEST(ParserSection9, StatementLabelOnForkBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial\n"
+      "    name: fork\n"
+      "      a = 1;\n"
+      "    join: name\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "name");
+}
+
 }  // namespace
