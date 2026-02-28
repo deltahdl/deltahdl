@@ -60,4 +60,15 @@ TEST(ParserA70503, ScalarConstant1B1) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// scalar_constant ::= 1
+TEST(ParserA70503, ScalarConstantDecimal1) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data &&& (en == 1), posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

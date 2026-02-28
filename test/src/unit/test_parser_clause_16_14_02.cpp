@@ -82,4 +82,41 @@ TEST(ParserSection16, AssumePropertyModuleLevel) {
   EXPECT_TRUE(found);
 }
 
+struct ParseResult16c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16c Parse(const std::string& src) {
+  ParseResult16c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using VerifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Section 16.5.1 -- Concurrent assertion statements: assume property
+// =============================================================================
+// Assume property with a simple property expression.
+TEST(ParserSection16, Sec16_5_1_AssumePropertySimple) {
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) valid);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  auto* ap =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
+  ASSERT_NE(ap, nullptr);
+  EXPECT_NE(ap->assert_expr, nullptr);
+}
+
 }  // namespace

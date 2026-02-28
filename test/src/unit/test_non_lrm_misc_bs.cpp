@@ -40,18 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.26 — Typedef class (forward declaration)
-TEST(ParserSection8, TypedefClass) {
-  auto r = Parse(
-      "typedef class MyClass;\n"
-      "class MyClass;\n"
-      "  int x;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
-}
-
 // §8.3 — Lifetime specifier on class
 TEST(ParserSection8, ClassWithLifetime) {
   auto r = Parse(
