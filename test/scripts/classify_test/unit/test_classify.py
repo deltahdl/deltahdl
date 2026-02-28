@@ -257,6 +257,23 @@ def test_call_claude_raw_text_fallback(monkeypatch):
     assert _call_claude("prompt") == {"clause": "6.1"}
 
 
+def test_call_claude_structured_output(monkeypatch):
+    """Returns structured_output directly when present in envelope."""
+    envelope = json.dumps({
+        "result": "",
+        "structured_output": {"clause": "25.7", "rationale": "r"},
+        "session_id": "x",
+    })
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = envelope
+    mock_result.stderr = ""
+    monkeypatch.setattr(
+        subprocess, "run", lambda *_a, **_kw: mock_result,
+    )
+    assert _call_claude("prompt") == {"clause": "25.7", "rationale": "r"}
+
+
 def test_call_claude_failure(monkeypatch):
     """Exits on non-zero return code."""
     mock_result = MagicMock()

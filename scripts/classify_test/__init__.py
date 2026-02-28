@@ -479,6 +479,8 @@ def _call_claude(prompt, schema=None):
         envelope = json.loads(raw)
     except json.JSONDecodeError:
         return _extract_json(raw)
+    if isinstance(envelope, dict) and "structured_output" in envelope:
+        return envelope["structured_output"]
     if isinstance(envelope, dict) and "result" in envelope:
         return _extract_json(envelope["result"])
     return _extract_json(raw)
