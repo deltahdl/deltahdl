@@ -47,4 +47,44 @@ TEST(ParserA27, TaskBodyNewStyleDefaultValue) {
   EXPECT_NE(item->func_args[0].default_value, nullptr);
 }
 
+struct ParseResult4e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4e Parse(const std::string& src) {
+  ParseResult4e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// 21. Automatic function with default argument values
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_AutoFuncWithDefaultArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int scale(int x, int factor = 2);\n"
+      "    return x * factor;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].name, "x");
+  EXPECT_EQ(item->func_args[0].default_value, nullptr);
+  EXPECT_EQ(item->func_args[1].name, "factor");
+  EXPECT_NE(item->func_args[1].default_value, nullptr);
+}
+
 }  // namespace
