@@ -270,4 +270,22 @@ TEST(ParserA504, UdpInst_SingleInput) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 2u);
 }
 
+TEST(ParserA504, UdpInst_ManyInputs) {
+  auto r = Parse(
+      "primitive my_gate(output y, input a, input b, input c, input d);\n"
+      "  table\n"
+      "    0 0 0 0 : 0 ;\n"
+      "    1 1 1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  my_gate u1(out, in1, in2, in3, in4);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto insts = FindUdpInsts(r.cu->modules[0]->items);
+  ASSERT_EQ(insts.size(), 1u);
+  EXPECT_EQ(insts[0]->gate_terminals.size(), 5u);
+}
+
 }  // namespace
