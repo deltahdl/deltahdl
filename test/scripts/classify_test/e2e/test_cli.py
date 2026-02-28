@@ -67,7 +67,7 @@ def _install_fake(tmp_path, name, body):
     return bin_dir
 
 
-def _env_with_fakes(tmp_path, claude_response):
+def _env_with_fakes(tmp_path, claude_response, test_names=None):
     """Build env with fake claude, git, and gh binaries on PATH."""
     payload = json.dumps(claude_response)
     bin_dir = _install_fake(
@@ -75,7 +75,17 @@ def _env_with_fakes(tmp_path, claude_response):
         f"#!/bin/sh\necho '{payload}'\n",
     )
     _install_fake(tmp_path, "git", "#!/bin/sh\nexit 0\n")
-    _install_fake(tmp_path, "gh", "#!/bin/sh\nexit 0\n")
+    names = test_names or ["Alpha", "DryT"]
+    checkbox_file = tmp_path / "issue_body.txt"
+    checkbox_file.write_text(
+        "\n".join(f"- [ ] {n}" for n in names) + "\n",
+        encoding="utf-8",
+    )
+    _install_fake(
+        tmp_path, "gh",
+        f'#!/bin/sh\nif echo "$@" | grep -q "\\-\\-jq"; then'
+        f' cat "{checkbox_file}"; fi\n',
+    )
     env = _base_env(tmp_path)
     env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
     return env

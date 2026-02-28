@@ -1,9 +1,9 @@
 """GitHub issue integration for classify_test."""
 
+import json
+import re
 import subprocess
 import sys
-
-from ._output import _format_clause
 
 
 def _validate_issue_args(args):
@@ -18,39 +18,64 @@ def _validate_issue_args(args):
         sys.exit(1)
 
 
-def build_issue_comment(tests):
-    """Build markdown comment body for GitHub issue."""
-    lines = ["### Test Classification Results", ""]
-    for t in tests:
-        clause_display = _format_clause(t.clause)
-        lines.append(f"- **{t.test_name}()** \u2192 {clause_display}")
-        if t.rationale:
-            lines.append(f"  - {t.rationale}")
-    return "\n".join(lines)
+def tick_checkbox(body, test_name):
+    """Replace '- [ ] test_name' with '- [x] test_name' in body."""
+    pattern = re.compile(
+        r"^(- \[) \] " + re.escape(test_name) + r"$",
+        re.MULTILINE,
+    )
+    if not pattern.search(body):
+        if re.search(
+            r"^- \[x\] " + re.escape(test_name) + r"$",
+            body, re.MULTILINE,
+        ):
+            return body
+        print(f"ERROR: Checkbox for {test_name!r} not found"
+              " in issue body")
+        sys.exit(1)
+    return pattern.sub(r"\1x] " + test_name, body)
 
 
-def post_issue_comment(organization, repo, issue, body):
-    """Post a comment on a GitHub issue using gh CLI."""
+def fetch_issue_body(organization, repo, issue):
+    """Fetch the body of a GitHub issue using gh api."""
     result = subprocess.run(
-        ["gh", "issue", "comment", str(issue),
-         "--repo", f"{organization}/{repo}",
-         "--body", body],
+        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
+         "--jq", ".body"],
         capture_output=True,
         text=True,
         check=False,
     )
     if result.returncode != 0:
-        print(f"ERROR: Failed to post comment to issue #{issue}:"
+        print(f"ERROR: Failed to fetch issue #{issue}:"
+              f"\n{result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    return result.stdout
+
+
+def update_issue_body(organization, repo, issue, body):
+    """Update the body of a GitHub issue using gh api."""
+    payload = json.dumps({"body": body})
+    result = subprocess.run(
+        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
+         "-X", "PATCH", "--input", "-"],
+        input=payload,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: Failed to update issue #{issue}:"
               f"\n{result.stderr}", file=sys.stderr)
         sys.exit(1)
 
 
-def maybe_post_issue_comment(args, tests):
-    """Post a classification comment to a GitHub issue if --issue is set."""
-    if not args.issue:
-        return
-    comment = build_issue_comment(tests)
-    post_issue_comment(
-        args.organization, args.repo,
-        args.issue, comment,
+def maybe_tick_issue_checkbox(args, tests):
+    """Tick checkboxes for classified tests in a GitHub issue."""
+    body = fetch_issue_body(
+        args.organization, args.repo, args.issue,
+    )
+    for t in tests:
+        body = tick_checkbox(body, t.test_name)
+    update_issue_body(
+        args.organization, args.repo, args.issue, body,
     )

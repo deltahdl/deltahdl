@@ -770,6 +770,10 @@ def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier,
     monkeypatch.setattr(
         classify_test, "_call_claude", classifier,
     )
+    monkeypatch.setattr(
+        classify_test, "maybe_tick_issue_checkbox",
+        lambda args, tests: None,
+    )
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
         f"# header\nadd_unit_test({src.stem})\n", encoding="utf-8",
@@ -905,13 +909,13 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch):
 # ---- _run with --issue -----------------------------------------------------
 
 
-def test_run_with_issue_calls_maybe_post(tmp_path, monkeypatch):
-    """_run with --issue calls maybe_post_issue_comment."""
+def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch):
+    """_run with --issue calls maybe_tick_issue_checkbox."""
     _make_input_file(tmp_path)
     stub_classifier(monkeypatch, _parser_response())
     called = []
     monkeypatch.setattr(
-        classify_test, "maybe_post_issue_comment",
+        classify_test, "maybe_tick_issue_checkbox",
         lambda args, tests: called.append(True),
     )
     args = _run_args(
@@ -922,13 +926,13 @@ def test_run_with_issue_calls_maybe_post(tmp_path, monkeypatch):
     assert len(called) == 1
 
 
-def test_run_without_issue_calls_maybe_post(tmp_path, monkeypatch):
-    """_run without --issue still calls maybe_post_issue_comment."""
+def test_run_without_issue_calls_maybe_tick(tmp_path, monkeypatch):
+    """_run without --issue still calls maybe_tick_issue_checkbox."""
     _make_input_file(tmp_path)
     stub_classifier(monkeypatch, _parser_response())
     called = []
     monkeypatch.setattr(
-        classify_test, "maybe_post_issue_comment",
+        classify_test, "maybe_tick_issue_checkbox",
         lambda args, tests: called.append(True),
     )
     args = _run_args(tmp_path, dry_run=True)

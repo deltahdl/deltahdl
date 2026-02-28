@@ -1,5 +1,6 @@
 """Unit tests for GitHub integration functions in classify_test."""
 
+import json
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -10,9 +11,10 @@ import pytest
 import classify_test
 from classify_test._github import (
     _validate_issue_args,
-    build_issue_comment,
-    maybe_post_issue_comment,
-    post_issue_comment,
+    fetch_issue_body,
+    maybe_tick_issue_checkbox,
+    tick_checkbox,
+    update_issue_body,
 )
 from helpers import make_test_block as _tb
 
@@ -82,67 +84,67 @@ def test_parse_args_repo_required(monkeypatch):
         _parse_args()
 
 
-# ---- build_issue_comment ---------------------------------------------------
+# ---- tick_checkbox ---------------------------------------------------------
 
 
-def test_build_issue_comment_includes_header():
-    """Comment includes a markdown header."""
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
-    assert "###" in build_issue_comment([t])
+def test_tick_checkbox_ticks_unchecked():
+    """Replaces '- [ ] Name' with '- [x] Name'."""
+    body = "- [ ] Alpha\n- [ ] Beta\n"
+    assert "- [x] Alpha" in tick_checkbox(body, "Alpha")
 
 
-def test_build_issue_comment_includes_test_name():
-    """Comment includes the test name with parentheses."""
-    t = _tb("MyTest", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
-    assert "MyTest()" in build_issue_comment([t])
+def test_tick_checkbox_leaves_others_unchecked():
+    """Does not tick other checkboxes."""
+    body = "- [ ] Alpha\n- [ ] Beta\n"
+    result = tick_checkbox(body, "Alpha")
+    assert "- [ ] Beta" in result
 
 
-def test_build_issue_comment_includes_clause():
-    """Comment includes the formatted clause."""
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
-    assert "\u00a76.1" in build_issue_comment([t])
+def test_tick_checkbox_already_checked():
+    """No change when checkbox is already checked."""
+    body = "- [x] Alpha\n- [ ] Beta\n"
+    assert tick_checkbox(body, "Alpha") == body
 
 
-def test_build_issue_comment_includes_rationale():
-    """Comment includes the rationale text."""
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "Important reason"
-    assert "Important reason" in build_issue_comment([t])
+def test_tick_checkbox_not_found_exits():
+    """Exits when test name is not found in any checkbox."""
+    with pytest.raises(SystemExit):
+        tick_checkbox("- [ ] Other\n", "Missing")
 
 
-def test_build_issue_comment_no_rationale_omits_indent():
-    """No indented rationale line when rationale is empty."""
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = ""
-    comment = build_issue_comment([t])
-    assert not any(line.startswith("  -") for line in comment.splitlines())
+# ---- fetch_issue_body ------------------------------------------------------
 
 
-def test_build_issue_comment_non_lrm_clause():
-    """Non-LRM clause displays as Non-LRM TAG."""
-    t = _tb("T", prefix="test_non_lrm_", clause="non-lrm:aig")
-    t.rationale = "r"
-    assert "Non-LRM AIG" in build_issue_comment([t])
+def test_fetch_issue_body_returns_body(monkeypatch):
+    """Returns the issue body from gh api."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "- [ ] T\n"
+    mock_result.stderr = ""
+    monkeypatch.setattr(
+        subprocess, "run", lambda *_a, **_kw: mock_result,
+    )
+    assert fetch_issue_body("org", "repo", 42) == "- [ ] T\n"
 
 
-def test_build_issue_comment_multiple_tests():
-    """Comment includes all tests when given multiple."""
-    t1 = _tb("Alpha", prefix="test_parser_", clause="6.1")
-    t1.rationale = "r1"
-    t2 = _tb("Beta", prefix="test_lexer_", clause="5.3")
-    t2.rationale = "r2"
-    comment = build_issue_comment([t1, t2])
-    assert "Alpha()" in comment and "Beta()" in comment
+def test_fetch_issue_body_failure_exits(monkeypatch):
+    """Exits on non-zero return code."""
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+    mock_result.stdout = ""
+    mock_result.stderr = "not found"
+    monkeypatch.setattr(
+        subprocess, "run", lambda *_a, **_kw: mock_result,
+    )
+    with pytest.raises(SystemExit):
+        fetch_issue_body("org", "repo", 42)
 
 
-# ---- post_issue_comment ----------------------------------------------------
+# ---- update_issue_body -----------------------------------------------------
 
 
-def _capture_gh_cmd(monkeypatch):
-    """Run post_issue_comment and return the captured subprocess command."""
+def _capture_update_cmd(monkeypatch):
+    """Run update_issue_body and return captured subprocess command."""
     captured = []
     mock_result = MagicMock()
     mock_result.returncode = 0
@@ -154,63 +156,40 @@ def _capture_gh_cmd(monkeypatch):
         return mock_result
 
     monkeypatch.setattr(subprocess, "run", capture_run)
-    post_issue_comment("myorg", "myrepo", 42, "test body")
+    update_issue_body("myorg", "myrepo", 42, "new body")
     return captured
 
 
-def test_post_issue_comment_calls_gh(monkeypatch):
-    """Calls gh CLI for issue commenting."""
-    cmd = _capture_gh_cmd(monkeypatch)
+def test_update_issue_body_calls_gh(monkeypatch):
+    """Calls gh api for issue update."""
+    cmd = _capture_update_cmd(monkeypatch)
     assert cmd[0] == "gh"
 
 
-def test_post_issue_comment_includes_repo(monkeypatch):
-    """Command includes --repo org/repo."""
-    cmd = _capture_gh_cmd(monkeypatch)
-    idx = cmd.index("--repo")
-    assert cmd[idx + 1] == "myorg/myrepo"
+def test_update_issue_body_uses_patch(monkeypatch):
+    """Uses PATCH method."""
+    cmd = _capture_update_cmd(monkeypatch)
+    idx = cmd.index("-X")
+    assert cmd[idx + 1] == "PATCH"
 
 
-def test_post_issue_comment_includes_issue_number(monkeypatch):
-    """Command includes the issue number."""
-    cmd = _capture_gh_cmd(monkeypatch)
-    assert "42" in cmd
+def test_update_issue_body_targets_correct_endpoint(monkeypatch):
+    """Targets repos/org/repo/issues/N endpoint."""
+    cmd = _capture_update_cmd(monkeypatch)
+    assert "repos/myorg/myrepo/issues/42" in " ".join(cmd)
 
 
-def test_post_issue_comment_includes_body(monkeypatch):
-    """Command includes --body with the comment text."""
-    cmd = _capture_gh_cmd(monkeypatch)
-    idx = cmd.index("--body")
-    assert cmd[idx + 1] == "test body"
-
-
-def test_post_issue_comment_failure_exits(monkeypatch):
+def test_update_issue_body_failure_exits(monkeypatch):
     """Exits on non-zero return code."""
     mock_result = MagicMock()
     mock_result.returncode = 1
     mock_result.stdout = ""
-    mock_result.stderr = "auth error"
+    mock_result.stderr = "error"
     monkeypatch.setattr(
         subprocess, "run", lambda *_a, **_kw: mock_result,
     )
     with pytest.raises(SystemExit):
-        post_issue_comment("org", "repo", 42, "body")
-
-
-def test_post_issue_comment_failure_message(monkeypatch, capsys):
-    """Error message mentions the issue number."""
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-    mock_result.stderr = "auth error"
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_a, **_kw: mock_result,
-    )
-    try:
-        post_issue_comment("org", "repo", 99, "body")
-    except SystemExit:
-        pass
-    assert "99" in capsys.readouterr().err
+        update_issue_body("org", "repo", 42, "body")
 
 
 # ---- _validate_issue_args --------------------------------------------------
@@ -246,73 +225,58 @@ def test_validate_issue_args_missing_repo():
         _validate_issue_args(_issue_args(issue=42, organization="org"))
 
 
-# ---- maybe_post_issue_comment ----------------------------------------------
+# ---- maybe_tick_issue_checkbox ---------------------------------------------
 
 
-def test_maybe_post_no_issue_does_nothing(monkeypatch):
-    """No posting when --issue is not set."""
-    posted = []
+def test_maybe_tick_does_fetch_and_update(monkeypatch):
+    """Fetches body, ticks checkbox, and updates."""
+    updated = []
     monkeypatch.setattr(
-        "classify_test._github.post_issue_comment",
-        lambda org, repo, issue, body: posted.append(True),
+        "classify_test._github.fetch_issue_body",
+        lambda org, repo, issue: "- [ ] T\n",
     )
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
-    maybe_post_issue_comment(_issue_args(), [t])
-    assert not posted
-
-
-def test_maybe_post_with_issue_calls_post(monkeypatch):
-    """Posts when --issue is set."""
-    posted = []
     monkeypatch.setattr(
-        "classify_test._github.post_issue_comment",
-        lambda org, repo, issue, body: posted.append(True),
+        "classify_test._github.update_issue_body",
+        lambda org, repo, issue, body: updated.append(body),
     )
     t = _tb("T", prefix="test_parser_", clause="6.1")
     t.rationale = "r"
     args = _issue_args(issue=42, organization="org", repo="repo")
-    maybe_post_issue_comment(args, [t])
-    assert len(posted) == 1
+    maybe_tick_issue_checkbox(args, [t])
+    assert "- [x] T" in updated[0]
 
 
-def test_maybe_post_passes_correct_org(monkeypatch):
-    """Passes the organization to post_issue_comment."""
-    posted = []
+def test_maybe_tick_passes_correct_org(monkeypatch):
+    """Passes organization to fetch and update."""
+    orgs = []
     monkeypatch.setattr(
-        "classify_test._github.post_issue_comment",
-        lambda org, repo, issue, body: posted.append(org),
+        "classify_test._github.fetch_issue_body",
+        lambda org, repo, issue: (orgs.append(org), "- [ ] T\n")[1],
+    )
+    monkeypatch.setattr(
+        "classify_test._github.update_issue_body",
+        lambda org, repo, issue, body: orgs.append(org),
     )
     t = _tb("T", prefix="test_parser_", clause="6.1")
     t.rationale = "r"
     args = _issue_args(issue=42, organization="myorg", repo="repo")
-    maybe_post_issue_comment(args, [t])
-    assert posted[0] == "myorg"
+    maybe_tick_issue_checkbox(args, [t])
+    assert all(o == "myorg" for o in orgs)
 
 
-def test_maybe_post_passes_correct_repo(monkeypatch):
-    """Passes the repo to post_issue_comment."""
-    posted = []
+def test_maybe_tick_passes_correct_issue(monkeypatch):
+    """Passes issue number to fetch and update."""
+    issues = []
     monkeypatch.setattr(
-        "classify_test._github.post_issue_comment",
-        lambda org, repo, issue, body: posted.append(repo),
+        "classify_test._github.fetch_issue_body",
+        lambda org, repo, issue: (issues.append(issue), "- [ ] T\n")[1],
     )
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
-    args = _issue_args(issue=42, organization="org", repo="myrepo")
-    maybe_post_issue_comment(args, [t])
-    assert posted[0] == "myrepo"
-
-
-def test_maybe_post_passes_correct_issue(monkeypatch):
-    """Passes the issue number to post_issue_comment."""
-    posted = []
     monkeypatch.setattr(
-        "classify_test._github.post_issue_comment",
-        lambda org, repo, issue, body: posted.append(issue),
+        "classify_test._github.update_issue_body",
+        lambda org, repo, issue, body: issues.append(issue),
     )
     t = _tb("T", prefix="test_parser_", clause="6.1")
     t.rationale = "r"
     args = _issue_args(issue=99, organization="org", repo="repo")
-    maybe_post_issue_comment(args, [t])
-    assert posted[0] == 99
+    maybe_tick_issue_checkbox(args, [t])
+    assert all(i == 99 for i in issues)

@@ -19,9 +19,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ._github import (
-    _validate_issue_args, maybe_post_issue_comment,
+    _validate_issue_args,
+    fetch_issue_body,
+    maybe_tick_issue_checkbox,
+    tick_checkbox,
+    update_issue_body,
 )
-from ._github import build_issue_comment, post_issue_comment
 from ._output import (
     print_classification_table,
     print_summary,
@@ -940,7 +943,7 @@ def _run(args):
         Path(args.lrm).resolve(),
     )
     print_classification_table(target)
-    maybe_post_issue_comment(args, target)
+    maybe_tick_issue_checkbox(args, target)
     groups = _group_tests(target)
     source_is_target = any(
         clause_to_filename(p, c) == test_name
