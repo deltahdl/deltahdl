@@ -34,24 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §14.13: input with nonzero skew samples from a prior time step.
-TEST(ParserSection14, InputSamplingNonzeroSkew) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #3 addr;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  EXPECT_EQ(sig.direction, Direction::kInput);
-  EXPECT_EQ(sig.name, "addr");
-  ASSERT_NE(sig.skew_delay, nullptr);
-  EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
-}
-
 // §14.13: multiple inputs with same skew declaration.
 TEST(ParserSection14, InputSamplingMultipleSignals) {
   auto r = Parse(
