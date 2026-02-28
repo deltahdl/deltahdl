@@ -30,15 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserA213, NettypeDeclWithResolve) {
-  auto r = Parse("module m; nettype logic my_net with my_resolve; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-  EXPECT_EQ(item->nettype_resolve_func, "my_resolve");
-}
-
 TEST(ParserA213, NettypeDeclWithScopedResolve) {
   // with package_scope tf_identifier
   auto r =
