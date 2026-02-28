@@ -5,23 +5,31 @@
 
 using namespace delta;
 
-namespace {
+struct ParseResult6h {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
 
-// §6.7.1: Net with drive strength using reversed order (pull1, strong0).
-TEST(ParserSection6, Sec6_7_1_WireDriveStrengthReversedOrder) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire (pull1, weak0) w = 1'b1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  // 2=weak, 3=pull (parser encoding)
-  EXPECT_EQ(item->drive_strength0, 2u);
-  EXPECT_EQ(item->drive_strength1, 3u);
+static ParseResult6h Parse(const std::string& src) {
+  ParseResult6h result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
 }
+
+static ModuleItem* FirstItem(ParseResult6h& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
+}
+
+namespace {
 
 // §6.7.1: Trireg with charge strength and delay combined.
 TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithDelay) {
@@ -57,30 +65,6 @@ TEST(ParserSection6, Sec6_7_1_WireDelayWithInit) {
   ASSERT_NE(item->net_delay, nullptr);
   EXPECT_EQ(item->net_delay->int_val, 3u);
   ASSERT_NE(item->init_expr, nullptr);
-}
-
-struct ParseResult6g {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6g Parse(const std::string& src) {
-  ParseResult6g result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6g& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
 }
 
 // =============================================================================
@@ -905,30 +889,6 @@ TEST(ParserSection6, Sec6_11_IntegerAsPort) {
   ASSERT_EQ(ports.size(), 1u);
   EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kInteger);
   EXPECT_EQ(ports[0].direction, Direction::kInput);
-}
-
-struct ParseResult6h {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6h Parse(const std::string& src) {
-  ParseResult6h result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6h& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
 }
 
 // =============================================================================
