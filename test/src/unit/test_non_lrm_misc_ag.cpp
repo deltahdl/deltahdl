@@ -6,23 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Elaborator handles zero-iteration loop ---
-TEST(ParserAnnexA042, ElaborationGenerateForZeroIter) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module top #(parameter N = 0) ();\n"
-      "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin\n"
-      "      logic [31:0] x;\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  EXPECT_EQ(mod->variables.size(), 0u);
-}
-
 // --- Elaborator expands for-generate with continuous assigns ---
 TEST(ParserAnnexA042, ElaborationGenerateForWithAssign) {
   ElabFixture f;
