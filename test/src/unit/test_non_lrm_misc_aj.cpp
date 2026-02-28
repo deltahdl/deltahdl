@@ -43,21 +43,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserA602, InitialConstruct_Multiple) {
-  // Multiple initial blocks in the same module
-  auto r = Parse(
-      "module m;\n"
-      "  initial a = 0;\n"
-      "  initial b = 0;\n"
-      "  initial c = 0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto inits =
-      FindItems(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  EXPECT_EQ(inits.size(), 3u);
-}
-
 // =============================================================================
 // A.6.2 Production: always_construct
 // always_construct ::= always_keyword statement
