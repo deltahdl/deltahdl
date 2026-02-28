@@ -399,4 +399,21 @@ TEST(ParserSection29, TableSymbolX) {
   EXPECT_EQ(udp->table[4].output, 'x');
 }
 
+TEST(ParserSection29, TableSymbolB) {
+  auto r = Parse(
+      "primitive or_udp(output out, input a, b);\n"
+      "  table\n"
+      "    b 0 : 0;\n"
+      "    0 b : 0;\n"
+      "    1 ? : 1;\n"
+      "    ? 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->table.size(), 4);
+  EXPECT_EQ(udp->table[0].inputs[0], 'b');
+  EXPECT_EQ(udp->table[1].inputs[1], 'b');
+}
+
 }  // namespace
