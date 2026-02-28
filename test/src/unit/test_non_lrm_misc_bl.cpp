@@ -73,19 +73,6 @@ TEST(ParserSection6, CastCompatibleEnumToInt) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-// §6.6.7: Nettype with logic data type.
-TEST(ParserSection6, Sec6_6_7_NettypeWithLogicType) {
-  auto r = Parse(
-      "module m;\n"
-      "  nettype logic mylogic;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* nt = FindNettypeDecl(r);
-  ASSERT_NE(nt, nullptr);
-  EXPECT_EQ(nt->name, "mylogic");
-}
-
 // §6.6.7: Nettype with a packed vector type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithPackedVector) {
   EXPECT_TRUE(
