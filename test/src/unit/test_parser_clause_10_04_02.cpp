@@ -252,4 +252,31 @@ TEST(ParserSection9, Sec9_3_1_BlockWithNonblockingAssigns) {
   }
 }
 
+// --- 14. Multiple nonblocking assignments in same block ---
+TEST(ParserSection10, Sec10_4_2_MultipleInSameBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c, d;\n"
+      "  initial begin\n"
+      "    a <= b;\n"
+      "    c <= d;\n"
+      "    b <= a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s0 = NthInitialStmt(r, 0);
+  auto* s1 = NthInitialStmt(r, 1);
+  auto* s2 = NthInitialStmt(r, 2);
+  ASSERT_NE(s0, nullptr);
+  ASSERT_NE(s1, nullptr);
+  ASSERT_NE(s2, nullptr);
+  EXPECT_EQ(s0->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(s1->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(s2->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(s0->lhs->text, "a");
+  EXPECT_EQ(s1->lhs->text, "c");
+  EXPECT_EQ(s2->lhs->text, "b");
+}
+
 }  // namespace
