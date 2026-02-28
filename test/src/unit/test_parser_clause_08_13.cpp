@@ -1,0 +1,36 @@
+// §8.13: Inheritance and subclasses
+
+#include "fixture_parser.h"
+
+using namespace delta;
+
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+namespace {
+
+// §8.15 — Extends with scoped class name
+TEST(ParserSection8, ExtendsScopedName) {
+  auto r = Parse(
+      "class Child extends pkg::Base;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+
+  EXPECT_EQ(r.cu->classes[0]->name, "Child");
+}
+
+}  // namespace

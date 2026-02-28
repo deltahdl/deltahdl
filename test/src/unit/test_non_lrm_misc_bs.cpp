@@ -40,17 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.15 — Extends with scoped class name
-TEST(ParserSection8, ExtendsScopedName) {
-  auto r = Parse(
-      "class Child extends pkg::Base;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-
-  EXPECT_EQ(r.cu->classes[0]->name, "Child");
-}
-
 // §8.5 — Typedef inside class body (enum, struct)
 TEST(ParserSection8, ClassWithTypedef) {
   auto r = Parse(
