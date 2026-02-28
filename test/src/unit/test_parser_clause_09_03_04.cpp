@@ -106,4 +106,22 @@ TEST(ParserA603, ForkNamedJoinAnyWithEndLabel) {
   EXPECT_EQ(stmt->label, "f1");
 }
 
+// §9.3.4: Named fork with join_none and end label
+TEST(ParserA603, ForkNamedJoinNoneWithEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : f2\n"
+      "      #10 a = 1;\n"
+      "    join_none : f2\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
+  EXPECT_EQ(stmt->label, "f2");
+}
+
 }  // namespace
