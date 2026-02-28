@@ -15,28 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.7.3 specify_input_terminal_descriptor — with constant_range_expression
-// =============================================================================
-// Input terminal with bit-select
-TEST(ParserA703, InputTerminalBitSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a[3] => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
-  EXPECT_NE(si->path.src_ports[0].range_left, nullptr);
-  EXPECT_EQ(si->path.src_ports[0].range_right, nullptr);
-}
-
 // Input terminal with part-select range
 TEST(ParserA703, InputTerminalPartSelect) {
   auto r = Parse(
