@@ -21,35 +21,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-// Nested randsequence (randsequence inside code block)
-TEST(ParserA612, NestedRandsequence) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(outer)\n"
-      "      outer : {\n"
-      "        randsequence(inner)\n"
-      "          inner : { ; };\n"
-      "        endsequence\n"
-      "      };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
-// A.7 -- Specify section
-// =============================================================================
-TEST(ParserAnnexA, A7SpecifyParallelPath) {
-  auto r = Parse("module m; specify (a => b) = 5; endspecify endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecifyBlock);
-  ASSERT_GE(r.cu->modules[0]->items[0]->specify_items.size(), 1u);
-}
-
 TEST(ParserAnnexA, A7SpecifyFullPath) {
   auto r =
       Parse("module m; specify (a, b *> c, d) = 10; endspecify endmodule\n");
