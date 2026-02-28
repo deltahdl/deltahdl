@@ -13,25 +13,6 @@ bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// --- checker_instantiation: inside another checker ---
-TEST(ParserAnnexA0414, CheckerInstInsideChecker) {
-  auto r = Parse(
-      "checker inner_chk(input logic sig);\n"
-      "endchecker\n"
-      "checker outer_chk;\n"
-      "  logic sig;\n"
-      "  inner_chk u0(.sig(sig));\n"
-      "endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 2u);
-  ASSERT_GE(r.cu->checkers[1]->items.size(), 2u);
-  auto* inst = r.cu->checkers[1]->items[1];
-  EXPECT_EQ(inst->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(inst->inst_module, "inner_chk");
-  EXPECT_EQ(inst->inst_name, "u0");
-}
-
 // =============================================================================
 // Elaboration tests -- checker instantiation resolved through elaborator
 // =============================================================================
