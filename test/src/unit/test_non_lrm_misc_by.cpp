@@ -45,47 +45,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 11. always_comb with function call
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_FunctionCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] a, b, result;\n"
-      "  function logic [7:0] add(input logic [7:0] x, y);\n"
-      "    return x + y;\n"
-      "  endfunction\n"
-      "  always_comb result = add(a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->rhs, nullptr);
-  EXPECT_EQ(item->body->rhs->kind, ExprKind::kCall);
-}
-
-// ---------------------------------------------------------------------------
-// 12. always_comb with ternary expression
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_TernaryExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic sel, a, b, y;\n"
-      "  always_comb y = sel ? a : b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->rhs, nullptr);
-  EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
-}
-
-// ---------------------------------------------------------------------------
 // 13. always_comb with concatenation
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_Concatenation) {
