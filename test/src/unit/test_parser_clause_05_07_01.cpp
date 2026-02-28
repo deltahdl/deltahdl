@@ -190,4 +190,14 @@ TEST(ParserCh50701, IntLiteral_UnbasedUnsized_One) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
+// § unbased_unsized_literal — 'x (z_or_x)
+TEST(ParserA87, UnbasedUnsizedX) {
+  auto r = Parse("module m; logic x; initial x = 'x; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
+}
+
 }  // namespace
