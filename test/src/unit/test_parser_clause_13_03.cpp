@@ -39,4 +39,19 @@ TEST(ParserSection13, TaskWithInoutPort) {
   EXPECT_EQ(tk->func_args[0].direction, Direction::kInout);
 }
 
+// Task with no ports.
+TEST(ParserSection13, TaskWithNoPorts) {
+  auto r = Parse(
+      "module m;\n"
+      "  task idle();\n"
+      "    #10;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* tk = FindFunc(r, "idle");
+  ASSERT_NE(tk, nullptr);
+  EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(tk->func_args.empty());
+}
+
 }  // namespace

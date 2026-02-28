@@ -28,4 +28,14 @@ TEST(SourceText, PackageLifetimeWithItems) {
   EXPECT_EQ(r.cu->packages[0]->items.size(), 2u);
 }
 
+TEST(ParserSection26, PackageWithParameter) {
+  auto r = Parse(
+      "package cfg_pkg;\n"
+      "  parameter int WIDTH = 8;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  ASSERT_FALSE(r.cu->packages[0]->items.empty());
+}
+
 }  // namespace
