@@ -81,4 +81,16 @@ TEST(ParserA602, Force_WithConcat) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
+TEST(ParserA602, Release_WithConcat) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin release {a, b}; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
+}
+
 }  // namespace
