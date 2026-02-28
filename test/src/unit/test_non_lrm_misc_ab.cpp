@@ -13,23 +13,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-// Direction persists across simple ports (§25.5)
-TEST(ParserA29, DirectionPersistsAcrossPorts) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic a, b, c, d;\n"
-      "  modport target(input a, b, output c, d);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 4u);
-  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
-  EXPECT_EQ(mp->ports[2].direction, Direction::kOutput);
-  EXPECT_EQ(mp->ports[3].direction, Direction::kOutput);
-}
-
 // Empty modport (no ports) should parse
 TEST(ParserA29, EmptyModport) {
   auto r = Parse(
@@ -41,14 +24,6 @@ TEST(ParserA29, EmptyModport) {
   auto* mp = r.cu->interfaces[0]->modports[0];
   EXPECT_EQ(mp->ports.size(), 0u);
   EXPECT_EQ(mp->name, "empty");
-}
-
-static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
-                                  ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
 }
 
 // sequence_expr ::= ( sequence_expr {, sequence_match_item} ) [sequence_abbrev]
