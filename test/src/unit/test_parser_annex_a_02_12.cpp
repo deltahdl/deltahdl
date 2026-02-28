@@ -114,4 +114,11 @@ TEST(ParserA212, LetFormalType_Implicit) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
+TEST(ParserA212, LetFormalType_Logic) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let f(logic x) = x;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
