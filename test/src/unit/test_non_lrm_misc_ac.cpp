@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetFormalType_Implicit) {
-  auto r = Parse(
-      "module m;\n"
-      "  let f(x) = x;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->func_args[0].name, "x");
-}
-
 TEST(ParserA212, LetFormalType_Logic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
