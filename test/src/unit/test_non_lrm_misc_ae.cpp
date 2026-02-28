@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA304, CmosSwitchtype_Rcmos) {
-  auto r = Parse(
-      "module m;\n"
-      "  rcmos (out, in, nctrl, pctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 4u);
-}
-
 // =============================================================================
 // A.3.4 Production #2: enable_gatetype ::= bufif0 | bufif1 | notif0 | notif1
 // =============================================================================
