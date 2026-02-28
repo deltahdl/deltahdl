@@ -375,4 +375,69 @@ TEST(ParserSection11, Sec11_4_6_MultipleTernariesInExpr) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
 }
 
+struct ParseResult10d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult10d Parse(const std::string& src) {
+  ParseResult10d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult10d& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// --- 9. Blocking assignment with ternary RHS ---
+TEST(ParserSection10, Sec10_4_1_TernaryRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c, sel;\n"
+      "  initial begin\n"
+      "    a = sel ? b : c;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
+}
+
+// --- Ternary with string literal operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithStringLiterals) {
+  auto r = Parse(
+      "module t;\n"
+      "  string s;\n"
+      "  initial s = sel ? \"yes\" : \"no\";\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kStringLiteral);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kStringLiteral);
+}
+
 }  // namespace

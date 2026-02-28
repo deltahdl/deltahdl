@@ -335,4 +335,36 @@ TEST(ParserSection10, Sec10_4_1_Concatenation) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
+static Stmt* NthInitialStmt(ParseResult10d& r, size_t n) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      if (n < item->body->stmts.size()) return item->body->stmts[n];
+    }
+  }
+  return nullptr;
+}
+
+// --- 10. Blocking assignment in begin-end block ---
+TEST(ParserSection10, Sec10_4_1_InBeginEndBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] x, y;\n"
+      "  initial begin\n"
+      "    x = 8'h00;\n"
+      "    y = 8'hFF;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s0 = NthInitialStmt(r, 0);
+  auto* s1 = NthInitialStmt(r, 1);
+  ASSERT_NE(s0, nullptr);
+  ASSERT_NE(s1, nullptr);
+  EXPECT_EQ(s0->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(s1->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(s0->lhs->text, "x");
+  EXPECT_EQ(s1->lhs->text, "y");
+}
+
 }  // namespace
