@@ -149,4 +149,31 @@ TEST(ParserSection10, Sec10_6_1_InterleavedWithNonblocking) {
   EXPECT_EQ(s3->kind, StmtKind::kNonblockingAssign);
 }
 
+// --- 30. Full D-FF with assign/deassign and always @(posedge) ---
+TEST(ParserSection10, Sec10_6_1_FullDFlipFlopPattern) {
+  auto r = Parse(
+      "module dff_full(output reg q, input d, clr, pre, clk);\n"
+      "  always @(clr or pre) begin\n"
+      "    if (!clr)\n"
+      "      assign q = 0;\n"
+      "    else if (!pre)\n"
+      "      assign q = 1;\n"
+      "    else\n"
+      "      deassign q;\n"
+      "  end\n"
+      "  always @(posedge clk)\n"
+      "    q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "dff_full");
+  // Should have at least two always blocks.
+  int always_count = 0;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) always_count++;
+  }
+  EXPECT_GE(always_count, 2);
+}
+
 }  // namespace

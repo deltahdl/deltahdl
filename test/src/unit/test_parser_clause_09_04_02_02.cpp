@@ -89,4 +89,21 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSimple) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
+// @(*) at always block level: always @(*) stmt
+TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSimple) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  always @(*) a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
+  EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace
