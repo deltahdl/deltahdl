@@ -281,4 +281,16 @@ TEST(ParserA302, PulldownStrength_SingleStrength0_MultipleInstances) {
   EXPECT_EQ(gates[1]->drive_strength1, 0u);  // none
 }
 
+// -----------------------------------------------------------------------------
+// All strength0 values exercised in pulldown_strength
+// -----------------------------------------------------------------------------
+TEST(ParserA302, PulldownStrength_AllStrength0Values) {
+  // highz0=1, weak0=2, pull0=3, strong0=4, supply0=5
+  EXPECT_TRUE(ParseOk("module m; pulldown (highz0) (out); endmodule"));
+  EXPECT_TRUE(ParseOk("module m; pulldown (weak0) (out); endmodule"));
+  EXPECT_TRUE(ParseOk("module m; pulldown (pull0) (out); endmodule"));
+  EXPECT_TRUE(ParseOk("module m; pulldown (strong0) (out); endmodule"));
+  EXPECT_TRUE(ParseOk("module m; pulldown (supply0) (out); endmodule"));
+}
+
 }  // namespace
