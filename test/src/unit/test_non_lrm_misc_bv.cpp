@@ -51,25 +51,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
 
 namespace {
 
-TEST(ParserSection9c, DisableLabeledBlock) {
-  // LRM 9.6.2 example: block disables itself using its name.
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : block_name\n"
-      "    a = b;\n"
-      "    disable block_name;\n"
-      "    c = a;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->label, "block_name");
-  ASSERT_GE(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDisable);
-}
-
 // =============================================================================
 // LRM section 9.4 -- Procedural timing controls
 // Zero-delay, chained delays, delay expressions.

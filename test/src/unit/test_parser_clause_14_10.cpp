@@ -47,4 +47,21 @@ TEST(ParserSection14, ClockingBlockEventAlwaysAt) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
+// §14.10: clocking event alongside a posedge always block.
+TEST(ParserSection14, ClockingBlockEventWithPosedgeAlways) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking dram @(posedge phi1);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  always @(posedge phi1) $display(\"clocking event\");\n"
+      "  always @(dram) $display(\"clocking block event\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  // Three items: clocking block + two always blocks.
+  EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
 }  // namespace

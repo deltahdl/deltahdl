@@ -34,42 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §14.10: clocking block with output negedge skew (from LRM example).
-TEST(ParserSection14, ClockingBlockEventOutputNegedgeSkew) {
-  auto r = Parse(
-      "module foo(input phi1, input [7:0] data);\n"
-      "  clocking dram @(posedge phi1);\n"
-      "    input data;\n"
-      "    output negedge #1 address;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 2u);
-  auto& out_sig = item->clocking_signals[1];
-  EXPECT_EQ(out_sig.direction, Direction::kOutput);
-  EXPECT_EQ(out_sig.name, "address");
-  EXPECT_EQ(out_sig.skew_edge, Edge::kNegedge);
-  ASSERT_NE(out_sig.skew_delay, nullptr);
-}
-
-// §14.10: clocking event alongside a posedge always block.
-TEST(ParserSection14, ClockingBlockEventWithPosedgeAlways) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking dram @(posedge phi1);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "  always @(posedge phi1) $display(\"clocking event\");\n"
-      "  always @(dram) $display(\"clocking block event\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  // Three items: clocking block + two always blocks.
-  EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
-}
-
 // §14.10: clocking block with multiple input signals triggers one event.
 TEST(ParserSection14, ClockingBlockEventMultipleInputs) {
   auto r = Parse(

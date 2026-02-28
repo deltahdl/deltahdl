@@ -113,4 +113,41 @@ TEST(ParserSection9, Sec9_3_2_NamedForkDisabledByName) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisable);
 }
 
+struct ParseResult9d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9d Parse(const std::string& src) {
+  ParseResult9d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection9c, DisableLabeledBlock) {
+  // LRM 9.6.2 example: block disables itself using its name.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : block_name\n"
+      "    a = b;\n"
+      "    disable block_name;\n"
+      "    c = a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->label, "block_name");
+  ASSERT_GE(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDisable);
+}
+
 }  // namespace

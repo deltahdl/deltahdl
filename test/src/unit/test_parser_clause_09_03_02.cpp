@@ -347,4 +347,39 @@ TEST(ParserSection9, AutomaticVarInFork) {
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
+// ---------------------------------------------------------------------------
+// 30. Fork with assignment and delay in same thread
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_ForkThreadWithDelayedAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        a = 0;\n"
+      "        #10;\n"
+      "        a = 1;\n"
+      "      end\n"
+      "      begin\n"
+      "        b = 0;\n"
+      "        #20;\n"
+      "        b = 1;\n"
+      "      end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_EQ(stmt->fork_stmts.size(), 2u);
+  // Each thread block should contain assign, delay, assign
+  for (size_t i = 0; i < 2; ++i) {
+    auto* thread = stmt->fork_stmts[i];
+    EXPECT_EQ(thread->kind, StmtKind::kBlock);
+    EXPECT_EQ(thread->stmts.size(), 3u);
+  }
+}
+
 }  // namespace
