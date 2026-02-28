@@ -212,4 +212,19 @@ TEST(ParserA611, ClockingDeclAssignBare) {
   EXPECT_EQ(item->clocking_signals[0].hier_expr, nullptr);
 }
 
+// §14.13: inout signals are also sampled as inputs at the clocking event.
+TEST(ParserSection14, InputSamplingInoutSignal) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    inout data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+}
+
 }  // namespace
