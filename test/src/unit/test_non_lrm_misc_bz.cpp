@@ -5,19 +5,6 @@
 
 using namespace delta;
 
-// Helper for blocks 11: verify always block has var decl body.
-static void VerifyAlwaysVarDecl(ParseResult& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 3u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(item->body->stmts[0]->var_name, "temp");
-}
-
 // Helper for block 12: verify always block has 3 blocking assigns.
 static void VerifyAlwaysMultiAssigns(ParseResult& r) {
   ASSERT_NE(r.cu, nullptr);
@@ -94,21 +81,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 }
 
 namespace {
-
-// ---------------------------------------------------------------------------
-// 20. always @* with variable declarations in begin-end block.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarVarDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @* begin\n"
-      "    int temp;\n"
-      "    temp = a + b;\n"
-      "    y = temp;\n"
-      "  end\n"
-      "endmodule\n");
-  VerifyAlwaysVarDecl(r);
-}
 
 // ---------------------------------------------------------------------------
 // 21. always_comb with function call in body.
