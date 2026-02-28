@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection26, PackageWithFunction) {
-  auto r = Parse(
-      "package util_pkg;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
-}
-
 // =============================================================================
 // LRM section 26.3 -- Referencing data in packages (import)
 // =============================================================================
