@@ -72,4 +72,19 @@ TEST(ParserA602, BlockingAssignment_ParenthesizedIntraDelay) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
+TEST(ParserA602, NonblockingAssignment_WithRepeatEvent) {
+  // Nonblocking with repeat(N) @(event) intra-assignment timing
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin q <= repeat(2) @(posedge clk) d; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  EXPECT_FALSE(stmt->events.empty());
+}
+
 }  // namespace
