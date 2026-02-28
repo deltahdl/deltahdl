@@ -211,4 +211,32 @@ TEST(ParserSection9, DisableTaskName) {
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
 }
 
+// =============================================================================
+// LRM section 9.6.2 -- Disable statement
+// Disable named blocks and tasks from within and outside.
+// =============================================================================
+TEST(ParserSection9c, DisableBlockFromOutside) {
+  // LRM 9.6.2 example 3: disable a named block from an always procedure.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : outer\n"
+      "    forever begin\n"
+      "      @(posedge clk) x = x + 1;\n"
+      "    end\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #100;\n"
+      "    disable outer;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  // The second initial block should contain a disable statement.
+  auto* second_init = r.cu->modules[0]->items[1];
+  ASSERT_NE(second_init, nullptr);
+  ASSERT_NE(second_init->body, nullptr);
+  ASSERT_GE(second_init->body->stmts.size(), 2u);
+  EXPECT_EQ(second_init->body->stmts[1]->kind, StmtKind::kDisable);
+}
+
 }  // namespace
