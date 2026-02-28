@@ -121,4 +121,15 @@ TEST(SourceText, PackageOrGenerateItemDecl) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 4u);
 }
 
+// package_or_generate_item_declaration: checker_declaration
+TEST(SourceText, PackageItemCheckerDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  checker chk; endchecker\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
 }  // namespace
