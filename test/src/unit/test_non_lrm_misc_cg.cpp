@@ -42,20 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, ReplicationNestedInConcat) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {b, {3{a, b}}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(rhs->elements.size(), 2u);
-  EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kReplicate);
-}
-
 TEST(ParserSection11, ReplicationMultipleElements) {
   auto r = Parse(
       "module t;\n"

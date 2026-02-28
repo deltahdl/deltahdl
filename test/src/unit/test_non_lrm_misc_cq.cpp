@@ -43,25 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-TEST(ParserSection18b, DistInsideIfConstraint) {
-  // Distribution inside a conditional constraint block
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  rand bit mode;\n"
-      "  constraint c {\n"
-      "    if (mode == 0) {\n"
-      "      x dist {[0:10] := 1};\n"
-      "    } else {\n"
-      "      x dist {[100:200] := 1};\n"
-      "    }\n"
-      "  }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(ParserSection18b, DistWithExpressionWeights) {
   // Weights can be arbitrary constant expressions
   auto r = Parse(

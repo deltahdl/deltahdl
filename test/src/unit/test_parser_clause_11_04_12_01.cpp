@@ -96,4 +96,18 @@ TEST(ParserSection11, ReplicationCountAndElements) {
   EXPECT_EQ(rhs->elements.size(), 1u);
 }
 
+TEST(ParserSection11, ReplicationNestedInConcat) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {b, {3{a, b}}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(rhs->elements.size(), 2u);
+  EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kReplicate);
+}
+
 }  // namespace
