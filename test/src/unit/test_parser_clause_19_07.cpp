@@ -55,4 +55,16 @@ TEST(ParserA211, BinsSelectionOrOption_CoverageOption) {
               "endmodule\n"));
 }
 
+TEST(ParserA211, CoverGroup_MultipleOptions) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    option.auto_bin_max = 64;\n"
+              "    option.weight = 2;\n"
+              "    option.goal = 95;\n"
+              "    coverpoint x;\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
