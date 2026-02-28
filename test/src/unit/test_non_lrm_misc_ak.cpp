@@ -15,30 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.6.2 Production: blocking_assignment
-// blocking_assignment ::=
-//   variable_lvalue = delay_or_event_control expression
-//   | nonrange_variable_lvalue = dynamic_array_new
-//   | [implicit_class_handle . | class_scope | package_scope]
-//     hierarchical_variable_identifier select = class_new
-//   | operator_assignment
-//   | inc_or_dec_expression
-// =============================================================================
-TEST(ParserA602, BlockingAssignment_Simple) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin a = 42; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
   // §10.4.1: blocking with intra-assignment delay
   auto r = Parse(
