@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import classify_test
+import classify_test._github
 
 _run = getattr(classify_test, "_run")
 
@@ -52,6 +53,10 @@ def _stub_externals(monkeypatch, tmp_path, classifier):
         "# header\nadd_unit_test(test_input)\n", encoding="utf-8",
     )
     monkeypatch.setattr(classify_test, "CMAKE_PATH", cmake)
+    monkeypatch.setattr(
+        classify_test._github, "maybe_tick_issue_checkbox",
+        lambda args, tests: None,
+    )
 
 
 def _run_pipeline(tmp_path, test, dry_run=False):
@@ -62,9 +67,9 @@ def _run_pipeline(tmp_path, test, dry_run=False):
         dry_run=dry_run,
         lrm=str(tmp_path / "lrm.txt"),
         test=test,
-        issue=None,
-        organization=None,
-        repo=None,
+        issue=1,
+        organization="test-org",
+        repo="test-repo",
     ))
 
 
