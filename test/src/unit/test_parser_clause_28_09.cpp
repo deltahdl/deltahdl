@@ -58,4 +58,22 @@ TEST(ParserA301, GateInst_CmosWithDelay3) {
   EXPECT_NE(g->gate_delay_decay, nullptr);
 }
 
+// =============================================================================
+// A.3.1 Production #2: cmos_switch_instance
+// cmos_switch_instance ::= [name_of_instance]
+//   ( output_terminal , input_terminal , ncontrol_terminal , pcontrol_terminal
+//   )
+// =============================================================================
+TEST(ParserA301, CmosSwitchInst_Unnamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  cmos (out, in, nctrl, pctrl);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos);
+  ASSERT_NE(g, nullptr);
+  EXPECT_TRUE(g->gate_inst_name.empty());
+  EXPECT_EQ(g->gate_terminals.size(), 4u);
+}
+
 }  // namespace
