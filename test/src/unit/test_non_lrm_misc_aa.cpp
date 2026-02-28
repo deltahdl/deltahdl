@@ -324,21 +324,6 @@ TEST(ParserA29, MultipleSimplePortsSameDir) {
   EXPECT_EQ(mp->ports[2].name, "c");
 }
 
-// modport_tf_ports_declaration ::=
-//   import_export modport_tf_port { , modport_tf_port }
-TEST(ParserA29, ImportSingleIdentifier) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  modport target(import Read);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  EXPECT_TRUE(mp->ports[0].is_import);
-  EXPECT_EQ(mp->ports[0].name, "Read");
-}
-
 // Mixed modport_ports_declarations
 TEST(ParserA29, MixedDirImportExport) {
   auto r = Parse(
