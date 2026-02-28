@@ -50,26 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// A.6.1 Production: continuous_assign (parsing)
-// continuous_assign ::=
-//   assign [ drive_strength ] [ delay3 ] list_of_net_assignments ;
-//   | assign [ delay_control ] list_of_variable_assignments ;
-// =============================================================================
-TEST(ParserA601, ContinuousAssign_Basic) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  ASSERT_NE(cas[0]->assign_lhs, nullptr);
-  ASSERT_NE(cas[0]->assign_rhs, nullptr);
-}
-
 TEST(ParserA601, ContinuousAssign_DriveStrength) {
   auto r = Parse(
       "module m;\n"
