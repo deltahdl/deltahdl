@@ -226,4 +226,9 @@ TEST(ParserCh50701, IntLiteral_XValue) {
   EXPECT_TRUE(ParseOk("module m; initial x = 12'hx; endmodule"));
 }
 
+TEST(ParserCh50701, IntLiteral_ZValue) {
+  // 16'hz -- 16-bit high-impedance.
+  EXPECT_TRUE(ParseOk("module m; initial x = 16'hz; endmodule"));
+}
+
 }  // namespace

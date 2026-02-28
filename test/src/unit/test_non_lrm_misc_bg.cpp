@@ -111,11 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh50701, IntLiteral_ZValue) {
-  // 16'hz -- 16-bit high-impedance.
-  EXPECT_TRUE(ParseOk("module m; initial x = 16'hz; endmodule"));
-}
-
 TEST(ParserCh50701, IntLiteral_QuestionMark) {
   // ? is an alternative for z in literal constants.
   EXPECT_TRUE(ParseOk("module m; initial x = 16'sd?; endmodule"));
