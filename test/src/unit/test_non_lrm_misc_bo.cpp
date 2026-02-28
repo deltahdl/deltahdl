@@ -49,21 +49,6 @@ static void VerifyStructMemberNames(const std::vector<StructMember>& members,
 
 namespace {
 
-TEST(Parser, TypedefStructPacked) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [3:0] hi;\n"
-      "    logic [3:0] lo;\n"
-      "  } byte_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
-  EXPECT_TRUE(item->typedef_type.is_packed);
-  ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
-}
-
 TEST(Parser, InlineStructVar) {
   auto r = Parse(
       "module t;\n"

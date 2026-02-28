@@ -224,4 +224,35 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberAccessRead) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
+struct ParseResult7 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult7 Parse(const std::string& src) {
+  ParseResult7 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(Parser, TypedefStructPacked) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [3:0] hi;\n"
+      "    logic [3:0] lo;\n"
+      "  } byte_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
+}
+
 }  // namespace

@@ -256,4 +256,45 @@ TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
               "endprogram\n"));
 }
 
+struct ParseResult9e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9e Parse(const std::string& src) {
+  ParseResult9e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 9.3.1 -- Automatic and static variable declarations in blocks.
+// =============================================================================
+TEST(ParserSection9, Sec9_3_1_AutomaticVarDeclInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int k = 0;\n"
+      "    k = k + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(body->stmts[0]->var_is_automatic);
+  EXPECT_FALSE(body->stmts[0]->var_is_static);
+  EXPECT_EQ(body->stmts[0]->var_name, "k");
+  EXPECT_NE(body->stmts[0]->var_init, nullptr);
+}
+
 }  // namespace
