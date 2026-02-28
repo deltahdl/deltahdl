@@ -298,4 +298,22 @@ TEST(ParserAnnexA052, RegDecl_AfterInputs) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
+// Attribute on input declaration
+TEST(ParserAnnexA052, AttrOnInputDecl) {
+  auto r = Parse(
+      "primitive inv(out, a);\n"
+      "  output out;\n"
+      "  (* synthesis = \"off\" *) input a;\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->input_names.size(), 1u);
+  EXPECT_EQ(udp->input_names[0], "a");
+}
+
 }  // namespace
