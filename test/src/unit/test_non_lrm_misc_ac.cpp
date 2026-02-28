@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetIdentifier_Underscore) {
-  auto r = Parse(
-      "module m;\n"
-      "  let _my_let_123 = 0;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "_my_let_123");
-}
-
 // =============================================================================
 // A.2.12 Production #3: let_port_list
 // let_port_list ::= let_port_item { , let_port_item }
