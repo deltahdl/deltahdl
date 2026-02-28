@@ -50,21 +50,6 @@ static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserA601, ContinuousAssign_DelaySingle) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign #10 a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_NE(cas[0]->assign_delay, nullptr);
-  EXPECT_EQ(cas[0]->assign_delay_fall, nullptr);
-  EXPECT_EQ(cas[0]->assign_delay_decay, nullptr);
-}
-
 TEST(ParserA601, ContinuousAssign_DelayRiseFall) {
   auto r = Parse(
       "module m;\n"

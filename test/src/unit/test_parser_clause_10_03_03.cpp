@@ -71,4 +71,46 @@ TEST(ParserA223, Delay2ParenSingleValue) {
   EXPECT_EQ(item->assign_delay->int_val, 5u);
 }
 
+static std::vector<ModuleItem*> FindUdpInsts(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> insts;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
+  }
+  return insts;
+}
+
+static std::vector<ModuleItem*> FindContAssigns(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
+  }
+  return result;
+}
+
+static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
+                                          ModuleItemKind kind) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == kind) result.push_back(item);
+  }
+  return result;
+}
+
+TEST(ParserA601, ContinuousAssign_DelaySingle) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign #10 a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto cas = FindContAssigns(r.cu->modules[0]->items);
+  ASSERT_EQ(cas.size(), 1u);
+  EXPECT_NE(cas[0]->assign_delay, nullptr);
+  EXPECT_EQ(cas[0]->assign_delay_fall, nullptr);
+  EXPECT_EQ(cas[0]->assign_delay_decay, nullptr);
+}
+
 }  // namespace
