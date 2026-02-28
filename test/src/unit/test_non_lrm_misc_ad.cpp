@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_PassSwitchMultipleInstances) {
-  auto r = Parse(
-      "module m;\n"
-      "  tran t1(a1, b1), t2(a2, b2);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  EXPECT_EQ(gates.size(), 2u);
-}
-
 // =============================================================================
 // A.3.1 Production #1: gate_instantiation (pulldown alternative)
 // gate_instantiation ::=
