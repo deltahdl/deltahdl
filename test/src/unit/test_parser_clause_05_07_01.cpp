@@ -39,4 +39,14 @@ TEST(ParserA87, HexDigitUppercase) {
   EXPECT_EQ(rhs->int_val, 0xABCDEFu);
 }
 
+// § x_digit — x
+TEST(ParserA87, XDigitLower) {
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'hx; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
