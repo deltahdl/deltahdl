@@ -13,4 +13,11 @@ TEST(ParserSection21, DumpvarsNoArgs) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, DumpvarsWithLevels) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $dumpvars(1, t);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
