@@ -47,4 +47,25 @@ TEST(ParserA601, NetAssignment_TernaryRhs) {
   EXPECT_NE(cas[0]->assign_rhs, nullptr);
 }
 
+// Return all statements from the first initial block's begin/end.
+static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  if (!item || !item->body) return {};
+  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
+  return {item->body};
+}
+
+TEST(ParserA602, VariableAssignment_TernaryRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = sel ? a : b; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
+}
+
 }  // namespace

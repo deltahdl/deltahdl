@@ -15,19 +15,6 @@ static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA602, VariableAssignment_TernaryRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = sel ? a : b; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
-}
-
 TEST(ParserA602, VariableAssignment_CallRhs) {
   auto r = Parse(
       "module m;\n"
