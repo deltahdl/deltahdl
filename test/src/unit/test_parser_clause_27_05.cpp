@@ -47,4 +47,19 @@ TEST(ParserAnnexA, A4GenerateCase) {
   EXPECT_EQ(item->gen_case_items.size(), 2u);
 }
 
+// --- if_generate_construct: basic if ---
+TEST(ParserAnnexA042, IfGenerateBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (WIDTH > 1)\n"
+      "    assign out = in;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
+  ASSERT_EQ(gen->gen_body.size(), 1u);
+  EXPECT_EQ(gen->gen_else, nullptr);
+}
+
 }  // namespace
