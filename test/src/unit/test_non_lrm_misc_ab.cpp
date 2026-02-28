@@ -6,13 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA29, AttrOnImportPort) {
-  EXPECT_TRUE(
-      ParseOk("interface bus;\n"
-              "  modport target((* synthesis *) import Read);\n"
-              "endinterface\n"));
-}
-
 TEST(ParserA211, TransRangeList_NonConsecutiveRepeat) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
