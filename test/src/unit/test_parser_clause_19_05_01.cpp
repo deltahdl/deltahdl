@@ -114,4 +114,18 @@ TEST(ParserA211, BinsKeyword_Bins) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// §A.2.11 Production #27: covergroup_range_list
+// =============================================================================
+TEST(ParserA211, CovergroupRangeList_Single) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  covergroup cg;\n"
+              "    coverpoint x {\n"
+              "      bins a = {5};\n"
+              "    }\n"
+              "  endgroup\n"
+              "endmodule\n"));
+}
+
 }  // namespace
