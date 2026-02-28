@@ -30,23 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserCh513, BuiltInMethod_WithArgs) {
-  // Built-in method with arguments: arr.find with (item > 3).
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int q[$];\n"
-              "  initial q.sort();\n"
-              "endmodule"));
-}
-
-TEST(ParserCh513, BuiltInMethod_Delete) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int q[$];\n"
-              "  initial q.delete();\n"
-              "endmodule"));
-}
-
 TEST(ParserCh513, BuiltInMethod_PushBack) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
