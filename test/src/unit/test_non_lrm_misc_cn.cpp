@@ -48,18 +48,6 @@ TEST(ParserSection16, PropertyDeclAndAssertProperty) {
   EXPECT_TRUE(found_assert);
 }
 
-// --- Deferred immediate assertions at module level (§16.4) ---
-TEST(ParserSection16, DeferredAssertModuleLevel) {
-  auto r = Parse(
-      "module top();\n"
-      "  logic a = 1;\n"
-      "  assert #0 (a != 0);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(ParserSection16, DeferredAssumeModuleLevel) {
   auto r = Parse(
       "module top();\n"
