@@ -566,4 +566,26 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarFunctionCalls) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
+// @* with for loop in body
+TEST(ParserSection9, Sec9_4_2_3_AtStarForLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] data [0:3];\n"
+      "  reg [7:0] out [0:3];\n"
+      "  always @* begin\n"
+      "    for (int i = 0; i < 4; i++)\n"
+      "      out[i] = data[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kFor);
+}
+
 }  // namespace
