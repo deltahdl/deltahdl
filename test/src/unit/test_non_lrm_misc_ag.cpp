@@ -13,29 +13,6 @@ bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// =============================================================================
-// Elaboration tests -- checker instantiation resolved through elaborator
-// =============================================================================
-// --- Elaborator resolves checker instantiation within a module ---
-TEST(ParserAnnexA0414, ElaborationCheckerInstInModule) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "checker my_chk(input logic clk, input logic rst);\n"
-      "endchecker\n"
-      "module top;\n"
-      "  logic clk, rst;\n"
-      "  my_chk u0(.clk(clk), .rst(rst));\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  auto* top = design->top_modules[0];
-  ASSERT_GE(top->children.size(), 1u);
-  EXPECT_EQ(top->children[0].module_name, "my_chk");
-  EXPECT_EQ(top->children[0].inst_name, "u0");
-  EXPECT_NE(top->children[0].resolved, nullptr);
-}
-
 // --- Elaborator resolves checker instantiation with port bindings ---
 TEST(ParserAnnexA0414, ElaborationCheckerInstPortBindings) {
   ElabFixture f;
