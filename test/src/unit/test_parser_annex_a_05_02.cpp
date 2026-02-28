@@ -108,4 +108,25 @@ TEST(ParserAnnexA052, OutputDeclAnsi_RegInitZero) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
+// ---------------------------------------------------------------------------
+// udp_input_declaration — list_of_udp_port_identifiers
+// ---------------------------------------------------------------------------
+// Single input identifier
+TEST(ParserAnnexA052, InputDecl_SingleId) {
+  auto r = Parse(
+      "primitive inv(out, a);\n"
+      "  output out;\n"
+      "  input a;\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  ASSERT_EQ(udp->input_names.size(), 1u);
+  EXPECT_EQ(udp->input_names[0], "a");
+}
+
 }  // namespace
