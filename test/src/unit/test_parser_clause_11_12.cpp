@@ -92,4 +92,11 @@ TEST(ParserA212, LetDecl_InInterface) {
               "endinterface\n"));
 }
 
+TEST(ParserA212, LetDecl_InProgram) {
+  EXPECT_TRUE(
+      ParseOk("program p;\n"
+              "  let tval(x) = x + 1;\n"
+              "endprogram\n"));
+}
+
 }  // namespace
