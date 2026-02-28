@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_AllPassSwitchTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  tran  t1(a, b);\n"
-              "  rtran rt1(a, b);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA301, GateInst_AllPassEnSwitchTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

@@ -179,4 +179,12 @@ TEST(ParserA301, PassEnSwitchInst_Unnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
+TEST(ParserA301, GateInst_AllPassSwitchTypes) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  tran  t1(a, b);\n"
+              "  rtran rt1(a, b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
