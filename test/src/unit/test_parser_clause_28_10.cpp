@@ -67,4 +67,15 @@ TEST(ParserA301, PullGateInst_PulldownNamed) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
+TEST(ParserA301, PullGateInst_PullupUnnamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  pullup (net1);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
+  ASSERT_NE(g, nullptr);
+  EXPECT_TRUE(g->gate_inst_name.empty());
+}
+
 }  // namespace
