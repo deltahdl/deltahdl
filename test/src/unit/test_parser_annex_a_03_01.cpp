@@ -19,4 +19,16 @@ TEST(ParserA303, OutputTerminal_MultipleOutputs) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
+TEST(ParserA303, OutputTerminal_PullGate) {
+  // output_terminal in pull gate (single terminal)
+  auto r = Parse(
+      "module m;\n"
+      "  pullup (net_a);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 1u);
+}
+
 }  // namespace
