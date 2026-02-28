@@ -182,4 +182,22 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarVarDecls) {
   VerifyAlwaysVarDecl(r);
 }
 
+// @(*) at statement level: produces kEventControl with is_star_event=true
+TEST(ParserSection9, Sec9_4_2_3_AtStarParenStmtLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    @(*) a = b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_TRUE(stmt->is_star_event);
+  EXPECT_TRUE(stmt->events.empty());
+}
+
 }  // namespace

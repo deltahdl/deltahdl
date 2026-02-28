@@ -90,43 +90,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 
 namespace {
 
-// @* at statement level inside initial: produces kEventControl with
-// is_star_event=true
-TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelInitial) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    @* a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(stmt->is_star_event);
-  EXPECT_TRUE(stmt->events.empty());
-}
-
-// @(*) at statement level: produces kEventControl with is_star_event=true
-TEST(ParserSection9, Sec9_4_2_3_AtStarParenStmtLevel) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    @(*) a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(stmt->is_star_event);
-  EXPECT_TRUE(stmt->events.empty());
-}
-
 // @* with begin-end block body at always level
 TEST(ParserSection9, Sec9_4_2_3_AtStarBeginEndBlock) {
   auto r = Parse(
