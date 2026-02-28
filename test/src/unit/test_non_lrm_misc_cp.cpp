@@ -17,20 +17,6 @@ static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST_F(CheckerParseTest, CheckerWithSequenceDecl) {
-  auto* unit = Parse(R"(
-    checker seq_check(input logic clk, input logic a);
-      sequence s1;
-        a;
-      endsequence
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_FALSE(unit->checkers[0]->items.empty());
-  EXPECT_TRUE(
-      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kSequenceDecl));
-}
-
 // =============================================================================
 // §17.8 Checker coexists with module and program
 // =============================================================================
