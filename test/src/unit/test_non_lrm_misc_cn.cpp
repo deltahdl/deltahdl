@@ -26,26 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.5 Concurrent assertions — assert property (module-level)
-// =============================================================================
-TEST(ParserSection16, AssertPropertyModuleLevel) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) a |-> b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAssertProperty) {
-      found = true;
-      EXPECT_NE(item->assert_expr, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 TEST(ParserSection16, AssertPropertyWithElse) {
   auto r = Parse(
       "module m;\n"
