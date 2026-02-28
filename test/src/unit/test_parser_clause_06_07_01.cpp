@@ -480,4 +480,16 @@ TEST(ParserSection6, TriregDefaultInit) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
 }
 
+TEST(ParserSection6, WireWithPackedStruct) {
+  // §6.7.1 example: wire struct packed {logic ecc; ...} memsig;
+  auto r = Parse(
+      "module t;\n"
+      "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "memsig");
+}
+
 }  // namespace
