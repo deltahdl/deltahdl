@@ -46,27 +46,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// §4.6: Non-blocking assignment ordering
-// =============================================================================
-TEST(ParserSection4, Sec4_6_NonblockingAssignOrdering) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= 1;\n"
-      "    b <= 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
-}
-
-// =============================================================================
 // §4.6: Named begin-end block for deterministic scoping
 // =============================================================================
 TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
