@@ -83,4 +83,25 @@ TEST(ParserSection7, Sec7_2_1_PackedTypedefLogicWidths) {
   EXPECT_EQ(item->typedef_type.struct_members[2].name, "valid");
 }
 
+// --- Packed struct typedef with bit members and packed dim checks ---
+TEST(ParserSection7, Sec7_2_1_PackedTypedefBitMembers) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    bit [3:0] nibble_hi;\n"
+      "    bit [3:0] nibble_lo;\n"
+      "  } byte_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
+  EXPECT_EQ(item->typedef_type.struct_members[0].type_kind, DataTypeKind::kBit);
+  EXPECT_EQ(item->typedef_type.struct_members[1].type_kind, DataTypeKind::kBit);
+  EXPECT_NE(item->typedef_type.struct_members[0].packed_dim_left, nullptr);
+  EXPECT_NE(item->typedef_type.struct_members[0].packed_dim_right, nullptr);
+}
+
 }  // namespace

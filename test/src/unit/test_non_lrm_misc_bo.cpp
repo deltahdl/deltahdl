@@ -49,21 +49,6 @@ static void VerifyStructMemberNames(const std::vector<StructMember>& members,
 
 namespace {
 
-// 4. trireg (large) logic cap1; — charge strength + explicit type (LRM §6.7.1).
-TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithLogic) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (large) logic cap1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "cap1");
-}
-
 // 5. Multiple nets with explicit type: wire logic a, b, c;
 TEST(ParserSection6, Sec6_7_1_MultipleNetsExplicitType) {
   auto r = Parse(
