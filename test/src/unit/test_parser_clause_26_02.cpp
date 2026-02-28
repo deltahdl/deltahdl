@@ -79,4 +79,17 @@ TEST(ParserSection26, PackageWithStructTypedef) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kTypedef));
 }
 
+TEST(ParserSection26, PackageWithClassDecl) {
+  auto r = Parse(
+      "package cls_pkg;\n"
+      "  class transaction;\n"
+      "    int addr;\n"
+      "  endclass\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kClassDecl));
+}
+
 }  // namespace
