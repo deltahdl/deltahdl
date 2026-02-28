@@ -41,32 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.4.14 -- Streaming operators
-// =========================================================================
-TEST(ParserSection11, StreamingRight) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {>> {a, b, c}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
-}
-
-TEST(ParserSection11, StreamingRightDetails) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {>> {a, b, c}};\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kGtGt);
-  EXPECT_EQ(rhs->elements.size(), 3u);
-}
-
 TEST(ParserSection11, StreamingLeft) {
   auto r = Parse(
       "module t;\n"

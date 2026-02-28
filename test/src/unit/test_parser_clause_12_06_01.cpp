@@ -78,4 +78,22 @@ TEST(ParserA60701, PatternTaggedNested) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §12.6: tagged void member (no nested pattern)
+TEST(ParserA60701, PatternTaggedVoidMember) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(v) matches\n"
+      "      tagged Invalid: x = 0;\n"
+      "      default: x = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+}
+
 }  // namespace
