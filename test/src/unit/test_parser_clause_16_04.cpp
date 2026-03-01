@@ -57,4 +57,18 @@ TEST(ParserA610, DeferredAssertHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
+// assert final ( expression ) ;
+TEST(ParserA610, DeferredAssertFinal) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert final (1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+}
+
 }  // namespace
