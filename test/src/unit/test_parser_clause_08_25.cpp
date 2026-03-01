@@ -119,4 +119,39 @@ TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
   EXPECT_EQ(cls->params[0].first, "a");
 }
 
+// --- Test helpers ---
+struct ParseResult14 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult14 Parse(const std::string& src) {
+  ParseResult14 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// §13.8: Multiple parameters with defaults.
+TEST(ParserSection13, Sec13_8_MultipleParamsWithDefaults) {
+  auto r = Parse(
+      "virtual class Codec#(parameter IN_W = 8,\n"
+      "                     parameter OUT_W = $clog2(IN_W));\n"
+      "  static function logic [OUT_W-1:0] encode(\n"
+      "      input logic [IN_W-1:0] data);\n"
+      "    encode = '0;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  ASSERT_EQ(r.cu->classes[0]->params.size(), 2u);
+  EXPECT_EQ(r.cu->classes[0]->params[0].first, "IN_W");
+  EXPECT_EQ(r.cu->classes[0]->params[1].first, "OUT_W");
+}
+
 }  // namespace
