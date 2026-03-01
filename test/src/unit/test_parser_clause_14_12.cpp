@@ -194,4 +194,33 @@ TEST(ParserSection19, DefaultClocking_SeparateStatement) {
   EXPECT_TRUE(found_ref);
 }
 
+static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (count == idx) return item;
+    ++count;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// A.6.11 clocking_declaration — default clocking
+// =============================================================================
+TEST(ParserA611, ClockingDeclDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_default_clocking);
+  EXPECT_FALSE(item->is_global_clocking);
+  EXPECT_EQ(item->name, "cb");
+}
+
 }  // namespace
