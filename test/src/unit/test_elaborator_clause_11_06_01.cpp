@@ -42,4 +42,18 @@ TEST(Elaboration, WidthInference_ComparisonOneBit) {
   EXPECT_EQ(InferExprWidth(&cmp, typedefs), 1);
 }
 
+TEST(Elaboration, WidthInference_Concatenation) {
+  TypedefMap typedefs;
+  Expr a;
+  a.kind = ExprKind::kIntegerLiteral;
+  a.int_val = 1;
+  Expr b;
+  b.kind = ExprKind::kIntegerLiteral;
+  b.int_val = 2;
+  Expr concat;
+  concat.kind = ExprKind::kConcatenation;
+  concat.elements = {&a, &b};
+  EXPECT_EQ(InferExprWidth(&concat, typedefs), 64);  // 32 + 32
+}
+
 }  // namespace
