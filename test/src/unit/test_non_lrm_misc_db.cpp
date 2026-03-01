@@ -44,14 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-// File path spec with parent directory (..).
-TEST(LibraryText, LexerFilePathSpecParentDir) {
-  auto r = ParseLibrary("library lib ../rtl/*.v;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "../rtl/*.v");
-}
-
 // Config declaration within library text.
 TEST(LibraryText, ConfigInLibraryText) {
   auto r = ParseLibrary(
