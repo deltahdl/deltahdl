@@ -23,4 +23,22 @@ TEST(ParserA612, RsProdAsIfElse) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// A.6.12 Randsequence — rs_if_else
+// =============================================================================
+// if without else
+TEST(ParserA612, RsIfOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : if (1) child;\n"
+      "      child : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
