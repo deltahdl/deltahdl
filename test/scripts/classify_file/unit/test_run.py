@@ -748,12 +748,19 @@ def test_ensure_unchecked_adds_missing_box(monkeypatch):
     assert "- [ ] Beta" in updates[0]
 
 
-def test_ensure_unchecked_mixed(monkeypatch):
-    """Fixes both checked and missing in one update."""
+def test_ensure_unchecked_mixed_unchecks(monkeypatch):
+    """Mixed: unchecks the checked box."""
     body = "- [x] Alpha\n"
     updates = _stub_github(monkeypatch, body)
     ensure_unchecked(_make_args(), ["Alpha", "Beta"])
     assert "- [ ] Alpha" in updates[0]
+
+
+def test_ensure_unchecked_mixed_adds_missing(monkeypatch):
+    """Mixed: adds the missing box."""
+    body = "- [x] Alpha\n"
+    updates = _stub_github(monkeypatch, body)
+    ensure_unchecked(_make_args(), ["Alpha", "Beta"])
     assert "- [ ] Beta" in updates[0]
 
 

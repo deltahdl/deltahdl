@@ -203,10 +203,8 @@ def test_create_issue_then_process(tmp_path, monkeypatch):
 # ---- ensure_unchecked integration -----------------------------------------
 
 
-def test_ensure_unchecked_before_processing(
-    tmp_path, monkeypatch,
-):
-    """Pipeline calls ensure_unchecked before subprocess calls."""
+def _ensure_order_log(tmp_path, monkeypatch):
+    """Run pipeline recording ensure vs subprocess call order."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     order: list[str] = []
     monkeypatch.setattr(
@@ -223,5 +221,20 @@ def test_ensure_unchecked_before_processing(
     monkeypatch.setattr(subprocess, "run", log_run)
     _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, body))
+    return order
+
+
+def test_ensure_unchecked_runs_first(
+    tmp_path, monkeypatch,
+):
+    """Pipeline calls ensure_unchecked before subprocess calls."""
+    order = _ensure_order_log(tmp_path, monkeypatch)
     assert order[0] == "ensure"
+
+
+def test_subprocess_runs_after_ensure(
+    tmp_path, monkeypatch,
+):
+    """All calls after ensure_unchecked are subprocess calls."""
+    order = _ensure_order_log(tmp_path, monkeypatch)
     assert all(e == "subprocess" for e in order[1:])
