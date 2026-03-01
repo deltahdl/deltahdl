@@ -584,4 +584,36 @@ TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsComma) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
 }
 
+static Stmt* FirstAlwaysStmt(ParseResult9f& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kAlwaysBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Repeat event in always block
+// =============================================================================
+// Repeat event used inside an always block body.
+TEST(ParserSection9, Sec9_4_5_RepeatInAlwaysBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  always @(posedge clk) begin\n"
+      "    a <= repeat(2) @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstAlwaysStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_FALSE(stmt->events.empty());
+}
+
 }  // namespace

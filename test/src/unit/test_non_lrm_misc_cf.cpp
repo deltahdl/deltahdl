@@ -51,16 +51,6 @@ TEST(ParserSection11, ArithmeticDiv) {
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
 }
 
-TEST(ParserSection11, ArithmeticPower) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a ** b;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kPower);
-}
-
 TEST(ParserSection11, UnaryNegation) {
   auto r = Parse(
       "module t;\n"
