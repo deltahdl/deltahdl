@@ -167,4 +167,16 @@ TEST(SimA60701, ConstPatternInVarDeclInit) {
   EXPECT_EQ(var->value.ToUint64(), 25800u);
 }
 
+// --- §10.9.2: Struct assignment pattern validation ---
+TEST(Elaboration, StructPattern_InvalidMemberName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct packed { logic [7:0] a; logic [7:0] b; } s = "
+      "'{nonexistent: 8'hFF};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace

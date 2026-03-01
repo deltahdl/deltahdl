@@ -12,18 +12,6 @@ using namespace delta;
 
 namespace {
 
-// --- §10.9.2: Struct assignment pattern validation ---
-TEST(Elaboration, StructPattern_InvalidMemberName) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  struct packed { logic [7:0] a; logic [7:0] b; } s = "
-      "'{nonexistent: 8'hFF};\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(Elaboration, StructPattern_DuplicateKey) {
   ElabFixture f;
   ElaborateSrc(
