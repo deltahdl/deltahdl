@@ -324,4 +324,12 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithBitType) {
               "endmodule\n"));
 }
 
+// §6.6.7: Nettype with longint type.
+TEST(ParserSection6, Sec6_6_7_NettypeWithLongintType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype longint long_net;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
