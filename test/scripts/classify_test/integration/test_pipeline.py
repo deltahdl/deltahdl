@@ -1,13 +1,10 @@
 """Integration tests for the classify_test pipeline."""
 
-import glob
-from pathlib import Path
 from types import SimpleNamespace
 
 import classify_test
 
 _run = getattr(classify_test, "_run")
-_PREFIX_PATTERNS = getattr(classify_test, "_PREFIX_PATTERNS")
 
 
 # ---- Helpers ---------------------------------------------------------------
@@ -364,27 +361,29 @@ def test_named_ns_output_contains_test(tmp_path, monkeypatch):
     ).read_text()
 
 
-# ---- Codebase prefix coverage ---------------------------------------------
+# ---- Prefix fallback via Claude -------------------------------------------
 
 
-_KNOWN_UNPARSEABLE = {
-    "test_lexer_clause_05_09.cpp",
-}
+def _make_classifier_with_prefix(name, clause, stage):
+    """Build classifier that returns clause, then pipeline stage on fallback."""
+    def classifier(prompt, _schema=None):
+        if "pipeline stage" in prompt.lower():
+            return {"pipeline_stage": stage, "rationale": "r"}
+        if name in prompt:
+            return {"clause": clause, "rationale": "r"}
+        return {"clause": "non-lrm", "rationale": "fallback"}
+
+    return classifier
 
 
-def test_every_test_body_matches_a_prefix_pattern():
-    """Every TEST body in test/src/unit/ contains a known helper pattern."""
-    test_dir = Path("test/src/unit")
-    patterns = [p for p, _ in _PREFIX_PATTERNS]
-    unmatched: list[str] = []
-    for cpp in sorted(glob.glob(str(test_dir / "test_*.cpp"))):
-        if Path(cpp).name in _KNOWN_UNPARSEABLE:
-            continue
-        parsed = classify_test.parse_file(Path(cpp))
-        for test in parsed.all_tests:
-            body = "\n".join(test.lines)
-            if not any(pat in body for pat in patterns):
-                unmatched.append(
-                    f"{Path(cpp).name}:{test.test_name}",
-                )
-    assert not unmatched
+def test_prefix_fallback_creates_correct_file(tmp_path, monkeypatch):
+    """Non-obvious helper falls back to Claude for prefix detection."""
+    _write_input(
+        tmp_path,
+        "TEST(S, TimerTest) {\n  FooBarHelper(ctx);\n}\n\n",
+    )
+    _stub_externals(monkeypatch, tmp_path, _make_classifier_with_prefix(
+        "TimerTest", "11.4", "simulator",
+    ))
+    _run_pipeline(tmp_path, test="TimerTest")
+    assert (tmp_path / "test_simulator_clause_11_04.cpp").exists()

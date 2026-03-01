@@ -63,86 +63,118 @@ def test_existing_non_lrm_topics_empty_topic(tmp_path):
 def test_detect_prefix_parser():
     """Detects parser prefix from Parse( call."""
     t = _tb("T", body=["  auto r = Parse(src);"])
-    assert _detect_prefix(t, "6.1") == "test_parser_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_parser_"
 
 
 def test_detect_prefix_parser_src():
     """Detects parser prefix from ParseSrc( variant."""
     t = _tb("T", body=["  auto r = ParseSrc(src);"])
-    assert _detect_prefix(t, "6.1") == "test_parser_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_parser_"
 
 
 def test_detect_prefix_elaborator():
     """Detects elaborator prefix from Elaborate( call."""
     t = _tb("T", body=["  auto* d = Elaborate(src);"])
-    assert _detect_prefix(t, "6.1") == "test_elaborator_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_elaborator_"
 
 
 def test_detect_prefix_elaborator_src():
     """Detects elaborator prefix from ElaborateSrc( variant."""
     t = _tb("T", body=["  auto* d = ElaborateSrc(src, f);"])
-    assert _detect_prefix(t, "6.1") == "test_elaborator_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_elaborator_"
 
 
 def test_detect_prefix_lexer_lex():
     """Detects lexer prefix from Lex( call."""
     t = _tb("T", body=["  auto tok = Lex(src);"])
-    assert _detect_prefix(t, "6.1") == "test_lexer_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_lexer_"
 
 
 def test_detect_prefix_lexer_one():
     """Detects lexer prefix from LexOne( variant."""
     t = _tb("T", body=["  auto tok = LexOne(src);"])
-    assert _detect_prefix(t, "6.1") == "test_lexer_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_lexer_"
 
 
 def test_detect_prefix_simulator():
     """Detects simulator prefix from Scheduler( call."""
     t = _tb("T", body=["  Scheduler sched;"])
-    assert _detect_prefix(t, "6.1") == "test_simulator_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_simulator_"
 
 
 def test_detect_prefix_simulator_sim_context():
     """Detects simulator prefix from SimContext call."""
     t = _tb("T", body=["  SimContext ctx;"])
-    assert _detect_prefix(t, "6.1") == "test_simulator_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_simulator_"
 
 
 def test_detect_prefix_synthesizer():
     """Detects synthesizer prefix from SynthLower( call."""
     t = _tb("T", body=["  auto g = SynthLower(src);"])
-    assert _detect_prefix(t, "6.1") == "test_synthesizer_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_synthesizer_"
 
 
 def test_detect_prefix_synthesizer_aig():
     """Detects synthesizer prefix from AigGraph."""
     t = _tb("T", body=["  AigGraph g;"])
-    assert _detect_prefix(t, "6.1") == "test_synthesizer_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_synthesizer_"
 
 
 def test_detect_prefix_preprocessor():
     """Detects preprocessor prefix from Preprocessor( call."""
     t = _tb("T", body=["  Preprocessor pp(src);"])
-    assert _detect_prefix(t, "6.1") == "test_preprocessor_"
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_preprocessor_"
 
 
 def test_detect_prefix_non_lrm_override():
     """Non-LRM clause overrides detected prefix to test_non_lrm_."""
     t = _tb("T", body=["  auto r = Parse(src);"])
-    assert _detect_prefix(t, "non-lrm") == "test_non_lrm_"
+    assert _detect_prefix(t, "non-lrm", "/tmp/lrm.txt") == "test_non_lrm_"
 
 
 def test_detect_prefix_non_lrm_underscore_override():
     """Non_lrm (underscore variant) also overrides prefix."""
     t = _tb("T", body=["  auto r = Parse(src);"])
-    assert _detect_prefix(t, "non_lrm") == "test_non_lrm_"
+    assert _detect_prefix(t, "non_lrm", "/tmp/lrm.txt") == "test_non_lrm_"
 
 
-def test_detect_prefix_no_match():
-    """Exits when no pattern matches."""
-    t = _tb("T", body=["  int x = 1;"])
+def test_detect_prefix_no_match_fallback(monkeypatch):
+    """Falls back to Claude when no obvious pattern matches."""
+    monkeypatch.setattr(
+        classify_test, "_call_claude",
+        lambda _p, _s=None: {
+            "pipeline_stage": "simulator", "rationale": "r",
+        },
+    )
+    t = _tb("T", body=["  EvalExpr(ctx, e);"])
+    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_simulator_"
+
+
+def test_detect_prefix_fallback_calls_claude(monkeypatch):
+    """Fallback invokes _call_claude with prefix prompt."""
+    calls = []
+
+    def spy(prompt, schema=None):
+        calls.append(prompt)
+        return {"pipeline_stage": "simulator", "rationale": "r"}
+
+    monkeypatch.setattr(classify_test, "_call_claude", spy)
+    t = _tb("T", body=["  EvalExpr(ctx, e);"])
+    _detect_prefix(t, "6.1", "/tmp/lrm.txt")
+    assert "pipeline stage" in calls[0].lower()
+
+
+def test_detect_prefix_fallback_invalid_stage_exits(monkeypatch):
+    """Exits when Claude returns an unrecognized pipeline stage."""
+    monkeypatch.setattr(
+        classify_test, "_call_claude",
+        lambda _p, _s=None: {
+            "pipeline_stage": "bogus", "rationale": "r",
+        },
+    )
+    t = _tb("T", body=["  EvalExpr(ctx, e);"])
     with pytest.raises(SystemExit):
-        _detect_prefix(t, "6.1")
+        _detect_prefix(t, "6.1", "/tmp/lrm.txt")
 
 
 # ---- _build_clause_prompt --------------------------------------------------
@@ -339,7 +371,7 @@ def test_apply_classification_found():
     """Applies prefix, clause, and rationale from clause response."""
     t = _tb("MyTest", body=["  auto r = Parse(src);"])
     clause_resp = {"clause": "6.1", "rationale": "reason"}
-    _apply_classification(t, clause_resp)
+    _apply_classification(t, clause_resp, lrm_path="/tmp/lrm.txt")
     assert t.prefix == "test_parser_" and t.clause == "6.1"
 
 
@@ -348,7 +380,7 @@ def test_apply_classification_non_lrm_underscore():
     t = _tb("T", body=["  auto r = Parse(src);"])
     clause_resp = {"clause": "non_lrm", "rationale": "r"}
     topic_resp = {"non_lrm_topic": "aig", "rationale": "r"}
-    _apply_classification(t, clause_resp, topic_resp)
+    _apply_classification(t, clause_resp, topic_resp, lrm_path="/tmp/lrm.txt")
     assert t.clause == "non-lrm:aig"
 
 
@@ -357,7 +389,7 @@ def test_apply_classification_non_lrm_with_topic():
     t = _tb("T", body=["  auto r = Parse(src);"])
     clause_resp = {"clause": "non-lrm", "rationale": "r"}
     topic_resp = {"non_lrm_topic": "aig", "rationale": "r"}
-    _apply_classification(t, clause_resp, topic_resp)
+    _apply_classification(t, clause_resp, topic_resp, lrm_path="/tmp/lrm.txt")
     assert t.clause == "non-lrm:aig"
 
 
@@ -365,7 +397,7 @@ def test_apply_classification_no_rationale():
     """Missing rationale defaults to empty string."""
     t = _tb("T", body=["  auto r = Parse(src);"])
     clause_resp = {"clause": "6.1"}
-    _apply_classification(t, clause_resp)
+    _apply_classification(t, clause_resp, lrm_path="/tmp/lrm.txt")
     assert t.rationale == ""
 
 
@@ -375,14 +407,16 @@ def test_apply_classification_non_lrm_empty_topic():
     clause_resp = {"clause": "non-lrm", "rationale": "r"}
     topic_resp = {"non_lrm_topic": "", "rationale": "r"}
     with pytest.raises(SystemExit):
-        _apply_classification(t, clause_resp, topic_resp)
+        _apply_classification(
+            t, clause_resp, topic_resp, lrm_path="/tmp/lrm.txt",
+        )
 
 
 def test_apply_classification_detects_prefix():
     """Prefix is derived mechanically from test body."""
     t = _tb("T", body=["  auto* d = Elaborate(src);"])
     clause_resp = {"clause": "6.1", "rationale": "r"}
-    _apply_classification(t, clause_resp)
+    _apply_classification(t, clause_resp, lrm_path="/tmp/lrm.txt")
     assert t.prefix == "test_elaborator_"
 
 
@@ -391,7 +425,7 @@ def test_apply_classification_non_lrm_prefix_override():
     t = _tb("T", body=["  auto r = Parse(src);"])
     clause_resp = {"clause": "non-lrm", "rationale": "r"}
     topic_resp = {"non_lrm_topic": "aig", "rationale": "r"}
-    _apply_classification(t, clause_resp, topic_resp)
+    _apply_classification(t, clause_resp, topic_resp, lrm_path="/tmp/lrm.txt")
     assert t.prefix == "test_non_lrm_"
 
 
@@ -601,7 +635,9 @@ def test_apply_classification_rejects_bad_clause():
     """_apply_classification exits on an invalid clause."""
     t = _tb("T", body=["  auto r = Parse(src);"])
     with pytest.raises(SystemExit):
-        _apply_classification(t, _valid_clause(clause="abc"))
+        _apply_classification(
+            t, _valid_clause(clause="abc"), lrm_path="/tmp/lrm.txt",
+        )
 
 
 def test_classify_tests_propagates_validation_error(monkeypatch, tmp_path):

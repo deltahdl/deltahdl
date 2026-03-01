@@ -26,7 +26,14 @@ from ._github import (
     update_issue_body,
 )
 from ._git import commit_classification
+from ._patterns import CLAUSE_PROMPT_TEMPLATE
+from ._patterns import CLAUSE_SCHEMA
 from ._patterns import PREFIX_PATTERNS
+from ._patterns import PREFIX_PROMPT_TEMPLATE
+from ._patterns import PREFIX_SCHEMA
+from ._patterns import STAGE_TO_PREFIX
+from ._patterns import TOPIC_PROMPT_TEMPLATE
+from ._patterns import TOPIC_SCHEMA
 from ._output import (
     print_classification_table,
     print_summary,
@@ -331,18 +338,32 @@ def parse_file(filepath):
 # ---------------------------------------------------------------------------
 
 _PREFIX_PATTERNS = PREFIX_PATTERNS
+_STAGE_TO_PREFIX = STAGE_TO_PREFIX
+_PREFIX_PROMPT_TEMPLATE = PREFIX_PROMPT_TEMPLATE
+_PREFIX_SCHEMA = PREFIX_SCHEMA
 
 
-def _detect_prefix(test, clause):
-    """Detect pipeline stage prefix mechanically from test body."""
+def _detect_prefix(test, clause, lrm_path):
+    """Detect pipeline stage prefix from test body."""
     if clause.replace("_", "-").startswith("non-lrm"):
         return "test_non_lrm_"
     body = "\n".join(test.lines)
     for pattern, prefix in _PREFIX_PATTERNS:
         if pattern in body:
             return prefix
+    prompt = _PREFIX_PROMPT_TEMPLATE.format(
+        lrm_path=lrm_path,
+        suite=test.suite_name,
+        test_name=test.test_name,
+        test_body=body,
+    )
+    resp = _call_claude(prompt, _PREFIX_SCHEMA)
+    stage = resp.get("pipeline_stage", "")
+    prefix = _STAGE_TO_PREFIX.get(stage)
+    if prefix:
+        return prefix
     print(f"ERROR: Cannot detect pipeline stage for test"
-          f" {test.test_name}. No known helper call found in body.")
+          f" {test.test_name}. Claude returned: {resp}")
     sys.exit(1)
 
 
@@ -360,45 +381,10 @@ def existing_non_lrm_topics(test_dir):
     return sorted(topics)
 
 
-_CLAUSE_PROMPT_TEMPLATE = """What IEEE 1800-2023 clause does this test exercise?
-
-Use the most specific subclause possible (e.g., 9.2.2.2.2 not 9.2).
-Read the LRM to verify — do not guess from titles.
-If no LRM clause applies, respond with "non-lrm".
-
-LRM: {lrm_path}
-
-TEST({suite}, {test_name}):
-{test_body}
-"""
-
-_TOPIC_PROMPT_TEMPLATE = """What non-LRM topic does this test belong to?
-
-Return a short snake_case topic name (e.g., "aig", "arena", "dpi_helpers").
-{topics}
-TEST({suite}, {test_name}):
-{test_body}
-"""
-
-_CLAUSE_SCHEMA = json.dumps({
-    "type": "object",
-    "properties": {
-        "clause": {"type": "string"},
-        "rationale": {"type": "string"},
-    },
-    "required": ["clause", "rationale"],
-    "additionalProperties": False,
-})
-
-_TOPIC_SCHEMA = json.dumps({
-    "type": "object",
-    "properties": {
-        "non_lrm_topic": {"type": "string"},
-        "rationale": {"type": "string"},
-    },
-    "required": ["non_lrm_topic", "rationale"],
-    "additionalProperties": False,
-})
+_CLAUSE_PROMPT_TEMPLATE = CLAUSE_PROMPT_TEMPLATE
+_TOPIC_PROMPT_TEMPLATE = TOPIC_PROMPT_TEMPLATE
+_CLAUSE_SCHEMA = CLAUSE_SCHEMA
+_TOPIC_SCHEMA = TOPIC_SCHEMA
 
 
 def _build_clause_prompt(test, lrm_path):
@@ -505,7 +491,8 @@ def _validate_topic_response(response, test_name):
         sys.exit(1)
 
 
-def _apply_classification(test, clause_resp, topic_resp=None):
+def _apply_classification(test, clause_resp, topic_resp=None,
+                          *, lrm_path):
     """Apply clause and optional topic responses to a test block."""
     _validate_clause_response(clause_resp, test.test_name)
     clause = clause_resp["clause"]
@@ -514,7 +501,7 @@ def _apply_classification(test, clause_resp, topic_resp=None):
     if clause == "non-lrm" and topic_resp:
         _validate_topic_response(topic_resp, test.test_name)
         clause = f"non-lrm:{topic_resp['non_lrm_topic']}"
-    test.prefix = _detect_prefix(test, clause)
+    test.prefix = _detect_prefix(test, clause, lrm_path)
     test.clause = clause
     test.rationale = clause_resp.get("rationale", "")
 
@@ -529,7 +516,8 @@ def classify_tests(tests, test_dir, lrm_path):
         if clause.replace("_", "-") == "non-lrm":
             topic_prompt = _build_topic_prompt(test, test_dir)
             topic_resp = _call_claude(topic_prompt, _TOPIC_SCHEMA)
-        _apply_classification(test, clause_resp, topic_resp)
+        _apply_classification(test, clause_resp, topic_resp,
+                              lrm_path=lrm_path)
     return tests
 
 

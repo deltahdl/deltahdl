@@ -1,117 +1,102 @@
-"""Pattern table mapping test-body substrings to file-name prefixes.
+"""Patterns, prompts, and schemas for test classification.
 
-Each entry is ``(substring, prefix)``.  The first matching substring
-determines the pipeline-stage prefix used by ``_detect_prefix``.
+Only obviously-named helpers are listed in ``PREFIX_PATTERNS``.  When
+no pattern matches, ``_detect_prefix`` falls back to a Claude call
+using ``PREFIX_PROMPT_TEMPLATE`` and ``PREFIX_SCHEMA``.
 """
 
+import json
+
 PREFIX_PATTERNS: list[tuple[str, str]] = [
-    # Preprocessor
     ("Preprocess", "test_preprocessor_"),
-    # Synthesizer
     ("SynthLower", "test_synthesizer_"),
     ("Aig", "test_synthesizer_"),
-    # Elaborator
     ("Elaborate", "test_elaborator_"),
-    ("ElabOk", "test_elaborator_"),
-    ("ValidateNet", "test_elaborator_"),
-    ("ValidateGate", "test_elaborator_"),
-    ("ValidateRef", "test_elaborator_"),
-    ("InferExprWidth", "test_elaborator_"),
-    ("SensId", "test_elaborator_"),
-    ("LongestStaticPrefix", "test_elaborator_"),
-    ("ComputeArray", "test_elaborator_"),
-    ("CollectExpr", "test_elaborator_"),
-    ("MakeSelectExpr", "test_elaborator_"),
-    ("HasErrors", "test_elaborator_"),
-    ("ImplicitlySigned", "test_elaborator_"),
-    # Parser
     ("Parse", "test_parser_"),
-    ("CanHaveStrengthSpec", "test_parser_"),
-    # Lexer
     ("Lex", "test_lexer_"),
-    # Simulator: evaluation / runtime
-    ("Eval", "test_simulator_"),
-    ("CreateVariable", "test_simulator_"),
-    ("RunAndGet", "test_simulator_"),
-    ("RunStmt", "test_simulator_"),
-    ("Execute", "test_simulator_"),
-    ("ToUint64", "test_simulator_"),
-    ("MakeInt", "test_simulator_"),
-    ("MakeId", "test_simulator_"),
-    ("MkInt", "test_simulator_"),
-    ("MakeVar", "test_simulator_"),
-    ("MakeBinary", "test_simulator_"),
-    ("MakeClassType", "test_simulator_"),
-    # Simulator: 4-state values / logic
-    ("Logic4", "test_simulator_"),
-    ("Val4", "test_simulator_"),
-    # Simulator: variables / types
-    ("AddVariable", "test_simulator_"),
-    ("GetValue", "test_simulator_"),
-    ("SysCall", "test_simulator_"),
-    ("AddPlusArg", "test_simulator_"),
-    ("RegisterEnum", "test_simulator_"),
-    ("SvString", "test_simulator_"),
-    ("DynArray", "test_simulator_"),
-    ("AssocArray", "test_simulator_"),
-    # Simulator: VPI / DPI
-    ("Vpi", "test_simulator_"),
-    ("Dpi", "test_simulator_"),
-    # Simulator: scheduling / processes
     ("Scheduler", "test_simulator_"),
     ("SimContext", "test_simulator_"),
-    ("CurrentTime", "test_simulator_"),
-    ("SimTime", "test_simulator_"),
-    ("Process", "test_simulator_"),
-    ("Coroutine", "test_simulator_"),
-    ("EventCoalescer", "test_simulator_"),
-    ("Partitioner", "test_simulator_"),
-    # Simulator: clocking / sensitivity
-    ("Clocking", "test_simulator_"),
-    ("Sensitivity", "test_simulator_"),
-    ("EdgeKind", "test_simulator_"),
-    # Simulator: gates / switches / primitives
-    ("GateKind", "test_simulator_"),
-    ("SwitchType", "test_simulator_"),
-    ("Udp", "test_simulator_"),
-    ("MakeNetPair", "test_simulator_"),
-    ("Pullup", "test_simulator_"),
-    ("Pulldown", "test_simulator_"),
-    ("Strength", "test_simulator_"),
-    # Simulator: delays / timing
-    ("DelaySpec", "test_simulator_"),
-    ("MinTypMax", "test_simulator_"),
-    ("ComputeGateDelay", "test_simulator_"),
-    ("TimingControl", "test_simulator_"),
-    ("TimingCheck", "test_simulator_"),
-    ("RepeatCount", "test_simulator_"),
-    ("PathDelay", "test_simulator_"),
-    ("SpecifyPath", "test_simulator_"),
-    ("SdfAnnotate", "test_simulator_"),
-    # Simulator: coverage
-    ("Coverage", "test_simulator_"),
-    ("CreateGroup", "test_simulator_"),
-    ("Sample", "test_simulator_"),
-    # Simulator: assertions
-    ("Assertion", "test_simulator_"),
-    ("SvaEngine", "test_simulator_"),
-    # Simulator: VCD output
-    ("VcdClause", "test_simulator_"),
-    ("FormatModule", "test_simulator_"),
-    # Simulator: nets / resolution
-    ("ForceRelease", "test_simulator_"),
-    ("Supply", "test_simulator_"),
-    ("Trireg", "test_simulator_"),
-    # Simulator: suite-name / fixture patterns
-    ("SimCh", "test_simulator_"),
-    ("SimFixture", "test_simulator_"),
-    ("RealFixture", "test_simulator_"),
-    ("ClassSim", "test_simulator_"),
-    ("IpcSync", "test_simulator_"),
-    ("DriverUpdate", "test_simulator_"),
-    ("DataReadApi", "test_simulator_"),
-    # Simulator: misc
-    ("CompiledProcess", "test_simulator_"),
-    ("Arena", "test_simulator_"),
-    ("Callable", "test_simulator_"),
 ]
+
+STAGE_TO_PREFIX: dict[str, str] = {
+    "preprocessor": "test_preprocessor_",
+    "lexer": "test_lexer_",
+    "parser": "test_parser_",
+    "elaborator": "test_elaborator_",
+    "simulator": "test_simulator_",
+    "synthesizer": "test_synthesizer_",
+}
+
+CLAUSE_PROMPT_TEMPLATE = """What IEEE 1800-2023 clause does this test exercise?
+
+Use the most specific subclause possible (e.g., 9.2.2.2.2 not 9.2).
+Read the LRM to verify — do not guess from titles.
+If no LRM clause applies, respond with "non-lrm".
+
+LRM: {lrm_path}
+
+TEST({suite}, {test_name}):
+{test_body}
+"""
+
+TOPIC_PROMPT_TEMPLATE = """What non-LRM topic does this test belong to?
+
+Return a short snake_case topic name (e.g., "aig", "arena", "dpi_helpers").
+{topics}
+TEST({suite}, {test_name}):
+{test_body}
+"""
+
+CLAUSE_SCHEMA = json.dumps({
+    "type": "object",
+    "properties": {
+        "clause": {"type": "string"},
+        "rationale": {"type": "string"},
+    },
+    "required": ["clause", "rationale"],
+    "additionalProperties": False,
+})
+
+TOPIC_SCHEMA = json.dumps({
+    "type": "object",
+    "properties": {
+        "non_lrm_topic": {"type": "string"},
+        "rationale": {"type": "string"},
+    },
+    "required": ["non_lrm_topic", "rationale"],
+    "additionalProperties": False,
+})
+
+PREFIX_PROMPT_TEMPLATE = """Which pipeline stage does this test belong to?
+
+The DeltaHDL compiler has six pipeline stages:
+- preprocessor: macro expansion, `include, `ifdef, `timescale
+- lexer: tokenization, keyword recognition
+- parser: recursive-descent parsing, AST construction
+- elaborator: type resolution, constant evaluation, sensitivity analysis, RTLIR
+- simulator: scheduling, process execution, expression evaluation, VPI, DPI,
+  clocking, assertions, coverage, gate/switch primitives, specify, timing checks
+- synthesizer: AIG construction, optimization, LUT/cell mapping, netlist output
+
+Here is the LRM. The LRM is the source of truth for determining which
+pipeline stage implements the functionality this test exercises.
+
+LRM: {lrm_path}
+
+TEST({suite}, {test_name}):
+{test_body}
+"""
+
+PREFIX_SCHEMA = json.dumps({
+    "type": "object",
+    "properties": {
+        "pipeline_stage": {
+            "type": "string",
+            "enum": ["preprocessor", "lexer", "parser",
+                     "elaborator", "simulator", "synthesizer"],
+        },
+        "rationale": {"type": "string"},
+    },
+    "required": ["pipeline_stage", "rationale"],
+    "additionalProperties": False,
+})
