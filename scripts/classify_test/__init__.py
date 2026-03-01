@@ -60,7 +60,7 @@ from ._split import (
 # Data structures
 # ---------------------------------------------------------------------------
 @dataclass
-class TestBlock:  # pylint: disable=too-many-instance-attributes
+class TestBlock:
     """A single TEST/TEST_F/TEST_P block with classification metadata."""
 
     suite_name: str
@@ -70,7 +70,6 @@ class TestBlock:  # pylint: disable=too-many-instance-attributes
     prefix: str | None = None
     clause: str | None = None
     rationale: str | None = None
-    prefix_rationale: str | None = None
 
 
 @dataclass
