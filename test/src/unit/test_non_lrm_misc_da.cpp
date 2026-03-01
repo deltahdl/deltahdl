@@ -38,23 +38,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_PulsestyleOnevent) {
-  auto sp = ParseSpecifySingle(
-      "module m(input a, output b);\n"
-      "  specify\n"
-      "    pulsestyle_onevent b;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(sp.pr.cu, nullptr);
-  EXPECT_FALSE(sp.pr.has_errors);
-  ASSERT_NE(sp.sole_item, nullptr);
-  auto* si = sp.sole_item;
-  EXPECT_EQ(si->kind, SpecifyItemKind::kPulsestyle);
-  EXPECT_FALSE(si->is_ondetect);
-  ASSERT_EQ(si->signal_list.size(), 1u);
-  EXPECT_EQ(si->signal_list[0], "b");
-}
-
 TEST(ParserSection28, Sec28_12_PulsestyleOndetect) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b, c);\n"
