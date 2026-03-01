@@ -21,20 +21,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA702, EdgeIdentifierEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (edge clk => q) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_EQ(si->path.edge, SpecifyEdge::kEdge);
-}
-
 // =============================================================================
 // A.7.2 edge_sensitive_path_declaration — parallel form
 // =============================================================================
