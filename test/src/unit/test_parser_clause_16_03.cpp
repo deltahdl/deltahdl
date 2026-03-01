@@ -326,4 +326,19 @@ TEST(ParserA610, SimpleAssertPassElseFail) {
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
+// assert ( expression ) else fail_stmt ;
+TEST(ParserA610, SimpleAssertElseOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert(1) else $display(\"fail\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
+  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
+}
+
 }  // namespace
