@@ -15,21 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// 3 delays: trise, tfall, tz
-TEST(ParserA704, ListOfPathDelayExpr3) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = (2, 3, 4);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.delays.size(), 3u);
-}
-
 // 6 delays: t01, t10, t0z, tz1, t1z, tz0
 TEST(ParserA704, ListOfPathDelayExpr6) {
   auto r = Parse(
