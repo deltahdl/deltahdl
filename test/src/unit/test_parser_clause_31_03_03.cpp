@@ -124,4 +124,23 @@ TEST_F(SpecifyTest, SetupholdTimingCheck) {
   ASSERT_GE(tc.limits.size(), 2u);
 }
 
+TEST(ParserSection28, Sec28_12_TimingCheckSetuphold) {
+  auto sp = ParseSpecifySingle(
+      "module m(input d, clk);\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, d, 3, 2);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto* si = sp.sole_item;
+  EXPECT_EQ(si->kind, SpecifyItemKind::kTimingCheck);
+  EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetuphold);
+  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
+  EXPECT_EQ(si->timing_check.data_terminal.name, "d");
+  ASSERT_EQ(si->timing_check.limits.size(), 2u);
+}
+
 }  // namespace
