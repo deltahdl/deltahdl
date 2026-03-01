@@ -453,4 +453,16 @@ TEST(ParserA83, ConstantRangeExprBitSelect) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
+// § constant_range in part-select context
+TEST(ParserA83, ConstantRangePartSelect) {
+  auto r = Parse("module m; initial x = data[7:4]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->index, nullptr);
+  ASSERT_NE(rhs->index_end, nullptr);
+}
+
 }  // namespace
