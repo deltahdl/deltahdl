@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection12, NamedForkJoin) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial fork : my_fork\n"
-      "    x = 1;\n"
-      "  join : my_fork\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kFork);
-  EXPECT_EQ(body->label, "my_fork");
-}
-
 TEST(ParserSection12, NamedForkJoinAny) {
   auto r = Parse(
       "module t;\n"

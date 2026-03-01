@@ -412,4 +412,18 @@ TEST(ParserSection9, Sec9_3_2_NamedForkJoinMatchingLabels) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
 }
 
+TEST(ParserSection12, NamedForkJoin) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial fork : my_fork\n"
+      "    x = 1;\n"
+      "  join : my_fork\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kFork);
+  EXPECT_EQ(body->label, "my_fork");
+}
+
 }  // namespace
