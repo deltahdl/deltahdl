@@ -297,4 +297,26 @@ TEST(ParserSection39, AssertPropertyStatement) {
   EXPECT_TRUE(found_assert);
 }
 
+static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// A.6.10 — concurrent_assertion_statement (module-level)
+// =============================================================================
+// assert_property_statement
+TEST(ParserA610, AssertPropertyModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a |-> b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+}
+
 }  // namespace

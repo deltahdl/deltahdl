@@ -23,21 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// =============================================================================
-// A.6.10 — concurrent_assertion_statement (module-level)
-// =============================================================================
-// assert_property_statement
-TEST(ParserA610, AssertPropertyModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (a |-> b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
-  ASSERT_NE(item, nullptr);
-}
-
 // assume_property_statement
 TEST(ParserA610, AssumePropertyModule) {
   auto r = Parse(
