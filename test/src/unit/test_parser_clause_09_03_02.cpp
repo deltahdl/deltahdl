@@ -491,4 +491,23 @@ TEST(ParserSection4, Sec4_6_ForkJoinAnyFirstComplete) {
   EXPECT_EQ(body->join_kind, TokenKind::kKwJoinAny);
 }
 
+// =============================================================================
+// §4.6: Fork-join_none ordering — all branches concurrent
+// =============================================================================
+TEST(ParserSection4, Sec4_6_ForkJoinNoneConcurrent) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  join_none\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kFork);
+  EXPECT_EQ(body->join_kind, TokenKind::kKwJoinNone);
+}
+
 }  // namespace

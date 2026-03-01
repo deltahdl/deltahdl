@@ -179,4 +179,20 @@ TEST(ParserSection12, CaseWithOnlyDefault) {
   EXPECT_TRUE(stmt->case_items[0].is_default);
 }
 
+// §12.5: case statement items count and default detection
+TEST(ParserA607, CaseStmtItems) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; default: y = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+  EXPECT_FALSE(stmt->case_items[0].is_default);
+  EXPECT_TRUE(stmt->case_items[1].is_default);
+}
+
 }  // namespace
