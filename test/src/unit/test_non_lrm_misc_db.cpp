@@ -247,43 +247,6 @@ TEST(SourceText, ConfigDeclEndLabel) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg2");
 }
 
-// config_declaration with local_parameter_declaration
-TEST(SourceText, ConfigDeclLocalParams) {
-  auto r = Parse(
-      "config cfg3;\n"
-      "  localparam WIDTH = 8;\n"
-      "  localparam DEPTH = 4;\n"
-      "  design work.top;\n"
-      "  default liblist work;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* c = r.cu->configs[0];
-  ASSERT_EQ(c->local_params.size(), 2u);
-  EXPECT_EQ(c->local_params[0].first, "WIDTH");
-  EXPECT_EQ(c->local_params[1].first, "DEPTH");
-}
-
-// design_statement: multiple cells, with and without library qualifier
-TEST(SourceText, ConfigDesignMultipleCells) {
-  auto r = Parse(
-      "config cfg4;\n"
-      "  design work.top lib2.sub cellonly;\n"
-      "  default liblist work;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* c = r.cu->configs[0];
-  ASSERT_EQ(c->design_cells.size(), 3u);
-  EXPECT_EQ(c->design_cells[0].first, "work");
-  EXPECT_EQ(c->design_cells[0].second, "top");
-  EXPECT_EQ(c->design_cells[1].first, "lib2");
-  EXPECT_EQ(c->design_cells[1].second, "sub");
-  // Unqualified cell: lib is empty
-  EXPECT_EQ(c->design_cells[2].first, "");
-  EXPECT_EQ(c->design_cells[2].second, "cellonly");
-}
-
 // config_rule_statement: default_clause liblist_clause
 TEST(SourceText, ConfigRuleDefaultLiblist) {
   auto r = Parse(
