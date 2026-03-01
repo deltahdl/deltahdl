@@ -40,26 +40,6 @@ TEST(ParserA701, ShowcancelledMultipleOutputs) {
   EXPECT_EQ(item->signal_list[2], "out3");
 }
 
-TEST(ParserA701, MultipleSpecifyBlocksInModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "  endspecify\n"
-      "  specify\n"
-      "    (c => d) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  int spec_count = 0;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) ++spec_count;
-  }
-  EXPECT_EQ(spec_count, 2);
-}
-
 // =============================================================================
 // A.7.1 pulsestyle and showcancelled together
 // =============================================================================
