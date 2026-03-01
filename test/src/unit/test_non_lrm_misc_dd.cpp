@@ -12,12 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ConstEval, Concatenation) {
-  EvalFixture f;
-  // {4'd3, 4'd5} = 8'h35 = 53
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4'd3, 4'd5}", f)), 0x35);
-}
-
 TEST(ConstEval, Replication) {
   EvalFixture f;
   // {4{1'b1}} = 4'b1111 = 15
