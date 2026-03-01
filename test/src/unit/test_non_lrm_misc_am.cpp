@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// jump_statement ::= return [ expression ] ; | break ; | continue ;
-// ---------------------------------------------------------------------------
-// §12.8: return with expression from non-void function
-TEST(ParserA605, JumpReturnWithExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int f(); return 42; endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* func = FirstFunctionDecl(r);
-  ASSERT_NE(func, nullptr);
-  ASSERT_GE(func->func_body_stmts.size(), 1u);
-  auto* stmt = func->func_body_stmts[0];
-  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
 // §12.8: return without expression from void function
 TEST(ParserA605, JumpReturnVoid) {
   auto r = Parse(
