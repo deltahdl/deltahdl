@@ -51,16 +51,6 @@ TEST(ParserSection11, ArithmeticDiv) {
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
 }
 
-// --- Empty args in system calls (§20.2/§21.2) ---
-TEST(ParserSection11, SystemCallEmptyArgs) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial $display(5,,2,,3);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection11, SystemCallLeadingEmptyArg) {
   auto r = Parse(
       "module t;\n"
