@@ -115,4 +115,21 @@ TEST(ParserA70503, EdgeKeywordWithoutBrackets) {
   EXPECT_TRUE(tc->data_edge_descriptors.empty());
 }
 
+// edge_control_specifier on ref event
+TEST(ParserA70503, EdgeControlSpecifierOnRefEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $hold(edge [01] clk, data, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kEdge);
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), 1u);
+  EXPECT_EQ(tc->ref_edge_descriptors[0].first, '0');
+  EXPECT_EQ(tc->ref_edge_descriptors[0].second, '1');
+}
+
 }  // namespace
