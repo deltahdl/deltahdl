@@ -22,18 +22,6 @@ TEST(ParserAnnexD, AnnexDScope) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserAnnexD2, AnnexDIncsaveExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $incsave(\"incremental.sav\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->expr, nullptr);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
-}
-
 // --- D.3: $input ---
 TEST(ParserAnnexD2, AnnexDInput) {
   auto r = Parse(

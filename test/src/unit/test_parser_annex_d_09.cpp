@@ -28,4 +28,16 @@ TEST(ParserAnnexD2, AnnexDIncsaveParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
+TEST(ParserAnnexD2, AnnexDIncsaveExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial $incsave(\"incremental.sav\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->expr, nullptr);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
+}
+
 }  // namespace
