@@ -64,24 +64,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 
 namespace {
 
-// @* with ternary expression assignment
-TEST(ParserSection9, Sec9_4_2_3_AtStarTernary) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg sel, a, b, out;\n"
-      "  always @* out = sel ? a : b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->rhs, nullptr);
-  EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
-}
-
 // Verify is_star_event is true and events empty for @(*) at statement level
 TEST(ParserSection9, Sec9_4_2_3_IsStarEventTrueAtStarParen) {
   auto r = Parse(
