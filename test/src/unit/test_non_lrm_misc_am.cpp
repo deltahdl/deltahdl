@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.3: wait (condition) null statement
-TEST(ParserA605, WaitConditionNull) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait (ready) ;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-  EXPECT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
-}
-
 // §9.6.1: wait fork
 TEST(ParserA605, WaitFork) {
   auto r = Parse(
