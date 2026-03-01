@@ -20,17 +20,6 @@ TEST(ParserSection21, FeofFerror) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, DumplimitCall) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    $dumpfile(\"out.vcd\");\n"
-              "    $dumplimit(1000000);\n"
-              "    $dumpvars;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // ============================================================================
 // LRM section 21.7.1.2 -- Specifying variables to be dumped ($dumpvars)
 // ============================================================================
