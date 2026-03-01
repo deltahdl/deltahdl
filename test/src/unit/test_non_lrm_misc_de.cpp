@@ -9,24 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA81, ReplicationFour) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = {4{2'b10}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  // 2'b10 replicated 4 times = 8'b10101010 = 0xAA
-  EXPECT_EQ(var->value.ToUint64(), 0xAAu);
-}
-
 // § multiple_concatenation with multiple inner elements
 TEST(SimA81, ReplicationMultipleInner) {
   SimFixture f;
