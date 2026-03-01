@@ -52,20 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-// =============================================================================
-// LRM section 39.5.2 -- Assertion control via system tasks
-// The assertion control functions $assertcontrol and related tasks allow
-// runtime control over assertion evaluation.
-// =============================================================================
-TEST(ParserSection39, AssertControlSystemTask) {
-  // $assertcontrol enables runtime assertion control
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      initial $assertcontrol(3);
-    endmodule
-  )"));
-}
-
 TEST(ParserSection39, AssertControlWithMultipleArgs) {
   // $assertcontrol with control_type and assertion_type arguments
   EXPECT_TRUE(ParseOk(R"(
