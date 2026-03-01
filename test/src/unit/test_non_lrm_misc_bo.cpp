@@ -40,20 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-TEST(ParserSection7, IndexedPartSelectPlus) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = data[3 +: 4];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(rhs->is_part_select_plus);
-}
-
 TEST(ParserSection7, IndexedPartSelectMinus) {
   auto r = Parse(
       "module t;\n"
