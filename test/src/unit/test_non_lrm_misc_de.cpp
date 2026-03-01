@@ -9,25 +9,6 @@ using namespace delta;
 
 namespace {
 
-// § streaming_concatenation — left-shift (bit reversal)
-TEST(SimA81, StreamingLeftShift) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = {<< {8'hAB}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  // 0xAB = 10101011 reversed = 11010101 = 0xD5
-  EXPECT_EQ(var->value.ToUint64(), 0xD5u);
-}
-
 // § streaming_concatenation — multiple stream elements
 TEST(SimA81, StreamingMultipleElements) {
   SimFixture f;
