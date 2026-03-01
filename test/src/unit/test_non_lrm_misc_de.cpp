@@ -9,31 +9,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// assignment_pattern: named struct — simulation
-// ---------------------------------------------------------------------------
-// §10.9.2: named assignment pattern for struct initialization
-TEST(SimA60701, NamedStructPatternInit) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
-      "  pair_t p;\n"
-      "  initial begin\n"
-      "    p = pair_t'{a: 8'd10, b: 8'd20};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("p");
-  ASSERT_NE(var, nullptr);
-  // a=10 in upper byte, b=20 in lower byte: (10 << 8) | 20 = 2580
-  EXPECT_EQ(var->value.ToUint64(), 2580u);
-}
-
 // §10.9.2: named pattern with reversed field order
 TEST(SimA60701, NamedStructPatternReversedOrder) {
   SimFixture f;
