@@ -716,4 +716,22 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarTernary) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
+// Verify is_star_event is true and events empty for @(*) at statement level
+TEST(ParserSection9, Sec9_4_2_3_IsStarEventTrueAtStarParen) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    @(*) a = b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_TRUE(stmt->is_star_event);
+  EXPECT_EQ(stmt->events.size(), 0u);
+}
+
 }  // namespace
