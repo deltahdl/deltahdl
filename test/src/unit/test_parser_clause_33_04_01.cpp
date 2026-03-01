@@ -253,4 +253,18 @@ TEST_F(ConfigTest, MultipleRulesInConfig) {
   EXPECT_EQ(cfg->rules[2]->kind, ConfigRuleKind::kCell);
 }
 
+// =============================================================================
+// Endconfig with label
+// =============================================================================
+TEST_F(ConfigTest, EndconfigWithLabel) {
+  auto* unit = Parse(R"(
+    config my_config;
+      design lib.top;
+    endconfig : my_config
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  EXPECT_EQ(unit->configs[0]->name, "my_config");
+  EXPECT_FALSE(HasErrors());
+}
+
 }  // namespace

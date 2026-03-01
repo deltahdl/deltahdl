@@ -235,20 +235,6 @@ TEST(LibraryText, LexerFilePathSpecParentDir) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "../rtl/*.v");
 }
 
-// =============================================================================
-// Endconfig with label
-// =============================================================================
-TEST_F(ConfigTest, EndconfigWithLabel) {
-  auto* unit = Parse(R"(
-    config my_config;
-      design lib.top;
-    endconfig : my_config
-  )");
-  ASSERT_EQ(unit->configs.size(), 1u);
-  EXPECT_EQ(unit->configs[0]->name, "my_config");
-  EXPECT_FALSE(HasErrors());
-}
-
 // Config declaration within library text.
 TEST(LibraryText, ConfigInLibraryText) {
   auto r = ParseLibrary(
