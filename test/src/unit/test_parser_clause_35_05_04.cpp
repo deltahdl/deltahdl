@@ -279,4 +279,22 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportTask) {
   EXPECT_EQ(items[0]->func_args[0].name, "cycles");
 }
 
+// =============================================================================
+// Annex H - DPI context import task with C name
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiContextTaskWithCName) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context c_poll = task poll_hardware(int timeout);\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->dpi_c_name, "c_poll");
+  EXPECT_EQ(items[0]->name, "poll_hardware");
+  EXPECT_TRUE(items[0]->dpi_is_context);
+  EXPECT_TRUE(items[0]->dpi_is_task);
+}
+
 }  // namespace
