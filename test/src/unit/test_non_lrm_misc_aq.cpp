@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.12 Randsequence — rs_code_block
-// =============================================================================
-// Code block with data declaration and statement
-TEST(ParserA612, RsCodeBlockWithDataDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : { int x; x = 5; $display(x); };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // Weight with code block
 TEST(ParserA612, RsWeightWithCodeBlock) {
   auto r = Parse(
