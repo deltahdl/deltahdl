@@ -23,17 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// assert final at module level
-TEST(ParserA610, DeferredAssertFinalModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic x;\n"
-      "  assert final (x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.6.10 — concurrent assertion with action_block
 // =============================================================================

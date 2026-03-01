@@ -85,4 +85,15 @@ TEST(ParserA610, DeferredAssertHash0Module) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// assert final at module level
+TEST(ParserA610, DeferredAssertFinalModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic x;\n"
+      "  assert final (x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
