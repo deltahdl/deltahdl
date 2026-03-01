@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.6.1: wait fork
-TEST(ParserA605, WaitFork) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait fork;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWaitFork);
-}
-
 // §15.5.4: wait_order with semicolon (null action)
 TEST(ParserA605, WaitOrderNull) {
   auto r = Parse(

@@ -103,4 +103,19 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenWaitFork) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kWaitFork);
 }
 
+// §9.6.1: wait fork
+TEST(ParserA605, WaitFork) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait fork;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWaitFork);
+}
+
 }  // namespace
