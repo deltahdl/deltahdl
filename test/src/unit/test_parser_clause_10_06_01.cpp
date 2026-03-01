@@ -299,4 +299,23 @@ TEST(ParserSection10, Sec10_6_1_AssignExpressionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
+// --- 4. Assign with concatenation RHS ---
+TEST(ParserSection10, Sec10_6_1_AssignConcatenationRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [3:0] out;\n"
+      "  reg a, b, c, d;\n"
+      "  initial begin\n"
+      "    assign out = {a, b, c, d};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
+}
+
 }  // namespace
