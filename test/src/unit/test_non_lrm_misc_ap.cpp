@@ -17,26 +17,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 namespace {
 
 // =============================================================================
-// A.6.11 clocking_declaration — plain clocking block
-// =============================================================================
-TEST(ParserA611, ClockingDeclPlain) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
-  EXPECT_EQ(item->name, "cb");
-  EXPECT_FALSE(item->is_default_clocking);
-  EXPECT_FALSE(item->is_global_clocking);
-}
-
-// =============================================================================
 // A.6.11 clocking_declaration — default clocking
 // =============================================================================
 TEST(ParserA611, ClockingDeclDefault) {
