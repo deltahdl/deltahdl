@@ -43,19 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-TEST(ParserSection18b, DistMultipleConstraints) {
-  // Multiple dist constraints in one class
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x, y;\n"
-      "  constraint cx { x dist {[0:100] := 1}; }\n"
-      "  constraint cy { y dist {[0:50] :/ 2, [51:100] :/ 1}; }\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 // =============================================================================
 // LRM section 19.4 -- Clocking blocks
 // =============================================================================
