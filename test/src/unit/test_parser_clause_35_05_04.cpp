@@ -380,4 +380,58 @@ TEST(ParserSection38, DpiImportPureFunctionForSizetf) {
   EXPECT_FALSE(items[0]->dpi_is_context);
 }
 
+struct ConfigTest : ::testing::Test {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
+    source_ = src;
+    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
+    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
+    return parser_->Parse();
+  }
+
+  bool HasErrors() const { return diag_.HasErrors(); }
+
+  SourceManager mgr_;
+  Arena arena_;
+  DiagEngine diag_{mgr_};
+  std::string source_;
+  std::unique_ptr<Lexer> lexer_;
+  std::unique_ptr<Parser> parser_;
+};
+
+struct ParseResult34 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult34 Parse(const std::string& src) {
+  ParseResult34 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// §35.3 DPI-C import declarations
+// =============================================================================
+TEST_F(DpiParseTest, ImportFunction) {
+  auto* unit = Parse(R"(
+    module m;
+      import "DPI-C" function int add(input int a, input int b);
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "add");
+  EXPECT_FALSE(items[0]->dpi_is_task);
+  EXPECT_FALSE(items[0]->dpi_is_pure);
+  EXPECT_FALSE(items[0]->dpi_is_context);
+}
+
 }  // namespace
