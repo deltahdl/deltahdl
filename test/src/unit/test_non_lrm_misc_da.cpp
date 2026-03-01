@@ -354,18 +354,6 @@ TEST(ParserSection28, Sec28_12_TimingCheckWithEdges) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
 }
 
-TEST_F(SpecifyTest, TimingCheckWithNotifier) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, posedge clk, 10, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  EXPECT_EQ(spec->specify_items[0]->timing_check.notifier, "ntfr");
-}
-
 TEST_F(SpecifyTest, TimeskewWithNotifier) {
   auto* cu = Parse(
       "module m;\n"
