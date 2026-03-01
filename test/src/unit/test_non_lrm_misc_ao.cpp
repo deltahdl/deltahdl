@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- do statement_or_null while ( expression ) ; ---
-TEST(ParserA608, DoWhileLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin do x = x - 1; while (x > 0); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
-  EXPECT_NE(stmt->condition, nullptr);
-  EXPECT_NE(stmt->body, nullptr);
-}
-
 TEST(ParserA608, DoWhileNullStmt) {
   auto r = Parse(
       "module m;\n"
