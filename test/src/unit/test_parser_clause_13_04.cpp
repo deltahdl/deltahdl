@@ -124,4 +124,22 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithAllPortDirs) {
   EXPECT_EQ(item->func_args[2].data_type.kind, DataTypeKind::kInt);
 }
 
+TEST(Parser, FunctionDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(item->name, "add");
+  std::string expected[] = {"a", "b"};
+  ASSERT_EQ(item->func_args.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(item->func_args[i].name, expected[i]) << "arg " << i;
+  }
+}
+
 }  // namespace

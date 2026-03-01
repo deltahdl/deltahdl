@@ -39,24 +39,6 @@ TEST(ParserA27, TfItemDeclMixed) {
   EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
-TEST(Parser, FunctionDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  function int add(input int a, input int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(item->name, "add");
-  std::string expected[] = {"a", "b"};
-  ASSERT_EQ(item->func_args.size(), std::size(expected));
-  for (size_t i = 0; i < std::size(expected); ++i) {
-    EXPECT_EQ(item->func_args[i].name, expected[i]) << "arg " << i;
-  }
-}
-
 // 29. Function with local variables creating subscope
 TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
   auto r = Parse(
