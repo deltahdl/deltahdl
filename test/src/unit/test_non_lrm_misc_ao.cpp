@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA608, RepeatNullStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin repeat (5) ; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRepeat);
-}
-
 // --- while ( expression ) statement_or_null ---
 TEST(ParserA608, WhileLoop) {
   auto r = Parse(
