@@ -50,4 +50,22 @@ TEST(ParserA607, RandcaseWithBlocks) {
   EXPECT_EQ(stmt->randcase_items.size(), 2u);
 }
 
+// §18.16: randcase_statement
+TEST(ParserA604, StmtItemRandcaseStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1: a = 1;\n"
+      "      1: a = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
+}
+
 }  // namespace
