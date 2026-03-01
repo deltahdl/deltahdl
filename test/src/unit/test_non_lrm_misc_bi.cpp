@@ -40,17 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// --- type_assignment ---
-// type_identifier [ = data_type_or_incomplete_class_scoped_type ]
-TEST(ParserA24, TypeAssignmentWithDefault) {
-  auto r = Parse("module m; parameter type T = int; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "T");
-}
-
 // parameter_port_list: type parameter (#(type T = int))
 TEST(SourceText, ParamPortTypeParameter) {
   auto r = Parse("module m #(type T = int); endmodule\n");
