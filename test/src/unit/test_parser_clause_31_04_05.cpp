@@ -58,4 +58,22 @@ TEST(ParserA70502, ControlledReferenceEvent) {
   EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
 }
 
+using ConfigParseTest = ProgramTestParse;
+
+TEST(ParserSection28, Sec28_12_TimingCheckPeriod) {
+  auto sp = ParseSpecifySingle(
+      "module m(input clk);\n"
+      "  specify\n"
+      "    $period(posedge clk, 100);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto* si = sp.sole_item;
+  EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kPeriod);
+  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
+}
+
 }  // namespace
