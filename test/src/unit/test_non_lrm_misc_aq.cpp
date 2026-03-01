@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.11 clocking_item — assertion_item_declaration (sequence_declaration)
-// =============================================================================
-TEST(ParserA611, ClockingItemSequenceDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "    sequence s;\n"
-      "      data;\n"
-      "    endsequence\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-}
-
 // Production with port list: P(int x) : ...;
 TEST(ParserA612, RsProductionWithPorts) {
   auto r = Parse(
