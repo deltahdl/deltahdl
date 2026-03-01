@@ -162,4 +162,16 @@ TEST(SimA60701, PatternInForLoop) {
   EXPECT_EQ(var->value.ToUint64(), 1800u);
 }
 
+TEST(ElabCh511, ArrayInitPattern_NestedOk) {
+  // §5.11: Nested braces matching array dimensions are valid.
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef struct { int a; int b; } ms_t;\n"
+      "  ms_t ms[1:0] = '{'{0, 0}, '{1, 1}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
