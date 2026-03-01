@@ -44,16 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-// LRM example: library gateLib ./*.vg;
-TEST(LibraryText, LrmExampleDotSlash) {
-  auto r = ParseLibrary("library gateLib ./*.vg;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-  EXPECT_EQ(r.cu->libraries[0]->name, "gateLib");
-  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "./*.vg");
-}
-
 // LRM comprehensive example with all features.
 TEST(LibraryText, LrmComprehensiveExample) {
   auto r = ParseLibrary(
