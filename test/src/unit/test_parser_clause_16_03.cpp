@@ -359,4 +359,19 @@ TEST(ParserA610, SimpleAssumeSemicolon) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
+// assume ( expression ) pass else fail ;
+TEST(ParserA610, SimpleAssumePassElseFail) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assume(1) $display(\"p\"); else $display(\"f\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
+}
+
 }  // namespace

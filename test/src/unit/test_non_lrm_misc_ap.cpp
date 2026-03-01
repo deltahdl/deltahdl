@@ -23,21 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// assume ( expression ) pass else fail ;
-TEST(ParserA610, SimpleAssumePassElseFail) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assume(1) $display(\"p\"); else $display(\"f\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
-  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
-  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
-}
-
 // =============================================================================
 // A.6.10 — simple_immediate_cover_statement
 // =============================================================================
