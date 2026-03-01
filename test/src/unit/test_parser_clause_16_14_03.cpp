@@ -296,4 +296,16 @@ TEST(ParserA610, CoverPropertyModule) {
   ASSERT_NE(item, nullptr);
 }
 
+// cover_sequence_statement
+TEST(ParserA610, CoverSequenceModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover sequence (a ##1 b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverSequence);
+  ASSERT_NE(item, nullptr);
+}
+
 }  // namespace
