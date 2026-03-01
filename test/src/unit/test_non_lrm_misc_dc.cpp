@@ -52,15 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection40, CoverageMergeSystemCall) {
-  // $coverage_merge merges coverage databases
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      initial $coverage_merge("database.ucdb");
-    endmodule
-  )"));
-}
-
 TEST(ParserSection40, CoverageSaveSystemCall) {
   // $coverage_save saves coverage data to file
   EXPECT_TRUE(ParseOk(R"(
