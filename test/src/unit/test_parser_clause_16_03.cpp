@@ -281,4 +281,19 @@ TEST(ParserA610, SimpleAssertSemicolon) {
   EXPECT_FALSE(stmt->is_deferred);
 }
 
+// §16.3: procedural_assertion_statement (assert)
+TEST(ParserA604, StmtItemProceduralAssertionStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert (x == 1);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+}
+
 }  // namespace
