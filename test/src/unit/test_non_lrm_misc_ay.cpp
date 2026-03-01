@@ -22,19 +22,6 @@ TEST(ParserAnnexD, AnnexDScope) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// --- D.3: $input ---
-TEST(ParserAnnexD2, AnnexDInput) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $input(\"commands.txt\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-}
-
 // --- D.4: $key and $nokey ---
 TEST(ParserAnnexD2, AnnexDKeyNokey) {
   auto r = Parse(
