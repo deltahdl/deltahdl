@@ -514,4 +514,22 @@ TEST(ParserA608, ForEmptyCond) {
   EXPECT_EQ(stmt->for_cond, nullptr);
 }
 
+// §A.6.8: for_step is optional — empty step
+TEST(ParserA608, ForEmptyStep) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10;) begin\n"
+      "      i = i + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_EQ(stmt->for_step, nullptr);
+}
+
 }  // namespace
