@@ -316,4 +316,12 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithByteType) {
               "endmodule\n"));
 }
 
+// §6.6.7: Nettype with bit type.
+TEST(ParserSection6, Sec6_6_7_NettypeWithBitType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype bit bit_net;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
