@@ -22,4 +22,22 @@ TEST(ParserA612, RsProdAsRepeat) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// A.6.12 Randsequence — rs_repeat
+// =============================================================================
+// repeat with integral expression
+TEST(ParserA612, RsRepeat) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : repeat(5) child;\n"
+      "      child : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
