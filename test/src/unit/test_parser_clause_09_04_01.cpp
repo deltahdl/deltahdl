@@ -276,4 +276,29 @@ TEST(ParserA604, StmtItemProceduralTimingControlDelay) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
+// =============================================================================
+// A.6.5 Timing control statements
+// =============================================================================
+// ---------------------------------------------------------------------------
+// procedural_timing_control_statement ::=
+//   procedural_timing_control statement_or_null
+// ---------------------------------------------------------------------------
+// §9.4: delay control followed by statement
+TEST(ParserA605, ProceduralTimingControlDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10 x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace
