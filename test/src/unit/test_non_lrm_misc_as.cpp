@@ -15,20 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// Rise/fall delays using specparam identifiers
-TEST(ParserA704, PathDelayRiseFallSpecparams) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tRise = 3;\n"
-      "    specparam tFall = 5;\n"
-      "    (a => b) = (tRise, tFall);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.7.4 Invalid delay counts (not 1, 2, 3, 6, or 12)
 // =============================================================================

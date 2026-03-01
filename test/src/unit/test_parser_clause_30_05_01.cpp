@@ -254,4 +254,18 @@ TEST(ParserA704, PathDelayExprMinTypMax12) {
   }
 }
 
+// Rise/fall delays using specparam identifiers
+TEST(ParserA704, PathDelayRiseFallSpecparams) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam tRise = 3;\n"
+      "    specparam tFall = 5;\n"
+      "    (a => b) = (tRise, tFall);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
