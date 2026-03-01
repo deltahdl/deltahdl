@@ -111,4 +111,31 @@ TEST(SimA60701, PatternInConditionalBranch) {
   EXPECT_EQ(var->value.ToUint64(), 1286u);
 }
 
+// §10.9: assignment pattern used in case item body
+TEST(SimA60701, PatternInCaseItemBody) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel;\n"
+      "  logic [15:0] x;\n"
+      "  initial begin\n"
+      "    sel = 8'd1;\n"
+      "    case(sel)\n"
+      "      8'd0: x = '{8'd0, 8'd0};\n"
+      "      8'd1: x = '{8'd10, 8'd20};\n"
+      "      default: x = '{8'd0, 8'd0};\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // '{8'd10, 8'd20} = {8'h0A, 8'h14} = 16'h0A14 = 2580
+  EXPECT_EQ(var->value.ToUint64(), 2580u);
+}
+
 }  // namespace
