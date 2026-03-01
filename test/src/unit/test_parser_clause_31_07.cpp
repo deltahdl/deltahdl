@@ -203,4 +203,20 @@ TEST_F(SpecifyTest, ConditionedHoldBothSignals) {
   EXPECT_NE(tc.data_condition, nullptr);
 }
 
+// controlled_timing_check_event with &&& condition
+TEST(ParserA70503, ControlledTimingCheckEventWithCondition) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $period(posedge clk &&& en, 50);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc->ref_terminal.name, "clk");
+  EXPECT_NE(tc->ref_condition, nullptr);
+}
+
 }  // namespace
