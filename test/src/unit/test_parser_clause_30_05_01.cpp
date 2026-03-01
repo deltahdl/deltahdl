@@ -90,4 +90,17 @@ TEST(ParserSection28, Sec28_12_ThreeDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 3u);
 }
 
+TEST(ParserSection28, Sec28_12_SixDelayPath) {
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    (a => b) = (1, 2, 3, 4, 5, 6);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  ASSERT_EQ(sp.sole_item->path.delays.size(), 6u);
+}
+
 }  // namespace
