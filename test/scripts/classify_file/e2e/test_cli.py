@@ -28,19 +28,57 @@ def _install_fake_classify_test(tmp_path, exit_code=0):
         f"import sys; sys.exit({exit_code})\n",
         encoding="utf-8",
     )
+    (fake_pkg / "_github.py").write_text(
+        "import json\n"
+        "import subprocess\n"
+        "import sys\n"
+        "\n"
+        "\n"
+        "def fetch_issue_body(organization, repo, issue):\n"
+        "    result = subprocess.run(\n"
+        "        ['gh', 'api',\n"
+        "         f'repos/{organization}/{repo}/issues/{issue}',\n"
+        "         '--jq', '.body'],\n"
+        "        capture_output=True, text=True, check=False,\n"
+        "    )\n"
+        "    if result.returncode != 0:\n"
+        "        sys.exit(1)\n"
+        "    return result.stdout\n"
+        "\n"
+        "\n"
+        "def update_issue_body(organization, repo, issue, body):\n"
+        "    payload = json.dumps({'body': body})\n"
+        "    result = subprocess.run(\n"
+        "        ['gh', 'api',\n"
+        "         f'repos/{organization}/{repo}/issues/{issue}',\n"
+        "         '-X', 'PATCH', '--input', '-'],\n"
+        "        input=payload,\n"
+        "        capture_output=True, text=True, check=False,\n"
+        "    )\n"
+        "    if result.returncode != 0:\n"
+        "        sys.exit(1)\n",
+        encoding="utf-8",
+    )
     return str(fake_scripts)
 
 
-def _install_fake_gh(tmp_path):
-    """Install a fake gh that returns issue JSON for POST requests."""
+def _install_fake_gh(tmp_path, issue_body=""):
+    """Install a fake gh that handles POST, PATCH, and --jq requests."""
     fake_bin = tmp_path / "fake_bin"
     fake_bin.mkdir(exist_ok=True)
     gh_script = fake_bin / "gh"
+    escaped_body = issue_body.replace("'", "'\\''")
     gh_script.write_text(
         '#!/bin/sh\n'
         'for arg in "$@"; do\n'
         '  if [ "$arg" = "POST" ]; then\n'
         '    echo \'{"number": 999}\'\n'
+        '    exit 0\n'
+        '  fi\n'
+        'done\n'
+        'for arg in "$@"; do\n'
+        '  if [ "$arg" = ".body" ]; then\n'
+        f'    printf \'%s\' \'{escaped_body}\'\n'
         '    exit 0\n'
         '  fi\n'
         'done\n'
@@ -51,7 +89,7 @@ def _install_fake_gh(tmp_path):
     return str(fake_bin)
 
 
-def _base_env(tmp_path, fake_scripts_dir):
+def _base_env(tmp_path, fake_scripts_dir, issue_body=""):
     """Build subprocess env with fake classify_test before real scripts."""
     env = os.environ.copy()
     env["HOME"] = str(tmp_path)
@@ -60,7 +98,7 @@ def _base_env(tmp_path, fake_scripts_dir):
         [fake_scripts_dir, _SCRIPTS_DIR]
         + ([pypath] if pypath else []),
     )
-    fake_bin = _install_fake_gh(tmp_path)
+    fake_bin = _install_fake_gh(tmp_path, issue_body=issue_body)
     env["PATH"] = fake_bin + os.pathsep + env.get("PATH", "")
     return env
 
@@ -278,3 +316,21 @@ def test_neither_issue_flag_rejects(tmp_path):
         cwd=str(tmp_path), env=env,
     )
     assert result.returncode != 0
+
+
+# ---- ensure_unchecked e2e --------------------------------------------------
+
+
+def test_issue_unchecks_before_processing(tmp_path):
+    """Unchecks checked boxes before processing when --issue is given."""
+    fake = _install_fake_classify_test(tmp_path)
+    issue_body = "- [x] Alpha\n- [ ] Beta\n"
+    env = _base_env(tmp_path, fake, issue_body=issue_body)
+    _write_test_file(
+        tmp_path, "TEST(S, Alpha) {\n}\nTEST(S, Beta) {\n}\n",
+    )
+    result = _invoke(
+        *_all_flags(tmp_path),
+        cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode == 0

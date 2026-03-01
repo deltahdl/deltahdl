@@ -85,3 +85,13 @@ def stub_create_issue(monkeypatch, issue_number=42):
 
     monkeypatch.setattr(subprocess, "run", capture_run)
     return captured
+
+
+def stub_ensure_unchecked(monkeypatch):
+    """Stub classify_file.ensure_unchecked; return call log."""
+    log: list = []
+    monkeypatch.setattr(
+        classify_file, "ensure_unchecked",
+        lambda _a, _n: log.append(True),
+    )
+    return log

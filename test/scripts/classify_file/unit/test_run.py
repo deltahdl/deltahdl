@@ -13,6 +13,7 @@ from helpers import (
     make_test_file,
     stub_close_issue,
     stub_create_issue,
+    stub_ensure_unchecked,
     stub_subprocess_failure,
     stub_subprocess_mixed,
     stub_subprocess_success,
@@ -540,6 +541,7 @@ def test_run_all_succeed(tmp_path, monkeypatch, capsys):
     """Does not exit when all tests succeed."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     make_test_file(tmp_path, body)
+    stub_ensure_unchecked(monkeypatch)
     stub_subprocess_success(monkeypatch)
     _run(_make_run_args(tmp_path))
     assert "2/2 tests succeeded" in capsys.readouterr().out
@@ -549,6 +551,7 @@ def test_run_some_fail_exits(tmp_path, monkeypatch):
     """Exits when any test fails."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     make_test_file(tmp_path, body)
+    stub_ensure_unchecked(monkeypatch)
     stub_subprocess_mixed(monkeypatch, {"B"})
     with pytest.raises(SystemExit):
         _run(_make_run_args(tmp_path))
@@ -558,6 +561,7 @@ def test_run_continues_after_failure(tmp_path, monkeypatch, capsys):
     """Processes remaining tests after a failure."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\nTEST(S, C) {\n}\n"
     make_test_file(tmp_path, body)
+    stub_ensure_unchecked(monkeypatch)
     stub_subprocess_mixed(monkeypatch, {"A"})
     try:
         _run(_make_run_args(tmp_path))
@@ -570,6 +574,7 @@ def test_run_summary_shows_failures(tmp_path, monkeypatch, capsys):
     """Summary lists failed test names."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     make_test_file(tmp_path, body)
+    stub_ensure_unchecked(monkeypatch)
     stub_subprocess_mixed(monkeypatch, {"B"})
     try:
         _run(_make_run_args(tmp_path))
@@ -582,6 +587,7 @@ def test_run_invokes_per_test(tmp_path, monkeypatch):
     """Invokes classify_test once per test name."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\nTEST(S, C) {\n}\n"
     make_test_file(tmp_path, body)
+    stub_ensure_unchecked(monkeypatch)
     captured = stub_subprocess_success(monkeypatch)
     stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path))
@@ -591,6 +597,7 @@ def test_run_invokes_per_test(tmp_path, monkeypatch):
 def test_run_closes_issue_on_success(tmp_path, monkeypatch):
     """Closes issue when all tests succeed."""
     make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    stub_ensure_unchecked(monkeypatch)
     stub_subprocess_success(monkeypatch)
     log = stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path))
@@ -600,6 +607,7 @@ def test_run_closes_issue_on_success(tmp_path, monkeypatch):
 def test_run_skips_close_on_failure(tmp_path, monkeypatch):
     """Does not close issue when tests fail."""
     make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    stub_ensure_unchecked(monkeypatch)
     stub_subprocess_failure(monkeypatch)
     log = stub_close_issue(monkeypatch)
     try:
@@ -612,6 +620,7 @@ def test_run_skips_close_on_failure(tmp_path, monkeypatch):
 def test_run_skips_close_on_dry_run(tmp_path, monkeypatch):
     """Does not close issue in dry-run mode."""
     make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    stub_ensure_unchecked(monkeypatch)
     stub_subprocess_success(monkeypatch)
     log = stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path, dry_run=True))
@@ -626,6 +635,7 @@ def _stub_create_and_run(tmp_path, monkeypatch, **run_overrides):
         classify_file, "create_issue",
         lambda _a, _n: (create_log.append(True), 42)[1],
     )
+    stub_ensure_unchecked(monkeypatch)
     captured = stub_subprocess_success(monkeypatch)
     stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path, **run_overrides))
@@ -692,3 +702,103 @@ def test_main_enables_line_buffering(monkeypatch):
     )
     classify_file.main()
     assert any(k.get("line_buffering") for k in configured)
+
+
+# ---- ensure_unchecked ------------------------------------------------------
+
+
+ensure_unchecked = classify_file.ensure_unchecked
+
+
+def _stub_github(monkeypatch, body):
+    """Stub fetch_issue_body and capture update_issue_body calls."""
+    monkeypatch.setattr(
+        classify_file, "fetch_issue_body",
+        lambda _o, _r, _i: body,
+    )
+    updates: list[str] = []
+    monkeypatch.setattr(
+        classify_file, "update_issue_body",
+        lambda _o, _r, _i, b: updates.append(b),
+    )
+    return updates
+
+
+def test_ensure_unchecked_all_unchecked_no_update(monkeypatch):
+    """Does not call update when all checkboxes are already unchecked."""
+    body = "- [ ] Alpha\n- [ ] Beta\n"
+    updates = _stub_github(monkeypatch, body)
+    ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    assert len(updates) == 0
+
+
+def test_ensure_unchecked_unchecks_checked_box(monkeypatch):
+    """Unchecks a checked checkbox."""
+    body = "- [x] Alpha\n- [ ] Beta\n"
+    updates = _stub_github(monkeypatch, body)
+    ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    assert "- [ ] Alpha" in updates[0]
+
+
+def test_ensure_unchecked_adds_missing_box(monkeypatch):
+    """Adds an unchecked checkbox for a missing test."""
+    body = "- [ ] Alpha\n"
+    updates = _stub_github(monkeypatch, body)
+    ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    assert "- [ ] Beta" in updates[0]
+
+
+def test_ensure_unchecked_mixed(monkeypatch):
+    """Fixes both checked and missing in one update."""
+    body = "- [x] Alpha\n"
+    updates = _stub_github(monkeypatch, body)
+    ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    assert "- [ ] Alpha" in updates[0]
+    assert "- [ ] Beta" in updates[0]
+
+
+def test_ensure_unchecked_calls_update(monkeypatch):
+    """Calls update_issue_body when changes are made."""
+    body = "- [x] Alpha\n"
+    updates = _stub_github(monkeypatch, body)
+    ensure_unchecked(_make_args(), ["Alpha"])
+    assert len(updates) == 1
+
+
+def test_ensure_unchecked_preserves_other_checked(monkeypatch):
+    """Leaves checked boxes for tests not in test_names."""
+    body = "- [x] Other\n- [ ] Alpha\n"
+    updates = _stub_github(monkeypatch, body)
+    ensure_unchecked(_make_args(), ["Alpha"])
+    assert len(updates) == 0
+
+
+# ---- _run + ensure_unchecked -----------------------------------------------
+
+
+def test_run_calls_ensure_unchecked_with_issue(
+    tmp_path, monkeypatch,
+):
+    """Calls ensure_unchecked when --issue is provided."""
+    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    log = stub_ensure_unchecked(monkeypatch)
+    stub_subprocess_success(monkeypatch)
+    stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path))
+    assert len(log) == 1
+
+
+def test_run_skips_ensure_unchecked_with_create_issue(
+    tmp_path, monkeypatch,
+):
+    """Does not call ensure_unchecked when --create-issue is used."""
+    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    log = stub_ensure_unchecked(monkeypatch)
+    monkeypatch.setattr(
+        classify_file, "create_issue",
+        lambda _a, _n: 42,
+    )
+    stub_subprocess_success(monkeypatch)
+    stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path, issue=None, create_issue=True))
+    assert len(log) == 0

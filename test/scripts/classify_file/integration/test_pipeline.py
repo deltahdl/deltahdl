@@ -87,6 +87,16 @@ def _stub_create(monkeypatch, number=42):
     return called
 
 
+def _stub_ensure(monkeypatch):
+    """Stub ensure_unchecked; return call log."""
+    called: list[bool] = []
+    monkeypatch.setattr(
+        classify_file, "ensure_unchecked",
+        lambda _a, _n: called.append(True),
+    )
+    return called
+
+
 # ---- Multi-test batch processing -------------------------------------------
 
 
@@ -97,6 +107,7 @@ def test_processes_all_three_tests(tmp_path, monkeypatch):
         "TEST(S, Beta) {\n}\n"
         "TEST(S, Gamma) {\n}\n"
     )
+    _stub_ensure(monkeypatch)
     log = _mock_run_ok(monkeypatch)
     _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, body))
@@ -109,6 +120,7 @@ def test_each_call_has_distinct_test_name(tmp_path, monkeypatch):
         "TEST(S, Alpha) {\n}\n"
         "TEST(S, Beta) {\n}\n"
     )
+    _stub_ensure(monkeypatch)
     log = _mock_run_ok(monkeypatch)
     _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, body))
@@ -118,6 +130,7 @@ def test_each_call_has_distinct_test_name(tmp_path, monkeypatch):
 
 def test_flags_propagated_to_subprocess(tmp_path, monkeypatch):
     """Optional flags are forwarded to classify_test calls."""
+    _stub_ensure(monkeypatch)
     log = _mock_run_ok(monkeypatch)
     _run(_write_and_args(tmp_path, "TEST(S, T) {\n}\n", dry_run=True))
     assert "--dry-run" in log[0]
@@ -132,6 +145,7 @@ def test_continues_after_first_failure(
         "TEST(S, Pass1) {\n}\n"
         "TEST(S, Fail2) {\n}\n"
     )
+    _stub_ensure(monkeypatch)
     _mock_run_selective(monkeypatch, {"Fail1", "Fail2"})
     try:
         _run(_write_and_args(tmp_path, body))
@@ -147,6 +161,7 @@ def test_summary_counts_correct(tmp_path, monkeypatch, capsys):
         "TEST(S, B) {\n}\n"
         "TEST(S, C) {\n}\n"
     )
+    _stub_ensure(monkeypatch)
     _mock_run_selective(monkeypatch, {"B"})
     try:
         _run(_write_and_args(tmp_path, body))
@@ -157,6 +172,7 @@ def test_summary_counts_correct(tmp_path, monkeypatch, capsys):
 
 def test_single_test_file(tmp_path, monkeypatch, capsys):
     """Single-test file succeeds without error."""
+    _stub_ensure(monkeypatch)
     _mock_run_ok(monkeypatch)
     _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, "TEST(S, Only) {\n}\n"))
@@ -165,6 +181,7 @@ def test_single_test_file(tmp_path, monkeypatch, capsys):
 
 def test_closes_issue_after_all_pass(tmp_path, monkeypatch):
     """Pipeline closes the issue after all tests succeed."""
+    _stub_ensure(monkeypatch)
     _mock_run_ok(monkeypatch)
     log = _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"))
@@ -181,3 +198,30 @@ def test_create_issue_then_process(tmp_path, monkeypatch):
         tmp_path, body, issue=None, create_issue=True,
     ))
     assert len(log) == 2
+
+
+# ---- ensure_unchecked integration -----------------------------------------
+
+
+def test_ensure_unchecked_before_processing(
+    tmp_path, monkeypatch,
+):
+    """Pipeline calls ensure_unchecked before subprocess calls."""
+    body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
+    order: list[str] = []
+    monkeypatch.setattr(
+        classify_file, "ensure_unchecked",
+        lambda _a, _n: order.append("ensure"),
+    )
+
+    def log_run(_cmd, **_kw):
+        order.append("subprocess")
+        m = MagicMock()
+        m.returncode, m.stdout, m.stderr = 0, "", ""
+        return m
+
+    monkeypatch.setattr(subprocess, "run", log_run)
+    _stub_close(monkeypatch)
+    _run(_write_and_args(tmp_path, body))
+    assert order[0] == "ensure"
+    assert all(e == "subprocess" for e in order[1:])

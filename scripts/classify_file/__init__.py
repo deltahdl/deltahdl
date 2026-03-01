@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from classify_test._github import fetch_issue_body, update_issue_body
+
 
 _TEST_RE = re.compile(
     r"^\s*TEST(?:_[FP])?\(\s*\w+\s*,\s*(\w+)\s*\)",
@@ -59,6 +61,36 @@ def create_issue(
     issue_number = json.loads(result.stdout)["number"]
     print(f"Created issue #{issue_number}")
     return issue_number
+
+
+def ensure_unchecked(
+    args: argparse.Namespace,
+    test_names: list[str],
+) -> None:
+    """Ensure every test has an unchecked checkbox in the issue."""
+    body = fetch_issue_body(
+        args.organization, args.repo, args.issue,
+    )
+    changed = False
+    for name in test_names:
+        checked = re.compile(
+            r"^- \[x\] " + re.escape(name) + r"$",
+            re.MULTILINE,
+        )
+        unchecked = re.compile(
+            r"^- \[ \] " + re.escape(name) + r"$",
+            re.MULTILINE,
+        )
+        if checked.search(body):
+            body = checked.sub("- [ ] " + name, body)
+            changed = True
+        elif not unchecked.search(body):
+            body = body.rstrip("\n") + "\n- [ ] " + name + "\n"
+            changed = True
+    if changed:
+        update_issue_body(
+            args.organization, args.repo, args.issue, body,
+        )
 
 
 def _build_command(
@@ -200,6 +232,8 @@ def _run(args: argparse.Namespace) -> None:
         sys.exit(1)
     if args.create_issue:
         args.issue = create_issue(args, test_names)
+    else:
+        ensure_unchecked(args, test_names)
     total = len(test_names)
     succeeded = 0
     failed = 0
