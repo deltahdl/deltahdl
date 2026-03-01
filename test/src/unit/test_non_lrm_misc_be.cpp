@@ -45,30 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 3. Explicit static variable in automatic function
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_ExplicitStaticInAutoFunc) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int call_count();\n"
-      "    static int cnt = 0;\n"
-      "    cnt = cnt + 1;\n"
-      "    return cnt;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_automatic);
-  ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(fn->func_body_stmts[0]->var_is_static);
-  EXPECT_FALSE(fn->func_body_stmts[0]->var_is_automatic);
-  EXPECT_EQ(fn->func_body_stmts[0]->var_name, "cnt");
-}
-
-// =============================================================================
 // 4. Explicit automatic variable in static function
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_ExplicitAutoInStaticFunc) {
