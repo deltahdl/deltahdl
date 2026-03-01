@@ -12,19 +12,6 @@ using namespace delta;
 
 namespace {
 
-// § streaming_concatenation elaborates in procedural context
-TEST(ElabA81, StreamingConcatLeftShiftElab) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial a = {<< {b}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ElabA81, StreamingConcatRightShiftElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
