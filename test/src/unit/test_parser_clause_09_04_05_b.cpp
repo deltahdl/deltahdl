@@ -137,4 +137,21 @@ TEST(ParserA605, IntraAssignEventBlocking) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
+// §9.4.5: repeat event control in blocking assignment
+TEST(ParserA605, IntraAssignRepeatEventBlocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = repeat(3) @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  EXPECT_FALSE(stmt->events.empty());
+}
+
 }  // namespace
