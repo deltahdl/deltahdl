@@ -354,20 +354,6 @@ TEST(ParserSection28, Sec28_12_TimingCheckWithEdges) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
 }
 
-TEST_F(SpecifyTest, TimeskewWithNotifier) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  auto& tc = spec->specify_items[0]->timing_check;
-  EXPECT_EQ(tc.check_kind, TimingCheckKind::kTimeskew);
-  EXPECT_EQ(tc.notifier, "ntfr");
-}
-
 // =============================================================================
 // §31.7 Conditioned events
 // =============================================================================

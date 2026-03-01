@@ -112,4 +112,18 @@ TEST_F(SpecifyTest, TimeskewTimingCheck) {
   ASSERT_EQ(tc.limits.size(), 1u);
 }
 
+TEST_F(SpecifyTest, TimeskewWithNotifier) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto& tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kTimeskew);
+  EXPECT_EQ(tc.notifier, "ntfr");
+}
+
 }  // namespace
