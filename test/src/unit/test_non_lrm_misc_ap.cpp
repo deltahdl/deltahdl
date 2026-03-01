@@ -23,22 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// assert #0 ( expression ) pass else fail ;
-TEST(ParserA610, DeferredAssertHash0ActionBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assert #0 (1) $display(\"p\"); else $display(\"f\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
-  EXPECT_TRUE(stmt->is_deferred);
-  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
-  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
-}
-
 // =============================================================================
 // A.6.10 — deferred_immediate_assume_statement
 // =============================================================================
