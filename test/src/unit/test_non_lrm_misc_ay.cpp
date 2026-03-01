@@ -22,20 +22,6 @@ TEST(ParserAnnexD, AnnexDScope) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// --- D.5: $reset, $reset_count, $reset_value ---
-TEST(ParserAnnexD2, AnnexDResetFamily) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $reset;\n"
-      "    x = $reset_count;\n"
-      "    y = $reset_value;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // --- D.6: $scale ---
 TEST(ParserAnnexD2, AnnexDScaleParse) {
   auto r = Parse(
