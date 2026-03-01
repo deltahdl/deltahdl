@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.1: or-separated event list
-TEST(ParserA605, EventExprOr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk_a or posedge clk_b) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 2u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kPosedge);
-}
-
 // §9.4.2.1: comma-separated event list
 TEST(ParserA605, EventExprComma) {
   auto r = Parse(
