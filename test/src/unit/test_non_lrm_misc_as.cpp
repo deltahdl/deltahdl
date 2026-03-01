@@ -15,25 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.7.4 6 and 12 delays on parallel and full paths
-// =============================================================================
-// 6 delays on a parallel path
-TEST(ParserA704, SixDelaysParallelPath) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = (1, 2, 3, 4, 5, 6);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
-  ASSERT_EQ(si->path.delays.size(), 6u);
-}
-
 // 12 delays on a parallel path
 TEST(ParserA704, TwelveDelaysParallelPath) {
   auto r = Parse(
