@@ -45,25 +45,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 22. always_comb has implicit sensitivity (no sensitivity list on item)
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_ImplicitSensitivity) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "  always_comb c = a ^ b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
-  // always_comb must not have an explicit sensitivity list
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-}
-
-// ---------------------------------------------------------------------------
 // 23. always_comb with complex combinational logic (priority encoder)
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_PriorityEncoderPattern) {
@@ -101,28 +82,6 @@ TEST(ParserSection9, Sec9_2_2_PriorityEncoderPattern) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(item->body->stmts[2]->kind, StmtKind::kIf);
-}
-
-// ---------------------------------------------------------------------------
-// 24. Multiple always_comb blocks in the same module
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_MultipleAlwaysCombBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic a, b, x, y;\n"
-      "  always_comb x = a & b;\n"
-      "  always_comb y = a | b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* first = NthAlwaysComb(r, 0);
-  auto* second = NthAlwaysComb(r, 1);
-  ASSERT_NE(first, nullptr);
-  ASSERT_NE(second, nullptr);
-  EXPECT_EQ(first->kind, ModuleItemKind::kAlwaysCombBlock);
-  EXPECT_EQ(second->kind, ModuleItemKind::kAlwaysCombBlock);
-  ASSERT_NE(first->body, nullptr);
-  ASSERT_NE(second->body, nullptr);
 }
 
 // ---------------------------------------------------------------------------

@@ -315,4 +315,26 @@ TEST(ParserSection4, Sec4_6_AlwaysCombWithCaseInside) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kCase);
 }
 
+// ---------------------------------------------------------------------------
+// 24. Multiple always_comb blocks in the same module
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_MultipleAlwaysCombBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, x, y;\n"
+      "  always_comb x = a & b;\n"
+      "  always_comb y = a | b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* first = NthAlwaysComb(r, 0);
+  auto* second = NthAlwaysComb(r, 1);
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(first->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(second->kind, ModuleItemKind::kAlwaysCombBlock);
+  ASSERT_NE(first->body, nullptr);
+  ASSERT_NE(second->body, nullptr);
+}
+
 }  // namespace
