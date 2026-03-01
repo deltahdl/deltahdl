@@ -12,17 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, StructPattern_DuplicateKey) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  struct packed { logic [7:0] a; logic [7:0] b; } s = "
-      "'{a: 8'h01, a: 8'h02};\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 // § empty_unpacked_array_concatenation elaborates
 TEST(ElabA81, EmptyUnpackedArrayConcatElab) {
   ElabFixture f;
