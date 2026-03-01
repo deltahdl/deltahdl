@@ -641,4 +641,17 @@ TEST(ParserA28, ParameterInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "Y");
 }
 
+// Mixed block items: all 4 alternatives together
+TEST(ParserA28, MixedBlockItems) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    parameter int P = 1;\n"
+              "    localparam int LP = 2;\n"
+              "    int x = 3;\n"
+              "    x = x + P + LP;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
