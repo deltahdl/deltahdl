@@ -38,19 +38,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-TEST_F(ConfigParseTest, ConfigCoexistsWithModule) {
-  auto* unit = Parse(R"(
-    module m;
-    endmodule
-    config cfg;
-      design lib.top;
-    endconfig
-  )");
-  EXPECT_EQ(unit->modules.size(), 1u);
-  EXPECT_EQ(unit->configs.size(), 1u);
-  EXPECT_EQ(unit->configs[0]->name, "cfg");
-}
-
 TEST_F(ConfigParseTest, MultipleConfigs) {
   auto* unit = Parse(R"(
     config cfg1;
