@@ -301,4 +301,21 @@ TEST(ParserA605, ProceduralTimingControlDelay) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlockingAssign);
 }
 
+// §9.4: delay control followed by null statement
+TEST(ParserA605, ProceduralTimingControlDelayNull) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10 ;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
+}
+
 }  // namespace
