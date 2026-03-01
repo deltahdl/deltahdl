@@ -296,4 +296,16 @@ TEST(ParserA213, NettypeDeclWithScopedResolve) {
   EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
 }
 
+// §6.6.7: Nettype in a package scope.
+TEST(ParserSection6, Sec6_6_7_NettypeInPackage) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef real myreal;\n"
+      "  nettype myreal pkg_net;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->packages.size(), 1u);
+}
+
 }  // namespace
