@@ -462,4 +462,29 @@ TEST_F(DpiParseTest, ImportWithCName) {
   EXPECT_EQ(items[0]->name, "add");
 }
 
+static bool ParseOk38(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
+  // Multiple import/export declarations modeling a complete VPI registration
+  // set
+  EXPECT_TRUE(ParseOk38(R"(
+    module m;
+      import "DPI-C" context function int calltf(input string data);
+      import "DPI-C" context function int compiletf(input string data);
+      import "DPI-C" pure function int sizetf(input string data);
+      export "DPI-C" function sv_calltf_impl;
+      export "DPI-C" task sv_task_impl;
+    endmodule
+  )"));
+}
+
 }  // namespace
