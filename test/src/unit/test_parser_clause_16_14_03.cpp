@@ -308,4 +308,17 @@ TEST(ParserA610, CoverSequenceModule) {
   ASSERT_NE(item, nullptr);
 }
 
+// cover property with pass action only (no else)
+TEST(ParserA610, CoverPropertyPassAction) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (a) $display(\"covered\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->assert_pass_stmt, nullptr);
+}
+
 }  // namespace

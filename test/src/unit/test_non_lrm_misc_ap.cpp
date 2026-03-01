@@ -4,13 +4,6 @@
 
 using namespace delta;
 
-static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
 static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
   size_t count = 0;
   for (auto* item : r.cu->modules[0]->items) {
@@ -22,19 +15,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 }
 
 namespace {
-
-// cover property with pass action only (no else)
-TEST(ParserA610, CoverPropertyPassAction) {
-  auto r = Parse(
-      "module m;\n"
-      "  cover property (a) $display(\"covered\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->assert_pass_stmt, nullptr);
-}
 
 // =============================================================================
 // A.6.11 clocking_declaration — plain clocking block
