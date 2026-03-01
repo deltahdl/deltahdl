@@ -467,4 +467,21 @@ TEST(ParserA611, ClockingDeclPlain) {
   EXPECT_FALSE(item->is_global_clocking);
 }
 
+// =============================================================================
+// A.6.11 clocking_declaration — end label
+// =============================================================================
+TEST(ParserA611, ClockingDeclEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking : cb\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "cb");
+}
+
 }  // namespace
