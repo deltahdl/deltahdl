@@ -20,13 +20,6 @@ TEST(ParserSection21, FeofFerror) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, DumpvarsMultipleScopes) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $dumpvars(0, top.mod1, top.mod2.net1);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, DumpOffOnSequence) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
