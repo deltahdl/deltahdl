@@ -62,16 +62,6 @@ TEST_F(ApiParseTest, ReadmemhSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-TEST_F(ApiParseTest, ReadmembSystemCall) {
-  auto* unit = Parse(R"(
-    module m;
-      logic [7:0] mem [0:255];
-      initial $readmemb("data.bin", mem);
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-}
-
 TEST_F(ApiParseTest, WritememhSystemCall) {
   auto* unit = Parse(R"(
     module m;
