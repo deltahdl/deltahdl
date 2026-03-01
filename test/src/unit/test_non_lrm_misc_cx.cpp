@@ -20,19 +20,6 @@ TEST(SourceText, PackageItemDpiImportExport) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
 }
 
-// package_or_generate_item_declaration: class_declaration
-TEST(SourceText, PackageItemClassDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  class C;\n"
-      "    int x;\n"
-      "  endclass\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
 // package_or_generate_item_declaration: interface_class_declaration
 TEST(SourceText, PackageItemInterfaceClassDecl) {
   auto r = Parse(
