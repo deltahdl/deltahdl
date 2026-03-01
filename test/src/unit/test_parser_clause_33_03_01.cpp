@@ -140,4 +140,15 @@ TEST(LibraryText, LrmComprehensiveExample) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
 }
 
+// =============================================================================
+// Lexer: file_path_spec token recognition.
+// =============================================================================
+// Verify the lexer correctly reads file path specs with special chars.
+TEST(LibraryText, LexerFilePathSpecAbsolute) {
+  auto r = ParseLibrary("library lib /proj/rtl/top.v;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/proj/rtl/top.v");
+}
+
 }  // namespace
