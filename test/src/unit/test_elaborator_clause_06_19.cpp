@@ -34,4 +34,14 @@ TEST(Elaboration, EnumXZin2State_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  enum integer {a=0, b={32{1'bx}}, c} val;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace

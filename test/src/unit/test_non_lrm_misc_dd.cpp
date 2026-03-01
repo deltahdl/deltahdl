@@ -12,16 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  enum integer {a=0, b={32{1'bx}}, c} val;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(EnumMethods, NameForUnknownValue) {
   EnumFixture f;
   auto* var = f.RegisterEnum("color", "color_t",
