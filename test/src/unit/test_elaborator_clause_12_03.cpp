@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §12.3: Syntax
 
 #include "builders_ast.h"
 #include "fixture_enum_methods.h"
