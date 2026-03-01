@@ -40,15 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// --- list_of_type_assignments ---
-// type_assignment { , type_assignment }
-TEST(ParserA23, ListOfTypeAssignmentsSingle) {
-  auto r = Parse("module m; parameter type T = int; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
-}
-
 TEST(ParserA24, TypeAssignmentNoDefault) {
   auto r = Parse("module m #(parameter type T); endmodule\n");
   ASSERT_NE(r.cu, nullptr);

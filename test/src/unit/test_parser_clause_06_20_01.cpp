@@ -102,4 +102,13 @@ TEST(ParserA24, TypeAssignmentWithDefault) {
   EXPECT_EQ(item->name, "T");
 }
 
+// --- list_of_type_assignments ---
+// type_assignment { , type_assignment }
+TEST(ParserA23, ListOfTypeAssignmentsSingle) {
+  auto r = Parse("module m; parameter type T = int; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
+}
+
 }  // namespace
