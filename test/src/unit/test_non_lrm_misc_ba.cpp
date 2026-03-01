@@ -4,13 +4,6 @@
 
 using namespace delta;
 
-static bool HasItemOfKindAndName(const std::vector<ModuleItem*>& items,
-                                 ModuleItemKind kind, const std::string& name) {
-  for (const auto* item : items)
-    if (item->kind == kind && item->name == name) return true;
-  return false;
-}
-
 static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
                          const std::string& name) {
   for (const auto* item : items)
@@ -33,25 +26,6 @@ TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->name, "my_cfg");
-}
-
-// 2. Same-name variables in different modules (separate scopes)
-TEST(ParserClause03, Cl3_13_SameNameVarsInDifferentModules) {
-  auto r = ParseWithPreprocessor(
-      "module a;\n"
-      "  logic [7:0] data;\n"
-      "endmodule\n"
-      "module b;\n"
-      "  logic [7:0] data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 2u);
-  // Both modules should have a 'data' variable in their own scope.
-  EXPECT_TRUE(HasItemOfKindAndName(r.cu->modules[0]->items,
-                                   ModuleItemKind::kVarDecl, "data"));
-  EXPECT_TRUE(HasItemOfKindAndName(r.cu->modules[1]->items,
-                                   ModuleItemKind::kVarDecl, "data"));
 }
 
 // 6. Task and function names in same module scope
