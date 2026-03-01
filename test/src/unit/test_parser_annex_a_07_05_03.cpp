@@ -151,4 +151,19 @@ TEST(ParserA70503, TerminalPartSelect) {
   EXPECT_NE(tc->ref_terminal.range_right, nullptr);
 }
 
+// specify_terminal_descriptor — interface.port form
+TEST(ParserA70503, TerminalInterfaceDotPort) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(intf.data, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_terminal.interface_name, "intf");
+  EXPECT_EQ(tc->ref_terminal.name, "data");
+}
+
 }  // namespace

@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-// specify_terminal_descriptor — interface.port form
-TEST(ParserA70503, TerminalInterfaceDotPort) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(intf.data, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->ref_terminal.interface_name, "intf");
-  EXPECT_EQ(tc->ref_terminal.name, "data");
-}
-
 // specify_terminal_descriptor with bit select on data signal
 TEST(ParserA70503, TerminalBitSelectOnDataSignal) {
   auto r = Parse(
