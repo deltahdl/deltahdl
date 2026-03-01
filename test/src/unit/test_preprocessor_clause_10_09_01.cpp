@@ -16,4 +16,15 @@ TEST(Lexical, AssignmentPattern_Positional) {
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
+TEST(Lexical, AssignmentPattern_Named) {
+  auto r = ParseWithPreprocessor(
+      "module top;\n"
+      "  initial begin\n"
+      "    logic [7:0] x;\n"
+      "    x = '{default: 'x};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
