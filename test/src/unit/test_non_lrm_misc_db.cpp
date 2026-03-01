@@ -44,25 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-// LRM comprehensive example with all features.
-TEST(LibraryText, LrmComprehensiveExample) {
-  auto r = ParseLibrary(
-      "// Library map file\n"
-      "library rtlLib /proj/rtl/*.v, /proj/common/*.v\n"
-      "  -incdir /proj/inc, /proj/common/inc;\n"
-      "library gateLib /proj/gates/*.vg;\n"
-      "include /proj/sub_libs.map;\n"
-      "config top_cfg;\n"
-      "  design rtlLib.top;\n"
-      "  default liblist rtlLib gateLib;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 2u);
-  ASSERT_EQ(r.cu->lib_includes.size(), 1u);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-}
-
 // =============================================================================
 // Lexer: file_path_spec token recognition.
 // =============================================================================
