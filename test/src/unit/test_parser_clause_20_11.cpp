@@ -73,4 +73,15 @@ TEST(ParserSection39, AssertOnNoArgs) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+TEST(ParserSection39, AssertOffNoArgs) {
+  // $assertOff with no arguments disables all assertions
+  auto r = Parse(R"(
+    module m;
+      initial $assertoff;
+    endmodule
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
