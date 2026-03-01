@@ -219,4 +219,24 @@ TEST(ParserA70503, ControlledTimingCheckEventWithCondition) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
+// =============================================================================
+// A.7.5.3 specify_terminal_descriptor
+// =============================================================================
+// specify_terminal_descriptor — simple identifier
+TEST(ParserA70503, TerminalSimpleIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_terminal.name, "data");
+  EXPECT_EQ(tc->ref_terminal.range_kind, SpecifyRangeKind::kNone);
+  EXPECT_EQ(tc->data_terminal.name, "clk");
+  EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kNone);
+}
+
 }  // namespace
