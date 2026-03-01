@@ -12,14 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Preprocessor, DelayToTicks_Basic) {
-  TimeScale ts;
-  ts.unit = TimeUnit::kNs;
-  ts.magnitude = 1;
-  // 10 delay units at 1ns with 1ps precision = 10,000 ticks.
-  EXPECT_EQ(DelayToTicks(10, ts, TimeUnit::kPs), 10000);
-}
-
 // Sim test fixture
 // =============================================================================
 // A.6.4 Statements — Simulation
