@@ -95,4 +95,19 @@ TEST(ParserA608, DoWhileNullStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
 }
 
+TEST(ParserA608, DoWhileBlockBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    do begin x = x + 1; end while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
 }  // namespace
