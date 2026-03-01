@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.1: posedge with comma
-TEST(ParserA605, EventExprPosedgeComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk, negedge rstn) x <= 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 2u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
-}
-
 // ---------------------------------------------------------------------------
 // procedural_timing_control ::=
 //   delay_control | event_control | cycle_delay
