@@ -12,13 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ConstEval, ScopedExprWithParam) {
-  EvalFixture f;
-  ScopeMap scope = {{"WIDTH", 16}};
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH > 8", f), scope), 1);
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH + 4", f), scope), 20);
-}
-
 TEST(ConstEval, Concatenation) {
   EvalFixture f;
   // {4'd3, 4'd5} = 8'h35 = 53

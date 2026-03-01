@@ -100,4 +100,11 @@ TEST(ConstEval, ScopedIdentifier) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH", f), scope), 16);
 }
 
+TEST(ConstEval, ScopedExprWithParam) {
+  EvalFixture f;
+  ScopeMap scope = {{"WIDTH", 16}};
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH > 8", f), scope), 1);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH + 4", f), scope), 20);
+}
+
 }  // namespace
