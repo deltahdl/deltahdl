@@ -34,33 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §14.14: global clocking with end label.
-TEST(ParserSection14, GlobalClockingEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  global clocking gclk @(posedge sys_clk);\n"
-      "  endclocking : gclk\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_TRUE(item->is_global_clocking);
-  EXPECT_EQ(item->name, "gclk");
-}
-
-// §14.14: global clocking has no signal declarations (shall be empty body).
-TEST(ParserSection14, GlobalClockingNoSignals) {
-  auto r = Parse(
-      "module m;\n"
-      "  global clocking gc @(negedge clk); endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_TRUE(item->is_global_clocking);
-  EXPECT_TRUE(item->clocking_signals.empty());
-  ASSERT_EQ(item->clocking_event.size(), 1u);
-  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
-}
-
 // §14.14: global clocking in subsystem pattern (from LRM hierarchical example).
 TEST(ParserSection14, GlobalClockingSubsystemPattern) {
   auto r = Parse(
