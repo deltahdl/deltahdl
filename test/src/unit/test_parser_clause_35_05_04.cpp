@@ -365,4 +365,19 @@ TEST(ParserSection38, DpiImportWithCNameForCallback) {
   EXPECT_EQ(items[0]->name, "cb_value_change");
 }
 
+TEST(ParserSection38, DpiImportPureFunctionForSizetf) {
+  // Pure function import modeling the sizetf callback (no side effects)
+  auto r = Parse(R"(
+    module m;
+      import "DPI-C" pure function int my_sizetf(input string data);
+    endmodule
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_TRUE(items[0]->dpi_is_pure);
+  EXPECT_FALSE(items[0]->dpi_is_context);
+}
+
 }  // namespace

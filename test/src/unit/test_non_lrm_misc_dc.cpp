@@ -38,21 +38,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection38, DpiImportPureFunctionForSizetf) {
-  // Pure function import modeling the sizetf callback (no side effects)
-  auto r = Parse(R"(
-    module m;
-      import "DPI-C" pure function int my_sizetf(input string data);
-    endmodule
-  )");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_TRUE(items[0]->dpi_is_pure);
-  EXPECT_FALSE(items[0]->dpi_is_context);
-}
-
 // =============================================================================
 // LRM section 38.37 -- vpi_register_systf: DPI-C exports for system tasks
 // These tests verify DPI-C export declarations modeling the callback
