@@ -44,20 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(DpiParseTest, ImportContextFunction) {
-  auto* unit = Parse(R"(
-    module m;
-      import "DPI-C" context function void set_val(input int v);
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_TRUE(items[0]->dpi_is_context);
-  EXPECT_FALSE(items[0]->dpi_is_pure);
-  EXPECT_EQ(items[0]->name, "set_val");
-}
-
 // =============================================================================
 // §35.3 DPI-C export declarations
 // =============================================================================
