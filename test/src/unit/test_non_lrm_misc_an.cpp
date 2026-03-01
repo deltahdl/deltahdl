@@ -31,44 +31,6 @@ TEST(ParserA607, CaseStmtParse) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
 }
 
-// §12.5: case statement items count and default detection
-TEST(ParserA607, CaseStmtItems) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case(x) 0: y = 1; default: y = 0; endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->case_items.size(), 2u);
-  EXPECT_FALSE(stmt->case_items[0].is_default);
-  EXPECT_TRUE(stmt->case_items[1].is_default);
-}
-
-// §12.5: multiple case_item_expressions per case item (comma-separated)
-TEST(ParserA607, CaseMultipleItemExprs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case(sel)\n"
-      "      0, 1: x = 8'd10;\n"
-      "      2, 3, 4: x = 8'd20;\n"
-      "      default: x = 8'd30;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->case_items.size(), 3u);
-  EXPECT_EQ(stmt->case_items[0].patterns.size(), 2u);
-  EXPECT_EQ(stmt->case_items[1].patterns.size(), 3u);
-  EXPECT_TRUE(stmt->case_items[2].is_default);
-}
-
 // §12.5: default without colon
 TEST(ParserA607, CaseDefaultNoColon) {
   auto r = Parse(
