@@ -182,4 +182,18 @@ TEST_F(ConfigParseTest, ConfigCoexistsWithModule) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
+TEST_F(ConfigParseTest, MultipleConfigs) {
+  auto* unit = Parse(R"(
+    config cfg1;
+      design lib.top1;
+    endconfig
+    config cfg2;
+      design lib.top2;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 2u);
+  EXPECT_EQ(unit->configs[0]->name, "cfg1");
+  EXPECT_EQ(unit->configs[1]->name, "cfg2");
+}
+
 }  // namespace

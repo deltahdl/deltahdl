@@ -5,24 +5,6 @@
 
 using namespace delta;
 
-struct ParseResult31 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult31 Parse(const std::string& src) {
-  ParseResult31 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 using ConfigParseTest = ProgramTestParse;
 
 ParseResult ParseLibrary(const std::string& src) {
@@ -37,20 +19,6 @@ ParseResult ParseLibrary(const std::string& src) {
 }
 
 namespace {
-
-TEST_F(ConfigParseTest, MultipleConfigs) {
-  auto* unit = Parse(R"(
-    config cfg1;
-      design lib.top1;
-    endconfig
-    config cfg2;
-      design lib.top2;
-    endconfig
-  )");
-  ASSERT_EQ(unit->configs.size(), 2u);
-  EXPECT_EQ(unit->configs[0]->name, "cfg1");
-  EXPECT_EQ(unit->configs[1]->name, "cfg2");
-}
 
 // =============================================================================
 // A.1.1 library_text ::= { library_description }
