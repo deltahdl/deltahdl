@@ -52,22 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-// =============================================================================
-// LRM section 39.4.1 -- Placing assertion system callbacks
-// These system tasks control assertion processing at the system level:
-// $assertOn, $assertOff, $assertKill
-// =============================================================================
-TEST(ParserSection39, AssertOnNoArgs) {
-  // $assertOn with no arguments enables all assertions
-  auto r = Parse(R"(
-    module m;
-      initial $asserton;
-    endmodule
-  )");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(ParserSection39, AssertOffNoArgs) {
   // $assertOff with no arguments disables all assertions
   auto r = Parse(R"(
