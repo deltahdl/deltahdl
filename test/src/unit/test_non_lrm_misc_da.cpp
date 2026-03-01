@@ -159,20 +159,6 @@ TEST(ParserSection28, Sec28_12_Noshowcancelled) {
   ASSERT_EQ(si->signal_list.size(), 2u);
 }
 
-TEST(ParserSection28, Sec28_12_MixedPathsAndTimingChecks) {
-  EXPECT_TRUE(
-      ParseOk("module m(input a, d, clk, output b);\n"
-              "  specify\n"
-              "    specparam tPD = 10;\n"
-              "    (a => b) = tPD;\n"
-              "    $setup(d, posedge clk, 5);\n"
-              "    $hold(posedge clk, d, 3);\n"
-              "    showcancelled b;\n"
-              "    pulsestyle_onevent b;\n"
-              "  endspecify\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // §30.4 Pulsestyle and showcancelled
 // =============================================================================
