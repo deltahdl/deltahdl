@@ -138,4 +138,28 @@ TEST(SimA60701, PatternInCaseItemBody) {
   EXPECT_EQ(var->value.ToUint64(), 2580u);
 }
 
+// §10.9: assignment pattern in for loop body
+TEST(SimA60701, PatternInForLoop) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  initial begin\n"
+      "    x = 16'd0;\n"
+      "    for (int i = 0; i < 3; i = i + 1) begin\n"
+      "      x = '{8'd7, 8'd8};\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // '{8'd7, 8'd8} = {8'h07, 8'h08} = 16'h0708 = 1800
+  EXPECT_EQ(var->value.ToUint64(), 1800u);
+}
+
 }  // namespace
