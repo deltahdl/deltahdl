@@ -526,4 +526,20 @@ TEST(ParserLet, DeclWithArgsParse) {
   EXPECT_EQ(let_item->name, "op");
 }
 
+TEST(ParserLet, DeclWithArgsNames) {
+  auto r = Parse(
+      "module t;\n"
+      "  let op(x, y, z) = |((x | y) & z);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
+  ASSERT_EQ(let_item->func_args.size(), 3u);
+  const char* const kExpected[] = {"x", "y", "z"};
+  for (size_t i = 0; i < 3; i++) {
+    EXPECT_EQ(let_item->func_args[i].name, kExpected[i]);
+  }
+  ASSERT_NE(let_item->init_expr, nullptr);
+}
+
 }  // namespace

@@ -38,4 +38,25 @@ TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
   EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "full_case"));
 }
 
+// 29. Function with local variables creating subscope
+TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int compute(int a, int b);\n"
+      "    int temp;\n"
+      "    temp = a + b;\n"
+      "    return temp;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  auto* func = mod->items[0];
+  EXPECT_EQ(func->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(func->name, "compute");
+  // The function should have body statements (local var + assign + return).
+  EXPECT_FALSE(func->func_body_stmts.empty());
+}
+
 }  // namespace

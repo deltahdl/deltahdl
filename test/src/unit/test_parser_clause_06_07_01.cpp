@@ -505,4 +505,23 @@ TEST(ParserSection6, WireWithTypedef) {
   EXPECT_EQ(items[1]->name, "w1");
 }
 
+// 17. Multiple wire declarations on one line.
+TEST(ParserSection6, Sec6_5_MultipleWireDecls) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire a, b, c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  for (auto* item : items) {
+    EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+    EXPECT_TRUE(item->data_type.is_net);
+  }
+  EXPECT_EQ(items[0]->name, "a");
+  EXPECT_EQ(items[1]->name, "b");
+  EXPECT_EQ(items[2]->name, "c");
+}
+
 }  // namespace
