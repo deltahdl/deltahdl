@@ -262,4 +262,15 @@ TEST(ConstEval, Concatenation) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4'd3, 4'd5}", f)), 0x35);
 }
 
+// § constant_concatenation ::= { constant_expression { , constant_expression }
+// }
+TEST(ParserA81, ConstantConcatenation) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter P = {8'hAB, 8'hCD};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
