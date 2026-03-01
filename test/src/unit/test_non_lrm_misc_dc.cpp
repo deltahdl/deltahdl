@@ -52,16 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection39, AssumePropertyStatement) {
-  // assume property can also have callbacks placed on it
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic clk, req, gnt;
-      assume property (@(posedge clk) req |-> ##[1:3] gnt);
-    endmodule
-  )"));
-}
-
 TEST(ParserSection39, CoverPropertyStatement) {
   // cover property is used for coverage callbacks
   EXPECT_TRUE(ParseOk(R"(

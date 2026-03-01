@@ -182,4 +182,18 @@ TEST(ParserAnnexF, AnnexFAssumeProperty) {
   EXPECT_TRUE(found);
 }
 
+using DpiParseTest = ProgramTestParse;
+
+using ApiParseTest = ProgramTestParse;
+
+TEST(ParserSection39, AssumePropertyStatement) {
+  // assume property can also have callbacks placed on it
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      logic clk, req, gnt;
+      assume property (@(posedge clk) req |-> ##[1:3] gnt);
+    endmodule
+  )"));
+}
+
 }  // namespace
