@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- for ( [for_initialization] ; [expression] ; [for_step] ) stmt_or_null ---
-TEST(ParserA608, ForLoopParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-}
-
 TEST(ParserA608, ForLoopParts) {
   auto r = Parse(
       "module m;\n"

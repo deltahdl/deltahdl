@@ -421,4 +421,19 @@ TEST(ParserSection12, ForWithoutDeclStillWorks) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kImplicit);
 }
 
+// --- for ( [for_initialization] ; [expression] ; [for_step] ) stmt_or_null ---
+TEST(ParserA608, ForLoopParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i++) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+}
+
 }  // namespace
