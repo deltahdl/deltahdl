@@ -40,4 +40,21 @@ TEST(ParserSection16, DeferredAssumeHash0WithAction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+// =============================================================================
+// A.6.10 — deferred_immediate_assert_statement
+// =============================================================================
+// assert #0 ( expression ) ;
+TEST(ParserA610, DeferredAssertHash0) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert #0 (1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+}
+
 }  // namespace
