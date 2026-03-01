@@ -91,4 +91,11 @@ TEST(ParserA84, TimeLiteralUs) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// § time_literal — unsigned_number time_unit (ms)
+TEST(ParserA84, TimeLiteralMs) {
+  auto r = Parse("module m; initial #2ms; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
