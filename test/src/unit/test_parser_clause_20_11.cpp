@@ -148,4 +148,19 @@ TEST(ParserSection39, AssertPassStepAndFailStep) {
   )"));
 }
 
+TEST(ParserSection39, AssertionControlInAlwaysBlock) {
+  // Assertion control tasks in always blocks
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      logic clk, reset;
+      always @(posedge clk) begin
+        if (reset)
+          $assertoff(0, m);
+        else
+          $asserton(0, m);
+      end
+    endmodule
+  )"));
+}
+
 }  // namespace

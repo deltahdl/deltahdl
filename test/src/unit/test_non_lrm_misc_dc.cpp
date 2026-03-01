@@ -52,21 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection39, AssertionControlInAlwaysBlock) {
-  // Assertion control tasks in always blocks
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic clk, reset;
-      always @(posedge clk) begin
-        if (reset)
-          $assertoff(0, m);
-        else
-          $asserton(0, m);
-      end
-    endmodule
-  )"));
-}
-
 TEST(ParserSection39, AssertionControlSequence) {
   // Complete assertion control sequence: off, kill, on
   EXPECT_TRUE(ParseOk(R"(
