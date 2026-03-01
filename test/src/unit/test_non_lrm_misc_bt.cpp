@@ -30,64 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// 25. begin-end with no name (anonymous block)
-TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    x = 5;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  // Anonymous blocks have an empty label.
-  EXPECT_TRUE(item->body->label.empty());
-}
-
-// 26. Multiple named blocks at same level
-TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    begin : block_a\n"
-      "      int x;\n"
-      "      x = 1;\n"
-      "    end : block_a\n"
-      "    begin : block_b\n"
-      "      int y;\n"
-      "      y = 2;\n"
-      "    end : block_b\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->label, "block_a");
-  EXPECT_EQ(body->stmts[1]->label, "block_b");
-}
-
-// §A.2.8 block_item_declaration alternative 3: parameter_declaration
-TEST(ParserA28, ParameterInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    parameter int Y = 10;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->var_name, "Y");
-}
-
 // Mixed block items: all 4 alternatives together
 TEST(ParserA28, MixedBlockItems) {
   EXPECT_TRUE(

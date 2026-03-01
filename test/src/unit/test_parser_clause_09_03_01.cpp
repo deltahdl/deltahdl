@@ -625,4 +625,20 @@ TEST(ParserSection9, SequentialBlockMultipleVarDecls) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
 }
 
+// §A.2.8 block_item_declaration alternative 3: parameter_declaration
+TEST(ParserA28, ParameterInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    parameter int Y = 10;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->var_name, "Y");
+}
+
 }  // namespace
