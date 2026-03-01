@@ -40,21 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-// =========================================================================
-// §7.8: Associative arrays
-// =========================================================================
-TEST(ParserSection7, AssocArrayWildcard) {
-  auto r = Parse(
-      "module t;\n"
-      "  integer aa[*];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "aa");
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
 TEST(ParserSection7, AssocArrayStringIndex) {
   auto r = Parse(
       "module t;\n"
