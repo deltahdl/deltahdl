@@ -310,4 +310,21 @@ TEST(ParserA604, StmtItemProceduralTimingControlEvent) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
+// §9.4.2: event control followed by statement
+TEST(ParserA605, ProceduralTimingControlEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_FALSE(stmt->events.empty());
+  EXPECT_NE(stmt->body, nullptr);
+}
+
 }  // namespace
