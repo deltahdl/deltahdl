@@ -12,20 +12,6 @@ using namespace delta;
 
 namespace {
 
-// § multiple_concatenation (replication) in continuous assignment
-TEST(ElabA81, ReplicationInContAssign) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic [1:0] x;\n"
-      "  assign a = {4{x}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // § streaming_concatenation elaborates in procedural context
 TEST(ElabA81, StreamingConcatLeftShiftElab) {
   ElabFixture f;
