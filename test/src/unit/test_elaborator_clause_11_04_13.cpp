@@ -1,0 +1,30 @@
+// §11.4.13: for an explanation of range list syntax.
+
+#include "fixture_simulator.h"
+#include "helpers_clocking.h"
+#include "helpers_eval_op.h"
+#include "helpers_scheduler.h"
+
+using namespace delta;
+
+namespace {
+
+// § inside_expression — value no match
+TEST(SimA83, InsideValueNoMatch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = 8'd4 inside {8'd3, 8'd5, 8'd7};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+}  // namespace
