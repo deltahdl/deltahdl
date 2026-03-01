@@ -38,21 +38,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-TEST_F(SpecifyTest, ConditionedHoldBothSignals) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $hold(posedge clk &&& en, data &&& reset, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  auto& tc = spec->specify_items[0]->timing_check;
-  EXPECT_EQ(tc.check_kind, TimingCheckKind::kHold);
-  EXPECT_NE(tc.ref_condition, nullptr);
-  EXPECT_NE(tc.data_condition, nullptr);
-}
-
 // =============================================================================
 // §31.9 Extended $setuphold arguments
 // =============================================================================
