@@ -107,4 +107,19 @@ TEST(ParserSection12, WhileWithNullBody) {
               "endmodule\n"));
 }
 
+// --- while ( expression ) statement_or_null ---
+TEST(ParserA608, WhileLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin while (x > 0) x = x - 1; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWhile);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
 }  // namespace
