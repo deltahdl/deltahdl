@@ -34,4 +34,14 @@ TEST(ParserSection21, DumpvarsMultipleScopes) {
               "endmodule\n"));
 }
 
+// ============================================================================
+// LRM section 21.7.1.2 -- Specifying variables to be dumped ($dumpvars)
+// ============================================================================
+TEST(ParserSection21, DumpvarsLevelOneModule) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $dumpvars(1, top);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
