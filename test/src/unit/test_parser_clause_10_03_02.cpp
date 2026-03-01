@@ -338,4 +338,20 @@ TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
   ASSERT_NE(items[1]->assign_rhs, nullptr);
 }
 
+// 16. Variable with continuous assignment (assign logic_var = expr).
+TEST(ParserSection6, Sec6_5_VarWithContAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic y;\n"
+      "  assign y = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kContAssign);
+}
+
 }  // namespace
