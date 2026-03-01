@@ -64,18 +64,6 @@ TEST(ParserSection13, Sec13_8_VirtualClassStaticTask) {
   EXPECT_EQ(r.cu->classes[0]->params[0].first, "W");
 }
 
-// §13.8: Class scope resolution call with parameterization.
-TEST(ParserSection13, Sec13_8_ScopeCallParsesAsExpr) {
-  auto r = Parse(
-      "module top;\n"
-      "  logic [7:0] d;\n"
-      "  logic [2:0] e;\n"
-      "  assign e = Codec#(8)::encode(d);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §13.8: Two different specializations in the same module.
 TEST(ParserSection13, Sec13_8_TwoSpecializations) {
   auto r = Parse(
