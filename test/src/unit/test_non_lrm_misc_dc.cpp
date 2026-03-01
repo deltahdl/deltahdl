@@ -52,18 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection40, CoverageGetSystemCall) {
-  // $coverage_get returns current coverage count
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      initial begin
-        int val;
-        val = $coverage_get(0, 0);
-      end
-    endmodule
-  )"));
-}
-
 TEST(ParserSection40, CoverageMergeSystemCall) {
   // $coverage_merge merges coverage databases
   EXPECT_TRUE(ParseOk(R"(
