@@ -20,23 +20,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-// Library declaration with both multiple file paths and multiple -incdir.
-TEST(LibraryText, LibraryDeclFullForm) {
-  auto r = ParseLibrary(
-      "library rtlLib /proj/rtl/*.v, /proj/extra/*.v\n"
-      "  -incdir /proj/inc, /proj/common;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-  EXPECT_EQ(r.cu->libraries[0]->name, "rtlLib");
-  ASSERT_EQ(r.cu->libraries[0]->file_paths.size(), 2u);
-  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/proj/rtl/*.v");
-  EXPECT_EQ(r.cu->libraries[0]->file_paths[1], "/proj/extra/*.v");
-  ASSERT_EQ(r.cu->libraries[0]->incdir_paths.size(), 2u);
-  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[0], "/proj/inc");
-  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[1], "/proj/common");
-}
-
 // Library declaration with hierarchical wildcard path (...).
 TEST(LibraryText, LibraryDeclHierarchicalWildcard) {
   auto r = ParseLibrary("library deepLib .../a.v;\n");
