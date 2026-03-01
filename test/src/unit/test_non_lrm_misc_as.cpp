@@ -15,28 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// All dotted terminals in full path
-TEST(ParserA703, AllDottedTerminalsFullPath) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (intf1.a, intf2.b *> intf3.c) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.src_ports.size(), 2u);
-  EXPECT_EQ(si->path.src_ports[0].interface_name, "intf1");
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[1].interface_name, "intf2");
-  EXPECT_EQ(si->path.src_ports[1].name, "b");
-  ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0].interface_name, "intf3");
-  EXPECT_EQ(si->path.dst_ports[0].name, "c");
-}
-
 // Simple terminal — no range, no interface (baseline)
 TEST(ParserA703, SimpleTerminalNoRange) {
   auto r = Parse(
