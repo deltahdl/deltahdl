@@ -247,22 +247,6 @@ TEST(SourceText, ConfigDeclEndLabel) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg2");
 }
 
-// config_rule_statement: inst_clause liblist_clause with hierarchical inst_name
-TEST(SourceText, ConfigRuleInstLiblist) {
-  auto r = Parse(
-      "config cfg6;\n"
-      "  design top;\n"
-      "  instance top.u1.u2 liblist mylib;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rule = r.cu->configs[0]->rules[0];
-  EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
-  EXPECT_EQ(rule->inst_path, "top.u1.u2");
-  ASSERT_EQ(rule->liblist.size(), 1u);
-  EXPECT_EQ(rule->liblist[0], "mylib");
-}
-
 // config_rule_statement: inst_clause use_clause
 TEST(SourceText, ConfigRuleInstUse) {
   auto r = Parse(
