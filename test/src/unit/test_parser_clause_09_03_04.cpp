@@ -449,4 +449,19 @@ TEST(ParserSection9c, NestedNamedSequentialBlocks) {
   EXPECT_EQ(body->stmts[0]->label, "inner");
 }
 
+TEST(ParserSection12, NamedForkJoinAny) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial fork : par_blk\n"
+      "    x = 1;\n"
+      "  join_any : par_blk\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kFork);
+  EXPECT_EQ(body->label, "par_blk");
+  EXPECT_EQ(body->join_kind, TokenKind::kKwJoinAny);
+}
+
 }  // namespace
