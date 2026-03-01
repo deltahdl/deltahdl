@@ -72,4 +72,22 @@ TEST(ParserA70502, TimecheckCondMinTypMax) {
   EXPECT_EQ(tc->timecheck_cond->kind, ExprKind::kMinTypMax);
 }
 
+// =============================================================================
+// A.7.5.2 delayed_reference / delayed_data
+// =============================================================================
+// Simple delayed_reference / delayed_data (identifier only)
+TEST(ParserA70502, DelayedRefDataSimple) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dDATA);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->delayed_ref, "dCLK");
+  EXPECT_EQ(tc->delayed_data, "dDATA");
+}
+
 }  // namespace

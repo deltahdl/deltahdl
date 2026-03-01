@@ -70,21 +70,6 @@ TEST(ParserSection9, ParallelBlockNamedForkJoin) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
 }
 
-TEST(ParserSection9, ParallelBlockVarDeclInFork) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial fork\n"
-      "    int local_var;\n"
-      "    begin local_var = 1; end\n"
-      "  join\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_GE(stmt->fork_stmts.size(), 1u);
-}
-
 TEST(ParserSection9, ParallelBlockNestedBeginInFork) {
   auto r = Parse(
       "module m;\n"

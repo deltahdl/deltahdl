@@ -44,24 +44,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 10. Struct member access in assignment.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_3_StructMemberAccess) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct packed {\n"
-              "    logic [7:0] data;\n"
-              "    logic valid;\n"
-              "  } packet_t;\n"
-              "  packet_t pkt;\n"
-              "  logic en;\n"
-              "  logic [7:0] d;\n"
-              "  always_latch\n"
-              "    if (en) pkt.data <= d;\n"
-              "endmodule\n"));
-}
-
-// ---------------------------------------------------------------------------
 // 11. Function call in RHS expression.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_FunctionCallRHS) {

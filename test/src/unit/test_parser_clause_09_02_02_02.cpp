@@ -358,4 +358,42 @@ TEST(ParserSection9, Sec9_2_2_ArrayIndexing) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kSelect);
 }
 
+struct ParseResult6j {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6j Parse(const std::string& src) {
+  ParseResult6j result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// 14. Variable driven by always_comb.
+TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysComb) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic a, y;\n"
+      "  always_comb y = a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  bool found_comb = false;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock) {
+      found_comb = true;
+      ASSERT_NE(item->body, nullptr);
+    }
+  }
+  EXPECT_TRUE(found_comb);
+}
+
 }  // namespace
