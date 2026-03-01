@@ -54,4 +54,21 @@ TEST(SimA81, ConcatDoesNotInterfere) {
   EXPECT_EQ(vb->value.ToUint64(), 99u);
 }
 
+// =============================================================================
+// A.8.1 Concatenations — Elaboration
+// =============================================================================
+// § concatenation elaborates in continuous assignment
+TEST(ElabA81, ConcatenationInContAssign) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] x, y;\n"
+      "  assign a = {x, y};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
