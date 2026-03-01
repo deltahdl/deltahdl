@@ -305,4 +305,22 @@ TEST(ParserSection12, NamedBeginEnd) {
   EXPECT_EQ(body->label, "my_block");
 }
 
+// 25. begin-end with no name (anonymous block)
+TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "    x = 5;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  // Anonymous blocks have an empty label.
+  EXPECT_TRUE(item->body->label.empty());
+}
+
 }  // namespace

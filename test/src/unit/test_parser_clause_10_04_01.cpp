@@ -562,4 +562,23 @@ TEST(ParserSection10, Sec10_4_1_MultipleSequential) {
   EXPECT_EQ(s3->lhs->text, "a");
 }
 
+// --- 18. Blocking assignment to array element: arr[i] = val ---
+TEST(ParserSection10, Sec10_4_1_ArrayElementLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] arr [0:3];\n"
+      "  initial begin\n"
+      "    arr[2] = 8'hAB;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
