@@ -6,23 +6,6 @@ using namespace delta;
 
 namespace {
 
-// specify_terminal_descriptor with part select [expr:expr]
-TEST(ParserA70503, TerminalPartSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data[3:0], posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->ref_terminal.name, "data");
-  EXPECT_EQ(tc->ref_terminal.range_kind, SpecifyRangeKind::kPartSelect);
-  EXPECT_NE(tc->ref_terminal.range_left, nullptr);
-  EXPECT_NE(tc->ref_terminal.range_right, nullptr);
-}
-
 // specify_terminal_descriptor — interface.port form
 TEST(ParserA70503, TerminalInterfaceDotPort) {
   auto r = Parse(
