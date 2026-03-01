@@ -196,4 +196,23 @@ TEST(ParserSection39, AssumePropertyStatement) {
   )"));
 }
 
+static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+// assume_property_statement
+TEST(ParserA610, AssumePropertyModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (req |-> ack);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssumeProperty);
+  ASSERT_NE(item, nullptr);
+}
+
 }  // namespace
