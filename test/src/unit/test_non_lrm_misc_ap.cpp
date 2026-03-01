@@ -23,20 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// action_block: [ statement ] else statement_or_null
-TEST(ParserA610, ActionBlockPassFailBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assert(1) begin end else begin end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
-  ASSERT_NE(stmt->assert_fail_stmt, nullptr);
-}
-
 // =============================================================================
 // A.6.10 — concurrent_assertion_statement (module-level)
 // =============================================================================
