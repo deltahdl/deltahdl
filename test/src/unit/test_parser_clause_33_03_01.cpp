@@ -85,4 +85,11 @@ TEST(LibraryText, ErrorMissingSemicolon) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// Missing file path spec.
+TEST(LibraryText, ErrorMissingFilePath) {
+  auto r = ParseLibrary("library lib;\n");
+  // Should produce an error: file_path_spec is required.
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
