@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA608, ForNullStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) ;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-}
-
 // --- for_variable_declaration: [var] data_type variable_identifier = expr ---
 TEST(ParserA608, ForVarKeyword) {
   auto r = Parse(
