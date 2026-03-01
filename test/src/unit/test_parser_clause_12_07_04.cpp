@@ -122,4 +122,16 @@ TEST(ParserA608, WhileLoop) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
+TEST(ParserA608, WhileNullStmt) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin while (x > 0) ; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWhile);
+}
+
 }  // namespace
