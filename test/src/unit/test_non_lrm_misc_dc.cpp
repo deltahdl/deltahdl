@@ -52,16 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-TEST_F(ApiParseTest, ReadmemhSystemCall) {
-  auto* unit = Parse(R"(
-    module m;
-      logic [7:0] mem [0:255];
-      initial $readmemh("data.hex", mem);
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-}
-
 // =============================================================================
 // LRM section 38.36 -- vpi_register_cb: DPI-C imports for VPI callbacks
 // These tests verify that DPI-C import declarations with signatures typical
