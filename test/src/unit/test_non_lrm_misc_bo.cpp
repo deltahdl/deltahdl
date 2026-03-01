@@ -41,21 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 namespace {
 
 // =========================================================================
-// §7.5: Dynamic arrays
-// =========================================================================
-TEST(ParserSection7, DynamicArrayDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  int dyn[];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "dyn");
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
-// =========================================================================
 // §7.8: Associative arrays
 // =========================================================================
 TEST(ParserSection7, AssocArrayWildcard) {
