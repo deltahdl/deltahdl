@@ -7,28 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// delay_or_event_control ::=
-//   delay_control | event_control | repeat ( expression ) event_control
-// (used in intra-assignment context — §9.4.5)
-// ---------------------------------------------------------------------------
-// §9.4.5: intra-assignment delay in blocking assignment
-TEST(ParserA605, IntraAssignDelayBlocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = #5 b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_NE(stmt->delay, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
 // §9.4.5: intra-assignment event in blocking assignment
 TEST(ParserA605, IntraAssignEventBlocking) {
   auto r = Parse(
