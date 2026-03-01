@@ -421,4 +421,17 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberMultiPackedDims) {
   EXPECT_GE(member.extra_packed_dims.size(), 1u);
 }
 
+// 26. Struct output port assigned in module body.
+TEST(ParserSection7, Sec7_2_2_StructOutputPort) {
+  EXPECT_TRUE(
+      ParseOk("module t(\n"
+              "  output logic [15:0] result\n"
+              ");\n"
+              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } s_t;\n"
+              "  s_t s;\n"
+              "  assign s = 16'hDEAD;\n"
+              "  assign result = s;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
