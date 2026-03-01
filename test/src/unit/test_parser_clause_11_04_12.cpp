@@ -97,4 +97,13 @@ TEST(ParserSection11, ConcatWithPartSelects) {
   EXPECT_EQ(rhs->elements.size(), 4u);
 }
 
+TEST(ParserAnnexA, A8Concatenation) {
+  auto r = Parse("module m; initial x = {a, b, c}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(stmt->rhs->elements.size(), 3u);
+}
+
 }  // namespace
