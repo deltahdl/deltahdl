@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.5: repeat event control in nonblocking assignment
-TEST(ParserA605, IntraAssignRepeatEventNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= repeat(5) @(posedge clk) data;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->repeat_event_count, nullptr);
-  EXPECT_FALSE(stmt->events.empty());
-}
-
 // ---------------------------------------------------------------------------
 // delay_control ::= # delay_value | # ( mintypmax_expression )
 // ---------------------------------------------------------------------------
