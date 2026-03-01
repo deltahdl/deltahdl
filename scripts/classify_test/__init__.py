@@ -34,10 +34,7 @@ from ._patterns import PREFIX_SCHEMA
 from ._patterns import STAGE_TO_PREFIX
 from ._patterns import TOPIC_PROMPT_TEMPLATE
 from ._patterns import TOPIC_SCHEMA
-from ._output import (
-    print_classification_table,
-    print_summary,
-)
+from ._output import print_classification_table
 from ._split import (
     _batch_tests,
     _count_file_lines,
@@ -931,20 +928,14 @@ def _run(args):
         groups, Path(args.output_dir).resolve(),
         exclude_path=filepath, dry_run=args.dry_run,
     )
-    n_kept = sum(len(ts) for (p, c), ts in groups.items()
-                 if clause_to_filename(p, c) == test_name)
-    n_others = sum(1 for t in parsed.all_tests
-                   if t.test_name != args.test)
-    skw = {"n_kept": n_kept, "n_removed": n_removed,
-           "n_others": n_others}
+    for dest, _, _ in to_create:
+        print(f"  Target: {dest}.cpp")
+    for merge_into, _ in to_merge:
+        print(f"  Merging into {merge_into.name}")
     if args.dry_run:
-        print_summary(to_create, to_merge, test_name,
-                       source_is_target, dry_run=True, **skw)
         return
     if not to_create and not to_merge and source_is_target \
             and n_removed == 0:
-        print_summary(to_create, to_merge, test_name,
-                       source_is_target, **skw)
         return
     titles = load_lrm_titles(Path(args.lrm).resolve())
     new_names = _write_files(to_create, to_merge, parsed, {
@@ -952,7 +943,7 @@ def _run(args):
         "lrm_titles": titles,
         "max_lines": getattr(args, "max_lines", None),
     })
-    n_kept = _update_source(filepath, parsed, {
+    _update_source(filepath, parsed, {
         "test": args.test, "groups": groups,
         "titles": titles, "stem": test_name,
         "source_is_target": source_is_target,
@@ -963,8 +954,7 @@ def _run(args):
             t.test_name != args.test for t in parsed.all_tests
         ),
     )
-    print_summary(to_create, to_merge, test_name,
-                   source_is_target, **skw)
+    print("Updated `CMakeLists.txt`")
     if not getattr(args, "no_commit", False):
         commit_classification({
             "filepath": filepath, "target": target,
