@@ -97,4 +97,14 @@ TEST(ParserA81, StreamingConcatLeftShift) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kLtLt);
 }
 
+TEST(ParserA81, StreamingConcatRightShift) {
+  auto r = Parse("module m; initial x = {>> {a}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
+  EXPECT_EQ(stmt->rhs->op, TokenKind::kGtGt);
+}
+
 }  // namespace

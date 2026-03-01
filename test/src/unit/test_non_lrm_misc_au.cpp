@@ -14,16 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA81, StreamingConcatRightShift) {
-  auto r = Parse("module m; initial x = {>> {a}}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
-  EXPECT_EQ(stmt->rhs->op, TokenKind::kGtGt);
-}
-
 // § slice_size ::= simple_type | constant_expression
 TEST(ParserA81, StreamingWithTypeSliceSize) {
   auto r = Parse("module m; initial x = {<< byte {a}}; endmodule\n");
