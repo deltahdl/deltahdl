@@ -207,4 +207,42 @@ TEST(ParserSection6, Sec6_5_LogicVarInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
+struct ParseResult6h {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6h Parse(const std::string& src) {
+  ParseResult6h result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// 13. Multiple variables with packed dims share the same type.
+TEST(ParserSection6, Sec6_11_MultipleVarsWithPackedDims) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  EXPECT_EQ(items[0]->name, "a");
+  EXPECT_EQ(items[1]->name, "b");
+  EXPECT_EQ(items[2]->name, "c");
+  for (auto* item : items) {
+    EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+    ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+    EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
+  }
+}
+
 }  // namespace
