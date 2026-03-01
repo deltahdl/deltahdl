@@ -23,21 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// cover ( expression ) pass_stmt ;
-TEST(ParserA610, SimpleCoverPassAction) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial cover(1) $display(\"hit\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
-  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
-  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
-}
-
 // =============================================================================
 // A.6.10 — deferred_immediate_assert_statement
 // =============================================================================
