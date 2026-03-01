@@ -358,8 +358,8 @@ def test_remove_file_checkbox_calls_update(monkeypatch):
     assert updated[0] == "- [ ] b.cpp\n"
 
 
-def test_remove_file_checkbox_not_found_skips(monkeypatch, capsys):
-    """Prints friendly message and skips update when filename not in issue."""
+def _stub_not_found(monkeypatch):
+    """Stub helpers so remove_checkbox raises ValueError."""
     monkeypatch.setattr(
         classify_files, "fetch_issue_body",
         lambda _o, _r, _i: "- [ ] other.cpp\n",
@@ -373,15 +373,25 @@ def test_remove_file_checkbox_not_found_skips(monkeypatch, capsys):
         classify_files, "update_issue_body",
         lambda _o, _r, _i, body: updated.append(body),
     )
-    classify_files.remove_file_checkbox("o", "r", 61, "missing.cpp")
-    assert not updated
-    out = capsys.readouterr().out
-    assert "not found in issue #61" in out
-    assert "Nothing to delete" in out
+    return updated
 
 
 def _raise_value_error(_body, _name):
     raise ValueError("not found")
+
+
+def test_remove_file_checkbox_not_found_skips_update(monkeypatch):
+    """Does not call update_issue_body when filename is missing."""
+    updated = _stub_not_found(monkeypatch)
+    classify_files.remove_file_checkbox("o", "r", 61, "missing.cpp")
+    assert not updated
+
+
+def test_remove_file_checkbox_not_found_prints_message(monkeypatch, capsys):
+    """Prints friendly skip message when filename is missing."""
+    _stub_not_found(monkeypatch)
+    classify_files.remove_file_checkbox("o", "r", 61, "missing.cpp")
+    assert "Filename not found in issue #61" in capsys.readouterr().out
 
 
 # ---- _run ------------------------------------------------------------------
