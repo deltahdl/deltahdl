@@ -91,4 +91,28 @@ TEST(ParserSection7, ArrayMethodSort) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
+TEST(ParserSection7, ArrayMethodRsort) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3, 4, 5};\n"
+      "  initial arr.rsort;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+}
+
+TEST(ParserSection7, ArrayMethodShuffle) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3};\n"
+      "  initial arr.shuffle;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+}
+
 }  // namespace
