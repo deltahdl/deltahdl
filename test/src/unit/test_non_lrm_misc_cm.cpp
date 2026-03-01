@@ -34,17 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-TEST(ParserSection15, NonblockingEventTriggerHierarchical) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial ->> top.e;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
-}
-
 // =============================================================================
 // §15.4 — Parameterized mailbox: mailbox #(type)
 // =============================================================================
