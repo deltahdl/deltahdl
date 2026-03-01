@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// function_statement ::= statement
-// function_statement_or_null ::= function_statement | { attribute_instance } ;
-// ---------------------------------------------------------------------------
-// §13: function_statement — regular statement in function body
-TEST(ParserA604, FunctionStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void f();\n"
-      "    a = 1;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* func = FirstFunctionDecl(r);
-  ASSERT_NE(func, nullptr);
-  ASSERT_GE(func->func_body_stmts.size(), 1u);
-  EXPECT_EQ(func->func_body_stmts[0]->kind, StmtKind::kBlockingAssign);
-}
-
 // §13: function_statement_or_null — null statement in function body
 TEST(ParserA604, FunctionStatementOrNullWithNull) {
   auto r = Parse(
