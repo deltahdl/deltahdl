@@ -45,42 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 30. Task in program block (automatic by default)
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_TaskInProgramBlock) {
-  EXPECT_TRUE(
-      ParseOk("program test_prog;\n"
-              "  task run_test();\n"
-              "    int x;\n"
-              "    x = 1;\n"
-              "    $display(\"x=%0d\", x);\n"
-              "  endtask\n"
-              "endprogram\n"));
-}
-
-// =============================================================================
-// 1. Static function — variables are static by default
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_StaticFunctionDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int count();\n"
-      "    int c;\n"
-      "    c = c + 1;\n"
-      "    return c;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(fn->is_static);
-  EXPECT_FALSE(fn->is_automatic);
-  EXPECT_EQ(fn->name, "count");
-}
-
-// =============================================================================
 // 2. Automatic function — variables are automatic by default
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutomaticFunctionDecl) {

@@ -241,4 +241,37 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncReturningLogic) {
   EXPECT_NE(item->return_type.packed_dim_right, nullptr);
 }
 
+// Returns the first function or task declaration from the first module.
+static ModuleItem* FirstFuncOrTask(ParseResult4e& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl)
+      return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// 1. Static function — variables are static by default
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_StaticFunctionDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  function static int count();\n"
+      "    int c;\n"
+      "    c = c + 1;\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FirstFuncOrTask(r);
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(fn->is_static);
+  EXPECT_FALSE(fn->is_automatic);
+  EXPECT_EQ(fn->name, "count");
+}
+
 }  // namespace
