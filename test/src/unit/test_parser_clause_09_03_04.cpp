@@ -426,4 +426,27 @@ TEST(ParserSection12, NamedForkJoin) {
   EXPECT_EQ(body->label, "my_fork");
 }
 
+// =============================================================================
+// LRM section 9.3.1 -- Sequential blocks (additional)
+// Nested blocks with names, and automatic variable lifetime in blocks.
+// =============================================================================
+TEST(ParserSection9c, NestedNamedSequentialBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : outer\n"
+      "    begin : inner\n"
+      "      a = 1;\n"
+      "    end : inner\n"
+      "  end : outer\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->label, "outer");
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->stmts[0]->label, "inner");
+}
+
 }  // namespace
