@@ -155,6 +155,17 @@ def _all_flags_create(tmp_path):
     ]
 
 
+def _common_flags(tmp_path):
+    """Return flags shared by issue-mutex validation tests."""
+    return [
+        "--file", str(tmp_path / "f.cpp"),
+        "--output-dir", str(tmp_path),
+        "--lrm", "lrm.txt",
+        "--organization", "org", "--repo", "repo",
+        "--max-lines", "500",
+    ]
+
+
 def _run_batch(tmp_path, body, exit_code=0):
     """Write *body*, install fake classify_test, and invoke classify_file."""
     fake = _install_fake_classify_test(tmp_path, exit_code=exit_code)
@@ -293,11 +304,7 @@ def test_both_issue_flags_rejects(tmp_path):
     env = _base_env(tmp_path, fake)
     result = _invoke(
         "--issue", "1", "--create-issue",
-        "--file", str(tmp_path / "f.cpp"),
-        "--output-dir", str(tmp_path),
-        "--lrm", "lrm.txt",
-        "--organization", "org", "--repo", "repo",
-        "--max-lines", "500",
+        *_common_flags(tmp_path),
         cwd=str(tmp_path), env=env,
     )
     assert result.returncode != 0
@@ -308,11 +315,7 @@ def test_neither_issue_flag_rejects(tmp_path):
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
     result = _invoke(
-        "--file", str(tmp_path / "f.cpp"),
-        "--output-dir", str(tmp_path),
-        "--lrm", "lrm.txt",
-        "--organization", "org", "--repo", "repo",
-        "--max-lines", "500",
+        *_common_flags(tmp_path),
         cwd=str(tmp_path), env=env,
     )
     assert result.returncode != 0
