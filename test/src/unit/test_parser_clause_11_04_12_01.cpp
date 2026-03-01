@@ -121,4 +121,12 @@ TEST(ParserSection11, ReplicationMultipleElements) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
+TEST(ParserAnnexA, A8Replication) {
+  auto r = Parse("module m; initial x = {4{a}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
+}
+
 }  // namespace
