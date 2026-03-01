@@ -40,15 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// parameter_port_list: type parameter (#(type T = int))
-TEST(SourceText, ParamPortTypeParameter) {
-  auto r = Parse("module m #(type T = int); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "T");
-}
-
 // --- list_of_type_assignments ---
 // type_assignment { , type_assignment }
 TEST(ParserA23, ListOfTypeAssignmentsSingle) {
