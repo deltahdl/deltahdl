@@ -52,16 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
-  // cover property -- target of vpiAssertAttemptCovered/vpiAssertSuccessCovered
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic clk, a, b;
-      cover property (@(posedge clk) a |-> ##[1:3] b);
-    endmodule
-  )"));
-}
-
 TEST(ParserSection40, CoverageControlInAlwaysBlock) {
   // Coverage control calls within procedural context
   EXPECT_TRUE(ParseOk(R"(

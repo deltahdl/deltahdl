@@ -267,4 +267,14 @@ TEST(ParserSection39, CoverPropertyStatement) {
   )"));
 }
 
+TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
+  // cover property -- target of vpiAssertAttemptCovered/vpiAssertSuccessCovered
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      logic clk, a, b;
+      cover property (@(posedge clk) a |-> ##[1:3] b);
+    endmodule
+  )"));
+}
+
 }  // namespace
