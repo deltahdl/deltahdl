@@ -328,4 +328,20 @@ TEST(ParserA704, TwelveDelaysParallelPath) {
   ASSERT_EQ(si->path.delays.size(), 12u);
 }
 
+// 6 delays with edge-sensitive path
+TEST(ParserA704, SixDelaysEdgeSensitive) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => q) = (1, 2, 3, 4, 5, 6);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
+  ASSERT_EQ(si->path.delays.size(), 6u);
+}
+
 }  // namespace
