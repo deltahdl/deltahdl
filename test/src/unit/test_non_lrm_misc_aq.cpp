@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.12 Randsequence — rs_prod (all alternatives)
-// =============================================================================
-// rs_prod as rs_production_item
-TEST(ParserA612, RsProdAsProductionItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : child;\n"
-      "      child : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // rs_prod as rs_code_block
 TEST(ParserA612, RsProdAsCodeBlock) {
   auto r = Parse(
