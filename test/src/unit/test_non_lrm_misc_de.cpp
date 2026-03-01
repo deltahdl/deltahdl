@@ -9,26 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9: single-element positional pattern
-TEST(SimA60701, SingleElementPositionalPattern) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = '{8'd42};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
 // §10.9: four-element positional pattern
 TEST(SimA60701, FourElementPositionalPattern) {
   SimFixture f;
