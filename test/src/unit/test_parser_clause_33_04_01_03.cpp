@@ -98,4 +98,19 @@ TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
   EXPECT_EQ(inst_rule->liblist[0], "gateLib");
 }
 
+TEST(ParserSection34, ConfigWithInstanceAndLiblist) {
+  // Config with instance clause pointing to a specific library
+  auto r = Parse(R"(
+    config inst_cfg;
+      design work.top;
+      instance top.u1 liblist gatelib;
+      instance top.u2 liblist rtllib;
+    endconfig
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  auto* cfg = r.cu->configs[0];
+  ASSERT_GE(cfg->rules.size(), 2u);
+}
+
 }  // namespace

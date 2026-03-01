@@ -250,21 +250,6 @@ TEST(LibraryText, ConfigInLibraryText) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(ParserSection34, ConfigWithInstanceAndLiblist) {
-  // Config with instance clause pointing to a specific library
-  auto r = Parse(R"(
-    config inst_cfg;
-      design work.top;
-      instance top.u1 liblist gatelib;
-      instance top.u2 liblist rtllib;
-    endconfig
-  )");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-  auto* cfg = r.cu->configs[0];
-  ASSERT_GE(cfg->rules.size(), 2u);
-}
-
 TEST(ParserSection34, ConfigCoexistsWithModuleAndProtected) {
   // Ensure config declarations coexist with modules
   // (In a full flow, protected modules are stripped by preprocessor;
