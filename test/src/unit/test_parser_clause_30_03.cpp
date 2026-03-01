@@ -125,4 +125,25 @@ TEST(ParserA701, SpecifyItemAllFiveKinds) {
   EXPECT_EQ(spec->specify_items[4]->kind, SpecifyItemKind::kTimingCheck);
 }
 
+// =============================================================================
+// A.7.1 specify_block coexistence with other module items
+// =============================================================================
+TEST(ParserA701, SpecifyBlockCoexistsWithModuleItems) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "  assign a = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kSpecifyBlock);
+  EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
+}
+
 }  // namespace
