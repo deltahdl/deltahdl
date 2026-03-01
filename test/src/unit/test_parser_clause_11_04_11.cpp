@@ -534,4 +534,37 @@ TEST(ParserSection7, Sec7_2_2_StructTernary) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
+static Stmt* FirstInitialStmt(ParseResult11e& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+static Expr* FirstAssignRhs(ParseResult11e& r) {
+  auto* stmt = FirstInitialStmt(r);
+  if (!stmt) return nullptr;
+  return stmt->rhs;
+}
+
+// =========================================================================
+// Section 11.4.6 -- Conditional operator (ternary)
+// =========================================================================
+TEST(ParserSection11, TernaryFieldAccess) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel ? a : b;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->condition, nullptr);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  ASSERT_NE(rhs->false_expr, nullptr);
+}
+
 }  // namespace

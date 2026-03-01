@@ -56,22 +56,6 @@ TEST(ParserSection11, ReductionXnorCaretTilde) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-// =========================================================================
-// Section 11.4.6 -- Conditional operator (ternary)
-// =========================================================================
-TEST(ParserSection11, TernaryFieldAccess) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = sel ? a : b;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->condition, nullptr);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  ASSERT_NE(rhs->false_expr, nullptr);
-}
-
 TEST(ParserSection11, NestedTernaryRightAssoc) {
   auto r = Parse(
       "module t;\n"
