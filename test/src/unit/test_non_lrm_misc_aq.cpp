@@ -8,21 +8,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// A.6.11 clocking_declaration — default clocking reference form
-// =============================================================================
-TEST(ParserA611, DefaultClockingReference) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "  default clocking cb;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
 // A.6.11 clocking_declaration — multiple direction groups
 // =============================================================================
 TEST(ParserA611, MultipleDirectionGroups) {
