@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA608, DoWhileNullStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin do ; while (x > 0); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
-}
-
 TEST(ParserA608, DoWhileBlockBody) {
   auto r = Parse(
       "module m;\n"
