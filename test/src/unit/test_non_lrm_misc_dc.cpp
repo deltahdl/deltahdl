@@ -38,23 +38,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection38, DpiImportContextCallbackWithArgs) {
-  // Context function with arguments typical for VPI callback registration
-  auto r = Parse(R"(
-    module m;
-      import "DPI-C" context function int register_cb_wrapper(
-        input int reason, input string user_data
-      );
-    endmodule
-  )");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_TRUE(items[0]->dpi_is_context);
-  EXPECT_EQ(items[0]->name, "register_cb_wrapper");
-}
-
 TEST(ParserSection38, DpiImportWithCNameForCallback) {
   // C-name mapping for VPI registration function linkage
   auto r = Parse(R"(

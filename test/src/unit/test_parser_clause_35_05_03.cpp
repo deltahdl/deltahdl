@@ -55,4 +55,21 @@ TEST(ParserSection38, DpiImportForVpiAccess) {
   EXPECT_TRUE(dpi->dpi_is_context);
 }
 
+TEST(ParserSection38, DpiImportContextCallbackWithArgs) {
+  // Context function with arguments typical for VPI callback registration
+  auto r = Parse(R"(
+    module m;
+      import "DPI-C" context function int register_cb_wrapper(
+        input int reason, input string user_data
+      );
+    endmodule
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_TRUE(items[0]->dpi_is_context);
+  EXPECT_EQ(items[0]->name, "register_cb_wrapper");
+}
+
 }  // namespace
