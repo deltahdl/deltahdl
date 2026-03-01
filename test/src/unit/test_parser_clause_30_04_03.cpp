@@ -204,4 +204,26 @@ TEST(ParserA702, EdgeIdentifierEdge) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kEdge);
 }
 
+// =============================================================================
+// A.7.2 edge_sensitive_path_declaration — parallel form
+// =============================================================================
+// parallel_edge_sensitive_path_description with data_source
+TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => (q : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].name, "q");
+  EXPECT_NE(si->path.data_source, nullptr);
+}
+
 }  // namespace
