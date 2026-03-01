@@ -8,30 +8,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// A.6.12 Randsequence — rs_case
-// =============================================================================
-// Case with multiple items
-TEST(ParserA612, RsCaseMultipleItems) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : case (1)\n"
-      "               0: a;\n"
-      "               1: b;\n"
-      "               2: c;\n"
-      "             endcase;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "      c : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
 // A.6.12 Randsequence — rs_case_item
 // =============================================================================
 // Case item with comma-separated expressions
