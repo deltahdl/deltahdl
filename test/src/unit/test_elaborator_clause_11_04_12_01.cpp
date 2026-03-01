@@ -78,4 +78,18 @@ TEST(ElabA81, ReplicationInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// § replication in initial block elaborates
+TEST(ElabA81, ReplicateInInitialBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [1:0] x;\n"
+      "  initial a = {4{x}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
