@@ -12,12 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ConstEval, Replication) {
-  EvalFixture f;
-  // {4{1'b1}} = 4'b1111 = 15
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4{1'b1}}", f)), 15);
-}
-
 // § constant_multiple_concatenation in parameter
 TEST(ElabA81, ConstantMultipleConcatInParam) {
   ElabFixture f;

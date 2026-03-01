@@ -177,4 +177,10 @@ TEST(ParserSection10, Sec10_4_1_ReplicationRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
 }
 
+TEST(ConstEval, Replication) {
+  EvalFixture f;
+  // {4{1'b1}} = 4'b1111 = 15
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4{1'b1}}", f)), 15);
+}
+
 }  // namespace
