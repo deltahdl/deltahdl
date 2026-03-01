@@ -414,4 +414,28 @@ TEST(ParserA605, ClockingEventNegedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
 
+// ---------------------------------------------------------------------------
+// event_expression ::=
+//   [ edge_identifier ] expression [ iff expression ]
+//   | sequence_instance [ iff expression ]
+//   | event_expression or event_expression
+//   | event_expression , event_expression
+//   | ( event_expression )
+// ---------------------------------------------------------------------------
+// §9.4.2: edge_identifier = edge (generic)
+TEST(ParserA605, EventExprEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(edge clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kEdge);
+}
+
 }  // namespace
