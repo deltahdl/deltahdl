@@ -144,4 +144,24 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUseConfig) {
   EXPECT_TRUE(inst_rule->use_config);
 }
 
+// =============================================================================
+// §33.4.1.3/6 Instance clause with use binding
+// =============================================================================
+TEST_F(ConfigTest, InstanceUseClause) {
+  auto* unit = Parse(R"(
+    config cfg;
+      design lib1.top;
+      instance top.u1 use lib2.adder;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  ASSERT_EQ(unit->configs[0]->rules.size(), 1u);
+  auto* rule = unit->configs[0]->rules[0];
+  EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
+  EXPECT_EQ(rule->inst_path, "top.u1");
+  EXPECT_EQ(rule->use_lib, "lib2");
+  EXPECT_EQ(rule->use_cell, "adder");
+  EXPECT_FALSE(rule->use_config);
+}
+
 }  // namespace
