@@ -332,4 +332,21 @@ TEST_F(AnnexHParseTest, AnnexJDpiImportCoexistence) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
 }
 
+// LRM section 38.36 -- vpi_register_cb callback function signatures
+TEST(ParserSection38, DpiImportVoidCallbackFunction) {
+  // Import a void function modeling a VPI callback routine
+  auto r = Parse(R"(
+    module m;
+      import "DPI-C" function void my_callback();
+    endmodule
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "my_callback");
+  EXPECT_FALSE(items[0]->dpi_is_task);
+}
+
 }  // namespace
