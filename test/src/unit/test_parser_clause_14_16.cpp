@@ -83,4 +83,25 @@ TEST(ParserA611, CycleDelayParenExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// A.6.11 clockvar / clockvar_expression — hierarchical access
+// =============================================================================
+TEST(ParserA611, ClockvarExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    cb.data <= 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+}
+
 }  // namespace
