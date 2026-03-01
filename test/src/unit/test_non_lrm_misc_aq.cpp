@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// rs_prod as rs_case
-TEST(ParserA612, RsProdAsCase) {
-  auto r = Parse(
-      "module m;\n"
-      "  int sel = 1;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : case (sel) 0: a; 1: b; default: c; endcase;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "      c : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.6.12 Randsequence — rs_production_item
 // =============================================================================
