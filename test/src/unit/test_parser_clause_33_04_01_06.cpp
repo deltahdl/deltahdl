@@ -181,4 +181,18 @@ TEST_F(ConfigTest, CellClauseWithLibUse) {
   EXPECT_EQ(rule->use_cell, "fast_adder");
 }
 
+TEST(ParserSection34, ConfigWithUseClause) {
+  // Config with use clause to specify library cell binding
+  auto r = Parse(R"(
+    config map_cfg;
+      design work.top;
+      cell ram_cell use gatelib.ram_gate;
+    endconfig
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "map_cfg");
+  ASSERT_GE(r.cu->configs[0]->rules.size(), 1u);
+}
+
 }  // namespace

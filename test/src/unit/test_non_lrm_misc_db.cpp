@@ -250,20 +250,6 @@ TEST(LibraryText, ConfigInLibraryText) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(ParserSection34, ConfigWithUseClause) {
-  // Config with use clause to specify library cell binding
-  auto r = Parse(R"(
-    config map_cfg;
-      design work.top;
-      cell ram_cell use gatelib.ram_gate;
-    endconfig
-  )");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-  EXPECT_EQ(r.cu->configs[0]->name, "map_cfg");
-  ASSERT_GE(r.cu->configs[0]->rules.size(), 1u);
-}
-
 TEST(ParserSection34, ConfigWithInstanceAndLiblist) {
   // Config with instance clause pointing to a specific library
   auto r = Parse(R"(
