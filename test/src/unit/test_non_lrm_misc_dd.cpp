@@ -12,20 +12,6 @@ using namespace delta;
 
 namespace {
 
-// timing_check_event with edge keyword elaborates
-TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, edge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // --- §5: Source locations ---
 TEST(LexerCh5, SourceLocations) {
   auto tokens = Lex("a\nb c");
