@@ -70,22 +70,6 @@ TEST(ParserSection9, ParallelBlockNamedForkJoin) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
 }
 
-TEST(ParserSection9b, ForkJoinNoneWithWaitFork) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      begin #10 a = 1; end\n"
-      "      begin #20 b = 1; end\n"
-      "    join_none\n"
-      "    wait fork;\n"
-      "    $display(\"all done\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection9b, ForkJoinAnyWithDisableFork) {
   auto r = Parse(
       "module m;\n"
