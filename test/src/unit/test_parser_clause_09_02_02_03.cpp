@@ -338,4 +338,20 @@ TEST(ParserSection9, Sec9_2_3_StructMemberAccess) {
               "endmodule\n"));
 }
 
+// ---------------------------------------------------------------------------
+// 11. Function call in RHS expression.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_FunctionCallRHS) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function logic [7:0] compute(input logic [7:0] x);\n"
+              "    return x + 1;\n"
+              "  endfunction\n"
+              "  logic en;\n"
+              "  logic [7:0] q, d;\n"
+              "  always_latch\n"
+              "    if (en) q <= compute(d);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
