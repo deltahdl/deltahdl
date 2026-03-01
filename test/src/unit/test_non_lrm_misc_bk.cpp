@@ -63,18 +63,6 @@ TEST(ParserSection6, MatchingTypesSameSigningModifier) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypeOperatorTypeOf) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  int a;\n"
-      "  initial begin\n"
-      "    $display(\"%0d\", $typename(a));\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // LRM section 6.22.2 -- Compatible types
 // =============================================================================

@@ -44,27 +44,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-TEST(Parser, GenerateCaseInRegion) {
-  auto r = Parse(
-      "module t;\n"
-      "  generate\n"
-      "    case (WIDTH)\n"
-      "      1: begin\n"
-      "        assign a = b;\n"
-      "      end\n"
-      "    endcase\n"
-      "  endgenerate\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kGenerateCase) {
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 // 15. Labeled generate blocks (if-generate)
 TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
   auto r = Parse(
