@@ -319,4 +319,21 @@ TEST(ParserA610, AssertPropertyModule) {
   ASSERT_NE(item, nullptr);
 }
 
+// =============================================================================
+// A.6.10 — concurrent assertion with action_block
+// =============================================================================
+// assert property with pass and else actions
+TEST(ParserA610, AssertPropertyActionBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a) $display(\"pass\"); else $display(\"fail\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->assert_pass_stmt, nullptr);
+  ASSERT_NE(item->assert_fail_stmt, nullptr);
+}
+
 }  // namespace
