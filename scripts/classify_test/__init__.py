@@ -331,15 +331,13 @@ def parse_file(filepath):
 
 _PREFIX_PATTERNS = [
     ("Preprocessor", "test_preprocessor_"),
-    ("SynthLower(", "test_synthesizer_"),
+    ("SynthLower", "test_synthesizer_"),
     ("AigGraph", "test_synthesizer_"),
     ("Scheduler", "test_simulator_"),
     ("SimContext", "test_simulator_"),
-    ("Elaborate(", "test_elaborator_"),
-    ("Parse(", "test_parser_"),
-    ("ParseOk(", "test_parser_"),
-    ("LexAll(", "test_lexer_"),
-    ("Lex(", "test_lexer_"),
+    ("Elaborate", "test_elaborator_"),
+    ("Parse", "test_parser_"),
+    ("Lex", "test_lexer_"),
 ]
 
 

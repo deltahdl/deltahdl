@@ -66,9 +66,9 @@ def test_detect_prefix_parser():
     assert _detect_prefix(t, "6.1") == "test_parser_"
 
 
-def test_detect_prefix_parser_ok():
-    """Detects parser prefix from ParseOk( call."""
-    t = _tb("T", body=["  EXPECT_TRUE(ParseOk(src));"])
+def test_detect_prefix_parser_src():
+    """Detects parser prefix from ParseSrc( variant."""
+    t = _tb("T", body=["  auto r = ParseSrc(src);"])
     assert _detect_prefix(t, "6.1") == "test_parser_"
 
 
@@ -78,15 +78,21 @@ def test_detect_prefix_elaborator():
     assert _detect_prefix(t, "6.1") == "test_elaborator_"
 
 
+def test_detect_prefix_elaborator_src():
+    """Detects elaborator prefix from ElaborateSrc( variant."""
+    t = _tb("T", body=["  auto* d = ElaborateSrc(src, f);"])
+    assert _detect_prefix(t, "6.1") == "test_elaborator_"
+
+
 def test_detect_prefix_lexer_lex():
     """Detects lexer prefix from Lex( call."""
     t = _tb("T", body=["  auto tok = Lex(src);"])
     assert _detect_prefix(t, "6.1") == "test_lexer_"
 
 
-def test_detect_prefix_lexer_lex_all():
-    """Detects lexer prefix from LexAll( call."""
-    t = _tb("T", body=["  auto toks = LexAll(src);"])
+def test_detect_prefix_lexer_one():
+    """Detects lexer prefix from LexOne( variant."""
+    t = _tb("T", body=["  auto tok = LexOne(src);"])
     assert _detect_prefix(t, "6.1") == "test_lexer_"
 
 
