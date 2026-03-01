@@ -98,4 +98,17 @@ TEST(LibraryText, ErrorMissingLibraryName) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// =============================================================================
+// LRM §33 examples — library map file from the specification.
+// =============================================================================
+// LRM example: library rtlLib *.v;
+TEST(LibraryText, LrmExampleSimple) {
+  auto r = ParseLibrary("library rtlLib *.v;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  EXPECT_EQ(r.cu->libraries[0]->name, "rtlLib");
+  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "*.v");
+}
+
 }  // namespace
