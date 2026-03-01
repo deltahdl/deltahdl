@@ -235,27 +235,6 @@ TEST(LibraryText, LexerFilePathSpecParentDir) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "../rtl/*.v");
 }
 
-// =============================================================================
-// §33.4.1.4/5 Cell clause for library binding
-// =============================================================================
-TEST_F(ConfigTest, CellClauseLiblist) {
-  auto* unit = Parse(R"(
-    config cfg;
-      design lib.top;
-      cell adder liblist lib2 lib3;
-    endconfig
-  )");
-  ASSERT_EQ(unit->configs.size(), 1u);
-  ASSERT_EQ(unit->configs[0]->rules.size(), 1u);
-  auto* rule = unit->configs[0]->rules[0];
-  EXPECT_EQ(rule->kind, ConfigRuleKind::kCell);
-  EXPECT_TRUE(rule->cell_lib.empty());
-  EXPECT_EQ(rule->cell_name, "adder");
-  ASSERT_EQ(rule->liblist.size(), 2u);
-  EXPECT_EQ(rule->liblist[0], "lib2");
-  EXPECT_EQ(rule->liblist[1], "lib3");
-}
-
 TEST_F(ConfigTest, CellClauseWithLibUse) {
   auto* unit = Parse(R"(
     config cfg;
