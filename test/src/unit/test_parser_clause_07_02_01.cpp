@@ -400,4 +400,25 @@ TEST(ParserSection7, Sec7_2_1_PackedWithPackedArrayMember) {
   EXPECT_FALSE(item->typedef_type.struct_members[0].extra_packed_dims.empty());
 }
 
+// --- Packed struct with multiple packed dimensions on a member ---
+TEST(ParserSection7, Sec7_2_1_PackedMemberMultiPackedDims) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    bit [1:0][3:0][7:0] data;\n"
+      "  } multi_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 1u);
+  auto& member = item->typedef_type.struct_members[0];
+  EXPECT_EQ(member.name, "data");
+  EXPECT_NE(member.packed_dim_left, nullptr);
+  EXPECT_NE(member.packed_dim_right, nullptr);
+  EXPECT_GE(member.extra_packed_dims.size(), 1u);
+}
+
 }  // namespace
