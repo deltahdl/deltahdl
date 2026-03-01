@@ -97,4 +97,18 @@ TEST(ElabA81, ConcatInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// § primary — concatenation elaborates
+TEST(ElabA84, PrimaryConcatenationElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [15:0] c;\n"
+      "  initial c = {a, b};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
