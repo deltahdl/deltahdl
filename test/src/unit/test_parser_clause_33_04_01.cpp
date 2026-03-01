@@ -201,4 +201,16 @@ TEST(SourceText, DescriptionConfig) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
+// config_declaration with endconfig label
+TEST(SourceText, ConfigDeclEndLabel) {
+  auto r = Parse(
+      "config cfg2;\n"
+      "  design top;\n"
+      "endconfig : cfg2\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg2");
+}
+
 }  // namespace
