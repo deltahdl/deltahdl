@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4: procedural_timing_control with event_control
-TEST(ParserA605, ProceduralTimingControlEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(negedge clk) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-}
-
 // ---------------------------------------------------------------------------
 // jump_statement ::= return [ expression ] ; | break ; | continue ;
 // ---------------------------------------------------------------------------

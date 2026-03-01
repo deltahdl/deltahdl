@@ -454,4 +454,19 @@ TEST(ParserA605, EventExprAnyChange) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
 }
 
+// §9.4: procedural_timing_control with event_control
+TEST(ParserA605, ProceduralTimingControlEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(negedge clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+}
+
 }  // namespace
