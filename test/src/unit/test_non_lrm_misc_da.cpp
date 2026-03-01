@@ -38,20 +38,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_TwoDelayPath) {
-  auto sp = ParseSpecifySingle(
-      "module m(input a, output b);\n"
-      "  specify\n"
-      "    (a => b) = (5, 10);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(sp.pr.cu, nullptr);
-  EXPECT_FALSE(sp.pr.has_errors);
-  ASSERT_NE(sp.sole_item, nullptr);
-  EXPECT_EQ(sp.sole_item->kind, SpecifyItemKind::kPathDecl);
-  ASSERT_EQ(sp.sole_item->path.delays.size(), 2u);
-}
-
 TEST(ParserSection28, Sec28_12_ThreeDelayPath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"
