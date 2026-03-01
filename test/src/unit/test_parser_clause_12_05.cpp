@@ -380,4 +380,23 @@ TEST(ParserA607, CaseStmtParse) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
 }
 
+// §12.5: case with null statement body (;)
+TEST(ParserA607, CaseItemNullBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x)\n"
+      "      0: ;\n"
+      "      1: y = 1;\n"
+      "      default: ;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 3u);
+}
+
 }  // namespace
