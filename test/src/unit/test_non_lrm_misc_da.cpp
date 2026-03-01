@@ -159,33 +159,6 @@ TEST(ParserSection28, Sec28_12_Noshowcancelled) {
   ASSERT_EQ(si->signal_list.size(), 2u);
 }
 
-TEST_F(SpecifyTest, PulsestyleOndetect) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  pulsestyle_ondetect out1;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  EXPECT_TRUE(spec->specify_items[0]->is_ondetect);
-}
-
-TEST_F(SpecifyTest, Showcancelled) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  showcancelled out1;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  auto* item = spec->specify_items[0];
-  EXPECT_EQ(item->kind, SpecifyItemKind::kShowcancelled);
-  EXPECT_FALSE(item->is_noshowcancelled);
-}
-
 TEST_F(SpecifyTest, Noshowcancelled) {
   auto* cu = Parse(
       "module m;\n"

@@ -86,4 +86,39 @@ TEST(ParserA701, NoshowcancelledMultipleOutputs) {
   EXPECT_EQ(item->signal_list[1], "out2");
 }
 
+struct ParseResult31 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult31 Parse(const std::string& src) {
+  ParseResult31 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using ConfigParseTest = ProgramTestParse;
+
+TEST_F(SpecifyTest, Showcancelled) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  showcancelled out1;\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  auto* item = spec->specify_items[0];
+  EXPECT_EQ(item->kind, SpecifyItemKind::kShowcancelled);
+  EXPECT_FALSE(item->is_noshowcancelled);
+}
+
 }  // namespace
