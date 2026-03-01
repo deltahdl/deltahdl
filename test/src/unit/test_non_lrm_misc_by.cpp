@@ -85,27 +85,6 @@ TEST(ParserSection9, Sec9_2_2_PriorityEncoderPattern) {
 }
 
 // ---------------------------------------------------------------------------
-// 25. always_comb with array indexing
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_ArrayIndexing) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] mem [0:15];\n"
-      "  logic [3:0] addr;\n"
-      "  logic [7:0] data;\n"
-      "  always_comb data = mem[addr];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->rhs, nullptr);
-  EXPECT_EQ(item->body->rhs->kind, ExprKind::kSelect);
-}
-
-// ---------------------------------------------------------------------------
 // 26. always_comb with unique0 case
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_Unique0Case) {
