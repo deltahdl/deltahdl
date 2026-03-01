@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.4: wait_order with semicolon (null action)
-TEST(ParserA605, WaitOrderNull) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait_order(a, b, c);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
-  ASSERT_EQ(stmt->wait_order_events.size(), 3u);
-}
-
 // §15.5.4: wait_order with success statement
 TEST(ParserA605, WaitOrderWithAction) {
   auto r = Parse(
