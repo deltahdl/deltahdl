@@ -17,17 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// anonymous_program at file scope (outside package)
-TEST(SourceText, AnonymousProgramTopLevel) {
-  auto r = Parse(
-      "program;\n"
-      "  function void f(); endfunction\n"
-      "  class C; endclass\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // §24.5 $exit system task in programs
 // =============================================================================

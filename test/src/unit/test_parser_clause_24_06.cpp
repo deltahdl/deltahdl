@@ -21,4 +21,15 @@ TEST(SourceText, AnonymousProgram) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
+// anonymous_program at file scope (outside package)
+TEST(SourceText, AnonymousProgramTopLevel) {
+  auto r = Parse(
+      "program;\n"
+      "  function void f(); endfunction\n"
+      "  class C; endclass\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
