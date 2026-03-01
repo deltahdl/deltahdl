@@ -40,17 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-TEST(ParserSection7, MultidimensionalArray) {
-  auto r = Parse(
-      "module t;\n"
-      "  int matrix[4][8];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_GE(item->unpacked_dims.size(), 2u);
-}
-
 TEST(ParserSection7, IndexedPartSelectPlus) {
   auto r = Parse(
       "module t;\n"

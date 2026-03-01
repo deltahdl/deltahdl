@@ -454,4 +454,52 @@ TEST(ParserA212, LetActualArg_FunctionCall) {
               "endmodule\n"));
 }
 
+struct LetParseResult {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+// Helper: find the first kLetDecl item in the first module.
+static ModuleItem* FirstLetDecl(LetParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kLetDecl) return item;
+  }
+  return nullptr;
+}
+
+struct ParseResult11 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11 Parse(const std::string& src) {
+  ParseResult11 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// ==========================================================================
+// §11.12: Let declaration parsing
+// ==========================================================================
+TEST(ParserLet, DeclNoArgsParse) {
+  auto r = Parse(
+      "module t;\n"
+      "  let addr = top.block1.base + top.block1.displ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
+  EXPECT_EQ(let_item->name, "addr");
+}
+
 }  // namespace
