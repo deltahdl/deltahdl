@@ -10,31 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// assignment_pattern: positional struct — simulation
-// ---------------------------------------------------------------------------
-// §10.9: positional assignment pattern for struct
-TEST(SimA60701, PositionalStructPatternInit) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
-      "  pair_t p;\n"
-      "  initial begin\n"
-      "    p = '{8'd3, 8'd7};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("p");
-  ASSERT_NE(var, nullptr);
-  // a=3 in upper byte, b=7 in lower byte: (3 << 8) | 7 = 775
-  EXPECT_EQ(var->value.ToUint64(), 775u);
-}
-
-// ---------------------------------------------------------------------------
 // assignment_pattern: struct with three fields — simulation
 // ---------------------------------------------------------------------------
 // §10.9.2: struct with three fields, named pattern
