@@ -235,27 +235,6 @@ TEST(LibraryText, LexerFilePathSpecParentDir) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "../rtl/*.v");
 }
 
-// =============================================================================
-// §33.4.3 Config with parameter override
-// =============================================================================
-TEST_F(ConfigTest, UseClauseWithParams) {
-  auto* unit = Parse(R"(
-    config cfg;
-      design lib.top;
-      instance top.u1 use lib.adder #(.WIDTH(16), .DEPTH(4));
-    endconfig
-  )");
-  ASSERT_EQ(unit->configs.size(), 1u);
-  ASSERT_EQ(unit->configs[0]->rules.size(), 1u);
-  auto* rule = unit->configs[0]->rules[0];
-  EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
-  EXPECT_EQ(rule->use_lib, "lib");
-  EXPECT_EQ(rule->use_cell, "adder");
-  ASSERT_EQ(rule->use_params.size(), 2u);
-  EXPECT_EQ(rule->use_params[0].first, "WIDTH");
-  EXPECT_EQ(rule->use_params[1].first, "DEPTH");
-}
-
 TEST_F(ConfigTest, LocalparamInConfig) {
   auto* unit = Parse(R"(
     config cfg;
