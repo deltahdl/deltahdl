@@ -379,4 +379,33 @@ TEST(ParserSection29, CombinationalUdp) {
   EXPECT_EQ(udp->table[0].current_state, 0);
 }
 
+// §3.7: "Designers can supplement the built-in primitives with user-defined
+//        primitives (UDPs). A UDP is enclosed between the keywords
+//        primitive...endprimitive."
+//        Combinational UDP with truth table for gate-level modeling.
+TEST(ParserClause03, Cl3_7_CombinationalUdp) {
+  auto r = Parse(
+      "primitive udp_or (output out, input a, b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    0 1 : 1;\n"
+      "    1 0 : 1;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  const auto* udp = r.cu->udps[0];
+  EXPECT_EQ(udp->name, "udp_or");
+  EXPECT_EQ(udp->output_name, "out");
+  ASSERT_EQ(udp->input_names.size(), 2u);
+  EXPECT_EQ(udp->input_names[0], "a");
+  EXPECT_EQ(udp->input_names[1], "b");
+  EXPECT_FALSE(udp->is_sequential);
+  ASSERT_EQ(udp->table.size(), 4u);
+  EXPECT_EQ(udp->table[0].output, '0');
+  EXPECT_EQ(udp->table[3].output, '1');
+}
+
 }  // namespace

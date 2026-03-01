@@ -547,4 +547,25 @@ TEST(ParserSection9, ParallelBlockVarDeclInFork) {
   ASSERT_GE(stmt->fork_stmts.size(), 1u);
 }
 
+// ---------------------------------------------------------------------------
+// 4. Fork-join_none with a single thread
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_ForkJoinNoneSingleThread) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #50 a = 1;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
+  EXPECT_EQ(stmt->fork_stmts.size(), 1u);
+}
+
 }  // namespace
