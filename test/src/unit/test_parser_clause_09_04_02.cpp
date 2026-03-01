@@ -344,4 +344,22 @@ TEST(ParserA605, ProceduralTimingControlEventNull) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
 }
 
+// §9.4.2: @identifier simple event control
+TEST(ParserA605, EventControlBareIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @r x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  EXPECT_NE(stmt->events[0].signal, nullptr);
+}
+
 }  // namespace
