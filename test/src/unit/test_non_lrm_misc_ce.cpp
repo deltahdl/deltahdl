@@ -75,30 +75,6 @@ TEST(ParserSection10, Sec10_4_2_RegisterFilePattern) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(Parser, ExpressionPrecedence) {
-  auto r = Parse(
-      "module expr;\n"
-      "  logic a;\n"
-      "  assign a = 1 + 2 * 3;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
-// ==========================================================================
-// §11.12: Let declaration parsing
-// ==========================================================================
-TEST(ParserLet, DeclNoArgsParse) {
-  auto r = Parse(
-      "module t;\n"
-      "  let addr = top.block1.base + top.block1.displ;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* let_item = FirstLetDecl(r);
-  ASSERT_NE(let_item, nullptr);
-  EXPECT_EQ(let_item->name, "addr");
-}
-
 TEST(ParserLet, DeclNoArgsBody) {
   auto r = Parse(
       "module t;\n"
