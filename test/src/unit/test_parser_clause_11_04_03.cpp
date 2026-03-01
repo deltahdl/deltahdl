@@ -215,4 +215,15 @@ TEST(ParserSection11, ArithmeticPower) {
   EXPECT_EQ(rhs->op, TokenKind::kPower);
 }
 
+TEST(ParserSection11, UnaryNegation) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = -a;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kMinus);
+}
+
 }  // namespace
