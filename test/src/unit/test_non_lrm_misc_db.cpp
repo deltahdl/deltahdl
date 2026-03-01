@@ -44,12 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-// Include without file path.
-TEST(LibraryText, ErrorIncludeNoPath) {
-  auto r = ParseLibrary("include;\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // =============================================================================
 // LRM §33 examples — library map file from the specification.
 // =============================================================================

@@ -71,4 +71,10 @@ TEST(LibraryText, IncludeStmtHasSourceLoc) {
   EXPECT_NE(r.cu->lib_includes[0]->loc.line, 0u);
 }
 
+// Include without file path.
+TEST(LibraryText, ErrorIncludeNoPath) {
+  auto r = ParseLibrary("include;\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
