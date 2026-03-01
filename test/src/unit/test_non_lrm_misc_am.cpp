@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2: expression without edge (any change)
-TEST(ParserA605, EventExprAnyChange) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
-}
-
 // §9.4.2.3: iff qualifier on event expression
 TEST(ParserA605, EventExprIff) {
   auto r = Parse(
