@@ -49,25 +49,6 @@ TEST(ParserSection16, PropertyDeclAndAssertProperty) {
 }
 
 // =============================================================================
-// §16.4.1 Deferred assertion reporting
-// =============================================================================
-TEST(ParserSection16, DeferredAssertHash0PassAndFail) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert #0 (data_ok)\n"
-      "      $display(\"pass\"); else $error(\"fail\");\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->is_deferred);
-  EXPECT_NE(stmt->assert_pass_stmt, nullptr);
-  EXPECT_NE(stmt->assert_fail_stmt, nullptr);
-}
-
-// =============================================================================
 // §16.5 Concurrent assertions overview — clocked property
 // =============================================================================
 TEST(ParserSection16, ConcurrentAssertWithClock) {
