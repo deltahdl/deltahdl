@@ -374,4 +374,22 @@ TEST(ParserA610, SimpleAssumePassElseFail) {
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
+// =============================================================================
+// A.6.10 — simple_immediate_cover_statement
+// =============================================================================
+// cover ( expression ) ;
+TEST(ParserA610, SimpleCoverSemicolon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cover(1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
+  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+}
+
 }  // namespace
