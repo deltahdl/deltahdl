@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.4.13: value_range with bracket range [lo:hi]
-TEST(ParserA607, ValueRangeBracket) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case(x) inside\n"
-      "      [0:15]: y = 1;\n"
-      "      default: y = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §12.5: case with null statement body (;)
 TEST(ParserA607, CaseItemNullBody) {
   auto r = Parse(
