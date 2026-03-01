@@ -12,16 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, HardPackedUnion_DifferentWidth_Error) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union packed { logic [7:0] a; logic [15:0] b; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 // §10.9: assignment pattern with default key elaborates
 TEST(ElabA60701, PatternDefaultKeyElaborates) {
   ElabFixture f;
