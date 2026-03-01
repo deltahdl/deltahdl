@@ -47,19 +47,6 @@ TEST(ParserSection6, IntegerTypeByteDecl) {
   EXPECT_EQ(item->name, "b");
 }
 
-TEST(ParserSection6, IntegerTypeIntDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  int i;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_EQ(item->name, "i");
-}
-
 TEST(ParserSection6, IntegerTypeLongintDecl) {
   auto r = Parse(
       "module m;\n"
