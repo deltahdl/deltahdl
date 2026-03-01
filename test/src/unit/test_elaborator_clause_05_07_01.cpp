@@ -223,4 +223,23 @@ TEST(ElabA87, UnbasedUnsizedZElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// § decimal_number — [size] decimal_base x_digit (all x)
+TEST(SimA87, DecimalXDigitAllBits) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'dx;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // x fills all bits — check bval is set (four-state x)
+  EXPECT_NE(var->value.words[0].bval, 0u);
+}
+
 }  // namespace
