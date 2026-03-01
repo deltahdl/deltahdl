@@ -169,4 +169,18 @@ TEST(ParserSection11, PrefixDecrementInForStep) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// A.8.6 Operators — inc_or_dec_operator
+// =============================================================================
+// § inc_or_dec_operator ::= ++ (prefix)
+TEST(ParserA86, IncOrDecPrefixIncrement) {
+  auto r = Parse("module m; initial ++x; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kUnary);
+  EXPECT_EQ(expr->op, TokenKind::kPlusPlus);
+}
+
 }  // namespace
