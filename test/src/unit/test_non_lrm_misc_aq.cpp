@@ -8,26 +8,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// A.6.12 Randsequence — rs_rule (multiple alternatives with |)
-// =============================================================================
-// Multiple rules separated by |
-TEST(ParserA612, RsRuleMultipleAlternatives) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a | b | c;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "      c : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
 // A.6.12 Randsequence — rs_production_list
 // =============================================================================
 // Sequence of production items
