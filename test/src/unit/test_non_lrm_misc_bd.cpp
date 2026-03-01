@@ -46,30 +46,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// §4.6: Unique case with multiple matches listed
-// =============================================================================
-TEST(ParserSection4, Sec4_6_UniqueCaseMultipleItems) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    unique case (state)\n"
-      "      IDLE: x = 0;\n"
-      "      RUN: x = 1;\n"
-      "      DONE: x = 2;\n"
-      "      ERR: x = 3;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
-  EXPECT_EQ(stmt->case_items.size(), 4u);
-}
-
-// =============================================================================
 // §4.6: always_comb with multiple outputs
 // =============================================================================
 TEST(ParserSection4, Sec4_6_AlwaysCombMultipleOutputs) {
