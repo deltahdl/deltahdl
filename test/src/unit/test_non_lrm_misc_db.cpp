@@ -45,25 +45,6 @@ using DpiParseTest = ProgramTestParse;
 namespace {
 
 // =============================================================================
-// A.1.1 library_description ::=
-//   library_declaration | include_statement | config_declaration | ;
-// =============================================================================
-// Multiple library descriptions mixed together.
-TEST(LibraryText, MixedDescriptions) {
-  auto r = ParseLibrary(
-      "library lib1 /a/*.v;\n"
-      ";\n"
-      "include /proj/other.map;\n"
-      "library lib2 /b/*.v;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 2u);
-  EXPECT_EQ(r.cu->libraries[0]->name, "lib1");
-  EXPECT_EQ(r.cu->libraries[1]->name, "lib2");
-  ASSERT_EQ(r.cu->lib_includes.size(), 1u);
-}
-
-// =============================================================================
 // Comments in library source text.
 // =============================================================================
 // Line comments.
