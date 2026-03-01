@@ -102,4 +102,21 @@ TEST(ParserA610, DeferredAssumeFinal) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
+// =============================================================================
+// A.6.10 — deferred_immediate_cover_statement
+// =============================================================================
+// cover #0 ( expression ) ;
+TEST(ParserA610, DeferredCoverHash0) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial cover #0 (1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+}
+
 }  // namespace
