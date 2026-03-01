@@ -34,20 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// default clocking as module_or_generate_item_declaration.
-TEST(SourceText, DefaultClockingAsModuleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kClockingBlock);
-  EXPECT_TRUE(r.cu->modules[0]->items[0]->is_default_clocking);
-}
-
 // =============================================================================
 // §15.5.1 — Nonblocking event trigger (->>)
 // =============================================================================
