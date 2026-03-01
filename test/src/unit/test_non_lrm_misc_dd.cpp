@@ -12,12 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ConstEval, ScopedIdentifier) {
-  EvalFixture f;
-  ScopeMap scope = {{"WIDTH", 16}};
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH", f), scope), 16);
-}
-
 TEST(Elaboration, HardPackedUnion_DifferentWidth_Error) {
   ElabFixture f;
   ElaborateSrc(

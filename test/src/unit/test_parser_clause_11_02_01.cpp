@@ -94,4 +94,10 @@ TEST(ParserA83, ConstantExprTernary) {
   EXPECT_EQ(params[0].second->kind, ExprKind::kTernary);
 }
 
+TEST(ConstEval, ScopedIdentifier) {
+  EvalFixture f;
+  ScopeMap scope = {{"WIDTH", 16}};
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH", f), scope), 16);
+}
+
 }  // namespace
