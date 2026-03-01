@@ -186,4 +186,19 @@ TEST(ParserSection9b, WaitStatementExpression) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
+// §9.4.3: wait_statement
+TEST(ParserA604, StmtItemWaitStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (done) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWait);
+}
+
 }  // namespace
