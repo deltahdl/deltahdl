@@ -150,4 +150,33 @@ TEST(ParserA611, GlobalClockingCompoundEvent) {
   EXPECT_GE(item->clocking_event.size(), 2u);
 }
 
+static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (count == idx) return item;
+    ++count;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// A.6.11 clocking_declaration — global clocking
+// =============================================================================
+TEST(ParserA611, ClockingDeclGlobal) {
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking gclk @(posedge sys_clk);\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_FALSE(item->is_default_clocking);
+  EXPECT_EQ(item->name, "gclk");
+  EXPECT_TRUE(item->clocking_signals.empty());
+}
+
 }  // namespace
