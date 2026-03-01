@@ -262,4 +262,23 @@ TEST(ParserSection10, Sec10_6_1_AssignInInitialBlock) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
+// --- 2. Basic deassign in initial block ---
+TEST(ParserSection10, Sec10_6_1_DeassignInInitialBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q;\n"
+      "  initial begin\n"
+      "    deassign q;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->text, "q");
+  EXPECT_EQ(stmt->rhs, nullptr);
+}
+
 }  // namespace

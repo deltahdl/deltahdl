@@ -79,4 +79,16 @@ TEST(ParserCh513, BuiltInMethod_WithArgs) {
               "endmodule"));
 }
 
+TEST(ParserSection7, ArrayMethodSort) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{5, 3, 1, 4, 2};\n"
+      "  initial arr.sort;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+}
+
 }  // namespace
