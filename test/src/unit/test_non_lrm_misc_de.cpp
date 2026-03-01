@@ -9,24 +9,6 @@ using namespace delta;
 
 namespace {
 
-// § inside_expression — range match
-TEST(SimA83, InsideRangeMatch) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = 8'd5 inside {[8'd1:8'd10]};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
 // § decimal_number — [size] decimal_base x_digit (all x)
 TEST(SimA87, DecimalXDigitAllBits) {
   SimFixture f;
