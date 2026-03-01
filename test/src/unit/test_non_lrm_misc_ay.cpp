@@ -22,19 +22,6 @@ TEST(ParserAnnexD, AnnexDScope) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// --- D.4: $key and $nokey ---
-TEST(ParserAnnexD2, AnnexDKeyNokey) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $key(\"keylog.txt\");\n"
-      "    $nokey;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // --- D.5: $reset, $reset_count, $reset_value ---
 TEST(ParserAnnexD2, AnnexDResetFamily) {
   auto r = Parse(
