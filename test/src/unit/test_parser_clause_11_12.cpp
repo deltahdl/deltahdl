@@ -514,4 +514,16 @@ TEST(ParserLet, DeclNoArgsBody) {
   ASSERT_NE(let_item->init_expr, nullptr);
 }
 
+TEST(ParserLet, DeclWithArgsParse) {
+  auto r = Parse(
+      "module t;\n"
+      "  let op(x, y, z) = |((x | y) & z);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
+  EXPECT_EQ(let_item->name, "op");
+}
+
 }  // namespace
