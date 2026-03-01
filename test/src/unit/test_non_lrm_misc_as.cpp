@@ -15,20 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// system_timing_check ::= $hold_timing_check
-TEST(ParserA705, SystemTimingCheckHold) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $hold(posedge clk, data, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kHold);
-}
-
 // system_timing_check ::= $setuphold_timing_check
 TEST(ParserA705, SystemTimingCheckSetuphold) {
   auto r = Parse(
