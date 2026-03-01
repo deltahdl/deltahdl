@@ -38,19 +38,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §33 Configuration declarations
-// =============================================================================
-TEST_F(ConfigParseTest, BasicConfig) {
-  auto* unit = Parse(R"(
-    config cfg;
-      design lib.top;
-    endconfig
-  )");
-  ASSERT_EQ(unit->configs.size(), 1u);
-  EXPECT_EQ(unit->configs[0]->name, "cfg");
-}
-
 TEST_F(ConfigParseTest, ConfigWithEndLabel) {
   auto* unit = Parse(R"(
     config cfg;

@@ -267,4 +267,37 @@ TEST_F(ConfigTest, EndconfigWithLabel) {
   EXPECT_FALSE(HasErrors());
 }
 
+struct ParseResult31 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult31 Parse(const std::string& src) {
+  ParseResult31 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using ConfigParseTest = ProgramTestParse;
+
+// =============================================================================
+// §33 Configuration declarations
+// =============================================================================
+TEST_F(ConfigParseTest, BasicConfig) {
+  auto* unit = Parse(R"(
+    config cfg;
+      design lib.top;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  EXPECT_EQ(unit->configs[0]->name, "cfg");
+}
+
 }  // namespace
