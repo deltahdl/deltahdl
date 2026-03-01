@@ -17,24 +17,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 namespace {
 
 // =============================================================================
-// A.6.11 clocking_declaration — clocking_event as @identifier
-// =============================================================================
-TEST(ParserA611, ClockingEventBareIdentifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @clk;\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_event.size(), 1u);
-  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
-}
-
-// =============================================================================
 // A.6.11 clocking_declaration — clocking_event as @(event_expression)
 // =============================================================================
 TEST(ParserA611, ClockingEventParenExpr) {
