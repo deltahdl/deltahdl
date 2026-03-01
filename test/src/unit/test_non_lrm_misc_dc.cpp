@@ -52,16 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection39, CoverPropertyStatement) {
-  // cover property is used for coverage callbacks
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic clk, a, b;
-      cover property (@(posedge clk) a ##1 b);
-    endmodule
-  )"));
-}
-
 // =============================================================================
 // LRM section 39.5.2 -- Assertion control via system tasks
 // The assertion control functions $assertcontrol and related tasks allow

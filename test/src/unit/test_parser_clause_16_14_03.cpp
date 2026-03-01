@@ -253,4 +253,18 @@ TEST(ParserAnnexF, AnnexFCoverProperty) {
   EXPECT_TRUE(found);
 }
 
+using DpiParseTest = ProgramTestParse;
+
+using ApiParseTest = ProgramTestParse;
+
+TEST(ParserSection39, CoverPropertyStatement) {
+  // cover property is used for coverage callbacks
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      logic clk, a, b;
+      cover property (@(posedge clk) a ##1 b);
+    endmodule
+  )"));
+}
+
 }  // namespace
