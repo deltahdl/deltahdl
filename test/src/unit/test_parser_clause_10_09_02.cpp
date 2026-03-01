@@ -150,4 +150,22 @@ TEST(ParserA60701, StructurePatternKeyMemberAndDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// 27. Positional assignment pattern elements count.
+TEST(ParserSection7, Sec7_2_2_PositionalPatternElements) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int a; int b; int c; } tri_t;\n"
+      "  tri_t v;\n"
+      "  initial v = '{100, 200, 300};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
+  EXPECT_EQ(stmt->rhs->elements.size(), 3u);
+  EXPECT_TRUE(stmt->rhs->pattern_keys.empty());
+}
+
 }  // namespace
