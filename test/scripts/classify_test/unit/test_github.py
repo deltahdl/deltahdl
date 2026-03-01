@@ -109,6 +109,30 @@ def test_tick_checkbox_already_checked():
     assert tick_checkbox(body, "Alpha") == body
 
 
+def test_tick_checkbox_link_ticks_unchecked():
+    """Ticks a checkbox when the name is a markdown link."""
+    body = "- [ ] [Alpha](https://example.com/1)\n- [ ] Beta\n"
+    assert "- [x] [Alpha]" in tick_checkbox(body, "Alpha")
+
+
+def test_tick_checkbox_link_leaves_others_unchecked():
+    """Does not tick other checkboxes when ticking a link."""
+    body = "- [ ] [Alpha](https://example.com/1)\n- [ ] Beta\n"
+    assert "- [ ] Beta" in tick_checkbox(body, "Alpha")
+
+
+def test_tick_checkbox_link_preserves_url():
+    """Preserves the markdown link URL after ticking."""
+    body = "- [ ] [Alpha](https://example.com/1)\n"
+    assert "(https://example.com/1)" in tick_checkbox(body, "Alpha")
+
+
+def test_tick_checkbox_link_already_checked():
+    """No change when a linked checkbox is already checked."""
+    body = "- [x] [Alpha](https://example.com/1)\n"
+    assert tick_checkbox(body, "Alpha") == body
+
+
 def test_tick_checkbox_not_found_exits():
     """Exits when test name is not found in any checkbox."""
     with pytest.raises(SystemExit):

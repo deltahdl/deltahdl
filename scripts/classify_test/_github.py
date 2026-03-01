@@ -18,22 +18,32 @@ def _validate_issue_args(args):
         sys.exit(1)
 
 
+def _checkbox_patterns(test_name):
+    """Return (unchecked, checked) regexes for plain or linked checkbox."""
+    escaped = re.escape(test_name)
+    suffix = r"(?:\[" + escaped + r"\]\([^)]*\)|" + escaped + r")"
+    unchecked = re.compile(
+        r"^(- \[) \] " + suffix + r"$", re.MULTILINE,
+    )
+    checked = re.compile(
+        r"^- \[x\] " + suffix + r"$", re.MULTILINE,
+    )
+    return unchecked, checked
+
+
 def tick_checkbox(body, test_name):
     """Replace '- [ ] test_name' with '- [x] test_name' in body."""
-    pattern = re.compile(
-        r"^(- \[) \] " + re.escape(test_name) + r"$",
-        re.MULTILINE,
-    )
-    if not pattern.search(body):
-        if re.search(
-            r"^- \[x\] " + re.escape(test_name) + r"$",
-            body, re.MULTILINE,
-        ):
+    unchecked, checked = _checkbox_patterns(test_name)
+    match = unchecked.search(body)
+    if not match:
+        if checked.search(body):
             return body
         print(f"ERROR: Checkbox for {test_name!r} not found"
               " in issue body")
         sys.exit(1)
-    return pattern.sub(r"\1x] " + test_name, body)
+    line = match.group(0)
+    ticked = line[:len("- [")] + "x" + line[len("- [x"):]
+    return body[:match.start()] + ticked + body[match.end():]
 
 
 def fetch_issue_body(organization, repo, issue):
