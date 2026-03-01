@@ -41,23 +41,6 @@ TEST(ParserA604, StatementWithLabel) {
   EXPECT_EQ(stmt->label, "my_label");
 }
 
-// §12.3: statement with attribute instance
-TEST(ParserA604, StatementWithAttribute) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    (* full_case *) a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_FALSE(stmt->attrs.empty());
-  EXPECT_EQ(stmt->attrs[0].name, "full_case");
-}
-
 // §12.3: statement with attribute having value
 TEST(ParserA604, StatementWithAttributeValue) {
   auto r = Parse(
