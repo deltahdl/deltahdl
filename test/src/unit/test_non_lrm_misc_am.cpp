@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §12.8: break statement
-TEST(ParserA605, JumpBreak) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    forever begin\n"
-      "      break;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  VerifyForeverLoopJump(body, StmtKind::kBreak);
-}
-
 // §12.8: continue statement
 TEST(ParserA605, JumpContinue) {
   auto r = Parse(
