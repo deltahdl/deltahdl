@@ -217,4 +217,20 @@ TEST(ParserA607, CaseMultipleItemExprs) {
   EXPECT_TRUE(stmt->case_items[2].is_default);
 }
 
+// §12.5: default without colon
+TEST(ParserA607, CaseDefaultNoColon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; default y = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+  EXPECT_TRUE(stmt->case_items[1].is_default);
+}
+
 }  // namespace
