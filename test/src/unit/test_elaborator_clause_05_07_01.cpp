@@ -278,4 +278,17 @@ TEST(SimA87, HexValueUnderscores) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
+// § unsigned_number — underscored decimal elaborates
+TEST(ElabA87, UnderscoredDecimalElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = 1_000;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

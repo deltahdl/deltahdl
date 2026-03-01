@@ -12,19 +12,6 @@ using namespace delta;
 
 namespace {
 
-// § unsigned_number — underscored decimal elaborates
-TEST(ElabA87, UnderscoredDecimalElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int x;\n"
-      "  initial x = 1_000;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ElabCh511, ArrayInitPattern_NestedOk) {
   // §5.11: Nested braces matching array dimensions are valid.
   ElabFixture f;
