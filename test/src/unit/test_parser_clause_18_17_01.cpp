@@ -46,4 +46,21 @@ TEST(ParserA612, RsWeightIntegralNumber) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// Weight as identifier
+TEST(ParserA612, RsWeightIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  int w = 5;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : a := w | b;\n"
+      "      a : { ; };\n"
+      "      b : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
