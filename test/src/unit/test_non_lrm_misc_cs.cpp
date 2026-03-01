@@ -20,13 +20,6 @@ TEST(ParserSection21, FeofFerror) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, DumpvarsAllLevels) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $dumpvars(0, t);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, DumpvarsMultipleScopes) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

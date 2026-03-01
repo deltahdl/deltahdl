@@ -66,4 +66,21 @@ TEST(SourceText, ConfigDeclBasic) {
   EXPECT_EQ(c->rules[0]->kind, ConfigRuleKind::kDefault);
 }
 
+// config_declaration with local_parameter_declaration
+TEST(SourceText, ConfigDeclLocalParams) {
+  auto r = Parse(
+      "config cfg3;\n"
+      "  localparam WIDTH = 8;\n"
+      "  localparam DEPTH = 4;\n"
+      "  design work.top;\n"
+      "  default liblist work;\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* c = r.cu->configs[0];
+  ASSERT_EQ(c->local_params.size(), 2u);
+  EXPECT_EQ(c->local_params[0].first, "WIDTH");
+  EXPECT_EQ(c->local_params[1].first, "DEPTH");
+}
+
 }  // namespace

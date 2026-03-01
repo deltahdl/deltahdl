@@ -56,17 +56,6 @@ TEST(ParserSection11, ReductionXnorCaretTilde) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-TEST(ParserSection11, ReductionOnParenthesizedExpr) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = &(a ^ b);\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
-  EXPECT_EQ(rhs->op, TokenKind::kAmp);
-}
-
 // =========================================================================
 // Section 11.4.6 -- Conditional operator (ternary)
 // =========================================================================
