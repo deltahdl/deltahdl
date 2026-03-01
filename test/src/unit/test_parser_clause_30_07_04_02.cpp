@@ -133,4 +133,21 @@ TEST_F(SpecifyTest, Noshowcancelled) {
   EXPECT_TRUE(spec->specify_items[0]->is_noshowcancelled);
 }
 
+TEST(ParserSection28, Sec28_12_Showcancelled) {
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    showcancelled b;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto* si = sp.sole_item;
+  EXPECT_EQ(si->kind, SpecifyItemKind::kShowcancelled);
+  EXPECT_FALSE(si->is_noshowcancelled);
+  ASSERT_EQ(si->signal_list.size(), 1u);
+  EXPECT_EQ(si->signal_list[0], "b");
+}
+
 }  // namespace
