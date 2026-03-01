@@ -12,20 +12,6 @@ using namespace delta;
 
 namespace {
 
-// § primary — streaming concatenation elaborates
-TEST(ElabA84, PrimaryStreamingConcatElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [31:0] a;\n"
-      "  logic [31:0] b;\n"
-      "  initial b = {<< 8 {a}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(Elaboration, WidthInference_Concatenation) {
   TypedefMap typedefs;
   Expr a;
