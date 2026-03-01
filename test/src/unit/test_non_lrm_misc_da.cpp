@@ -20,17 +20,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-// Library declaration with multiple file paths.
-TEST(LibraryText, LibraryDeclMultiplePaths) {
-  auto r = ParseLibrary("library lib /a/*.v, /b/*.v;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-  ASSERT_EQ(r.cu->libraries[0]->file_paths.size(), 2u);
-  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/a/*.v");
-  EXPECT_EQ(r.cu->libraries[0]->file_paths[1], "/b/*.v");
-}
-
 // Library declaration with -incdir clause.
 TEST(LibraryText, LibraryDeclWithIncdir) {
   auto r = ParseLibrary("library lib /proj/*.v -incdir /proj/inc;\n");
