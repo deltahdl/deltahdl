@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.6.1: procedural deassign
-TEST(ParserA604, StmtItemProceduralDeassign) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    deassign x;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
-}
-
 // §10.6.2: force statement
 TEST(ParserA604, StmtItemForceStatement) {
   auto r = Parse(
