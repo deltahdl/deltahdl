@@ -60,41 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// --- Packed struct assigned from assignment pattern ---
-TEST(ParserSection7, Sec7_2_1_PackedAssignFromPattern) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] opcode;\n"
-      "    logic [7:0] data;\n"
-      "  } cmd_t;\n"
-      "  cmd_t c;\n"
-      "  initial c = '{8'h01, 8'hFF};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
-  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
-}
-
-// --- Packed struct as function return type ---
-TEST(ParserSection7, Sec7_2_1_PackedAsFuncReturn) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct packed {\n"
-              "    logic [7:0] a;\n"
-              "    logic [7:0] b;\n"
-              "  } pair_t;\n"
-              "  function pair_t make_pair;\n"
-              "    input logic [7:0] x, y;\n"
-              "    make_pair = {x, y};\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
 // --- Packed struct as port type (inline struct in port list) ---
 TEST(ParserSection7, Sec7_2_1_PackedAsPortType) {
   EXPECT_TRUE(ParseOk(
@@ -104,26 +69,6 @@ TEST(ParserSection7, Sec7_2_1_PackedAsPortType) {
       ");\n"
       "  assign data_out = data_in;\n"
       "endmodule\n"));
-}
-
-// --- Packed struct with packed array member (extra_packed_dims) ---
-TEST(ParserSection7, Sec7_2_1_PackedWithPackedArrayMember) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [3:0][7:0] bytes;\n"
-      "    logic [31:0] word;\n"
-      "  } frame_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->typedef_type.is_packed);
-  ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
-  EXPECT_EQ(item->typedef_type.struct_members[0].name, "bytes");
-  EXPECT_NE(item->typedef_type.struct_members[0].packed_dim_left, nullptr);
-  EXPECT_FALSE(item->typedef_type.struct_members[0].extra_packed_dims.empty());
 }
 
 // --- Packed struct with multiple packed dimensions on a member ---

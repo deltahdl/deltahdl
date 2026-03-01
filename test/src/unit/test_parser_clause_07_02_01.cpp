@@ -380,4 +380,24 @@ TEST(ParserSection9, Sec9_2_2_StructMemberAccess) {
   EXPECT_EQ(item->body->stmts[1]->lhs->kind, ExprKind::kMemberAccess);
 }
 
+// --- Packed struct with packed array member (extra_packed_dims) ---
+TEST(ParserSection7, Sec7_2_1_PackedWithPackedArrayMember) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [3:0][7:0] bytes;\n"
+      "    logic [31:0] word;\n"
+      "  } frame_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
+  EXPECT_EQ(item->typedef_type.struct_members[0].name, "bytes");
+  EXPECT_NE(item->typedef_type.struct_members[0].packed_dim_left, nullptr);
+  EXPECT_FALSE(item->typedef_type.struct_members[0].extra_packed_dims.empty());
+}
+
 }  // namespace
