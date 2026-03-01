@@ -46,4 +46,22 @@ TEST(ParserA70503, EdgeControlSpecifierSingle01) {
   EXPECT_EQ(tc->data_edge_descriptors[0].second, '1');
 }
 
+// edge_descriptor ::= z_or_x zero_or_one (x0, x1)
+TEST(ParserA70503, EdgeControlSpecifierXTransitions) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, edge [x0, x1] clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  ASSERT_EQ(tc->data_edge_descriptors.size(), 2u);
+  EXPECT_EQ(tc->data_edge_descriptors[0].first, 'x');
+  EXPECT_EQ(tc->data_edge_descriptors[0].second, '0');
+  EXPECT_EQ(tc->data_edge_descriptors[1].first, 'x');
+  EXPECT_EQ(tc->data_edge_descriptors[1].second, '1');
+}
+
 }  // namespace
