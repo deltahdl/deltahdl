@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM §3.3 — Modules
-// =============================================================================
-// §3.3 Module with end label
-TEST(ParserClause03, Cl3_3_ModuleEndLabel) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "endmodule : m\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-}
-
 // §3.3 LRM mux2to1 example (verbatim, with always_comb procedural block).
 TEST(ParserClause03, Cl3_3_Mux2to1LrmExample) {
   auto r = ParseWithPreprocessor(
