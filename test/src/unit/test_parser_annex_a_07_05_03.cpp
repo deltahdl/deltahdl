@@ -166,4 +166,21 @@ TEST(ParserA70503, TerminalInterfaceDotPort) {
   EXPECT_EQ(tc->ref_terminal.name, "data");
 }
 
+// =============================================================================
+// A.7.5.3 timing_check_condition / scalar_timing_check_condition
+// =============================================================================
+// timing_check_condition: bare expression after &&&
+TEST(ParserA70503, TimingCheckConditionBare) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data &&& en, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_NE(tc->ref_condition, nullptr);
+}
+
 }  // namespace
