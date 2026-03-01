@@ -163,16 +163,8 @@ def run_classify_file(
     """Invoke classify_file for a single file. Exits on failure."""
     print(f"Processing file {index}/{total}: {Path(file_path).name}")
     cmd = _build_command(args, file_path, sub_issue=sub_issue)
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.stdout:
-        print(result.stdout, end="")
+    result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
-        print(result.stderr, end="", file=sys.stderr)
         sys.exit(1)
 
 

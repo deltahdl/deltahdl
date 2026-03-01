@@ -278,39 +278,21 @@ def test_run_classify_file_passes_file_path(monkeypatch):
     assert captured[0][captured[0].index("--file") + 1] == "/p/a.cpp"
 
 
-def test_run_classify_file_forwards_stdout(monkeypatch, capsys):
-    """Subprocess stdout appears in parent stdout."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "child output\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr(
-        subprocess, "run", lambda _cmd, **_kw: mock_result,
-    )
+def test_run_classify_file_does_not_capture_output(monkeypatch):
+    """Subprocess inherits stdout/stderr (no capture_output)."""
+    kwargs_log: list[dict] = []
+
+    def spy_run(_cmd, **kwargs):
+        kwargs_log.append(kwargs)
+        result = MagicMock()
+        result.returncode = 0
+        return result
+
+    monkeypatch.setattr(subprocess, "run", spy_run)
     classify_files.run_classify_file(
         _make_args(), "/p/a.cpp", 1, 1,
     )
-    assert "child output" in capsys.readouterr().out
-
-
-def test_run_classify_file_prints_stderr_on_failure(
-    monkeypatch, capsys,
-):
-    """Subprocess stderr appears in parent stderr on failure."""
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-    mock_result.stderr = "error details\n"
-    monkeypatch.setattr(
-        subprocess, "run", lambda _cmd, **_kw: mock_result,
-    )
-    try:
-        classify_files.run_classify_file(
-            _make_args(), "/p/a.cpp", 1, 1,
-        )
-    except SystemExit:
-        pass
-    assert "error details" in capsys.readouterr().err
+    assert "capture_output" not in kwargs_log[0]
 
 
 # ---- tick_file_checkbox ----------------------------------------------------

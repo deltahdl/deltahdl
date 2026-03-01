@@ -358,26 +358,19 @@ def test_run_classify_test_passes_test_name(monkeypatch):
     assert captured[0][captured[0].index("--test") + 1] == "FooBar"
 
 
-def test_run_classify_test_forwards_stdout(monkeypatch, capsys):
-    """Forwards subprocess stdout to parent stdout."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "classified OK\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_a, **_kw: mock_result,
-    )
-    classify_file.run_classify_test(_make_args(), "T", 1, 1)
-    assert "classified OK" in capsys.readouterr().out
+def test_run_classify_test_does_not_capture_output(monkeypatch):
+    """Subprocess inherits stdout/stderr (no capture_output)."""
+    kwargs_log: list[dict] = []
 
+    def spy_run(_cmd, **kwargs):
+        kwargs_log.append(kwargs)
+        result = MagicMock()
+        result.returncode = 0
+        return result
 
-def test_run_classify_test_prints_stderr_on_failure(
-    monkeypatch, capsys,
-):
-    """Forwards subprocess stderr on failure."""
-    stub_subprocess_failure(monkeypatch)
+    monkeypatch.setattr(subprocess, "run", spy_run)
     classify_file.run_classify_test(_make_args(), "T", 1, 1)
-    assert "error" in capsys.readouterr().err
+    assert "capture_output" not in kwargs_log[0]
 
 
 # ---- print_summary ---------------------------------------------------------

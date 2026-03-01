@@ -254,6 +254,13 @@ def test_commit_and_push_message_passed_to_commit(monkeypatch):
     assert inputs[0] == "my commit msg"
 
 
+def test_commit_and_push_prints_success(monkeypatch, capsys):
+    """Prints success message after commit and push."""
+    stub_subprocess_success(monkeypatch)
+    commit_and_push([Path("/a/b.cpp")], [], "msg")
+    assert "Committed and pushed" in capsys.readouterr().out
+
+
 # ---- commit_classification ---------------------------------------------------
 
 

@@ -125,16 +125,8 @@ def run_classify_test(
     """Invoke classify_test for a single test. Returns True on success."""
     print(f"Processing test {index}/{total}: {test_name}")
     cmd = _build_command(args, test_name)
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.stdout:
-        print(result.stdout, end="")
+    result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
-        print(result.stderr, end="", file=sys.stderr)
         return False
     return True
 

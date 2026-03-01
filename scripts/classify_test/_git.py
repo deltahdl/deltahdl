@@ -48,6 +48,7 @@ def commit_and_push(changed_files, deleted_files, message):
         _run_git(["git", "rm", str(f)])
     _run_git(["git", "commit", "-F", "-"], input=message)
     _run_git(["git", "push"])
+    print("Committed and pushed")
 
 
 def commit_classification(ctx):
