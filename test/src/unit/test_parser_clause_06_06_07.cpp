@@ -332,4 +332,16 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithLongintType) {
               "endmodule\n"));
 }
 
+// §6.6.7: Nettype with typedef'd type used as port type.
+TEST(ParserSection6, Sec6_6_7_NettypeAsPortType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { logic [7:0] data; logic valid; } bus_t;\n"
+              "  nettype bus_t bus_net;\n"
+              "endmodule\n"
+              "module top;\n"
+              "  bus_t sig;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
