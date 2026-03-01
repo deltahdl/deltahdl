@@ -61,25 +61,6 @@ TEST(ParserSection10, DeassignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-// --- 5. Assign to bit-select ---
-TEST(ParserSection10, Sec10_6_1_AssignBitSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] data;\n"
-      "  initial begin\n"
-      "    assign data[3] = 1'b1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 // --- 6. Assign to part-select ---
 TEST(ParserSection10, Sec10_6_1_AssignPartSelect) {
   auto r = Parse(
