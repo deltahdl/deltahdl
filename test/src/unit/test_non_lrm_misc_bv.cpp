@@ -64,49 +64,6 @@ TEST(ParserSection9c, ProcessStatusCheck) {
 }
 
 // =============================================================================
-// LRM section 9.2.2.4 -- always_ff procedure
-// Sequential logic with reset and multiple sensitivity list items.
-// =============================================================================
-TEST(ParserSection9c, AlwaysFFWithReset) {
-  // LRM example: always_ff @(posedge clock iff reset == 0 or posedge reset)
-  auto r = Parse(
-      "module m;\n"
-      "  logic clock, reset;\n"
-      "  logic [7:0] r1, r2;\n"
-      "  always_ff @(posedge clock iff reset == 0 or posedge reset) begin\n"
-      "    r1 <= reset ? 0 : r2 + 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-  ASSERT_EQ(item->sensitivity.size(), 2u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-  EXPECT_EQ(item->sensitivity[1].edge, Edge::kPosedge);
-  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
-}
-
-TEST(ParserSection9c, AlwaysFFSimplePosedge) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic clk;\n"
-      "  logic [3:0] count;\n"
-      "  always_ff @(posedge clk)\n"
-      "    count <= count + 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-}
-
-// =============================================================================
 // LRM section 9.3.1 -- Sequential blocks (additional)
 // Nested blocks with names, and automatic variable lifetime in blocks.
 // =============================================================================
