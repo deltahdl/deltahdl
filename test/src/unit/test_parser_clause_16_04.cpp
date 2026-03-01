@@ -88,4 +88,18 @@ TEST(ParserA610, DeferredAssumeHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
+// assume final ( expression ) ;
+TEST(ParserA610, DeferredAssumeFinal) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assume final (1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
+  EXPECT_TRUE(stmt->is_deferred);
+}
+
 }  // namespace

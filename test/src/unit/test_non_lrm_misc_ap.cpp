@@ -23,20 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// assume final ( expression ) ;
-TEST(ParserA610, DeferredAssumeFinal) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assume final (1);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
-  EXPECT_TRUE(stmt->is_deferred);
-}
-
 // =============================================================================
 // A.6.10 — deferred_immediate_cover_statement
 // =============================================================================
