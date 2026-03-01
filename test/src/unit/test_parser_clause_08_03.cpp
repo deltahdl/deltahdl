@@ -73,4 +73,15 @@ TEST(ParserSection8, ClassWithLifetime) {
   EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
 }
 
+// §8.5 — Parameter inside class body
+TEST(ParserSection8, ClassWithParameter) {
+  auto r = Parse(
+      "class par_cls;\n"
+      "  parameter int b = 23;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "par_cls");
+}
+
 }  // namespace

@@ -51,17 +51,6 @@ TEST(ParserSection8, ClassWithTypedef) {
   EXPECT_EQ(r.cu->classes[0]->name, "test_cls");
 }
 
-// §8.5 — Parameter inside class body
-TEST(ParserSection8, ClassWithParameter) {
-  auto r = Parse(
-      "class par_cls;\n"
-      "  parameter int b = 23;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "par_cls");
-}
-
 // §8.5 — Localparam inside class body
 TEST(ParserSection8, ClassWithLocalparam) {
   auto r = Parse(
