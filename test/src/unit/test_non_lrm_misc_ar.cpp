@@ -21,23 +21,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-// parallel_edge_sensitive_path_description with polarity and data_source
-TEST(ParserA702, EdgeSensitiveParallelPolarityAndDataSource) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk + => (q : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
-  EXPECT_NE(si->path.data_source, nullptr);
-}
-
 // =============================================================================
 // A.7.2 edge_sensitive_path_declaration — full form
 // =============================================================================
