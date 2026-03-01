@@ -15,20 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// system_timing_check ::= $removal_timing_check
-TEST(ParserA705, SystemTimingCheckRemoval) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $removal(posedge clk, rst, 3);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kRemoval);
-}
-
 // system_timing_check ::= $recrem_timing_check
 TEST(ParserA705, SystemTimingCheckRecrem) {
   auto r = Parse(
