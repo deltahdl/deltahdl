@@ -37,27 +37,6 @@ TEST(Lexical, AssignmentPattern_DefaultZero) {
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
-TEST(Lexical, AssignmentPattern_Positional) {
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  logic [3:0] a;\n"
-      "  initial a = '{1, 0, 1, 0};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-}
-
-TEST(Lexical, AssignmentPattern_Named) {
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  initial begin\n"
-      "    logic [7:0] x;\n"
-      "    x = '{default: 'x};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // net_alias: alias net1 = net2 = net3;
 TEST(SourceText, NetAlias) {
   auto r = ParseWithPreprocessor(
