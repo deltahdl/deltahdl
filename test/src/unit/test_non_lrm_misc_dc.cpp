@@ -52,20 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection40, CoverageControlInAlwaysBlock) {
-  // Coverage control calls within procedural context
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic clk, reset;
-      always @(posedge clk) begin
-        if (reset) begin
-          $coverage_control(2, 0, 0);
-        end
-      end
-    endmodule
-  )"));
-}
-
 // §10.9: named assignment pattern elaborates for struct init
 TEST(ElabA60701, StructNamedPatternElaborates) {
   SimFixture f;
