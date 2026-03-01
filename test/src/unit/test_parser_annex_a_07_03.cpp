@@ -43,4 +43,25 @@ TEST(ParserA703, InputTerminalPartSelect) {
   EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
 }
 
+// =============================================================================
+// A.7.3 specify_output_terminal_descriptor — with constant_range_expression
+// =============================================================================
+// Output terminal with bit-select
+TEST(ParserA703, OutputTerminalBitSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b[0]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].name, "b");
+  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
+}
+
 }  // namespace
