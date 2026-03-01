@@ -138,4 +138,16 @@ TEST(ParserCh90301, BlockVarDecl_FullStructReplication) {
               "endmodule\n"));
 }
 
+// §10.9: structure_pattern_key with member identifier and default
+TEST(ParserA60701, StructurePatternKeyMemberAndDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = '{a: 5, default: 0};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
