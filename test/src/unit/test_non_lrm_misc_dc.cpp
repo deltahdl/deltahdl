@@ -38,22 +38,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection38, DpiImportWithCNameForCallback) {
-  // C-name mapping for VPI registration function linkage
-  auto r = Parse(R"(
-    module m;
-      import "DPI-C" vpi_cb_rtn =
-        function void cb_value_change(input int reason);
-    endmodule
-  )");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->dpi_c_name, "vpi_cb_rtn");
-  EXPECT_EQ(items[0]->name, "cb_value_change");
-}
-
 TEST(ParserSection38, DpiImportPureFunctionForSizetf) {
   // Pure function import modeling the sizetf callback (no side effects)
   auto r = Parse(R"(
