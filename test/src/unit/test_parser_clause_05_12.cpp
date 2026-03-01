@@ -118,4 +118,21 @@ TEST_F(DpiParseTest, AttributeWithAndWithoutValue) {
   EXPECT_NE(items[0]->attrs[1].value, nullptr);
 }
 
+// §12.3: statement with attribute having value
+TEST(ParserA604, StatementWithAttributeValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* weight = 10 *) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_FALSE(stmt->attrs.empty());
+  EXPECT_EQ(stmt->attrs[0].name, "weight");
+  EXPECT_NE(stmt->attrs[0].value, nullptr);
+}
+
 }  // namespace
