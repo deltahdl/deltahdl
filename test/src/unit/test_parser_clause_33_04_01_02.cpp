@@ -100,4 +100,35 @@ TEST(ParserSection34, ConfigCoexistsWithModuleAndProtected) {
   EXPECT_EQ(r.cu->configs[0]->name, "ip_cfg");
 }
 
+struct ParseResult31 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult31 Parse(const std::string& src) {
+  ParseResult31 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using ConfigParseTest = ProgramTestParse;
+
+TEST_F(ConfigParseTest, ConfigWithDefaultClause) {
+  auto* unit = Parse(R"(
+    config cfg;
+      design lib.top;
+      default liblist lib1 lib2;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  EXPECT_EQ(unit->configs[0]->name, "cfg");
+}
+
 }  // namespace
