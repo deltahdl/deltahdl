@@ -183,4 +183,15 @@ TEST(ParserA86, IncOrDecPrefixIncrement) {
   EXPECT_EQ(expr->op, TokenKind::kPlusPlus);
 }
 
+// § inc_or_dec_operator ::= -- (prefix)
+TEST(ParserA86, IncOrDecPrefixDecrement) {
+  auto r = Parse("module m; initial --x; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kUnary);
+  EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
+}
+
 }  // namespace
