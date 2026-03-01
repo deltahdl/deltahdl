@@ -176,4 +176,18 @@ TEST(ParserA702, EdgeIdentifierPosedge) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
 }
 
+TEST(ParserA702, EdgeIdentifierNegedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (negedge clk => q) = 8;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kNegedge);
+}
+
 }  // namespace
