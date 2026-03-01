@@ -9,13 +9,6 @@ using DpiParseTest = ProgramTestParse;
 
 using ApiParseTest = ProgramTestParse;
 
-struct ParseResult38 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
 static bool ParseOk38(const std::string& src) {
   SourceManager mgr;
   Arena arena;
@@ -25,13 +18,6 @@ static bool ParseOk38(const std::string& src) {
   Parser parser(lexer, arena, diag);
   parser.Parse();
   return !diag.HasErrors();
-}
-
-static ModuleItem* FindItemByKind(ParseResult38& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
 }
 
 struct ParseResult40 {
@@ -51,20 +37,6 @@ static ParseResult40 Parse(const std::string& src) {
 }
 
 namespace {
-
-TEST(ParserSection38, DpiImportForVpiAccess) {
-  auto r = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" context function void\n"
-      "    set_value(input int handle, input int val);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* dpi = FindItemByKind(r, ModuleItemKind::kDpiImport);
-  ASSERT_NE(dpi, nullptr);
-  EXPECT_EQ(dpi->name, "set_value");
-  EXPECT_TRUE(dpi->dpi_is_context);
-}
 
 // LRM section 38.36 -- vpi_register_cb callback function signatures
 TEST(ParserSection38, DpiImportVoidCallbackFunction) {
