@@ -194,4 +194,15 @@ TEST(ParserA81, ConstantMultipleConcatenation) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// § multiple_concatenation ::= { expression concatenation }
+TEST(ParserA81, MultipleConcatenationBasic) {
+  auto r = Parse("module m; initial x = {4{a}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
+  ASSERT_NE(stmt->rhs->repeat_count, nullptr);
+}
+
 }  // namespace
