@@ -175,4 +175,22 @@ TEST(ParserSection28, Sec28_12_PulsestyleOnevent) {
   EXPECT_EQ(si->signal_list[0], "b");
 }
 
+TEST(ParserSection28, Sec28_12_PulsestyleOndetect) {
+  auto sp = ParseSpecifySingle(
+      "module m(input a, output b, c);\n"
+      "  specify\n"
+      "    pulsestyle_ondetect b, c;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto* si = sp.sole_item;
+  EXPECT_EQ(si->kind, SpecifyItemKind::kPulsestyle);
+  EXPECT_TRUE(si->is_ondetect);
+  ASSERT_EQ(si->signal_list.size(), 2u);
+  EXPECT_EQ(si->signal_list[0], "b");
+  EXPECT_EQ(si->signal_list[1], "c");
+}
+
 }  // namespace
