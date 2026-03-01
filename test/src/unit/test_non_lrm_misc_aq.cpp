@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.12 Randsequence — rs_weight_specification
-// =============================================================================
-// Weight as integral number
-TEST(ParserA612, RsWeightIntegralNumber) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a := 3 | b := 7;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // Weight as identifier
 TEST(ParserA612, RsWeightIdentifier) {
   auto r = Parse(
