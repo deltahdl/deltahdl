@@ -111,18 +111,6 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
-TEST(ParserCh508, TimeLiteral_Us) {
-  EXPECT_TRUE(ParseOk("module m; initial #100us; endmodule"));
-}
-
-TEST(ParserCh508, TimeLiteral_Ms) {
-  EXPECT_TRUE(ParseOk("module m; initial #1ms; endmodule"));
-}
-
-TEST(ParserCh508, TimeLiteral_Fs) {
-  EXPECT_TRUE(ParseOk("module m; initial #500fs; endmodule"));
-}
-
 // delay_value: time_literal — time literal (e.g. 10ns) as delay.
 TEST(ParserA223, DelayValueTimeLiteral) {
   auto r = Parse(

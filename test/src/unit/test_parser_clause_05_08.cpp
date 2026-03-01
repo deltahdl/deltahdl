@@ -76,4 +76,12 @@ TEST(ParserA84, TimeLiteralNs) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserCh508, TimeLiteral_Ms) {
+  EXPECT_TRUE(ParseOk("module m; initial #1ms; endmodule"));
+}
+
+TEST(ParserCh508, TimeLiteral_Fs) {
+  EXPECT_TRUE(ParseOk("module m; initial #500fs; endmodule"));
+}
+
 }  // namespace
