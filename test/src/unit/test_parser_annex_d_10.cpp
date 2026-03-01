@@ -20,4 +20,16 @@ TEST(ParserAnnexD2, AnnexDScaleParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
+TEST(ParserAnnexD2, AnnexDScaleRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = $scale(hier_ref);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
+}
+
 }  // namespace
