@@ -91,4 +91,22 @@ TEST_F(ConfigTest, CellClauseLiblist) {
   EXPECT_EQ(rule->liblist[1], "lib3");
 }
 
+// =============================================================================
+// LRM section 34.5.6 -- author_info pragma: config declarations with libraries
+// These tests verify that configuration declarations (which reference library
+// mappings) parse correctly alongside other design units.
+// =============================================================================
+TEST(ParserSection34, ConfigWithDefaultLiblist) {
+  // Config with default clause specifying a library list
+  auto r = Parse(R"(
+    config cfg1;
+      design mylib.top;
+      default liblist mylib rtllib;
+    endconfig
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg1");
+}
+
 }  // namespace
