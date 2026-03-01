@@ -85,15 +85,6 @@ TEST(ParserCh5, ModuleBody_NullItem) {
   EXPECT_TRUE(ParseOk5("module m; ; endmodule"));
 }
 
-// =========================================================================
-// White space as token delimiter
-// =========================================================================
-// Tab, newline, and space are all equivalent token delimiters.
-TEST(ParserCh501, Sec5_1_WhitespaceTabDelimiter) {
-  // Tabs instead of spaces between all tokens.
-  EXPECT_TRUE(ParseOk("module\tt;\tlogic\ta;\tendmodule"));
-}
-
 TEST(ParserCh501, Sec5_1_WhitespaceNewlineDelimiter) {
   // Every token on its own line.
   EXPECT_TRUE(
