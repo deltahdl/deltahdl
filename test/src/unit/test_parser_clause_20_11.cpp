@@ -104,4 +104,13 @@ TEST(ParserSection39, AssertOnWithLevelArg) {
   )"));
 }
 
+TEST(ParserSection39, AssertOffWithLevelAndModuleArgs) {
+  // $assertoff with levels and list of modules/instances
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      initial $assertoff(0, m);
+    endmodule
+  )"));
+}
+
 }  // namespace

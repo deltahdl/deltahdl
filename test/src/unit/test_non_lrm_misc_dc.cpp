@@ -52,15 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection39, AssertOffWithLevelAndModuleArgs) {
-  // $assertoff with levels and list of modules/instances
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      initial $assertoff(0, m);
-    endmodule
-  )"));
-}
-
 // =============================================================================
 // LRM section 39.4.2 -- Placing assertion callbacks
 // These tests verify assertion-related syntax that enables placement of
