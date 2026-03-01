@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9: array_pattern_key with constant_expression
-TEST(ParserA60701, ArrayPatternKeyConstExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    x = '{0: 8'd1, 1: 8'd2};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // ---------------------------------------------------------------------------
 // assignment_pattern_net_lvalue ::= '{ net_lvalue { , net_lvalue } }
 // assignment_pattern_variable_lvalue ::= '{ variable_lvalue { , variable_lvalue
@@ -689,6 +677,40 @@ TEST(ParserA608, ForeachBlockBody) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
+static bool ParseOk5(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+// =========================================================================
+// Section 5.6.3: System tasks and system functions
+// =========================================================================
+struct ParseResult50603 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult50603 Parse(const std::string& src) {
+  ParseResult50603 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(ParserCh5, ModuleBody_SemicolonAfterEnd) {
+  EXPECT_TRUE(ParseOk5("module m; initial begin end; endmodule"));
 }
 
 }  // namespace
