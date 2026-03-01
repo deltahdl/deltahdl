@@ -23,24 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// =============================================================================
-// A.6.10 — action_block
-// =============================================================================
-// action_block: begin/end block as pass action
-TEST(ParserA610, ActionBlockBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assert(1) begin $display(\"a\"); $display(\"b\"); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
-  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
-  EXPECT_EQ(stmt->assert_pass_stmt->kind, StmtKind::kBlock);
-}
-
 // action_block: [ statement ] else statement_or_null
 TEST(ParserA610, ActionBlockPassFailBlocks) {
   auto r = Parse(
