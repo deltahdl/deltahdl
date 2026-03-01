@@ -56,14 +56,6 @@ TEST(ParserSection11, ReductionXnorCaretTilde) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-TEST(ParserSection11, ConcatOnLhsOfAssign) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic log1, log2, log3;\n"
-              "  initial {log1, log2, log3} = 3'b111;\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // Section 11.4.12.1 -- Concatenation
 // =========================================================================

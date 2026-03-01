@@ -126,4 +126,12 @@ TEST(ParserSection9, Sec9_2_2_ConcatenationLHS) {
   EXPECT_EQ(item->body->lhs->kind, ExprKind::kConcatenation);
 }
 
+TEST(ParserSection11, ConcatOnLhsOfAssign) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic log1, log2, log3;\n"
+              "  initial {log1, log2, log3} = 3'b111;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
