@@ -45,4 +45,18 @@ TEST(SimA83, InsideRangeMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// § inside_expression — inside in initial block elaborates
+TEST(ElabA83, InsideExprElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  logic result;\n"
+      "  initial result = x inside {8'd1, 8'd2, 8'd3};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
