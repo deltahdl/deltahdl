@@ -83,18 +83,6 @@ TEST(ParserSection10, Sec10_4_1_StructMemberLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-// --- 21. Compound assignment operators *=, /=, %= ---
-TEST(ParserSection10, Sec10_4_1_CompoundMulDivMod) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    a *= 3;\n"
-              "    b /= 4;\n"
-              "    c %= 5;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // --- 22. Compound assignment operators &=, |=, ^= ---
 TEST(ParserSection10, Sec10_4_1_CompoundBitwise) {
   auto r = Parse(

@@ -457,4 +457,16 @@ TEST(ParserSection10, Sec10_4_1_CompoundMinusEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kMinusEq);
 }
 
+// --- 21. Compound assignment operators *=, /=, %= ---
+TEST(ParserSection10, Sec10_4_1_CompoundMulDivMod) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    a *= 3;\n"
+              "    b /= 4;\n"
+              "    c %= 5;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
