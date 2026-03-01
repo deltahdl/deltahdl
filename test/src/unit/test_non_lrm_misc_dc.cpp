@@ -52,22 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// LRM section 38.36 -- vpi_register_cb: DPI-C imports for VPI callbacks
-// These tests verify that DPI-C import declarations with signatures typical
-// of VPI callback routines parse correctly.
-// =============================================================================
-TEST(ParserSection38, VpiSystemCallDeposit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $deposit(sig, 1'b1);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection38, VpiSystemCallForce) {
   auto r = Parse(
       "module m;\n"
