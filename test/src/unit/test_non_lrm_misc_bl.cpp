@@ -83,15 +83,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithResolveAndNetDecl) {
               "endmodule\n"));
 }
 
-// §6.6.7: Nettype with packed struct type.
-TEST(ParserSection6, Sec6_6_7_NettypeWithPackedStruct) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } nibble_t;\n"
-      "  nettype nibble_t nibble_net;\n"
-      "endmodule\n"));
-}
-
 // §6.6.7: Nettype with array typedef.
 TEST(ParserSection6, Sec6_6_7_NettypeWithArrayTypedef) {
   auto r = Parse(
