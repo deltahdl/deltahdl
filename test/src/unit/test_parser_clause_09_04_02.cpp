@@ -295,4 +295,19 @@ TEST(Parser, EventWaitWithParens) {
   EXPECT_EQ(stmt->events[0].signal->text, "ev");
 }
 
+// §9.4.2: procedural_timing_control_statement (event control)
+TEST(ParserA604, StmtItemProceduralTimingControlEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+}
+
 }  // namespace
