@@ -84,4 +84,15 @@ TEST(ParserSection39, AssertOffNoArgs) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+TEST(ParserSection39, AssertKillNoArgs) {
+  // $assertKill kills all active assertion attempts
+  auto r = Parse(R"(
+    module m;
+      initial $assertkill;
+    endmodule
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
