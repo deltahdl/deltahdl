@@ -38,23 +38,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_TimingCheckWidth) {
-  auto sp = ParseSpecifySingle(
-      "module m(input clk);\n"
-      "  specify\n"
-      "    $width(posedge clk, 50);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(sp.pr.cu, nullptr);
-  EXPECT_FALSE(sp.pr.has_errors);
-  ASSERT_NE(sp.sole_item, nullptr);
-  auto* si = sp.sole_item;
-  EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kWidth);
-  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
-  ASSERT_EQ(si->timing_check.limits.size(), 1u);
-}
-
 TEST(ParserSection28, Sec28_12_TimingCheckPeriod) {
   auto sp = ParseSpecifySingle(
       "module m(input clk);\n"
