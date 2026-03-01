@@ -58,4 +58,8 @@ TEST(ParserCh508, TimeLiteral_FixedPointNs) {
   EXPECT_TRUE(ParseOk("module m; initial #2.1ns; endmodule"));
 }
 
+TEST(ParserCh508, TimeLiteral_Ps) {
+  EXPECT_TRUE(ParseOk("module m; initial #40ps; endmodule"));
+}
+
 }  // namespace
