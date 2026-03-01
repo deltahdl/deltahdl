@@ -579,4 +579,289 @@ TEST(ParserA83, IndexedRangeVariableBase) {
   EXPECT_EQ(rhs->index->kind, ExprKind::kIdentifier);
 }
 
+struct ParseResult11d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11d Parse(const std::string& src) {
+  ParseResult11d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// --- Bit-select on concatenation (§11.4.12) ---
+TEST(ParserSection11, BitSelectOnConcat) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [3:0] a, b, c;\n"
+      "  initial a = {b, c}[5:2];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- Select on member access result (s.field[i]) ---
+TEST(ParserSection11, Sec11_4_1_SelectOnMemberAccess) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = s.field[2];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->base, nullptr);
+  EXPECT_EQ(rhs->base->kind, ExprKind::kMemberAccess);
+  ASSERT_NE(rhs->index, nullptr);
+  EXPECT_EQ(rhs->index_end, nullptr);
+}
+
+static ModuleItem* FirstAlwaysCombItem(ParseResult11g& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock) return item;
+  }
+  return nullptr;
+}
+
+// --- Indexed part-select in always_comb ---
+TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInAlwaysComb) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [31:0] vec;\n"
+      "  logic [7:0] out;\n"
+      "  always_comb out = vec[8 +: 8];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysCombItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(item->body->rhs, nullptr);
+  EXPECT_EQ(item->body->rhs->kind, ExprKind::kSelect);
+  EXPECT_TRUE(item->body->rhs->is_part_select_plus);
+}
+
+TEST(ParserAnnexA, A8BitAndPartSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = data[3]; y = data[7:4]; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- Part-select with system function as index ($clog2) ---
+TEST(ParserSection11, Sec11_4_1_PartSelectWithSysFuncIndex) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [31:0] vec;\n"
+      "  initial x = vec[$clog2(16):0];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->index, nullptr);
+  EXPECT_EQ(rhs->index->kind, ExprKind::kSystemCall);
+  ASSERT_NE(rhs->index_end, nullptr);
+}
+
+// --- Multiple part-selects in expression ---
+TEST(ParserSection11, Sec11_4_1_MultiplePartSelectsInExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [15:0] a, b;\n"
+      "  initial x = a[7:0] | b[15:8];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPipe);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->lhs->index_end, nullptr);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->rhs->index_end, nullptr);
+}
+
+// --- Indexed part-select with complex base expression ---
+TEST(ParserSection11, Sec11_4_1_IndexedPartSelectComplexBase) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [63:0] vec;\n"
+      "  initial x = vec[(i * 8) +: 8];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  EXPECT_TRUE(rhs->is_part_select_plus);
+  ASSERT_NE(rhs->index, nullptr);
+  EXPECT_EQ(rhs->index->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->index->op, TokenKind::kStar);
+}
+
+struct ParseResult11e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11e Parse(const std::string& src) {
+  ParseResult11e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult11e& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+static Expr* FirstAssignRhs(ParseResult11e& r) {
+  auto* stmt = FirstInitialStmt(r);
+  if (!stmt) return nullptr;
+  return stmt->rhs;
+}
+
+// =========================================================================
+// Section 11.5.1 -- Bit-select
+// =========================================================================
+TEST(ParserSection11, BitSelectWithExprIndex) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a[i + 1];\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->index, nullptr);
+  EXPECT_EQ(rhs->index->kind, ExprKind::kBinary);
+}
+
+// =============================================================================
+// A.8.4 Primaries — bit_select
+// =============================================================================
+// § bit_select — single dimension
+TEST(ParserA84, BitSelectSingleDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  logic x;\n"
+      "  initial x = data[5];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->index, nullptr);
+  EXPECT_EQ(rhs->index_end, nullptr);
+}
+
+// --- Part-select in if condition ---
+TEST(ParserSection11, Sec11_4_1_PartSelectInIfCondition) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [15:0] data;\n"
+      "  initial begin\n"
+      "    if (data[3:0] == 4'hF) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
+  ASSERT_NE(stmt->condition->lhs, nullptr);
+  EXPECT_EQ(stmt->condition->lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(stmt->condition->lhs->index_end, nullptr);
+}
+
+// --- Packed struct indexed part-select plus ---
+TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectPlus) {
+  auto r = Parse(
+      "module t;\n"
+      "  struct packed {\n"
+      "    bit [7:0] a;\n"
+      "    bit [7:0] b;\n"
+      "    bit [7:0] c;\n"
+      "    bit [7:0] d;\n"
+      "  } s;\n"
+      "  initial x = s[8 +: 8];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
+  EXPECT_TRUE(stmt->rhs->is_part_select_plus);
+}
+
+// =============================================================================
+// A.8.4 Primaries — select
+// =============================================================================
+// § select — bit_select with part_select_range
+TEST(ParserA84, SelectBitWithPartSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [31:0] data;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = data[15:8];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->index, nullptr);
+  ASSERT_NE(rhs->index_end, nullptr);
+}
+
+// =========================================================================
+// Section 11.5.2 -- Part-select
+// =========================================================================
+TEST(ParserSection11, PartSelectHasIndexEnd) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a[15:8];\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  EXPECT_NE(rhs->index, nullptr);
+  EXPECT_NE(rhs->index_end, nullptr);
+}
+
 }  // namespace

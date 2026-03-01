@@ -131,37 +131,6 @@ TEST(ParserSection6, CastCompatibleIntToEnum) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-// =========================================================================
-// §6.23: Type operator
-// =========================================================================
-TEST(ParserSection6, TypeOperatorExpr_Kind) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = type(y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
-}
-
-TEST(ParserSection6, TypeOperatorExpr_Inner) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = type(y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  ASSERT_NE(rhs->lhs, nullptr);
-  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(rhs->lhs->text, "y");
-}
-
 TEST(ParserSection6, TypeRefInferWidth) {
   // §6.23: InferExprWidth on type(expr) returns inner expression's width.
   Arena arena;
@@ -172,75 +141,6 @@ TEST(ParserSection6, TypeRefInferWidth) {
   ref->lhs = inner;
   TypedefMap typedefs;
   EXPECT_EQ(InferExprWidth(ref, typedefs), 32u);
-}
-
-TEST(ParserSection6, TypeOperatorInDataType) {
-  auto r = Parse(
-      "module t;\n"
-      "  parameter type T = type(int);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  // The init_expr should be a type reference.
-  ASSERT_NE(item->init_expr, nullptr);
-  EXPECT_EQ(item->init_expr->kind, ExprKind::kTypeRef);
-}
-
-// =========================================================================
-// §6.25: Parameterized data types
-// =========================================================================
-TEST(ParserSection6, ScopeResolutionType) {
-  auto r = Parse(
-      "module t;\n"
-      "  import pkg::mytype;\n"
-      "  pkg::mytype x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  // Find the variable declaration.
-  auto& items = r.cu->modules[0]->items;
-  ModuleItem* var_item = nullptr;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kVarDecl && it->name == "x") {
-      var_item = it;
-      break;
-    }
-  }
-  ASSERT_NE(var_item, nullptr);
-  EXPECT_EQ(var_item->data_type.kind, DataTypeKind::kNamed);
-  EXPECT_EQ(var_item->data_type.scope_name, "pkg");
-  EXPECT_EQ(var_item->data_type.type_name, "mytype");
-}
-
-// Step 1a: string type in block-level declarations (fixes 6.19.5.6)
-TEST(ParserSection6, BlockVarDecl_StringType) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    string s;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
-  EXPECT_EQ(stmt->var_name, "s");
-}
-
-// Step 1b: implicit port types (fixes 6.10)
-TEST(ParserSection6, ParsePortDecl_ImplicitType) {
-  auto r = Parse("module m(input [3:0] a, output [7:0] b); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  auto& ports = r.cu->modules[0]->ports;
-  std::string expected_names[] = {"a", "b"};
-  ASSERT_EQ(ports.size(), std::size(expected_names));
-  for (size_t i = 0; i < std::size(expected_names); ++i) {
-    EXPECT_EQ(ports[i].name, expected_names[i]) << "port " << i;
-    EXPECT_EQ(ports[i].data_type.kind, DataTypeKind::kLogic) << "port " << i;
-  }
 }
 
 // Step 1c: localparam implicit type (fixes 6.20.4)

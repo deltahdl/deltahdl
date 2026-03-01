@@ -71,4 +71,31 @@ TEST(ParserSection8, ClassWithLocalparam) {
   EXPECT_EQ(r.cu->classes[0]->name, "my_cls");
 }
 
+TEST(ParserA24, LocalparamAssignment) {
+  auto r = Parse("module m; localparam int LP = 42; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "LP");
+}
+
+// §A.2.8 block_item_declaration alternative 2: local_parameter_declaration
+TEST(ParserA28, LocalparamInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    localparam int X = 5;\n"
+      "    $display(\"%0d\", X);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[0]->var_name, "X");
+}
+
 }  // namespace

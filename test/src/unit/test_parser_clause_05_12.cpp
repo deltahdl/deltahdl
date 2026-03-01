@@ -135,4 +135,21 @@ TEST(ParserA604, StatementWithAttributeValue) {
   EXPECT_NE(stmt->attrs[0].value, nullptr);
 }
 
+// §12.3: statement with multiple attributes
+TEST(ParserA604, StatementWithMultipleAttributes) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* foo, bar *) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->attrs.size(), 2u);
+  EXPECT_EQ(stmt->attrs[0].name, "foo");
+  EXPECT_EQ(stmt->attrs[1].name, "bar");
+}
+
 }  // namespace

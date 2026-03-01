@@ -154,4 +154,20 @@ TEST(ParserSection13, Sec13_8_MultipleParamsWithDefaults) {
   EXPECT_EQ(r.cu->classes[0]->params[1].first, "OUT_W");
 }
 
+// §13.8: Three parameters with complex expressions.
+TEST(ParserSection13, Sec13_8_ThreeParams) {
+  auto r = Parse(
+      "virtual class Xform#(parameter IN_W = 8,\n"
+      "                     parameter OUT_W = IN_W * 2,\n"
+      "                     parameter DEPTH = 4);\n"
+      "  static function logic [OUT_W-1:0] widen(\n"
+      "      input logic [IN_W-1:0] data);\n"
+      "    return {DEPTH{data}};\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes[0]->params.size(), 3u);
+}
+
 }  // namespace

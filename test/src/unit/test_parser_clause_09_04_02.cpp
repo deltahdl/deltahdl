@@ -226,4 +226,73 @@ TEST(ParserSection4, Sec4_5_NegedgeEventControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
+// =============================================================================
+// LRM section 9.4.2 -- Event control (additional edge cases)
+// Null statement after event control, back-to-back event controls.
+// =============================================================================
+TEST(ParserSection9c, EventControlNullStatement) {
+  // @(posedge clk); -- event control with null statement (just a semicolon)
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk);\n"
+      "    a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+}
+
+TEST(ParserSection9c, BackToBackEventControls) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk);\n"
+      "    @(posedge clk);\n"
+      "    a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kEventControl);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kEventControl);
+}
+
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(Parser, EventWaitWithParens) {
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "  initial @(ev) ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[1];
+  auto* stmt = item->body;
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  EXPECT_EQ(stmt->events[0].signal->text, "ev");
+}
+
 }  // namespace

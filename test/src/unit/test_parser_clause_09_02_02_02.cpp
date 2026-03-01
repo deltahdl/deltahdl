@@ -418,4 +418,141 @@ TEST(ParserSection4, Sec4_6_AlwaysCombMultipleOutputs) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
+// ---------------------------------------------------------------------------
+// 30. always_comb ParseOk smoke test for full mux with for loop and array
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_ParseOkComplexMuxPattern) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [3:0] sel;\n"
+              "  logic [7:0] inputs [0:15];\n"
+              "  logic [7:0] out;\n"
+              "  always_comb begin\n"
+              "    out = 8'd0;\n"
+              "    for (int i = 0; i < 16; i++) begin\n"
+              "      if (sel == i[3:0])\n"
+              "        out = inputs[i];\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// Return the first always-kind module item (any always variant).
+static ModuleItem* FirstAlwaysItem(ParseResult9h& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.2.2.2 -- always_comb compared with always @*
+//
+// Both always_comb and always @* describe combinational logic. The parser
+// produces AlwaysKind::kAlwaysComb for always_comb and AlwaysKind::kAlways
+// for always @*. For always @*, the parser consumes the @* at the
+// module-item level (not as a statement-level event control), so both
+// forms have the body directly on item->body with empty sensitivity.
+// =============================================================================
+// ---------------------------------------------------------------------------
+// 1. always_comb parses with AlwaysKind::kAlwaysComb.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysCombAlwaysKind) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb a = b & c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+}
+
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Returns the first always_* item from the first module.
+static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock)
+      return item;
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 19. always_comb block (scheduling semantics)
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_AlwaysComb) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c;\n"
+      "  always_comb a = b & c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// 6. always_comb body is directly on item->body (single assignment).
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBodyDirectAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb x = a ^ b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
+}
+
+// ---------------------------------------------------------------------------
+// 8. always_comb with begin-end block body.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBeginEndBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb begin\n"
+      "    x = a & b;\n"
+      "    y = a | c;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_EQ(item->body->stmts.size(), 2u);
+}
+
 }  // namespace

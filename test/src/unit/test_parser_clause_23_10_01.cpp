@@ -17,4 +17,15 @@ TEST(ParserA23, ListOfDefparamAssignmentsThree) {
   EXPECT_EQ(item->defparam_assigns.size(), 3u);
 }
 
+TEST(ParserAnnexA, A9DefparamDecl) {
+  auto r = Parse("module m; defparam u.WIDTH = 16; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool found = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kDefparam) found = true;
+  }
+  EXPECT_TRUE(found);
+}
+
 }  // namespace

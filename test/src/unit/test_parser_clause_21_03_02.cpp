@@ -25,4 +25,23 @@ TEST(ParserSection21, FdisplayFwrite) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, FstrobeAndFmonitor) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  integer fd;\n"
+              "  initial begin\n"
+              "    fd = $fopen(\"log.txt\", \"w\");\n"
+              "    $fstrobe(fd, \"val=%d\", x);\n"
+              "    $fstrobeb(fd, x);\n"
+              "    $fstrobeh(fd, x);\n"
+              "    $fstrobeo(fd, x);\n"
+              "    $fmonitor(fd, \"x=%b\", x);\n"
+              "    $fmonitorb(fd, x);\n"
+              "    $fmonitorh(fd, x);\n"
+              "    $fmonitoro(fd, x);\n"
+              "    $fclose(fd);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

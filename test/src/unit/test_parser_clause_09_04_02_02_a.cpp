@@ -863,4 +863,131 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarInInitial) {
   EXPECT_TRUE(s1->is_star_event);
 }
 
+// ParseOk: @* parses without errors in a typical combinational module
+TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarCombiModule) {
+  EXPECT_TRUE(
+      ParseOk("module mux4(\n"
+              "  input [1:0] sel,\n"
+              "  input [7:0] a, b, c, d,\n"
+              "  output reg [7:0] out\n"
+              ");\n"
+              "  always @* begin\n"
+              "    case (sel)\n"
+              "      2'd0: out = a;\n"
+              "      2'd1: out = b;\n"
+              "      2'd2: out = c;\n"
+              "      default: out = d;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// ---------------------------------------------------------------------------
+// 14. @(*) -- parenthesized implicit sensitivity
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_ParenStarEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    @(*) a = b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_TRUE(stmt->is_star_event);
+  EXPECT_TRUE(stmt->events.empty());
+}
+
+// ParseOk: @(*) parses without errors in a typical combinational module
+TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarParenCombiModule) {
+  EXPECT_TRUE(
+      ParseOk("module adder(\n"
+              "  input [7:0] a, b,\n"
+              "  output reg [8:0] sum\n"
+              ");\n"
+              "  always @(*) begin\n"
+              "    sum = a + b;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// --- 29. Full blocking assignment pattern in always block ---
+TEST(ParserSection10, Sec10_4_1_FullPatternAlwaysComb) {
+  EXPECT_TRUE(
+      ParseOk("module m(\n"
+              "  input [7:0] a, b,\n"
+              "  input sel,\n"
+              "  output reg [7:0] result\n"
+              ");\n"
+              "  always @(*) begin\n"
+              "    result = 0;\n"
+              "    if (sel)\n"
+              "      result = a + b;\n"
+              "    else\n"
+              "      result = a - b;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+struct ParseResult9h {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9h Parse(const std::string& src) {
+  ParseResult9h result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Return the first always-kind module item (any always variant).
+static ModuleItem* FirstAlwaysItem(ParseResult9h& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 4. always @* also has empty sensitivity (star consumed at module level).
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysStarEmptySensitivity) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @* y = a | b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->sensitivity.empty());
+}
+
+// ---------------------------------------------------------------------------
+// 5. always @(*) is equivalent to always @* -- same empty sensitivity.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenEquivalent) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(*) y = a & b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
+  EXPECT_TRUE(item->sensitivity.empty());
+}
+
 }  // namespace

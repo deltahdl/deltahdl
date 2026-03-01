@@ -4,14 +4,6 @@
 
 using namespace delta;
 
-static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
-                         const std::string& name) {
-  for (const auto* item : items)
-    for (const auto& attr : item->attrs)
-      if (attr.name == name) return true;
-  return false;
-}
-
 namespace {
 
 // 15. Config declarations at top level (part of CU).
@@ -26,141 +18,6 @@ TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->name, "my_cfg");
-}
-
-// 6. Task and function names in same module scope
-TEST(ParserClause03, Cl3_13_TaskAndFunctionInSameModule) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "  task do_work(input int x);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  bool found_func = false;
-  bool found_task = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl && item->name == "add")
-      found_func = true;
-    if (item->kind == ModuleItemKind::kTaskDecl && item->name == "do_work")
-      found_task = true;
-  }
-  EXPECT_TRUE(found_func);
-  EXPECT_TRUE(found_task);
-}
-
-// 7. Variable name same as module name (different name spaces)
-TEST(ParserClause03, Cl3_13_VarNameSameAsModuleName) {
-  // A variable named 'top' inside module 'top' is legal because
-  // the definition name space and the local scope are distinct.
-  EXPECT_TRUE(
-      ParseOk("module top;\n"
-              "  logic top;\n"
-              "endmodule\n"));
-}
-
-// 18. $unit scope -- declarations outside any module/package
-TEST(ParserClause03, Cl3_13_UnitScopeDeclarations) {
-  auto r = ParseWithPreprocessor(
-      "function automatic int helper(int x);\n"
-      "  return x + 1;\n"
-      "endfunction\n"
-      "task automatic global_task(input int v);\n"
-      "endtask\n"
-      "module m;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->cu_items.size(), 2u);
-  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(r.cu->cu_items[0]->name, "helper");
-  EXPECT_EQ(r.cu->cu_items[1]->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_EQ(r.cu->cu_items[1]->name, "global_task");
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-// 33. All 8 name spaces coexist in a single compilation unit
-TEST(ParserClause03, Cl3_13_AllEightNameSpaces) {
-  auto r = ParseWithPreprocessor(
-      // (d) Text macro name space
-      "`define VAL 1\n"
-      // (b) Package name space
-      "package pkg; int x; endpackage\n"
-      // (c) Compilation-unit scope name space
-      "function automatic int cu_fn(int a); return a; endfunction\n"
-      // (a) Definitions name space: module, interface, program, primitive
-      "module m (input logic clk, output logic q);\n"  // (g) Port name space
-      "  (* keep *) logic flag;\n"                // (h) Attribute name space
-      "  import pkg::*;\n"                        // (e) Module name space
-      "  always_ff @(posedge clk) begin : blk\n"  // (f) Block name space
-      "    int cnt;\n"
-      "    cnt = `VAL;\n"
-      "    q <= flag;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  // (b) Package name space
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-  // (c) Compilation-unit scope
-  ASSERT_GE(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->cu_items[0]->name, "cu_fn");
-  // (a) Definitions name space
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-  // (g) Port name space
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "clk");
-  // (h) Attribute name space
-  EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "keep"));
-}
-
-// package_item: timeunits_declaration (footnote 3)
-TEST(SourceText, PackageItemTimeunitsDecl) {
-  auto r = ParseWithPreprocessor(
-      "package pkg;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
-// =============================================================================
-// LRM §3.14 — Simulation time units and precision
-// =============================================================================
-TEST(ParserClause03, Cl3_14_TimeunitsAndTimescale) {
-  auto r1 = ParseWithPreprocessor("module m; timeunit 1ns; endmodule\n");
-  EXPECT_FALSE(r1.has_errors);
-  EXPECT_TRUE(r1.cu->modules[0]->has_timeunit);
-  auto r2 = ParseWithPreprocessor("module m; timeprecision 1ps; endmodule\n");
-  EXPECT_FALSE(r2.has_errors);
-  EXPECT_TRUE(r2.cu->modules[0]->has_timeprecision);
-  auto r3 = ParseWithPreprocessor(
-      "module m; timeunit 1ns; timeprecision 1ps; endmodule\n");
-  EXPECT_FALSE(r3.has_errors);
-  EXPECT_TRUE(r3.cu->modules[0]->has_timeunit);
-  EXPECT_TRUE(r3.cu->modules[0]->has_timeprecision);
-  EXPECT_TRUE(ParseOk("module m; timeunit 100ps / 10fs; endmodule\n"));
-  EXPECT_TRUE(
-      ParseOk("program p; timeunit 10us; timeprecision 100ns; endprogram\n"));
-  EXPECT_TRUE(ParseOk("interface ifc; timeunit 1ns; endinterface\n"));
-  // `timescale directive
-  EXPECT_TRUE(ParseOk("`timescale 1ns/1ps\nmodule m; endmodule\n"));
-  // Time literals (§5.8): integer, fractional, all unit suffixes
-  EXPECT_TRUE(ParseOk("module m; initial #10ns $display(\"d\"); endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m; initial #2.1ns $display(\"d\"); endmodule\n"));
-  // Various magnitudes (Table 3-1)
-  EXPECT_TRUE(
-      ParseOk("module a; timeunit 100ns; timeprecision 10ps; endmodule\n"));
-  EXPECT_TRUE(
-      ParseOk("module b; timeunit 1us; timeprecision 1ns; endmodule\n"));
 }
 
 // 1. TimeUnit enum: six values with correct power-of-10 exponents
@@ -234,24 +91,6 @@ TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
             static_cast<int8_t>(TimeUnit::kMs));
   EXPECT_LE(static_cast<int8_t>(TimeUnit::kMs),
             static_cast<int8_t>(TimeUnit::kS));
-}
-
-// 13. Time values stored in design element: module with timeunit and
-// timeprecision stores both components.
-TEST(ParserClause03, Cl3_14_TimeValuesInDesignElement) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* mod = r.cu->modules[0];
-  EXPECT_TRUE(mod->has_timeunit);
-  EXPECT_TRUE(mod->has_timeprecision);
-  EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
-  EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
 }
 
 // ===========================================================================

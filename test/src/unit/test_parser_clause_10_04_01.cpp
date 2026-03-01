@@ -581,4 +581,111 @@ TEST(ParserSection10, Sec10_4_1_ArrayElementLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
+// ---------------------------------------------------------------------------
+// statement_item — all 19 alternatives recognized by the dispatcher
+// Each sub-alternative is defined in its own subclause; here we verify the
+// statement_item dispatch recognizes each one.
+// ---------------------------------------------------------------------------
+// §10.4.1: blocking_assignment ;
+TEST(ParserA604, StmtItemBlockingAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
+// --- 27. Blocking assignment to nested struct member: s.inner.field = val ---
+TEST(ParserSection10, Sec10_4_1_NestedStructMemberLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    s.inner.field = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
+}
+
+// --- 30. Blocking assignment with complex LHS and RHS combinations ---
+TEST(ParserSection10, Sec10_4_1_ComplexLhsRhsCombinations) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [15:0] data;\n"
+      "  reg [7:0] arr [0:3];\n"
+      "  initial begin\n"
+      "    data[7:0] = arr[0] + arr[1];\n"
+      "    data[15:8] = arr[2] & arr[3];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s0 = NthInitialStmt(r, 0);
+  auto* s1 = NthInitialStmt(r, 1);
+  ASSERT_NE(s0, nullptr);
+  ASSERT_NE(s1, nullptr);
+  EXPECT_EQ(s0->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(s1->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(s0->lhs->kind, ExprKind::kSelect);
+  EXPECT_EQ(s1->lhs->kind, ExprKind::kSelect);
+  EXPECT_EQ(s0->rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(s1->rhs->kind, ExprKind::kBinary);
+}
+
+struct ParseResult9c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9c Parse(const std::string& src) {
+  ParseResult9c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult9c& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// §10.4.1 -- Blocking procedural assignments
+// =============================================================================
+TEST(ParserSection9b, BlockingAssignSimple) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    rega = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace

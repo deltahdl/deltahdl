@@ -334,4 +334,99 @@ TEST(ParserSection4, Sec4_6_AutomaticVarInitPerEntry) {
   EXPECT_NE(stmt->var_init, nullptr);
 }
 
+struct ParseResult9d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9d Parse(const std::string& src) {
+  ParseResult9d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection9c, AutomaticVarDeclInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int k = 5;\n"
+      "    $display(\"%0d\", k);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(body->stmts[0]->var_is_automatic);
+}
+
+struct ParseResult4e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4e Parse(const std::string& src) {
+  ParseResult4e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// 7. Static variable in begin-end block (initial block)
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_StaticVarInBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    static int counter = 0;\n"
+      "    counter = counter + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmtT(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(stmt->var_is_static);
+  EXPECT_FALSE(stmt->var_is_automatic);
+  EXPECT_EQ(stmt->var_name, "counter");
+}
+
+// =============================================================================
+// 8. Automatic variable in begin-end block (initial block)
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_AutoVarInBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int temp = 42;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmtT(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(stmt->var_is_automatic);
+  EXPECT_FALSE(stmt->var_is_static);
+  EXPECT_EQ(stmt->var_name, "temp");
+  EXPECT_NE(stmt->var_init, nullptr);
+}
+
 }  // namespace

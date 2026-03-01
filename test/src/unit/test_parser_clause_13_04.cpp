@@ -142,4 +142,113 @@ TEST(Parser, FunctionDecl) {
   }
 }
 
+TEST(ParserA23, ListOfTfVariableIdentifiersThree) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int sum3;\n"
+      "    input int x, y, z;\n"
+      "    sum3 = x + y + z;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->func_args.size(), 3u);
+  EXPECT_EQ(item->func_args[0].name, "x");
+  EXPECT_EQ(item->func_args[1].name, "y");
+  EXPECT_EQ(item->func_args[2].name, "z");
+}
+
+TEST(ParserA26, FuncReturnTypeImplicit) {
+  auto r =
+      Parse("module m;\n  function foo(); return 1; endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kImplicit);
+}
+
+struct ParseResult6h {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6h Parse(const std::string& src) {
+  ParseResult6h result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult6h& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
+}
+
+// 15. Integer types as function parameters.
+TEST(ParserSection6, Sec6_11_IntegerTypesAsFunctionParams) {
+  auto r = Parse(
+      "module t;\n"
+      "  function void f(int a, byte b);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->func_args[0].name, "a");
+  EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(item->func_args[1].name, "b");
+}
+
+TEST(ParserA26, FuncReturnTypeImplicitSigned) {
+  auto r = Parse(
+      "module m;\n  function signed [7:0] foo();\n"
+      "    return 0;\n  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(item->return_type.is_signed);
+}
+
+TEST(ParserA26, FuncBodyNewStyleWithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].name, "a");
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[1].name, "b");
+}
+
+TEST(ParserA26, FuncBodyNewStyleMultipleDirections) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void xfer(input int a, output int b, inout int c, ref int "
+      "d);\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  VerifyFuncArgDirections(r.cu->modules[0]->items[0],
+                          {Direction::kInput, Direction::kOutput,
+                           Direction::kInout, Direction::kRef});
+}
+
 }  // namespace

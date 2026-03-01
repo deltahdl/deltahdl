@@ -98,4 +98,45 @@ TEST(ParserA84, TimeLiteralMs) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// § time_literal — unsigned_number time_unit (s)
+TEST(ParserA84, TimeLiteralS) {
+  auto r = Parse("module m; initial #1s; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// Time literal variants in delay: fs, ps, ns, us, ms, s.
+TEST(ParserA223, DelayValueAllTimeLiterals) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire #1fs w1;\n"
+              "  wire #2ps w2;\n"
+              "  wire #3ns w3;\n"
+              "  wire #4us w4;\n"
+              "  wire #5ms w5;\n"
+              "  wire #6s w6;\n"
+              "endmodule"));
+}
+
+// § time_literal — unsigned_number time_unit (ps)
+TEST(ParserA84, TimeLiteralPs) {
+  auto r = Parse("module m; initial #100ps; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// § time_literal — unsigned_number time_unit (fs)
+TEST(ParserA84, TimeLiteralFs) {
+  auto r = Parse("module m; initial #50fs; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// § time_literal — fixed_point_number time_unit
+TEST(ParserA84, TimeLiteralFixedPoint) {
+  auto r = Parse("module m; initial #1.5ns; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

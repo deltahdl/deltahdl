@@ -21,4 +21,15 @@ TEST(ParserAnnexE, AnnexEMultipleDirectives) {
   }
 }
 
+// --- E.2: `delay_mode_distributed ---
+TEST(ParserAnnexE2, AnnexEDelayModeDistributed) {
+  auto r = Parse(
+      "`delay_mode_distributed\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  if (r.cu->modules.size() >= 1u) {
+    EXPECT_EQ(r.cu->modules[0]->name, "m");
+  }
+}
+
 }  // namespace

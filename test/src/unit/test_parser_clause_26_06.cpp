@@ -44,4 +44,49 @@ TEST(ParserSection26, PackageExportSpecific) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// --- Package export declarations (LRM section 26.6) ---
+TEST(ParserSection23, ExportDecl) {
+  auto r = Parse(
+      "package p;\n"
+      "  export pkg::*;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* pkg = r.cu->packages[0];
+  ASSERT_EQ(pkg->items.size(), 1);
+  EXPECT_EQ(pkg->items[0]->kind, ModuleItemKind::kExportDecl);
+  EXPECT_EQ(pkg->items[0]->import_item.package_name, "pkg");
+  EXPECT_TRUE(pkg->items[0]->import_item.is_wildcard);
+}
+
+TEST(ParserSection23, ExportWildcardAll) {
+  auto r = Parse(
+      "package p;\n"
+      "  export *::*;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* pkg = r.cu->packages[0];
+  ASSERT_EQ(pkg->items.size(), 1);
+  EXPECT_EQ(pkg->items[0]->kind, ModuleItemKind::kExportDecl);
+  EXPECT_EQ(pkg->items[0]->import_item.package_name, "*");
+  EXPECT_TRUE(pkg->items[0]->import_item.is_wildcard);
+}
+
 }  // namespace

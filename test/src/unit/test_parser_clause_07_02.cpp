@@ -239,4 +239,23 @@ TEST(ParserSection7, StructMemberUnpackedDim) {
   EXPECT_FALSE(item->typedef_type.struct_members[0].unpacked_dims.empty());
 }
 
+TEST(ParserSection7, StructMultipleMembersSameType) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    int x, y, z;\n"
+      "  } point;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  std::string expected_names[] = {"x", "y", "z"};
+  ASSERT_EQ(item->typedef_type.struct_members.size(),
+            std::size(expected_names));
+  for (size_t i = 0; i < std::size(expected_names); ++i) {
+    EXPECT_EQ(item->typedef_type.struct_members[i].name, expected_names[i])
+        << "member " << i;
+  }
+}
+
 }  // namespace

@@ -49,4 +49,38 @@ TEST(ParserA602, InitialConstruct_Multiple) {
   EXPECT_EQ(inits.size(), 3u);
 }
 
+struct ParseResult9c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9c Parse(const std::string& src) {
+  ParseResult9c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §9.2 -- Structured procedures (initial, always, final)
+// =============================================================================
+TEST(ParserSection9b, StructuredProcInitialAndAlways) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial a = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
+  EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kAlwaysBlock);
+}
+
 }  // namespace

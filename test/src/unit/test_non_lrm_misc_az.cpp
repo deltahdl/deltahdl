@@ -64,51 +64,6 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportDefaultArgs) {
   EXPECT_NE(items[0]->func_args[2].default_value, nullptr);
 }
 
-// =============================================================================
-// Annex J - Foreign language code inclusion
-// =============================================================================
-TEST_F(AnnexHParseTest, AnnexJDpiImportCoexistence) {
-  auto* unit = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" function int c_func();\n"
-      "  logic [7:0] data;\n"
-      "  assign data = 8'hFF;\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 3u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(items[1]->kind, ModuleItemKind::kVarDecl);
-  EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
-}
-
-// =============================================================================
-// Annex K/L/M - VPI headers (VPI-backed system tasks/functions)
-// =============================================================================
-TEST_F(AnnexHParseTest, AnnexKVpiSystemCalls) {
-  auto* unit = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $vpi_get_time;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_GE(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
-}
-
-TEST_F(AnnexHParseTest, AnnexKVpiSysGetValue) {
-  auto* unit = Parse(
-      "module m;\n"
-      "  initial $display($time);\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_GE(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
-}
-
 TEST_F(AnnexHParseTest, AnnexMSvVpiCalls) {
   auto* unit = Parse(
       "module m;\n"

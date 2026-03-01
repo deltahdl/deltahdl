@@ -134,4 +134,126 @@ TEST(ParserSection11, ConcatOnLhsOfAssign) {
               "endmodule\n"));
 }
 
+// =========================================================================
+// Section 11.4.12.1 -- Concatenation
+// =========================================================================
+TEST(ParserSection11, ConcatPartSelectPostfix) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte a, b;\n"
+      "  bit [1:0] c;\n"
+      "  initial c = {a + b}[1:0];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserSection11, ConcatSingleElement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {a};\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(rhs->elements.size(), 1u);
+}
+
+struct ParseResult11g {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11g Parse(const std::string& src) {
+  ParseResult11g result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult11g& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+static Expr* FirstAssignRhs(ParseResult11g& r) {
+  auto* stmt = FirstInitialStmt(r);
+  if (!stmt) return nullptr;
+  return stmt->rhs;
+}
+
+// --- Select on concatenation result ({a,b}[i]) ---
+TEST(ParserSection11, Sec11_4_1_SelectOnConcatenation) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {a, b}[3];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->base, nullptr);
+  EXPECT_EQ(rhs->base->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(rhs->index_end, nullptr);
+}
+
+// =============================================================================
+// A.8.1 Concatenations — Parser
+// =============================================================================
+// § concatenation ::= { expression { , expression } }
+TEST(ParserA81, ConcatenationSingleElement) {
+  auto r = Parse("module m; initial x = {a}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(stmt->rhs->elements.size(), 1u);
+}
+
+TEST(ParserA81, ConcatenationTwoElements) {
+  auto r = Parse("module m; initial x = {a, b}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
+}
+
+TEST(ParserA81, ConcatenationThreeElements) {
+  auto r = Parse("module m; initial x = {a, b, c}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(stmt->rhs->elements.size(), 3u);
+}
+
+TEST(ParserA81, ConcatenationNested) {
+  auto r = Parse("module m; initial x = {a, {b, c}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
+  EXPECT_EQ(stmt->rhs->elements[1]->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(stmt->rhs->elements[1]->elements.size(), 2u);
+}
+
 }  // namespace

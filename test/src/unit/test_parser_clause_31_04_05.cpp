@@ -41,4 +41,21 @@ TEST(ParserA70501, PeriodTimingCheck) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
+// =============================================================================
+// A.7.5.2 controlled_reference_event ::= controlled_timing_check_event
+// =============================================================================
+// $period requires controlled_reference_event (mandatory edge)
+TEST(ParserA70502, ControlledReferenceEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $period(posedge clk, 50);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
+}
+
 }  // namespace

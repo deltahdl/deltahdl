@@ -85,4 +85,45 @@ TEST(ParserSection9, Sec9_2_2_2_FullComboModuleParseOk) {
               "endmodule\n"));
 }
 
+struct ParseResult9h {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9h Parse(const std::string& src) {
+  ParseResult9h result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Return the first always-kind module item (any always variant).
+static ModuleItem* FirstAlwaysItem(ParseResult9h& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 2. always @* parses with AlwaysKind::kAlways.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysStarAlwaysKind) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @* a = b & c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
+}
+
 }  // namespace

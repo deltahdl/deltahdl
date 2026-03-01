@@ -313,4 +313,13 @@ TEST(ParserA84, PrimaryLiteralUnbasedUnsized) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
+TEST(ParserAnnexA, A8IntegerLiterals) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = 42; b = 8'hFF; c = 4'b1010; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

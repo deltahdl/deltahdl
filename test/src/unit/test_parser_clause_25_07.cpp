@@ -65,4 +65,42 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
+// --- Modport import/export (LRM §25.5, §25.7) ---
+TEST(ParserSection25, ModportImportExportName) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(import Read, export Write);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_EQ(mp->name, "target");
+  ASSERT_EQ(mp->ports.size(), 2);
+}
+
+TEST(ParserSection25, ModportImportExportPorts) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(import Read, export Write);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2);
+  VerifyImportExportPort(mp->ports[0], true, false, "Read");
+  VerifyImportExportPort(mp->ports[1], false, true, "Write");
+}
+
+TEST(ParserSection25, ModportImportWithDirectionSecond) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic data;\n"
+      "  modport target(input data, import Read);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2);
+  EXPECT_FALSE(mp->ports[0].is_export);
+  EXPECT_TRUE(mp->ports[1].is_import);
+  EXPECT_EQ(mp->ports[1].name, "Read");
+}
+
 }  // namespace

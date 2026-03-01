@@ -266,4 +266,101 @@ TEST(SourceText, CheckerGenerateItems) {
   EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kElabSystemTask));
 }
 
+// Combined: checker with multiple A.1.8 item types.
+TEST(SourceText, CheckerMultipleItemTypes) {
+  auto r = Parse(
+      "checker chk(input logic clk, output bit ok);\n"
+      "  logic sig;\n"
+      "  assign ok = sig;\n"
+      "  initial begin end\n"
+      "  always @(posedge clk) sig <= 1;\n"
+      "  final begin end\n"
+      "  assert property (@(posedge clk) sig);\n"
+      "  default disable iff !ok;\n"
+      "  function int f(); return 0; endfunction\n"
+      "  $warning(\"test\");\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto* chk = r.cu->checkers[0];
+  EXPECT_EQ(chk->name, "chk");
+  ASSERT_EQ(chk->ports.size(), 2u);
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kVarDecl));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kContAssign));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kAssertProperty));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kDefaultDisableIff));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kElabSystemTask));
+}
+
+// description: checker_declaration
+TEST(SourceText, DescriptionChecker) {
+  auto r = Parse("checker chk; endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
+}
+
+TEST(ParserAnnexA, A1CheckerDecl) {
+  auto r = Parse("checker chk; endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
+}
+
+// checker_or_generate_item_declaration ::= [rand] data_declaration
+TEST(SourceText, CheckerRandDataDecl) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  rand bit [3:0] val;\n"
+      "  logic [7:0] data;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 2u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_TRUE(r.cu->checkers[0]->items[0]->is_rand);
+  EXPECT_EQ(r.cu->checkers[0]->items[1]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_FALSE(r.cu->checkers[0]->items[1]->is_rand);
+}
+
+// =============================================================================
+// §17.10 Checker with function/task declarations
+// =============================================================================
+TEST_F(CheckerParseTest, CheckerWithFunctionDecl) {
+  auto* unit = Parse(R"(
+    checker func_check;
+      function int get_val;
+        return 42;
+      endfunction
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kFunctionDecl));
+}
+
+// checker_or_generate_item_declaration ::= function_declaration
+TEST(SourceText, CheckerFunctionDecl) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  function automatic int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_GE(r.cu->checkers[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(r.cu->checkers[0]->items[0]->name, "add");
+}
+
 }  // namespace

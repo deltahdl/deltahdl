@@ -121,4 +121,66 @@ TEST(ParserA210, SequenceExpr_ParenWithMatchItems) {
               "endmodule\n"));
 }
 
+using VerifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Section 16.5.1 -- Sequence operators in concurrent assertions
+// =============================================================================
+// Assert property with ## cycle delay operator.
+TEST(ParserSection16, Sec16_5_1_SequenceDelayOperator) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) req ##1 gnt ##1 !req);\n"
+              "endmodule\n"));
+}
+
+// --- Test helpers ---
+struct ParseResult16b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16b Parse(const std::string& src) {
+  ParseResult16b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §16.7 Sequences — concatenation and delay
+// =============================================================================
+TEST(ParserSection16, SequenceConcatDelay1) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req ##1 gnt ##1 !req);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
+TEST(ParserSection16, SequenceConcatDelay2) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req ##2 gnt);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
+TEST(ParserSection16, SequenceDelayRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req ##[4:32] gnt);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace

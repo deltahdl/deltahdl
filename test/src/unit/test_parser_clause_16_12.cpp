@@ -188,4 +188,61 @@ TEST(ParserSection16, PropertyDeclaration) {
   EXPECT_TRUE(found);
 }
 
+struct ParseResult16c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16c Parse(const std::string& src) {
+  ParseResult16c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using VerifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Section 16.5.1 -- disable iff in concurrent assertions
+// =============================================================================
+// Assert property with disable iff.
+TEST(ParserSection16, Sec16_5_1_AssertPropertyDisableIff) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (\n"
+      "    @(posedge clk) disable iff (rst) req |-> ack);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  auto* ap =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(ap, nullptr);
+  EXPECT_NE(ap->assert_expr, nullptr);
+}
+
+TEST(ParserAnnexF, AnnexFPropertyDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p1;\n"
+      "    @(posedge clk) a |-> ##1 b;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  bool found = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kPropertyDecl) {
+      found = true;
+      EXPECT_EQ(item->name, "p1");
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 }  // namespace

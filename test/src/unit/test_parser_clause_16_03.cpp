@@ -206,4 +206,79 @@ TEST(ParserSection16, OverviewAssertWithComplexExpr) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+struct ParseResult4b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static Stmt* FirstInitialStmt(ParseResult4b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// 25. Assert immediate (Observed region)
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_AssertImmediate) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a;\n"
+      "  initial begin\n"
+      "    assert (a == 1);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_NE(stmt->assert_expr, nullptr);
+}
+
+// =============================================================================
+// A.6.10 Assertion statements — simple_immediate_assert_statement
+// =============================================================================
+// assert ( expression ) ;
+TEST(ParserA610, SimpleAssertSemicolon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert(1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  ASSERT_NE(stmt->assert_expr, nullptr);
+  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+  EXPECT_FALSE(stmt->is_deferred);
+}
+
 }  // namespace

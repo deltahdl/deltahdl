@@ -268,4 +268,92 @@ TEST(ParserA607, CaseItemWithBlock) {
   EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kBlock);
 }
 
+TEST(ParserSection12, PlainCaseHasNoQualifier) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      0: x = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
+}
+
+// Case inside a for loop.
+TEST(ParserSection12, CaseInsideForLoop) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    for (int i = 0; i < 4; i = i + 1) begin\n"
+              "      case (mode)\n"
+              "        0: data[i] = 0;\n"
+              "        1: data[i] = i;\n"
+              "        default: data[i] = 8'hFF;\n"
+              "      endcase\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection12, PlainCaseIsNotInside) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (val)\n"
+      "      0: x = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_FALSE(stmt->case_inside);
+}
+
+// §12.5: case_statement
+TEST(ParserA604, StmtItemCaseStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case (x)\n"
+      "      1: a = 1;\n"
+      "      default: a = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+}
+
+// §12.5: nested case statements
+TEST(ParserA607, NestedCaseStmt) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(a)\n"
+      "      0: case(b)\n"
+      "           0: x = 1;\n"
+      "           1: x = 2;\n"
+      "         endcase\n"
+      "      1: x = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kCase);
+}
+
 }  // namespace

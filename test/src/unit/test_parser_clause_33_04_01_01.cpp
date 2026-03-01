@@ -64,4 +64,49 @@ TEST(SourceText, ConfigDesignMultipleCells) {
   EXPECT_EQ(c->design_cells[2].second, "cellonly");
 }
 
+// =============================================================================
+// §33.4.1.1 Design statement
+// =============================================================================
+TEST_F(ConfigTest, DesignStatementParsed) {
+  auto* unit = Parse(R"(
+    config cfg;
+      design lib1.top;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  auto* cfg = unit->configs[0];
+  EXPECT_EQ(cfg->name, "cfg");
+  ASSERT_EQ(cfg->design_cells.size(), 1u);
+  EXPECT_EQ(cfg->design_cells[0].first, "lib1");
+  EXPECT_EQ(cfg->design_cells[0].second, "top");
+}
+
+TEST_F(ConfigTest, DesignStatementNoLib) {
+  auto* unit = Parse(R"(
+    config cfg;
+      design top;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  auto* cfg = unit->configs[0];
+  ASSERT_EQ(cfg->design_cells.size(), 1u);
+  EXPECT_TRUE(cfg->design_cells[0].first.empty());
+  EXPECT_EQ(cfg->design_cells[0].second, "top");
+}
+
+TEST_F(ConfigTest, DesignStatementMultipleTopCells) {
+  auto* unit = Parse(R"(
+    config cfg;
+      design lib1.top1 lib2.top2;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  auto* cfg = unit->configs[0];
+  ASSERT_EQ(cfg->design_cells.size(), 2u);
+  EXPECT_EQ(cfg->design_cells[0].first, "lib1");
+  EXPECT_EQ(cfg->design_cells[0].second, "top1");
+  EXPECT_EQ(cfg->design_cells[1].first, "lib2");
+  EXPECT_EQ(cfg->design_cells[1].second, "top2");
+}
+
 }  // namespace

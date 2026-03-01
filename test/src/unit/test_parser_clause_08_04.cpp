@@ -46,4 +46,36 @@ TEST(ParserSection6, ClassVarDecl_VarType) {
   EXPECT_EQ(var_item->data_type.type_name, "MyClass");
 }
 
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// §8.4 — Null comparison
+TEST(ParserSection8, NullExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  class test_cls;\n"
+      "    int a;\n"
+      "  endclass\n"
+      "  test_cls obj;\n"
+      "  initial begin\n"
+      "    if (obj == null) obj = new;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace

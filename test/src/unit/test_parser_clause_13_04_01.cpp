@@ -301,4 +301,37 @@ TEST(ParserSection7, Sec7_2_1_PackedAsFuncReturn) {
               "endmodule\n"));
 }
 
+struct ParseResult12b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult12b Parse(const std::string& src) {
+  ParseResult12b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// Return with complex expression.
+TEST(ParserSection12, ReturnWithComplexExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  function int compute(int a, int b);\n"
+      "    return a * b + 1;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* ret = FindReturnStmt(r);
+  ASSERT_NE(ret, nullptr);
+  EXPECT_EQ(ret->kind, StmtKind::kReturn);
+  ASSERT_NE(ret->expr, nullptr);
+  // The expression is a binary op (a * b + 1).
+  EXPECT_EQ(ret->expr->kind, ExprKind::kBinary);
+}
+
 }  // namespace

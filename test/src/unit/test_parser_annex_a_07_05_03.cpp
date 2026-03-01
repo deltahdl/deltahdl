@@ -71,4 +71,67 @@ TEST(ParserA70503, ScalarConstantUnsized_b1) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// timing_check_event_control ::= posedge
+TEST(ParserA70503, TimingCheckEventPosedge) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->data_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc->data_terminal.name, "clk");
+}
+
+// timing_check_event_control ::= negedge
+TEST(ParserA70503, TimingCheckEventNegedge) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $hold(negedge clk, data, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kNegedge);
+  EXPECT_EQ(tc->ref_terminal.name, "clk");
+}
+
+// timing_check_event_control ::= edge
+TEST(ParserA70503, TimingCheckEventEdgeKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, edge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->data_edge, SpecifyEdge::kEdge);
+  EXPECT_EQ(tc->data_terminal.name, "clk");
+}
+
+// =============================================================================
+// A.7.5.3 controlled_timing_check_event
+// =============================================================================
+// $period uses controlled_timing_check_event (mandatory edge)
+TEST(ParserA70503, ControlledTimingCheckEventPeriod) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $period(posedge clk, 50);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc->ref_terminal.name, "clk");
+}
+
 }  // namespace

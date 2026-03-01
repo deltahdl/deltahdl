@@ -62,4 +62,25 @@ TEST(ParserSection13, Sec13_8_TwoSpecializations) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §13.8: Specialization with multiple parameter overrides.
+TEST(ParserSection13, Sec13_8_MultiParamSpecialization) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [15:0] data;\n"
+      "  logic [31:0] result;\n"
+      "  assign result = Xform#(16, 32, 2)::widen(data);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §13.8: Call to parameterized class with type parameter override.
+TEST(ParserSection13, Sec13_8_TypeParamOverrideCall) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [7:0] x, y;\n"
+              "  assign y = Converter#(logic [7:0])::identity(x);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

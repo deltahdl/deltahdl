@@ -428,4 +428,83 @@ TEST(ParserSection23, IndexedGenerateBlockName) {
   EXPECT_FALSE(gen->gen_body.empty());
 }
 
+TEST(ParserSection23, EndLabelOnGenerateBlock) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  genvar i;\n"
+              "  for (i = 0; i < 4; i = i + 1) begin : blk\n"
+              "    assign a[i] = b[i];\n"
+              "  end : blk\n"
+              "endmodule\n"));
+}
+
+// =========================================================================
+// Combined / integration tests
+// =========================================================================
+TEST(ParserSection23, ParameterizedModuleWithGenerate) {
+  auto r = Parse(
+      "module gray2bin #(parameter SIZE = 8) (\n"
+      "  output [SIZE-1:0] bin,\n"
+      "  input [SIZE-1:0] gray);\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 0; i < SIZE; i = i + 1) begin : bitnum\n"
+      "      assign bin[i] = ^gray[SIZE-1:i];\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "gray2bin");
+  ASSERT_EQ(mod->params.size(), 1);
+  EXPECT_EQ(mod->params[0].first, "SIZE");
+  ASSERT_EQ(mod->ports.size(), 2);
+}
+
+TEST(ParserSection23, GenerateNestedLoops) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i, j;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin : B1\n"
+      "    for (j = 0; j < 2; j = j + 1) begin : B2\n"
+      "      assign a[i][j] = b[i][j];\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ModuleItem* outer = nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) outer = item;
+  }
+  ASSERT_NE(outer, nullptr);
+  bool has_inner = false;
+  for (auto* inner : outer->gen_body) {
+    if (inner->kind == ModuleItemKind::kGenerateFor) has_inner = true;
+  }
+  EXPECT_TRUE(has_inner);
+}
+
+TEST(ParserSection23, GenerateIfInsideForLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin : blk\n"
+      "    if (i > 0) begin : guard\n"
+      "      assign a[i] = b[i-1];\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ModuleItem* gen = nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) gen = item;
+  }
+  ASSERT_NE(gen, nullptr);
+  bool has_if = false;
+  for (auto* inner : gen->gen_body) {
+    if (inner->kind == ModuleItemKind::kGenerateIf) has_if = true;
+  }
+  EXPECT_TRUE(has_if);
+}
+
 }  // namespace

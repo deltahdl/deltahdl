@@ -26,4 +26,14 @@ TEST(ParserSection22, BeginKeywords1800_2005) {
               "`end_keywords\n"));
 }
 
+TEST(ParserSection22, BeginKeywordsMultipleModules) {
+  EXPECT_TRUE(
+      ParseOk("`begin_keywords \"1800-2012\"\n"
+              "module m1;\n"
+              "endmodule\n"
+              "module m2;\n"
+              "endmodule\n"
+              "`end_keywords\n"));
+}
+
 }  // namespace

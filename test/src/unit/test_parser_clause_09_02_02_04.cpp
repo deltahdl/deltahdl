@@ -308,4 +308,62 @@ TEST(ParserSection9c, AlwaysFFSimplePosedge) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
 
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Returns the first always_* item from the first module.
+static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock)
+      return item;
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 20. always_ff block
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_AlwaysFF) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, clk;\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
+  ASSERT_FALSE(item->sensitivity.empty());
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+}
+
+TEST(ParserSection9c, AlwaysFFWithNegedge) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  always_ff @(negedge clk)\n"
+              "    q <= d;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

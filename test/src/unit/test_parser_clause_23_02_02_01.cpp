@@ -112,4 +112,24 @@ TEST(ParserSection23, NonAnsiPortsMixed) {
   EXPECT_NE(mod->ports[2].data_type.packed_dim_left, nullptr);
 }
 
+using ProgramParseTest = ProgramTestParse;
+
+TEST(ParserSection23, Sec23_2_2_NonAnsiPortDeclarations) {
+  // Non-ANSI style: port list + separate direction declarations
+  auto r = Parse(
+      "module m (a, b, y);\n"
+      "  input a, b;\n"
+      "  output y;\n"
+      "  assign y = a & b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  // Variants with packed types and inout
+  EXPECT_TRUE(
+      ParseOk("module m (a, d); input [15:0] a; inout [7:0] d; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (a, b); inout [7:0] a; inout [7:0] b; endmodule\n"));
+}
+
 }  // namespace

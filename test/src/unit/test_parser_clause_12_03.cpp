@@ -144,4 +144,22 @@ TEST(ParserA604, StatementWithAttribute) {
   EXPECT_EQ(stmt->attrs[0].name, "full_case");
 }
 
+// §12.3: statement with label AND attribute
+TEST(ParserA604, StatementWithLabelAndAttribute) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    lbl: (* mark *) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->label, "lbl");
+  EXPECT_FALSE(stmt->attrs.empty());
+  EXPECT_EQ(stmt->attrs[0].name, "mark");
+}
+
 }  // namespace

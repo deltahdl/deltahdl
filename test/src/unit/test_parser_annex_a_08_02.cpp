@@ -38,4 +38,20 @@ TEST(ParserA609, SystemTfCallNoParens) {
   EXPECT_TRUE(expr->args.empty());
 }
 
+TEST(ParserAnnexA, A8SystemFunctionCall) {
+  auto r = Parse(
+      "module m; initial begin $display(\"v=%0d\", x); $finish; end "
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserAnnexA, A8FunctionCallExpr) {
+  auto r = Parse("module m; initial x = func(a, b); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+}
+
 }  // namespace

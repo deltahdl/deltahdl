@@ -58,4 +58,19 @@ TEST(ParserCh513, BuiltInMethodCall_Parse) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
+TEST(ParserCh513, BuiltInMethodCall_Callee) {
+  // The callee_expr should be the full member-access expression.
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = arr.size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
+}
+
 }  // namespace

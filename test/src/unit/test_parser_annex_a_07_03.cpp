@@ -64,4 +64,58 @@ TEST(ParserA703, OutputTerminalBitSelect) {
   EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
 }
 
+// =============================================================================
+// A.7.3 input_identifier / output_identifier — dotted interface.port form
+// =============================================================================
+// Input identifier — interface_identifier.port_identifier
+TEST(ParserA703, InputIdentifierDotted) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (intf.sig => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.src_ports.size(), 1u);
+  EXPECT_EQ(si->path.src_ports[0].interface_name, "intf");
+  EXPECT_EQ(si->path.src_ports[0].name, "sig");
+}
+
+// Dotted input with range
+TEST(ParserA703, DottedInputWithRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (intf.sig[3:0] => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.src_ports[0].interface_name, "intf");
+  EXPECT_EQ(si->path.src_ports[0].name, "sig");
+  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
+}
+
+// Dotted output with range
+TEST(ParserA703, DottedOutputWithRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => intf.sig[7:0]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.dst_ports[0].interface_name, "intf");
+  EXPECT_EQ(si->path.dst_ports[0].name, "sig");
+  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
+}
+
 }  // namespace

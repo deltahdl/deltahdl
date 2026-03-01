@@ -97,4 +97,14 @@ TEST(ParserSection12, NestedForInsideWhile) {
   EXPECT_EQ(stmt->body->stmts[0]->kind, StmtKind::kFor);
 }
 
+// While loop with null body (semicolon).
+TEST(ParserSection12, WhileWithNullBody) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    while (0) ;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

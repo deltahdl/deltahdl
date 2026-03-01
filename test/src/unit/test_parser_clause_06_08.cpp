@@ -245,4 +245,120 @@ TEST(ParserSection6, Sec6_11_MultipleVarsWithPackedDims) {
   }
 }
 
+// 18. Multiple logic declarations on one line.
+TEST(ParserSection6, Sec6_5_MultipleLogicDecls) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic x, y, z;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  for (auto* item : items) {
+    EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+    EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+    EXPECT_FALSE(item->data_type.is_net);
+  }
+  EXPECT_EQ(items[0]->name, "x");
+  EXPECT_EQ(items[1]->name, "y");
+  EXPECT_EQ(items[2]->name, "z");
+}
+
+static ModuleItem* FirstItem(ParseResult6h& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
+}
+
+// 14. Integer types with initializer expressions.
+TEST(ParserSection6, Sec6_11_ByteWithInitializer) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte b = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(item->name, "b");
+  ASSERT_NE(item->init_expr, nullptr);
+}
+
+// =========================================================================
+// §6.8: Variable declarations
+// =========================================================================
+TEST(ParserSection6, VarKeywordLogicDecl) {
+  // §6.8: "var" keyword can precede an explicit data type.
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  var logic [7:0] data;\n"
+              "endmodule\n"));
+}
+
+struct ParseResult616 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult616 Parse(const std::string& src) {
+  ParseResult616 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// --- Multiple integer declarations ---
+TEST(ParserSection6, MultipleIntDeclsCommaSeparated) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a, b, c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
+TEST(ParserSection6, VarKeywordImplicitType) {
+  // §6.8: "var" without explicit type implies logic.
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  var [3:0] nibble;\n"
+              "endmodule\n"));
+}
+
+static ModuleItem* FirstItem(ParseResult616& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+TEST(ParserSection6, IntWithInitializer) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x = 42;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ParserSection6, VarWithEnumType) {
+  // §6.8: "var enum bit { clear, error } status;"
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  var enum bit { clear, error } status;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

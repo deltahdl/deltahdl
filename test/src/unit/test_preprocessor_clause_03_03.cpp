@@ -52,4 +52,31 @@ TEST(ParserClause03, Cl3_3_ModuleDeclarations) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 7u);
 }
 
+// §3.3 Subroutine definitions and procedural blocks
+TEST(ParserClause03, Cl3_3_SubroutinesAndProceduralBlocks) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  function int add(int a, int b); return a + b; endfunction\n"
+      "  task display_val(input int x); $display(\"%d\", x); endtask\n"
+      "  initial a = 0;\n"
+      "  final $display(\"done\");\n"
+      "  always @(posedge clk) a <= b;\n"
+      "  always_comb b = a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kTaskDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlways));
+  EXPECT_TRUE(
+      HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
+}
+
 }  // namespace

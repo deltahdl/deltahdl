@@ -262,4 +262,41 @@ TEST(SourceText, AnonymousProgramMisc) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// 24. Program block (Reactive region)
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_ProgramBlock) {
+  auto r = Parse(
+      "program test_prog;\n"
+      "  initial begin\n"
+      "    $display(\"reactive region\");\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "test_prog");
+  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_FALSE(r.cu->programs[0]->items.empty());
+  EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
 }  // namespace

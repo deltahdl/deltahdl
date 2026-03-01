@@ -31,4 +31,20 @@ TEST_F(VerifyParseTest, CheckerWithCovergroupAndClocking) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
+// =============================================================================
+// §17.14 Checker with covergroup
+// =============================================================================
+TEST_F(CheckerParseTest, CheckerWithCovergroup) {
+  auto* unit = Parse(R"(
+    checker cov_check(input logic clk, input logic x);
+      covergroup cg @(posedge clk);
+        coverpoint x;
+      endgroup
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kCovergroupDecl));
+}
+
 }  // namespace

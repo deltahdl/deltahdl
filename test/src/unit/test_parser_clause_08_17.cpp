@@ -34,4 +34,20 @@ TEST(ParserSection8, ExtendsWithArgs) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
+// §8.13 — Super.new() call
+TEST(ParserSection8, ConstructorSuperNew) {
+  auto r = Parse(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    super.new();\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+}
+
 }  // namespace

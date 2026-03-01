@@ -115,4 +115,71 @@ TEST(ParserA210, SequenceExpr_SequenceInstanceWithAbbrev) {
               "endmodule\n"));
 }
 
+using VerifyParseTest = ProgramTestParse;
+
+// Assert property with [*N] consecutive repetition.
+TEST(ParserSection16, Sec16_5_1_SequenceConsecutiveRepetition) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a[*3] |-> b);\n"
+              "endmodule\n"));
+}
+
+// Assert property with [->N] goto repetition.
+TEST(ParserSection16, Sec16_5_1_SequenceGotoRepetition) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) req |-> ack[->1]);\n"
+              "endmodule\n"));
+}
+
+// --- Test helpers ---
+struct ParseResult16b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16b Parse(const std::string& src) {
+  ParseResult16b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §16.9 Sequence operations — repetition
+// =============================================================================
+TEST(ParserSection16, SequenceConsecutiveRepetition) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a[*3] |-> b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
+TEST(ParserSection16, SequenceRepetitionRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a[*1:3] ##1 b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
+TEST(ParserSection16, SequenceGotoRepetition) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req |-> ack[->1]);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace

@@ -168,4 +168,105 @@ TEST(ParserSection7, Sec7_2_2_PositionalPatternElements) {
   EXPECT_TRUE(stmt->rhs->pattern_keys.empty());
 }
 
+// 29. Named pattern keys verified for three-member struct.
+TEST(ParserSection7, Sec7_2_2_NamedPatternKeysThreeMembers) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int x; int y; int z; } vec3_t;\n"
+      "  vec3_t v;\n"
+      "  initial v = '{x: 1, y: 2, z: 3};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
+  ASSERT_EQ(stmt->rhs->pattern_keys.size(), 3u);
+  EXPECT_EQ(stmt->rhs->pattern_keys[0], "x");
+  EXPECT_EQ(stmt->rhs->pattern_keys[1], "y");
+  EXPECT_EQ(stmt->rhs->pattern_keys[2], "z");
+  ASSERT_EQ(stmt->rhs->elements.size(), 3u);
+  EXPECT_EQ(stmt->rhs->elements[0]->kind, ExprKind::kIntegerLiteral);
+}
+
+// 30. Multiple struct variables with different initializers.
+TEST(ParserSection7, Sec7_2_2_MultipleVarsWithInit) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int a; int b; } pair_t;\n"
+              "  pair_t p1 = '{1, 2};\n"
+              "  pair_t p2 = '{3, 4};\n"
+              "  pair_t p3 = '{default: 0};\n"
+              "endmodule\n"));
+}
+
+// §10.9: named assignment pattern — AST pattern_keys populated
+TEST(ParserA60701, AssignmentPatternKeysPopulated) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = '{a: 1, b: 2};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
+  ASSERT_EQ(rhs->pattern_keys.size(), 2u);
+  EXPECT_EQ(rhs->pattern_keys[0], "a");
+  EXPECT_EQ(rhs->pattern_keys[1], "b");
+  EXPECT_EQ(rhs->elements.size(), 2u);
+}
+
+struct ParseResult7 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult7 Parse(const std::string& src) {
+  ParseResult7 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult7& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+// =========================================================================
+// §7.2.2: Assigning to structures
+// =========================================================================
+TEST(ParserSection7, StructAssignmentPattern) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int a; int b; } pair;\n"
+      "  initial begin\n"
+      "    pair p = '{1, 2};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  ASSERT_NE(stmt->var_init, nullptr);
+  EXPECT_EQ(stmt->var_init->kind, ExprKind::kAssignmentPattern);
+}
+
 }  // namespace

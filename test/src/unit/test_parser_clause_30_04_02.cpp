@@ -118,4 +118,165 @@ TEST(ParserA701, SpecifyItemPathDecl) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
 }
 
+// Output terminal with part-select range
+TEST(ParserA703, OutputTerminalPartSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b[7:0]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].name, "b");
+  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
+  EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
+  EXPECT_NE(si->path.dst_ports[0].range_right, nullptr);
+}
+
+SpecifyItem* GetSolePathItem(ParseResult& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  if (!spec || spec->specify_items.empty()) return nullptr;
+  return spec->specify_items[0];
+}
+
+// =============================================================================
+// A.7.2 path_declaration — 3 alternatives
+// =============================================================================
+// path_declaration ::= simple_path_declaration ;
+TEST(ParserA702, PathDeclSimpleParallel) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kNone);
+  EXPECT_EQ(si->path.condition, nullptr);
+  EXPECT_FALSE(si->path.is_ifnone);
+}
+
+// path_declaration ::= simple_path_declaration ; (full connection)
+TEST(ParserA702, PathDeclSimpleFull) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b *> c) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
+  ASSERT_EQ(si->path.src_ports.size(), 2u);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+}
+
+// Both input and output with range expressions
+TEST(ParserA703, BothInputOutputWithRanges) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a[3:0] => b[7:4]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
+  EXPECT_EQ(si->path.dst_ports[0].name, "b");
+  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
+}
+
+// Output identifier — interface_identifier.port_identifier
+TEST(ParserA703, OutputIdentifierDotted) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => intf.sig) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].interface_name, "intf");
+  EXPECT_EQ(si->path.dst_ports[0].name, "sig");
+}
+
+// =============================================================================
+// A.7.2 simple_path_declaration — parallel_path_description = path_delay_value
+// =============================================================================
+TEST(ParserA702, SimplePathParallelSingleDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
+  ASSERT_EQ(si->path.src_ports.size(), 1u);
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].name, "b");
+  ASSERT_EQ(si->path.delays.size(), 1u);
+}
+
+// simple_path_declaration — full_path_description = path_delay_value
+TEST(ParserA702, SimplePathFullMultiplePorts) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b, c *> x, y) = 12;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
+}
+
+// =============================================================================
+// A.7.3 Combined forms — terminals with ranges in full/edge/conditional paths
+// =============================================================================
+// Multiple input terminals with mixed forms in full path
+TEST(ParserA703, MixedInputTerminalsFullPath) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b[3], c[7:0] *> d) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.src_ports.size(), 3u);
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kNone);
+  EXPECT_EQ(si->path.src_ports[1].name, "b");
+  EXPECT_EQ(si->path.src_ports[1].range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_EQ(si->path.src_ports[2].name, "c");
+  EXPECT_EQ(si->path.src_ports[2].range_kind, SpecifyRangeKind::kPartSelect);
+}
+
 }  // namespace

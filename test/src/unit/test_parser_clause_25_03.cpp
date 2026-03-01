@@ -48,4 +48,23 @@ TEST(ParserAnnexA0412, InterfaceInstWithParams) {
   ASSERT_EQ(item->inst_params.size(), 1u);
 }
 
+// --- End label on endinterface (LRM §25) ---
+TEST(ParserSection25, EndinterfaceLabel) {
+  auto r = Parse(
+      "interface simple_bus;\n"
+      "endinterface : simple_bus\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "simple_bus");
+}
+
+TEST(ParserSection25, EndinterfaceNoLabel) {
+  auto r = Parse(
+      "interface my_if;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "my_if");
+}
+
 }  // namespace

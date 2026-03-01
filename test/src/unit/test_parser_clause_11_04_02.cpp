@@ -216,4 +216,15 @@ TEST(ParserA86, IncOrDecPostfixDecrement) {
   EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
 }
 
+// § expression ::= inc_or_dec_expression (as sub-expression)
+TEST(ParserA83, IncDecAsExpression) {
+  auto r = Parse("module m; initial x = ++y; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlusPlus);
+}
+
 }  // namespace

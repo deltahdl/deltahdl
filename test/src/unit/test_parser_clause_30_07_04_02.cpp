@@ -121,4 +121,16 @@ TEST_F(SpecifyTest, Showcancelled) {
   EXPECT_FALSE(item->is_noshowcancelled);
 }
 
+TEST_F(SpecifyTest, Noshowcancelled) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  noshowcancelled out1;\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_TRUE(spec->specify_items[0]->is_noshowcancelled);
+}
+
 }  // namespace

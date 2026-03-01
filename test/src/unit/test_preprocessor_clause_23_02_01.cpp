@@ -30,4 +30,33 @@ TEST(ParserClause03, Cl3_3_ModuleEndLabel) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
+// Module with lifetime qualifier: module automatic m;
+TEST(SourceText, ModuleWithLifetime) {
+  auto r = ParseWithPreprocessor("module automatic m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+// Module with end label: endmodule : m
+TEST(SourceText, ModuleEndLabel) {
+  auto r = ParseWithPreprocessor("module m; endmodule : m\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+// =============================================================================
+// A.1.3 Module parameters and ports
+// =============================================================================
+// parameter_port_list ::= #( )
+TEST(SourceText, EmptyParameterPortList) {
+  auto r = ParseWithPreprocessor("module m #(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->params.empty());
+}
+
 }  // namespace

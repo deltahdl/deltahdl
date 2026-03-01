@@ -380,4 +380,20 @@ TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
   EXPECT_TRUE(found_gen_if);
 }
 
+TEST(ParserSection23, CaseGenerateMultipleLabels) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (SEL)\n"
+      "    0, 1: assign a = b;\n"
+      "    2, 3: assign a = c;\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGenerateCase);
+  ASSERT_EQ(item->gen_case_items.size(), 2);
+  EXPECT_EQ(item->gen_case_items[0].patterns.size(), 2);
+  EXPECT_EQ(item->gen_case_items[1].patterns.size(), 2);
+}
+
 }  // namespace

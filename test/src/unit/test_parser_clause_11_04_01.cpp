@@ -502,4 +502,31 @@ TEST(ParserSection10, Sec10_4_1_CompoundBitwise) {
   EXPECT_EQ(s2->rhs->op, TokenKind::kCaretEq);
 }
 
+// --- 23. Compound assignment operators <<=, >>=, <<<=, >>>= ---
+TEST(ParserSection10, Sec10_4_1_CompoundShifts) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <<= 2;\n"
+      "    b >>= 1;\n"
+      "    c <<<= 3;\n"
+      "    d >>>= 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s0 = NthInitialStmt(r, 0);
+  auto* s1 = NthInitialStmt(r, 1);
+  auto* s2 = NthInitialStmt(r, 2);
+  auto* s3 = NthInitialStmt(r, 3);
+  ASSERT_NE(s0, nullptr);
+  ASSERT_NE(s1, nullptr);
+  ASSERT_NE(s2, nullptr);
+  ASSERT_NE(s3, nullptr);
+  EXPECT_EQ(s0->rhs->op, TokenKind::kLtLtEq);
+  EXPECT_EQ(s1->rhs->op, TokenKind::kGtGtEq);
+  EXPECT_EQ(s2->rhs->op, TokenKind::kLtLtLtEq);
+  EXPECT_EQ(s3->rhs->op, TokenKind::kGtGtGtEq);
+}
+
 }  // namespace

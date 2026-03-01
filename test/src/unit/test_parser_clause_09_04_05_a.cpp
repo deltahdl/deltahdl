@@ -646,4 +646,347 @@ TEST(ParserSection9, Sec9_4_5_RepeatInTask) {
   ASSERT_FALSE(stmt->events.empty());
 }
 
+// =============================================================================
+// LRM section 9.4.5 -- Intra-assignment delay with expression
+// =============================================================================
+// Intra-assignment delay with parenthesized expression: a = #(x+y) b;
+TEST(ParserSection9, Sec9_4_5_IntraDelayExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  int x, y;\n"
+      "  initial a = #(x+y) b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Intra-assignment with real delay
+// =============================================================================
+// Intra-assignment with real-valued delay: a = #3.5 b;
+TEST(ParserSection9, Sec9_4_5_IntraDelayReal) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial a = #3.5 b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
+// --- 26. Blocking assignment with negedge intra-assignment event ---
+TEST(ParserSection10, Sec10_4_1_IntraAssignNegedgeEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, clk;\n"
+      "  initial begin\n"
+      "    a = @(negedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+static Stmt* NthInitialStmt(ParseResult9f& r, size_t n) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      if (n < item->body->stmts.size()) return item->body->stmts[n];
+    }
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Multiple intra-assignment statements in sequence
+// =============================================================================
+// Multiple intra-assignment statements in the same begin-end block.
+TEST(ParserSection9, Sec9_4_5_MultipleIntraAssignSequence) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b, c, d;\n"
+      "  initial begin\n"
+      "    a = #10 b;\n"
+      "    c <= @(posedge clk) d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s0 = NthInitialStmt(r, 0);
+  auto* s1 = NthInitialStmt(r, 1);
+  ASSERT_NE(s0, nullptr);
+  ASSERT_NE(s1, nullptr);
+  EXPECT_EQ(s0->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(s0->delay, nullptr);
+  EXPECT_EQ(s1->kind, StmtKind::kNonblockingAssign);
+  ASSERT_FALSE(s1->events.empty());
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Repeat event with concatenation RHS
+// =============================================================================
+// Repeat event control with concatenation on RHS.
+TEST(ParserSection9, Sec9_4_5_RepeatConcatRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk;\n"
+      "  reg [7:0] a, b, c;\n"
+      "  initial a = repeat(3) @(posedge clk) {b, c};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Repeat event with function call on RHS
+// =============================================================================
+// Repeat event control with system function call on RHS.
+TEST(ParserSection9, Sec9_4_5_RepeatFuncCallRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk;\n"
+      "  int a;\n"
+      "  initial a = repeat(2) @(posedge clk) $random;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Repeat event with edge keyword
+// =============================================================================
+// Repeat event with the 'edge' keyword: a = repeat(2) @(edge clk) b;
+TEST(ParserSection9, Sec9_4_5_RepeatEdgeKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  initial a = repeat(2) @(edge clk) b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kEdge);
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Blocking assign with #0 delay
+// =============================================================================
+// Blocking assign with zero delay: a = #0 b;
+TEST(ParserSection9, Sec9_4_5_BlockingIntraDelayZero) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial a = #0 b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Nonblocking assign with #0 delay
+// =============================================================================
+// Nonblocking assign with zero delay: a <= #0 b;
+TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelayZero) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial a <= #0 b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Repeat event with complex RHS expression
+// =============================================================================
+// Repeat event with a binary expression on the RHS.
+TEST(ParserSection9, Sec9_4_5_RepeatComplexRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk;\n"
+      "  reg [7:0] a, b, c;\n"
+      "  initial a = repeat(2) @(posedge clk) b + c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Intra-assignment event with multiple signals
+// =============================================================================
+// Intra-assignment event with multiple signals separated by 'or'.
+TEST(ParserSection9, Sec9_4_5_IntraEventMultipleSignals) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, rst, a, b;\n"
+      "  initial a = @(posedge clk or negedge rst) b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_EQ(stmt->events.size(), 2u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
+  EXPECT_EQ(stmt->repeat_event_count, nullptr);
+}
+
+struct ParseResult4b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static Stmt* FirstInitialStmt(ParseResult4b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// 27. Non-blocking assign with intra-assignment delay (a <= #2 b)
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_NonblockingAssignWithDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    a <= #2 b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Repeat event in automatic task
+// =============================================================================
+// Repeat event inside an automatic task.
+TEST(ParserSection9, Sec9_4_5_RepeatInAutoTask) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  reg clk, a, b;\n"
+              "  task automatic sample;\n"
+              "    a = repeat(4) @(posedge clk) b;\n"
+              "  endtask\n"
+              "endmodule\n"));
+}
+
+// --- 3. Nonblocking with intra-assignment event: q <= @(posedge clk) d ---
+TEST(ParserSection10, Sec10_4_2_IntraAssignEventPosedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, clk;\n"
+      "  initial begin\n"
+      "    q <= @(posedge clk) d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->text, "d");
+}
+
+// ---------------------------------------------------------------------------
+// 28. Intra-assignment delay on blocking assign (a = #5 b)
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_BlockingIntraAssignDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    a = #5 b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace

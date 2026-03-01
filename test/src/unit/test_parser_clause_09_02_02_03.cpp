@@ -354,4 +354,240 @@ TEST(ParserSection9, Sec9_2_3_FunctionCallRHS) {
               "endmodule\n"));
 }
 
+struct ParseResult9c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9c Parse(const std::string& src) {
+  ParseResult9c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §9.2.2.4 -- always_ff procedure
+// =============================================================================
+TEST(ParserSection9b, AlwaysLatchMultipleOutputs) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_latch begin\n"
+      "    if (en) begin\n"
+      "      q1 <= d1;\n"
+      "      q2 <= d2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Returns the first always_* item from the first module.
+static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock)
+      return item;
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 21. always_latch block
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_AlwaysLatch) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q, d, en;\n"
+      "  always_latch\n"
+      "    if (en) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
+  ASSERT_NE(item->body, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// 17. Verify ModuleItemKind is kAlwaysLatchBlock.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_ModuleItemKindIsAlwaysLatchBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_latch\n"
+      "    if (en) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool found = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      found = true;
+      EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// ---------------------------------------------------------------------------
+// 18. always_latch has no sensitivity list (implicit).
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_NoSensitivityList) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch\n"
+      "    if (en) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->sensitivity.empty());
+}
+
+static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      if (count == n) return item;
+      ++count;
+    }
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 19. Multiple always_latch blocks in the same module.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_MultipleAlwaysLatchBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic en1, en2, d1, d2, q1, q2;\n"
+      "  always_latch\n"
+      "    if (en1) q1 <= d1;\n"
+      "  always_latch\n"
+      "    if (en2) q2 <= d2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* first = NthAlwaysLatchItem(r, 0);
+  auto* second = NthAlwaysLatchItem(r, 1);
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(first->kind, ModuleItemKind::kAlwaysLatchBlock);
+  EXPECT_EQ(second->kind, ModuleItemKind::kAlwaysLatchBlock);
+}
+
+// ---------------------------------------------------------------------------
+// 22. Body verification: if-statement has correct condition and then branch.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_BodyVerificationIfCondition) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic gate, d, q;\n"
+      "  always_latch\n"
+      "    if (gate) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  auto* body = item->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kIf);
+  ASSERT_NE(body->condition, nullptr);
+  ASSERT_NE(body->then_branch, nullptr);
+  EXPECT_EQ(body->then_branch->kind, StmtKind::kNonblockingAssign);
+  EXPECT_NE(body->then_branch->lhs, nullptr);
+  EXPECT_NE(body->then_branch->rhs, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// 23. always_latch with blocking assignments (combinational style).
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_BlockingAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  auto* if_stmt = item->body;
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  ASSERT_NE(if_stmt->then_branch, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBlockingAssign);
+}
+
+// ---------------------------------------------------------------------------
+// 24. always_latch with ternary in condition.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_TernaryInCondition) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic sel, en_a, en_b, d, q;\n"
+              "  always_latch\n"
+              "    if (sel ? en_a : en_b) q <= d;\n"
+              "endmodule\n"));
+}
+
+// ---------------------------------------------------------------------------
+// 25. always_latch with concatenation on LHS.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_ConcatenationLHS) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic en;\n"
+      "  logic [3:0] a, b, d;\n"
+      "  always_latch\n"
+      "    if (en) {a, b} <= {d, d};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  auto* if_stmt = item->body;
+  ASSERT_NE(if_stmt, nullptr);
+  ASSERT_NE(if_stmt->then_branch, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(if_stmt->then_branch->lhs, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kConcatenation);
+}
+
 }  // namespace

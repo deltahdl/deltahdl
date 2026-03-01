@@ -138,4 +138,40 @@ TEST(ParserSection7, ArrayReductionSum) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
+TEST(ParserA609, ArrayMethodAnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr.and(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+TEST(ParserA609, ArrayMethodOr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr.or(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+TEST(ParserA609, ArrayMethodXor) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr.xor(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
 }  // namespace

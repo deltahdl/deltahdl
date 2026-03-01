@@ -37,4 +37,20 @@ TEST(ParserA70502, DelayedReferenceWithBracketExpr) {
   EXPECT_EQ(tc->delayed_ref_expr->kind, ExprKind::kMinTypMax);
 }
 
+// =============================================================================
+// A.7.5.2 threshold ::= constant_expression
+// =============================================================================
+TEST(ParserA70502, ThresholdExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(posedge clk, 20, 1);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  ASSERT_GE(tc->limits.size(), 2u);
+}
+
 }  // namespace

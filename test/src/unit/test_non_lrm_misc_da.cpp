@@ -159,18 +159,6 @@ TEST(ParserSection28, Sec28_12_Noshowcancelled) {
   ASSERT_EQ(si->signal_list.size(), 2u);
 }
 
-TEST_F(SpecifyTest, Noshowcancelled) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  noshowcancelled out1;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  EXPECT_TRUE(spec->specify_items[0]->is_noshowcancelled);
-}
-
 TEST(ParserSection28, Sec28_12_TimingCheckSetup) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
@@ -282,56 +270,6 @@ TEST(ParserSection28, Sec28_12_TimingCheckRecrem) {
   ASSERT_EQ(si->timing_check.limits.size(), 2u);
 }
 
-TEST(ParserSection28, Sec28_12_MultipleTimingChecksInSpecifyBlock) {
-  auto r = Parse(
-      "module m(input d, clk, rst);\n"
-      "  specify\n"
-      "    $setup(d, posedge clk, 5);\n"
-      "    $hold(posedge clk, d, 3);\n"
-      "    $recovery(posedge clk, rst, 10);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 3u);
-  EXPECT_EQ(spec->specify_items[0]->timing_check.check_kind,
-            TimingCheckKind::kSetup);
-  EXPECT_EQ(spec->specify_items[1]->timing_check.check_kind,
-            TimingCheckKind::kHold);
-  EXPECT_EQ(spec->specify_items[2]->timing_check.check_kind,
-            TimingCheckKind::kRecovery);
-}
-
-TEST_F(SpecifyTest, SetupholdTimingCheck) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, 10, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  auto& tc = spec->specify_items[0]->timing_check;
-  EXPECT_EQ(tc.check_kind, TimingCheckKind::kSetuphold);
-  ASSERT_GE(tc.limits.size(), 2u);
-}
-
-TEST_F(SpecifyTest, RecremTimingCheck) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $recrem(posedge clk, rst, 8, 3);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  auto& tc = spec->specify_items[0]->timing_check;
-  EXPECT_EQ(tc.check_kind, TimingCheckKind::kRecrem);
-  ASSERT_GE(tc.limits.size(), 2u);
-}
-
 TEST(ParserSection28, Sec28_12_TimingCheckWidth) {
   auto sp = ParseSpecifySingle(
       "module m(input clk);\n"
@@ -381,56 +319,6 @@ TEST(ParserSection28, Sec28_12_TimingCheckSkew) {
   EXPECT_EQ(si->timing_check.ref_terminal.name, "clk1");
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk2");
-}
-
-TEST_F(SpecifyTest, WidthTimingCheck) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $width(posedge clk, 20);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  auto& tc = spec->specify_items[0]->timing_check;
-  EXPECT_EQ(tc.check_kind, TimingCheckKind::kWidth);
-  EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.ref_terminal.name, "clk");
-  ASSERT_GE(tc.limits.size(), 1u);
-}
-
-TEST_F(SpecifyTest, TimeskewTimingCheck) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $timeskew(posedge clk1, posedge clk2, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  auto& tc = spec->specify_items[0]->timing_check;
-  EXPECT_EQ(tc.check_kind, TimingCheckKind::kTimeskew);
-  EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.ref_terminal.name, "clk1");
-  EXPECT_EQ(tc.data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.data_terminal.name, "clk2");
-  ASSERT_EQ(tc.limits.size(), 1u);
-}
-
-TEST_F(SpecifyTest, FullskewTimingCheck) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  auto& tc = spec->specify_items[0]->timing_check;
-  EXPECT_EQ(tc.check_kind, TimingCheckKind::kFullskew);
-  EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.data_edge, SpecifyEdge::kNegedge);
-  ASSERT_GE(tc.limits.size(), 2u);
 }
 
 TEST(ParserSection28, Sec28_12_TimingCheckWithNotifier) {

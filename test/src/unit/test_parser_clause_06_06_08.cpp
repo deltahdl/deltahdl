@@ -51,4 +51,12 @@ TEST(ParserSection6, InterconnectNet) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
+TEST(ParserSection6, InterconnectWithPackedDim) {
+  // §6.6.8: interconnect may have packed dimensions.
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  interconnect [7:0] ibus;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

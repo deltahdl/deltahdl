@@ -60,4 +60,88 @@ TEST(SourceText, ConfigRuleInstUse) {
   EXPECT_EQ(rule->use_cell, "alt_cell");
 }
 
+// use_clause: use with named_parameter_assignment
+TEST(SourceText, ConfigUseNamedParams) {
+  auto r = Parse(
+      "config cfg10;\n"
+      "  design top;\n"
+      "  instance top.u1 use #(.WIDTH(16), .DEPTH(4));\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rule = r.cu->configs[0]->rules[0];
+  EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
+  ASSERT_EQ(rule->use_params.size(), 2u);
+  EXPECT_EQ(rule->use_params[0].first, "WIDTH");
+  EXPECT_EQ(rule->use_params[1].first, "DEPTH");
+}
+
+// use_clause: use [lib.] cell named_parameter_assignment (combined form)
+TEST(SourceText, ConfigUseCellAndParams) {
+  auto r = Parse(
+      "config cfg11;\n"
+      "  design top;\n"
+      "  cell adder use work.fast_add #(.W(32)) :config;\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rule = r.cu->configs[0]->rules[0];
+  EXPECT_EQ(rule->use_lib, "work");
+  EXPECT_EQ(rule->use_cell, "fast_add");
+  ASSERT_EQ(rule->use_params.size(), 1u);
+  EXPECT_EQ(rule->use_params[0].first, "W");
+  EXPECT_TRUE(rule->use_config);
+}
+
+using ApiParseTest = ProgramTestParse;
+
+struct ParseResult40 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult40 Parse(const std::string& src) {
+  ParseResult40 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST_F(ApiParseTest, ConfigInstanceClauseUse) {
+  auto* unit = Parse(R"(
+    config cfg1;
+      design lib1.top;
+      default liblist lib1;
+      instance top.u1 use lib2.cell_impl;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  ASSERT_GE(unit->configs[0]->rules.size(), 2u);
+  auto* inst_rule = unit->configs[0]->rules[1];
+  EXPECT_EQ(inst_rule->kind, ConfigRuleKind::kInstance);
+  EXPECT_EQ(inst_rule->inst_path, "top.u1");
+  EXPECT_EQ(inst_rule->use_lib, "lib2");
+  EXPECT_EQ(inst_rule->use_cell, "cell_impl");
+}
+
+TEST_F(ApiParseTest, ConfigInstanceClauseUseConfig) {
+  auto* unit = Parse(R"(
+    config cfg1;
+      design lib1.top;
+      default liblist lib1;
+      instance top.bot use lib1.bot:config;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  ASSERT_GE(unit->configs[0]->rules.size(), 2u);
+  auto* inst_rule = unit->configs[0]->rules[1];
+  EXPECT_EQ(inst_rule->kind, ConfigRuleKind::kInstance);
+  EXPECT_EQ(inst_rule->use_cell, "bot");
+  EXPECT_TRUE(inst_rule->use_config);
+}
+
 }  // namespace

@@ -198,4 +198,99 @@ TEST(ParserSection26, ImportSpecificNotWildcard) {
   EXPECT_EQ(imp->import_item.item_name, "X");
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection23, MultiItemImport) {
+  auto r = Parse(
+      "module m;\n"
+      "  import pkg::a, pkg::b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 2);
+  VerifyImportItem(mod->items[0], "pkg", "a");
+  VerifyImportItem(mod->items[1], "pkg", "b");
+}
+
+TEST(ParserSection23, MultiItemImportWithWildcardFirst) {
+  auto r = Parse(
+      "module m;\n"
+      "  import pkg::*, other::func;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 2);
+  EXPECT_EQ(mod->items[0]->import_item.package_name, "pkg");
+  EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
+}
+
+TEST(ParserSection23, MultiItemImportWithWildcardSecond) {
+  auto r = Parse(
+      "module m;\n"
+      "  import pkg::*, other::func;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 2);
+  EXPECT_EQ(mod->items[1]->import_item.package_name, "other");
+  EXPECT_EQ(mod->items[1]->import_item.item_name, "func");
+}
+
+struct ParseResult6b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6b Parse(const std::string& src) {
+  ParseResult6b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =========================================================================
+// §6.25: Parameterized data types
+// =========================================================================
+TEST(ParserSection6, ScopeResolutionType) {
+  auto r = Parse(
+      "module t;\n"
+      "  import pkg::mytype;\n"
+      "  pkg::mytype x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  // Find the variable declaration.
+  auto& items = r.cu->modules[0]->items;
+  ModuleItem* var_item = nullptr;
+  for (auto* it : items) {
+    if (it->kind == ModuleItemKind::kVarDecl && it->name == "x") {
+      var_item = it;
+      break;
+    }
+  }
+  ASSERT_NE(var_item, nullptr);
+  EXPECT_EQ(var_item->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(var_item->data_type.scope_name, "pkg");
+  EXPECT_EQ(var_item->data_type.type_name, "mytype");
+}
+
 }  // namespace

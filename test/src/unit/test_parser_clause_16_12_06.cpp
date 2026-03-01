@@ -23,4 +23,17 @@ TEST(ParserA210, PropertyExpr_IfNoElse) {
               "endmodule\n"));
 }
 
+using VerifyParseTest = ProgramTestParse;
+
+// Assert property with if-else inside property expression.
+TEST(ParserSection16, Sec16_5_1_PropertyIfElse) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (\n"
+              "    @(posedge clk)\n"
+              "    if (mode) a |-> b\n"
+              "    else a |-> c);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

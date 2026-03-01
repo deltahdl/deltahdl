@@ -230,4 +230,24 @@ TEST(SourceText, EmptySourceText) {
   EXPECT_TRUE(r.cu->modules.empty());
 }
 
+// 18. $unit scope -- declarations outside any module/package
+TEST(ParserClause03, Cl3_13_UnitScopeDeclarations) {
+  auto r = ParseWithPreprocessor(
+      "function automatic int helper(int x);\n"
+      "  return x + 1;\n"
+      "endfunction\n"
+      "task automatic global_task(input int v);\n"
+      "endtask\n"
+      "module m;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->cu_items.size(), 2u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "helper");
+  EXPECT_EQ(r.cu->cu_items[1]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(r.cu->cu_items[1]->name, "global_task");
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace

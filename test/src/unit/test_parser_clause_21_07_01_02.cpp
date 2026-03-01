@@ -51,4 +51,11 @@ TEST(ParserSection21, DumpvarsLevelZeroAllHierarchy) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, DumpvarsMixedModulesAndVars) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $dumpvars(0, top.mod1, top.mod2.net1);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

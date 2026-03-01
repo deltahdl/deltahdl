@@ -149,4 +149,37 @@ TEST(ParserSection16, Sec16_5_1_AssumePropertyElseAction) {
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
+// =============================================================================
+// §16.5.1 Concurrent assert/assume/cover
+// =============================================================================
+TEST(ParserSection16, ConcurrentAssumePropertyWithAction) {
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) req |-> gnt)\n"
+      "    else $error(\"assumption failed\");\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* ap =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssumeProperty);
+  ASSERT_NE(ap, nullptr);
+  EXPECT_NE(ap->assert_fail_stmt, nullptr);
+}
+
+TEST(ParserAnnexF, AnnexFAssumeProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) req |-> ##[1:3] ack);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  bool found = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAssumeProperty) {
+      found = true;
+      EXPECT_NE(item->assert_expr, nullptr);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 }  // namespace

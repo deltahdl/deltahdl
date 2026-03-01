@@ -57,4 +57,18 @@ TEST(ParserA29, DirectionPersistsAcrossPorts) {
   EXPECT_EQ(mp->ports[3].direction, Direction::kOutput);
 }
 
+TEST(ParserSection25, ModportImportWithDirectionFirst) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic data;\n"
+      "  modport target(input data, import Read);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[0].name, "data");
+  EXPECT_FALSE(mp->ports[0].is_import);
+}
+
 }  // namespace

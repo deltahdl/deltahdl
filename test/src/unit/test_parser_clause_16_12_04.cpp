@@ -14,4 +14,15 @@ TEST(ParserA210, PropertyExpr_Or) {
               "endmodule\n"));
 }
 
+using VerifyParseTest = ProgramTestParse;
+
+// Assert property with or (disjunction).
+TEST(ParserSection16, Sec16_5_1_PropertyOr) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (\n"
+              "    @(posedge clk) (a |-> b) or (c |-> d));\n"
+              "endmodule\n"));
+}
+
 }  // namespace

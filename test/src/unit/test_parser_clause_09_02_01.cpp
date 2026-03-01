@@ -86,4 +86,54 @@ TEST(Parser, ModuleWithInitialBlock) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
+struct ParseResult9c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9c Parse(const std::string& src) {
+  ParseResult9c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection9b, StructuredProcMultipleInitial) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial a = 0;\n"
+      "  initial b = 1;\n"
+      "  initial c = 2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) count++;
+  }
+  EXPECT_EQ(count, 3);
+}
+
+// =============================================================================
+// LRM section 9.2 -- Structured procedures (ParseOk smoke tests)
+// Various procedure forms that should parse without errors.
+// =============================================================================
+TEST(ParserSection9c, InitialWithTaskCall) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task my_task;\n"
+              "    #10 a = 1;\n"
+              "  endtask\n"
+              "  initial begin\n"
+              "    my_task;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

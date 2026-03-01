@@ -26,4 +26,24 @@ TEST(ParserA611, ClockingDeclAssignWithHierExpr) {
   EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
 
+// =============================================================================
+// A.6.11 clocking_decl_assign — multiple with mixed hier_expr
+// =============================================================================
+TEST(ParserA611, ClockingDeclAssignMultipleMixed) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input a, b = top.sig_b, c;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 3u);
+  EXPECT_EQ(item->clocking_signals[0].hier_expr, nullptr);
+  EXPECT_NE(item->clocking_signals[1].hier_expr, nullptr);
+  EXPECT_EQ(item->clocking_signals[2].hier_expr, nullptr);
+}
+
 }  // namespace

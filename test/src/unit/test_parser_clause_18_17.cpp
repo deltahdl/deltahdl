@@ -45,4 +45,44 @@ TEST(ParserA612, NestedRandsequence) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// A.6.12 Randsequence — randsequence_statement
+// =============================================================================
+// randsequence ( production_identifier ) production+ endsequence
+TEST(ParserA612, RandsequenceStmtWithName) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : first second;\n"
+      "      first : { $display(\"first\"); };\n"
+      "      second : { $display(\"second\"); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
+}
+
+// randsequence ( ) production+ endsequence — no production name
+TEST(ParserA612, RandsequenceStmtNoName) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence()\n"
+      "      main : first;\n"
+      "      first : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
+}
+
 }  // namespace

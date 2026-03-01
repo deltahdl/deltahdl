@@ -111,4 +111,13 @@ TEST(ParserA23, ListOfTypeAssignmentsSingle) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
 }
 
+// parameter_port_list with localparam (parameter_port_declaration form 2)
+TEST(SourceText, ParamPortLocalparam) {
+  auto r = Parse("module m #(localparam int X = 5); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->params[0].first, "X");
+}
+
 }  // namespace

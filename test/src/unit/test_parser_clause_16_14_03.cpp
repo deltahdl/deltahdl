@@ -224,4 +224,33 @@ TEST(ParserSection16, Sec16_5_1_CoverSequenceWithPassAction) {
   EXPECT_NE(cp->assert_pass_stmt, nullptr);
 }
 
+TEST(ParserSection16, ConcurrentCoverPropertyWithStmt) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) a ##1 b)\n"
+      "    $display(\"covered\");\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* cp =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCoverProperty);
+  ASSERT_NE(cp, nullptr);
+}
+
+TEST(ParserAnnexF, AnnexFCoverProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) a ##1 b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  bool found = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kCoverProperty) {
+      found = true;
+      EXPECT_NE(item->assert_expr, nullptr);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 }  // namespace

@@ -14,4 +14,17 @@ TEST(ParserA210, PropertyExpr_Not) {
               "endmodule\n"));
 }
 
+using VerifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Section 16.5.1 -- Property operators in concurrent assertions
+// =============================================================================
+// Assert property with not (property negation).
+TEST(ParserSection16, Sec16_5_1_PropertyNot) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) not (a ##1 b));\n"
+              "endmodule\n"));
+}
+
 }  // namespace

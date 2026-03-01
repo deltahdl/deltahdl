@@ -93,4 +93,70 @@ TEST(ParserA702, DataSourceWithNegativeOutputPolarity) {
   EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kNegative);
 }
 
+ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+  }
+  return nullptr;
+}
+
+SpecifyItem* GetSolePathItem(ParseResult& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  if (!spec || spec->specify_items.empty()) return nullptr;
+  return spec->specify_items[0];
+}
+
+// path_declaration ::= edge_sensitive_path_declaration ;
+TEST(ParserA702, PathDeclEdgeSensitiveParallel) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
+}
+
+// path_declaration ::= edge_sensitive_path_declaration ; (full)
+TEST(ParserA702, PathDeclEdgeSensitiveFull) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk *> q, qb) = (3, 5);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
+  ASSERT_EQ(si->path.dst_ports.size(), 2u);
+}
+
+// Terminal descriptor with edge-sensitive path
+TEST(ParserA703, TerminalWithEdgeSensitivePath) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => (q[0] : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].name, "q");
+  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_NE(si->path.data_source, nullptr);
+}
+
 }  // namespace

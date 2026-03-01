@@ -183,4 +183,81 @@ TEST(SourceText, PackageItemInterfaceClassDecl) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
+// package_or_generate_item_declaration: class_constructor_declaration
+TEST(SourceText, PackageItemClassConstructorDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  function MyClass::new(); endfunction\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: local_parameter_declaration
+TEST(SourceText, PackageItemLocalparamDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  localparam int A = 1;\n"
+      "  parameter int B = 2;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
+}
+
+// package_or_generate_item_declaration: covergroup_declaration
+TEST(SourceText, PackageItemCovergroupDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  covergroup cg; endgroup\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: assertion_item_declaration
+TEST(SourceText, PackageItemAssertionDecl) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  property p; 1; endproperty\n"
+      "  sequence s; 1; endsequence\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// package_or_generate_item_declaration: ; (empty statement)
+TEST(SourceText, PackageItemEmptyStmt) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  ;\n"
+      "  ;;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
+// 8. Package with internal declarations (local scope)
+TEST(ParserClause03, Cl3_13_PackageWithInternalDeclarations) {
+  auto r = Parse(
+      "package my_pkg;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  parameter int WIDTH = 8;\n"
+      "  function automatic int double_it(int x);\n"
+      "    return x * 2;\n"
+      "  endfunction\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  auto* pkg = r.cu->packages[0];
+  EXPECT_EQ(pkg->name, "my_pkg");
+  EXPECT_GE(pkg->items.size(), 3u);
+}
+
 }  // namespace

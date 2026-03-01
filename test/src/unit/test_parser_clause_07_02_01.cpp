@@ -448,4 +448,154 @@ TEST(ParserSection7, Sec7_2_1_NestedPackedStruct) {
               "endmodule\n"));
 }
 
+// --- Packed struct containing packed union ---
+TEST(ParserSection7, Sec7_2_1_PackedStructWithPackedUnion) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct packed {\n"
+              "    logic [7:0] tag;\n"
+              "    union packed {\n"
+              "      logic [31:0] word;\n"
+              "      logic [3:0][7:0] bytes;\n"
+              "    } payload;\n"
+              "  } tagged_data_t;\n"
+              "endmodule\n"));
+}
+
+// 28. Packed struct assigned from bit vector and used in expression.
+TEST(ParserSection7, Sec7_2_2_PackedStructBitVector) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [3:0] upper;\n"
+      "    logic [3:0] lower;\n"
+      "  } nibbles_t;\n"
+      "  nibbles_t n;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    n = 8'b1010_0101;\n"
+      "    result = n;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s0 = NthInitialStmt(r, 0);
+  ASSERT_NE(s0, nullptr);
+  EXPECT_EQ(s0->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(s0->rhs, nullptr);
+  EXPECT_EQ(s0->rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// --- Packed struct with enum member (named type) ---
+TEST(ParserSection7, Sec7_2_1_PackedWithEnumMember) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef enum logic [1:0] { IDLE, RUN, STOP } state_e;\n"
+              "  typedef struct packed {\n"
+              "    state_e state;\n"
+              "    logic [5:0] data;\n"
+              "  } ctrl_t;\n"
+              "endmodule\n"));
+}
+
+// --- Packed struct typedef in a package ---
+TEST(ParserSection7, Sec7_2_1_PackedInPackage) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] addr;\n"
+      "    logic [7:0] data;\n"
+      "  } pkt_t;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  ASSERT_FALSE(r.cu->packages[0]->items.empty());
+  auto* item = r.cu->packages[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
+}
+
+// --- Packed struct typedef used in subsequent variable declaration ---
+TEST(ParserSection7, Sec7_2_1_TypedefUsedInVarDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] a;\n"
+      "    logic [7:0] b;\n"
+      "  } pair_t;\n"
+      "  pair_t my_pair;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = NthItem(r, 1);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "my_pair");
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(item->data_type.type_name, "pair_t");
+}
+
+// --- Packed struct with single-bit member (no packed dimension) ---
+TEST(ParserSection7, Sec7_2_1_PackedSingleBitMember) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    bit [6:0] data;\n"
+      "    bit parity;\n"
+      "  } frame_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
+  auto& parity = item->typedef_type.struct_members[1];
+  EXPECT_EQ(parity.name, "parity");
+  EXPECT_EQ(parity.type_kind, DataTypeKind::kBit);
+  EXPECT_EQ(parity.packed_dim_left, nullptr);
+  EXPECT_EQ(parity.packed_dim_right, nullptr);
+}
+
+// =========================================================================
+// §7.2.1: Packed structures (additional)
+// =========================================================================
+TEST(ParserSection7, StructPackedUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed unsigned {\n"
+      "    time a;\n"
+      "    integer b;\n"
+      "    logic [31:0] c;\n"
+      "  } pack2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  EXPECT_FALSE(item->typedef_type.is_signed);
+  EXPECT_EQ(item->typedef_type.struct_members.size(), 3u);
+}
+
+// --- Packed struct with signed member type qualifier ---
+TEST(ParserSection7, Sec7_2_1_PackedMemberSignedType) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic signed [7:0] value;\n"
+      "    logic [7:0] magnitude;\n"
+      "  } signed_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
+  EXPECT_TRUE(item->typedef_type.struct_members[0].is_signed);
+  EXPECT_FALSE(item->typedef_type.struct_members[1].is_signed);
+}
+
 }  // namespace

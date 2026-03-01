@@ -59,4 +59,27 @@ TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
   EXPECT_FALSE(func->func_body_stmts.empty());
 }
 
+// 7. Variable name same as module name (different name spaces)
+TEST(ParserClause03, Cl3_13_VarNameSameAsModuleName) {
+  // A variable named 'top' inside module 'top' is legal because
+  // the definition name space and the local scope are distinct.
+  EXPECT_TRUE(
+      ParseOk("module top;\n"
+              "  logic top;\n"
+              "endmodule\n"));
+}
+
+// 5. Fork-join block creating a subscope
+TEST(ParserClause03, Cl3_13_ForkJoinBlockSubscope) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      $display(\"a\");\n"
+              "      $display(\"b\");\n"
+              "    join\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

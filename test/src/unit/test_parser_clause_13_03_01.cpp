@@ -148,4 +148,69 @@ TEST(ParserSection4, Sec4_9_3_TaskNoLifetimeQualifier) {
   EXPECT_FALSE(item->is_static);
 }
 
+struct ParseResult4d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4d Parse(const std::string& src) {
+  ParseResult4d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Returns the first module item from the first module.
+static ModuleItem* FirstItem(ParseResult4d& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
+}
+
+// =============================================================================
+// 3. Automatic task declaration
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_AutomaticTaskDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic do_work(input int n);\n"
+      "    $display(\"work %0d\", n);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+  EXPECT_EQ(item->name, "do_work");
+}
+
+// =============================================================================
+// 4. Static task declaration
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_StaticTaskDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  task static wait_cycles(input int n);\n"
+      "    repeat (n) #1;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->is_static);
+  EXPECT_FALSE(item->is_automatic);
+  EXPECT_EQ(item->name, "wait_cycles");
+}
+
 }  // namespace

@@ -116,4 +116,38 @@ TEST(ParserSection14, GlobalClockingSubsystemPattern) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
 }
 
+// =============================================================================
+// A.6.11 global clocking — unnamed with negedge
+// =============================================================================
+TEST(ParserA611, GlobalClockingUnnamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking @(negedge clk); endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_TRUE(item->name.empty());
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
+}
+
+// =============================================================================
+// A.6.11 global clocking — compound event expression
+// =============================================================================
+TEST(ParserA611, GlobalClockingCompoundEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  global clocking sys @(clk1 or clk2); endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_global_clocking);
+  EXPECT_GE(item->clocking_event.size(), 2u);
+}
+
 }  // namespace

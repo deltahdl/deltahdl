@@ -346,4 +346,278 @@ TEST(ParserSection4, Sec4_6_UniqueCaseMultipleItems) {
   EXPECT_EQ(stmt->case_items.size(), 4u);
 }
 
+// ---------------------------------------------------------------------------
+// 26. always_comb with unique0 case
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_Unique0Case) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [3:0] y;\n"
+      "  always_comb begin\n"
+      "    unique0 case (sel)\n"
+      "      2'b00: y = 4'd0;\n"
+      "      2'b01: y = 4'd1;\n"
+      "      2'b10: y = 4'd2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstAlwaysCombStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+  ASSERT_EQ(stmt->case_items.size(), 3u);
+}
+
+TEST(ParserSection12, UniqueCase) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique case (sel)\n"
+      "      0: x = 1;\n"
+      "      1: x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+TEST(ParserSection12, PriorityCase) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    priority case (sel)\n"
+      "      0: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
+// ---------------------------------------------------------------------------
+// unique_priority with case
+// ---------------------------------------------------------------------------
+// §12.5.3: unique case
+TEST(ParserA607, UniqueCaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique case(x)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+struct ParseResult9i {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9i Parse(const std::string& src) {
+  ParseResult9i result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysLatchItem(ParseResult9i& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return item;
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 14. unique case statement inside always_latch.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_UniqueCaseStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [3:0] q, a, b, c;\n"
+      "  always_latch\n"
+      "    unique case (sel)\n"
+      "      2'b00: q <= a;\n"
+      "      2'b01: q <= b;\n"
+      "      2'b10: q <= c;\n"
+      "      default: q <= q;\n"
+      "    endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kCase);
+  EXPECT_EQ(item->body->qualifier, CaseQualifier::kUnique);
+}
+
+// =============================================================================
+// Combined patterns -- real-world usage patterns from sections 12.4-12.8
+// =============================================================================
+// Case inside always_comb with unique qualifier.
+TEST(ParserSection12, UniqueCaseInsideAlwaysComb) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic [1:0] sel;\n"
+              "  logic [7:0] out;\n"
+              "  always_comb begin\n"
+              "    unique case (sel)\n"
+              "      2'd0: out = 8'hAA;\n"
+              "      2'd1: out = 8'hBB;\n"
+              "      2'd2: out = 8'hCC;\n"
+              "      2'd3: out = 8'hDD;\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// §12.5.3: unique0 case
+TEST(ParserA607, Unique0CaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 case(x)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
+// ---------------------------------------------------------------------------
+// 15. priority case statement inside always_latch.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_PriorityCaseStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [3:0] q, a, b;\n"
+      "  always_latch\n"
+      "    priority case (sel)\n"
+      "      2'b00: q <= a;\n"
+      "      2'b01: q <= b;\n"
+      "      default: q <= q;\n"
+      "    endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kCase);
+  EXPECT_EQ(item->body->qualifier, CaseQualifier::kPriority);
+}
+
+// §12.5.3: priority case
+TEST(ParserA607, PriorityCaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority case(x)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
+// §12.5.3: priority casez
+TEST(ParserA607, PriorityCasezParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority casez(a)\n"
+      "      3'b00?: y = 1;\n"
+      "      3'b0??: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
+}
+
+// Unique0 case with empty default.
+TEST(ParserSection12, Unique0CaseWithDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique0 case (sel)\n"
+      "      0: x = 1;\n"
+      "      1: x = 2;\n"
+      "      default: ;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+  ASSERT_GE(stmt->case_items.size(), 3u);
+  EXPECT_TRUE(stmt->case_items[2].is_default);
+}
+
+// ---------------------------------------------------------------------------
+// 26. unique0 case inside always_latch.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_Unique0CaseStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [3:0] q, a, b;\n"
+      "  always_latch\n"
+      "    unique0 case (sel)\n"
+      "      2'b00: q <= a;\n"
+      "      2'b01: q <= b;\n"
+      "    endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kCase);
+  EXPECT_EQ(item->body->qualifier, CaseQualifier::kUnique0);
+}
+
 }  // namespace

@@ -33,4 +33,25 @@ TEST(ParserA210, PropertyExpr_Weak) {
               "endmodule\n"));
 }
 
+using VerifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Section 16.5.1 -- Strong and weak sequences
+// =============================================================================
+// Assert property with strong sequence.
+TEST(ParserSection16, Sec16_5_1_StrongSequence) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) strong(a ##1 b ##1 c));\n"
+              "endmodule\n"));
+}
+
+// Assert property with weak sequence.
+TEST(ParserSection16, Sec16_5_1_WeakSequence) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) weak(a ##1 b));\n"
+              "endmodule\n"));
+}
+
 }  // namespace

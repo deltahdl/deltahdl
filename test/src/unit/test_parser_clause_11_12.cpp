@@ -542,4 +542,82 @@ TEST(ParserLet, DeclWithArgsNames) {
   ASSERT_NE(let_item->init_expr, nullptr);
 }
 
+TEST(ParserLet, DeclWithDefaultsParse) {
+  auto r = Parse(
+      "module t;\n"
+      "  let at_least_two(sig, rst = 1'b0) = rst || sig;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
+  EXPECT_EQ(let_item->name, "at_least_two");
+  ASSERT_EQ(let_item->func_args.size(), 2u);
+}
+
+TEST(ParserLet, DeclWithDefaultsArgs) {
+  auto r = Parse(
+      "module t;\n"
+      "  let at_least_two(sig, rst = 1'b0) = rst || sig;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
+  EXPECT_EQ(let_item->func_args[0].name, "sig");
+  EXPECT_EQ(let_item->func_args[0].default_value, nullptr);
+  EXPECT_EQ(let_item->func_args[1].name, "rst");
+  EXPECT_NE(let_item->func_args[1].default_value, nullptr);
+}
+
+TEST(ParserLet, DeclTypedArgsParse) {
+  auto r = Parse(
+      "module t;\n"
+      "  let mult(logic [15:0] x, logic [15:0] y) = x * y;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
+  EXPECT_EQ(let_item->name, "mult");
+}
+
+TEST(ParserLet, DeclTypedArgsNames) {
+  auto r = Parse(
+      "module t;\n"
+      "  let mult(logic [15:0] x, logic [15:0] y) = x * y;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
+  ASSERT_EQ(let_item->func_args.size(), 2u);
+  EXPECT_EQ(let_item->func_args[0].name, "x");
+  EXPECT_EQ(let_item->func_args[1].name, "y");
+}
+
+TEST(ParserLet, DeclUntypedArg) {
+  auto r = Parse(
+      "module t;\n"
+      "  let check(untyped a) = a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
+  ASSERT_EQ(let_item->func_args.size(), 1u);
+  EXPECT_EQ(let_item->func_args[0].name, "a");
+}
+
+TEST(ParserLet, DeclEmptyParens) {
+  auto r = Parse(
+      "module t;\n"
+      "  let empty_let() = 42;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* let_item = FirstLetDecl(r);
+  ASSERT_NE(let_item, nullptr);
+  EXPECT_EQ(let_item->name, "empty_let");
+  EXPECT_TRUE(let_item->func_args.empty());
+}
+
 }  // namespace

@@ -654,4 +654,127 @@ TEST(ParserA28, MixedBlockItems) {
               "endmodule\n"));
 }
 
+// Nested blocks with declarations
+TEST(ParserA28, NestedBlocksWithDecls) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    int x = 1;\n"
+              "    begin\n"
+              "      int y = 2;\n"
+              "      x = x + y;\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+struct ParseResult9i {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9i Parse(const std::string& src) {
+  ParseResult9i result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysLatchItem(ParseResult9i& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return item;
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 13. Variable declaration inside always_latch begin-end block.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_VarDeclInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic en;\n"
+      "  logic [7:0] q, d;\n"
+      "  always_latch begin\n"
+      "    logic [7:0] tmp;\n"
+      "    tmp = d + 1;\n"
+      "    if (en) q <= tmp;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 3u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
+}
+
+static Stmt* FirstInitialBody(ParseResult9d& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.3.1 -- Sequential blocks (begin...end)
+// Empty and minimal begin-end blocks.
+// =============================================================================
+TEST(ParserSection9, Sec9_3_1_EmptyBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_TRUE(body->stmts.empty());
+}
+
+TEST(ParserSection9, Sec9_3_1_SingleStatementInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = 42;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_EQ(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParserSection9, Sec9_3_1_MultipleAssignmentsInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "    c = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 3u);
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(body->stmts[i]->kind, StmtKind::kBlockingAssign);
+  }
+}
+
 }  // namespace

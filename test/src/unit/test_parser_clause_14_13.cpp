@@ -60,4 +60,15 @@ TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
+// Access clocking block signal via dot notation (cb.v) in always block.
+TEST(ParserSection19, ClockingBlockEvent_DotAccess) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(negedge clk);\n"
+              "    input v;\n"
+              "  endclocking\n"
+              "  always @(cb) $display(cb.v);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

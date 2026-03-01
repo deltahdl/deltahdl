@@ -157,4 +157,15 @@ TEST(ParserA86, BinaryBitwiseXnorAlt) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
 }
 
+// § expression ::= unary_operator { attribute_instance } primary
+TEST(ParserA83, ExprUnaryOp) {
+  auto r = Parse("module m; initial x = ~a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kTilde);
+}
+
 }  // namespace

@@ -264,4 +264,68 @@ TEST(ParserA304, NInputGatetype_Xnor) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+using SpecifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Parser test fixture
+// =============================================================================
+struct SpecifyTest : ::testing::Test {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
+    source_ = src;
+    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
+    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
+    return parser_->Parse();
+  }
+
+  // Helper: get first specify block from first module.
+  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
+    for (auto* item : cu->modules[0]->items) {
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+    }
+    return nullptr;
+  }
+
+  SourceManager mgr_;
+  Arena arena_;
+  DiagEngine diag_{mgr_};
+  std::string source_;
+  std::unique_ptr<Lexer> lexer_;
+  std::unique_ptr<Parser> parser_;
+};
+
+struct ParseResult30 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult30 Parse(const std::string& src) {
+  ParseResult30 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// delay2: two values on n_input gate (rise, fall).
+TEST(ParserA223, Delay2NInputGateTwoValues) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  or #(3, 5) g1(y, a, b);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  ASSERT_NE(item->gate_delay, nullptr);
+  EXPECT_EQ(item->gate_delay->int_val, 3u);
+  ASSERT_NE(item->gate_delay_fall, nullptr);
+  EXPECT_EQ(item->gate_delay_fall->int_val, 5u);
+}
+
 }  // namespace

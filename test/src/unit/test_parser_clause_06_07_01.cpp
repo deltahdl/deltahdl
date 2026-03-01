@@ -524,4 +524,158 @@ TEST(ParserSection6, Sec6_5_MultipleWireDecls) {
   EXPECT_EQ(items[2]->name, "c");
 }
 
+// 19. Tri net type declaration.
+TEST(ParserSection6, Sec6_5_TriNetDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  tri [3:0] bus;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTri);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_EQ(item->name, "bus");
+}
+
+struct ParseResult6 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6 Parse(const std::string& src) {
+  ParseResult6 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult6& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// =========================================================================
+// §6.5-6.7: Net declarations
+// =========================================================================
+TEST(ParserSection6, WireDeclaration_Kind) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kWire);
+}
+
+struct ParseResult6f {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6f Parse(const std::string& src) {
+  ParseResult6f result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 6.7.1 -- Net declarations with built-in net types
+// =============================================================================
+// §6.7.1: Wire with multiple variable names produces separate items.
+TEST(ParserSection6, Sec6_7_1_WireMultipleNames) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire a, b, c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  EXPECT_EQ(items[0]->name, "a");
+  EXPECT_EQ(items[1]->name, "b");
+  EXPECT_EQ(items[2]->name, "c");
+}
+
+TEST(ParserSection6, WireDeclaration_Props) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_EQ(item->name, "w");
+}
+
+TEST(ParserSection6, TriDeclaration) {
+  auto r = Parse(
+      "module t;\n"
+      "  tri [3:0] t1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+}
+
+// §6.7.1: Each item from a multi-name wire declaration is a kNetDecl.
+TEST(ParserSection6, Sec6_7_1_WireMultipleNamesAllNetDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire a, b, c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  for (auto* item : items) {
+    EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+    EXPECT_EQ(item->data_type.kind, DataTypeKind::kWire);
+    EXPECT_TRUE(item->data_type.is_net);
+  }
+}
+
+static ModuleItem* FirstItem(ParseResult6f& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// §6.7.1: Tri net with range.
+TEST(ParserSection6, Sec6_7_1_TriWithRange) {
+  auto r = Parse(
+      "module t;\n"
+      "  tri [7:0] t1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTri);
+  EXPECT_TRUE(item->data_type.is_net);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
+  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
+}
+
 }  // namespace

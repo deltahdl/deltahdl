@@ -71,4 +71,58 @@ TEST(ParserSection9c, EventControlMixedEdgesComma) {
   EXPECT_EQ(stmt->events[2].edge, Edge::kNone);
 }
 
+struct ParseResult4c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4c Parse(const std::string& src) {
+  ParseResult4c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Returns the first always_* item from the first module.
+static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock)
+      return item;
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 29. Multiple event control in always block
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_MultipleEventControlInAlways) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, rst, a;\n"
+      "  always @(posedge clk or negedge rst) begin\n"
+      "    if (!rst)\n"
+      "      a <= 0;\n"
+      "    else\n"
+      "      a <= 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_GE(item->sensitivity.size(), 2u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
+}
+
 }  // namespace

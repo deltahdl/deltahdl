@@ -15,4 +15,19 @@ TEST(ParserSection22, FileAndLineInErrorMessage) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, LineDirectiveInAssignment) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  integer line_num;\n"
+              "  initial line_num = `__LINE__;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection22, FileDirectiveInStringConcat) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $display(\"source: %s:%0d\", `__FILE__, `__LINE__);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

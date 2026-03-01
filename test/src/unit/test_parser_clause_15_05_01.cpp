@@ -101,4 +101,36 @@ TEST(ParserSection15, NonblockingEventTriggerHierarchical) {
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
 
+// =============================================================================
+// §15.5.1 — Event trigger and wait (existing support, comprehensive test)
+// =============================================================================
+TEST(ParserSection15, EventTriggerAndWait) {
+  auto r = Parse(
+      "module m;\n"
+      "  event e;\n"
+      "  initial begin\n"
+      "    -> e;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
+}
+
+// §15.5.1: event_trigger (->)
+TEST(ParserA604, StmtItemEventTrigger) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    -> my_event;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
+}
+
 }  // namespace

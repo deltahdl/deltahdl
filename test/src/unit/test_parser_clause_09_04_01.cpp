@@ -227,4 +227,53 @@ TEST(ParserSection9, DelayControlReal) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
+static ModuleItem* FindItemByKind(ParseResult4b& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+static ModuleItem* FindInitialBlock(ParseResult4b& r) {
+  return FindItemByKind(r, ModuleItemKind::kInitialBlock);
+}
+
+// ---------------------------------------------------------------------------
+// 22. initial block with delays
+// ---------------------------------------------------------------------------
+TEST(ParserSection4, Sec4_5_InitialBlockWithDelays) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    #5 a = 1;\n"
+      "    #10 b = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* init_item = FindInitialBlock(r);
+  ASSERT_NE(init_item, nullptr);
+  ASSERT_NE(init_item->body, nullptr);
+  EXPECT_EQ(init_item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(init_item->body->stmts.size(), 2u);
+  EXPECT_EQ(init_item->body->stmts[0]->kind, StmtKind::kDelay);
+  EXPECT_EQ(init_item->body->stmts[1]->kind, StmtKind::kDelay);
+}
+
+// §9.4: procedural_timing_control_statement (delay)
+TEST(ParserA604, StmtItemProceduralTimingControlDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10 a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+}
+
 }  // namespace

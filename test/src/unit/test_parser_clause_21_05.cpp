@@ -37,4 +37,20 @@ TEST_F(ApiParseTest, WritememhSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
+TEST(ParserSection21, WritememhCall) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  reg [7:0] mem [0:255];\n"
+              "  initial $writememh(\"out.hex\", mem);\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection21, WritemembCall) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  reg [7:0] mem [0:255];\n"
+              "  initial $writememb(\"out.bin\", mem);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

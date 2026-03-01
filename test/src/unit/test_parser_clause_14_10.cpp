@@ -80,4 +80,46 @@ TEST(ParserSection14, ClockingBlockEventMultipleInputs) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
+// =============================================================================
+// LRM section 19.5 -- Clocking block events
+// =============================================================================
+// Use a clocking block name as an event in an always block.
+TEST(ParserSection19, ClockingBlockEvent_AlwaysAt) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking dram @(posedge phi1);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "  always @(dram)\n"
+              "    $display(\"clocking block event\");\n"
+              "endmodule\n"));
+}
+
+// Clocking event used alongside a posedge always for comparison.
+TEST(ParserSection19, ClockingBlockEvent_BothTriggers) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking dram @(posedge phi1);\n"
+              "    input data;\n"
+              "    output negedge #1 address;\n"
+              "  endclocking\n"
+              "  always @(posedge phi1) $display(\"clocking event\");\n"
+              "  always @(dram) $display(\"clocking block event\");\n"
+              "endmodule\n"));
+}
+
+// Clocking block event used in an initial block with @(cb).
+TEST(ParserSection19, ClockingBlockEvent_InitialBlock) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input v;\n"
+              "  endclocking\n"
+              "  initial begin\n"
+              "    @(cb);\n"
+              "    $display(cb.v);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

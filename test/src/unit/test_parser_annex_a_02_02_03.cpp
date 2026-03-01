@@ -162,4 +162,34 @@ TEST(ParserA223, NoDelayDefault) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
+// --- §5.12 Attributes ---
+struct ParseResult512 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult512 Parse(const std::string& src) {
+  ParseResult512 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// delay_value: time_literal — time literal (e.g. 10ns) as delay.
+TEST(ParserA223, DelayValueTimeLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire #10ns w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->kind, ExprKind::kTimeLiteral);
+}
+
 }  // namespace

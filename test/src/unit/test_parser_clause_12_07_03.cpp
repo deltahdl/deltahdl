@@ -45,4 +45,79 @@ TEST(ParserSection9, Sec9_2_2_ForeachLoop) {
   ASSERT_FALSE(stmt->foreach_vars.empty());
 }
 
+// =============================================================================
+// LRM section 12.7.3 -- foreach loop
+// =============================================================================
+TEST(ParserSection12, ForeachBasicParses) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) x = arr[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  EXPECT_NE(stmt->expr, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(ParserSection12, ForeachBasicVars) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) x = arr[i];\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->foreach_vars.size(), 1u);
+  EXPECT_EQ(stmt->foreach_vars[0], "i");
+}
+
+TEST(ParserSection12, ForeachEmptyVar) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[, j]) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  ASSERT_EQ(stmt->foreach_vars.size(), 2u);
+}
+
+TEST(ParserSection12, ForeachEmptyVarValues) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[, j]) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_TRUE(stmt->foreach_vars[0].empty());
+  EXPECT_EQ(stmt->foreach_vars[1], "j");
+}
+
+TEST(ParserSection12, ForeachWithBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) begin\n"
+      "      $display(\"%d\", arr[i]);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
 }  // namespace

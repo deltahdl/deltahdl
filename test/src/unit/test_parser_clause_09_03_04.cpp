@@ -489,4 +489,123 @@ TEST(ParserSection23, EndLabelInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "myif");
 }
 
+// ---------------------------------------------------------------------------
+// 7. Named fork-join_none
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_NamedForkJoinNone) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : bg_threads\n"
+      "      #100 a = 1;\n"
+      "    join_none : bg_threads\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "bg_threads");
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
+}
+
+TEST(ParserSection12, UnlabeledBlockHasEmptyLabel) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_TRUE(body->label.empty());
+}
+
+TEST(ParserSection23, EndLabelProgram) {
+  auto r = Parse("program myprog; endprogram : myprog\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->programs.size(), 1);
+  EXPECT_EQ(r.cu->programs[0]->name, "myprog");
+}
+
+// 24. Named fork-join blocks
+TEST(ParserClause03, Cl3_13_NamedForkJoinBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : my_fork\n"
+      "      $display(\"a\");\n"
+      "      $display(\"b\");\n"
+      "    join : my_fork\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->body, nullptr);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  auto* fork_stmt = item->body->stmts[0];
+  EXPECT_EQ(fork_stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(fork_stmt->label, "my_fork");
+}
+
+static Stmt* FirstInitialBody(ParseResult9d& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
+  }
+  return nullptr;
+}
+
+TEST(ParserSection9, Sec9_3_1_NamedBeginEndMatchingLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : seq_block\n"
+      "    a = 1;\n"
+      "  end : seq_block\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "seq_block");
+  EXPECT_EQ(body->stmts.size(), 1u);
+}
+
+// Named block with declarations
+TEST(ParserA28, NamedBlockWithDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    parameter int N = 4;\n"
+      "    int i;\n"
+      "    for (i = 0; i < N; i++) begin\n"
+      "    end\n"
+      "  end : my_block\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->label, "my_block");
+}
+
+TEST(ParserSection9, Sec9_3_1_NamedBeginEndNoEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : blk_no_end\n"
+      "    a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "blk_no_end");
+}
+
 }  // namespace

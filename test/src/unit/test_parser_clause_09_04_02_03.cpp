@@ -398,4 +398,364 @@ TEST(ParserSection9c, AlwaysFFWithReset) {
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
 
+struct ParseResult9k {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9k Parse(const std::string& src) {
+  ParseResult9k result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysItem(ParseResult9k& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      return item;
+    }
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.4.2.4 -- Conditional event controls (iff guard)
+//
+// event_expression ::= [ edge_identifier ] expression [ iff expression ]
+//
+// The iff guard filters the event so the associated statement only triggers
+// when the guard condition is true at the moment of the edge.
+// =============================================================================
+// ---------------------------------------------------------------------------
+// Basic iff guard with posedge
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardPosedgeBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff reset == 0) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_NE(item->sensitivity[0].signal, nullptr);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// iff guard with posedge and simple enable signal
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardPosedgeEnable) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// iff guard with negedge
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardNegedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(negedge clk iff !rst) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kNegedge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// iff guard with edge keyword
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardEdgeKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(edge sig iff guard) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kEdge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+static Stmt* FirstInitialBody(ParseResult9d& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
+  }
+  return nullptr;
+}
+
+static Stmt* FirstInitialStmt(ParseResult9d& r) {
+  auto* body = FirstInitialBody(r);
+  if (body && body->kind == StmtKind::kBlock) {
+    return body->stmts.empty() ? nullptr : body->stmts[0];
+  }
+  return body;
+}
+
+// =============================================================================
+// LRM section 9.4.2.3 -- Conditional event controls (iff)
+// Additional iff guard tests for stmt-level and always_ff contexts.
+// =============================================================================
+TEST(ParserSection9c, IffGuardStmtLevelNoEdge) {
+  // @(a iff enable == 1) - level-sensitive with iff qualifier
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(a iff enable == 1) y = a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
+}
+
+struct ParseResult9c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9c Parse(const std::string& src) {
+  ParseResult9c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysItem(ParseResult9c& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// §9.4.2.3 -- Conditional event controls (iff)
+// =============================================================================
+TEST(ParserSection9b, ConditionalEventIffBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(a iff enable == 1)\n"
+      "    y <= a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_GE(item->sensitivity.size(), 1u);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+TEST(ParserSection9c, IffGuardAlwaysFF) {
+  // always_ff with iff guard on the sensitivity.
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, en;\n"
+      "  logic [3:0] q, d;\n"
+      "  always_ff @(posedge clk iff en) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// iff guard with no edge qualifier (level-sensitive)
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardNoEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(sig iff en) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kNone);
+  EXPECT_NE(item->sensitivity[0].signal, nullptr);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+TEST(ParserSection9b, ConditionalEventIffWithEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff reset == 0)\n"
+      "    q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_GE(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// iff guard with complex parenthesized condition
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardComplexCondition) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff (a && b)) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+TEST(ParserSection9b, ConditionalEventIffMultipleEvents) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en or negedge rst)\n"
+      "    q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_GE(item->sensitivity.size(), 2u);
+}
+
+// ---------------------------------------------------------------------------
+// Multiple events with iff on first only (or-separated)
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardMultipleOrFirst) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en or negedge rst) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 2u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
+  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// Multiple events with iff on second only (or-separated)
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardMultipleOrSecond) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk or negedge rst iff !en) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 2u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_EQ(item->sensitivity[0].iff_condition, nullptr);
+  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
+  EXPECT_NE(item->sensitivity[1].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// Multiple events with iff on both (comma-separated)
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardBothComma) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff en, negedge rst iff !mode) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 2u);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+  EXPECT_NE(item->sensitivity[1].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// iff guard with comparison operator
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardComparison) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff state == 2'b01) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// iff guard at always block level populates sensitivity vector
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysSensitivity) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk iff reset == 0 or posedge reset) begin\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  // The sensitivity list should have two entries.
+  ASSERT_EQ(item->sensitivity.size(), 2u);
+  // First event has iff guard.
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+  // Second event has no iff guard.
+  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
+  EXPECT_EQ(item->sensitivity[1].edge, Edge::kPosedge);
+}
+
 }  // namespace

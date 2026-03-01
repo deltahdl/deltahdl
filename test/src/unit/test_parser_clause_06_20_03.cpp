@@ -31,4 +31,16 @@ TEST(SourceText, ParamPortTypeParameter) {
   EXPECT_EQ(r.cu->modules[0]->params[0].first, "T");
 }
 
+TEST(ParserA24, TypeAssignmentNoDefault) {
+  auto r = Parse("module m #(parameter type T); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA24, TypeAssignmentComplexType) {
+  auto r = Parse("module m; parameter type T = logic [7:0]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

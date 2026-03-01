@@ -118,4 +118,75 @@ TEST(ParserSection7, ArrayLocatorFindIndex) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
+struct ParseResult7 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult7 Parse(const std::string& src) {
+  ParseResult7 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult7& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+TEST(ParserSection7, ArrayMethodMin) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial y = arr.min;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  // min without parens is a member access
+  EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
+}
+
+// =============================================================================
+// A.6.9 — array_method_name keywords (unique, and, or, xor)
+// =============================================================================
+TEST(ParserA609, ArrayMethodUnique) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr.unique(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+}
+
+// =============================================================================
+// A.6.9 — array_manipulation_call with 'with' clause
+// =============================================================================
+TEST(ParserA609, ArrayMethodWithClause) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr[4];\n"
+      "  int result[$];\n"
+      "  initial begin result = arr.find with (item > 5); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

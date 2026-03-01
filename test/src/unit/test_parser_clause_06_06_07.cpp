@@ -353,4 +353,105 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithPackedStruct) {
       "endmodule\n"));
 }
 
+// §6.6.7: Nettype with array typedef.
+TEST(ParserSection6, Sec6_6_7_NettypeWithArrayTypedef) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef real TR[5];\n"
+      "  nettype TR array_net;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* nt = FindNettypeDecl(r, "array_net");
+  ASSERT_NE(nt, nullptr);
+}
+
+// §6.6.7: Nettype alias used to declare nets.
+TEST(ParserSection6, Sec6_6_7_NettypeAliasForNetDecl) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef real TR[5];\n"
+              "  nettype TR wTR;\n"
+              "  nettype wTR alias_net;\n"
+              "  alias_net sig;\n"
+              "endmodule\n"));
+}
+
+// §6.6.7: Nettype with resolution function — multiple drivers scenario.
+TEST(ParserSection6, Sec6_6_7_NettypeResolveFuncMultipleDrivers) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { real val; } S;\n"
+              "  function S resolve_S(input S drivers[]);\n"
+              "    resolve_S = drivers[0];\n"
+              "  endfunction\n"
+              "  nettype S net_S with resolve_S;\n"
+              "endmodule\n"));
+}
+
+// §6.6.7: Multiple nettypes with different resolution functions.
+TEST(ParserSection6, Sec6_6_7_DifferentResolveFuncs) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef int IT;\n"
+      "  nettype IT netA with resolve_a;\n"
+      "  nettype IT netB with resolve_b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* nt_a = FindNettypeDecl(r, "netA");
+  auto* nt_b = FindNettypeDecl(r, "netB");
+  ASSERT_NE(nt_a, nullptr);
+  ASSERT_NE(nt_b, nullptr);
+  EXPECT_EQ(nt_a->nettype_resolve_func, "resolve_a");
+  EXPECT_EQ(nt_b->nettype_resolve_func, "resolve_b");
+}
+
+// §6.6.7: Nettype with no resolution function — empty resolve func field.
+TEST(ParserSection6, Sec6_6_7_NettypeNoResolveFunc) {
+  auto r = Parse(
+      "module m;\n"
+      "  nettype int plain_net;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* nt = FindNettypeDecl(r, "plain_net");
+  ASSERT_NE(nt, nullptr);
+  EXPECT_TRUE(nt->nettype_resolve_func.empty());
+}
+
+// §6.6.7: Nettype with shortint type.
+TEST(ParserSection6, Sec6_6_7_NettypeWithShortintType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype shortint si_net;\n"
+              "endmodule\n"));
+}
+
+// §6.6.7: Nettype coexisting with wire and other net declarations.
+TEST(ParserSection6, Sec6_6_7_NettypeWithWireDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [7:0] w;\n"
+      "  nettype int custom_net;\n"
+      "  tri t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
+// §6.6.7: Nettype with named type from typedef.
+TEST(ParserSection6, Sec6_6_7_NettypeWithNamedType) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [31:0] word_t;\n"
+      "  nettype word_t word_net;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* nt = FindNettypeDecl(r, "word_net");
+  ASSERT_NE(nt, nullptr);
+}
+
 }  // namespace

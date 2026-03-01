@@ -331,4 +331,110 @@ TEST(ParserA611, MultipleDirectionGroups) {
   EXPECT_EQ(item->clocking_signals[3].direction, Direction::kInout);
 }
 
+// Clocking block with negedge event.
+TEST(ParserSection19, ClockingBlock_NegedgeEvent) {
+  auto r = Parse(
+      "module t;\n"
+      "  clocking cb @(negedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
+}
+
+// Clocking block with bare identifier event (no edge).
+TEST(ParserSection19, ClockingBlock_BareIdentifierEvent) {
+  auto r = Parse(
+      "module t;\n"
+      "  clocking cb @(clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
+}
+
+// Clocking block with all three signal directions: input, output, inout.
+TEST(ParserSection19, ClockingBlock_AllDirections) {
+  auto r = Parse(
+      "module t;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data_in;\n"
+      "    output data_out;\n"
+      "    inout bidir;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+
+  VerifyClockingSignalDirections(item, {
+                                           {Direction::kInput, "data_in"},
+                                           {Direction::kOutput, "data_out"},
+                                           {Direction::kInout, "bidir"},
+                                       });
+}
+
+// Multiple signals in a single direction group, comma-separated.
+TEST(ParserSection19, ClockingBlock_MultipleSignalsSameDirection) {
+  auto r = Parse(
+      "module t;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data, ready, enable;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+
+  const char* const kNames[] = {"data", "ready", "enable"};
+  ASSERT_EQ(item->clocking_signals.size(), std::size(kNames));
+  for (size_t i = 0; i < std::size(kNames); ++i) {
+    EXPECT_EQ(item->clocking_signals[i].name, kNames[i]) << "signal " << i;
+    EXPECT_EQ(item->clocking_signals[i].direction, Direction::kInput)
+        << "signal " << i;
+  }
+}
+
+// =============================================================================
+// A.6.11 clocking_item — assertion_item_declaration (property_declaration)
+// =============================================================================
+TEST(ParserA611, ClockingItemPropertyDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "    property p;\n"
+      "      data;\n"
+      "    endproperty\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+}
+
+// =============================================================================
+// A.6.11 clocking_item — assertion_item_declaration (let_declaration)
+// =============================================================================
+TEST(ParserA611, ClockingItemLetDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "    let valid = data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+}
+
 }  // namespace

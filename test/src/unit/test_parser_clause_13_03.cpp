@@ -99,4 +99,35 @@ TEST(ParserA28, BlockItemInTask) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
+struct ParseResult12b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult12b Parse(const std::string& src) {
+  ParseResult12b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(Parser, TaskDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  task my_task(input int x);\n"
+      "    $display(\"%d\", x);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(mod->items[0]->name, "my_task");
+  ASSERT_EQ(mod->items[0]->func_args.size(), 1);
+}
+
 }  // namespace

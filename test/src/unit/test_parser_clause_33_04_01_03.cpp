@@ -60,4 +60,42 @@ TEST(SourceText, ConfigRuleInstLiblist) {
   EXPECT_EQ(rule->liblist[0], "mylib");
 }
 
+using ApiParseTest = ProgramTestParse;
+
+struct ParseResult40 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult40 Parse(const std::string& src) {
+  ParseResult40 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// §36.9.2 Config instance clause
+// =============================================================================
+TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
+  auto* unit = Parse(R"(
+    config cfg1;
+      design rtlLib.top;
+      default liblist rtlLib;
+      instance top.a2 liblist gateLib;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  ASSERT_GE(unit->configs[0]->rules.size(), 2u);
+  auto* inst_rule = unit->configs[0]->rules[1];
+  EXPECT_EQ(inst_rule->kind, ConfigRuleKind::kInstance);
+  EXPECT_EQ(inst_rule->inst_path, "top.a2");
+  ASSERT_EQ(inst_rule->liblist.size(), 1u);
+  EXPECT_EQ(inst_rule->liblist[0], "gateLib");
+}
+
 }  // namespace
