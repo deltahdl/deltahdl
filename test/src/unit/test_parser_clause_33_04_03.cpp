@@ -65,4 +65,19 @@ TEST_F(ConfigTest, UseClauseWithParams) {
   EXPECT_EQ(rule->use_params[1].first, "DEPTH");
 }
 
+TEST_F(ConfigTest, LocalparamInConfig) {
+  auto* unit = Parse(R"(
+    config cfg;
+      localparam W = 32;
+      design lib.top;
+      default liblist lib;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  auto* cfg = unit->configs[0];
+  ASSERT_EQ(cfg->local_params.size(), 1u);
+  EXPECT_EQ(cfg->local_params[0].first, "W");
+  EXPECT_NE(cfg->local_params[0].second, nullptr);
+}
+
 }  // namespace
