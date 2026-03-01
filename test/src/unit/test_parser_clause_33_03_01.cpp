@@ -47,4 +47,16 @@ TEST(LibraryText, MixedDescriptions) {
   ASSERT_EQ(r.cu->lib_includes.size(), 1u);
 }
 
+// =============================================================================
+// AST structural verification — ensures AST nodes capture all data.
+// =============================================================================
+// Verify LibraryDecl stores source range.
+TEST(LibraryText, LibraryDeclHasSourceRange) {
+  auto r = ParseLibrary("library mylib /proj/*.v;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  EXPECT_NE(r.cu->libraries[0]->range.start.line, 0u);
+}
+
 }  // namespace

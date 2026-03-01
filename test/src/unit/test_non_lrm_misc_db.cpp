@@ -44,18 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// AST structural verification — ensures AST nodes capture all data.
-// =============================================================================
-// Verify LibraryDecl stores source range.
-TEST(LibraryText, LibraryDeclHasSourceRange) {
-  auto r = ParseLibrary("library mylib /proj/*.v;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-  EXPECT_NE(r.cu->libraries[0]->range.start.line, 0u);
-}
-
 // Verify IncludeStmt stores source location.
 TEST(LibraryText, IncludeStmtHasSourceLoc) {
   auto r = ParseLibrary("include /proj/lib.map;\n");
