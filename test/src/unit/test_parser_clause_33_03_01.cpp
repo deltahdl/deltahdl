@@ -200,4 +200,20 @@ TEST(LibraryText, EmptyInput) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
+// =============================================================================
+// A.1.1 library_declaration ::=
+//   library library_identifier file_path_spec
+//   { , file_path_spec } [ -incdir file_path_spec { , file_path_spec } ] ;
+// =============================================================================
+// Basic library declaration with a single file path.
+TEST(LibraryText, BasicLibraryDecl) {
+  auto r = ParseLibrary("library mylib /proj/rtl/top.v;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  EXPECT_EQ(r.cu->libraries[0]->name, "mylib");
+  ASSERT_EQ(r.cu->libraries[0]->file_paths.size(), 1u);
+  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/proj/rtl/top.v");
+}
+
 }  // namespace
