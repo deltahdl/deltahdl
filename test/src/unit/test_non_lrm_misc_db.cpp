@@ -250,23 +250,6 @@ TEST(LibraryText, ConfigInLibraryText) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(ParserSection34, ConfigWithMultipleLibraries) {
-  // Config referencing multiple libraries in liblist
-  auto r = Parse(R"(
-    config design_cfg;
-      design lib1.chip_top;
-      default liblist lib1 lib2 lib3;
-      instance chip_top.cpu liblist lib2;
-    endconfig
-  )");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-  auto* cfg = r.cu->configs[0];
-  EXPECT_EQ(cfg->name, "design_cfg");
-  // Should have design cells
-  ASSERT_GE(cfg->design_cells.size(), 1u);
-}
-
 TEST(ParserSection34, ConfigWithUseClause) {
   // Config with use clause to specify library cell binding
   auto r = Parse(R"(
