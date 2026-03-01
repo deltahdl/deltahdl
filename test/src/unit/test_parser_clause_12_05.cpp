@@ -233,4 +233,21 @@ TEST(ParserA607, CaseDefaultNoColon) {
   EXPECT_TRUE(stmt->case_items[1].is_default);
 }
 
+// §12.5: case with no default
+TEST(ParserA607, CaseNoDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; 1: y = 2; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+  EXPECT_FALSE(stmt->case_items[0].is_default);
+  EXPECT_FALSE(stmt->case_items[1].is_default);
+}
+
 }  // namespace
