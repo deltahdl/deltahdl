@@ -525,9 +525,40 @@ def test_run_file_not_found(tmp_path):
     """Exits when input file does not exist."""
     args = _make_run_args(
         tmp_path, file=str(tmp_path / "missing.cpp"),
+        create_issue=True, issue=None,
     )
     with pytest.raises(SystemExit):
         _run(args)
+
+
+def test_run_missing_file_with_issue_closes_issue(
+    tmp_path, monkeypatch,
+):
+    """Missing file + --issue → close_issue called."""
+    log = stub_close_issue(monkeypatch)
+    _run(_make_run_args(
+        tmp_path, file=str(tmp_path / "missing.cpp"),
+    ))
+    assert len(log) == 1
+
+
+def test_run_missing_file_with_issue_returns(
+    tmp_path, monkeypatch,
+):
+    """Missing file + --issue → returns without SystemExit."""
+    stub_close_issue(monkeypatch)
+    assert _run(_make_run_args(
+        tmp_path, file=str(tmp_path / "missing.cpp"),
+    )) is None
+
+
+def test_run_missing_file_without_issue_exits(tmp_path):
+    """Missing file + --create-issue → SystemExit."""
+    with pytest.raises(SystemExit):
+        _run(_make_run_args(
+            tmp_path, file=str(tmp_path / "missing.cpp"),
+            create_issue=True, issue=None,
+        ))
 
 
 def test_run_no_tests(tmp_path):
