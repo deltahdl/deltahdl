@@ -308,4 +308,12 @@ TEST(ParserSection6, Sec6_6_7_NettypeInPackage) {
   ASSERT_GE(r.cu->packages.size(), 1u);
 }
 
+// §6.6.7: Nettype with byte type.
+TEST(ParserSection6, Sec6_6_7_NettypeWithByteType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype byte byte_net;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

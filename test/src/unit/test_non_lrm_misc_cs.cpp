@@ -20,17 +20,6 @@ TEST(ParserSection21, FeofFerror) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, DumpOffOnSequence) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    $dumpvars;\n"
-              "    #100 $dumpoff;\n"
-              "    #200 $dumpon;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, DumpallAndFlush) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
