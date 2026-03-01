@@ -12,3 +12,22 @@ TEST(LexerCh503, VerticalTabIsWhitespace) {
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
+// --- §5: Source locations ---
+TEST(LexerCh5, SourceLocations) {
+  auto tokens = Lex("a\nb c");
+  struct Case {
+    size_t idx;
+    int line;
+    int column;
+  };
+  Case expected[] = {
+      {0, 1, 1},
+      {1, 2, 1},
+      {2, 2, 3},
+  };
+  for (const auto& c : expected) {
+    EXPECT_EQ(tokens[c.idx].loc.line, c.line) << "token " << c.idx;
+    EXPECT_EQ(tokens[c.idx].loc.column, c.column) << "token " << c.idx;
+  }
+}
+
