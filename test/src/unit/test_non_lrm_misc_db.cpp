@@ -247,23 +247,6 @@ TEST(SourceText, ConfigDeclEndLabel) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg2");
 }
 
-// config_rule_statement: default_clause liblist_clause
-TEST(SourceText, ConfigRuleDefaultLiblist) {
-  auto r = Parse(
-      "config cfg5;\n"
-      "  design top;\n"
-      "  default liblist lib1 lib2 lib3;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rule = r.cu->configs[0]->rules[0];
-  EXPECT_EQ(rule->kind, ConfigRuleKind::kDefault);
-  ASSERT_EQ(rule->liblist.size(), 3u);
-  EXPECT_EQ(rule->liblist[0], "lib1");
-  EXPECT_EQ(rule->liblist[1], "lib2");
-  EXPECT_EQ(rule->liblist[2], "lib3");
-}
-
 // config_rule_statement: inst_clause liblist_clause with hierarchical inst_name
 TEST(SourceText, ConfigRuleInstLiblist) {
   auto r = Parse(

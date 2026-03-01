@@ -116,4 +116,20 @@ TEST(ParserA70503, TerminalBitSelectWithCondition) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
+// Edge + terminal with part select + &&& condition
+TEST(ParserA70503, EdgeTerminalPartSelectWithCondition) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $hold(posedge clk &&& en, data[3:0] &&& reset, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->data_terminal.name, "data");
+  EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kPartSelect);
+  EXPECT_NE(tc->data_condition, nullptr);
+}
+
 }  // namespace
