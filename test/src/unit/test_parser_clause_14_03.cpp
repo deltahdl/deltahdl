@@ -520,4 +520,23 @@ TEST(ParserA611, ClockingEventParenExpr) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
 }
 
+// =============================================================================
+// A.6.11 clocking_item — default default_skew (input)
+// =============================================================================
+TEST(ParserA611, ClockingItemDefaultSkewInput) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input #1;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_GE(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+}
+
 }  // namespace
