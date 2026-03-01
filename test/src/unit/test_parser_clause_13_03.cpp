@@ -82,4 +82,21 @@ TEST(ParserA27, TfPortItemNoNameInPrototype) {
   ASSERT_EQ(item->func_args.size(), 2u);
 }
 
+// block_item_declaration in task body (§13.3)
+TEST(ParserA28, BlockItemInTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task();\n"
+      "    int x;\n"
+      "    x = 5;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  ASSERT_GE(item->func_body_stmts.size(), 1u);
+  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+}
+
 }  // namespace
