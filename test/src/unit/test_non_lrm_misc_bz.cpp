@@ -44,19 +44,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult9i& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 9. Part select on LHS of assignment.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_3_PartSelect) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic en;\n"
-              "  logic [7:0] q, d;\n"
-              "  always_latch\n"
-              "    if (en) q[3:0] <= d[3:0];\n"
-              "endmodule\n"));
-}
-
-// ---------------------------------------------------------------------------
 // 10. Struct member access in assignment.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_StructMemberAccess) {

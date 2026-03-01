@@ -307,4 +307,17 @@ TEST(ParserSection9, Sec9_2_3_BitSelect) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
 }
 
+// ---------------------------------------------------------------------------
+// 9. Part select on LHS of assignment.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_PartSelect) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic en;\n"
+              "  logic [7:0] q, d;\n"
+              "  always_latch\n"
+              "    if (en) q[3:0] <= d[3:0];\n"
+              "endmodule\n"));
+}
+
 }  // namespace
