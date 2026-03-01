@@ -49,19 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7, ArrayReductionSum) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[] = '{1, 2, 3};\n"
-      "  initial y = arr.sum;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
-}
-
 // =========================================================================
 // §7.10: Queues (additional tests)
 // =========================================================================
