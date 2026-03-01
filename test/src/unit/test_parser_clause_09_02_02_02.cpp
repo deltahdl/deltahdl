@@ -396,4 +396,26 @@ TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysComb) {
   EXPECT_TRUE(found_comb);
 }
 
+// =============================================================================
+// §4.6: always_comb with multiple outputs
+// =============================================================================
+TEST(ParserSection4, Sec4_6_AlwaysCombMultipleOutputs) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, sum, carry;\n"
+      "  always_comb begin\n"
+      "    sum = a ^ b;\n"
+      "    carry = a & b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_GE(item->body->stmts.size(), 2u);
+}
+
 }  // namespace
