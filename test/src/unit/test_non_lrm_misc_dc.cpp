@@ -52,31 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-// =============================================================================
-// LRM section 39.4.2 -- Placing assertion callbacks
-// These tests verify assertion-related syntax that enables placement of
-// callbacks on assertion statements (assert, assume, cover properties).
-// =============================================================================
-TEST(ParserSection39, AssertPropertyStatement) {
-  // assert property is the target of assertion callbacks
-  auto r = Parse(R"(
-    module m;
-      logic clk, a, b;
-      assert property (@(posedge clk) a |-> b);
-    endmodule
-  )");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  // Find the assert property item
-  bool found_assert = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAssertProperty) {
-      found_assert = true;
-    }
-  }
-  EXPECT_TRUE(found_assert);
-}
-
 TEST(ParserSection39, AssumePropertyStatement) {
   // assume property can also have callbacks placed on it
   EXPECT_TRUE(ParseOk(R"(

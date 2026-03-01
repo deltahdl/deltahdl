@@ -252,4 +252,49 @@ TEST(ParserSection16, ConcurrentAssertNegedgeClock) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+using DpiParseTest = ProgramTestParse;
+
+using ApiParseTest = ProgramTestParse;
+
+struct ParseResult40 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult40 Parse(const std::string& src) {
+  ParseResult40 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// LRM section 39.4.2 -- Placing assertion callbacks
+// These tests verify assertion-related syntax that enables placement of
+// callbacks on assertion statements (assert, assume, cover properties).
+// =============================================================================
+TEST(ParserSection39, AssertPropertyStatement) {
+  // assert property is the target of assertion callbacks
+  auto r = Parse(R"(
+    module m;
+      logic clk, a, b;
+      assert property (@(posedge clk) a |-> b);
+    endmodule
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  // Find the assert property item
+  bool found_assert = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAssertProperty) {
+      found_assert = true;
+    }
+  }
+  EXPECT_TRUE(found_assert);
+}
+
 }  // namespace
