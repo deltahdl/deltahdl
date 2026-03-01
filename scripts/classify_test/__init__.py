@@ -911,8 +911,6 @@ def _run(args):
     filepath = Path(args.file).resolve()
     test_name = filepath.stem
     parsed, target = _validate_input(filepath, args.test)
-    print(f"{test_name}.cpp \u2014 {args.test}"
-          f"{' (dry run)' if args.dry_run else ''}")
     classify_tests(
         target, Path(args.output_dir).resolve(),
         Path(args.lrm).resolve(),

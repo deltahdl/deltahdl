@@ -409,23 +409,6 @@ def test_run_test_not_found(tmp_path):
         _run(args)
 
 
-def test_run_dry_run_header_shows_test_name(tmp_path, monkeypatch, capsys):
-    """Dry-run header shows the test name, not the count."""
-    _make_input_file(tmp_path)
-    stub_classifier(monkeypatch, _parser_response())
-    args = _run_args(tmp_path, dry_run=True)
-    _run(args)
-    assert "T (dry run)" in capsys.readouterr().out
-
-
-def test_run_dry_run(tmp_path, monkeypatch, capsys):
-    """Dry run classifies but does not write files."""
-    _make_input_file(tmp_path)
-    stub_classifier(monkeypatch, _parser_response())
-    args = _run_args(tmp_path, dry_run=True)
-    _run(args)
-    assert "dry run" in capsys.readouterr().out
-
 
 def test_run_dry_run_shows_target(tmp_path, monkeypatch, capsys):
     """Dry-run output shows the target filename."""

@@ -226,11 +226,6 @@ def test_test_not_found_reports_error(tmp_path):
 # ---- Dry run ---------------------------------------------------------------
 
 
-def test_dry_run_reports_completion(tmp_path):
-    """Dry run output includes the dry run marker."""
-    out = _run_dry(tmp_path).stdout
-    assert "dry run" in out
-
 
 def test_dry_run_lists_target_filename(tmp_path):
     """Dry run output lists the target filename."""
