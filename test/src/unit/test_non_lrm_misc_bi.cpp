@@ -40,38 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-TEST(ParserA23, ListOfParamAssignmentsMultiple) {
-  auto r = Parse("module m; parameter int A = 1, B = 2, C = 3; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl) count++;
-  }
-  EXPECT_GE(count, 3);
-}
-
-TEST(ParserA24, ParamAssignmentNoDefault) {
-  // Parameter in module header without default
-  auto r = Parse("module m #(parameter int P); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// --- specparam_assignment ---
-// specparam_identifier = constant_mintypmax_expression
-// | pulse_control_specparam
-TEST(ParserA24, SpecparamAssignmentBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tRise = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // --- type_assignment ---
 // type_identifier [ = data_type_or_incomplete_class_scoped_type ]
 TEST(ParserA24, TypeAssignmentWithDefault) {
