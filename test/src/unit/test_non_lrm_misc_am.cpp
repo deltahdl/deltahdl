@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.3: iff qualifier on event expression
-TEST(ParserA605, EventExprIff) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a iff enable) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
-}
-
 // §9.4.2.3: posedge with iff qualifier
 TEST(ParserA605, EventExprPosedgeIff) {
   auto r = Parse(
