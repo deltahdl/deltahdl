@@ -183,4 +183,15 @@ TEST(ConstEval, Replication) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4{1'b1}}", f)), 15);
 }
 
+// § constant_multiple_concatenation ::=
+//     { constant_expression constant_concatenation }
+TEST(ParserA81, ConstantMultipleConcatenation) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter P = {4{8'hFF}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

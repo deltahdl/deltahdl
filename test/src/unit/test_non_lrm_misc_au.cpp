@@ -14,17 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-// § constant_multiple_concatenation ::=
-//     { constant_expression constant_concatenation }
-TEST(ParserA81, ConstantMultipleConcatenation) {
-  auto r = Parse(
-      "module m;\n"
-      "  parameter P = {4{8'hFF}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § multiple_concatenation ::= { expression concatenation }
 TEST(ParserA81, MultipleConcatenationBasic) {
   auto r = Parse("module m; initial x = {4{a}}; endmodule\n");
