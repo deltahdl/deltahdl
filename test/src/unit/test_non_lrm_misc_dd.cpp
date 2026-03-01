@@ -12,18 +12,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_multiple_concatenation in parameter
-TEST(ElabA81, ConstantMultipleConcatInParam) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  parameter [31:0] P = {4{8'hFF}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // § primary — streaming concatenation elaborates
 TEST(ElabA84, PrimaryStreamingConcatElaborates) {
   ElabFixture f;

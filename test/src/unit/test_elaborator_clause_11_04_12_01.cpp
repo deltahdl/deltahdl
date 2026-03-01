@@ -92,4 +92,16 @@ TEST(ElabA81, ReplicateInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// § constant_multiple_concatenation in parameter
+TEST(ElabA81, ConstantMultipleConcatInParam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter [31:0] P = {4{8'hFF}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
