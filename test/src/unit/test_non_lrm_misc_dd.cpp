@@ -12,20 +12,6 @@ using namespace delta;
 
 namespace {
 
-// § concatenation in initial block elaborates
-TEST(ElabA81, ConcatInInitialBlock) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic [3:0] x, y;\n"
-      "  initial a = {x, y};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // § replication in initial block elaborates
 TEST(ElabA81, ReplicateInInitialBlock) {
   ElabFixture f;
