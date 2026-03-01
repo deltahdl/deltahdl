@@ -536,4 +536,16 @@ TEST(ParserA83, IndexedRangePlusColon) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
+// § constant_indexed_range ::= constant_expression -: constant_expression
+TEST(ParserA83, IndexedRangeMinusColon) {
+  auto r = Parse("module m; initial x = data[7-:4]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  EXPECT_FALSE(rhs->is_part_select_plus);
+  EXPECT_TRUE(rhs->is_part_select_minus);
+}
+
 }  // namespace
