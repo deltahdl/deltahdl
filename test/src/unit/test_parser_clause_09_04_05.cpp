@@ -616,4 +616,34 @@ TEST(ParserSection9, Sec9_4_5_RepeatInAlwaysBlock) {
   ASSERT_FALSE(stmt->events.empty());
 }
 
+static Stmt* FirstTaskStmt(ParseResult9f& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kTaskDecl) continue;
+    if (item->func_body_stmts.empty()) return nullptr;
+    return item->func_body_stmts[0];
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.4.5 -- Repeat event in task
+// =============================================================================
+// Repeat event used in a task body.
+TEST(ParserSection9, Sec9_4_5_RepeatInTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  task my_task;\n"
+      "    a = repeat(5) @(posedge clk) b;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstTaskStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_FALSE(stmt->events.empty());
+}
+
 }  // namespace
