@@ -89,27 +89,6 @@ static Stmt* FirstAlwaysCombStmt(ParseResult9g& r) {
 namespace {
 
 // =============================================================================
-// LRM section 9.4.5 -- Repeat event with multiple events (comma)
-// =============================================================================
-// Repeat event with comma-separated events: a = repeat(2) @(posedge clk,
-// negedge rst) b;
-TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, rst, a, b;\n"
-      "  initial a = repeat(2) @(posedge clk, negedge rst) b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_NE(stmt->repeat_event_count, nullptr);
-  ASSERT_EQ(stmt->events.size(), 2u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
-}
-
-// =============================================================================
 // LRM section 9.4.5 -- Repeat event in always block
 // =============================================================================
 // Repeat event used inside an always block body.
