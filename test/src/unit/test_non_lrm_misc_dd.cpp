@@ -12,18 +12,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_concatenation in parameter initialization
-TEST(ElabA81, ConstantConcatenationInParam) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  parameter [15:0] P = {8'hAB, 8'hCD};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // § multiple_concatenation (replication) in continuous assignment
 TEST(ElabA81, ReplicationInContAssign) {
   ElabFixture f;

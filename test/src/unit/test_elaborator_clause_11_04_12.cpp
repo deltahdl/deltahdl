@@ -71,4 +71,16 @@ TEST(ElabA81, ConcatenationInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// § constant_concatenation in parameter initialization
+TEST(ElabA81, ConstantConcatenationInParam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter [15:0] P = {8'hAB, 8'hCD};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
