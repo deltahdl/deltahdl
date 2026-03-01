@@ -88,4 +88,62 @@ TEST(ParserA701, PulsestyleOndetectSingleOutput) {
   EXPECT_EQ(item->signal_list[0], "q");
 }
 
+TEST(ParserA701, PulsestyleOndetectMultipleOutputs) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    pulsestyle_ondetect q1, q2;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  auto* item = spec->specify_items[0];
+  EXPECT_TRUE(item->is_ondetect);
+  ASSERT_EQ(item->signal_list.size(), 2u);
+  EXPECT_EQ(item->signal_list[0], "q1");
+  EXPECT_EQ(item->signal_list[1], "q2");
+}
+
+struct ParseResult31 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult31 Parse(const std::string& src) {
+  ParseResult31 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using ConfigParseTest = ProgramTestParse;
+
+// =============================================================================
+// §30.4 Pulsestyle and showcancelled
+// =============================================================================
+TEST_F(SpecifyTest, PulsestyleOnevent) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  pulsestyle_onevent out1;\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  auto* item = spec->specify_items[0];
+  EXPECT_EQ(item->kind, SpecifyItemKind::kPulsestyle);
+  EXPECT_FALSE(item->is_ondetect);
+  ASSERT_EQ(item->signal_list.size(), 1u);
+  EXPECT_EQ(item->signal_list[0], "out1");
+}
+
 }  // namespace

@@ -159,26 +159,6 @@ TEST(ParserSection28, Sec28_12_Noshowcancelled) {
   ASSERT_EQ(si->signal_list.size(), 2u);
 }
 
-// =============================================================================
-// §30.4 Pulsestyle and showcancelled
-// =============================================================================
-TEST_F(SpecifyTest, PulsestyleOnevent) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  pulsestyle_onevent out1;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  auto* item = spec->specify_items[0];
-  EXPECT_EQ(item->kind, SpecifyItemKind::kPulsestyle);
-  EXPECT_FALSE(item->is_ondetect);
-  ASSERT_EQ(item->signal_list.size(), 1u);
-  EXPECT_EQ(item->signal_list[0], "out1");
-}
-
 TEST_F(SpecifyTest, PulsestyleOndetect) {
   auto* cu = Parse(
       "module m;\n"
