@@ -123,7 +123,7 @@ def run_classify_test(
     total: int,
 ) -> bool:
     """Invoke classify_test for a single test. Returns True on success."""
-    print(f"Processing test {index}/{total}: {test_name}")
+    print(f"Processing test {index}/{total}: {test_name}()")
     cmd = _build_command(args, test_name)
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:

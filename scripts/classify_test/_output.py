@@ -22,12 +22,26 @@ def _wrap(label, value):
     )
 
 
+_PREFIX_TO_STAGE = {
+    "test_preprocessor_": "preprocessor",
+    "test_lexer_": "lexer",
+    "test_parser_": "parser",
+    "test_elaborator_": "elaborator",
+    "test_simulator_": "simulator",
+    "test_synthesizer_": "synthesizer",
+}
+
+
 def print_classification_table(tests):
     """Print the classification results as sub-reports."""
     for i, t in enumerate(tests):
         print(_wrap("Test", f"{t.test_name}()"))
         print(_wrap("Clause", _format_clause(t.clause)))
         print(_wrap("Rationale", t.rationale or ""))
+        stage = _PREFIX_TO_STAGE.get(t.prefix, t.prefix or "")
+        print(_wrap("Stage", stage))
+        print(_wrap("Stage rationale",
+                     getattr(t, "prefix_rationale", "") or ""))
         if i < len(tests) - 1:
             print("  ----")
 

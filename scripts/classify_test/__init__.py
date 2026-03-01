@@ -60,7 +60,7 @@ from ._split import (
 # Data structures
 # ---------------------------------------------------------------------------
 @dataclass
-class TestBlock:
+class TestBlock:  # pylint: disable=too-many-instance-attributes
     """A single TEST/TEST_F/TEST_P block with classification metadata."""
 
     suite_name: str
@@ -70,6 +70,7 @@ class TestBlock:
     prefix: str | None = None
     clause: str | None = None
     rationale: str | None = None
+    prefix_rationale: str | None = None
 
 
 @dataclass
@@ -346,10 +347,12 @@ _PREFIX_SCHEMA = PREFIX_SCHEMA
 def _detect_prefix(test, clause, lrm_path):
     """Detect pipeline stage prefix from test body."""
     if clause.replace("_", "-").startswith("non-lrm"):
+        test.prefix_rationale = "clause is non-LRM"
         return "test_non_lrm_"
     body = "\n".join(test.lines)
     for pattern, prefix in _PREFIX_PATTERNS:
         if pattern in body:
+            test.prefix_rationale = f"body contains '{pattern}'"
             return prefix
     prompt = _PREFIX_PROMPT_TEMPLATE.format(
         lrm_path=lrm_path,
@@ -361,6 +364,7 @@ def _detect_prefix(test, clause, lrm_path):
     stage = resp.get("pipeline_stage", "")
     prefix = _STAGE_TO_PREFIX.get(stage)
     if prefix:
+        test.prefix_rationale = resp.get("rationale", "")
         return prefix
     print(f"ERROR: Cannot detect pipeline stage for test"
           f" {test.test_name}. Claude returned: {resp}")

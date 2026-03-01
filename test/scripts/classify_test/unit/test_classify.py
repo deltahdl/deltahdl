@@ -150,6 +150,27 @@ def test_detect_prefix_no_match_fallback(monkeypatch):
     assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_simulator_"
 
 
+def test_detect_prefix_fallback_stores_rationale(monkeypatch):
+    """Fallback stores prefix_rationale on the test block."""
+    monkeypatch.setattr(
+        classify_test, "_call_claude",
+        lambda _p, _s=None: {
+            "pipeline_stage": "simulator",
+            "rationale": "timing checks",
+        },
+    )
+    t = _tb("T", body=["  EvalExpr(ctx, e);"])
+    _detect_prefix(t, "6.1", "/tmp/lrm.txt")
+    assert t.prefix_rationale == "timing checks"
+
+
+def test_detect_prefix_pattern_match_rationale():
+    """Pattern match stores rationale mentioning matched pattern."""
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    _detect_prefix(t, "6.1", "/tmp/lrm.txt")
+    assert "Parse" in t.prefix_rationale
+
+
 def test_detect_prefix_fallback_calls_claude(monkeypatch):
     """Fallback invokes _call_claude with prefix prompt."""
     calls = []

@@ -23,6 +23,7 @@ def make_test_block(
         prefix=prefix,
         clause=clause,
         rationale=None,
+        prefix_rationale=None,
     )
 
 
