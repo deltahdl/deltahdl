@@ -49,4 +49,17 @@ TEST(LibraryText, IncludeStatementRelative) {
   EXPECT_EQ(r.cu->lib_includes[0]->file_path, "./sub/lib.map");
 }
 
+// =============================================================================
+// Comments in library source text.
+// =============================================================================
+// Line comments.
+TEST(LibraryText, LineComments) {
+  auto r = ParseLibrary(
+      "// This is a library map file\n"
+      "library lib1 /proj/*.v; // RTL files\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+}
+
 }  // namespace

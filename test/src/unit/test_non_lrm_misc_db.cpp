@@ -44,19 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// Comments in library source text.
-// =============================================================================
-// Line comments.
-TEST(LibraryText, LineComments) {
-  auto r = ParseLibrary(
-      "// This is a library map file\n"
-      "library lib1 /proj/*.v; // RTL files\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-}
-
 // Block comments.
 TEST(LibraryText, BlockComments) {
   auto r = ParseLibrary(
