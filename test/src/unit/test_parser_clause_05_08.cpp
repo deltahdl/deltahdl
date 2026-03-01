@@ -84,4 +84,11 @@ TEST(ParserCh508, TimeLiteral_Fs) {
   EXPECT_TRUE(ParseOk("module m; initial #500fs; endmodule"));
 }
 
+// § time_literal — unsigned_number time_unit (us)
+TEST(ParserA84, TimeLiteralUs) {
+  auto r = Parse("module m; initial #1us; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
