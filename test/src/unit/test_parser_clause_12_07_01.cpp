@@ -496,4 +496,22 @@ TEST(ParserA608, ForEmptyInit) {
   EXPECT_EQ(stmt->for_init, nullptr);
 }
 
+// §A.6.8: expression in for condition is optional — empty cond
+TEST(ParserA608, ForEmptyCond) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; ; i++) begin\n"
+      "      if (i == 10) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_EQ(stmt->for_cond, nullptr);
+}
+
 }  // namespace
