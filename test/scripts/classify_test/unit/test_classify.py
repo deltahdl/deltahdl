@@ -154,7 +154,7 @@ def test_detect_prefix_fallback_calls_claude(monkeypatch):
     """Fallback invokes _call_claude with prefix prompt."""
     calls = []
 
-    def spy(prompt, schema=None):
+    def spy(prompt, _schema=None):
         calls.append(prompt)
         return {"pipeline_stage": "simulator", "rationale": "r"}
 
