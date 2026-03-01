@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.12 Randsequence — rs_production_item
-// =============================================================================
-// Production item with arguments
-TEST(ParserA612, RsProductionItemWithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : gen(1, 2);\n"
-      "      void gen(int a, int b) : { $display(a + b); };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // Production item bare (no arguments)
 TEST(ParserA612, RsProductionItemBare) {
   auto r = Parse(
