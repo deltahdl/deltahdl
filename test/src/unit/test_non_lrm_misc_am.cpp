@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.6.2: release statement
-TEST(ParserA604, StmtItemReleaseStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    release x;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
-}
-
 // ---------------------------------------------------------------------------
 // function_statement ::= statement
 // function_statement_or_null ::= function_statement | { attribute_instance } ;

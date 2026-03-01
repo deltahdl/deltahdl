@@ -168,4 +168,19 @@ TEST(ParserA604, StmtItemForceStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kForce);
 }
 
+// §10.6.2: release statement
+TEST(ParserA604, StmtItemReleaseStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    release x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
+}
+
 }  // namespace
