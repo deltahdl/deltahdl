@@ -119,4 +119,20 @@ TEST(ParserA86, BinaryModulePathBitwiseAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// 6 delays with conditional path
+TEST(ParserA704, SixDelaysConditionalPath) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    if (en) (a => b) = (1, 2, 3, 4, 5, 6);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_NE(si->path.condition, nullptr);
+  ASSERT_EQ(si->path.delays.size(), 6u);
+}
+
 }  // namespace
