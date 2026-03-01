@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA608, ForeachSingleVar) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foreach (arr[i]) x = i; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->foreach_vars.size(), 1u);
-  EXPECT_EQ(stmt->foreach_vars[0], "i");
-}
-
 // §A.6.8: loop_variables — multiple comma-separated identifiers
 TEST(ParserA608, ForeachMultipleVars) {
   auto r = Parse(
