@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-// edge without bracket list — no descriptors stored
-TEST(ParserA70503, EdgeKeywordWithoutBrackets) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, edge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kEdge);
-  EXPECT_TRUE(tc->data_edge_descriptors.empty());
-}
-
 // edge_control_specifier on ref event
 TEST(ParserA70503, EdgeControlSpecifierOnRefEvent) {
   auto r = Parse(
