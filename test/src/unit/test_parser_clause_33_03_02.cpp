@@ -40,4 +40,13 @@ TEST(LibraryText, IncludeStatement) {
   EXPECT_EQ(r.cu->lib_includes[0]->file_path, "/proj/other.map");
 }
 
+// Include statement with relative path.
+TEST(LibraryText, IncludeStatementRelative) {
+  auto r = ParseLibrary("include ./sub/lib.map;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->lib_includes.size(), 1u);
+  EXPECT_EQ(r.cu->lib_includes[0]->file_path, "./sub/lib.map");
+}
+
 }  // namespace
