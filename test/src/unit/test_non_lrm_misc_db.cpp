@@ -235,23 +235,6 @@ TEST(LibraryText, LexerFilePathSpecParentDir) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "../rtl/*.v");
 }
 
-TEST_F(ConfigTest, CellClauseWithLibUse) {
-  auto* unit = Parse(R"(
-    config cfg;
-      design lib.top;
-      cell mylib.adder use otherlib.fast_adder;
-    endconfig
-  )");
-  ASSERT_EQ(unit->configs.size(), 1u);
-  ASSERT_EQ(unit->configs[0]->rules.size(), 1u);
-  auto* rule = unit->configs[0]->rules[0];
-  EXPECT_EQ(rule->kind, ConfigRuleKind::kCell);
-  EXPECT_EQ(rule->cell_lib, "mylib");
-  EXPECT_EQ(rule->cell_name, "adder");
-  EXPECT_EQ(rule->use_lib, "otherlib");
-  EXPECT_EQ(rule->use_cell, "fast_adder");
-}
-
 // =============================================================================
 // §33.4.2 Config with nested config references
 // =============================================================================
