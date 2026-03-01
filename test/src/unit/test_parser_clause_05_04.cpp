@@ -114,4 +114,36 @@ TEST(ParserCh501, Sec5_1_AdjacentLineComments) {
   EXPECT_EQ(item->name, "a");
 }
 
+struct ConfigTest : ::testing::Test {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
+    source_ = src;
+    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
+    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
+    return parser_->Parse();
+  }
+
+  bool HasErrors() const { return diag_.HasErrors(); }
+
+  SourceManager mgr_;
+  Arena arena_;
+  DiagEngine diag_{mgr_};
+  std::string source_;
+  std::unique_ptr<Lexer> lexer_;
+  std::unique_ptr<Parser> parser_;
+};
+
+using DpiParseTest = ProgramTestParse;
+
+// Block comments.
+TEST(LibraryText, BlockComments) {
+  auto r = ParseLibrary(
+      "/* Multi-line\n"
+      "   comment */\n"
+      "library lib1 /proj/*.v;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+}
+
 }  // namespace

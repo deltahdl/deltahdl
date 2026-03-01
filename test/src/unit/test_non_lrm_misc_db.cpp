@@ -44,17 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-// Block comments.
-TEST(LibraryText, BlockComments) {
-  auto r = ParseLibrary(
-      "/* Multi-line\n"
-      "   comment */\n"
-      "library lib1 /proj/*.v;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-}
-
 // =============================================================================
 // AST structural verification — ensures AST nodes capture all data.
 // =============================================================================
