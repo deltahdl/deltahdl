@@ -288,4 +288,13 @@ TEST(LibraryText, LibraryDeclFullForm) {
   EXPECT_EQ(r.cu->libraries[0]->incdir_paths[1], "/proj/common");
 }
 
+// Library declaration with hierarchical wildcard path (...).
+TEST(LibraryText, LibraryDeclHierarchicalWildcard) {
+  auto r = ParseLibrary("library deepLib .../a.v;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], ".../a.v");
+}
+
 }  // namespace
