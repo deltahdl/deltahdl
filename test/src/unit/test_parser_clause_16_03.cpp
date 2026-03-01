@@ -296,4 +296,19 @@ TEST(ParserA604, StmtItemProceduralAssertionStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
 }
 
+// assert ( expression ) pass_stmt ;
+TEST(ParserA610, SimpleAssertPassAction) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert(1) $display(\"pass\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  ASSERT_NE(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+}
+
 }  // namespace
