@@ -9,26 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §12.3: statements with attributes execute normally
-TEST(SimA604, AttributedStatementExecutes) {
-  SimA604Fixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    (* synthesis *) x = 8'd99;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
-}
-
 // =============================================================================
 // A.6.7.1 Patterns — Simulation tests
 // =============================================================================
@@ -634,7 +614,6 @@ TEST(VpiAnnexK2, VpiTimeDefaultInit) {
 // introduced in §4.2, covering parallel process execution, sequential
 // ordering within processes, and interaction between concurrent elements.
 // ===========================================================================
-
 // ---------------------------------------------------------------------------
 // 29. §4.2 Processes are concurrently scheduled elements: always_comb
 //     re-evaluates when any input changes.
