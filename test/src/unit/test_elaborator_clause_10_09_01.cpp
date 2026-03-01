@@ -174,4 +174,15 @@ TEST(ElabCh511, ArrayInitPattern_NestedOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(ElabCh511, ArrayInitPattern_SizeMismatch) {
+  // §10.9.1: Expressions shall match element for element; 3 != 2.
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  int arr[1:0] = '{10, 20, 30};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
