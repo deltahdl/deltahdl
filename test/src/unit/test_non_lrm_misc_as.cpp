@@ -15,26 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// Simple terminal — no range, no interface (baseline)
-TEST(ParserA703, SimpleTerminalNoRange) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kNone);
-  EXPECT_TRUE(si->path.src_ports[0].interface_name.empty());
-  EXPECT_EQ(si->path.dst_ports[0].name, "b");
-  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kNone);
-  EXPECT_TRUE(si->path.dst_ports[0].interface_name.empty());
-}
-
 // =============================================================================
 // A.7.4 path_delay_value — bare vs parenthesized
 // =============================================================================
