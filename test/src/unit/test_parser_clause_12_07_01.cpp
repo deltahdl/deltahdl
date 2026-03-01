@@ -594,4 +594,20 @@ TEST(ParserA608, ForLogicTypeInit) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
 }
 
+// --- for_step_assignment: operator_assignment ---
+TEST(ParserA608, ForStepCompoundAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i += 1) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_NE(stmt->for_step, nullptr);
+}
+
 }  // namespace
