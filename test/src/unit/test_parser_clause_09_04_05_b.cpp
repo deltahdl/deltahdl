@@ -120,4 +120,21 @@ TEST(ParserA605, IntraAssignDelayBlocking) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
+// §9.4.5: intra-assignment event in blocking assignment
+TEST(ParserA605, IntraAssignEventBlocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+}
+
 }  // namespace
