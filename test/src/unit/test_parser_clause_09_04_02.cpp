@@ -378,4 +378,24 @@ TEST(ParserA605, EventControlParenthesized) {
   ASSERT_EQ(stmt->events.size(), 1u);
 }
 
+// ---------------------------------------------------------------------------
+// clocking_event ::=
+//   @ ps_identifier | @ hierarchical_identifier | @ ( event_expression )
+// ---------------------------------------------------------------------------
+// §9.4.2: @(posedge clk) — clocking event with edge
+TEST(ParserA605, ClockingEventPosedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+}
+
 }  // namespace
