@@ -186,4 +186,48 @@ TEST(ParserClause03, Cl3_12_1_HierRefFromCUScope) {
   ASSERT_EQ(r.cu->modules.size(), 2u);
 }
 
+// 13. CU allows type sharing without packages (§3.12.1 last paragraph).
+// Users can share types across a CU without declaring a package.
+// Top-level typedef is parsed as a module item (discarded at top level
+// in current implementation) or could be a class.  Verify CU-scope
+// classes enable type sharing.
+TEST(ParserClause03, Cl3_12_1_TypeSharingViaCUScope) {
+  auto r = ParseWithPreprocessor(
+      "class shared_type;\n"
+      "  int value;\n"
+      "endclass\n"
+      "module m1;\n"
+      "  shared_type obj;\n"
+      "endmodule\n"
+      "module m2;\n"
+      "  shared_type obj;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  ASSERT_EQ(r.cu->modules.size(), 2u);
+}
+
+// 16. Checker declarations at CU scope.
+TEST(ParserClause03, Cl3_12_1_CheckerAtCUScope) {
+  auto r = ParseWithPreprocessor(
+      "checker my_chk;\n"
+      "endchecker\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+}
+
+// =============================================================================
+// A.1.2 source_text ::= [ timeunits_declaration ] { description }
+// =============================================================================
+// Empty source text.
+TEST(SourceText, EmptySourceText) {
+  auto r = ParseWithPreprocessor("");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules.empty());
+}
+
 }  // namespace
