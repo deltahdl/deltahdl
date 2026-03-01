@@ -54,6 +54,14 @@ def _parse_args() -> argparse.Namespace:
         "--max-lines", type=int, required=True,
         help="Maximum lines per output file",
     )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Classify only, don't write files",
+    )
+    parser.add_argument(
+        "--no-commit", action="store_true",
+        help="Skip git commit and push",
+    )
     return parser.parse_args()
 
 
@@ -137,6 +145,10 @@ def _build_command(
         "--repo", args.repo,
         "--max-lines", str(args.max_lines),
     ]
+    if args.dry_run:
+        cmd.append("--dry-run")
+    if args.no_commit:
+        cmd.append("--no-commit")
     return cmd
 
 

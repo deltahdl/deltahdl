@@ -61,6 +61,8 @@ def _make_args(**overrides):
         "organization": "testorg",
         "repo": "testrepo",
         "max_lines": 1000,
+        "dry_run": False,
+        "no_commit": False,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -144,6 +146,30 @@ def test_parse_args_max_lines_required(monkeypatch):
     monkeypatch.setattr(sys, "argv", argv)
     with pytest.raises(SystemExit):
         _parse_args()
+
+
+def test_parse_args_dry_run(monkeypatch):
+    """Parses --dry-run flag."""
+    monkeypatch.setattr(sys, "argv", [*_BASE_ARGV, "--dry-run"])
+    assert _parse_args().dry_run is True
+
+
+def test_parse_args_dry_run_default(monkeypatch):
+    """Default dry_run is False."""
+    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
+    assert _parse_args().dry_run is False
+
+
+def test_parse_args_no_commit(monkeypatch):
+    """Parses --no-commit flag."""
+    monkeypatch.setattr(sys, "argv", [*_BASE_ARGV, "--no-commit"])
+    assert _parse_args().no_commit is True
+
+
+def test_parse_args_no_commit_default(monkeypatch):
+    """Default no_commit is False."""
+    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
+    assert _parse_args().no_commit is False
 
 
 def test_parse_args_prog_name(monkeypatch, capsys):
@@ -488,6 +514,30 @@ def test_resolve_sub_issues_returns_entries(monkeypatch):
 
 
 # ---- _build_command with sub_issue ----------------------------------------
+
+
+def test_build_command_dry_run():
+    """--dry-run appears in subprocess command."""
+    cmd = _build_command(_make_args(dry_run=True), "/p/a.cpp")
+    assert "--dry-run" in cmd
+
+
+def test_build_command_no_dry_run():
+    """--dry-run absent when flag is False."""
+    cmd = _build_command(_make_args(), "/p/a.cpp")
+    assert "--dry-run" not in cmd
+
+
+def test_build_command_no_commit():
+    """--no-commit appears in subprocess command."""
+    cmd = _build_command(_make_args(no_commit=True), "/p/a.cpp")
+    assert "--no-commit" in cmd
+
+
+def test_build_command_no_no_commit():
+    """--no-commit absent when flag is False."""
+    cmd = _build_command(_make_args(), "/p/a.cpp")
+    assert "--no-commit" not in cmd
 
 
 def test_build_command_with_sub_issue():

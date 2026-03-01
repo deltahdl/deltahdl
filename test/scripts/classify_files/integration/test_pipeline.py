@@ -29,6 +29,8 @@ def _pipeline_args(**overrides):
         "sub_issues": None,
         "output_dir": "/out",
         "lrm": "/lrm.txt",
+        "dry_run": False,
+        "no_commit": False,
         **_ARGS_DEFAULTS, **overrides,
     }
     return SimpleNamespace(**result)

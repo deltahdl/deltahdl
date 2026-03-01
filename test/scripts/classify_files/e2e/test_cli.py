@@ -229,6 +229,28 @@ def test_sub_issues_batch_exits_zero(tmp_path):
     assert result.returncode == 0
 
 
+def test_dry_run_exits_zero(tmp_path):
+    """--dry-run flag accepted and exits 0."""
+    fake = _install_fakes(tmp_path)
+    env = _base_env(tmp_path, fake)
+    result = _invoke(
+        *_all_flags(tmp_path), "--dry-run",
+        cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode == 0
+
+
+def test_no_commit_exits_zero(tmp_path):
+    """--no-commit flag accepted and exits 0."""
+    fake = _install_fakes(tmp_path)
+    env = _base_env(tmp_path, fake)
+    result = _invoke(
+        *_all_flags(tmp_path), "--no-commit",
+        cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode == 0
+
+
 def test_both_flags_rejects(tmp_path):
     """--files and --sub-issues together are rejected."""
     fake = _install_fakes(tmp_path)
