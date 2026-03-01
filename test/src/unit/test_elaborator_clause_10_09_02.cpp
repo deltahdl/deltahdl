@@ -116,4 +116,33 @@ TEST(SimA60701, PositionalStructPatternInit) {
   EXPECT_EQ(var->value.ToUint64(), 775u);
 }
 
+// ---------------------------------------------------------------------------
+// assignment_pattern: struct with three fields — simulation
+// ---------------------------------------------------------------------------
+// §10.9.2: struct with three fields, named pattern
+TEST(SimA60701, ThreeFieldStructNamedPattern) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] x;\n"
+      "    logic [7:0] y;\n"
+      "    logic [7:0] z;\n"
+      "  } triple_t;\n"
+      "  triple_t v;\n"
+      "  initial begin\n"
+      "    v = triple_t'{x: 8'd1, y: 8'd2, z: 8'd3};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("v");
+  ASSERT_NE(var, nullptr);
+  // x=1 bits[23:16], y=2 bits[15:8], z=3 bits[7:0]: 0x010203 = 66051
+  EXPECT_EQ(var->value.ToUint64(), 0x010203u);
+}
+
 }  // namespace
