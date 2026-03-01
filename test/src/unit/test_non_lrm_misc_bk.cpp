@@ -63,15 +63,6 @@ TEST(ParserSection6, MatchingTypesSameSigningModifier) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypedefUnion) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  typedef union { int i; real r; } num_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // LRM section 6.20 -- Type operator
 // =============================================================================

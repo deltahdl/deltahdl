@@ -27,4 +27,13 @@ TEST(ParserSection6, TypedefForwardStruct) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection6, TypedefUnion) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  typedef union { int i; real r; } num_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
