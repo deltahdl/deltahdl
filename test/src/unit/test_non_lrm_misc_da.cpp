@@ -20,17 +20,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-// Library declaration with wildcard file path.
-TEST(LibraryText, LibraryDeclWildcard) {
-  auto r = ParseLibrary("library rtlLib *.v;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-  EXPECT_EQ(r.cu->libraries[0]->name, "rtlLib");
-  ASSERT_EQ(r.cu->libraries[0]->file_paths.size(), 1u);
-  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "*.v");
-}
-
 // Library declaration with dot-slash relative path.
 TEST(LibraryText, LibraryDeclDotSlash) {
   auto r = ParseLibrary("library gateLib ./*.vg;\n");

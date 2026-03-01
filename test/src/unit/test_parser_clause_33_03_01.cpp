@@ -216,4 +216,15 @@ TEST(LibraryText, BasicLibraryDecl) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/proj/rtl/top.v");
 }
 
+// Library declaration with wildcard file path.
+TEST(LibraryText, LibraryDeclWildcard) {
+  auto r = ParseLibrary("library rtlLib *.v;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  EXPECT_EQ(r.cu->libraries[0]->name, "rtlLib");
+  ASSERT_EQ(r.cu->libraries[0]->file_paths.size(), 1u);
+  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "*.v");
+}
+
 }  // namespace
