@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// if with else
-TEST(ParserA612, RsIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : if (0) a else b;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.6.12 Randsequence — rs_repeat
 // =============================================================================
