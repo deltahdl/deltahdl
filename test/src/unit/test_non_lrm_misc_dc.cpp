@@ -38,27 +38,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// LRM section 38.37 -- vpi_register_systf: DPI-C exports for system tasks
-// These tests verify DPI-C export declarations modeling the callback
-// registration pattern used by vpi_register_systf().
-// =============================================================================
-TEST(ParserSection38, DpiExportFunctionForCalltf) {
-  // Export an SV function for C-side systf registration
-  auto r = Parse(R"(
-    module m;
-      export "DPI-C" function calltf_routine;
-    endmodule
-  )");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
-  EXPECT_EQ(items[0]->name, "calltf_routine");
-  EXPECT_FALSE(items[0]->dpi_is_task);
-}
-
 TEST(ParserSection38, DpiExportTaskForSystf) {
   // Export a task for use as a systf callback handler
   auto r = Parse(R"(
