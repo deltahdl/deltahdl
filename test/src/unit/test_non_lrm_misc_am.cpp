@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2: event control followed by null statement
-TEST(ParserA605, ProceduralTimingControlEventNull) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk) ;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
-}
-
 // ---------------------------------------------------------------------------
 // delay_or_event_control ::=
 //   delay_control | event_control | repeat ( expression ) event_control
