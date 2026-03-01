@@ -50,4 +50,22 @@ TEST(ParserA701, ShowcancelledSingleOutput) {
   EXPECT_EQ(item->signal_list[0], "out1");
 }
 
+TEST(ParserA701, NoshowcancelledSingleOutput) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    noshowcancelled out1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  auto* item = spec->specify_items[0];
+  EXPECT_EQ(item->kind, SpecifyItemKind::kShowcancelled);
+  EXPECT_TRUE(item->is_noshowcancelled);
+  ASSERT_EQ(item->signal_list.size(), 1u);
+  EXPECT_EQ(item->signal_list[0], "out1");
+}
+
 }  // namespace

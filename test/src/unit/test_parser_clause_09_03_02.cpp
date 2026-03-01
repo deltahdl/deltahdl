@@ -510,4 +510,26 @@ TEST(ParserSection4, Sec4_6_ForkJoinNoneConcurrent) {
   EXPECT_EQ(body->join_kind, TokenKind::kKwJoinNone);
 }
 
+// ---------------------------------------------------------------------------
+// 3. Fork-join_any with two threads
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_ForkJoinAnyTwoThreads) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #5 a = 1;\n"
+      "      #100 b = 2;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
+  EXPECT_EQ(stmt->fork_stmts.size(), 2u);
+}
+
 }  // namespace
