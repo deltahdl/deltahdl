@@ -183,4 +183,19 @@ TEST(ParserSection6, Sec6_11_TimeSignedOverride) {
   EXPECT_EQ(item->name, "ts");
 }
 
+// 12. bit signed override.
+TEST(ParserSection6, Sec6_11_BitSignedOverride) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit signed bs;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
+  EXPECT_TRUE(item->data_type.is_signed);
+  EXPECT_EQ(item->name, "bs");
+}
+
 }  // namespace

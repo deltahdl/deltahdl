@@ -164,4 +164,24 @@ TEST(ParserSection11, PostfixIncrementInForStep) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// LRM section 12.7.1 -- For loop with variable declarations (additional cases)
+// =============================================================================
+// For loop with increment expression in step.
+TEST(ParserSection12, ForWithIncrementStep) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i++)\n"
+      "      x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
+}
+
 }  // namespace
