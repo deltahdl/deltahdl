@@ -137,4 +137,23 @@ TEST(ParserA703, InputTerminalPlusIndexed) {
   EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
 }
 
+// Input terminal with descending indexed part-select
+TEST(ParserA703, InputTerminalMinusIndexed) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a[7-:4] => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.src_ports.size(), 1u);
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kMinusIndexed);
+  EXPECT_NE(si->path.src_ports[0].range_left, nullptr);
+  EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
+}
+
 }  // namespace
