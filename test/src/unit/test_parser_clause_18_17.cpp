@@ -140,4 +140,18 @@ TEST(ParserA612, RsProdAsProductionItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// rs_prod as rs_code_block
+TEST(ParserA612, RsProdAsCodeBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { $display(\"inline\"); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
