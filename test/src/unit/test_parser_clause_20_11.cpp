@@ -95,4 +95,13 @@ TEST(ParserSection39, AssertKillNoArgs) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+TEST(ParserSection39, AssertOnWithLevelArg) {
+  // $asserton with levels_arg controls depth of hierarchy
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      initial $asserton(0);
+    endmodule
+  )"));
+}
+
 }  // namespace

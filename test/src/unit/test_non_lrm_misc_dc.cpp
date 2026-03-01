@@ -52,15 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection39, AssertOnWithLevelArg) {
-  // $asserton with levels_arg controls depth of hierarchy
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      initial $asserton(0);
-    endmodule
-  )"));
-}
-
 TEST(ParserSection39, AssertOffWithLevelAndModuleArgs) {
   // $assertoff with levels and list of modules/instances
   EXPECT_TRUE(ParseOk(R"(
