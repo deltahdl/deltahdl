@@ -24,4 +24,19 @@ TEST(ParserA704, ListOfPathDelayExpr1) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
+// 2 delays: trise, tfall
+TEST(ParserA704, ListOfPathDelayExpr2) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = (3, 5);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.delays.size(), 2u);
+}
+
 }  // namespace
