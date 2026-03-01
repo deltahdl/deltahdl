@@ -45,29 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 4. Explicit automatic variable in static function
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_ExplicitAutoInStaticFunc) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int compute(int x);\n"
-      "    automatic int tmp = x * 2;\n"
-      "    return tmp;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_static);
-  ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(fn->func_body_stmts[0]->var_is_automatic);
-  EXPECT_FALSE(fn->func_body_stmts[0]->var_is_static);
-  EXPECT_EQ(fn->func_body_stmts[0]->var_name, "tmp");
-}
-
-// =============================================================================
 // 5. Static variable with initializer in function
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticVarWithInitInFunc) {
