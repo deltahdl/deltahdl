@@ -156,4 +156,23 @@ TEST(ParserA703, InputTerminalMinusIndexed) {
   EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
 }
 
+// Terminal descriptor in state-dependent path
+TEST(ParserA703, TerminalInConditionalPath) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    if (en) (a[0] => b[1]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_NE(si->path.condition, nullptr);
+  EXPECT_EQ(si->path.src_ports[0].name, "a");
+  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_EQ(si->path.dst_ports[0].name, "b");
+  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
+}
+
 }  // namespace
