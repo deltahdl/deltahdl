@@ -93,4 +93,19 @@ TEST(ParserSection28, Sec28_12_TimingCheckWidth) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
+// $width uses controlled_timing_check_event (mandatory edge)
+TEST(ParserA70503, ControlledTimingCheckEventWidth) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(negedge rst, 20);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kNegedge);
+  EXPECT_EQ(tc->ref_terminal.name, "rst");
+}
+
 }  // namespace
