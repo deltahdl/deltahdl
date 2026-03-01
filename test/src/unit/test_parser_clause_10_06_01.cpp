@@ -281,4 +281,22 @@ TEST(ParserSection10, Sec10_6_1_DeassignInInitialBlock) {
   EXPECT_EQ(stmt->rhs, nullptr);
 }
 
+// --- 3. Assign with expression RHS (a + b) ---
+TEST(ParserSection10, Sec10_6_1_AssignExpressionRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    assign c = a + b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
+}
+
 }  // namespace
