@@ -195,4 +195,14 @@ TEST(ParserSection11, ArithmeticMul) {
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
 
+TEST(ParserSection11, ArithmeticMod) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a % b;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kPercent);
+}
+
 }  // namespace

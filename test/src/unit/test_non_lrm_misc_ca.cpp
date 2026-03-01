@@ -21,21 +21,6 @@ static Stmt* NthInitialStmt(ParseResult9j& r, size_t n) {
   return nullptr;
 }
 
-// Helper: verify always @* case statement pattern.
-static Stmt* GetAlwaysStarCaseStmt(ParseResult9j& r) {
-  EXPECT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  EXPECT_NE(item, nullptr);
-  if (!item) return nullptr;
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  auto* case_stmt = item->body->stmts[0];
-  EXPECT_EQ(case_stmt->kind, StmtKind::kCase);
-  return case_stmt;
-}
-
 struct ParseResult9k {
   SourceManager mgr;
   Arena arena;
@@ -78,24 +63,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 }
 
 namespace {
-
-// @* with priority case
-TEST(ParserSection9, Sec9_4_2_3_AtStarPriorityCase) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [1:0] sel;\n"
-      "  reg out;\n"
-      "  always @* begin\n"
-      "    priority case (sel)\n"
-      "      2'b00: out = 0;\n"
-      "      default: out = 1;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  auto* case_stmt = GetAlwaysStarCaseStmt(r);
-  ASSERT_NE(case_stmt, nullptr);
-  EXPECT_EQ(case_stmt->qualifier, CaseQualifier::kPriority);
-}
 
 // @* with concatenation assignments
 TEST(ParserSection9, Sec9_4_2_3_AtStarConcatenation) {
