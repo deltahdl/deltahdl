@@ -148,4 +148,19 @@ TEST(ParserA608, ForeachSingleVar) {
   EXPECT_EQ(stmt->foreach_vars[0], "i");
 }
 
+// §A.6.8: loop_variables — multiple comma-separated identifiers
+TEST(ParserA608, ForeachMultipleVars) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foreach (matrix[i, j]) x = i; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->foreach_vars.size(), 2u);
+  EXPECT_EQ(stmt->foreach_vars[0], "i");
+  EXPECT_EQ(stmt->foreach_vars[1], "j");
+}
+
 }  // namespace
