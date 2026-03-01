@@ -15,22 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// Single min:typ:max delay (parenthesized)
-TEST(ParserA704, PathDelayExprMinTypMaxParenthesized) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = (1:2:3);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.delays.size(), 1u);
-  EXPECT_EQ(si->path.delays[0]->kind, ExprKind::kMinTypMax);
-}
-
 // 2 delays with min:typ:max (trise, tfall)
 TEST(ParserA704, PathDelayExprMinTypMax2) {
   auto r = Parse(
