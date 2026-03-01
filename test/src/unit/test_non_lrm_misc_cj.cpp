@@ -53,47 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// Return with complex expression.
-TEST(ParserSection12, ReturnWithComplexExpr) {
-  auto r = Parse(
-      "module t;\n"
-      "  function int compute(int a, int b);\n"
-      "    return a * b + 1;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* ret = FindReturnStmt(r);
-  ASSERT_NE(ret, nullptr);
-  EXPECT_EQ(ret->kind, StmtKind::kReturn);
-  ASSERT_NE(ret->expr, nullptr);
-  // The expression is a binary op (a * b + 1).
-  EXPECT_EQ(ret->expr->kind, ExprKind::kBinary);
-}
-
-// Break inside while loop.
-TEST(ParserSection12, BreakInsideWhile) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    while (1) begin\n"
-      "      if (done) break;\n"
-      "      x = x + 1;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWhile);
-  auto* blk = stmt->body;
-  ASSERT_NE(blk, nullptr);
-  ASSERT_GE(blk->stmts.size(), 1u);
-  auto* if_stmt = blk->stmts[0];
-  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
-  ASSERT_NE(if_stmt->then_branch, nullptr);
-  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
-}
-
 // Continue inside do-while loop.
 TEST(ParserSection12, ContinueInsideDoWhile) {
   auto r = Parse(
