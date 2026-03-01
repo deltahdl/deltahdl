@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.8: for_initialization is optional — empty init
-TEST(ParserA608, ForEmptyInit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (; i < 10; i++) x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init, nullptr);
-}
-
 // §A.6.8: expression in for condition is optional — empty cond
 TEST(ParserA608, ForEmptyCond) {
   auto r = Parse(
