@@ -20,18 +20,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-// Library declaration with multiple -incdir paths.
-TEST(LibraryText, LibraryDeclMultipleIncdir) {
-  auto r = ParseLibrary("library lib /proj/*.v -incdir /inc1, /inc2, /inc3;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-  ASSERT_EQ(r.cu->libraries[0]->incdir_paths.size(), 3u);
-  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[0], "/inc1");
-  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[1], "/inc2");
-  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[2], "/inc3");
-}
-
 // Library declaration with both multiple file paths and multiple -incdir.
 TEST(LibraryText, LibraryDeclFullForm) {
   auto r = ParseLibrary(

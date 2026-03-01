@@ -259,4 +259,16 @@ TEST(LibraryText, LibraryDeclWithIncdir) {
   EXPECT_EQ(r.cu->libraries[0]->incdir_paths[0], "/proj/inc");
 }
 
+// Library declaration with multiple -incdir paths.
+TEST(LibraryText, LibraryDeclMultipleIncdir) {
+  auto r = ParseLibrary("library lib /proj/*.v -incdir /inc1, /inc2, /inc3;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  ASSERT_EQ(r.cu->libraries[0]->incdir_paths.size(), 3u);
+  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[0], "/inc1");
+  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[1], "/inc2");
+  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[2], "/inc3");
+}
+
 }  // namespace
