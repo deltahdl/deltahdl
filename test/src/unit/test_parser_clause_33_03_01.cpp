@@ -92,4 +92,10 @@ TEST(LibraryText, ErrorMissingFilePath) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// Missing library identifier.
+TEST(LibraryText, ErrorMissingLibraryName) {
+  auto r = ParseLibrary("library;\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

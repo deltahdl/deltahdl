@@ -44,12 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-// Missing library identifier.
-TEST(LibraryText, ErrorMissingLibraryName) {
-  auto r = ParseLibrary("library;\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // Include without file path.
 TEST(LibraryText, ErrorIncludeNoPath) {
   auto r = ParseLibrary("include;\n");
