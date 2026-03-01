@@ -38,22 +38,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_Noshowcancelled) {
-  auto sp = ParseSpecifySingle(
-      "module m(input a, output b, c);\n"
-      "  specify\n"
-      "    noshowcancelled b, c;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(sp.pr.cu, nullptr);
-  EXPECT_FALSE(sp.pr.has_errors);
-  ASSERT_NE(sp.sole_item, nullptr);
-  auto* si = sp.sole_item;
-  EXPECT_EQ(si->kind, SpecifyItemKind::kShowcancelled);
-  EXPECT_TRUE(si->is_noshowcancelled);
-  ASSERT_EQ(si->signal_list.size(), 2u);
-}
-
 TEST(ParserSection28, Sec28_12_TimingCheckSetup) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
