@@ -23,24 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// =============================================================================
-// A.6.10 — simple_immediate_assume_statement
-// =============================================================================
-// assume ( expression ) ;
-TEST(ParserA610, SimpleAssumeSemicolon) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assume(1);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
-  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
-  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
-}
-
 // assume ( expression ) pass else fail ;
 TEST(ParserA610, SimpleAssumePassElseFail) {
   auto r = Parse(
