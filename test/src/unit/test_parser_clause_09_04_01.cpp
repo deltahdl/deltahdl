@@ -337,4 +337,21 @@ TEST(ParserA605, DelayControlNumeric) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
+// §9.4.1: identifier-based delay
+TEST(ParserA605, DelayControlIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #d x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_EQ(stmt->delay->kind, ExprKind::kIdentifier);
+}
+
 }  // namespace
