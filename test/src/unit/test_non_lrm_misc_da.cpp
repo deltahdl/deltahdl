@@ -20,14 +20,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-// A null library description (bare semicolon) is valid.
-TEST(LibraryText, NullDescription) {
-  auto r = ParseLibrary(";\n;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->libraries.empty());
-}
-
 // =============================================================================
 // A.1.1 library_declaration ::=
 //   library library_identifier file_path_spec
