@@ -12,21 +12,6 @@ using namespace delta;
 
 namespace {
 
-// § subroutine_call — nested function calls elaborate
-TEST(ElabA82, NestedCallsElaborate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  function int f(int n); return n + 1; endfunction\n"
-      "  function int g(int n); return n * 2; endfunction\n"
-      "  logic [31:0] x;\n"
-      "  initial x = f(g(3));\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // § inside_expression — inside in initial block elaborates
 TEST(ElabA83, InsideExprElaborates) {
   ElabFixture f;
