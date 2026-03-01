@@ -106,4 +106,24 @@ TEST(ParserAnnexA, A8Concatenation) {
   EXPECT_EQ(stmt->rhs->elements.size(), 3u);
 }
 
+// ---------------------------------------------------------------------------
+// 27. always_comb with concatenation on LHS
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_ConcatenationLHS) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0] hi, lo;\n"
+      "  logic [7:0] data;\n"
+      "  always_comb {hi, lo} = data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysComb(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(item->body->lhs, nullptr);
+  EXPECT_EQ(item->body->lhs->kind, ExprKind::kConcatenation);
+}
+
 }  // namespace

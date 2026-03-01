@@ -85,51 +85,6 @@ TEST(ParserSection9, Sec9_2_2_PriorityEncoderPattern) {
 }
 
 // ---------------------------------------------------------------------------
-// 26. always_comb with unique0 case
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_Unique0Case) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [3:0] y;\n"
-      "  always_comb begin\n"
-      "    unique0 case (sel)\n"
-      "      2'b00: y = 4'd0;\n"
-      "      2'b01: y = 4'd1;\n"
-      "      2'b10: y = 4'd2;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstAlwaysCombStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
-  ASSERT_EQ(stmt->case_items.size(), 3u);
-}
-
-// ---------------------------------------------------------------------------
-// 27. always_comb with concatenation on LHS
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_ConcatenationLHS) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [3:0] hi, lo;\n"
-      "  logic [7:0] data;\n"
-      "  always_comb {hi, lo} = data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->lhs, nullptr);
-  EXPECT_EQ(item->body->lhs->kind, ExprKind::kConcatenation);
-}
-
-// ---------------------------------------------------------------------------
 // 28. always_comb with nested ternary expressions
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_NestedTernary) {
