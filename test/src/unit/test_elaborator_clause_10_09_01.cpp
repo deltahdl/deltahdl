@@ -89,4 +89,26 @@ TEST(SimA60701, FourElementPositionalPattern) {
   EXPECT_EQ(var->value.ToUint64(), 0x01020304u);
 }
 
+// §10.9: assignment pattern used in conditional branch
+TEST(SimA60701, PatternInConditionalBranch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  initial begin\n"
+      "    if (1) x = '{8'd5, 8'd6};\n"
+      "    else x = '{8'd0, 8'd0};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // '{8'd5, 8'd6} = {8'h05, 8'h06} = 16'h0506 = 1286
+  EXPECT_EQ(var->value.ToUint64(), 1286u);
+}
+
 }  // namespace
