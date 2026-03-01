@@ -777,4 +777,21 @@ TEST(ParserSection9, Sec9_3_1_MultipleAssignmentsInBlock) {
   }
 }
 
+// §9.3.1: seq_block (begin-end)
+TEST(ParserA604, StmtItemSeqBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      a = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
+}
+
 }  // namespace
