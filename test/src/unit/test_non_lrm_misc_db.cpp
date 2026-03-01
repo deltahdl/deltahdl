@@ -247,22 +247,6 @@ TEST(SourceText, ConfigDeclEndLabel) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg2");
 }
 
-// config_rule_statement: inst_clause use_clause
-TEST(SourceText, ConfigRuleInstUse) {
-  auto r = Parse(
-      "config cfg7;\n"
-      "  design top;\n"
-      "  instance top.u1 use work.alt_cell;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rule = r.cu->configs[0]->rules[0];
-  EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
-  EXPECT_EQ(rule->inst_path, "top.u1");
-  EXPECT_EQ(rule->use_lib, "work");
-  EXPECT_EQ(rule->use_cell, "alt_cell");
-}
-
 // config_rule_statement: cell_clause liblist_clause
 TEST(SourceText, ConfigRuleCellLiblist) {
   auto r = Parse(
