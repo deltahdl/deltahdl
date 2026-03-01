@@ -21,4 +21,20 @@ TEST(ParserA70502, DelayedDataWithBracketExpr) {
   EXPECT_NE(tc->delayed_data_expr, nullptr);
 }
 
+// delayed_reference ::= terminal_identifier [ constant_mintypmax_expression ]
+TEST(ParserA70502, DelayedReferenceWithBracketExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK[1:2:3], dD);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->delayed_ref, "dCLK");
+  ASSERT_NE(tc->delayed_ref_expr, nullptr);
+  EXPECT_EQ(tc->delayed_ref_expr->kind, ExprKind::kMinTypMax);
+}
+
 }  // namespace
