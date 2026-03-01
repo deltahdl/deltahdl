@@ -154,4 +154,19 @@ TEST(ParserA612, RsProdAsCodeBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// Production item bare (no arguments)
+TEST(ParserA612, RsProductionItemBare) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : child;\n"
+      "      child : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
