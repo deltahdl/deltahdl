@@ -83,29 +83,6 @@ TEST(ParserSection10, Sec10_4_1_StructMemberLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-// --- 22. Compound assignment operators &=, |=, ^= ---
-TEST(ParserSection10, Sec10_4_1_CompoundBitwise) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a &= 8'hFF;\n"
-      "    b |= 8'h01;\n"
-      "    c ^= 8'hAA;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
-  auto* s2 = NthInitialStmt(r, 2);
-  ASSERT_NE(s0, nullptr);
-  ASSERT_NE(s1, nullptr);
-  ASSERT_NE(s2, nullptr);
-  EXPECT_EQ(s0->rhs->op, TokenKind::kAmpEq);
-  EXPECT_EQ(s1->rhs->op, TokenKind::kPipeEq);
-  EXPECT_EQ(s2->rhs->op, TokenKind::kCaretEq);
-}
-
 // --- 23. Compound assignment operators <<=, >>=, <<<=, >>>= ---
 TEST(ParserSection10, Sec10_4_1_CompoundShifts) {
   auto r = Parse(

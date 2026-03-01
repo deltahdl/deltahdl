@@ -469,4 +469,37 @@ TEST(ParserSection10, Sec10_4_1_CompoundMulDivMod) {
               "endmodule\n"));
 }
 
+static Stmt* NthInitialStmt(ParseResult10d& r, size_t n) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      if (n < item->body->stmts.size()) return item->body->stmts[n];
+    }
+  }
+  return nullptr;
+}
+
+// --- 22. Compound assignment operators &=, |=, ^= ---
+TEST(ParserSection10, Sec10_4_1_CompoundBitwise) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a &= 8'hFF;\n"
+      "    b |= 8'h01;\n"
+      "    c ^= 8'hAA;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s0 = NthInitialStmt(r, 0);
+  auto* s1 = NthInitialStmt(r, 1);
+  auto* s2 = NthInitialStmt(r, 2);
+  ASSERT_NE(s0, nullptr);
+  ASSERT_NE(s1, nullptr);
+  ASSERT_NE(s2, nullptr);
+  EXPECT_EQ(s0->rhs->op, TokenKind::kAmpEq);
+  EXPECT_EQ(s1->rhs->op, TokenKind::kPipeEq);
+  EXPECT_EQ(s2->rhs->op, TokenKind::kCaretEq);
+}
+
 }  // namespace
