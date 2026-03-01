@@ -201,4 +201,28 @@ TEST(ParserA604, StmtItemWaitStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
+// ---------------------------------------------------------------------------
+// wait_statement ::=
+//   wait ( expression ) statement_or_null
+//   | wait fork ;
+//   | wait_order ( hierarchical_identifier { , hierarchical_identifier } )
+//     action_block
+// ---------------------------------------------------------------------------
+// §9.4.3: wait (condition) statement
+TEST(ParserA605, WaitConditionStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait (ready) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWait);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
 }  // namespace
