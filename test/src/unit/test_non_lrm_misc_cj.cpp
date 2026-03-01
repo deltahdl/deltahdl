@@ -53,42 +53,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 12.7.1 -- For loop with variable declarations (additional cases)
-// =============================================================================
-// For loop with increment expression in step.
-TEST(ParserSection12, ForWithIncrementStep) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++)\n"
-      "      x = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_NE(stmt->for_step, nullptr);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
-}
-
-// For loop with byte variable declaration.
-TEST(ParserSection12, ForWithByteDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    for (byte b = 0; b < 100; b = b + 1)\n"
-      "      data = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kByte);
-}
-
 // For loop with block body.
 TEST(ParserSection12, ForWithBlockBody) {
   auto r = Parse(

@@ -184,4 +184,20 @@ TEST(ParserSection12, ForWithIncrementStep) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
+// For loop with byte variable declaration.
+TEST(ParserSection12, ForWithByteDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (byte b = 0; b < 100; b = b + 1)\n"
+      "      data = b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kByte);
+}
+
 }  // namespace
