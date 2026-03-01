@@ -146,4 +146,16 @@ TEST_F(SpecifyTest, PulsestyleOnevent) {
   EXPECT_EQ(item->signal_list[0], "out1");
 }
 
+TEST_F(SpecifyTest, PulsestyleOndetect) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  pulsestyle_ondetect out1;\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_TRUE(spec->specify_items[0]->is_ondetect);
+}
+
 }  // namespace
