@@ -356,4 +356,28 @@ TEST(ParserA607, NestedCaseStmt) {
   EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kCase);
 }
 
+// =============================================================================
+// A.6.7 Case statements
+// =============================================================================
+// ---------------------------------------------------------------------------
+// case_statement ::=
+//   [ unique_priority ] case_keyword ( case_expression )
+//     case_item { case_item } endcase
+// ---------------------------------------------------------------------------
+// §12.5: basic case statement with single items
+TEST(ParserA607, CaseStmtParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; default: y = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
+}
+
 }  // namespace
