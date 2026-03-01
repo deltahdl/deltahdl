@@ -213,4 +213,24 @@ TEST(SourceText, ConfigDeclEndLabel) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg2");
 }
 
+// =============================================================================
+// §33.3 Library mapping (parsing only)
+// =============================================================================
+TEST_F(ConfigTest, LibraryMappingConfig) {
+  // Config with library-qualified design cells
+  auto* unit = Parse(R"(
+    config cfg;
+      design rtlLib.top;
+      default liblist rtlLib;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  auto* cfg = unit->configs[0];
+  ASSERT_EQ(cfg->design_cells.size(), 1u);
+  EXPECT_EQ(cfg->design_cells[0].first, "rtlLib");
+  EXPECT_EQ(cfg->design_cells[0].second, "top");
+  ASSERT_EQ(cfg->rules.size(), 1u);
+  EXPECT_EQ(cfg->rules[0]->liblist[0], "rtlLib");
+}
+
 }  // namespace
