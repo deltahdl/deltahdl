@@ -250,4 +250,22 @@ TEST(ParserA607, CaseNoDefault) {
   EXPECT_FALSE(stmt->case_items[1].is_default);
 }
 
+// §12.5: case with block statement in item body
+TEST(ParserA607, CaseItemWithBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x)\n"
+      "      0: begin y = 1; z = 2; end\n"
+      "      default: begin y = 0; z = 0; end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kBlock);
+}
+
 }  // namespace
