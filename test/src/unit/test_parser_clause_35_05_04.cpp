@@ -297,4 +297,21 @@ TEST_F(AnnexHParseTest, AnnexHDpiContextTaskWithCName) {
   EXPECT_TRUE(items[0]->dpi_is_task);
 }
 
+// =============================================================================
+// Annex H - DPI import no-arg function
+// =============================================================================
+TEST_F(AnnexHParseTest, AnnexHDpiImportNoArgs) {
+  // A DPI import with no argument list at all (valid per LRM).
+  auto* unit = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" function int get_seed;\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
+  EXPECT_EQ(items[0]->name, "get_seed");
+  EXPECT_TRUE(items[0]->func_args.empty());
+}
+
 }  // namespace
