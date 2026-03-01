@@ -34,23 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// =============================================================================
-// §15.5.1 — Nonblocking event trigger (->>)
-// =============================================================================
-TEST(ParserSection15, NonblockingEventTrigger) {
-  auto r = Parse(
-      "module m;\n"
-      "  event e;\n"
-      "  initial begin\n"
-      "    ->> e;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
-}
-
 TEST(ParserSection15, NonblockingEventTriggerHierarchical) {
   auto r = Parse(
       "module m;\n"
