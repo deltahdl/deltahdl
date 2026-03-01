@@ -56,15 +56,6 @@ TEST(ParserSection11, ReductionXnorCaretTilde) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-TEST(ParserSection11, TernaryTristateDriver) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  wire drive_busa;\n"
-              "  wire [15:0] data;\n"
-              "  wire [15:0] busa = drive_busa ? data : 16'bz;\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // Section 11.4.12 -- Concatenation operators
 // =========================================================================

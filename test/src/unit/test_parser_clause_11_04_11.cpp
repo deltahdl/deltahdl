@@ -579,4 +579,13 @@ TEST(ParserSection11, NestedTernaryRightAssoc) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
 }
 
+TEST(ParserSection11, TernaryTristateDriver) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wire drive_busa;\n"
+              "  wire [15:0] data;\n"
+              "  wire [15:0] busa = drive_busa ? data : 16'bz;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
