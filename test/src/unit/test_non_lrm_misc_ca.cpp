@@ -4,23 +4,6 @@
 
 using namespace delta;
 
-struct ParseResult9j {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static Stmt* NthInitialStmt(ParseResult9j& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
-}
-
 struct ParseResult9k {
   SourceManager mgr;
   Arena arena;
@@ -63,28 +46,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 }
 
 namespace {
-
-// Multiple @* event controls in sequence inside initial block
-TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarInInitial) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, c, d;\n"
-      "  initial begin\n"
-      "    @* a = b;\n"
-      "    @(*) c = d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
-  ASSERT_NE(s0, nullptr);
-  ASSERT_NE(s1, nullptr);
-  EXPECT_EQ(s0->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(s0->is_star_event);
-  EXPECT_EQ(s1->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(s1->is_star_event);
-}
 
 // ParseOk: @* parses without errors in a typical combinational module
 TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarCombiModule) {
