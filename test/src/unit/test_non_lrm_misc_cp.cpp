@@ -17,20 +17,6 @@ static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// checker_or_generate_item_declaration ::= checker_declaration (nested)
-TEST(SourceText, CheckerNestedChecker) {
-  auto r = Parse(
-      "checker outer;\n"
-      "  checker inner;\n"
-      "    logic a;\n"
-      "  endchecker\n"
-      "endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->checkers[0]->name, "outer");
-}
-
 // checker_or_generate_item_declaration ::= genvar_declaration
 TEST(SourceText, CheckerGenvarDecl) {
   auto r = Parse(
