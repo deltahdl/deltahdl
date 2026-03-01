@@ -153,4 +153,19 @@ TEST(ParserSection10, ReleaseNet) {
   ASSERT_NE(stmt->lhs, nullptr);
 }
 
+// §10.6.2: force statement
+TEST(ParserA604, StmtItemForceStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    force x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForce);
+}
+
 }  // namespace
