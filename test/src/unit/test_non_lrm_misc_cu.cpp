@@ -24,13 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, EndLabelPackage) {
-  auto r = Parse("package mypkg; endpackage : mypkg\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1);
-  EXPECT_EQ(r.cu->packages[0]->name, "mypkg");
-}
-
 TEST(ParserSection23, EndLabelInterface) {
   auto r = Parse("interface myif; endinterface : myif\n");
   ASSERT_NE(r.cu, nullptr);

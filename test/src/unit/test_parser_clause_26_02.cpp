@@ -132,4 +132,29 @@ TEST(SourceText, PackageItemCheckerDecl) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection23, EndLabelPackage) {
+  auto r = Parse("package mypkg; endpackage : mypkg\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1);
+  EXPECT_EQ(r.cu->packages[0]->name, "mypkg");
+}
+
 }  // namespace
