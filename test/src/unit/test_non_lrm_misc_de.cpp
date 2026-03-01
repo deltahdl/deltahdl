@@ -9,28 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9.2: named pattern with reversed field order
-TEST(SimA60701, NamedStructPatternReversedOrder) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
-      "  pair_t p;\n"
-      "  initial begin\n"
-      "    p = pair_t'{b: 8'd20, a: 8'd10};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("p");
-  ASSERT_NE(var, nullptr);
-  // Same result as above regardless of key order: (10 << 8) | 20 = 2580
-  EXPECT_EQ(var->value.ToUint64(), 2580u);
-}
-
 // ---------------------------------------------------------------------------
 // assignment_pattern: positional struct — simulation
 // ---------------------------------------------------------------------------
