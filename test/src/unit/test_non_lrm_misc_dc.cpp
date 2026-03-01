@@ -52,18 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection39, AssertPassStepAndFailStep) {
-  // $assertpasson / $assertpassoff control pass action execution
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      initial begin
-        $assertpasson;
-        $assertpassoff;
-      end
-    endmodule
-  )"));
-}
-
 TEST(ParserSection39, AssertionControlInAlwaysBlock) {
   // Assertion control tasks in always blocks
   EXPECT_TRUE(ParseOk(R"(

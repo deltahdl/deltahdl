@@ -136,4 +136,16 @@ TEST(ParserSection39, AssertControlWithMultipleArgs) {
   )"));
 }
 
+TEST(ParserSection39, AssertPassStepAndFailStep) {
+  // $assertpasson / $assertpassoff control pass action execution
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      initial begin
+        $assertpasson;
+        $assertpassoff;
+      end
+    endmodule
+  )"));
+}
+
 }  // namespace
