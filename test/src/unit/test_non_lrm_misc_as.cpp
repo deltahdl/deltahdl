@@ -15,17 +15,6 @@ TimingCheckDecl* GetSoleTimingCheck(ParseResult& r) {
 
 namespace {
 
-// 5 delays — invalid
-TEST(ParserA704, InvalidDelayCount5) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = (1, 2, 3, 4, 5);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // =============================================================================
 // A.7.4 6 and 12 delays on parallel and full paths
 // =============================================================================

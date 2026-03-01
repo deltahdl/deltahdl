@@ -282,4 +282,15 @@ TEST(ParserA704, InvalidDelayCount4) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// 5 delays — invalid
+TEST(ParserA704, InvalidDelayCount5) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = (1, 2, 3, 4, 5);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
