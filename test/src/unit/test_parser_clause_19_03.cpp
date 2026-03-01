@@ -256,4 +256,26 @@ TEST(ParserA211, CoverGroup_ASTVerification) {
   EXPECT_TRUE(item->loc.IsValid());
 }
 
+using DpiParseTest = ProgramTestParse;
+
+using ApiParseTest = ProgramTestParse;
+
+// =============================================================================
+// LRM section 40.5.2 -- Coverage with assertion and covergroup constructs
+// The VPI coverage API queries are applied to assertion handles and
+// covergroup instances. These tests verify the parser handles the
+// constructs that coverage queries operate on.
+// =============================================================================
+TEST(ParserSection40, CovergroupWithCoverpoint) {
+  // Covergroup with coverpoint -- target of vpi_get(vpiCovered, ...)
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      logic [2:0] addr;
+      covergroup cg @(addr);
+        coverpoint addr;
+      endgroup
+    endmodule
+  )"));
+}
+
 }  // namespace

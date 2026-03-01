@@ -52,24 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-// =============================================================================
-// LRM section 40.5.2 -- Coverage with assertion and covergroup constructs
-// The VPI coverage API queries are applied to assertion handles and
-// covergroup instances. These tests verify the parser handles the
-// constructs that coverage queries operate on.
-// =============================================================================
-TEST(ParserSection40, CovergroupWithCoverpoint) {
-  // Covergroup with coverpoint -- target of vpi_get(vpiCovered, ...)
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic [2:0] addr;
-      covergroup cg @(addr);
-        coverpoint addr;
-      endgroup
-    endmodule
-  )"));
-}
-
 TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
   // cover property -- target of vpiAssertAttemptCovered/vpiAssertSuccessCovered
   EXPECT_TRUE(ParseOk(R"(
