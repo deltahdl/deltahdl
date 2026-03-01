@@ -353,6 +353,8 @@ def _detect_prefix(test, clause, lrm_path):
         if pattern in body:
             test.prefix_rationale = f"body contains '{pattern}'"
             return prefix
+    print(f"Calling Claude to detect pipeline stage"
+          f" for {test.test_name}...")
     prompt = _PREFIX_PROMPT_TEMPLATE.format(
         lrm_path=lrm_path,
         suite=test.suite_name,
@@ -512,11 +514,13 @@ def _apply_classification(test, clause_resp, topic_resp=None,
 def classify_tests(tests, test_dir, lrm_path):
     """Use Claude to classify each test's prefix and clause."""
     for test in tests:
+        print(f"Calling Claude to classify clause for {test.test_name}...")
         clause_prompt = _build_clause_prompt(test, lrm_path)
         clause_resp = _call_claude(clause_prompt, _CLAUSE_SCHEMA)
         topic_resp = None
         clause = clause_resp.get("clause", "")
         if clause.replace("_", "-") == "non-lrm":
+            print(f"Calling Claude to classify topic for {test.test_name}...")
             topic_prompt = _build_topic_prompt(test, test_dir)
             topic_resp = _call_claude(topic_prompt, _TOPIC_SCHEMA)
         _apply_classification(test, clause_resp, topic_resp,

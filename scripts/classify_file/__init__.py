@@ -44,6 +44,7 @@ def create_issue(
     filename = Path(args.file).name
     title = f"Classify tests in {filename}"
     body = build_issue_body(filename, test_names)
+    print(f"Creating issue for {filename}...")
     payload = json.dumps({"title": title, "body": body})
     result = subprocess.run(
         ["gh", "api",
@@ -68,6 +69,7 @@ def ensure_unchecked(
     test_names: list[str],
 ) -> None:
     """Ensure every test has an unchecked checkbox in the issue."""
+    print(f"Fetching issue #{args.issue} to verify checkboxes...")
     body = fetch_issue_body(
         args.organization, args.repo, args.issue,
     )
@@ -88,6 +90,7 @@ def ensure_unchecked(
             body = body.rstrip("\n") + "\n- [ ] " + name + "\n"
             changed = True
     if changed:
+        print(f"Resetting checkboxes for issue #{args.issue}...")
         update_issue_body(
             args.organization, args.repo, args.issue, body,
         )
@@ -133,6 +136,7 @@ def run_classify_test(
 
 def close_issue(args: argparse.Namespace) -> None:
     """Close the GitHub issue using gh api."""
+    print(f"Closing issue #{args.issue}...")
     result = subprocess.run(
         ["gh", "api",
          f"repos/{args.organization}/{args.repo}/issues/{args.issue}",

@@ -71,11 +71,13 @@ def update_issue_body(organization, repo, issue, body):
 
 def maybe_tick_issue_checkbox(args, tests):
     """Tick checkboxes for classified tests in a GitHub issue."""
+    print(f"Fetching issue #{args.issue}...")
     body = fetch_issue_body(
         args.organization, args.repo, args.issue,
     )
     for t in tests:
         body = tick_checkbox(body, t.test_name)
+    print(f"Ticking checkbox for issue #{args.issue}...")
     update_issue_body(
         args.organization, args.repo, args.issue, body,
     )

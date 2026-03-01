@@ -46,7 +46,9 @@ def commit_and_push(changed_files, deleted_files, message):
         _run_git(["git", "add", str(f)])
     for f in deleted_files:
         _run_git(["git", "rm", str(f)])
+    print("Committing...")
     _run_git(["git", "commit", "-F", "-"], input=message)
+    print("Pushing...")
     _run_git(["git", "push"])
     print("Committed and pushed")
 

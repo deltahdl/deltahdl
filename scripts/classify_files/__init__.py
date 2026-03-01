@@ -102,6 +102,7 @@ def resolve_sub_issues(
     issues = [int(n.strip()) for n in args.sub_issues.split(",")]
     entries: list[tuple[str, int | None]] = []
     for issue in issues:
+        print(f"Fetching title for issue #{issue}...")
         title = fetch_issue_title(
             args.organization, args.repo, issue,
         )
@@ -118,6 +119,7 @@ def tick_file_checkbox(
     filename: str,
 ) -> None:
     """Tick a file checkbox in the master issue."""
+    print(f"Ticking checkbox for {filename} in issue #{issue}...")
     body = fetch_issue_body(org, repo, issue)
     body = tick_checkbox(body, filename)
     update_issue_body(org, repo, issue, body)
