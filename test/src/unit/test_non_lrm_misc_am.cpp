@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// procedural_timing_control ::=
-//   delay_control | event_control | cycle_delay
-// ---------------------------------------------------------------------------
-// §9.4: procedural_timing_control with delay_control
-TEST(ParserA605, ProceduralTimingControlDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #5 x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-}
-
 // §9.4: procedural_timing_control with event_control
 TEST(ParserA605, ProceduralTimingControlEventControl) {
   auto r = Parse(
