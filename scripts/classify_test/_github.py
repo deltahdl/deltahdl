@@ -46,6 +46,21 @@ def tick_checkbox(body, test_name):
     return body[:match.start()] + ticked + body[match.end():]
 
 
+def remove_checkbox(body, test_name):
+    """Remove the checkbox line for test_name from body."""
+    escaped = re.escape(test_name)
+    suffix = r"(?:\[" + escaped + r"\]\([^)]*\)|" + escaped + r")"
+    pattern = re.compile(
+        r"^- \[[ x]\] " + suffix + r"\n?", re.MULTILINE,
+    )
+    match = pattern.search(body)
+    if not match:
+        print(f"ERROR: Checkbox for {test_name!r} not found"
+              " in issue body")
+        sys.exit(1)
+    return body[:match.start()] + body[match.end():]
+
+
 def fetch_issue_body(organization, repo, issue):
     """Fetch the body of a GitHub issue using gh api."""
     result = subprocess.run(

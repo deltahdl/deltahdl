@@ -35,15 +35,17 @@ def stub_subprocess_failure(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fail_run)
 
 
-def stub_tick_file_checkbox(monkeypatch):
-    """Stub tick_file_checkbox; return list of filenames ticked."""
-    ticked: list[str] = []
+def stub_remove_file_checkbox(monkeypatch):
+    """Stub remove_file_checkbox; return list of filenames removed."""
+    removed: list[str] = []
 
-    def fake_tick(_org, _repo, _issue, filename):
-        ticked.append(filename)
+    def fake_remove(_org, _repo, _issue, filename):
+        removed.append(filename)
 
-    monkeypatch.setattr(classify_files, "tick_file_checkbox", fake_tick)
-    return ticked
+    monkeypatch.setattr(
+        classify_files, "remove_file_checkbox", fake_remove,
+    )
+    return removed
 
 
 def stub_fetch_issue_title(

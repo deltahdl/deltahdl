@@ -12,7 +12,7 @@ from helpers import (
     stub_fetch_issue_title,
     stub_subprocess_failure,
     stub_subprocess_success,
-    stub_tick_file_checkbox,
+    stub_remove_file_checkbox,
 )
 
 _parse_args = getattr(classify_files, "_parse_args")
@@ -295,10 +295,10 @@ def test_run_classify_file_does_not_capture_output(monkeypatch):
     assert "capture_output" not in kwargs_log[0]
 
 
-# ---- tick_file_checkbox ----------------------------------------------------
+# ---- remove_file_checkbox --------------------------------------------------
 
 
-def test_tick_file_checkbox_calls_fetch(monkeypatch):
+def test_remove_file_checkbox_calls_fetch(monkeypatch):
     """Fetches the issue body with correct arguments."""
     calls: list[tuple] = []
     monkeypatch.setattr(
@@ -309,53 +309,53 @@ def test_tick_file_checkbox_calls_fetch(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        classify_files, "tick_checkbox",
+        classify_files, "remove_checkbox",
         lambda body, _name: body,
     )
     monkeypatch.setattr(
         classify_files, "update_issue_body",
         lambda _o, _r, _i, _b: None,
     )
-    classify_files.tick_file_checkbox("myorg", "myrepo", 61, "a.cpp")
+    classify_files.remove_file_checkbox("myorg", "myrepo", 61, "a.cpp")
     assert calls[0] == ("myorg", "myrepo", 61)
 
 
-def test_tick_file_checkbox_calls_tick(monkeypatch):
-    """Ticks the checkbox for the given filename."""
-    ticked: list[str] = []
+def test_remove_file_checkbox_calls_remove(monkeypatch):
+    """Calls remove_checkbox for the given filename."""
+    removed: list[str] = []
     monkeypatch.setattr(
         classify_files, "fetch_issue_body",
         lambda _o, _r, _i: "- [ ] a.cpp\n",
     )
     monkeypatch.setattr(
-        classify_files, "tick_checkbox",
-        lambda body, name: (ticked.append(name) or body),
+        classify_files, "remove_checkbox",
+        lambda body, name: (removed.append(name) or body),
     )
     monkeypatch.setattr(
         classify_files, "update_issue_body",
         lambda _o, _r, _i, _b: None,
     )
-    classify_files.tick_file_checkbox("o", "r", 1, "a.cpp")
-    assert ticked[0] == "a.cpp"
+    classify_files.remove_file_checkbox("o", "r", 1, "a.cpp")
+    assert removed[0] == "a.cpp"
 
 
-def test_tick_file_checkbox_calls_update(monkeypatch):
-    """Updates the issue body after ticking."""
+def test_remove_file_checkbox_calls_update(monkeypatch):
+    """Updates the issue body after removal."""
     updated: list[str] = []
     monkeypatch.setattr(
         classify_files, "fetch_issue_body",
-        lambda _o, _r, _i: "- [ ] a.cpp\n",
+        lambda _o, _r, _i: "- [ ] a.cpp\n- [ ] b.cpp\n",
     )
     monkeypatch.setattr(
-        classify_files, "tick_checkbox",
-        lambda _body, _name: "- [x] a.cpp\n",
+        classify_files, "remove_checkbox",
+        lambda _body, _name: "- [ ] b.cpp\n",
     )
     monkeypatch.setattr(
         classify_files, "update_issue_body",
         lambda _o, _r, _i, body: updated.append(body),
     )
-    classify_files.tick_file_checkbox("o", "r", 1, "a.cpp")
-    assert updated[0] == "- [x] a.cpp\n"
+    classify_files.remove_file_checkbox("o", "r", 1, "a.cpp")
+    assert updated[0] == "- [ ] b.cpp\n"
 
 
 # ---- _run ------------------------------------------------------------------
@@ -364,23 +364,33 @@ def test_tick_file_checkbox_calls_update(monkeypatch):
 def test_run_processes_all_files(monkeypatch):
     """Subprocess invoked once per file."""
     captured = stub_subprocess_success(monkeypatch)
-    stub_tick_file_checkbox(monkeypatch)
+    stub_remove_file_checkbox(monkeypatch)
     _run(_make_args(files="a.cpp,b.cpp"))
     assert len(captured) == 2
 
 
-def test_run_ticks_checkbox_after_each_file(monkeypatch):
-    """Ticks file checkbox after each successful file."""
+def test_run_removes_checkbox_after_each_file(monkeypatch):
+    """Removes file checkbox after each successful file."""
     stub_subprocess_success(monkeypatch)
-    ticked = stub_tick_file_checkbox(monkeypatch)
+    removed = stub_remove_file_checkbox(monkeypatch)
     _run(_make_args(files="a.cpp,b.cpp"))
-    assert ticked == ["a.cpp", "b.cpp"]
+    assert removed == ["a.cpp", "b.cpp"]
+
+
+def test_run_skips_checkbox_when_file_exists(monkeypatch, tmp_path):
+    """Does not remove checkbox when the file still exists."""
+    f = tmp_path / "a.cpp"
+    f.write_text("", encoding="utf-8")
+    stub_subprocess_success(monkeypatch)
+    removed = stub_remove_file_checkbox(monkeypatch)
+    _run(_make_args(files=str(f)))
+    assert removed == []
 
 
 def test_run_splits_comma_separated_files(monkeypatch):
     """Comma-separated files result in distinct subprocess calls."""
     captured = stub_subprocess_success(monkeypatch)
-    stub_tick_file_checkbox(monkeypatch)
+    stub_remove_file_checkbox(monkeypatch)
     _run(_make_args(files="x.cpp,y.cpp"))
     files = [c[c.index("--file") + 1] for c in captured]
     assert files == ["x.cpp", "y.cpp"]
@@ -389,7 +399,7 @@ def test_run_splits_comma_separated_files(monkeypatch):
 def test_run_prints_done(monkeypatch, capsys):
     """Prints Done after all files processed."""
     stub_subprocess_success(monkeypatch)
-    stub_tick_file_checkbox(monkeypatch)
+    stub_remove_file_checkbox(monkeypatch)
     _run(_make_args(files="a.cpp"))
     assert "Done" in capsys.readouterr().out
 
@@ -550,22 +560,22 @@ def test_run_sub_issues_passes_issue_flag(monkeypatch):
         77: "Classify tests in b.cpp",
     })
     captured = stub_subprocess_success(monkeypatch)
-    stub_tick_file_checkbox(monkeypatch)
+    stub_remove_file_checkbox(monkeypatch)
     _run(_make_args(files=None, sub_issues="76,77"))
     issues = [c[c.index("--issue") + 1] for c in captured]
     assert issues == ["76", "77"]
 
 
-def test_run_sub_issues_ticks_master_checkbox(monkeypatch):
-    """Master issue checkbox ticked after each file."""
+def test_run_sub_issues_removes_master_checkbox(monkeypatch):
+    """Master issue checkbox removed after each file."""
     stub_fetch_issue_title(monkeypatch, {
         76: "Classify tests in a.cpp",
         77: "Classify tests in b.cpp",
     })
     stub_subprocess_success(monkeypatch)
-    ticked = stub_tick_file_checkbox(monkeypatch)
+    removed = stub_remove_file_checkbox(monkeypatch)
     _run(_make_args(files=None, sub_issues="76,77"))
-    assert ticked == ["a.cpp", "b.cpp"]
+    assert removed == ["a.cpp", "b.cpp"]
 
 
 # ---- main ------------------------------------------------------------------
@@ -575,6 +585,6 @@ def test_main_calls_run(monkeypatch, capsys):
     """main() calls _run with parsed args."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     stub_subprocess_success(monkeypatch)
-    stub_tick_file_checkbox(monkeypatch)
+    stub_remove_file_checkbox(monkeypatch)
     classify_files.main()
     assert "Done" in capsys.readouterr().out

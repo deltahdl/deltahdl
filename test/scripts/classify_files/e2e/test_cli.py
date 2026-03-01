@@ -34,13 +34,17 @@ def _install_fakes(tmp_path, exit_code=0):
     fake_ct.mkdir(parents=True)
     (fake_ct / "__init__.py").write_text("", encoding="utf-8")
     (fake_ct / "_github.py").write_text(
+        "import re\n"
+        "\n"
         "def fetch_issue_body(_org, _repo, _issue):\n"
         "    return '- [ ] a.cpp\\n- [ ] b.cpp\\n'\n"
         "\n"
-        "def tick_checkbox(body, name):\n"
-        "    return body.replace(\n"
-        "        '- [ ] ' + name, '- [x] ' + name,\n"
+        "def remove_checkbox(body, name):\n"
+        "    pattern = re.compile(\n"
+        "        r'^- \\[[ x]\\] ' + re.escape(name)"
+        " + r'\\n?', re.MULTILINE,\n"
         "    )\n"
+        "    return pattern.sub('', body)\n"
         "\n"
         "def update_issue_body(_org, _repo, _issue, _body):\n"
         "    pass\n",

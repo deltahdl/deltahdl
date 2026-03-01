@@ -12,6 +12,7 @@ from classify_test._github import (
     _validate_issue_args,
     fetch_issue_body,
     maybe_tick_issue_checkbox,
+    remove_checkbox,
     tick_checkbox,
     update_issue_body,
 )
@@ -137,6 +138,45 @@ def test_tick_checkbox_not_found_exits():
     """Exits when test name is not found in any checkbox."""
     with pytest.raises(SystemExit):
         tick_checkbox("- [ ] Other\n", "Missing")
+
+
+# ---- remove_checkbox -------------------------------------------------------
+
+
+def test_remove_checkbox_removes_unchecked():
+    """Removes an unchecked checkbox line."""
+    body = "- [ ] Alpha\n- [ ] Beta\n"
+    assert remove_checkbox(body, "Alpha") == "- [ ] Beta\n"
+
+
+def test_remove_checkbox_removes_checked():
+    """Removes a checked checkbox line."""
+    body = "- [x] Alpha\n- [ ] Beta\n"
+    assert remove_checkbox(body, "Alpha") == "- [ ] Beta\n"
+
+
+def test_remove_checkbox_removes_linked_unchecked():
+    """Removes a linked unchecked checkbox line."""
+    body = "- [ ] [Alpha](https://example.com/1)\n- [ ] Beta\n"
+    assert remove_checkbox(body, "Alpha") == "- [ ] Beta\n"
+
+
+def test_remove_checkbox_removes_linked_checked():
+    """Removes a linked checked checkbox line."""
+    body = "- [x] [Alpha](https://example.com/1)\n- [ ] Beta\n"
+    assert remove_checkbox(body, "Alpha") == "- [ ] Beta\n"
+
+
+def test_remove_checkbox_preserves_others():
+    """Other checkboxes are untouched after removal."""
+    body = "- [ ] Alpha\n- [ ] Beta\n- [ ] Gamma\n"
+    assert "- [ ] Beta\n- [ ] Gamma\n" in remove_checkbox(body, "Alpha")
+
+
+def test_remove_checkbox_not_found_exits():
+    """Exits when test name is not found in any checkbox."""
+    with pytest.raises(SystemExit):
+        remove_checkbox("- [ ] Other\n", "Missing")
 
 
 # ---- fetch_issue_body ------------------------------------------------------

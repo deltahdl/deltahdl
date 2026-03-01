@@ -8,7 +8,7 @@ from pathlib import Path
 
 from classify_test._github import (
     fetch_issue_body,
-    tick_checkbox,
+    remove_checkbox,
     update_issue_body,
 )
 
@@ -112,16 +112,16 @@ def resolve_sub_issues(
     return entries
 
 
-def tick_file_checkbox(
+def remove_file_checkbox(
     org: str,
     repo: str,
     issue: int,
     filename: str,
 ) -> None:
-    """Tick a file checkbox in the master issue."""
-    print(f"Ticking checkbox for {filename} in issue #{issue}...")
+    """Remove a file checkbox from the master issue."""
+    print(f"Removing {filename} from issue #{issue}...")
     body = fetch_issue_body(org, repo, issue)
-    body = tick_checkbox(body, filename)
+    body = remove_checkbox(body, filename)
     update_issue_body(org, repo, issue, body)
 
 
@@ -181,10 +181,11 @@ def _run(args: argparse.Namespace) -> None:
         run_classify_file(
             args, file_path, i, total, sub_issue=sub_issue,
         )
-        tick_file_checkbox(
-            args.organization, args.repo,
-            args.issue, Path(file_path).name,
-        )
+        if not Path(file_path).exists():
+            remove_file_checkbox(
+                args.organization, args.repo,
+                args.issue, Path(file_path).name,
+            )
     print("Done")
 
 
