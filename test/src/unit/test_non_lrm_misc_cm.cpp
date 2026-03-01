@@ -34,21 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §14.14: global clocking in subsystem pattern (from LRM hierarchical example).
-TEST(ParserSection14, GlobalClockingSubsystemPattern) {
-  auto r = Parse(
-      "module subsystem1;\n"
-      "  logic subclk1;\n"
-      "  global clocking sub_sys1 @(subclk1); endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_TRUE(item->is_global_clocking);
-  EXPECT_EQ(item->name, "sub_sys1");
-  ASSERT_EQ(item->clocking_event.size(), 1u);
-  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
-}
-
 // default clocking as module_or_generate_item_declaration.
 TEST(SourceText, DefaultClockingAsModuleItem) {
   auto r = Parse(
