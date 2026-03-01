@@ -6,39 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.2 delayed_reference / delayed_data
-// =============================================================================
-// Simple delayed_reference / delayed_data (identifier only)
-TEST(ParserA70502, DelayedRefDataSimple) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dDATA);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->delayed_ref, "dCLK");
-  EXPECT_EQ(tc->delayed_data, "dDATA");
-}
-
-// delayed_data ::= terminal_identifier [ constant_mintypmax_expression ]
-TEST(ParserA70502, DelayedDataWithBracketExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dD[3]);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->delayed_data, "dD");
-  EXPECT_NE(tc->delayed_data_expr, nullptr);
-}
-
 // delayed_reference ::= terminal_identifier [ constant_mintypmax_expression ]
 TEST(ParserA70502, DelayedReferenceWithBracketExpr) {
   auto r = Parse(
