@@ -50,4 +50,20 @@ TEST(ParserA605, EventControlAtStar) {
   EXPECT_TRUE(stmt->is_star_event);
 }
 
+// §9.4.2.2: @(*) implicit sensitivity
+TEST(ParserA605, EventControlAtStarParen) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(*) y = a & b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_TRUE(stmt->is_star_event);
+}
+
 }  // namespace
