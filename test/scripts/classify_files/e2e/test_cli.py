@@ -49,13 +49,32 @@ def _install_fakes(tmp_path, exit_code=0):
     return str(fake_scripts)
 
 
-def _install_fake_gh(tmp_path):
-    """Install a fake gh that succeeds for all requests."""
+def _install_fake_gh(tmp_path, titles=None):
+    """Install a fake gh that succeeds for all requests.
+
+    *titles* maps issue number strings to title strings for
+    ``--jq .title`` requests.
+    """
     fake_bin = tmp_path / "fake_bin"
     fake_bin.mkdir(exist_ok=True)
     gh_script = fake_bin / "gh"
+    title_cases = ""
+    for number, title in (titles or {}).items():
+        escaped = title.replace("'", "'\\''")
+        title_cases += (
+            f'  if echo "$@" | grep -q "issues/{number}"; then\n'
+            f"    printf '%s' '{escaped}'\n"
+            f'    exit 0\n'
+            f'  fi\n'
+        )
     gh_script.write_text(
         '#!/bin/sh\n'
+        'for arg in "$@"; do\n'
+        '  if [ "$arg" = ".title" ]; then\n'
+        + title_cases +
+        '    exit 1\n'
+        '  fi\n'
+        'done\n'
         'echo \'{"body": "- [ ] a.cpp\\n- [ ] b.cpp"}\'\n'
         'exit 0\n',
         encoding="utf-8",
@@ -64,7 +83,7 @@ def _install_fake_gh(tmp_path):
     return str(fake_bin)
 
 
-def _base_env(tmp_path, fake_scripts_dir):
+def _base_env(tmp_path, fake_scripts_dir, titles=None):
     """Build subprocess env with fake classify_file before real scripts."""
     env = os.environ.copy()
     env["HOME"] = str(tmp_path)
@@ -73,7 +92,7 @@ def _base_env(tmp_path, fake_scripts_dir):
         [fake_scripts_dir, _SCRIPTS_DIR]
         + ([pypath] if pypath else []),
     )
-    fake_bin = _install_fake_gh(tmp_path)
+    fake_bin = _install_fake_gh(tmp_path, titles=titles)
     env["PATH"] = fake_bin + os.pathsep + env.get("PATH", "")
     return env
 
@@ -101,6 +120,19 @@ def _all_flags(tmp_path):
     """Return the full set of required CLI flags."""
     return [
         "--files", "a.cpp,b.cpp",
+        "--issue", "1",
+        "--output-dir", str(tmp_path),
+        "--lrm", str(tmp_path / "lrm.txt"),
+        "--organization", "org",
+        "--repo", "repo",
+        "--max-lines", "500",
+    ]
+
+
+def _all_flags_sub_issues(tmp_path):
+    """Return CLI flags with --sub-issues instead of --files."""
+    return [
+        "--sub-issues", "1,2",
         "--issue", "1",
         "--output-dir", str(tmp_path),
         "--lrm", str(tmp_path / "lrm.txt"),
@@ -177,3 +209,39 @@ def test_batch_progress_output(tmp_path):
     """Progress lines show file index and name."""
     result = _run_batch(tmp_path)
     assert "Processing file 1/2: a.cpp" in result.stdout
+
+
+# ---- --sub-issues ---------------------------------------------------------
+
+
+def test_sub_issues_batch_exits_zero(tmp_path):
+    """Exits 0 when --sub-issues is used and all pass."""
+    titles = {
+        "1": "Classify tests in a.cpp",
+        "2": "Classify tests in b.cpp",
+    }
+    fake = _install_fakes(tmp_path)
+    env = _base_env(tmp_path, fake, titles=titles)
+    result = _invoke(
+        *_all_flags_sub_issues(tmp_path),
+        cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode == 0
+
+
+def test_both_flags_rejects(tmp_path):
+    """--files and --sub-issues together are rejected."""
+    fake = _install_fakes(tmp_path)
+    env = _base_env(tmp_path, fake)
+    result = _invoke(
+        "--files", "a.cpp",
+        "--sub-issues", "1",
+        "--issue", "1",
+        "--output-dir", str(tmp_path),
+        "--lrm", "lrm.txt",
+        "--organization", "org",
+        "--repo", "repo",
+        "--max-lines", "500",
+        cwd=str(tmp_path), env=env,
+    )
+    assert result.returncode != 0

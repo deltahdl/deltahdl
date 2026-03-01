@@ -26,6 +26,7 @@ def _pipeline_args(**overrides):
     """Build args for _run."""
     result = {
         "files": "a.cpp,b.cpp",
+        "sub_issues": None,
         "output_dir": "/out",
         "lrm": "/lrm.txt",
         **_ARGS_DEFAULTS, **overrides,
@@ -104,4 +105,33 @@ def test_ticks_checkbox_after_each_file(monkeypatch):
     _mock_run_ok(monkeypatch)
     ticked = _stub_tick(monkeypatch)
     _run(_pipeline_args())
+    assert ticked == ["a.cpp", "b.cpp"]
+
+
+# ---- --sub-issues pipeline ------------------------------------------------
+
+
+def _stub_resolve(monkeypatch, entries):
+    """Stub resolve_sub_issues to return *entries*."""
+    monkeypatch.setattr(
+        classify_files, "resolve_sub_issues",
+        lambda _args: entries,
+    )
+
+
+def test_sub_issues_uses_issue_flag(monkeypatch):
+    """Each subprocess command has --issue, not --create-issue."""
+    _stub_resolve(monkeypatch, [("a.cpp", 76), ("b.cpp", 77)])
+    log = _mock_run_ok(monkeypatch)
+    _stub_tick(monkeypatch)
+    _run(_pipeline_args(files=None, sub_issues="76,77"))
+    assert all("--create-issue" not in c for c in log)
+
+
+def test_sub_issues_ticks_master_checkbox(monkeypatch):
+    """Master checkbox ticked with correct filenames."""
+    _stub_resolve(monkeypatch, [("a.cpp", 76), ("b.cpp", 77)])
+    _mock_run_ok(monkeypatch)
+    ticked = _stub_tick(monkeypatch)
+    _run(_pipeline_args(files=None, sub_issues="76,77"))
     assert ticked == ["a.cpp", "b.cpp"]

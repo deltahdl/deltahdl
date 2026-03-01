@@ -44,3 +44,14 @@ def stub_tick_file_checkbox(monkeypatch):
 
     monkeypatch.setattr(classify_files, "tick_file_checkbox", fake_tick)
     return ticked
+
+
+def stub_fetch_issue_title(
+    monkeypatch,
+    titles: dict[int, str],
+):
+    """Stub fetch_issue_title; return title from *titles* dict."""
+    monkeypatch.setattr(
+        classify_files, "fetch_issue_title",
+        lambda _o, _r, issue: titles[issue],
+    )

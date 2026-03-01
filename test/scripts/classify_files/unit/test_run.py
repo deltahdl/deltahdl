@@ -9,6 +9,7 @@ import pytest
 
 import classify_files
 from helpers import (
+    stub_fetch_issue_title,
     stub_subprocess_failure,
     stub_subprocess_success,
     stub_tick_file_checkbox,
@@ -17,6 +18,10 @@ from helpers import (
 _parse_args = getattr(classify_files, "_parse_args")
 _build_command = getattr(classify_files, "_build_command")
 _run = getattr(classify_files, "_run")
+extract_filename_from_title = getattr(
+    classify_files, "extract_filename_from_title",
+)
+resolve_sub_issues = getattr(classify_files, "resolve_sub_issues")
 
 
 # ---- Helpers ---------------------------------------------------------------
@@ -33,11 +38,23 @@ _BASE_ARGV = [
     "--max-lines", "1000",
 ]
 
+_SUB_ISSUES_ARGV = [
+    "prog",
+    "--sub-issues", "76,77",
+    "--issue", "61",
+    "--output-dir", "/out",
+    "--lrm", "/lrm.txt",
+    "--organization", "testorg",
+    "--repo", "testrepo",
+    "--max-lines", "1000",
+]
+
 
 def _make_args(**overrides):
     """Build a SimpleNamespace with all required args."""
     defaults = {
         "files": "a.cpp,b.cpp",
+        "sub_issues": None,
         "issue": 61,
         "output_dir": "/out",
         "lrm": "/lrm.txt",
@@ -367,6 +384,156 @@ def test_run_prints_done(monkeypatch, capsys):
     stub_tick_file_checkbox(monkeypatch)
     _run(_make_args(files="a.cpp"))
     assert "Done" in capsys.readouterr().out
+
+
+# ---- --sub-issues argument parsing -----------------------------------------
+
+
+def test_parse_args_sub_issues(monkeypatch):
+    """Parses --sub-issues flag."""
+    monkeypatch.setattr(sys, "argv", _SUB_ISSUES_ARGV)
+    assert _parse_args().sub_issues == "76,77"
+
+
+def test_parse_args_files_and_sub_issues_rejects(monkeypatch):
+    """Both --files and --sub-issues are rejected."""
+    monkeypatch.setattr(sys, "argv", [
+        "prog",
+        "--files", "a.cpp",
+        "--sub-issues", "76",
+        "--issue", "61",
+        "--output-dir", "/out",
+        "--lrm", "/lrm.txt",
+        "--organization", "testorg",
+        "--repo", "testrepo",
+        "--max-lines", "1000",
+    ])
+    with pytest.raises(SystemExit):
+        _parse_args()
+
+
+def test_parse_args_neither_rejects(monkeypatch):
+    """Neither --files nor --sub-issues is rejected."""
+    monkeypatch.setattr(sys, "argv", [
+        "prog",
+        "--issue", "61",
+        "--output-dir", "/out",
+        "--lrm", "/lrm.txt",
+        "--organization", "testorg",
+        "--repo", "testrepo",
+        "--max-lines", "1000",
+    ])
+    with pytest.raises(SystemExit):
+        _parse_args()
+
+
+# ---- fetch_issue_title -----------------------------------------------------
+
+
+def test_fetch_issue_title_returns_title(monkeypatch):
+    """Returns stripped stdout from gh api."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "Classify tests in foo.cpp\n"
+    mock_result.stderr = ""
+    monkeypatch.setattr(
+        subprocess, "run", lambda _cmd, **_kw: mock_result,
+    )
+    assert classify_files.fetch_issue_title("o", "r", 1) == (
+        "Classify tests in foo.cpp"
+    )
+
+
+def test_fetch_issue_title_exits_on_failure(monkeypatch):
+    """sys.exit(1) when gh api fails."""
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+    mock_result.stdout = ""
+    mock_result.stderr = "not found"
+    monkeypatch.setattr(
+        subprocess, "run", lambda _cmd, **_kw: mock_result,
+    )
+    with pytest.raises(SystemExit):
+        classify_files.fetch_issue_title("o", "r", 999)
+
+
+# ---- extract_filename_from_title ------------------------------------------
+
+
+def test_extract_filename_from_title_valid():
+    """Extracts filename from valid title."""
+    assert extract_filename_from_title(
+        "Classify tests in foo.cpp",
+    ) == "foo.cpp"
+
+
+def test_extract_filename_from_title_invalid():
+    """sys.exit(1) on non-matching title."""
+    with pytest.raises(SystemExit):
+        extract_filename_from_title("Unrelated title")
+
+
+# ---- resolve_sub_issues ---------------------------------------------------
+
+
+def test_resolve_sub_issues_returns_entries(monkeypatch):
+    """Maps issue numbers to (path, issue) pairs."""
+    stub_fetch_issue_title(monkeypatch, {
+        76: "Classify tests in a.cpp",
+        77: "Classify tests in b.cpp",
+    })
+    args = _make_args(sub_issues="76,77")
+    entries = resolve_sub_issues(args)
+    assert entries == [("/out/a.cpp", 76), ("/out/b.cpp", 77)]
+
+
+# ---- _build_command with sub_issue ----------------------------------------
+
+
+def test_build_command_with_sub_issue():
+    """sub_issue=76 produces --issue 76."""
+    cmd = _build_command(_make_args(), "/p/a.cpp", sub_issue=76)
+    assert cmd[cmd.index("--issue") + 1] == "76"
+
+
+def test_build_command_with_sub_issue_no_create():
+    """sub_issue=76 excludes --create-issue."""
+    cmd = _build_command(_make_args(), "/p/a.cpp", sub_issue=76)
+    assert "--create-issue" not in cmd
+
+
+def test_build_command_without_sub_issue():
+    """sub_issue=None keeps --create-issue (backward compat)."""
+    cmd = _build_command(_make_args(), "/p/a.cpp")
+    assert "--create-issue" in cmd
+
+
+# ---- _run with --sub-issues -----------------------------------------------
+
+
+def test_run_sub_issues_passes_issue_flag(monkeypatch):
+    """_run with sub_issues passes --issue to each subprocess."""
+    stub_fetch_issue_title(monkeypatch, {
+        76: "Classify tests in a.cpp",
+        77: "Classify tests in b.cpp",
+    })
+    captured = stub_subprocess_success(monkeypatch)
+    stub_tick_file_checkbox(monkeypatch)
+    _run(_make_args(files=None, sub_issues="76,77"))
+    issues = [c[c.index("--issue") + 1] for c in captured]
+    assert issues == ["76", "77"]
+
+
+def test_run_sub_issues_ticks_master_checkbox(monkeypatch):
+    """Master issue checkbox ticked after each file."""
+    stub_fetch_issue_title(monkeypatch, {
+        76: "Classify tests in a.cpp",
+        77: "Classify tests in b.cpp",
+    })
+    stub_subprocess_success(monkeypatch)
+    ticked = stub_tick_file_checkbox(monkeypatch)
+    _run(_make_args(files=None, sub_issues="76,77"))
+    assert ticked == ["a.cpp", "b.cpp"]
 
 
 # ---- main ------------------------------------------------------------------
