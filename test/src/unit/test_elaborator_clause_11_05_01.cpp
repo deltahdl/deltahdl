@@ -61,4 +61,18 @@ TEST(Elaboration, RealIndex_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// § primary — hierarchical identifier with select elaborates
+TEST(ElabA84, PrimaryHierIdentSelectElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  logic x;\n"
+      "  initial x = data[3];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
