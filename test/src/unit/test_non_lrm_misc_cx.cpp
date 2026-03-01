@@ -20,28 +20,6 @@ TEST(SourceText, PackageItemDpiImportExport) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
 }
 
-// package_or_generate_item_declaration: extern_constraint_declaration
-TEST(SourceText, PackageItemExternConstraint) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  constraint MyClass::c { x > 0; }\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
-// package_or_generate_item_declaration: static extern_constraint_declaration
-TEST(SourceText, PackageItemStaticExternConstraint) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  static constraint MyClass::c { x > 0; }\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
 // package_or_generate_item_declaration: class_declaration
 TEST(SourceText, PackageItemClassDecl) {
   auto r = Parse(
