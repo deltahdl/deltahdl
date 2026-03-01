@@ -324,4 +324,21 @@ TEST(ParserA605, JumpBreak) {
   VerifyForeverLoopJump(body, StmtKind::kBreak);
 }
 
+// §12.8: continue statement
+TEST(ParserA605, JumpContinue) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      continue;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  VerifyForeverLoopJump(body, StmtKind::kContinue);
+}
+
 }  // namespace
