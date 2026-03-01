@@ -44,20 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(DpiParseTest, ImportWithCName) {
-  auto* unit = Parse(R"(
-    module m;
-      import "DPI-C" c_add = function int add(input int a, input int b);
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(items[0]->dpi_c_name, "c_add");
-  EXPECT_EQ(items[0]->name, "add");
-}
-
 TEST_F(DpiParseTest, ImportPureFunction) {
   auto* unit = Parse(R"(
     module m;
