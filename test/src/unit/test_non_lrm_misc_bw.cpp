@@ -36,28 +36,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 5. Named fork-join with matching end labels
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_3_2_NamedForkJoinMatchingLabels) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork : thread_group\n"
-      "      #10 a = 1;\n"
-      "      #20 b = 2;\n"
-      "    join : thread_group\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->label, "thread_group");
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
-}
-
-// ---------------------------------------------------------------------------
 // 6. Named fork-join_any
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_NamedForkJoinAny) {

@@ -361,4 +361,55 @@ TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
   EXPECT_EQ(body->stmts[1]->label, "block_b");
 }
 
+struct ParseResult9e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9e Parse(const std::string& src) {
+  ParseResult9e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult9e& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// 5. Named fork-join with matching end labels
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_NamedForkJoinMatchingLabels) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : thread_group\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 2;\n"
+      "    join : thread_group\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "thread_group");
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
+}
+
 }  // namespace
