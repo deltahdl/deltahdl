@@ -26,6 +26,7 @@ from ._github import (
     update_issue_body,
 )
 from ._git import commit_classification
+from ._patterns import PREFIX_PATTERNS
 from ._output import (
     print_classification_table,
     print_summary,
@@ -329,16 +330,7 @@ def parse_file(filepath):
 # Stage 2: Classify via Claude
 # ---------------------------------------------------------------------------
 
-_PREFIX_PATTERNS = [
-    ("Preprocessor", "test_preprocessor_"),
-    ("SynthLower", "test_synthesizer_"),
-    ("AigGraph", "test_synthesizer_"),
-    ("Scheduler", "test_simulator_"),
-    ("SimContext", "test_simulator_"),
-    ("Elaborate", "test_elaborator_"),
-    ("Parse", "test_parser_"),
-    ("Lex", "test_lexer_"),
-]
+_PREFIX_PATTERNS = PREFIX_PATTERNS
 
 
 def _detect_prefix(test, clause):
