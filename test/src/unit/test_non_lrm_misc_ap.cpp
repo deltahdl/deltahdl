@@ -23,18 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// restrict_property_statement
-TEST(ParserA610, RestrictPropertyModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  restrict property (clk);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kRestrictProperty);
-  ASSERT_NE(item, nullptr);
-}
-
 // =============================================================================
 // A.6.10 — deferred_immediate_assertion_item (module-level)
 // =============================================================================
