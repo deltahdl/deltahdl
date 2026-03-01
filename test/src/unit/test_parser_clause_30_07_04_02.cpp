@@ -166,4 +166,23 @@ TEST(ParserSection28, Sec28_12_Noshowcancelled) {
   ASSERT_EQ(si->signal_list.size(), 2u);
 }
 
+TEST(ParserA701, ShowcancelledMultipleOutputs) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    showcancelled out1, out2, out3;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  auto* item = spec->specify_items[0];
+  EXPECT_FALSE(item->is_noshowcancelled);
+  ASSERT_EQ(item->signal_list.size(), 3u);
+  EXPECT_EQ(item->signal_list[0], "out1");
+  EXPECT_EQ(item->signal_list[1], "out2");
+  EXPECT_EQ(item->signal_list[2], "out3");
+}
+
 }  // namespace
