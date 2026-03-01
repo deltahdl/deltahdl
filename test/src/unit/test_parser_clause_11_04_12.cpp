@@ -45,4 +45,56 @@ TEST(ParserSection9, Sec9_2_2_Concatenation) {
   EXPECT_EQ(item->body->rhs->elements.size(), 2u);
 }
 
+struct ParseResult11e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11e Parse(const std::string& src) {
+  ParseResult11e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult11e& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+static Expr* FirstAssignRhs(ParseResult11e& r) {
+  auto* stmt = FirstInitialStmt(r);
+  if (!stmt) return nullptr;
+  return stmt->rhs;
+}
+
+// =========================================================================
+// Section 11.4.12 -- Concatenation operators
+// =========================================================================
+TEST(ParserSection11, ConcatWithPartSelects) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] a, w, b;\n"
+      "  initial x = {a, b[3:0], w, 3'b101};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(rhs->elements.size(), 4u);
+}
+
 }  // namespace

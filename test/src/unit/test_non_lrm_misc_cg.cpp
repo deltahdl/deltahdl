@@ -56,23 +56,6 @@ TEST(ParserSection11, ReductionXnorCaretTilde) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-// =========================================================================
-// Section 11.4.12 -- Concatenation operators
-// =========================================================================
-TEST(ParserSection11, ConcatWithPartSelects) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] a, w, b;\n"
-      "  initial x = {a, b[3:0], w, 3'b101};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(rhs->elements.size(), 4u);
-}
-
 TEST(ParserSection11, ConcatOnLhsOfAssign) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
