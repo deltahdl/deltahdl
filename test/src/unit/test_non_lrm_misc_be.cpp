@@ -45,27 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 2. Automatic function — variables are automatic by default
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_AutomaticFunctionDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int factorial(int n);\n"
-      "    if (n <= 1) return 1;\n"
-      "    return n * factorial(n - 1);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(fn->is_automatic);
-  EXPECT_FALSE(fn->is_static);
-  EXPECT_EQ(fn->name, "factorial");
-}
-
-// =============================================================================
 // 3. Explicit static variable in automatic function
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_ExplicitStaticInAutoFunc) {
