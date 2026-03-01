@@ -408,4 +408,24 @@ TEST(ParserClause03, Cl3_7_CombinationalUdp) {
   EXPECT_EQ(udp->table[3].output, '1');
 }
 
+TEST(ParserSection29, UdpMultiple) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "primitive buf2(output out, input in);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 2);
+  EXPECT_EQ(r.cu->udps[0]->name, "inv");
+  EXPECT_EQ(r.cu->udps[1]->name, "buf2");
+}
+
 }  // namespace
