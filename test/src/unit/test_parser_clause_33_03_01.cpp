@@ -59,4 +59,21 @@ TEST(LibraryText, LibraryDeclHasSourceRange) {
   EXPECT_NE(r.cu->libraries[0]->range.start.line, 0u);
 }
 
+// =============================================================================
+// Multiple library declarations.
+// =============================================================================
+// Multiple libraries, each mapping different file patterns.
+TEST(LibraryText, MultipleLibraries) {
+  auto r = ParseLibrary(
+      "library rtlLib *.v;\n"
+      "library gateLib ./*.vg;\n"
+      "library tbLib ../tb/*.sv;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->libraries.size(), 3u);
+  EXPECT_EQ(r.cu->libraries[0]->name, "rtlLib");
+  EXPECT_EQ(r.cu->libraries[1]->name, "gateLib");
+  EXPECT_EQ(r.cu->libraries[2]->name, "tbLib");
+}
+
 }  // namespace
