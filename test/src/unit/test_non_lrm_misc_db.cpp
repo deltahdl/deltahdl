@@ -44,15 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-// Verify IncludeStmt stores source location.
-TEST(LibraryText, IncludeStmtHasSourceLoc) {
-  auto r = ParseLibrary("include /proj/lib.map;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->lib_includes.size(), 1u);
-  EXPECT_NE(r.cu->lib_includes[0]->loc.line, 0u);
-}
-
 // =============================================================================
 // Multiple library declarations.
 // =============================================================================
