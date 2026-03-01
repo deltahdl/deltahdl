@@ -300,4 +300,14 @@ TEST_F(ConfigParseTest, BasicConfig) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
+TEST_F(ConfigParseTest, ConfigWithEndLabel) {
+  auto* unit = Parse(R"(
+    config cfg;
+      design lib.top;
+    endconfig : cfg
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  EXPECT_EQ(unit->configs[0]->name, "cfg");
+}
+
 }  // namespace
