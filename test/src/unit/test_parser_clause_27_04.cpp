@@ -408,4 +408,24 @@ TEST(ParserSection23, GenvarPostIncrementStep) {
               "endmodule\n"));
 }
 
+// =========================================================================
+// LRM section 27.4: Indexed generate block names
+// =========================================================================
+TEST(ParserSection23, IndexedGenerateBlockName) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i = i + 1) begin : stage\n"
+      "    wire w;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ModuleItem* gen = nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) gen = item;
+  }
+  ASSERT_NE(gen, nullptr);
+  EXPECT_FALSE(gen->gen_body.empty());
+}
+
 }  // namespace

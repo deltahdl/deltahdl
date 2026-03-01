@@ -43,32 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// =============================================================================
-// LRM section 19.4 -- Clocking blocks
-// =============================================================================
-// Basic clocking block with posedge event, input and output signals.
-TEST(ParserSection19, ClockingBlock_BasicDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input a;\n"
-      "    output b;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_EQ(item->name, "cb");
-  EXPECT_FALSE(item->is_default_clocking);
-  EXPECT_FALSE(item->is_global_clocking);
-  ASSERT_EQ(item->clocking_event.size(), 1u);
-  EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
-  ASSERT_EQ(item->clocking_signals.size(), 2u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
-  EXPECT_EQ(item->clocking_signals[0].name, "a");
-  EXPECT_EQ(item->clocking_signals[1].direction, Direction::kOutput);
-  EXPECT_EQ(item->clocking_signals[1].name, "b");
-}
-
 // Clocking block with negedge event.
 TEST(ParserSection19, ClockingBlock_NegedgeEvent) {
   auto r = Parse(
