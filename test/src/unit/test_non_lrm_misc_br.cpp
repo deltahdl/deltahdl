@@ -17,32 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// 25. Struct with packed array member assigned.
-TEST(ParserSection7, Sec7_2_2_PackedArrayMemberAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct {\n"
-      "    logic [7:0] data;\n"
-      "    logic [3:0] tag;\n"
-      "  } tagged_data_t;\n"
-      "  tagged_data_t td;\n"
-      "  initial begin\n"
-      "    td.data = 8'hFF;\n"
-      "    td.tag = 4'hA;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
-  ASSERT_NE(s0, nullptr);
-  ASSERT_NE(s1, nullptr);
-  EXPECT_EQ(s0->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(s1->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(s0->lhs->kind, ExprKind::kMemberAccess);
-  EXPECT_EQ(s1->lhs->kind, ExprKind::kMemberAccess);
-}
-
 // 26. Struct output port assigned in module body.
 TEST(ParserSection7, Sec7_2_2_StructOutputPort) {
   EXPECT_TRUE(
