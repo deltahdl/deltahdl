@@ -25,4 +25,25 @@ TEST(ElabA612, ControlFlowProdsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// =============================================================================
+// A.6.12 Randsequence — Elaboration
+// =============================================================================
+// Basic randsequence elaborates without errors
+TEST(ElabA612, BasicRandsequenceElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : first second;\n"
+      "      first : { ; };\n"
+      "      second : { ; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

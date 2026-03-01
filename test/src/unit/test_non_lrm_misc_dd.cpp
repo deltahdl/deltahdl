@@ -13,27 +13,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// A.6.12 Randsequence — Elaboration
-// =============================================================================
-// Basic randsequence elaborates without errors
-TEST(ElabA612, BasicRandsequenceElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : first second;\n"
-      "      first : { ; };\n"
-      "      second : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-// =============================================================================
 // A.7.5.3 Elab — edge_control_specifier
 // =============================================================================
 // edge_control_specifier with 01, 10 descriptors elaborates
@@ -452,12 +431,6 @@ TEST(LexerCh50603, DollarAloneIsNotSystemIdentifier) {
   auto tokens = Lex("$");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
-}
-
-static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
-                                    Preprocessor& pp) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  return pp.Preprocess(fid);
 }
 
 TEST(Preprocessor, DelayToTicks_Basic) {
