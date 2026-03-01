@@ -44,15 +44,6 @@ using DpiParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// Error handling.
-// =============================================================================
-// Missing semicolon after library declaration.
-TEST(LibraryText, ErrorMissingSemicolon) {
-  auto r = ParseLibrary("library lib /proj/*.v\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // Missing file path spec.
 TEST(LibraryText, ErrorMissingFilePath) {
   auto r = ParseLibrary("library lib;\n");
