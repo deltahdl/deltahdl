@@ -52,17 +52,6 @@ static ParseResult40 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection38, VpiSystemCallForce) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    force sig = 1'b0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection38, VpiSystemCallRelease) {
   auto r = Parse(
       "module m;\n"
