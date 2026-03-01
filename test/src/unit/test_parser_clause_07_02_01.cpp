@@ -434,4 +434,18 @@ TEST(ParserSection7, Sec7_2_2_StructOutputPort) {
               "endmodule\n"));
 }
 
+// --- Nested packed struct (packed struct inside packed struct) ---
+TEST(ParserSection7, Sec7_2_1_NestedPackedStruct) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct packed {\n"
+              "    struct packed {\n"
+              "      logic [7:0] x;\n"
+              "      logic [7:0] y;\n"
+              "    } coord;\n"
+              "    logic [7:0] color;\n"
+              "  } pixel_t;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
