@@ -226,4 +226,20 @@ TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
+// parallel_edge_sensitive_path_description without data_source
+TEST(ParserA702, EdgeSensitiveParallelWithoutDataSource) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (negedge clk => q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kNegedge);
+  EXPECT_EQ(si->path.data_source, nullptr);
+}
+
 }  // namespace
