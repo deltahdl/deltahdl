@@ -323,4 +323,18 @@ TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
   EXPECT_TRUE(item->body->label.empty());
 }
 
+TEST(ParserSection12, NamedBeginEndNoEndLabel) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : blk\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "blk");
+}
+
 }  // namespace
