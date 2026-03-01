@@ -121,7 +121,12 @@ def remove_file_checkbox(
     """Remove a file checkbox from the master issue."""
     print(f"Removing {filename} from issue #{issue}...")
     body = fetch_issue_body(org, repo, issue)
-    body = remove_checkbox(body, filename)
+    try:
+        body = remove_checkbox(body, filename)
+    except ValueError:
+        print(f"Filename not found in issue #{issue}."
+              " Nothing to delete.")
+        return
     update_issue_body(org, repo, issue, body)
 
 

@@ -55,9 +55,9 @@ def remove_checkbox(body, test_name):
     )
     match = pattern.search(body)
     if not match:
-        print(f"ERROR: Checkbox for {test_name!r} not found"
-              " in issue body")
-        sys.exit(1)
+        raise ValueError(
+            f"Checkbox for {test_name!r} not found in issue body",
+        )
     return body[:match.start()] + body[match.end():]
 
 

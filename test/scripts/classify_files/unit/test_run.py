@@ -358,6 +358,32 @@ def test_remove_file_checkbox_calls_update(monkeypatch):
     assert updated[0] == "- [ ] b.cpp\n"
 
 
+def test_remove_file_checkbox_not_found_skips(monkeypatch, capsys):
+    """Prints friendly message and skips update when filename not in issue."""
+    monkeypatch.setattr(
+        classify_files, "fetch_issue_body",
+        lambda _o, _r, _i: "- [ ] other.cpp\n",
+    )
+    monkeypatch.setattr(
+        classify_files, "remove_checkbox",
+        _raise_value_error,
+    )
+    updated: list[str] = []
+    monkeypatch.setattr(
+        classify_files, "update_issue_body",
+        lambda _o, _r, _i, body: updated.append(body),
+    )
+    classify_files.remove_file_checkbox("o", "r", 61, "missing.cpp")
+    assert not updated
+    out = capsys.readouterr().out
+    assert "not found in issue #61" in out
+    assert "Nothing to delete" in out
+
+
+def _raise_value_error(_body, _name):
+    raise ValueError("not found")
+
+
 # ---- _run ------------------------------------------------------------------
 
 

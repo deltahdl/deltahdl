@@ -173,9 +173,9 @@ def test_remove_checkbox_preserves_others():
     assert "- [ ] Beta\n- [ ] Gamma\n" in remove_checkbox(body, "Alpha")
 
 
-def test_remove_checkbox_not_found_exits():
-    """Exits when test name is not found in any checkbox."""
-    with pytest.raises(SystemExit):
+def test_remove_checkbox_not_found_raises():
+    """Raises ValueError when test name is not found in any checkbox."""
+    with pytest.raises(ValueError, match="not found"):
         remove_checkbox("- [ ] Other\n", "Missing")
 
 
