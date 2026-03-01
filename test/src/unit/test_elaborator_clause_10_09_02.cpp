@@ -145,4 +145,26 @@ TEST(SimA60701, ThreeFieldStructNamedPattern) {
   EXPECT_EQ(var->value.ToUint64(), 0x010203u);
 }
 
+// ---------------------------------------------------------------------------
+// constant_assignment_pattern_expression — simulation
+// ---------------------------------------------------------------------------
+// §10.9: constant assignment pattern in variable declaration initializer
+TEST(SimA60701, ConstPatternInVarDeclInit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t p = '{8'd100, 8'd200};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("p");
+  ASSERT_NE(var, nullptr);
+  // '{8'd100, 8'd200} = {8'h64, 8'hC8} = 16'h64C8 = 25800
+  EXPECT_EQ(var->value.ToUint64(), 25800u);
+}
+
 }  // namespace
