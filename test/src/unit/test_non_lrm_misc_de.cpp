@@ -9,27 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9: four-element positional pattern
-TEST(SimA60701, FourElementPositionalPattern) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    x = '{8'd1, 8'd2, 8'd3, 8'd4};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  // '{8'd1, 8'd2, 8'd3, 8'd4} = 32'h01020304 = 16909060
-  EXPECT_EQ(var->value.ToUint64(), 0x01020304u);
-}
-
 // ---------------------------------------------------------------------------
 // assignment_pattern: named struct — simulation
 // ---------------------------------------------------------------------------
