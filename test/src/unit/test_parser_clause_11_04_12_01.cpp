@@ -205,4 +205,14 @@ TEST(ParserA81, MultipleConcatenationBasic) {
   ASSERT_NE(stmt->rhs->repeat_count, nullptr);
 }
 
+TEST(ParserA81, MultipleConcatenationMultipleInner) {
+  auto r = Parse("module m; initial x = {2{a, b}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
+  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
+}
+
 }  // namespace
