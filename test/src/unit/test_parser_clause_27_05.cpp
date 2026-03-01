@@ -356,4 +356,28 @@ TEST(Parser, GenerateCaseInRegion) {
   EXPECT_TRUE(found);
 }
 
+// 15. Labeled generate blocks (if-generate)
+TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter USE_FAST = 1;\n"
+      "  if (USE_FAST) begin : fast_path\n"
+      "    logic [7:0] result;\n"
+      "  end else begin : slow_path\n"
+      "    logic [15:0] result;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  bool found_gen_if = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kGenerateIf) {
+      found_gen_if = true;
+      EXPECT_FALSE(item->gen_body.empty());
+    }
+  }
+  EXPECT_TRUE(found_gen_if);
+}
+
 }  // namespace

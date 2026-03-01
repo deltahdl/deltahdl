@@ -47,4 +47,19 @@ TEST(ParserSection13, Sec13_8_ScopeCallParsesAsExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §13.8: Two different specializations in the same module.
+TEST(ParserSection13, Sec13_8_TwoSpecializations) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0] a4;\n"
+      "  logic [15:0] a16;\n"
+      "  logic [1:0] r4;\n"
+      "  logic [3:0] r16;\n"
+      "  assign r4  = C#(4)::ENCODER_f(a4);\n"
+      "  assign r16 = C#(16)::ENCODER_f(a16);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
