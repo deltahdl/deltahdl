@@ -58,4 +58,27 @@ TEST(ElabA705, MultipleSpecifyBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// =============================================================================
+// Simulation tests — A.7.1 Specify block declaration
+// =============================================================================
+// Module with empty specify block simulates correctly
+TEST(SimA701, EmptySpecifyBlockSimulates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  specify\n"
+      "  endspecify\n"
+      "  initial x = 8'd42;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
 }  // namespace
