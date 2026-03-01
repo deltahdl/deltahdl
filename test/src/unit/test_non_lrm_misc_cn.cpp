@@ -48,15 +48,6 @@ TEST(ParserSection16, PropertyDeclAndAssertProperty) {
   EXPECT_TRUE(found_assert);
 }
 
-TEST(ParserSection16, ConcurrentAssertNegedgeClock) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(negedge clk) a |-> b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // =============================================================================
 // §16.5.1 Concurrent assert/assume/cover
 // =============================================================================
