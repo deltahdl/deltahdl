@@ -439,4 +439,22 @@ TEST(ParserSection10, Sec10_4_1_CompoundPlusEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kPlusEq);
 }
 
+// --- 20. Compound assignment operator -= ---
+TEST(ParserSection10, Sec10_4_1_CompoundMinusEq) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    count -= 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(stmt->rhs->op, TokenKind::kMinusEq);
+}
+
 }  // namespace
