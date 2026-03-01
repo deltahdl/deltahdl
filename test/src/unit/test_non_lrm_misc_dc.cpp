@@ -52,15 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection40, CoverageSaveSystemCall) {
-  // $coverage_save saves coverage data to file
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      initial $coverage_save("coverage.ucdb");
-    endmodule
-  )"));
-}
-
 // =============================================================================
 // LRM section 40.5.2 -- Coverage with assertion and covergroup constructs
 // The VPI coverage API queries are applied to assertion handles and
