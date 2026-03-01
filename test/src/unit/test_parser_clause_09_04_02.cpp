@@ -362,4 +362,20 @@ TEST(ParserA605, EventControlBareIdentifier) {
   EXPECT_NE(stmt->events[0].signal, nullptr);
 }
 
+// §9.4.2: @(expression) parenthesized event control
+TEST(ParserA605, EventControlParenthesized) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(clk) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+}
+
 }  // namespace
