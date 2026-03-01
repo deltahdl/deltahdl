@@ -69,4 +69,19 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportTask) {
   EXPECT_TRUE(items[0]->dpi_is_task);
 }
 
+TEST(ParserSection38, DpiExportTaskForSystf) {
+  // Export a task for use as a systf callback handler
+  auto r = Parse(R"(
+    module m;
+      export "DPI-C" task systf_handler;
+    endmodule
+  )");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
+  EXPECT_TRUE(items[0]->dpi_is_task);
+}
+
 }  // namespace
