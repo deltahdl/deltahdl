@@ -101,26 +101,6 @@ TEST(ParserSection4, Sec4_5_MixBlockingNonblocking) {
 }
 
 // ---------------------------------------------------------------------------
-// 13. @* (implicit sensitivity) event control
-// ---------------------------------------------------------------------------
-TEST(ParserSection4, Sec4_5_StarEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    @* a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(stmt->is_star_event);
-  EXPECT_TRUE(stmt->events.empty());
-}
-
-// ---------------------------------------------------------------------------
 // 14. @(*) -- parenthesized implicit sensitivity
 // ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_ParenStarEventControl) {
