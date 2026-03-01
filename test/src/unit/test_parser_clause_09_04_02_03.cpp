@@ -342,4 +342,60 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevelBody) {
   EXPECT_GE(stmt->body->stmts.size(), 2u);
 }
 
+struct ParseResult9d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9d Parse(const std::string& src) {
+  ParseResult9d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysItem(ParseResult9d& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      return item;
+    }
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.2.2.4 -- always_ff procedure
+// Sequential logic with reset and multiple sensitivity list items.
+// =============================================================================
+TEST(ParserSection9c, AlwaysFFWithReset) {
+  // LRM example: always_ff @(posedge clock iff reset == 0 or posedge reset)
+  auto r = Parse(
+      "module m;\n"
+      "  logic clock, reset;\n"
+      "  logic [7:0] r1, r2;\n"
+      "  always_ff @(posedge clock iff reset == 0 or posedge reset) begin\n"
+      "    r1 <= reset ? 0 : r2 + 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
+  ASSERT_EQ(item->sensitivity.size(), 2u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
+  EXPECT_EQ(item->sensitivity[1].edge, Edge::kPosedge);
+  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
+}
+
 }  // namespace

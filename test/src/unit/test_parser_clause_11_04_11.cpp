@@ -567,4 +567,16 @@ TEST(ParserSection11, TernaryFieldAccess) {
   ASSERT_NE(rhs->false_expr, nullptr);
 }
 
+TEST(ParserSection11, NestedTernaryRightAssoc) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a ? b : c ? d : e;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
+}
+
 }  // namespace

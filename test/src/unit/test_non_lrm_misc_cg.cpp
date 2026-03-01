@@ -56,18 +56,6 @@ TEST(ParserSection11, ReductionXnorCaretTilde) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-TEST(ParserSection11, NestedTernaryRightAssoc) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a ? b : c ? d : e;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
-}
-
 TEST(ParserSection11, TernaryTristateDriver) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
