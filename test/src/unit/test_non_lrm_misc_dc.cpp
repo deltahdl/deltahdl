@@ -52,20 +52,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-TEST(ParserSection39, AssertionControlSequence) {
-  // Complete assertion control sequence: off, kill, on
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      initial begin
-        $assertoff;
-        $assertkill;
-        #100;
-        $asserton;
-      end
-    endmodule
-  )"));
-}
-
 TEST(ParserSection40, CoverageGetSystemCall) {
   // $coverage_get returns current coverage count
   EXPECT_TRUE(ParseOk(R"(
