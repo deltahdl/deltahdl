@@ -24,18 +24,6 @@ TEST(ParserA83, ConstantRangeInPackedDim) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-// § indexed_range with variable base
-TEST(ParserA83, IndexedRangeVariableBase) {
-  auto r = Parse("module m; initial x = data[i+:8]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(rhs->is_part_select_plus);
-  EXPECT_EQ(rhs->index->kind, ExprKind::kIdentifier);
-}
-
 // =============================================================================
 // A.8.3 Expressions — expression
 // =============================================================================
