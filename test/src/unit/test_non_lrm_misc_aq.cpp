@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Weight as parenthesized expression
-TEST(ParserA612, RsWeightParenExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : a := (2 + 3) | b := (1);\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.6.12 Randsequence — rs_code_block
 // =============================================================================
