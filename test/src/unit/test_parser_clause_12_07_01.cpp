@@ -200,4 +200,23 @@ TEST(ParserSection12, ForWithByteDecl) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kByte);
 }
 
+// For loop with block body.
+TEST(ParserSection12, ForWithBlockBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 4; i = i + 1) begin\n"
+      "      a[i] = i;\n"
+      "      b[i] = i * 2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFor);
+  ASSERT_NE(stmt->for_body, nullptr);
+  EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlock);
+}
+
 }  // namespace
