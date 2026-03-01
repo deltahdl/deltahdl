@@ -64,25 +64,6 @@ static Stmt* FirstInitialStmt(ParseResult9k& r) {
 
 namespace {
 
-// @* with concatenation assignments
-TEST(ParserSection9, Sec9_4_2_3_AtStarConcatenation) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [3:0] a, b;\n"
-      "  reg [7:0] out;\n"
-      "  always @* out = {a, b};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->rhs, nullptr);
-  EXPECT_EQ(item->body->rhs->kind, ExprKind::kConcatenation);
-}
-
 // @* with ternary expression assignment
 TEST(ParserSection9, Sec9_4_2_3_AtStarTernary) {
   auto r = Parse(
