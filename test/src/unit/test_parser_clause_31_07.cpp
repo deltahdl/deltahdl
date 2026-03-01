@@ -152,4 +152,40 @@ TEST(ParserSection28, Sec28_12_TimingCheckWithEdges) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
 }
 
+struct ParseResult31 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult31 Parse(const std::string& src) {
+  ParseResult31 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §31.7 Conditioned events
+// =============================================================================
+TEST_F(SpecifyTest, ConditionedSetup) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data &&& clr, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  auto& tc = spec->specify_items[0]->timing_check;
+  EXPECT_EQ(tc.check_kind, TimingCheckKind::kSetup);
+  EXPECT_EQ(tc.ref_terminal.name, "data");
+  EXPECT_NE(tc.ref_condition, nullptr);
+}
+
 }  // namespace
