@@ -248,4 +248,22 @@ TEST(SourceText, CheckerGenvarDecl) {
   EXPECT_EQ(r.cu->checkers[0]->items[0]->name, "i");
 }
 
+// checker_generate_item ::= loop | conditional | generate_region | elab task
+TEST(SourceText, CheckerGenerateItems) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  for (genvar i = 0; i < 4; i++) begin end\n"
+      "  if (1) begin end\n"
+      "  generate endgenerate\n"
+      "  $info(\"checker ok\");\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  auto& items = r.cu->checkers[0]->items;
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kGenerateFor));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kGenerateIf));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kElabSystemTask));
+}
+
 }  // namespace
