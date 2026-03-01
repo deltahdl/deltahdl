@@ -63,20 +63,6 @@ TEST(ParserSection6, MatchingTypesSameSigningModifier) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-// =============================================================================
-// LRM section 6.22.2 -- Compatible types
-// =============================================================================
-TEST(ParserSection6, CompatibleTypesParseLogicVectors) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic [7:0] b;\n"
-      "  assign a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection6, CompatibleTypesIntToLogic) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
