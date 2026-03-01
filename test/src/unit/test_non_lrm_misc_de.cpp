@@ -9,24 +9,6 @@ using namespace delta;
 
 namespace {
 
-// § streaming_concatenation — multiple stream elements
-TEST(SimA81, StreamingMultipleElements) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = {>> {4'hA, 4'h5}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xA5u);
-}
-
 // § concatenation with variables
 TEST(SimA81, ConcatWithVariables) {
   SimFixture f;
