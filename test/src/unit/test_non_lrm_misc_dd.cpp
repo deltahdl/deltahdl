@@ -12,22 +12,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.1 Specify block declaration — Elaboration
-// =============================================================================
-// Empty specify block elaborates without errors
-TEST(ElabA701, EmptySpecifyBlockElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // timing_check_event with edge keyword elaborates
 TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
   ElabFixture f;

@@ -81,4 +81,20 @@ TEST(SimA701, EmptySpecifyBlockSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
+// =============================================================================
+// A.7.1 Specify block declaration — Elaboration
+// =============================================================================
+// Empty specify block elaborates without errors
+TEST(ElabA701, EmptySpecifyBlockElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
