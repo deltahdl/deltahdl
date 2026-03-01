@@ -159,4 +159,19 @@ TEST(LibraryText, LexerFilePathSpecParentDir) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "../rtl/*.v");
 }
 
+// Config declaration within library text.
+TEST(LibraryText, ConfigInLibraryText) {
+  auto r = ParseLibrary(
+      "library lib1 /a/*.v;\n"
+      "config cfg;\n"
+      "  design lib1.top;\n"
+      "  default liblist lib1;\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
+}
+
 }  // namespace
