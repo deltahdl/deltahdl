@@ -17,21 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// anonymous_program_item: covergroup, class_constructor, ;
-TEST(SourceText, AnonymousProgramMisc) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  program;\n"
-      "    covergroup cg; endgroup\n"
-      "    function MyClass::new(); endfunction\n"
-      "    ;\n"
-      "  endprogram\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
 // anonymous_program at file scope (outside package)
 TEST(SourceText, AnonymousProgramTopLevel) {
   auto r = Parse(

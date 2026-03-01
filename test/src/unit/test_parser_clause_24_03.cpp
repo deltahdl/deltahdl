@@ -233,4 +233,33 @@ TEST(SourceText, AnonymousProgramClasses) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
+// =============================================================================
+// 30. Task in program block (automatic by default)
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_TaskInProgramBlock) {
+  EXPECT_TRUE(
+      ParseOk("program test_prog;\n"
+              "  task run_test();\n"
+              "    int x;\n"
+              "    x = 1;\n"
+              "    $display(\"x=%0d\", x);\n"
+              "  endtask\n"
+              "endprogram\n"));
+}
+
+// anonymous_program_item: covergroup, class_constructor, ;
+TEST(SourceText, AnonymousProgramMisc) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  program;\n"
+      "    covergroup cg; endgroup\n"
+      "    function MyClass::new(); endfunction\n"
+      "    ;\n"
+      "  endprogram\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+}
+
 }  // namespace
