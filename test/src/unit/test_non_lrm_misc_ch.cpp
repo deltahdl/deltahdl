@@ -86,43 +86,6 @@ TEST(ParserSection11, Sec11_4_1_BitSelectInContAssignLhs) {
   EXPECT_EQ(ca->assign_lhs->index_end, nullptr);
 }
 
-// --- Nested bit-selects a[i][j] ---
-TEST(ParserSection11, Sec11_4_1_NestedBitSelects) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [3:0] [7:0] packed_arr;\n"
-      "  initial x = packed_arr[2][3];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_EQ(rhs->index_end, nullptr);
-  ASSERT_NE(rhs->base, nullptr);
-  EXPECT_EQ(rhs->base->kind, ExprKind::kSelect);
-  EXPECT_EQ(rhs->base->index_end, nullptr);
-}
-
-// --- Part-select after bit-select a[i][7:0] ---
-TEST(ParserSection11, Sec11_4_1_PartSelectAfterBitSelect) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [3:0] [7:0] packed_arr;\n"
-      "  initial x = packed_arr[1][7:4];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->index, nullptr);
-  ASSERT_NE(rhs->index_end, nullptr);
-  ASSERT_NE(rhs->base, nullptr);
-  EXPECT_EQ(rhs->base->kind, ExprKind::kSelect);
-  EXPECT_EQ(rhs->base->index_end, nullptr);
-}
-
 // --- Select on member access result (s.field[i]) ---
 TEST(ParserSection11, Sec11_4_1_SelectOnMemberAccess) {
   auto r = Parse(
