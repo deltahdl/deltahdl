@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- foreach ( ps_or_hierarchical_array_identifier [loop_variables] ) stmt ---
-TEST(ParserA608, ForeachStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foreach (arr[i]) $display(arr[i]); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
-  EXPECT_NE(stmt->expr, nullptr);
-  EXPECT_NE(stmt->body, nullptr);
-}
-
 TEST(ParserA608, ForeachSingleVar) {
   auto r = Parse(
       "module m;\n"
