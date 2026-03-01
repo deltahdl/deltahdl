@@ -240,4 +240,26 @@ TEST(ParserSection10, AssignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
+// =============================================================================
+// LRM section 10.6.1 -- The assign and deassign procedural statements
+// =============================================================================
+// --- 1. Basic assign in initial block ---
+TEST(ParserSection10, Sec10_6_1_AssignInInitialBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q;\n"
+      "  initial begin\n"
+      "    assign q = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->text, "q");
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
