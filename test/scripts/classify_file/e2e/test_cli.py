@@ -253,14 +253,6 @@ def test_batch_all_pass_exits_zero(tmp_path):
     assert result.returncode == 0
 
 
-def test_batch_all_pass_summary(tmp_path):
-    """Summary shows all tests succeeded."""
-    result = _run_batch(
-        tmp_path, "TEST(S, A) {\n}\nTEST(S, B) {\n}\n",
-    )
-    assert "2/2 tests succeeded" in result.stdout
-
-
 # ---- Failure batch run -----------------------------------------------------
 
 

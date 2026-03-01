@@ -131,20 +131,6 @@ def run_classify_test(
     return True
 
 
-def print_summary(
-    succeeded: int,
-    failed: int,
-    failed_names: list[str],
-) -> None:
-    """Print final summary of batch classification."""
-    total = succeeded + failed
-    print(f"\n{succeeded}/{total} tests succeeded")
-    if failed_names:
-        print("Failed:")
-        for name in failed_names:
-            print(f"  - {name}")
-
-
 def close_issue(args: argparse.Namespace) -> None:
     """Close the GitHub issue using gh api."""
     result = subprocess.run(
@@ -230,18 +216,9 @@ def _run(args: argparse.Namespace) -> None:
     else:
         ensure_unchecked(args, test_names)
     total = len(test_names)
-    succeeded = 0
-    failed = 0
-    failed_names: list[str] = []
     for i, name in enumerate(test_names, 1):
-        if run_classify_test(args, name, i, total):
-            succeeded += 1
-        else:
-            failed += 1
-            failed_names.append(name)
-    print_summary(succeeded, failed, failed_names)
-    if failed:
-        sys.exit(1)
+        if not run_classify_test(args, name, i, total):
+            sys.exit(1)
     if not args.dry_run:
         close_issue(args)
 

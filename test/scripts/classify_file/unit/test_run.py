@@ -373,40 +373,6 @@ def test_run_classify_test_does_not_capture_output(monkeypatch):
     assert "capture_output" not in kwargs_log[0]
 
 
-# ---- print_summary ---------------------------------------------------------
-
-
-def test_print_summary_all_succeeded(capsys):
-    """Prints N/N tests succeeded when all pass."""
-    classify_file.print_summary(3, 0, [])
-    assert "3/3 tests succeeded" in capsys.readouterr().out
-
-
-def test_print_summary_some_failed(capsys):
-    """Prints N/M tests succeeded when some fail."""
-    classify_file.print_summary(2, 1, ["BadTest"])
-    assert "2/3 tests succeeded" in capsys.readouterr().out
-
-
-def test_print_summary_lists_failures(capsys):
-    """Prints failed test names."""
-    classify_file.print_summary(1, 2, ["Bad1", "Bad2"])
-    assert "Bad1" in capsys.readouterr().out
-
-
-def test_print_summary_no_failures_omits_list(capsys):
-    """Does not print failure header when all tests pass."""
-    classify_file.print_summary(3, 0, [])
-    assert "Failed:" not in capsys.readouterr().out
-
-
-def test_print_summary_lists_all_failures(capsys):
-    """Lists every failed test name in output."""
-    classify_file.print_summary(0, 2, ["A", "B"])
-    out = capsys.readouterr().out
-    assert "B" in out
-
-
 # ---- build_issue_body ------------------------------------------------------
 
 
@@ -561,14 +527,15 @@ def test_run_no_tests(tmp_path):
         _run(_make_run_args(tmp_path))
 
 
-def test_run_all_succeed(tmp_path, monkeypatch, capsys):
+def test_run_all_succeed(tmp_path, monkeypatch):
     """Does not exit when all tests succeed."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     make_test_file(tmp_path, body)
     stub_ensure_unchecked(monkeypatch)
-    stub_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
+    stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path))
-    assert "2/2 tests succeeded" in capsys.readouterr().out
+    assert len(captured) == 2
 
 
 def test_run_some_fail_exits(tmp_path, monkeypatch):
@@ -581,30 +548,17 @@ def test_run_some_fail_exits(tmp_path, monkeypatch):
         _run(_make_run_args(tmp_path))
 
 
-def test_run_continues_after_failure(tmp_path, monkeypatch, capsys):
-    """Processes remaining tests after a failure."""
+def test_run_stops_after_failure(tmp_path, monkeypatch):
+    """Stops immediately when a test fails."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\nTEST(S, C) {\n}\n"
     make_test_file(tmp_path, body)
     stub_ensure_unchecked(monkeypatch)
-    stub_subprocess_mixed(monkeypatch, {"A"})
+    captured = stub_subprocess_mixed(monkeypatch, {"A"})
     try:
         _run(_make_run_args(tmp_path))
     except SystemExit:
         pass
-    assert "Processing test 3/3: C" in capsys.readouterr().out
-
-
-def test_run_summary_shows_failures(tmp_path, monkeypatch, capsys):
-    """Summary lists failed test names."""
-    body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
-    make_test_file(tmp_path, body)
-    stub_ensure_unchecked(monkeypatch)
-    stub_subprocess_mixed(monkeypatch, {"B"})
-    try:
-        _run(_make_run_args(tmp_path))
-    except SystemExit:
-        pass
-    assert "B" in capsys.readouterr().out
+    assert len(captured) == 1
 
 
 def test_run_invokes_per_test(tmp_path, monkeypatch):

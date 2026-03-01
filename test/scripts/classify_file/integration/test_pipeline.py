@@ -136,47 +136,30 @@ def test_flags_propagated_to_subprocess(tmp_path, monkeypatch):
     assert "--dry-run" in log[0]
 
 
-def test_continues_after_first_failure(
+def test_stops_after_first_failure(
     tmp_path, monkeypatch, capsys,
 ):
-    """Pipeline processes all tests even when first fails."""
+    """Pipeline stops immediately when first test fails."""
     body = (
         "TEST(S, Fail1) {\n}\n"
         "TEST(S, Pass1) {\n}\n"
-        "TEST(S, Fail2) {\n}\n"
     )
     _stub_ensure(monkeypatch)
-    _mock_run_selective(monkeypatch, {"Fail1", "Fail2"})
+    _mock_run_selective(monkeypatch, {"Fail1"})
     try:
         _run(_write_and_args(tmp_path, body))
     except SystemExit:
         pass
-    assert "Processing test 2/3: Pass1" in capsys.readouterr().out
+    assert "Pass1" not in capsys.readouterr().out
 
 
-def test_summary_counts_correct(tmp_path, monkeypatch, capsys):
-    """Summary shows correct success/failure counts."""
-    body = (
-        "TEST(S, A) {\n}\n"
-        "TEST(S, B) {\n}\n"
-        "TEST(S, C) {\n}\n"
-    )
-    _stub_ensure(monkeypatch)
-    _mock_run_selective(monkeypatch, {"B"})
-    try:
-        _run(_write_and_args(tmp_path, body))
-    except SystemExit:
-        pass
-    assert "2/3 tests succeeded" in capsys.readouterr().out
-
-
-def test_single_test_file(tmp_path, monkeypatch, capsys):
+def test_single_test_file(tmp_path, monkeypatch):
     """Single-test file succeeds without error."""
     _stub_ensure(monkeypatch)
-    _mock_run_ok(monkeypatch)
+    log = _mock_run_ok(monkeypatch)
     _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, "TEST(S, Only) {\n}\n"))
-    assert "1/1 tests succeeded" in capsys.readouterr().out
+    assert len(log) == 1
 
 
 def test_closes_issue_after_all_pass(tmp_path, monkeypatch):
