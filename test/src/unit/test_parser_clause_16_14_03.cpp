@@ -277,4 +277,23 @@ TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
   )"));
 }
 
+static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
+  }
+  return nullptr;
+}
+
+// cover_property_statement
+TEST(ParserA610, CoverPropertyModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (a && b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
+  ASSERT_NE(item, nullptr);
+}
+
 }  // namespace

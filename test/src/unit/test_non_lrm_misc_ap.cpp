@@ -23,18 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// cover_property_statement
-TEST(ParserA610, CoverPropertyModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  cover property (a && b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
-  ASSERT_NE(item, nullptr);
-}
-
 // cover_sequence_statement
 TEST(ParserA610, CoverSequenceModule) {
   auto r = Parse(
