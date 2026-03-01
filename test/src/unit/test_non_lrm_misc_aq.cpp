@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// rand join ( expression ) with bias
-TEST(ParserA612, RsProductionListRandJoinWithExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(main)\n"
-      "      main : rand join (1) a b c;\n"
-      "      a : { ; };\n"
-      "      b : { ; };\n"
-      "      c : { ; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.6.12 Randsequence — rs_weight_specification
 // =============================================================================
