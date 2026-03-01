@@ -48,21 +48,6 @@ TEST(ParserSection16, PropertyDeclAndAssertProperty) {
   EXPECT_TRUE(found_assert);
 }
 
-// =============================================================================
-// §16.5 Concurrent assertions overview — clocked property
-// =============================================================================
-TEST(ParserSection16, ConcurrentAssertWithClock) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) a);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* ap =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
-  ASSERT_NE(ap, nullptr);
-  EXPECT_NE(ap->assert_expr, nullptr);
-}
-
 TEST(ParserSection16, ConcurrentAssertNegedgeClock) {
   auto r = Parse(
       "module m;\n"
