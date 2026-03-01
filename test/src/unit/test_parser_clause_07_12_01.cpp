@@ -105,4 +105,17 @@ TEST(ParserSection7, ArrayLocatorFindWithClause) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
+TEST(ParserSection7, ArrayLocatorFindIndex) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{10, 20, 30};\n"
+      "  int idx[$];\n"
+      "  initial idx = arr.find_index with (item == 20);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
