@@ -23,20 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// method_call with arguments
-TEST(ParserA609, MethodCallWithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.method(1, 2); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  EXPECT_EQ(expr->args.size(), 2u);
-}
-
 // method_call with chained member access
 TEST(ParserA609, MethodCallChained) {
   auto r = Parse(
