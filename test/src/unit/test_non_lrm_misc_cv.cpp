@@ -27,15 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserSection23, GenvarPostIncrementStep) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  for (genvar i = 0; i < 4; i++) begin : blk\n"
-              "    assign a[i] = b[i];\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // LRM section 27.4: Indexed generate block names
 // =========================================================================

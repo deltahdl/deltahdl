@@ -337,4 +337,28 @@ TEST(ParserSection12, NamedBeginEndNoEndLabel) {
   EXPECT_EQ(body->label, "blk");
 }
 
+// 26. Multiple named blocks at same level
+TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin : block_a\n"
+      "      int x;\n"
+      "      x = 1;\n"
+      "    end : block_a\n"
+      "    begin : block_b\n"
+      "      int y;\n"
+      "      y = 2;\n"
+      "    end : block_b\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->label, "block_a");
+  EXPECT_EQ(body->stmts[1]->label, "block_b");
+}
+
 }  // namespace

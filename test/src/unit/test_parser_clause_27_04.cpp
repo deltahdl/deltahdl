@@ -399,4 +399,13 @@ TEST(ParserSection23, GenvarExprInLoopBound) {
   EXPECT_NE(gen->gen_step, nullptr);
 }
 
+TEST(ParserSection23, GenvarPostIncrementStep) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  for (genvar i = 0; i < 4; i++) begin : blk\n"
+              "    assign a[i] = b[i];\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
