@@ -271,4 +271,24 @@ TEST(ParserA604, FunctionStatement) {
   EXPECT_EQ(func->func_body_stmts[0]->kind, StmtKind::kBlockingAssign);
 }
 
+// §13: multiple function statements including null
+TEST(ParserA604, FunctionBodyMultipleStatements) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    a = 1;\n"
+      "    ;\n"
+      "    b = 2;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* func = FirstFunctionDecl(r);
+  ASSERT_NE(func, nullptr);
+  ASSERT_GE(func->func_body_stmts.size(), 3u);
+  EXPECT_EQ(func->func_body_stmts[0]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(func->func_body_stmts[1]->kind, StmtKind::kNull);
+  EXPECT_EQ(func->func_body_stmts[2]->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace
