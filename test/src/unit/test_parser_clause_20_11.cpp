@@ -127,4 +127,13 @@ TEST(ParserSection39, AssertControlSystemTask) {
   )"));
 }
 
+TEST(ParserSection39, AssertControlWithMultipleArgs) {
+  // $assertcontrol with control_type and assertion_type arguments
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      initial $assertcontrol(3, 1);
+    endmodule
+  )"));
+}
+
 }  // namespace
