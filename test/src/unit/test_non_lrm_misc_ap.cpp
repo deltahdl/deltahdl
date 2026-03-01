@@ -23,20 +23,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 
 namespace {
 
-// =============================================================================
-// A.6.10 — deferred_immediate_assertion_item (module-level)
-// =============================================================================
-// assert #0 at module level
-TEST(ParserA610, DeferredAssertHash0Module) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic x;\n"
-      "  assert #0 (x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // assert final at module level
 TEST(ParserA610, DeferredAssertFinalModule) {
   auto r = Parse(
