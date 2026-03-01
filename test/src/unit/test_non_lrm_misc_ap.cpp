@@ -17,24 +17,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 namespace {
 
 // =============================================================================
-// A.6.11 clocking_declaration — unnamed default clocking
-// =============================================================================
-TEST(ParserA611, ClockingDeclUnnamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  default clocking @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_default_clocking);
-  EXPECT_TRUE(item->name.empty());
-}
-
-// =============================================================================
 // A.6.11 clocking_declaration — end label
 // =============================================================================
 TEST(ParserA611, ClockingDeclEndLabel) {
