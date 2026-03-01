@@ -580,4 +580,18 @@ TEST(ParserA608, ForVarKeyword) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
+TEST(ParserA608, ForLogicTypeInit) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (logic [7:0] i = 0; i < 10; i++) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
+}
+
 }  // namespace
