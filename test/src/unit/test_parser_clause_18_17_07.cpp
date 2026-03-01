@@ -25,4 +25,19 @@ TEST(ParserA612, RsProductionWithReturnType) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// Production with port list: P(int x) : ...;
+TEST(ParserA612, RsProductionWithPorts) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : gen(5);\n"
+      "      void gen(int x) : { $display(x); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
