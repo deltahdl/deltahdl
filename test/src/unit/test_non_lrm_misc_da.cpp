@@ -20,19 +20,6 @@ ParseResult ParseLibrary(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// A.1.1 library_text ::= { library_description }
-// =============================================================================
-// Empty library text produces an empty CompilationUnit.
-TEST(LibraryText, EmptyInput) {
-  auto r = ParseLibrary("");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->libraries.empty());
-  EXPECT_TRUE(r.cu->lib_includes.empty());
-  EXPECT_TRUE(r.cu->configs.empty());
-}
-
 // A null library description (bare semicolon) is valid.
 TEST(LibraryText, NullDescription) {
   auto r = ParseLibrary(";\n;\n");

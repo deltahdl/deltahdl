@@ -174,4 +174,30 @@ TEST(LibraryText, ConfigInLibraryText) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
+using ConfigParseTest = ProgramTestParse;
+
+ParseResult ParseLibrary(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.ParseLibraryText();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// A.1.1 library_text ::= { library_description }
+// =============================================================================
+// Empty library text produces an empty CompilationUnit.
+TEST(LibraryText, EmptyInput) {
+  auto r = ParseLibrary("");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->libraries.empty());
+  EXPECT_TRUE(r.cu->lib_includes.empty());
+  EXPECT_TRUE(r.cu->configs.empty());
+}
+
 }  // namespace
