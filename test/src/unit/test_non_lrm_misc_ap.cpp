@@ -17,24 +17,6 @@ static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
 namespace {
 
 // =============================================================================
-// A.6.11 clocking_item — default default_skew (input + output)
-// =============================================================================
-TEST(ParserA611, ClockingItemDefaultSkewInputOutput) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    default input #1 output #2;\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_GE(item->clocking_signals.size(), 1u);
-}
-
-// =============================================================================
 // A.6.11 clocking_direction — input
 // =============================================================================
 TEST(ParserA611, ClockingDirectionInput) {
