@@ -185,4 +185,18 @@ TEST(ElabCh511, ArrayInitPattern_SizeMismatch) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §10.9: assignment pattern with default key elaborates
+TEST(ElabA60701, PatternDefaultKeyElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  initial begin\n"
+      "    arr = '{default: 8'd0};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+}
+
 }  // namespace

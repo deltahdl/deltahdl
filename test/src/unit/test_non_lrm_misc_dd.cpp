@@ -12,20 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9: assignment pattern with default key elaborates
-TEST(ElabA60701, PatternDefaultKeyElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] arr [0:3];\n"
-      "  initial begin\n"
-      "    arr = '{default: 8'd0};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-}
-
 // --- §10.9.2: Struct assignment pattern validation ---
 TEST(Elaboration, StructPattern_InvalidMemberName) {
   ElabFixture f;
