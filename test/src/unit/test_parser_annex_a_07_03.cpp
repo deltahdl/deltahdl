@@ -217,4 +217,20 @@ TEST(ParserA703, SimpleTerminalNoRange) {
   EXPECT_TRUE(si->path.dst_ports[0].interface_name.empty());
 }
 
+// specify_terminal_descriptor with bit select [expr]
+TEST(ParserA70503, TerminalBitSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data[0], posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_terminal.name, "data");
+  EXPECT_EQ(tc->ref_terminal.range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_NE(tc->ref_terminal.range_left, nullptr);
+}
+
 }  // namespace

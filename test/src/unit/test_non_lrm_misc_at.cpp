@@ -6,22 +6,6 @@ using namespace delta;
 
 namespace {
 
-// specify_terminal_descriptor with bit select [expr]
-TEST(ParserA70503, TerminalBitSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data[0], posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->ref_terminal.name, "data");
-  EXPECT_EQ(tc->ref_terminal.range_kind, SpecifyRangeKind::kBitSelect);
-  EXPECT_NE(tc->ref_terminal.range_left, nullptr);
-}
-
 // specify_terminal_descriptor with part select [expr:expr]
 TEST(ParserA70503, TerminalPartSelect) {
   auto r = Parse(
