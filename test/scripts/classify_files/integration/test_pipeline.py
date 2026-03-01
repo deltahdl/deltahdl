@@ -117,7 +117,7 @@ def test_skips_checkbox_when_file_exists(monkeypatch, tmp_path):
     _mock_run_ok(monkeypatch)
     removed = _stub_remove(monkeypatch)
     _run(_pipeline_args(files=str(f)))
-    assert removed == []
+    assert not removed
 
 
 # ---- --sub-issues pipeline ------------------------------------------------

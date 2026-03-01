@@ -384,7 +384,7 @@ def test_run_skips_checkbox_when_file_exists(monkeypatch, tmp_path):
     stub_subprocess_success(monkeypatch)
     removed = stub_remove_file_checkbox(monkeypatch)
     _run(_make_args(files=str(f)))
-    assert removed == []
+    assert not removed
 
 
 def test_run_splits_comma_separated_files(monkeypatch):
