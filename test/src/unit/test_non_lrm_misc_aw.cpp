@@ -14,16 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.8.4 Primaries — time_literal and time_unit
-// =============================================================================
-// § time_literal — unsigned_number time_unit (ns)
-TEST(ParserA84, TimeLiteralNs) {
-  auto r = Parse("module m; initial #5ns; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § time_literal — unsigned_number time_unit (us)
 TEST(ParserA84, TimeLiteralUs) {
   auto r = Parse("module m; initial #1us; endmodule\n");

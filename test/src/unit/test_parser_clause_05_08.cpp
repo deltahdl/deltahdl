@@ -66,4 +66,14 @@ TEST(ParserCh508, TimeLiteral_Us) {
   EXPECT_TRUE(ParseOk("module m; initial #100us; endmodule"));
 }
 
+// =============================================================================
+// A.8.4 Primaries — time_literal and time_unit
+// =============================================================================
+// § time_literal — unsigned_number time_unit (ns)
+TEST(ParserA84, TimeLiteralNs) {
+  auto r = Parse("module m; initial #5ns; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
