@@ -157,4 +157,19 @@ TEST(ParserA605, EventExprComma) {
   ASSERT_EQ(stmt->events.size(), 3u);
 }
 
+// §9.4.2.1: mixed or and comma
+TEST(ParserA605, EventExprMixedOrComma) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(a or b, c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->events.size(), 3u);
+}
+
 }  // namespace
