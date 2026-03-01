@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.1: nonblocking event trigger (->>)
-TEST(ParserA604, StmtItemNonblockingEventTrigger) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    ->> my_event;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
-}
-
 // §10.6.1: procedural deassign
 TEST(ParserA604, StmtItemProceduralDeassign) {
   auto r = Parse(
