@@ -436,4 +436,20 @@ TEST(ParserA608, ForLoopParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
 
+TEST(ParserA608, ForLoopParts) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i++) x = i;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->for_init, nullptr);
+  EXPECT_NE(stmt->for_cond, nullptr);
+  EXPECT_NE(stmt->for_step, nullptr);
+  EXPECT_NE(stmt->for_body, nullptr);
+}
+
 }  // namespace
