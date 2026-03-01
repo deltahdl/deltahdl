@@ -51,15 +51,6 @@ TEST(ParserSection11, ArithmeticDiv) {
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
 }
 
-TEST(ParserSection11, SystemCallLeadingEmptyArg) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial $display(,\"hello\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // --- Bit-select on concatenation (§11.4.12) ---
 TEST(ParserSection11, BitSelectOnConcat) {
   auto r = Parse(

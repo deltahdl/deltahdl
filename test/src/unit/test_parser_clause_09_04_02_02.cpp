@@ -752,4 +752,27 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtBodyPresent) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlockingAssign);
 }
 
+// @* statement level with begin-end block
+TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b, c;\n"
+      "  initial begin\n"
+      "    @* begin\n"
+      "      a = b;\n"
+      "      c = a;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_TRUE(stmt->is_star_event);
+  ASSERT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->body->stmts.size(), 2u);
+}
+
 }  // namespace

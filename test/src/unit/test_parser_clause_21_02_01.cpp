@@ -99,4 +99,13 @@ TEST(ParserSection11, SystemCallEmptyArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection11, SystemCallLeadingEmptyArg) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial $display(,\"hello\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
