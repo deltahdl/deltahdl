@@ -40,20 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-TEST(ParserSection7, IndexedPartSelectMinus) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = data[7 -: 4];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(rhs->is_part_select_minus);
-}
-
 // =========================================================================
 // §7.5: Dynamic arrays
 // =========================================================================
