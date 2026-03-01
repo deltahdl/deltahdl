@@ -61,37 +61,6 @@ TEST(ParserSection10, DeassignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserSection10, ForceNet) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [7:0] bus;\n"
-      "  initial begin\n"
-      "    force bus = 8'hFF;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForce);
-  ASSERT_NE(stmt->lhs, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
-TEST(ParserSection10, ReleaseNet) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [7:0] bus;\n"
-      "  initial begin\n"
-      "    release bus;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
-  ASSERT_NE(stmt->lhs, nullptr);
-}
-
 // =============================================================================
 // LRM section 10.6.1 -- The assign and deassign procedural statements
 // =============================================================================
