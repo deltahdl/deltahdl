@@ -268,4 +268,18 @@ TEST(ParserA704, PathDelayRiseFallSpecparams) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// A.7.4 Invalid delay counts (not 1, 2, 3, 6, or 12)
+// =============================================================================
+// 4 delays — invalid
+TEST(ParserA704, InvalidDelayCount4) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = (1, 2, 3, 4);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
