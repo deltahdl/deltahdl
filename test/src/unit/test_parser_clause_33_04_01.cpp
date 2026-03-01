@@ -233,4 +233,24 @@ TEST_F(ConfigTest, LibraryMappingConfig) {
   EXPECT_EQ(cfg->rules[0]->liblist[0], "rtlLib");
 }
 
+// =============================================================================
+// Multiple rules in single config
+// =============================================================================
+TEST_F(ConfigTest, MultipleRulesInConfig) {
+  auto* unit = Parse(R"(
+    config cfg;
+      design lib.top;
+      default liblist rtlLib;
+      instance top.a1 use lib.fast_adder;
+      cell mux use lib.fast_mux;
+    endconfig
+  )");
+  ASSERT_EQ(unit->configs.size(), 1u);
+  auto* cfg = unit->configs[0];
+  ASSERT_EQ(cfg->rules.size(), 3u);
+  EXPECT_EQ(cfg->rules[0]->kind, ConfigRuleKind::kDefault);
+  EXPECT_EQ(cfg->rules[1]->kind, ConfigRuleKind::kInstance);
+  EXPECT_EQ(cfg->rules[2]->kind, ConfigRuleKind::kCell);
+}
+
 }  // namespace
