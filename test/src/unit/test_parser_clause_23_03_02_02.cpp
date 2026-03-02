@@ -176,4 +176,19 @@ TEST(ParserSection23, SimpleModuleInstance) {
   EXPECT_EQ(item->inst_name, "u1");
 }
 
+// =========================================================================
+// LRM section 23.3.2: Port connections
+// =========================================================================
+TEST(ParserSection23, NamedPortConnectionsOrder) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1 (.b(y), .a(x));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->inst_ports.size(), 2);
+  EXPECT_EQ(item->inst_ports[0].first, "b");
+  EXPECT_EQ(item->inst_ports[1].first, "a");
+}
+
 }  // namespace
