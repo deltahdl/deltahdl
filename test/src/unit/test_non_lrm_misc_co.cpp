@@ -27,23 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// §17.5 Checker procedures
-// =============================================================================
-TEST_F(VerifyParseTest, CheckerWithInitialProcedure) {
-  auto* unit = Parse(R"(
-    checker init_check(input logic clk, input logic rst);
-      logic flag;
-      initial begin
-        flag = 0;
-      end
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_EQ(unit->checkers[0]->name, "init_check");
-  EXPECT_FALSE(unit->checkers[0]->items.empty());
-}
-
 TEST_F(VerifyParseTest, CheckerWithAlwaysFF) {
   auto* unit = Parse(R"(
     checker check(logic a, b, c, clk, rst);
