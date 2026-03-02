@@ -49,4 +49,22 @@ TEST(ParserA608, ForeverNullStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
 
+TEST(ParserSection12, ForeverLoopWithBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      @(posedge clk);\n"
+      "      x = x + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
+}
+
 }  // namespace
