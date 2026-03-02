@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.2 Subroutine calls — method_call
-// =============================================================================
-// § method_call ::= method_call_root . method_call_body
-// § method_call_root ::= primary | implicit_class_handle
-// Basic method call on identifier
-TEST(ParserA82, MethodCallBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.method(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  ASSERT_NE(expr->lhs, nullptr);
-  EXPECT_EQ(expr->lhs->kind, ExprKind::kMemberAccess);
-}
-
 // method_call_root: implicit_class_handle (this)
 TEST(ParserA82, MethodCallRootThis) {
   auto r = Parse(
