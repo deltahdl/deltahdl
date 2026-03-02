@@ -196,4 +196,13 @@ TEST_F(ConfigParseTest, MultipleConfigs) {
   EXPECT_EQ(unit->configs[1]->name, "cfg2");
 }
 
+TEST(Parser, InterfaceAndModule) {
+  auto r = Parse(
+      "interface bus; endinterface\n"
+      "module top; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->modules.size(), 1);
+}
+
 }  // namespace
