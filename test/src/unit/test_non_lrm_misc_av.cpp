@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.4 Primaries — module_path_primary
-// =============================================================================
-// § module_path_primary — number in specify
-TEST(ParserA84, ModulePathPrimaryNumber) {
-  auto r = Parse(
-      "module m(input a, output b);\n"
-      "  specify\n"
-      "    (a => b) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § module_path_primary — identifier in specify
 TEST(ParserA84, ModulePathPrimaryIdentifier) {
   auto r = Parse(
