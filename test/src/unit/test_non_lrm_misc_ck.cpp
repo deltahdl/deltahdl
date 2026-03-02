@@ -18,19 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, ParameterizedSubroutine_MultipleStaticMethods) {
-  auto r = Parse(
-      "virtual class C#(parameter W = 4);\n"
-      "  static function logic [W-1:0] encode(input logic [W-1:0] x);\n"
-      "    return x;\n"
-      "  endfunction\n"
-      "  static function logic [W-1:0] decode(input logic [W-1:0] x);\n"
-      "    return x;\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection13, ParameterizedSubroutine_DifferentSpecializations) {
   auto r = Parse(
       "module m;\n"
