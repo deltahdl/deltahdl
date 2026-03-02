@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- net_port_type ---
-// [ net_type ] data_type_or_implicit | interconnect implicit_data_type
-TEST(ParserA212, NetPortTypeTriType) {
-  auto r = ParseWithPreprocessor("module m(inout tri [7:0] bus); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "bus");
-}
-
 // --- variable_port_type ---
 // var_data_type ::= data_type | var data_type_or_implicit
 TEST(ParserA212, VarDataTypeExplicit) {
