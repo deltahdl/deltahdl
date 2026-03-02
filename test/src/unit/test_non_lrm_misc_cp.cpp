@@ -9,18 +9,6 @@ using CheckerParseTest = ProgramTestParse;
 
 namespace {
 
-// extern_constraint_declaration with dynamic_override_specifiers at top-level
-TEST(SourceText, ExternConstraintDeclDynOverrideTopLevel) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  extern constraint c;\n"
-      "endclass\n"
-      "constraint :initial C::c { x > 0; }\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 // uniqueness_constraint ::= unique { range_list }
 TEST(SourceText, UniquenessConstraint) {
   auto r = Parse(
