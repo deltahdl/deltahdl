@@ -26,4 +26,13 @@ TEST(ParserSection22, IfdefWithElse) {
               "`endif\n"));
 }
 
+TEST(ParserSection22, IfndefUndefined) {
+  EXPECT_TRUE(
+      ParseOk("`ifndef GUARD\n"
+              "`define GUARD\n"
+              "module t;\n"
+              "endmodule\n"
+              "`endif\n"));
+}
+
 }  // namespace

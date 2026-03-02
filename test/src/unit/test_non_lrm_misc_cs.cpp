@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, IfndefUndefined) {
-  EXPECT_TRUE(
-      ParseOk("`ifndef GUARD\n"
-              "`define GUARD\n"
-              "module t;\n"
-              "endmodule\n"
-              "`endif\n"));
-}
-
 TEST(ParserSection22, IfdefElsifChain) {
   EXPECT_TRUE(
       ParseOk("`define OPT_B\n"
