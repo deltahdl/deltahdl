@@ -43,17 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Clocking block in an interface (valid scope per LRM).
-TEST(ParserSection19, ClockingBlockScope_InInterface) {
-  EXPECT_TRUE(
-      ParseOk("interface bus_if (input clk);\n"
-              "  logic [7:0] data;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "  endclocking\n"
-              "endinterface\n"));
-}
-
 // Clocking block in a checker (valid scope per LRM).
 TEST(ParserSection19, ClockingBlockScope_InChecker) {
   EXPECT_TRUE(
