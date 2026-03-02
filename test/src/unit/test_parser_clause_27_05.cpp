@@ -396,4 +396,19 @@ TEST(ParserSection23, CaseGenerateMultipleLabels) {
   EXPECT_EQ(item->gen_case_items[1].patterns.size(), 2);
 }
 
+// --- Single-item generate-if without begin/end (§27.5) ---
+TEST(ParserSection27, GenerateIfSingleItemParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (WIDTH > 1)\n"
+      "    assign out = in;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  auto* gen = mod->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
+  ASSERT_EQ(gen->gen_body.size(), 1);
+}
+
 }  // namespace
