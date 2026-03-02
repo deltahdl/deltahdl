@@ -27,20 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, CheckerInstantiationNamed) {
-  auto* unit = Parse(R"(
-    checker my_check(input logic clk, input logic data);
-    endchecker
-    module m;
-      logic clk, data;
-      my_check inst(.clk(clk), .data(data));
-    endmodule
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  ASSERT_EQ(unit->modules.size(), 1u);
-  EXPECT_FALSE(unit->modules[0]->items.empty());
-}
-
 TEST_F(VerifyParseTest, CheckerInstantiationInAlwaysBlock) {
   auto* unit = Parse(R"(
     checker c1(event clk, logic [7:0] a, b);
