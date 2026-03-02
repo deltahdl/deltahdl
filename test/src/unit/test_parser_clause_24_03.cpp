@@ -666,4 +666,11 @@ TEST(SourceText, ProgramWithLifetime) {
   ASSERT_EQ(r.cu->programs.size(), 1u);
 }
 
+// Program with end label.
+TEST(SourceText, ProgramEndLabel) {
+  auto r = Parse("program prg; endprogram : prg\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

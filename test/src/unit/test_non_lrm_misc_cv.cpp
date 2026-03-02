@@ -10,13 +10,6 @@ using ProgramParseTest = ProgramTestParse;
 
 namespace {
 
-// Program with end label.
-TEST(SourceText, ProgramEndLabel) {
-  auto r = Parse("program prg; endprogram : prg\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // Extern program declaration.
 TEST(SourceText, ExternProgram) {
   auto r = Parse("extern program prg(input logic clk);\n");
