@@ -45,28 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// §14.8 — Multiple clocking blocks
-// =============================================================================
-TEST(ParserSection14, MultipleClockingBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cd1 @(posedge phi1);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "  clocking cd2 @(posedge phi2);\n"
-      "    output cmd;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* cb1 = FindClockingBlock(r, 0);
-  auto* cb2 = FindClockingBlock(r, 1);
-  ASSERT_NE(cb1, nullptr);
-  ASSERT_NE(cb2, nullptr);
-  EXPECT_EQ(cb1->name, "cd1");
-  EXPECT_EQ(cb2->name, "cd2");
-}
-
-// =============================================================================
 // LRM section 14.1 -- Clocking block overview
 // =============================================================================
 // §14.1 introduces clocking blocks as grouping clock-synchronous signals.

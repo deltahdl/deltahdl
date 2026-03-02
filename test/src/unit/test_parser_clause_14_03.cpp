@@ -931,4 +931,26 @@ TEST(ParserSection14, UnnamedDefaultClocking) {
   EXPECT_TRUE(item->name.empty());
 }
 
+// =============================================================================
+// §14.8 — Multiple clocking blocks
+// =============================================================================
+TEST(ParserSection14, MultipleClockingBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cd1 @(posedge phi1);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  clocking cd2 @(posedge phi2);\n"
+      "    output cmd;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* cb1 = FindClockingBlock(r, 0);
+  auto* cb2 = FindClockingBlock(r, 1);
+  ASSERT_NE(cb1, nullptr);
+  ASSERT_NE(cb2, nullptr);
+  EXPECT_EQ(cb1->name, "cd1");
+  EXPECT_EQ(cb2->name, "cd2");
+}
+
 }  // namespace
