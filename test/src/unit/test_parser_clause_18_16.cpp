@@ -126,4 +126,17 @@ TEST_F(VerifyParseTest, RandcaseInModule) {
   ASSERT_FALSE(items.empty());
 }
 
+TEST_F(VerifyParseTest, RandcaseSingleBranch) {
+  auto* unit = Parse(R"(
+    module m;
+      initial begin
+        randcase
+          1 : y = 42;
+        endcase
+      end
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+}
+
 }  // namespace
