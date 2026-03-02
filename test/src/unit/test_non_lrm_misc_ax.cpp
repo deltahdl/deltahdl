@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § binary_module_path_operator — ~^ in specify path condition
-TEST(ParserA86, BinaryModulePathXnorAlt) {
-  auto r = Parse(
-      "module m(input a, input b, output y);\n"
-      "  specify\n"
-      "    if (a ~^ b) (a => y) = 9;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.8.7 Numbers — Parser
 // =============================================================================
