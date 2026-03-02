@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-// non_port_interface_item ::= modport_declaration
-TEST(SourceText, NonPortInterfaceItemModport) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  modport master(input clk, output data);\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
-}
-
 // 16. Interface with modport declarations
 TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
   auto r = Parse(
