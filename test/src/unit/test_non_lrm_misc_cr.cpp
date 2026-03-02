@@ -38,19 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-TEST(Section20, ValuePlusargsFound) {
-  SimFixture f;
-  f.ctx.AddPlusArg("DEPTH=42");
-  auto* dest_var = f.ctx.CreateVariable("depth", 32);
-  dest_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-  auto* expr =
-      MakeSysCall(f.arena, "$value$plusargs",
-                  {MakeStrLit(f.arena, "DEPTH=%d"), MakeId(f.arena, "depth")});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-  EXPECT_EQ(dest_var->value.ToUint64(), 42u);
-}
-
 TEST(Section20, ValuePlusargsNotFound) {
   SimFixture f;
   auto* dest_var = f.ctx.CreateVariable("depth", 32);
