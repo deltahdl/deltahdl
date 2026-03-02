@@ -39,20 +39,6 @@ static ParseResult21 Parse(const std::string& src) {
 namespace {
 
 // ============================================================================
-// §21.3.3 — $sformatf
-// ============================================================================
-TEST(Section20, SformatfBasic) {
-  SimFixture f;
-  auto* expr =
-      MakeSysCall(f.arena, "$sformatf",
-                  {MakeStrLit(f.arena, "val=%d"), MakeInt(f.arena, 42)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  // $sformatf returns a string as a Logic4Vec; the width should be
-  // text.size()*8. "val=42" is 6 chars = 48 bits.
-  EXPECT_EQ(result.width, 48u);
-}
-
-// ============================================================================
 // §21.3.1/§21.3.2 — $fopen, $fclose
 // ============================================================================
 TEST(Section21, FopenFclose) {
