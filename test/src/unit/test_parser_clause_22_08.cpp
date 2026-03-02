@@ -20,4 +20,11 @@ TEST(ParserSection22, DefaultNettypeWand) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, DefaultNettypeWor) {
+  EXPECT_TRUE(
+      ParseOk("`default_nettype wor\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
