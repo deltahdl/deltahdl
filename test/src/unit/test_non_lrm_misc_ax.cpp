@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § number — real_number
-TEST(ParserA87, NumberReal) {
-  auto r = Parse("module m; real x; initial x = 3.14; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
 // § integral_number — decimal_number (unsized)
 TEST(ParserA87, IntegralDecimal) {
   auto r = Parse("module m; int x; initial x = 255; endmodule\n");

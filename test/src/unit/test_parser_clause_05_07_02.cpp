@@ -121,4 +121,14 @@ TEST(ParserA84, PrimaryRealLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
+// § number — real_number
+TEST(ParserA87, NumberReal) {
+  auto r = Parse("module m; real x; initial x = 3.14; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
 }  // namespace
