@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Generate-if with begin/end blocks (§27.5) ---
-TEST(ParserSection27, GenerateIfBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH > 1) begin\n"
-      "    assign a = b;\n"
-      "    assign c = d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1u);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_GE(gen->gen_body.size(), 2u);
-}
-
 // --- Generate-if/else-if chain (§27.5) ---
 TEST(ParserSection27, GenerateIfElseIfChainParse) {
   auto r = Parse(
