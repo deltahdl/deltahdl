@@ -4,10 +4,12 @@ Discovers subclauses, filters for implementability via Claude,
 syncs a GitHub issue checklist, and invokes implement_subclause.
 """
 
+import argparse
 import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 
 def filter_implementable(
@@ -75,3 +77,25 @@ def invoke_implement_subclause(
     )
     if result.returncode != 0:
         sys.exit(result.returncode)
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments for implement_clause."""
+    parser = argparse.ArgumentParser(
+        description="Orchestrate LRM clause implementation.",
+    )
+    parser.add_argument("--lrm", required=True, help="Path to LRM text")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--clause", help="Numeric clause (e.g. 4)")
+    group.add_argument("--annex", help="Annex letter (e.g. A)")
+    parser.add_argument("--issue", type=int, required=True)
+    parser.add_argument("--organization", required=True)
+    parser.add_argument("--repo", required=True)
+
+    args = parser.parse_args(argv)
+
+    lrm = Path(args.lrm)
+    if not lrm.exists():
+        parser.error(f"LRM file not found: {args.lrm}")
+
+    return args
