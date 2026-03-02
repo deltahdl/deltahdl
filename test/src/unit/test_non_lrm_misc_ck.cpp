@@ -18,29 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// =============================================================================
-// LRM section 13.6 -- DPI import / export
-// =============================================================================
-TEST(ParserSection13, DpiImportFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" function int c_add(int a, int b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* dpi = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiImport) {
-      dpi = item;
-      break;
-    }
-  }
-  ASSERT_NE(dpi, nullptr);
-  EXPECT_EQ(dpi->name, "c_add");
-  EXPECT_FALSE(dpi->dpi_is_task);
-  EXPECT_FALSE(dpi->dpi_is_pure);
-}
-
 TEST(ParserSection13, DpiImportPureFunction) {
   auto r = Parse(
       "module m;\n"
