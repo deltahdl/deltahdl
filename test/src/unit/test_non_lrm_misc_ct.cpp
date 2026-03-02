@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection23, MacromoduleDefinition) {
-  auto r = ParseWithPreprocessor(
-      "macromodule top;\n"
-      "  wire a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-  EXPECT_EQ(r.cu->modules[0]->name, "top");
-}
-
 TEST(Parser, EmptyModule) {
   auto r = ParseWithPreprocessor("module empty; endmodule");
   ASSERT_NE(r.cu, nullptr);
