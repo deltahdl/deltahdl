@@ -503,4 +503,31 @@ TEST(SourceText, ProgramContinuousAssign) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kContAssign));
 }
 
+// Returns true if any item matches the given kind and name.
+bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
+                      ModuleItemKind kind, std::string_view name) {
+  for (auto* item : items) {
+    if (item->kind == kind && item->name == name) return true;
+  }
+  return false;
+}
+
+// non_port_program_item ::= module_or_generate_item_declaration
+TEST(SourceText, ProgramModuleOrGenerateItemDecl) {
+  auto r = Parse(
+      "program prg;\n"
+      "  int count;\n"
+      "  function void compute(); endfunction\n"
+      "  task run(); endtask\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  auto& items = r.cu->programs[0]->items;
+  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kVarDecl, "count"));
+  EXPECT_TRUE(
+      HasItemKindNamed(items, ModuleItemKind::kFunctionDecl, "compute"));
+  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTaskDecl, "run"));
+}
+
 }  // namespace
