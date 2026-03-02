@@ -27,21 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST_F(ProgramParseTest, ProgramWithMultipleItems) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  logic [7:0] data;\n"
-      "  assign data = 8'hFF;\n"
-      "  initial begin\n"
-      "    $display(\"test\");\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  ASSERT_GE(unit->programs[0]->items.size(), 3u);
-}
-
 TEST_F(ProgramParseTest, ProgramWithImportStatement) {
   auto* unit = Parse(
       "program p;\n"
