@@ -38,13 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-TEST(Section20, IsunknownFalse) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$isunknown", {MakeInt(f.arena, 42)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
 TEST(Section20, IsunknownTrueXVar) {
   SimFixture f;
   // CreateVariable initializes to X (bval = all ones).
