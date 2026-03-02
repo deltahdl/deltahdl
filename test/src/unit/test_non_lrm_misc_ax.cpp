@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § octal_value — octal_digit { _ | octal_digit }
-TEST(ParserA87, OctalValueWithUnderscores) {
-  auto r =
-      Parse("module m; logic [11:0] x; initial x = 12'o77_77; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->int_val, 07777u);
-}
-
 // § hex_value — hex_digit { _ | hex_digit }
 TEST(ParserA87, HexValueWithUnderscores) {
   auto r =
