@@ -219,4 +219,13 @@ TEST(ParserA82, ArrayMethodNameOr) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserA82, ArrayMethodNameXor) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = arr.xor(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
