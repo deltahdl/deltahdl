@@ -44,4 +44,14 @@ TEST(ParserA83, ParamExprLiteralValue) {
             ExprKind::kIntegerLiteral);
 }
 
+// §13.8: Parameter with string type default.
+TEST(ParserSection13, Sec13_8_StringTypeParam) {
+  EXPECT_TRUE(
+      ParseOk("virtual class Logger#(parameter string PREFIX = \"LOG\");\n"
+              "  static task info(string msg);\n"
+              "    $display(\"%s: %s\", PREFIX, msg);\n"
+              "  endtask\n"
+              "endclass\n"));
+}
+
 }  // namespace
