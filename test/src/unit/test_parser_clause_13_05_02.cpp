@@ -263,4 +263,18 @@ TEST(ParserSection13, ConstRefMixedWithOtherDirections) {
   EXPECT_EQ(fn->func_args[2].direction, Direction::kOutput);
 }
 
+TEST(ParserSection13, RefArgOnFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void swap(ref int a, ref int b);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "swap");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 2u);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
+  EXPECT_EQ(fn->func_args[1].direction, Direction::kRef);
+}
+
 }  // namespace

@@ -18,20 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, RefArgOnFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void swap(ref int a, ref int b);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "swap");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_EQ(fn->func_args.size(), 2u);
-  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
-  EXPECT_EQ(fn->func_args[1].direction, Direction::kRef);
-}
-
 // =============================================================================
 // LRM section 13.1 -- Tasks and functions overview (additional tests)
 // =============================================================================
