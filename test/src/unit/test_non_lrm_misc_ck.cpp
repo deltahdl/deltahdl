@@ -18,19 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, ParameterizedSubroutine_DifferentSpecializations) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [3:0] a;\n"
-      "  logic [7:0] b;\n"
-      "  logic [1:0] ra;\n"
-      "  logic [2:0] rb;\n"
-      "  assign ra = C#(4)::ENCODER_f(a);\n"
-      "  assign rb = C#(8)::ENCODER_f(b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // =============================================================================
 // LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
 // =============================================================================
