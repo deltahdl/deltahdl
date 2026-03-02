@@ -526,4 +526,19 @@ TEST(ParserSection16, ImmediateAssertWithElseActions) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
+TEST(ParserSection16, ImmediateAssertPassOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert(valid) $display(\"passed\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
+  EXPECT_NE(stmt->assert_pass_stmt, nullptr);
+  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
+}
+
 }  // namespace
