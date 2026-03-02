@@ -26,20 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, SequenceThroughoutInSeqDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  sequence burst_rule;\n"
-      "    @(posedge clk)\n"
-      "    (!burst_mode) throughout (##2 (trdy && irdy)[*7]);\n"
-      "  endsequence\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* sq =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kSequenceDecl);
-  ASSERT_NE(sq, nullptr);
-}
-
 // =============================================================================
 // §16.9.11 Sequence methods — triggered
 // =============================================================================

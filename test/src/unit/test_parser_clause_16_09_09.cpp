@@ -77,4 +77,18 @@ TEST(ParserAnnexF, AnnexFThroughout) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
+TEST(ParserSection16, SequenceThroughoutInSeqDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence burst_rule;\n"
+      "    @(posedge clk)\n"
+      "    (!burst_mode) throughout (##2 (trdy && irdy)[*7]);\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* sq =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(sq, nullptr);
+}
+
 }  // namespace
