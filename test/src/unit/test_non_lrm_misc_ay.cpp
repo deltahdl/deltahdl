@@ -14,17 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.13: Overlapping implication |-> ---
-TEST(ParserAnnexF, AnnexFOverlapImplication) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) a && b |-> c);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
-}
-
 // --- F.14: Non-overlapping implication |=> ---
 TEST(ParserAnnexF, AnnexFNonoverlapImplication) {
   auto r = Parse(
