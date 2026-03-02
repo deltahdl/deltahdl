@@ -117,4 +117,15 @@ TEST(ParserA86, BinaryArithLeftShift) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLtLt);
 }
 
+// Shift operators
+TEST(ParserA83, ExprLeftShift) {
+  auto r = Parse("module m; initial x = a << 2; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kLtLt);
+}
+
 }  // namespace
