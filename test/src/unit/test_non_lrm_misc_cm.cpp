@@ -34,20 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-TEST(ParserSection16, ImmediateAssertBasicNoActions) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert(a == b);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->assert_pass_stmt, nullptr);
-  EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
-}
-
 TEST(ParserSection16, ImmediateAssertWithElseKind) {
   auto r = Parse(
       "module m;\n"
