@@ -79,4 +79,16 @@ TEST(ParserA84, ModulePathPrimaryNumber) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// § module_path_primary — identifier in specify
+TEST(ParserA84, ModulePathPrimaryIdentifier) {
+  auto r = Parse(
+      "module m(input a, input en, output b);\n"
+      "  specify\n"
+      "    if (en) (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
