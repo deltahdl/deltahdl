@@ -391,4 +391,16 @@ TEST(ParserA28, ImportInTask) {
               "endmodule\n"));
 }
 
+// Multiple imports in one statement in block
+TEST(ParserA28, ImportMultipleInBlock) {
+  EXPECT_TRUE(
+      ParseOk("package p1; int a; endpackage\n"
+              "package p2; int b; endpackage\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    import p1::a, p2::b;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
