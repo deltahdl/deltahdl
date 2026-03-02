@@ -361,4 +361,14 @@ TEST(ParserSection19, InputOutputSkew_TimeUnitSuffix) {
               "endmodule\n"));
 }
 
+// Input skew of #1step (special 1step literal).
+TEST(ParserSection19, InputOutputSkew_OneStep) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cd1 @(posedge phi1);\n"
+              "    input #1step state = top.cpu1.state;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace
