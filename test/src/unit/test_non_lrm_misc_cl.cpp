@@ -44,20 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// §13.8: Parameterized class extending another class.
-TEST(ParserSection13, Sec13_8_ClassExtends) {
-  EXPECT_TRUE(
-      ParseOk("class Base;\n"
-              "  virtual function void display();\n"
-              "  endfunction\n"
-              "endclass\n"
-              "virtual class Derived#(parameter N = 1) extends Base;\n"
-              "  static function int count();\n"
-              "    return N;\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
 // §13.8: Parameterized class with for loop using parameter as bound.
 TEST(ParserSection13, Sec13_8_ForLoopWithParamBound) {
   EXPECT_TRUE(

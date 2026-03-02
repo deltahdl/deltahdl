@@ -183,4 +183,18 @@ TEST(ParserSection13, Sec13_8_NoDefaultParam) {
   ASSERT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
+// §13.8: Parameterized class extending another class.
+TEST(ParserSection13, Sec13_8_ClassExtends) {
+  EXPECT_TRUE(
+      ParseOk("class Base;\n"
+              "  virtual function void display();\n"
+              "  endfunction\n"
+              "endclass\n"
+              "virtual class Derived#(parameter N = 1) extends Base;\n"
+              "  static function int count();\n"
+              "    return N;\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
 }  // namespace
