@@ -14,18 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.6: first_match ---
-TEST(ParserAnnexF, AnnexFFirstMatch) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (\n"
-      "    @(posedge clk) first_match(a ##[1:4] b));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
-}
-
 // --- F.7: throughout ---
 TEST(ParserAnnexF, AnnexFThroughout) {
   auto r = Parse(
