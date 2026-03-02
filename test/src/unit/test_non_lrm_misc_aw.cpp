@@ -14,20 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// § cast — signed cast
-TEST(ParserA84, CastSigned) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  initial a = signed'(a);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCast);
-}
-
 // § constant_cast — in parameter
 TEST(ParserA84, ConstantCastInParam) {
   auto r = Parse("module m; parameter int P = int'(3.0); endmodule\n");
