@@ -104,4 +104,24 @@ TEST(ParserSection28, MultipleInstancesNoNames) {
   EXPECT_TRUE(mod->items[1]->gate_inst_name.empty());
 }
 
+static void VerifyStrengthDelayInstances(const std::vector<ModuleItem*>& items,
+                                         size_t count, int str0, int str1) {
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(items[i]->drive_strength0, str0);
+    EXPECT_EQ(items[i]->drive_strength1, str1);
+    EXPECT_NE(items[i]->gate_delay, nullptr);
+  }
+}
+
+TEST(ParserSection28, MultipleInstancesWithStrengthAndDelay) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  and (strong0, strong1) #5 g1(a, b, c), g2(d, e, f);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 2);
+  VerifyStrengthDelayInstances(mod->items, 2, 4, 4);
+}
+
 }  // namespace
