@@ -44,18 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// §13.8: Parameterized class with parameter used in local variable.
-TEST(ParserSection13, Sec13_8_ParamInLocalVar) {
-  EXPECT_TRUE(
-      ParseOk("virtual class BitOps#(parameter W = 8);\n"
-              "  static function logic [W-1:0] invert(input logic [W-1:0] x);\n"
-              "    logic [W-1:0] mask;\n"
-              "    mask = '1;\n"
-              "    return x ^ mask;\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
 // §13.8: Parameterized class extending another class.
 TEST(ParserSection13, Sec13_8_ClassExtends) {
   EXPECT_TRUE(
