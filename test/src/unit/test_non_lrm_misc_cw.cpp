@@ -17,13 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// Interface with end label.
-TEST(SourceText, InterfaceEndLabel) {
-  auto r = Parse("interface ifc; endinterface : ifc\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // Extern interface declaration.
 TEST(SourceText, ExternInterface) {
   auto r = Parse("extern interface ifc(input logic clk);\n");

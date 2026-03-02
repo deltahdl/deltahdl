@@ -225,4 +225,11 @@ TEST(SourceText, InterfaceWithLifetime) {
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
 }
 
+// Interface with end label.
+TEST(SourceText, InterfaceEndLabel) {
+  auto r = Parse("interface ifc; endinterface : ifc\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
