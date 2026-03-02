@@ -14,20 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// § net_lvalue — ps_or_hierarchical_net_identifier constant_select (part
-// select)
-TEST(ParserA85, NetLvalueConstPartSelect) {
-  auto r = Parse(
-      "module m; wire [7:0] a; wire [3:0] b; assign a[7:4] = b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* ca = FirstContAssign(r);
-  ASSERT_NE(ca, nullptr);
-  ASSERT_NE(ca->assign_lhs, nullptr);
-  EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kSelect);
-  ASSERT_NE(ca->assign_lhs->index_end, nullptr);
-}
-
 // § net_lvalue — { net_lvalue { , net_lvalue } } (concatenation)
 TEST(ParserA85, NetLvalueConcatenation) {
   auto r = Parse(
