@@ -235,4 +235,21 @@ TEST(ParserSection23, PortConnectionAllEmpty) {
   }
 }
 
+// =========================================================================
+// LRM section 23.3.3.7.1: Named port connections .name(expr)
+// =========================================================================
+TEST(ParserSection23, NamedPortWithPartSelect) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1 (.a(bus[7:0]), .b(bus[15:8]));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->inst_ports.size(), 2);
+  EXPECT_EQ(item->inst_ports[0].first, "a");
+  EXPECT_NE(item->inst_ports[0].second, nullptr);
+  EXPECT_EQ(item->inst_ports[1].first, "b");
+  EXPECT_NE(item->inst_ports[1].second, nullptr);
+}
+
 }  // namespace
