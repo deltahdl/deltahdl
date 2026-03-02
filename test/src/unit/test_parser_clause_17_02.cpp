@@ -474,4 +474,22 @@ TEST_F(VerifyParseTest, NestedCheckerDeclaration) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
+TEST_F(VerifyParseTest, CheckerWithAlwaysFF) {
+  auto* unit = Parse(R"(
+    checker check(logic a, b, c, clk, rst);
+      logic x, y, z;
+      assign x = a;
+      always_ff @(posedge clk or negedge rst) begin
+        a1: assert (b);
+        if (rst)
+          z <= b;
+        else z <= !c;
+      end
+    endchecker : check
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_EQ(unit->checkers[0]->name, "check");
+  EXPECT_FALSE(unit->checkers[0]->items.empty());
+}
+
 }  // namespace
