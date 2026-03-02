@@ -336,4 +336,18 @@ TEST(ParserA84, ConstantPrimaryIntegerLiteral) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kIntegerLiteral);
 }
 
+// § constant_primary — unbased_unsized_literal
+TEST(ParserA84, ConstantPrimaryUnbasedUnsizedLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  assign x = '1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstContAssignRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
+}
+
 }  // namespace

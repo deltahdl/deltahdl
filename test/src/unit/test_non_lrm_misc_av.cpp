@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_primary — unbased_unsized_literal
-TEST(ParserA84, ConstantPrimaryUnbasedUnsizedLiteral) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  assign x = '1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstContAssignRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
-}
-
 // =============================================================================
 // A.8.4 Primaries — module_path_primary
 // =============================================================================
