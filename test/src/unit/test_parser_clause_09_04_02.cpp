@@ -515,4 +515,20 @@ TEST(ParserSection15, WaitForEventBasicAt) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
+// §15.5.2: @ event wait with parenthesized expression.
+TEST(ParserSection15, WaitForEventParenthesized) {
+  auto r = Parse(
+      "module m;\n"
+      "  event e;\n"
+      "  initial begin\n"
+      "    @(e);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+}
+
 }  // namespace
