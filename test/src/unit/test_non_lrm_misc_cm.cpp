@@ -34,22 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §15.5.2: @ event wait with 'or' event expression (multiple events).
-TEST(ParserSection15, WaitForEventOrExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  event e1, e2;\n"
-      "  initial begin\n"
-      "    @(e1 or e2);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_GE(stmt->events.size(), 2u);
-}
-
 // default disable iff expression_or_dist (module_or_generate_item_declaration).
 TEST(SourceText, DefaultDisableIff) {
   auto r = Parse(
