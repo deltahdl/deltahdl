@@ -67,8 +67,18 @@ def test_filter_implementable_empty() -> None:
         assert filter_implementable("text", {"4.1": "General"}) == []
 
 
-def test_filter_implementable_failure(capsys) -> None:
-    """SystemExit and stderr message on Claude failure."""
+def test_filter_implementable_failure() -> None:
+    """SystemExit on Claude failure."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="", stderr="err",
+    )
+    with patch("implement_clause.subprocess.run", return_value=cp):
+        with pytest.raises(SystemExit):
+            filter_implementable("text", {"4.1": "General"})
+
+
+def test_filter_implementable_failure_prints_error(capsys) -> None:
+    """Prints Claude failure message to stderr."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=1, stdout="", stderr="err",
     )
