@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § exp — e
-TEST(ParserA87, ExpLowercase) {
-  auto r = Parse("module m; real x; initial x = 2.5e2; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
 // § exp — E
 TEST(ParserA87, ExpUppercase) {
   auto r = Parse("module m; real x; initial x = 2.5E2; endmodule\n");

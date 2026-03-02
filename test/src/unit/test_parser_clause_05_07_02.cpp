@@ -191,4 +191,14 @@ TEST(ParserA87, FixedPointNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
+// § exp — e
+TEST(ParserA87, ExpLowercase) {
+  auto r = Parse("module m; real x; initial x = 2.5e2; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
 }  // namespace
