@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- ref_declaration ---
-// ref variable_port_type list_of_variable_identifiers
-TEST(ParserA212, RefDeclaration) {
-  auto r = ParseWithPreprocessor("module m(ref logic [7:0] d); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kRef);
-}
-
 // --- net_port_type ---
 // [ net_type ] data_type_or_implicit | interconnect implicit_data_type
 TEST(ParserA212, NetPortTypeTriType) {
