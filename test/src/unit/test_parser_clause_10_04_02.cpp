@@ -798,4 +798,16 @@ TEST(ParserSection10, Sec10_4_2_AlwaysFFNonblocking) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
+// § variable_lvalue — nonblocking assignment LHS
+TEST(ParserA85, VarLvalueNonblocking) {
+  auto r = Parse("module m; logic x; initial x <= 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
+}
+
 }  // namespace
