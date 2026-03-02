@@ -62,4 +62,32 @@ TEST(SourceText, ConstraintDeclaration) {
   EXPECT_TRUE(members[2]->is_static);
 }
 
+// constraint_block ::= { { constraint_block_item } }
+// constraint_block_item ::= solve ... before ... ; | constraint_expression
+TEST(SourceText, ConstraintBlockItems) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int a;\n"
+      "  rand int b;\n"
+      "  rand int c;\n"
+      "  constraint order_c {\n"
+      "    solve a before b;\n"
+      "    solve a before b, c;\n"
+      "    a > 0;\n"
+      "    soft b == 1;\n"
+      "    a > 0 -> b < 10;\n"
+      "    if (a > 5) { b == 1; } else { b == 0; }\n"
+      "    foreach (c[i]) c[i] > 0;\n"
+      "    disable soft a;\n"
+      "    unique { a, b, c };\n"
+      "  }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_GE(members.size(), 4u);
+  EXPECT_EQ(members[3]->kind, ClassMemberKind::kConstraint);
+  EXPECT_EQ(members[3]->name, "order_c");
+}
+
 }  // namespace
