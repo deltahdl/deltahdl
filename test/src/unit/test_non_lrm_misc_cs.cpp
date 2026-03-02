@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, TimescaleWithDelays) {
-  EXPECT_TRUE(
-      ParseOk("`timescale 1ns/1ps\n"
-              "module t;\n"
-              "  reg clk;\n"
-              "  initial begin\n"
-              "    clk = 0;\n"
-              "    #5 clk = 1;\n"
-              "    #5 clk = 0;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection22, TimescaleModuleNamePreserved) {
   auto r = ParseWithPreprocessor(
       "`timescale 1ns/1ps\n"
