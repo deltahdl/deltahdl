@@ -142,4 +142,16 @@ TEST(ParserCh510, AssignmentPatternPositional_Parse) {
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
 }
 
+// § constant_primary — constant_assignment_pattern_expression
+TEST(ParserA84, ConstantPrimaryAssignmentPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int arr [3] = '{1, 2, 3};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

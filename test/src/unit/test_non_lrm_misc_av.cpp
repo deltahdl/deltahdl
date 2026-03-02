@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_primary — constant_assignment_pattern_expression
-TEST(ParserA84, ConstantPrimaryAssignmentPattern) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int arr [3] = '{1, 2, 3};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § constant_primary — unbased_unsized_literal
 TEST(ParserA84, ConstantPrimaryUnbasedUnsizedLiteral) {
   auto r = Parse(
