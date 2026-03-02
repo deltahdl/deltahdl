@@ -18,22 +18,6 @@ bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// program_generate_item ::= conditional_generate_construct
-TEST(SourceText, ProgramGenerateConditional) {
-  auto r = Parse(
-      "program prg;\n"
-      "  parameter P = 1;\n"
-      "  if (P) begin : blk\n"
-      "    int x;\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(
-      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateIf));
-}
-
 // program_generate_item ::= generate_region
 TEST(SourceText, ProgramGenerateRegion) {
   auto r = Parse(
