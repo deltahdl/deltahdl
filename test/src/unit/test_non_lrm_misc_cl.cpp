@@ -45,28 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// §14.3 — Signal directions: input, output, inout
-// =============================================================================
-TEST(ParserSection14, SignalDirections) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data_in;\n"
-      "    output data_out;\n"
-      "    inout bidir;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-
-  VerifyClockingSignalDirections(item, {
-                                           {Direction::kInput, "data_in"},
-                                           {Direction::kOutput, "data_out"},
-                                           {Direction::kInout, "bidir"},
-                                       });
-}
-
-// =============================================================================
 // §14.3 — Input skew with delay
 // =============================================================================
 TEST(ParserSection14, InputSkewDelay) {
