@@ -15,20 +15,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 namespace {
 
 // =============================================================================
-// A.8.4 Primaries — escaped identifier as primary
-// =============================================================================
-// § primary — escaped identifier
-TEST(ParserA84, PrimaryEscapedIdentifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic \\my-signal ;\n"
-      "  initial \\my-signal = 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
 // A.8.5 Expression left-side values — net_lvalue
 // =============================================================================
 // § net_lvalue — ps_or_hierarchical_net_identifier constant_select (simple net)

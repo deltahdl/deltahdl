@@ -14,4 +14,18 @@ TEST(ParserA212, LetIdentifier_Escaped) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// A.8.4 Primaries — escaped identifier as primary
+// =============================================================================
+// § primary — escaped identifier
+TEST(ParserA84, PrimaryEscapedIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic \\my-signal ;\n"
+      "  initial \\my-signal = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
