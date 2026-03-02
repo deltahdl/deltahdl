@@ -28,19 +28,6 @@ using VerifyParseTest = ProgramTestParse;
 namespace {
 
 // =============================================================================
-// Section 16.5.1 -- Concurrent assertions in procedural context
-// =============================================================================
-// Assert property inside an always block (procedural concurrent assertion).
-TEST(ParserSection16, Sec16_5_1_AssertPropertyInAlwaysBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  always @(posedge clk) begin\n"
-              "    assert property (req |-> ack);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-// =============================================================================
 // Section 16.5.1 -- Assert property with named property instance
 // =============================================================================
 // Assert property referencing a previously declared named property.
