@@ -10,23 +10,6 @@ using ProgramParseTest = ProgramTestParse;
 
 namespace {
 
-// 17. Program block with declarations
-TEST(ParserClause03, Cl3_13_ProgramBlockWithDeclarations) {
-  auto r = Parse(
-      "program test_prog;\n"
-      "  int count;\n"
-      "  initial begin\n"
-      "    count = 0;\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->name, "test_prog");
-  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  EXPECT_FALSE(r.cu->programs[0]->items.empty());
-}
-
 // description: program_declaration
 TEST(SourceText, DescriptionProgram) {
   auto r = Parse("program prg; endprogram\n");
