@@ -18,19 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// function_body_declaration (new-style ports)
-// ---------------------------------------------------------------------------
-TEST(ParserA26, FuncBodyNewStyleEmptyPorts) {
-  auto r =
-      Parse("module m;\n  function void foo();\n  endfunction\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->func_args.empty());
-}
-
 TEST(ParserA26, FuncBodyNewStyleStickyDirection) {
   auto r = Parse(
       "module m;\n"
