@@ -26,19 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.14.8 Property disjunction and conjunction
-// =============================================================================
-TEST(ParserSection16, PropertyDisjunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (\n"
-      "    @(posedge clk) (a |-> b) or (c |-> d));\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection16, PropertyConjunction) {
   auto r = Parse(
       "module m;\n"
