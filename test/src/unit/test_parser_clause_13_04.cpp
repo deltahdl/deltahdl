@@ -374,4 +374,19 @@ TEST(ParserA26, FuncBodyOldStyleOutputPort) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
+// ---------------------------------------------------------------------------
+// function_body_declaration: argument unpacked dimensions (§13.4)
+// ---------------------------------------------------------------------------
+TEST(ParserA26, FuncArgUnpackedDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(input int arr [4]);\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].unpacked_dims.size(), 1u);
+}
+
 }  // namespace
