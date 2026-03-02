@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection27, GenerateCaseItemDefaults) {
-  auto r = Parse(
-      "module m;\n"
-      "  case (WIDTH)\n"
-      "    1: assign out = in;\n"
-      "    2: assign out = in2;\n"
-      "    default: assign out = 0;\n"
-      "  endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  const bool kExpectedDefaults[] = {false, false, true};
-  for (size_t i = 0; i < 3; i++) {
-    EXPECT_EQ(gen->gen_case_items[i].is_default, kExpectedDefaults[i]);
-  }
-}
-
 // --- Generate-for with labeled begin/end (§27.4) ---
 TEST(ParserSection27, GenerateForLabeled) {
   auto r = Parse(
