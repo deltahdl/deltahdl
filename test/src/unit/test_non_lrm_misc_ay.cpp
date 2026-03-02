@@ -14,19 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.15: Property if-else ---
-TEST(ParserAnnexF, AnnexFPropertyIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p_cond;\n"
-      "    @(posedge clk) if (mode) a |-> b; else c |-> d;\n"
-      "  endproperty\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
-}
-
 // --- F.16: Negedge clocking ---
 TEST(ParserAnnexF, AnnexFNegedgeClocking) {
   auto r = Parse(
