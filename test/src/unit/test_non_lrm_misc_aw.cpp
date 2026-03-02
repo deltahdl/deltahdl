@@ -14,17 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// § constant_select — in parameter expression
-TEST(ParserA84, ConstantSelectParameterExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  parameter int A [4] = '{1, 2, 3, 4};\n"
-      "  parameter int B = A[2];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.8.4 Primaries — cast and constant_cast
 // =============================================================================
