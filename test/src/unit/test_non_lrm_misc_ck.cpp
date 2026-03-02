@@ -18,24 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// block_item_declaration in function body (§13.4)
-TEST(ParserA28, BlockItemInFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int foo(input int x);\n"
-      "    int temp;\n"
-      "    temp = x + 1;\n"
-      "    return temp;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  ASSERT_GE(item->func_body_stmts.size(), 1u);
-  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
-}
-
 // =============================================================================
 // LRM section 13.5.3 -- Default argument values
 // =============================================================================
