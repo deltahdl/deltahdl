@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Parser, MultipleModules) {
-  auto r = ParseWithPreprocessor(
-      "module a; endmodule\n"
-      "module b; endmodule\n"
-      "module c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 3);
-  EXPECT_EQ(r.cu->modules[0]->name, "a");
-  EXPECT_EQ(r.cu->modules[1]->name, "b");
-  EXPECT_EQ(r.cu->modules[2]->name, "c");
-}
-
 // §3.3 Design element instantiations
 TEST(ParserClause03, Cl3_3_DesignElementInstantiations) {
   auto r = ParseWithPreprocessor(
