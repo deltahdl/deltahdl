@@ -636,4 +636,16 @@ TEST(ParserSection19, DefaultSkew_InputOutputTimeUnits) {
   ASSERT_GE(item->clocking_signals.size(), 3u);
 }
 
+// Default input skew only (no output skew specified).
+TEST(ParserSection19, DefaultSkew_InputOnly) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    default input #5;\n"
+              "    input a;\n"
+              "    output b;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace

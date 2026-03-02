@@ -43,18 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Default input skew only (no output skew specified).
-TEST(ParserSection19, DefaultSkew_InputOnly) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    default input #5;\n"
-              "    input a;\n"
-              "    output b;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 // Default output skew only (no input skew specified).
 TEST(ParserSection19, DefaultSkew_OutputOnly) {
   EXPECT_TRUE(
