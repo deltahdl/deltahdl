@@ -43,16 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Clocking block in a checker (valid scope per LRM).
-TEST(ParserSection19, ClockingBlockScope_InChecker) {
-  EXPECT_TRUE(
-      ParseOk("checker my_check(input clk, input data);\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "  endclocking\n"
-              "endchecker\n"));
-}
-
 // =============================================================================
 // LRM section 19.6.1 -- Input and output skews
 // =============================================================================

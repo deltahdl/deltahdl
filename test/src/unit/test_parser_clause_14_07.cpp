@@ -84,4 +84,14 @@ TEST(ParserSection19, ClockingBlockScope_AmongOtherItems) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 4u);
 }
 
+// Clocking block in a checker (valid scope per LRM).
+TEST(ParserSection19, ClockingBlockScope_InChecker) {
+  EXPECT_TRUE(
+      ParseOk("checker my_check(input clk, input data);\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "endchecker\n"));
+}
+
 }  // namespace
