@@ -24,19 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, NonAnsiMultiplePortsSameDir) {
-  auto r = Parse(
-      "module m(x, y, z);\n"
-      "  output x, y, z;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 3);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(mod->ports[i].direction, Direction::kOutput);
-  }
-}
-
 // =========================================================================
 // LRM section 23.3: Module instances
 // =========================================================================

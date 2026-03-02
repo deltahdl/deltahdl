@@ -148,4 +148,17 @@ TEST(ParserSection23, NonAnsiInoutPort) {
   EXPECT_NE(mod->ports[0].data_type.packed_dim_left, nullptr);
 }
 
+TEST(ParserSection23, NonAnsiMultiplePortsSameDir) {
+  auto r = Parse(
+      "module m(x, y, z);\n"
+      "  output x, y, z;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 3);
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(mod->ports[i].direction, Direction::kOutput);
+  }
+}
+
 }  // namespace
