@@ -124,6 +124,8 @@ jobs:
   static-analysis:
     if: >-
       needs.detect.outputs.force-static-analysis == 'true'
+      || needs.detect.outputs.implement-clause == 'true'
+      || needs.detect.outputs.implement-subclause == 'true'
       || needs.detect.outputs.lib-changed == 'true'
       || needs.detect.outputs.scripts-changed == 'true'
       || inputs.force-static-analysis
