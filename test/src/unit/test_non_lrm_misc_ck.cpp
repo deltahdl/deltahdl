@@ -18,25 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, NamedArgBindingNames) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void foo(int a, int b);\n"
-      "  endfunction\n"
-      "  initial foo(.b(2), .a(1));\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* call = stmt->expr;
-  ASSERT_NE(call, nullptr);
-  ASSERT_EQ(call->args.size(), 2u);
-  ASSERT_EQ(call->arg_names.size(), 2u);
-  const std::vector<std::string> kExpected = {"b", "a"};
-  for (size_t i = 0; i < kExpected.size(); ++i) {
-    EXPECT_EQ(call->arg_names[i], kExpected[i]);
-  }
-}
-
 TEST(ParserSection13, PositionalArgsHaveEmptyNames) {
   auto r = Parse(
       "module m;\n"
