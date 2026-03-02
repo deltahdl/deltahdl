@@ -321,4 +321,21 @@ TEST_F(ProgramParseTest, ProgramWithEndLabel) {
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
+// =============================================================================
+// §24.2 Program ports and parameters
+// =============================================================================
+TEST_F(ProgramParseTest, ProgramWithPorts) {
+  auto* unit = Parse(
+      "program p(input logic clk, input logic rst);\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_GE(unit->programs[0]->ports.size(), 2u);
+  EXPECT_EQ(unit->programs[0]->ports[0].name, "clk");
+  EXPECT_EQ(unit->programs[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(unit->programs[0]->ports[1].name, "rst");
+  EXPECT_EQ(unit->programs[0]->ports[1].direction, Direction::kInput);
+}
+
 }  // namespace
