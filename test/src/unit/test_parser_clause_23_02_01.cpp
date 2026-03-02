@@ -109,4 +109,23 @@ TEST(ParserSection23, ModuleHeaderMultipleImportsFirst) {
   EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
 }
 
+// =============================================================================
+// LRM section 23.2 -- Module definitions (additional)
+// =============================================================================
+TEST(ParserSection23, ModuleWithParameters) {
+  auto r = Parse(
+      "module m #(parameter WIDTH = 8, parameter DEPTH = 16)(\n"
+      "  input logic [WIDTH-1:0] data_in,\n"
+      "  output logic [WIDTH-1:0] data_out\n"
+      ");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "m");
+  ASSERT_EQ(mod->params.size(), 2u);
+  EXPECT_EQ(mod->params[0].first, "WIDTH");
+  EXPECT_EQ(mod->params[1].first, "DEPTH");
+  ASSERT_EQ(mod->ports.size(), 2u);
+}
+
 }  // namespace

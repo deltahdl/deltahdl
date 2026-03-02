@@ -24,25 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// LRM section 23.2 -- Module definitions (additional)
-// =============================================================================
-TEST(ParserSection23, ModuleWithParameters) {
-  auto r = Parse(
-      "module m #(parameter WIDTH = 8, parameter DEPTH = 16)(\n"
-      "  input logic [WIDTH-1:0] data_in,\n"
-      "  output logic [WIDTH-1:0] data_out\n"
-      ");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  ASSERT_EQ(mod->params.size(), 2u);
-  EXPECT_EQ(mod->params[0].first, "WIDTH");
-  EXPECT_EQ(mod->params[1].first, "DEPTH");
-  ASSERT_EQ(mod->ports.size(), 2u);
-}
-
 TEST(ParserSection23, ModuleEmptyPortList) {
   auto r = Parse("module m(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
