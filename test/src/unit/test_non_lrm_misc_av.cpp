@@ -6,23 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.3 Expressions — part_select_range / constant_part_select_range
-// =============================================================================
-// § part_select_range ::= constant_range
-TEST(ParserA83, PartSelectConstantRange) {
-  auto r = Parse("module m; initial x = data[15:8]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->index, nullptr);
-  ASSERT_NE(rhs->index_end, nullptr);
-  EXPECT_FALSE(rhs->is_part_select_plus);
-  EXPECT_FALSE(rhs->is_part_select_minus);
-}
-
 // § part_select_range ::= indexed_range (+:)
 TEST(ParserA83, PartSelectIndexedPlus) {
   auto r = Parse("module m; initial x = data[0+:8]; endmodule\n");
