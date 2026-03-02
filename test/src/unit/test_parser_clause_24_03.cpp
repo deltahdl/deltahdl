@@ -463,4 +463,22 @@ TEST_F(ProgramParseTest, ProgramWithTaskAndFunction) {
   EXPECT_EQ(unit->programs[0]->items[1]->kind, ModuleItemKind::kFunctionDecl);
 }
 
+// =============================================================================
+// A.1.7 Program items
+// =============================================================================
+// program_item ::= port_declaration ;
+TEST(SourceText, ProgramItemPortDecl) {
+  auto r = Parse(
+      "program prg(input logic clk, output logic done);\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  auto* p = r.cu->programs[0];
+  EXPECT_EQ(p->name, "prg");
+  EXPECT_EQ(p->ports.size(), 2u);
+  EXPECT_EQ(p->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(p->ports[1].direction, Direction::kOutput);
+}
+
 }  // namespace
