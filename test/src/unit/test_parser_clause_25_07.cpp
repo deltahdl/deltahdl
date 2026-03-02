@@ -150,4 +150,19 @@ TEST(ParserA27, TaskBodyInterfaceScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserA29, ImportFunctionPrototype) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport init(import function int compute(input int a));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  EXPECT_TRUE(mp->ports[0].is_import);
+  EXPECT_NE(mp->ports[0].prototype, nullptr);
+  EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(mp->ports[0].prototype->name, "compute");
+}
+
 }  // namespace
