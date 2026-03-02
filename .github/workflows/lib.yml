@@ -281,7 +281,7 @@ jobs:
             .github/workflows/lib.yml \
             .github/workflows/implement_clause.yml \
             .github/workflows/implement_subclause.yml
-name: Lib
+name: lib
 on:
   pull_request:
     paths:
