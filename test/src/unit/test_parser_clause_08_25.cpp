@@ -170,4 +170,17 @@ TEST(ParserSection13, Sec13_8_ThreeParams) {
   ASSERT_EQ(r.cu->classes[0]->params.size(), 3u);
 }
 
+// §13.8: Parameterized class with no default parameter value.
+TEST(ParserSection13, Sec13_8_NoDefaultParam) {
+  auto r = Parse(
+      "virtual class Shifter#(parameter int AMOUNT);\n"
+      "  static function logic [31:0] left(input logic [31:0] val);\n"
+      "    return val << AMOUNT;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes[0]->params.size(), 1u);
+}
+
 }  // namespace
