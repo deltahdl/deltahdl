@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection26, PackageWithEndLabel) {
-  auto r = Parse(
-      "package my_pkg;\n"
-      "endpackage : my_pkg\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "my_pkg");
-}
-
 TEST(ParserSection26, PackageWithTypedef) {
   auto r = Parse(
       "package types_pkg;\n"

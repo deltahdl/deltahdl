@@ -312,4 +312,13 @@ TEST(ParserSection26, EmptyPackage) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
+TEST(ParserSection26, PackageWithEndLabel) {
+  auto r = Parse(
+      "package my_pkg;\n"
+      "endpackage : my_pkg\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "my_pkg");
+}
+
 }  // namespace
