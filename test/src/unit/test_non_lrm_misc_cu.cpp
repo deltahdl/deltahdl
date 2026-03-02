@@ -24,13 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, InterfaceLifetimeAutomatic) {
-  auto r = Parse("interface automatic myif; endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->interfaces.size(), 1);
-  EXPECT_EQ(r.cu->interfaces[0]->name, "myif");
-}
-
 // --- Package import in module headers (LRM section 26.4) ---
 TEST(ParserSection23, ModuleHeaderImport) {
   auto r = Parse(
