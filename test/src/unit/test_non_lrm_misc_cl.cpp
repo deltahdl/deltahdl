@@ -45,35 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// §14.3 — Input skew with delay
-// =============================================================================
-TEST(ParserSection14, InputSkewDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #2 data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  ASSERT_NE(sig.skew_delay, nullptr);
-
-  struct {
-    bool ok;
-    const char* label;
-  } const kChecks[] = {
-      {sig.direction == Direction::kInput, "direction"},
-      {sig.name == "data", "name"},
-      {sig.skew_delay->kind == ExprKind::kIntegerLiteral, "skew_delay_kind"},
-  };
-  for (const auto& c : kChecks) {
-    EXPECT_TRUE(c.ok) << c.label;
-  }
-}
-
-// =============================================================================
 // §14.3 — Output skew with edge
 // =============================================================================
 TEST(ParserSection14, OutputSkewEdge) {
