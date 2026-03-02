@@ -205,4 +205,21 @@ TEST(ParserSection23, NamedPortEmptyConnection) {
   EXPECT_EQ(item->inst_ports[1].second, nullptr);
 }
 
+// =========================================================================
+// LRM section 23.3.3: Port connection rules
+// =========================================================================
+TEST(ParserSection23, PortConnectionRulesNamedMultiple) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1 (.clk(clk), .rst(rst), .data(d), .out(q));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->inst_ports.size(), 4);
+  EXPECT_EQ(item->inst_ports[0].first, "clk");
+  EXPECT_EQ(item->inst_ports[1].first, "rst");
+  EXPECT_EQ(item->inst_ports[2].first, "data");
+  EXPECT_EQ(item->inst_ports[3].first, "out");
+}
+
 }  // namespace
