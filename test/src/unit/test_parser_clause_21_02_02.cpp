@@ -71,4 +71,15 @@ TEST(ParserSection21, StrobeBasicCall) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, StrobebHexOctal) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    $strobeb(a);\n"
+              "    $strobeh(a);\n"
+              "    $strobeo(a);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
