@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — post-decrement
-TEST(ParserA85, VarLvaluePostDecrement) {
-  auto r = Parse("module m; int x; initial x--; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § variable_lvalue — multi-dimensional array element select
 TEST(ParserA85, VarLvalueMultiDimSelect) {
   auto r = Parse(

@@ -248,4 +248,11 @@ TEST(ParserA85, VarLvaluePreDecrement) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// § variable_lvalue — post-decrement
+TEST(ParserA85, VarLvaluePostDecrement) {
+  auto r = Parse("module m; int x; initial x--; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
