@@ -41,4 +41,18 @@ TEST(ParserA83, ConstantMinTypMaxInSpecparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// A.8.3 Expressions — mintypmax_expression
+// =============================================================================
+// § mintypmax_expression ::= expression : expression : expression
+TEST(ParserA83, MinTypMaxInDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y;\n"
+      "  assign #(1:2:3) y = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
