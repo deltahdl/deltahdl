@@ -892,4 +892,15 @@ TEST(ParserA83, PartSelectIndexedPlus) {
   EXPECT_TRUE(rhs->is_part_select_plus);
 }
 
+// § part_select_range ::= indexed_range (-:)
+TEST(ParserA83, PartSelectIndexedMinus) {
+  auto r = Parse("module m; initial x = data[7-:8]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  EXPECT_TRUE(rhs->is_part_select_minus);
+}
+
 }  // namespace
