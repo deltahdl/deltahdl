@@ -298,4 +298,15 @@ TEST(ParserSection16, DisableIffInPropertyDecl) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+TEST(ParserSection16, DisableIffWithComplexExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (\n"
+      "    @(posedge clk) disable iff (rst || !en)\n"
+      "    req |-> ##[1:5] ack);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
