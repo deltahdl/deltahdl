@@ -13,4 +13,11 @@ TEST(ParserSection22, DefaultNettypeTri) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, DefaultNettypeWand) {
+  EXPECT_TRUE(
+      ParseOk("`default_nettype wand\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
