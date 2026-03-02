@@ -28,16 +28,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 namespace {
 
 // =============================================================================
-// §24.5 Program lifetime qualifier
-// =============================================================================
-TEST_F(ProgramParseTest, ProgramWithAutomaticLifetime) {
-  auto* unit = Parse("program automatic p; endprogram");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-}
-
-// =============================================================================
 // §24.6 Program with task and function declarations
 // =============================================================================
 TEST_F(ProgramParseTest, ProgramWithTaskDecl) {

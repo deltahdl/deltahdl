@@ -429,4 +429,16 @@ TEST(ParserSection4, Sec4_9_4_AutoVarInBeginEnd) {
   EXPECT_NE(stmt->var_init, nullptr);
 }
 
+using ProgramParseTest = ProgramTestParse;
+
+// =============================================================================
+// §24.5 Program lifetime qualifier
+// =============================================================================
+TEST_F(ProgramParseTest, ProgramWithAutomaticLifetime) {
+  auto* unit = Parse("program automatic p; endprogram");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+}
+
 }  // namespace
