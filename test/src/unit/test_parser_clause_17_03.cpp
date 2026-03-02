@@ -182,4 +182,22 @@ TEST_F(VerifyParseTest, CheckerInstantiationNamed) {
   EXPECT_FALSE(unit->modules[0]->items.empty());
 }
 
+TEST_F(VerifyParseTest, CheckerInstantiationInAlwaysBlock) {
+  auto* unit = Parse(R"(
+    checker c1(event clk, logic [7:0] a, b);
+      logic [7:0] sum;
+      always_ff @(clk) begin
+        sum <= a + 1'b1;
+      end
+    endchecker
+    module m(input logic clk, logic [7:0] in1, in2);
+      always @(posedge clk) begin
+        c1 check_inside(posedge clk, in1, in2);
+      end
+    endmodule
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  ASSERT_EQ(unit->modules.size(), 1u);
+}
+
 }  // namespace
