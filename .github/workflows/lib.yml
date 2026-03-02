@@ -10,6 +10,8 @@ jobs:
         ${{ steps.check.outputs.implement_clause }}
       implement-subclause: >-
         ${{ steps.check.outputs.implement_subclause }}
+      lib-changed: >-
+        ${{ steps.check.outputs.lib_changed }}
       workflows-changed: >-
         ${{ steps.check.outputs.workflows_changed }}
     runs-on: ubuntu-24.04
@@ -25,6 +27,7 @@ jobs:
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "implement_clause=true" >> "$GITHUB_OUTPUT"
             echo "implement_subclause=true" >> "$GITHUB_OUTPUT"
+            echo "lib_changed=true" >> "$GITHUB_OUTPUT"
             echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           else
@@ -34,6 +37,7 @@ jobs:
           if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
             echo "implement_clause=true" >> "$GITHUB_OUTPUT"
             echo "implement_subclause=true" >> "$GITHUB_OUTPUT"
+            echo "lib_changed=true" >> "$GITHUB_OUTPUT"
             echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -45,6 +49,7 @@ jobs:
           if echo "$CHANGED" | grep -qE "$LIB"; then
             LIB_HIT=true
           fi
+          echo "lib_changed=$LIB_HIT" >> "$GITHUB_OUTPUT"
           if [ "$LIB_HIT" = "true" ] \
               || echo "$CHANGED" | grep -qE "$IC"; then
             echo "implement_clause=true" >> "$GITHUB_OUTPUT"
@@ -65,8 +70,7 @@ jobs:
   # ── Gate: static analysis ──
   static-analysis:
     if: >-
-      needs.detect.outputs.implement-clause == 'true'
-      || needs.detect.outputs.implement-subclause == 'true'
+      needs.detect.outputs.lib-changed == 'true'
     needs: detect
     runs-on: ubuntu-24.04
     steps:
