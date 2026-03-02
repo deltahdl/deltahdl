@@ -18,18 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, FunctionReturnTypeVoid) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void bar();\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "bar");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
-}
-
 TEST(ParserSection13, FunctionReturnTypeLogicVec) {
   auto r = Parse(
       "module m;\n"

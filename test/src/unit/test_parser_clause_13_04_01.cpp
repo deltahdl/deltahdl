@@ -396,4 +396,16 @@ TEST(ParserSection13, FunctionReturnTypeInt) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
 }
 
+TEST(ParserSection13, FunctionReturnTypeVoid) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void bar();\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "bar");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
+}
+
 }  // namespace
