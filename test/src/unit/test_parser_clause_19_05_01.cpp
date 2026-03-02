@@ -249,4 +249,38 @@ TEST(ParserA211, CoverGroup_ValueRangesInBins) {
               "endmodule\n"));
 }
 
+struct ParseResult16c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16c Parse(const std::string& src) {
+  ParseResult16c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using VerifyParseTest = ProgramTestParse;
+
+TEST_F(VerifyParseTest, CovergroupWithBins) {
+  auto* unit = Parse(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        coverpoint addr {
+          bins low = {[0:15]};
+          bins high = {[16:31]};
+        }
+      endgroup
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+}
+
 }  // namespace
