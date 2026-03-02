@@ -270,4 +270,22 @@ TEST(ParserA84, PrimaryCast) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
+// =============================================================================
+// A.8.4 Primaries — cast and constant_cast
+// =============================================================================
+// § cast — type cast in expression
+TEST(ParserA84, CastInExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  int b;\n"
+      "  initial b = int'(a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+}
+
 }  // namespace
