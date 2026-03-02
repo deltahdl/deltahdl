@@ -215,4 +215,18 @@ TEST(ParserSection13, ConstRefArg) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
 }
 
+TEST(ParserSection13, RefWithoutConst) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void baz(ref int x);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "baz");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 1u);
+  EXPECT_FALSE(fn->func_args[0].is_const);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
+}
+
 }  // namespace
