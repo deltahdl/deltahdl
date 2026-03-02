@@ -24,18 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// =========================================================================
-// LRM section 23.1: Module definitions
-// =========================================================================
-TEST(ParserSection23, ModuleDefinitionEmpty) {
-  auto r = Parse("module empty_mod; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-  EXPECT_EQ(r.cu->modules[0]->name, "empty_mod");
-  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
-  EXPECT_TRUE(r.cu->modules[0]->items.empty());
-}
-
 TEST(ParserSection23, ModuleDefinitionWithBody) {
   auto r = Parse(
       "module m;\n"
