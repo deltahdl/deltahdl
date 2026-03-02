@@ -121,4 +121,33 @@ TEST(ParserSection6, ParsePortDecl_ImplicitType) {
   }
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection23, AnsiPortsWithDefaultType) {
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 2u);
+  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
+}
+
 }  // namespace

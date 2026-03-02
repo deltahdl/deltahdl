@@ -24,17 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, AnsiPortsWithDefaultType) {
-  auto r = Parse(
-      "module m(input a, output b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 2u);
-  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
-}
-
 TEST(ParserSection23, AnsiPortsInout) {
   auto r = Parse(
       "module m(inout wire [7:0] data);\n"
