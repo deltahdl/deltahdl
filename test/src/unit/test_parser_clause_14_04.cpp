@@ -381,4 +381,14 @@ TEST(ParserSection19, InputOutputSkew_OutputNegedgeWithDelay) {
               "endmodule\n"));
 }
 
+// Input skew with explicit #0 (Observed region sampling).
+TEST(ParserSection19, InputOutputSkew_ExplicitZero) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input #0 data;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace

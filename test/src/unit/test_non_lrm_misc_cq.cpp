@@ -43,16 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Input skew with explicit #0 (Observed region sampling).
-TEST(ParserSection19, InputOutputSkew_ExplicitZero) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input #0 data;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 // Combined input/output with time-unit suffix on output (#4ps).
 TEST(ParserSection19, InputOutputSkew_MixedUnitSuffix) {
   EXPECT_TRUE(
