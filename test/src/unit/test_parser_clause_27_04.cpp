@@ -650,4 +650,17 @@ TEST(ParserSection27, GenerateForNestedBeginEnd) {
   EXPECT_EQ(outer->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
+TEST(ParserSection27, GenerateForPreDecrement) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 3; i >= 0; i--) begin\n"
+      "    assign out[i] = in[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
+  ASSERT_NE(gen->gen_step, nullptr);
+}
+
 }  // namespace
