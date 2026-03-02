@@ -38,4 +38,23 @@ TEST(ParserSection8, OutOfBlockMethod) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+// ---------------------------------------------------------------------------
+// function_prototype ::=
+//   function [ dynamic_override_specifiers ] data_type_or_void
+//     function_identifier [ ( [ tf_port_list ] ) ]
+// ---------------------------------------------------------------------------
+TEST(ParserA26, FuncPrototypeExtern) {
+  auto r = Parse(
+      "module m;\n"
+      "  extern function int foo(input int x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(item->is_extern);
+  EXPECT_EQ(item->name, "foo");
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
+}
+
 }  // namespace
