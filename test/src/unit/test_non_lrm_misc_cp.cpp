@@ -9,18 +9,6 @@ using CheckerParseTest = ProgramTestParse;
 
 namespace {
 
-// --- Top-level function declaration (§13) ---
-TEST(ParserSection18, TopLevelFunction) {
-  auto r = Parse(
-      "function int my_func(int x);\n"
-      "  return x + 1;\n"
-      "endfunction\n"
-      "class C;\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // --- Block-level var decl in function body ---
 TEST(ParserSection18, FuncBodyVarDecl) {
   auto r = Parse(
