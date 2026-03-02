@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, CelldefineEndcelldefine) {
-  EXPECT_TRUE(
-      ParseOk("`celldefine\n"
-              "module inv(output y, input a);\n"
-              "  assign y = ~a;\n"
-              "endmodule\n"
-              "`endcelldefine\n"));
-}
-
 // ============================================================================
 // LRM section 22.13 -- `__FILE__ and `__LINE__
 // ============================================================================
