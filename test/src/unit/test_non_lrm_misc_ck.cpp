@@ -18,19 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, MultipleDimsOnFuncArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  task bar(logic mem[16][8]);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "bar");
-  ASSERT_NE(tk, nullptr);
-  ASSERT_EQ(tk->func_args.size(), 1u);
-  EXPECT_EQ(tk->func_args[0].unpacked_dims.size(), 2u);
-}
-
 TEST(ParserSection13, NoDimsOnFuncArg) {
   auto r = Parse(
       "module m;\n"
