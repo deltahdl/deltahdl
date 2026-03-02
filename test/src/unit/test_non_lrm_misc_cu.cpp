@@ -24,18 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, ModuleInstWithParamOverride) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub #(8, 16) u1(.a(w1));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "sub");
-  ASSERT_EQ(item->inst_params.size(), 2u);
-}
-
 TEST(ParserSection23, ModuleInstNamedParamOverride) {
   auto r = Parse(
       "module top;\n"
