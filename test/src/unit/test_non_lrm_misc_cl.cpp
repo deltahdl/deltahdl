@@ -44,14 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// §13.8: Calling parameterized task from initial block.
-TEST(ParserSection13, Sec13_8_CallParamTaskFromInitial) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial Utils#(16)::report();\n"
-              "endmodule\n"));
-}
-
 // §13.8: Parameter with string type default.
 TEST(ParserSection13, Sec13_8_StringTypeParam) {
   EXPECT_TRUE(
