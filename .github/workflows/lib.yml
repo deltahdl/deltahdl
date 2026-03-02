@@ -64,6 +64,9 @@ jobs:
           fi
   # ── Gate: static analysis ──
   static-analysis:
+    if: >-
+      needs.detect.outputs.implement-clause == 'true'
+      || needs.detect.outputs.implement-subclause == 'true'
     needs: detect
     runs-on: ubuntu-24.04
     steps:
