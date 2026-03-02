@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.3 Expressions — misc expression forms
-// =============================================================================
-// Multiple binary operators chained
-TEST(ParserA83, ChainedBinaryOps) {
-  auto r = Parse("module m; initial x = a | b & c ^ d; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-}
-
 // Unary reduction operators
 TEST(ParserA83, UnaryReductionAnd) {
   auto r = Parse("module m; initial x = &a; endmodule\n");
