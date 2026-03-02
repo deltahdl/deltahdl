@@ -91,4 +91,19 @@ TEST(ParserA84, ModulePathPrimaryIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// § primary — hierarchical_identifier select
+TEST(ParserA84, PrimaryHierarchicalIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  logic x;\n"
+      "  initial x = data[3];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace
