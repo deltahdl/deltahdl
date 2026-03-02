@@ -216,4 +216,18 @@ TEST(ParserSection13, OldStyleTaskMultipleInputs) {
   }
 }
 
+// Task with end label matching the task name (LRM section 13.3).
+TEST(ParserSection13, TaskEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  task do_work(int x);\n"
+      "    $display(\"%d\", x);\n"
+      "  endtask : do_work\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* tk = FindFunc(r, "do_work");
+  ASSERT_NE(tk, nullptr);
+  EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
+}
+
 }  // namespace

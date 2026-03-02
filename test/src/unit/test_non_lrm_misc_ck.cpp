@@ -18,20 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// Task with end label matching the task name (LRM section 13.3).
-TEST(ParserSection13, TaskEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  task do_work(int x);\n"
-      "    $display(\"%d\", x);\n"
-      "  endtask : do_work\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "do_work");
-  ASSERT_NE(tk, nullptr);
-  EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
-}
-
 // Function with empty body.
 TEST(ParserSection13, FunctionEmptyBody) {
   auto r = Parse(
