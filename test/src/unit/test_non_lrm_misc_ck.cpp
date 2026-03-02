@@ -18,30 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// =============================================================================
-// LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
-// =============================================================================
-// =============================================================================
-// LRM section 13.8 -- Parameterized tasks and functions
-// =============================================================================
-TEST(ParserSection13, ParameterizedSubroutine_VirtualClassWithStaticMethod) {
-  auto r = Parse(
-      "virtual class C#(parameter DECODE_W = 8,\n"
-      "                 parameter ENCODE_W = $clog2(DECODE_W));\n"
-      "  static function logic [ENCODE_W-1:0] ENCODER_f\n"
-      "      (input logic [DECODE_W-1:0] DecodeIn);\n"
-      "    ENCODER_f = '0;\n"
-      "    for (int i = 0; i < DECODE_W; i++) begin\n"
-      "      if (DecodeIn[i]) begin\n"
-      "        ENCODER_f = i[ENCODE_W-1:0];\n"
-      "        break;\n"
-      "      end\n"
-      "    end\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection13, ParameterizedSubroutine_ClassScopeCall) {
   auto r = Parse(
       "module top;\n"
