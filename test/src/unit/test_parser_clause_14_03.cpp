@@ -709,4 +709,17 @@ TEST(ParserSection19, DefaultSkew_NumericLiterals) {
               "endmodule\n"));
 }
 
+// =============================================================================
+// Additional cross-cutting tests
+// =============================================================================
+// End label on clocking block.
+TEST(ParserSection19, ClockingBlock_EndLabel) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input a;\n"
+              "  endclocking : cb\n"
+              "endmodule\n"));
+}
+
 }  // namespace
