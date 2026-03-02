@@ -672,4 +672,17 @@ TEST(ParserSection19, DefaultSkew_1StepInputNegedgeOutput) {
               "endmodule\n"));
 }
 
+// Default skew with per-signal override: addr overrides input to #1step.
+TEST(ParserSection19, DefaultSkew_PerSignalOverride) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking bus @(posedge clock1);\n"
+              "    default input #10ns output #2ns;\n"
+              "    input data, ready, enable = top.mem1.enable;\n"
+              "    output negedge ack;\n"
+              "    input #1step addr;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace
