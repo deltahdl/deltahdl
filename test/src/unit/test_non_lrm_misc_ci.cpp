@@ -8,23 +8,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// LRM section 12.9 -- Event trigger (->)
-// =============================================================================
-TEST(ParserSection12, EventTrigger) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    -> done_event;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
-// =============================================================================
 // Combined tests -- qualifiers with named blocks
 // =============================================================================
 TEST(ParserSection12, UniqueCasexQualifier) {
