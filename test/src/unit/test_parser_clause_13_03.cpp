@@ -230,4 +230,23 @@ TEST(ParserSection13, TaskEndLabel) {
   EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
 }
 
+// =============================================================================
+// LRM section 13.3 -- Tasks (additional tests)
+// =============================================================================
+// Task with timing control in body (tasks may have time-controlling stmts).
+TEST(ParserSection13, TaskWithTimingControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  task wait_clk(input int n);\n"
+      "    repeat (n) @(posedge clk);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* tk = FindFunc(r, "wait_clk");
+  ASSERT_NE(tk, nullptr);
+  EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
+  ASSERT_EQ(tk->func_args.size(), 1u);
+  EXPECT_EQ(tk->func_args[0].direction, Direction::kInput);
+}
+
 }  // namespace
