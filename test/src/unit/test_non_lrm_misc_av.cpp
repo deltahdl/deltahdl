@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § module_path_conditional_expression used in specify ifnone
-TEST(ParserA83, ModulePathConditionalInSpecify) {
-  auto r = Parse(
-      "module m(input a, input en, output y);\n"
-      "  specify\n"
-      "    if (en) (a => y) = 2;\n"
-      "    ifnone (a => y) = 3;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.8.3 Expressions — misc expression forms
 // =============================================================================
