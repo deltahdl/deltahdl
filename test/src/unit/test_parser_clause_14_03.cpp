@@ -891,4 +891,27 @@ TEST(ParserSection14, MultipleSignalsSameDirection) {
   }
 }
 
+// =============================================================================
+// §14.3 — Clocking block in module context alongside other items
+// =============================================================================
+TEST(ParserSection14, ClockingBlockAmongOtherItems) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [7:0] data;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FindClockingBlock(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "cb");
+  // Also check the other items parsed.
+  ASSERT_GE(r.cu->modules[0]->items.size(), 4u);
+}
+
 }  // namespace
