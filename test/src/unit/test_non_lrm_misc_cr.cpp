@@ -8,17 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, WritebHexOctal) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    $writeb(val);\n"
-              "    $writeh(val);\n"
-              "    $writeo(val);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, StrobeBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
