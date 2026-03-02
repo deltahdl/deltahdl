@@ -332,4 +332,28 @@ TEST(ParserClause03, Cl3_13_PackageWildcardImport) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
+// 11. Multiple packages imported into same module
+TEST(ParserClause03, Cl3_13_MultiplePackageImports) {
+  auto r = Parse(
+      "package alpha;\n"
+      "  typedef int alpha_t;\n"
+      "endpackage\n"
+      "package beta;\n"
+      "  typedef int beta_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import alpha::*;\n"
+      "  import beta::beta_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 2u);
+  auto* mod = r.cu->modules[0];
+  int import_count = 0;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kImportDecl) import_count++;
+  }
+  EXPECT_EQ(import_count, 2);
+}
+
 }  // namespace
