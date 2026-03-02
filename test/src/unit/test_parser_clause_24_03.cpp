@@ -383,4 +383,20 @@ TEST_F(ProgramParseTest, ProgramWithMultipleItems) {
   ASSERT_GE(unit->programs[0]->items.size(), 3u);
 }
 
+// =============================================================================
+// §24.4 Multiple programs and coexistence with modules
+// =============================================================================
+TEST_F(ProgramParseTest, ProgramCoexistsWithModule) {
+  auto* unit = Parse(
+      "module m;\n"
+      "endmodule\n"
+      "program p;\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  EXPECT_EQ(unit->modules[0]->name, "m");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+}
+
 }  // namespace
