@@ -56,15 +56,6 @@ static ParseResult30 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_ConditionalFullPath) {
-  EXPECT_TRUE(
-      ParseOk("module m(input a, b, en, output y);\n"
-              "  specify\n"
-              "    if (en) (a, b *> y) = 10;\n"
-              "  endspecify\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // §30.3 Path delay declarations
 // =============================================================================

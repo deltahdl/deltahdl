@@ -235,4 +235,13 @@ TEST(ParserSection28, Sec28_12_ConditionalPath) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
+TEST(ParserSection28, Sec28_12_ConditionalFullPath) {
+  EXPECT_TRUE(
+      ParseOk("module m(input a, b, en, output y);\n"
+              "  specify\n"
+              "    if (en) (a, b *> y) = 10;\n"
+              "  endspecify\n"
+              "endmodule\n"));
+}
+
 }  // namespace
