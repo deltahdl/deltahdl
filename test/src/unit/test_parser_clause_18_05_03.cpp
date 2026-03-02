@@ -165,4 +165,24 @@ TEST(ParserSection18b, DistMultipleConstraints) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
+using CheckerParseTest = ProgramTestParse;
+
+// constraint_expression ::= expression_or_dist ;
+// expression_or_dist ::= expression [ dist { dist_list } ]
+// dist_list ::= dist_item { , dist_item }
+// dist_item ::= value_range [ dist_weight ] | default :/ expression
+// dist_weight ::= := expression | :/ expression
+TEST(SourceText, ConstraintExpressionOrDist) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint dist_c {\n"
+      "    x dist { 1 := 10, [2:5] :/ 20, default :/ 1 };\n"
+      "  }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->members[1]->name, "dist_c");
+}
+
 }  // namespace
