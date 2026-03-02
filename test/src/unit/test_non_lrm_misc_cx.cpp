@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-// import in task body
-TEST(ParserA28, ImportInTask) {
-  EXPECT_TRUE(
-      ParseOk("package pkg;\n"
-              "  int val = 1;\n"
-              "endpackage\n"
-              "module m;\n"
-              "  task my_task();\n"
-              "    import pkg::*;\n"
-              "  endtask\n"
-              "endmodule\n"));
-}
-
 // Multiple imports in one statement in block
 TEST(ParserA28, ImportMultipleInBlock) {
   EXPECT_TRUE(

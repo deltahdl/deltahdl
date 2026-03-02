@@ -378,4 +378,17 @@ TEST(ParserA213, PackageImportItemStar) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
+// import in task body
+TEST(ParserA28, ImportInTask) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  int val = 1;\n"
+              "endpackage\n"
+              "module m;\n"
+              "  task my_task();\n"
+              "    import pkg::*;\n"
+              "  endtask\n"
+              "endmodule\n"));
+}
+
 }  // namespace
