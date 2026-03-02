@@ -453,4 +453,14 @@ TEST(ParserA87, DecimalXDigit) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
+// § decimal_number — [size] decimal_base z_digit
+TEST(ParserA87, DecimalZDigit) {
+  auto r = Parse("module m; logic [7:0] x; initial x = 8'dz; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
