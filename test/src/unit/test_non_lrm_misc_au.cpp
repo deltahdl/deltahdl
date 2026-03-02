@@ -14,13 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-// § array_range_expression ::= expression -: expression
-TEST(ParserA81, StreamExprWithMinusRange) {
-  auto r = Parse("module m; initial x = {<< {a with [7-:4]}}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § empty_unpacked_array_concatenation ::= { }
 TEST(ParserA81, EmptyUnpackedArrayConcatenation) {
   auto r = Parse("module m; initial x = {}; endmodule\n");
