@@ -46,7 +46,7 @@ jobs:
             exit 0
           fi
           CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
-          PAT='^(scripts/run_sim_tests\.py|scripts/run_sv_tests\.py|lib/run_tests_common/|test/scripts/run_sim_tests/|test/scripts/run_sv_tests/|test/lib/run_tests_common/)'
+          PAT='^(scripts/run_sim_tests/|scripts/run_sv_tests/|lib/run_tests_common/|test/scripts/run_sim_tests/|test/scripts/run_sv_tests/|test/lib/run_tests_common/)'
           if echo "$CHANGED" | grep -qE "$PAT"; then
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -309,8 +309,8 @@ on:
       - CMakeLists.txt
       - etc/**
       - lib/**
-      - scripts/run_sim_tests.py
-      - scripts/run_sv_tests.py
+      - scripts/run_sim_tests/**
+      - scripts/run_sv_tests/**
       - src/**
       - test/CMakeLists.txt
       - test/lib/**
@@ -328,8 +328,8 @@ on:
       - CMakeLists.txt
       - etc/**
       - lib/**
-      - scripts/run_sim_tests.py
-      - scripts/run_sv_tests.py
+      - scripts/run_sim_tests/**
+      - scripts/run_sv_tests/**
       - src/**
       - test/CMakeLists.txt
       - test/lib/**

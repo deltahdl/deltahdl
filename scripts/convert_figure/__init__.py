@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Convert figures from the IEEE 1800-2023 SystemVerilog LRM to DOT."""
 
 import argparse
@@ -458,7 +457,3 @@ def main(argv: list[str] | None = None) -> None:
     """Entry point: parse args, extract figures, emit DOT."""
     args = parse_args(argv)
     _run(args.lrm, args.clause)
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()

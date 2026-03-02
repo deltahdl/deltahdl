@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """LRM clause implementation prompt generator.
 
 Dispatches to depth-appropriate prompt builders and invokes Claude CLI.
@@ -605,7 +604,3 @@ def main(argv=None):
         bound_handler, args.lrm, args.clause,
         issue=args.issue, model=args.model,
     )
-
-
-if __name__ == "__main__":
-    main()

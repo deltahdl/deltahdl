@@ -29,7 +29,7 @@ jobs:
           assert-no-inline-directives
           --tools pylint,mypy
           --verbose
-          ${{ github.workspace }}/scripts/implement_clause.py
+          ${{ github.workspace }}/scripts/implement_clause/**/*
           ${{ github.workspace }}/test/scripts/implement_clause/**/*
       - name: Assert no linter config files
         run: >-
@@ -45,7 +45,7 @@ jobs:
       - name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
-          scripts/implement_clause.py
+          scripts/implement_clause/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
@@ -56,7 +56,7 @@ jobs:
       - name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy
-          scripts/implement_clause.py
+          scripts/implement_clause/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts:test/scripts/implement_clause/unit
@@ -64,8 +64,8 @@ jobs:
           test/scripts/implement_clause/
       - name: Detect copy-paste in source
         run: >-
-          jscpd --pattern "implement_clause.py" --threshold 0
-          --reporters console scripts/
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console scripts/implement_clause/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
@@ -91,12 +91,12 @@ on:
   pull_request:
     paths:
       - .github/workflows/implement_clause.yml
-      - scripts/implement_clause.py
+      - scripts/implement_clause/**
       - test/scripts/implement_clause/**
   push:
     branches: [main]
     paths:
       - .github/workflows/implement_clause.yml
-      - scripts/implement_clause.py
+      - scripts/implement_clause/**
       - test/scripts/implement_clause/**
   workflow_dispatch:

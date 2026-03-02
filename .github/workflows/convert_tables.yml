@@ -29,7 +29,7 @@ jobs:
           assert-no-inline-directives
           --tools pylint,mypy
           --verbose
-          ${{ github.workspace }}/scripts/convert_table.py
+          ${{ github.workspace }}/scripts/convert_table/**/*
           ${{ github.workspace }}/test/scripts/convert_table/**/*
       - name: Assert no linter config files
         run: >-
@@ -39,7 +39,7 @@ jobs:
           ${{ github.workspace }}
       - name: Run pylint on source
         run: >-
-          PYTHONPATH=. python3 -m pylint scripts/convert_table.py
+          PYTHONPATH=. python3 -m pylint scripts/convert_table/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
@@ -47,7 +47,7 @@ jobs:
           python3 -m pylint --recursive=y test/scripts/convert_table/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
-        run: PYTHONPATH=. python3 -m mypy scripts/convert_table.py
+        run: PYTHONPATH=. python3 -m mypy scripts/convert_table/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts:test/scripts/convert_table/unit
@@ -56,7 +56,7 @@ jobs:
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console scripts/convert_table.py
+          --reporters console scripts/convert_table/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
@@ -82,12 +82,12 @@ on:
   pull_request:
     paths:
       - .github/workflows/convert_tables.yml
-      - scripts/convert_table.py
+      - scripts/convert_table/**
       - test/scripts/convert_table/**
   push:
     branches: [main]
     paths:
       - .github/workflows/convert_tables.yml
-      - scripts/convert_table.py
+      - scripts/convert_table/**
       - test/scripts/convert_table/**
   workflow_dispatch:

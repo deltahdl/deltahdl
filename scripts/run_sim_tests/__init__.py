@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Run simulation e2e tests against deltahdl."""
 
 import subprocess
@@ -63,7 +62,3 @@ def main():
     total = passed + failed
     print(f"\nsim-tests summary: {passed}/{total} passed, {failed} failed")
     sys.exit(min(failed, 1))
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()

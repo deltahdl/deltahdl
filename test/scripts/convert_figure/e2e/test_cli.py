@@ -1,11 +1,12 @@
 """End-to-end tests for the convert_figure CLI."""
 
+import os
 import subprocess
 import sys
 from pathlib import Path
 
-_SCRIPT = str(
-    Path(__file__).resolve().parents[4] / "scripts" / "convert_figure.py",
+_SCRIPTS_DIR = str(
+    Path(__file__).resolve().parents[4] / "scripts",
 )
 
 
@@ -15,7 +16,8 @@ _SCRIPT = str(
 def _invoke(*args):
     """Run convert_figure as a child process."""
     return subprocess.run(
-        [sys.executable, _SCRIPT, *args],
+        [sys.executable, "-m", "convert_figure", *args],
+        env={**os.environ, "PYTHONPATH": _SCRIPTS_DIR},
         capture_output=True,
         text=True,
         check=False,

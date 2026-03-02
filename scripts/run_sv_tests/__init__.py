@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Run CHIPS Alliance sv-tests against deltahdl (advisory)."""
 
 import argparse
@@ -396,7 +395,3 @@ def main():
         print(f"\nJUnit XML written to {args.junit_xml}", flush=True)
 
     sys.exit(min(failed, 1))
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()
