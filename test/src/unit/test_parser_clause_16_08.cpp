@@ -194,4 +194,15 @@ TEST(ParserAnnexF, AnnexFSequenceDecl) {
   EXPECT_TRUE(found);
 }
 
+TEST(ParserSection16, SequenceWithFormalArgsDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s_req_ack(req, ack);\n"
+      "    req ##1 ack;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

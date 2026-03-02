@@ -26,17 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, SequenceWithFormalArgsDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  sequence s_req_ack(req, ack);\n"
-      "    req ##1 ack;\n"
-      "  endsequence\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection16, SequenceUsedInPropertyDecl) {
   auto r = Parse(
       "module m;\n"
