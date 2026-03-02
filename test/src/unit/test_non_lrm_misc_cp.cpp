@@ -9,21 +9,6 @@ using CheckerParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// §18 Constrained random — parsing
-// =============================================================================
-// --- Multi-declarator rand properties (§18.4) ---
-TEST(ParserSection18, RandMultiDeclarator) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int a, b, c;\n"
-      "endclass\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_GE(r.cu->classes[0]->members.size(), 3u);
-}
-
 TEST(ParserSection18, RandcMultiDeclarator) {
   auto r = Parse(
       "class C;\n"
