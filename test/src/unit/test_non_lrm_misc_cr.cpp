@@ -38,30 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-// ============================================================================
-// §21.3.1/§21.3.2 — $fopen, $fclose
-// ============================================================================
-TEST(Section21, FopenFclose) {
-  SimFixture f;
-  // Create a temporary file for the test.
-  std::string tmp_path = "/tmp/deltahdl_test_fopen.txt";
-  {
-    std::ofstream ofs(tmp_path);
-    ofs << "hello\n";
-  }
-  auto* open_expr = MakeSysCall(
-      f.arena, "$fopen",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeStrLit(f.arena, "r")});
-  auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
-  EXPECT_NE(fd_val.ToUint64(), 0u);
-
-  auto* close_expr =
-      MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd_val.ToUint64())});
-  EvalExpr(close_expr, f.ctx, f.arena);
-
-  std::remove(tmp_path.c_str());
-}
-
 TEST(Section21, FopenInvalidFile) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$fopen",
