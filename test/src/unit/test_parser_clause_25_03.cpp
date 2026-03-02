@@ -152,4 +152,17 @@ TEST(SourceText, NonPortInterfaceItemProgram) {
             ModuleItemKind::kNestedModuleDecl);
 }
 
+// non_port_interface_item ::= interface_declaration (nested interface)
+TEST(SourceText, NonPortInterfaceItemNestedInterface) {
+  auto r = Parse(
+      "interface outer;\n"
+      "  interface inner; endinterface\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_GE(r.cu->interfaces[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->items[0]->kind,
+            ModuleItemKind::kNestedModuleDecl);
+}
+
 }  // namespace
