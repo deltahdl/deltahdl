@@ -333,4 +333,19 @@ TEST(ParserA26, FuncBodyNewStyleStickyDirection) {
       {Direction::kInput, Direction::kInput, Direction::kInput});
 }
 
+TEST(ParserA26, FuncBodyWithBlockItemDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(input int x);\n"
+      "    int temp;\n"
+      "    temp = x + 1;\n"
+      "    return temp;\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_GE(item->func_body_stmts.size(), 1u);
+}
+
 }  // namespace
