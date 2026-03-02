@@ -34,5 +34,18 @@ TEST_F(AnnexHParseTest, AnnexKVpiSystemCalls) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
+TEST_F(AnnexHParseTest, AnnexMSvVpiCalls) {
+  auto* unit = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    $vpi_iterate;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  auto& items = unit->modules[0]->items;
+  ASSERT_GE(items.size(), 1u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
 }  // namespace
 }  // namespace delta
