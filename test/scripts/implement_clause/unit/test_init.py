@@ -9,12 +9,6 @@ import pytest
 
 from implement_clause import invoke_implement_subclause, main, parse_args
 
-INVOKE_KWARGS: dict[str, str | int] = {
-    "lrm": "/path/lrm.txt", "subclause": "4.2", "issue": 123,
-    "organization": "deltahdl", "repo": "deltahdl",
-}
-
-
 @contextmanager
 def _patch_main_with_subclauses(
     *, subclauses=None, implementable=None,
@@ -47,7 +41,10 @@ def test_invoke_implement_subclause_calls_subprocess(
     invoke_subprocess_ok,
 ) -> None:
     """Correct command is passed to subprocess.run."""
-    invoke_implement_subclause(**INVOKE_KWARGS)
+    invoke_implement_subclause(
+        lrm="/path/lrm.txt", subclause="4.2", issue=123,
+        organization="deltahdl", repo="deltahdl",
+    )
     assert invoke_subprocess_ok.call_args[0][0] == [
         sys.executable, "-m", "implement_subclause",
         "--lrm", "/path/lrm.txt",
@@ -61,7 +58,10 @@ def test_invoke_implement_subclause_calls_subprocess(
 @pytest.mark.usefixtures("invoke_subprocess_ok")
 def test_invoke_implement_subclause_prints_subclause(capsys) -> None:
     """Prints which subclause is being invoked."""
-    invoke_implement_subclause(**INVOKE_KWARGS)
+    invoke_implement_subclause(
+        lrm="/path/lrm.txt", subclause="4.2", issue=123,
+        organization="deltahdl", repo="deltahdl",
+    )
     assert "4.2" in capsys.readouterr().out
 
 
