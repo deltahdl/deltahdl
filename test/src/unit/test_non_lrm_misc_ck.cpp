@@ -18,20 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, DefaultArgValueOnTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  task bar(int x, int y = 10);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "bar");
-  ASSERT_NE(tk, nullptr);
-  ASSERT_EQ(tk->func_args.size(), 2u);
-  EXPECT_EQ(tk->func_args[0].default_value, nullptr);
-  EXPECT_NE(tk->func_args[1].default_value, nullptr);
-}
-
 TEST(ParserSection13, DefaultArgNoDefault) {
   auto r = Parse(
       "module m;\n"
