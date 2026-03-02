@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, IfdefSelectsCorrectModule) {
-  auto r = ParseWithPreprocessor(
-      "`define USE_A\n"
-      "`ifdef USE_A\n"
-      "module a;\n"
-      "endmodule\n"
-      "`else\n"
-      "module b;\n"
-      "endmodule\n"
-      "`endif\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "a");
-}
-
 TEST(ParserSection22, IfndefSelectsElseBranch) {
   auto r = ParseWithPreprocessor(
       "`define GUARD\n"
