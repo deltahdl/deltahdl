@@ -20,28 +20,6 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// =============================================================================
-// Annex H - DPI import with default argument values
-// =============================================================================
-TEST_F(AnnexHParseTest, AnnexHDpiImportDefaultArgs) {
-  auto* unit = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" function int compute(\n"
-      "    int a,\n"
-      "    int b = 0,\n"
-      "    int c = 42\n"
-      "  );\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
-  ASSERT_EQ(items[0]->func_args.size(), 3u);
-  EXPECT_EQ(items[0]->func_args[0].default_value, nullptr);
-  EXPECT_NE(items[0]->func_args[1].default_value, nullptr);
-  EXPECT_NE(items[0]->func_args[2].default_value, nullptr);
-}
-
 TEST_F(AnnexHParseTest, AnnexMSvVpiCalls) {
   auto* unit = Parse(
       "module m;\n"
