@@ -157,4 +157,23 @@ TEST(ParserSection23, PortConnectionPositional) {
   ASSERT_EQ(item->inst_ports.size(), 3u);
 }
 
+// =========================================================================
+// LRM section 23.3.1: Module instance ports (positional connections)
+// =========================================================================
+TEST(ParserSection23, PositionalPortConnections) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1 (a, b, c);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  ASSERT_EQ(item->inst_ports.size(), 3);
+  // Positional ports: first element of pair is empty string_view.
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_TRUE(item->inst_ports[i].first.empty());
+    EXPECT_NE(item->inst_ports[i].second, nullptr);
+  }
+}
+
 }  // namespace
