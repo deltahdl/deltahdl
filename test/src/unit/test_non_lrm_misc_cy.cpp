@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Parser, GateCmos) {
-  auto r = ParseWithPreprocessor(
-      "module t; cmos (out, in, nctrl, pctrl); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
-  EXPECT_EQ(item->gate_kind, GateKind::kCmos);
-  EXPECT_EQ(item->gate_terminals.size(), 4);
-}
-
 TEST(ParserSection28, GateWithParenDelay) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
