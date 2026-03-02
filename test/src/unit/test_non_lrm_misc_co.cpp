@@ -27,17 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, CovergroupEndLabel) {
-  auto* unit = Parse(R"(
-    module m;
-      covergroup my_cg @(posedge clk);
-        coverpoint x;
-      endgroup : my_cg
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-}
-
 TEST_F(VerifyParseTest, CovergroupWithOption) {
   auto* unit = Parse(R"(
     module m;

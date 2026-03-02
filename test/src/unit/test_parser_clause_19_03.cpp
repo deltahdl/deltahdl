@@ -313,4 +313,15 @@ TEST_F(VerifyParseTest, BasicCovergroup) {
   // Covergroup should parse without error.
 }
 
+TEST_F(VerifyParseTest, CovergroupEndLabel) {
+  auto* unit = Parse(R"(
+    module m;
+      covergroup my_cg @(posedge clk);
+        coverpoint x;
+      endgroup : my_cg
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+}
+
 }  // namespace
