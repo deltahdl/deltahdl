@@ -39,4 +39,13 @@ TEST(ParserSection18, RandomizeWithNullArg) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
+TEST(ParserA82, RandomizeCallWithNull) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj.randomize(null); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
