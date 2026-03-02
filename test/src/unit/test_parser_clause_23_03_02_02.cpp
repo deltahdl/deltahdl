@@ -100,4 +100,38 @@ TEST(ParserSection4, Sec4_6_NamedPortConnections) {
   EXPECT_EQ(item->inst_ports[2].first, "d");
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 23.10 -- Module instantiation / parameter override
+// =============================================================================
+TEST(ParserSection23, ModuleInstBasic) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(.a(w1), .b(w2));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "sub");
+  EXPECT_EQ(item->inst_name, "u1");
+  ASSERT_EQ(item->inst_ports.size(), 2u);
+}
+
 }  // namespace
