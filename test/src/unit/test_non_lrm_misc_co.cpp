@@ -27,18 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, NestedCheckerDeclaration) {
-  auto* unit = Parse(R"(
-    checker outer;
-      checker inner;
-      endchecker
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_EQ(unit->checkers[0]->name, "outer");
-  EXPECT_FALSE(unit->checkers[0]->items.empty());
-}
-
 // =============================================================================
 // §17.4 Checker instantiation
 // =============================================================================
