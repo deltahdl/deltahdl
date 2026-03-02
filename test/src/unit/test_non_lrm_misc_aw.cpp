@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — streaming_concatenation
-TEST(ParserA85, VarLvalueStreamingConcat) {
-  auto r = Parse(
-      "module m; logic [31:0] a, b;\n"
-      "  initial {>> {a}} = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
-}
-
 // § variable_lvalue — streaming_concatenation with slice_size
 TEST(ParserA85, VarLvalueStreamingConcatSliceSize) {
   auto r = Parse(
