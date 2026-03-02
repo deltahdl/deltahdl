@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 16. Interface with modport declarations
-TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
-  auto r = Parse(
-      "interface bus_if;\n"
-      "  logic [7:0] data;\n"
-      "  logic valid, ready;\n"
-      "  modport master (output data, output valid, input ready);\n"
-      "  modport slave (input data, input valid, output ready);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  auto* ifc = r.cu->interfaces[0];
-  EXPECT_EQ(ifc->name, "bus_if");
-  ASSERT_EQ(ifc->modports.size(), 2u);
-  EXPECT_EQ(ifc->modports[0]->name, "master");
-  EXPECT_EQ(ifc->modports[1]->name, "slave");
-}
-
 TEST(ParserAnnexA, A1InterfaceDecl) {
   auto r = Parse(
       "interface bus_if;\n"
