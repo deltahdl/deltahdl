@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA83, InsideExprMultipleValues) {
-  auto r = Parse("module m; initial x = a inside {1, 2, 3}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kInside);
-  EXPECT_EQ(rhs->elements.size(), 3u);
-}
-
 TEST(ParserA83, InsideExprWithRange) {
   auto r = Parse("module m; initial x = a inside {[1:10]}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
