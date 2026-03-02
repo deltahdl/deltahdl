@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — multi-dimensional array element select
-TEST(ParserA85, VarLvalueMultiDimSelect) {
-  auto r = Parse(
-      "module m; logic [7:0] mem [0:3][0:3];\n"
-      "  initial mem[1][2] = 8'hAB;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-}
-
 // § variable_lvalue — force statement LHS
 TEST(ParserA85, VarLvalueForce) {
   auto r = Parse("module m; logic x; initial force x = 1; endmodule\n");

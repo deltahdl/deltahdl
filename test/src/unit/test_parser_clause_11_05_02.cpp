@@ -172,4 +172,18 @@ TEST(ParserSection11, BitSelectChained) {
   EXPECT_EQ(rhs->base->kind, ExprKind::kSelect);
 }
 
+// § variable_lvalue — multi-dimensional array element select
+TEST(ParserA85, VarLvalueMultiDimSelect) {
+  auto r = Parse(
+      "module m; logic [7:0] mem [0:3][0:3];\n"
+      "  initial mem[1][2] = 8'hAB;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace
