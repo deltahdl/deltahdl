@@ -77,4 +77,16 @@ TEST(ParserSection16, InferredClockInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection16, InferredDisableInProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  default disable iff rst;\n"
+      "  property p_dis(rst_cond = $inferred_disable);\n"
+      "    disable iff (rst_cond) a |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
