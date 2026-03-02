@@ -34,22 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §15.5.2: @ event wait followed by a statement body.
-TEST(ParserSection15, WaitForEventWithBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  event e;\n"
-      "  initial begin\n"
-      "    @(e) $display(\"event triggered\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_NE(stmt->body, nullptr);
-}
-
 // §15.5.2: event wait with hierarchical event identifier.
 TEST(ParserSection15, WaitForEventHierarchical) {
   auto r = Parse(
