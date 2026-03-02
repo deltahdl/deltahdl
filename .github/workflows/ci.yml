@@ -198,33 +198,9 @@ jobs:
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console test/lib/
           test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
-  # ── Lane: lib ──
+  # ── Lane: lib/github ──
   # DO NOT lower coverage thresholds. Uncovered code is untested code —
   # lowering it hides bugs and lets regressions slip through silently.
-  test-lib-run-tests-common:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/ci.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-${{ github.job }}-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/run_tests_common/ -v
-          --cov=lib.run_tests_common
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  # ── Lane: lib/github ──
   test-lib-github:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -269,6 +245,30 @@ jobs:
         run: >-
           python3 -m pytest test/lib/lrm/unit/ -v
           --cov=lib.lrm
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  # ── Lane: lib/run_tests_common ──
+  test-lib-run-tests-common:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/ci.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/run_tests_common/ -v
+          --cov=lib.run_tests_common
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
