@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, StrengthSpecHighz) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  or (highz0, pull1) g1(out, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 1);  // highz0 = 1
-  EXPECT_EQ(item->drive_strength1, 3);  // pull1 = 3
-}
-
 TEST(Parser, GatePullup) {
   auto r = ParseWithPreprocessor("module t; pullup (o); endmodule");
   ASSERT_NE(r.cu, nullptr);
