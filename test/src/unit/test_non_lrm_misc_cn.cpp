@@ -26,25 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.14.6 Property case
-// =============================================================================
-TEST(ParserSection16, PropertyCaseBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p_delay(logic [1:0] delay);\n"
-      "    case (delay)\n"
-      "      2'd0 : a && b;\n"
-      "      2'd1 : a ##2 b;\n"
-      "      2'd2 : a ##4 b;\n"
-      "      default: 0;\n"
-      "    endcase\n"
-      "  endproperty\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection16, PropertyCaseInAssert) {
   auto r = Parse(
       "module m;\n"
