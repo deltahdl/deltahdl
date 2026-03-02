@@ -560,4 +560,18 @@ TEST(SourceText, ProgramFinalConstruct) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
+// non_port_program_item ::= concurrent_assertion_item
+TEST(SourceText, ProgramConcurrentAssertion) {
+  auto r = Parse(
+      "program prg;\n"
+      "  logic clk, a;\n"
+      "  assert property (@(posedge clk) a);\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kAssertProperty));
+}
+
 }  // namespace
