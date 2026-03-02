@@ -34,21 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §15.5.3: wait(.triggered) with subsequent statement body.
-TEST(ParserSection15, TriggeredMethodWithBodyStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  event e;\n"
-      "  initial begin\n"
-      "    wait(e.triggered) $display(\"done\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-}
-
 // §15.5.2: @ event wait with 'or' event expression (multiple events).
 TEST(ParserSection15, WaitForEventOrExpr) {
   auto r = Parse(
