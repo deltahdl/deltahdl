@@ -78,4 +78,14 @@ TEST(SimA82, SystemTfCallUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
+// ============================================================================
+// §20.6.1 — $unsigned, $signed
+// ============================================================================
+TEST(Section20, Unsigned) {
+  SimFixture f;
+  auto* expr = MakeSysCall(f.arena, "$unsigned", {MakeInt(f.arena, 42)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}
+
 }  // namespace
