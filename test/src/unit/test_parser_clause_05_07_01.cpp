@@ -376,4 +376,15 @@ TEST(ParserA87, NumberIntegral) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
+// § integral_number — decimal_number (unsized)
+TEST(ParserA87, IntegralDecimal) {
+  auto r = Parse("module m; int x; initial x = 255; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 255u);
+}
+
 }  // namespace
