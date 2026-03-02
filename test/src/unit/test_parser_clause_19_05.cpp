@@ -118,4 +118,35 @@ TEST(ParserA211, CoverGroup_WildcardIllegalIgnore) {
               "endmodule\n"));
 }
 
+struct ParseResult16c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16c Parse(const std::string& src) {
+  ParseResult16c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using VerifyParseTest = ProgramTestParse;
+
+TEST_F(VerifyParseTest, CovergroupWithIff) {
+  auto* unit = Parse(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        coverpoint x iff (en);
+      endgroup
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+}
+
 }  // namespace
