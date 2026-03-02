@@ -34,4 +34,15 @@ TEST(Parser, GateBufif0) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
+TEST(ParserSection28, GateWithThreeDelays) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  bufif0 #(10, 12, 11) b3(out, in, ctrl);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kBufif0);
+  EXPECT_NE(item->gate_delay, nullptr);
+}
+
 }  // namespace
