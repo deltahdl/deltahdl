@@ -355,4 +355,18 @@ TEST(ParserA82, TfCallAsExprInAssign) {
   EXPECT_EQ(stmt->rhs->args.size(), 2u);
 }
 
+// § primary — function_subroutine_call
+TEST(ParserA84, PrimaryFunctionCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(int a); return a + 1; endfunction\n"
+      "  initial x = foo(5);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+}
+
 }  // namespace

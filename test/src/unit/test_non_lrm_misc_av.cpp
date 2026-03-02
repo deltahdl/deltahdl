@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § primary — function_subroutine_call
-TEST(ParserA84, PrimaryFunctionCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int foo(int a); return a + 1; endfunction\n"
-      "  initial x = foo(5);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCall);
-}
-
 // § primary — parenthesized mintypmax_expression
 TEST(ParserA84, PrimaryParenthesizedExpr) {
   auto r = Parse("module m; initial x = (1 + 2); endmodule\n");
