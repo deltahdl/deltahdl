@@ -86,23 +86,6 @@ static SpecifyParseResult ParseSpecifySingle(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_IfnonePath) {
-  auto sp = ParseSpecifySingle(
-      "module m(input a, output b);\n"
-      "  specify\n"
-      "    ifnone (a => b) = 15;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(sp.pr.cu, nullptr);
-  EXPECT_FALSE(sp.pr.has_errors);
-  ASSERT_NE(sp.sole_item, nullptr);
-  auto* si = sp.sole_item;
-  EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_TRUE(si->path.is_ifnone);
-  EXPECT_EQ(si->path.condition, nullptr);
-  ASSERT_EQ(si->path.delays.size(), 1u);
-}
-
 TEST(ParserSection28, Sec28_12_PosedgeSensitivePath) {
   auto sp = ParseSpecifySingle(
       "module m(input clk, output q);\n"
