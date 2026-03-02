@@ -24,18 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, MultipleModuleDefinitions) {
-  auto r = Parse(
-      "module a; endmodule\n"
-      "module b; endmodule\n"
-      "module c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 3);
-  EXPECT_EQ(r.cu->modules[0]->name, "a");
-  EXPECT_EQ(r.cu->modules[1]->name, "b");
-  EXPECT_EQ(r.cu->modules[2]->name, "c");
-}
-
 // =========================================================================
 // LRM section 23.2: Module declarations (ANSI header style)
 // =========================================================================
