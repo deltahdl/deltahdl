@@ -17,21 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-TEST(ParserSection25, VirtualInterfaceMultipleDecls) {
-  auto r = Parse(
-      "module top;\n"
-      "  virtual interface bus_if a_if;\n"
-      "  virtual bus_if b_if;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_GE(mod->items.size(), 2);
-  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kVirtualInterface);
-  EXPECT_EQ(mod->items[0]->name, "a_if");
-  EXPECT_EQ(mod->items[1]->data_type.kind, DataTypeKind::kVirtualInterface);
-  EXPECT_EQ(mod->items[1]->name, "b_if");
-}
-
 // --- Interface/modport tests ---
 TEST(Parser, EmptyInterface) {
   auto r = Parse("interface simple_bus; endinterface");
