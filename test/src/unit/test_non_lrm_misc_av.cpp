@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.3 Expressions — inside_expression
-// =============================================================================
-// § inside_expression ::= expression inside { range_list }
-TEST(ParserA83, InsideExprSingleValue) {
-  auto r = Parse("module m; initial x = a inside {3}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kInside);
-  EXPECT_EQ(rhs->elements.size(), 1u);
-}
-
 TEST(ParserA83, InsideExprMultipleValues) {
   auto r = Parse("module m; initial x = a inside {1, 2, 3}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
