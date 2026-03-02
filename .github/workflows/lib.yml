@@ -159,17 +159,29 @@ name: Lib
 on:
   pull_request:
     paths:
+      - .github/workflows/implement_clause.yml
+      - .github/workflows/implement_subclause.yml
       - .github/workflows/lib.yml
       - lib/github/**
       - lib/lrm/**
+      - scripts/implement_clause/**
+      - scripts/implement_subclause/**
       - test/lib/github/**
       - test/lib/lrm/**
+      - test/scripts/implement_clause/**
+      - test/scripts/implement_subclause/**
   push:
     branches: [main]
     paths:
+      - .github/workflows/implement_clause.yml
+      - .github/workflows/implement_subclause.yml
       - .github/workflows/lib.yml
       - lib/github/**
       - lib/lrm/**
+      - scripts/implement_clause/**
+      - scripts/implement_subclause/**
       - test/lib/github/**
       - test/lib/lrm/**
+      - test/scripts/implement_clause/**
+      - test/scripts/implement_subclause/**
   workflow_dispatch:

@@ -1,14 +1,14 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: implement-clause-${{ inputs.branch || github.ref }}
+  group: implement-clause-${{ inputs.branch }}
 jobs:
   static-analysis:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha || '' }}
+          ref: ${{ inputs.sha }}
       - name: Restore pip cache
         uses: actions/cache@v4
         with:
@@ -78,7 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha || '' }}
+          ref: ${{ inputs.sha }}
       - name: Restore pip cache
         uses: actions/cache@v4
         with:
@@ -108,28 +108,17 @@ jobs:
           test/scripts/implement_clause/e2e/ -v
 name: Implement Clause
 on:
-  pull_request:
-    paths:
-      - .github/workflows/implement_clause.yml
-      - scripts/implement_clause/**
-      - test/scripts/implement_clause/**
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/implement_clause.yml
-      - scripts/implement_clause/**
-      - test/scripts/implement_clause/**
   workflow_dispatch:
     inputs:
       branch:
         description: Branch that triggered CI
-        required: false
+        required: true
         type: string
       event:
-        description: Event that triggered CI
-        required: false
+        description: Event that triggered CI (push or pull_request)
+        required: true
         type: string
       sha:
         description: Commit SHA to check out
-        required: false
+        required: true
         type: string
