@@ -50,4 +50,16 @@ TEST(ParserSection22, IfdefElsifChain) {
               "`endif\n"));
 }
 
+TEST(ParserSection22, NestedIfdef) {
+  EXPECT_TRUE(
+      ParseOk("`define OUTER\n"
+              "`define INNER\n"
+              "`ifdef OUTER\n"
+              "`ifdef INNER\n"
+              "module t;\n"
+              "endmodule\n"
+              "`endif\n"
+              "`endif\n"));
+}
+
 }  // namespace
