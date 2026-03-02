@@ -334,4 +334,25 @@ TEST(ParserSection12, ReturnWithComplexExpr) {
   EXPECT_EQ(ret->expr->kind, ExprKind::kBinary);
 }
 
+// =============================================================================
+// A.8.2 Subroutine calls — tf_call
+// =============================================================================
+// § tf_call ::= ps_or_hierarchical_tf_identifier { attribute_instance }
+//              [ ( list_of_arguments ) ]
+// tf_call as expression (function return value used in RHS)
+TEST(ParserA82, TfCallAsExprInAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = func(1, 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(stmt->rhs->callee, "func");
+  EXPECT_EQ(stmt->rhs->args.size(), 2u);
+}
+
 }  // namespace
