@@ -17,15 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// description: interface_declaration
-TEST(SourceText, DescriptionInterface) {
-  auto r = Parse("interface ifc; endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
-}
-
 // =============================================================================
 // A.1.2 interface_declaration — all forms
 // =============================================================================

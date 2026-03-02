@@ -205,4 +205,13 @@ TEST(Parser, InterfaceAndModule) {
   EXPECT_EQ(r.cu->modules.size(), 1);
 }
 
+// description: interface_declaration
+TEST(SourceText, DescriptionInterface) {
+  auto r = Parse("interface ifc; endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
+}
+
 }  // namespace
