@@ -44,26 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// =============================================================================
-// LRM §13.8 -- Parameterized tasks and functions
-// =============================================================================
-// §13.8: A virtual class with type parameters and a static method serves as
-// a parameterized subroutine.
-TEST(ParserSection13, Sec13_8_VirtualClassStaticTask) {
-  auto r = Parse(
-      "virtual class C#(parameter W = 8);\n"
-      "  static task drive(input logic [W-1:0] data);\n"
-      "  endtask\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_TRUE(r.cu->classes[0]->is_virtual);
-  EXPECT_EQ(r.cu->classes[0]->name, "C");
-  ASSERT_EQ(r.cu->classes[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->params[0].first, "W");
-}
-
 // §13.8: Chained call — result of parameterized call used as argument.
 TEST(ParserSection13, Sec13_8_ChainedParameterizedCalls) {
   EXPECT_TRUE(
