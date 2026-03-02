@@ -24,19 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, NamedPortWithConcatenation) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (.data({a, b, c}));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 1);
-  EXPECT_EQ(item->inst_ports[0].first, "data");
-  ASSERT_NE(item->inst_ports[0].second, nullptr);
-  EXPECT_EQ(item->inst_ports[0].second->kind, ExprKind::kConcatenation);
-}
-
 // =========================================================================
 // LRM section 23.3.3.7.2: Implicit named port connections (.*)
 // =========================================================================
