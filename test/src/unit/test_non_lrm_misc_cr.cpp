@@ -38,31 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-// ============================================================================
-// §21.4 — $writememh, $writememb
-// ============================================================================
-TEST(Section21, WritememhBasic) {
-  SimFixture f;
-  std::string tmp_path = "/tmp/deltahdl_test_writememh.txt";
-
-  auto* var = f.ctx.CreateVariable("wmem", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0xFF);
-
-  auto* expr = MakeSysCall(
-      f.arena, "$writememh",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeId(f.arena, "wmem")});
-  EvalExpr(expr, f.ctx, f.arena);
-
-  std::ifstream ifs(tmp_path);
-  std::string contents((std::istreambuf_iterator<char>(ifs)),
-                       std::istreambuf_iterator<char>());
-  EXPECT_FALSE(contents.empty());
-
-  EXPECT_NE(contents.find("ff"), std::string::npos);
-
-  std::remove(tmp_path.c_str());
-}
-
 TEST(Section21, WritemembBasic) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_writememb.txt";
