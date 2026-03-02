@@ -71,4 +71,20 @@ TEST(ParserA85, NetLvalueConcatenation) {
   EXPECT_EQ(ca->assign_lhs->elements.size(), 2u);
 }
 
+// § net_lvalue — nested concatenation
+TEST(ParserA85, NetLvalueNestedConcatenation) {
+  auto r = Parse(
+      "module m; wire a, b, c, d;\n"
+      "  assign {{a, b}, {c, d}} = 4'hF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* ca = FirstContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_lhs, nullptr);
+  EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(ca->assign_lhs->elements.size(), 2u);
+  EXPECT_EQ(ca->assign_lhs->elements[0]->kind, ExprKind::kConcatenation);
+}
+
 }  // namespace
