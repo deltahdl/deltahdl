@@ -156,4 +156,33 @@ TEST_F(SpecifyTest, SpecparamInsideSpecify) {
   EXPECT_NE(item->param_value, nullptr);
 }
 
+static ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+  }
+  return nullptr;
+}
+
+static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
+  for (auto* si : spec_block->specify_items) {
+    if (si->kind == kind) return true;
+  }
+  return false;
+}
+
+TEST(ParserSection28, SpecifyBlockWithSpecparam) {
+  auto r = Parse(
+      "module m(input clk, output q);\n"
+      "  specify\n"
+      "    specparam tDelay = 10;\n"
+      "    (clk => q) = tDelay;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kSpecparam));
+  EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kPathDecl));
+}
+
 }  // namespace

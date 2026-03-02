@@ -84,29 +84,7 @@ static SpecifyParseResult ParseSpecifySingle(const std::string& src) {
   return result;
 }
 
-static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
-  for (auto* si : spec_block->specify_items) {
-    if (si->kind == kind) return true;
-  }
-  return false;
-}
-
 namespace {
-
-TEST(ParserSection28, SpecifyBlockWithSpecparam) {
-  auto r = Parse(
-      "module m(input clk, output q);\n"
-      "  specify\n"
-      "    specparam tDelay = 10;\n"
-      "    (clk => q) = tDelay;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kSpecparam));
-  EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kPathDecl));
-}
 
 TEST(ParserSection28, Sec28_12_ConditionalPath) {
   auto sp = ParseSpecifySingle(
