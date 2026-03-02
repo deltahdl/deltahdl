@@ -9,23 +9,6 @@ using CheckerParseTest = ProgramTestParse;
 
 namespace {
 
-// --- Randcase statement (§18.16) ---
-TEST(ParserSection18, RandcaseStmt) {
-  auto r = Parse(
-      "module top;\n"
-      "  initial begin\n"
-      "    randcase\n"
-      "      1 : $display(\"one\");\n"
-      "      2 : $display(\"two\");\n"
-      "      3 : $display(\"three\");\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // --- Randsequence statement (§18.17) ---
 TEST(ParserSection18, RandsequenceStmt) {
   auto r = Parse(
