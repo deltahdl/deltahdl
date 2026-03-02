@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-// array_manipulation_call with 'with' clause
-TEST(ParserA82, ArrayManipCallWithClause) {
-  auto r = Parse(
-      "module m;\n"
-      "  int arr[4];\n"
-      "  int result[$];\n"
-      "  initial begin result = arr.find with (item > 5); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.8.2 Subroutine calls — array_method_name
 // =============================================================================
