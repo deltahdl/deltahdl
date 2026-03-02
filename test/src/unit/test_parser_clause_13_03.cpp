@@ -316,4 +316,17 @@ TEST(ParserA27, TaskBodyNewStyleMultipleDirections) {
                            Direction::kInout, Direction::kRef});
 }
 
+TEST(ParserA27, TaskBodyNewStyleStickyDirection) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(input int a, int b, int c);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  VerifyFuncArgDirections(
+      r.cu->modules[0]->items[0],
+      {Direction::kInput, Direction::kInput, Direction::kInput});
+}
+
 }  // namespace
