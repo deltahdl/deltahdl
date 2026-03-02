@@ -34,4 +34,15 @@ TEST(SourceText, MultipleDescriptions) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
+// =============================================================================
+// A.1 -- Source text productions
+// =============================================================================
+TEST(ParserAnnexA, A1ModuleDecl) {
+  auto r = ParseWithPreprocessor("module m; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_TRUE(r.cu->modules[0]->items.empty());
+}
+
 }  // namespace
