@@ -416,4 +416,16 @@ TEST(Parser, ImportSpecific) {
   EXPECT_FALSE(item->import_item.is_wildcard);
 }
 
+TEST(Parser, ImportWildcard) {
+  auto r = Parse(
+      "module t;\n"
+      "  import my_pkg::*;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(item->import_item.package_name, "my_pkg");
+  EXPECT_TRUE(item->import_item.is_wildcard);
+}
+
 }  // namespace
