@@ -80,4 +80,15 @@ TEST(ParserSection21, MonitorBasicCall) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, MonitorbHexOctal) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    $monitorb(a);\n"
+              "    $monitorh(a);\n"
+              "    $monitoro(a);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
