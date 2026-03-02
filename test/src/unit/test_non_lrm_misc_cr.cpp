@@ -8,16 +8,6 @@ using namespace delta;
 
 namespace {
 
-// ============================================================================
-// LRM section 21.1 -- Display system tasks (general I/O overview)
-// ============================================================================
-TEST(ParserSection21, DisplayBasicCall) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $display(\"hello\");\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, DisplayNoArgs) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

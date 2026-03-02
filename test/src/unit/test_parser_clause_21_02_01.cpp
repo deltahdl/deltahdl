@@ -125,4 +125,14 @@ TEST(ParserSection21, DisplayParsesAsSystemCall) {
   ASSERT_NE(item->body, nullptr);
 }
 
+// ============================================================================
+// LRM section 21.1 -- Display system tasks (general I/O overview)
+// ============================================================================
+TEST(ParserSection21, DisplayBasicCall) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $display(\"hello\");\n"
+              "endmodule\n"));
+}
+
 }  // namespace
