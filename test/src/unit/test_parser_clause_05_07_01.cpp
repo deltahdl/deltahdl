@@ -704,4 +704,14 @@ TEST(ParserA87, HexBaseUpper) {
   EXPECT_EQ(rhs->int_val, 0xABu);
 }
 
+// § hex_base — 'sh (signed)
+TEST(ParserA87, HexBaseSignedLower) {
+  auto r = Parse("module m; logic [7:0] x; initial x = 8'shAB; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->int_val, 0xABu);
+}
+
 }  // namespace
