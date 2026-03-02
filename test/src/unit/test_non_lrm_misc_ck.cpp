@@ -18,23 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// =============================================================================
-// LRM section 13.5.2 -- Const ref arguments
-// =============================================================================
-TEST(ParserSection13, ConstRefArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void bar(const ref int arr);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "bar");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_EQ(fn->func_args.size(), 1u);
-  EXPECT_TRUE(fn->func_args[0].is_const);
-  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
-}
-
 TEST(ParserSection13, RefWithoutConst) {
   auto r = Parse(
       "module m;\n"

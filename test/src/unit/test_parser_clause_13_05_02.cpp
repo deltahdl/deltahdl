@@ -187,4 +187,32 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithConstRefArg) {
   EXPECT_EQ(item->func_args[0].name, "data");
 }
 
+static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl &&
+        item->kind != ModuleItemKind::kTaskDecl) {
+      continue;
+    }
+    if (item->name == name) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 13.5.2 -- Const ref arguments
+// =============================================================================
+TEST(ParserSection13, ConstRefArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void bar(const ref int arr);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "bar");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 1u);
+  EXPECT_TRUE(fn->func_args[0].is_const);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
+}
+
 }  // namespace
