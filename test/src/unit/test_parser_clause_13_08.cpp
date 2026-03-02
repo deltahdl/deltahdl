@@ -90,4 +90,15 @@ TEST(ParserSection13, Sec13_8_ForLoopWithParamBound) {
               "endclass\n"));
 }
 
+// §13.8: Return type uses parameter.
+TEST(ParserSection13, Sec13_8_ReturnTypeUsesParam) {
+  EXPECT_TRUE(
+      ParseOk("virtual class Pack#(parameter W = 8);\n"
+              "  static function logic [2*W-1:0] double(\n"
+              "      input logic [W-1:0] x);\n"
+              "    return {x, x};\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
 }  // namespace
