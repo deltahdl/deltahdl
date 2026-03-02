@@ -26,18 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.14.7 Property negation
-// =============================================================================
-TEST(ParserSection16, PropertyNegation) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) not (a ##1 b));\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection16, PropertyNegationStrong) {
   auto r = Parse(
       "module m;\n"
