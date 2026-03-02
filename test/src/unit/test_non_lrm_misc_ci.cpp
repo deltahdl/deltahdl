@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 12.8 -- Block names and statement labels (additional tests)
-// =============================================================================
-TEST(ParserSection12, StatementLabelOnAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    assign_val: x = 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->label, "assign_val");
-}
-
 TEST(ParserSection12, StatementLabelOnForever) {
   auto r = Parse(
       "module t;\n"
