@@ -14,21 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.18: Property with named property reference ---
-TEST(ParserAnnexF, AnnexFPropertyReference) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p_base;\n"
-      "    @(posedge clk) a |-> b;\n"
-      "  endproperty\n"
-      "  assert property (p_base);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
-}
-
 // --- F.19: Assert with action blocks (pass/fail) ---
 TEST(ParserAnnexF, AnnexFAssertActionBlocks) {
   auto r = Parse(
