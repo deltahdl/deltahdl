@@ -379,4 +379,20 @@ TEST(ParserA82, TfCallInContAssign) {
   EXPECT_EQ(rhs->callee, "compute");
 }
 
+// Continuous assignment with expression
+TEST(ParserA83, ExprInContAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [7:0] y;\n"
+      "  wire [7:0] a, b;\n"
+      "  assign y = a + b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstContAssignRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+}
+
 }  // namespace
