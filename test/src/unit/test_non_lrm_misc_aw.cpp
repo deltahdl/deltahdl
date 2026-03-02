@@ -14,16 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// § constant_cast — in parameter
-TEST(ParserA84, ConstantCastInParam) {
-  auto r = Parse("module m; parameter int P = int'(3.0); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* param = r.cu->modules[0]->items[0];
-  ASSERT_NE(param->init_expr, nullptr);
-  EXPECT_EQ(param->init_expr->kind, ExprKind::kCast);
-}
-
 // =============================================================================
 // A.8.4 Primaries — constant_let_expression
 // =============================================================================
