@@ -34,24 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 15.5.2 -- Waiting for an event
-// =============================================================================
-// §15.5.2: basic @ event wait with named event (from LRM).
-TEST(ParserSection15, WaitForEventBasicAt) {
-  auto r = Parse(
-      "module m;\n"
-      "  event e;\n"
-      "  initial begin\n"
-      "    @e;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-}
-
 // §15.5.2: @ event wait with parenthesized expression.
 TEST(ParserSection15, WaitForEventParenthesized) {
   auto r = Parse(
