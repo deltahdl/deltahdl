@@ -241,4 +241,15 @@ TEST(ParserA611, ClockingDeclUnnamed) {
   EXPECT_TRUE(item->name.empty());
 }
 
+// Default clocking in an interface.
+TEST(ParserSection19, DefaultClocking_InInterface) {
+  EXPECT_TRUE(
+      ParseOk("interface my_if (input clk);\n"
+              "  logic [7:0] data;\n"
+              "  default clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "endinterface\n"));
+}
+
 }  // namespace

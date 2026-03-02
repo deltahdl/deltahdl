@@ -43,17 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Default clocking in an interface.
-TEST(ParserSection19, DefaultClocking_InInterface) {
-  EXPECT_TRUE(
-      ParseOk("interface my_if (input clk);\n"
-              "  logic [7:0] data;\n"
-              "  default clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "  endclocking\n"
-              "endinterface\n"));
-}
-
 // =============================================================================
 // LRM section 19.5.2 -- Clocking block scope
 // =============================================================================
