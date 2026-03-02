@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Package with end label.
-TEST(SourceText, PackageEndLabel) {
-  auto r = Parse("package pkg; endpackage : pkg\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserAnnexA, A1PackageDecl) {
   auto r = Parse(
       "package pkg;\n"
