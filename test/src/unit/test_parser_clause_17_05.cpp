@@ -91,4 +91,18 @@ TEST_F(VerifyParseTest, CheckerWithAlwaysComb) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
+TEST_F(VerifyParseTest, CheckerWithFinalProcedure) {
+  auto* unit = Parse(R"(
+    checker final_check;
+      logic count;
+      final begin
+        $display("count = %0d", count);
+      end
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_EQ(unit->checkers[0]->name, "final_check");
+  EXPECT_FALSE(unit->checkers[0]->items.empty());
+}
+
 }  // namespace
