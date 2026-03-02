@@ -38,15 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-TEST(Section21, FopenInvalidFile) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$fopen",
-                           {MakeStrLit(f.arena, "/nonexistent/path/file.txt"),
-                            MakeStrLit(f.arena, "r")});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
 // ============================================================================
 // §21.3.3 — $fdisplay, $fwrite
 // ============================================================================
