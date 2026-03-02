@@ -481,4 +481,26 @@ TEST(SourceText, ProgramItemPortDecl) {
   EXPECT_EQ(p->ports[1].direction, Direction::kOutput);
 }
 
+// Returns true if any item in the list matches the given kind.
+bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
+  for (auto* item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+// non_port_program_item ::= continuous_assign
+TEST(SourceText, ProgramContinuousAssign) {
+  auto r = Parse(
+      "program prg;\n"
+      "  logic a, b;\n"
+      "  assign a = b;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kContAssign));
+}
+
 }  // namespace

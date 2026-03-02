@@ -27,20 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// non_port_program_item ::= continuous_assign
-TEST(SourceText, ProgramContinuousAssign) {
-  auto r = Parse(
-      "program prg;\n"
-      "  logic a, b;\n"
-      "  assign a = b;\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(
-      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kContAssign));
-}
-
 // non_port_program_item ::= module_or_generate_item_declaration
 TEST(SourceText, ProgramModuleOrGenerateItemDecl) {
   auto r = Parse(
