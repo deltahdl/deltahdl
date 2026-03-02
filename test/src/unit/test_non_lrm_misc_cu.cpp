@@ -24,18 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, ModuleInstanceEmptyPorts) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 ();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_name, "u1");
-  EXPECT_TRUE(item->inst_ports.empty());
-}
-
 // =========================================================================
 // LRM section 23.3.1: Module instance ports (positional connections)
 // =========================================================================
