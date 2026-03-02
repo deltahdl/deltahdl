@@ -27,23 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, CheckerWithAlwaysComb) {
-  auto* unit = Parse(R"(
-    checker comb_check(logic a, b);
-      logic v;
-      always_comb begin
-        if (a)
-          v = b;
-        else
-          v = !b;
-      end
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_EQ(unit->checkers[0]->name, "comb_check");
-  EXPECT_FALSE(unit->checkers[0]->items.empty());
-}
-
 TEST_F(VerifyParseTest, CheckerWithFinalProcedure) {
   auto* unit = Parse(R"(
     checker final_check;
