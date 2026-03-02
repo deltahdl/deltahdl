@@ -101,4 +101,17 @@ TEST(ParserSection28, SpecifyBlockFullPath) {
   EXPECT_TRUE(HasFullPathDecl(spec));
 }
 
+TEST_F(SpecifyTest, FullPathDelay) {
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (a *> b) = 10;\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kFull);
+}
+
 }  // namespace
