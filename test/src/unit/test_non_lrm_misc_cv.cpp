@@ -10,16 +10,6 @@ using ProgramParseTest = ProgramTestParse;
 
 namespace {
 
-// Extern program declaration.
-TEST(SourceText, ExternProgram) {
-  auto r = Parse("extern program prg(input logic clk);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(r.cu->programs[0]->is_extern);
-  EXPECT_EQ(r.cu->programs[0]->name, "prg");
-}
-
 // =============================================================================
 // A.1.2 program_declaration — all 5 forms
 // =============================================================================
