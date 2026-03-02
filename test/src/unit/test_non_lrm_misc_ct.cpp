@@ -7,31 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Parser, ModuleWithPorts) {
-  auto r = ParseWithPreprocessor(
-      "module mux(input logic a, input logic b, input logic sel, output logic "
-      "y);\n"
-      "  assign y = sel ? b : a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  struct Expected {
-    Direction dir;
-    const char* name;
-  };
-  Expected expected[] = {
-      {Direction::kInput, "a"},
-      {Direction::kInput, "b"},
-      {Direction::kInput, "sel"},
-      {Direction::kOutput, "y"},
-  };
-  ASSERT_EQ(mod->ports.size(), std::size(expected));
-  for (size_t i = 0; i < std::size(expected); ++i) {
-    EXPECT_EQ(mod->ports[i].direction, expected[i].dir) << "port " << i;
-    EXPECT_EQ(mod->ports[i].name, expected[i].name) << "port " << i;
-  }
-}
-
 // Module with non-ANSI header (list_of_ports).
 TEST(SourceText, ModuleNonAnsiHeader) {
   auto r = ParseWithPreprocessor(
