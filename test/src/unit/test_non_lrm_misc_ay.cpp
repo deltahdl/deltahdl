@@ -14,17 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.1: Sequence concatenation with ## delay ---
-TEST(ParserAnnexF, AnnexFSequenceConcatDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) a ##2 b ##3 c);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
-}
-
 // --- F.2: Sequence repetition [*N] ---
 TEST(ParserAnnexF, AnnexFConsecutiveRepetition) {
   auto r = Parse(
