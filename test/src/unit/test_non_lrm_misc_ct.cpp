@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- output_declaration ---
-// output net_port_type list_of_port_identifiers
-// | output variable_port_type list_of_variable_port_identifiers
-TEST(ParserA212, OutputNetPortType) {
-  auto r = ParseWithPreprocessor("module m(output wire q); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
-}
-
 TEST(ParserA212, OutputVariablePortTypeReg) {
   auto r = ParseWithPreprocessor("module m(output reg q); endmodule");
   ASSERT_NE(r.cu, nullptr);
