@@ -42,4 +42,22 @@ TEST(ParserSection18b, DistInsideIfConstraint) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
+using CheckerParseTest = ProgramTestParse;
+
+// constraint_set ::= constraint_expression | { { constraint_expression } }
+TEST(SourceText, ConstraintSet) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int a;\n"
+      "  rand int b;\n"
+      "  constraint cs {\n"
+      "    if (a > 0) b > 0;\n"
+      "    if (a > 10) { b > 10; b < 100; }\n"
+      "  }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->members[2]->name, "cs");
+}
+
 }  // namespace
