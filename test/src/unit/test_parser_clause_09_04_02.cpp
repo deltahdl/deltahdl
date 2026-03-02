@@ -531,4 +531,20 @@ TEST(ParserSection15, WaitForEventParenthesized) {
   ASSERT_EQ(stmt->events.size(), 1u);
 }
 
+// §15.5.2: event wait with posedge-qualified event expression.
+TEST(ParserSection15, WaitForEventPosedge) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge done);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+}
+
 }  // namespace
