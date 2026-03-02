@@ -140,4 +140,32 @@ TEST(ParserSection13, DefaultArgWithExpression) {
   EXPECT_EQ(fn->func_args[0].default_value->kind, ExprKind::kBinary);
 }
 
+static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl &&
+        item->kind != ModuleItemKind::kTaskDecl) {
+      continue;
+    }
+    if (item->name == name) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 13.5.3 -- Default argument values
+// =============================================================================
+TEST(ParserSection13, DefaultArgValues) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a = 0, int b = 1);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "foo");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 2u);
+  EXPECT_NE(fn->func_args[0].default_value, nullptr);
+  EXPECT_NE(fn->func_args[1].default_value, nullptr);
+}
+
 }  // namespace
