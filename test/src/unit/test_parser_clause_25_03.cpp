@@ -218,4 +218,13 @@ TEST(SourceText, InterfaceParamsAndPorts) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
 }
 
+TEST(Parser, InterfaceWithPorts) {
+  auto r = Parse(
+      "interface bus(input logic clk, input logic rst);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces.size(), 1);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2);
+}
+
 }  // namespace

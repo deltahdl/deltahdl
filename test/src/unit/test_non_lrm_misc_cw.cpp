@@ -17,15 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-TEST(Parser, InterfaceWithPorts) {
-  auto r = Parse(
-      "interface bus(input logic clk, input logic rst);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->interfaces.size(), 1);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2);
-}
-
 // interface_item ::= port_declaration ;
 // Verify that port declarations are accepted in interface ANSI port list.
 TEST(SourceText, InterfaceItemPortDecl) {
