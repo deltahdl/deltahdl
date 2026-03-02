@@ -148,4 +148,17 @@ TEST(ParserSection23, PortConnectionNamed) {
   EXPECT_EQ(item->inst_ports[2].first, "data");
 }
 
+TEST(ParserSection23, PortConnectionEmptyNamed) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(.clk(sys_clk), .unused());\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  ASSERT_EQ(item->inst_ports.size(), 2u);
+  EXPECT_EQ(item->inst_ports[1].first, "unused");
+  EXPECT_EQ(item->inst_ports[1].second, nullptr);
+}
+
 }  // namespace
