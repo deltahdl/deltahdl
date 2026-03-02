@@ -17,20 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-TEST(ParserSection25, MultipleModportItems) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic a;\n"
-      "  logic b;\n"
-      "  modport m1(input a), m2(output b);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* iface = r.cu->interfaces[0];
-  ASSERT_EQ(iface->modports.size(), 2);
-  VerifyModportItem(iface->modports[0], "m1", Direction::kInput, "a");
-  VerifyModportItem(iface->modports[1], "m2", Direction::kOutput, "b");
-}
-
 TEST(ParserSection25, MultipleModportThreeItems) {
   auto r = Parse(
       "interface bus;\n"
