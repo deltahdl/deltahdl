@@ -23,4 +23,15 @@ TEST(ParserA82, SystemTfCallBitsExprArg) {
   EXPECT_EQ(stmt->rhs->callee, "$bits");
 }
 
+// § constant_primary — type_reference
+TEST(ParserA84, ConstantPrimaryTypeReference) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  parameter int W = $bits(x);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

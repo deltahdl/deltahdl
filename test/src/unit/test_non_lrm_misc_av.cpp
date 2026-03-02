@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_primary — type_reference
-TEST(ParserA84, ConstantPrimaryTypeReference) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  parameter int W = $bits(x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § constant_primary — null
 TEST(ParserA84, ConstantPrimaryNull) {
   auto r = Parse("module m; initial x = null; endmodule\n");
