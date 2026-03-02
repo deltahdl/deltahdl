@@ -648,4 +648,16 @@ TEST(ParserSection19, DefaultSkew_InputOnly) {
               "endmodule\n"));
 }
 
+// Default output skew only (no input skew specified).
+TEST(ParserSection19, DefaultSkew_OutputOnly) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    default output #3;\n"
+              "    input a;\n"
+              "    output b;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace
