@@ -903,4 +903,18 @@ TEST(ParserA83, PartSelectIndexedMinus) {
   EXPECT_TRUE(rhs->is_part_select_minus);
 }
 
+// =============================================================================
+// A.8.4 Primaries — nonrange_select
+// =============================================================================
+// § nonrange_select — simple bit_select
+TEST(ParserA84, NonrangeSelectBitSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  initial data[3] = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
