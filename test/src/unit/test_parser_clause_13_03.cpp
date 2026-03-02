@@ -130,4 +130,25 @@ TEST(Parser, TaskDecl) {
   ASSERT_EQ(mod->items[0]->func_args.size(), 1);
 }
 
+// ---------------------------------------------------------------------------
+// tf_item_declaration: block_item_declaration and tf_port_declaration mixed
+// ---------------------------------------------------------------------------
+TEST(ParserA27, TfItemDeclMixed) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task;\n"
+      "    input int a;\n"
+      "    output int b;\n"
+      "    int temp;\n"
+      "    temp = a + 1;\n"
+      "    b = temp;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_GE(item->func_body_stmts.size(), 1u);
+}
+
 }  // namespace
