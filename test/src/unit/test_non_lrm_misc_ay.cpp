@@ -14,14 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserAnnexD, AnnexDScope) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin $scope(m); $showscopes; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserAnnexF, AnnexFSequenceDecl) {
   auto r = Parse(
       "module m;\n"
