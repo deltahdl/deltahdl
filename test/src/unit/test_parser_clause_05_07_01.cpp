@@ -421,4 +421,15 @@ TEST(ParserA87, IntegralHex) {
   EXPECT_EQ(rhs->int_val, 0xFFu);
 }
 
+// § decimal_number — unsigned_number
+TEST(ParserA87, DecimalUnsigned) {
+  auto r = Parse("module m; int x; initial x = 0; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 0u);
+}
+
 }  // namespace
