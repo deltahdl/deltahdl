@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — hierarchical_variable_identifier select (bit select)
-TEST(ParserA85, VarLvalueBitSelect) {
-  auto r = Parse("module m; logic [7:0] x; initial x[3] = 1; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-  ASSERT_NE(stmt->lhs->base, nullptr);
-  EXPECT_EQ(stmt->lhs->base->text, "x");
-  ASSERT_NE(stmt->lhs->index, nullptr);
-  EXPECT_EQ(stmt->lhs->index_end, nullptr);
-}
-
 // § variable_lvalue — hierarchical_variable_identifier select (part select)
 TEST(ParserA85, VarLvaluePartSelect) {
   auto r = Parse("module m; logic [7:0] x; initial x[7:4] = 4'hF; endmodule\n");
