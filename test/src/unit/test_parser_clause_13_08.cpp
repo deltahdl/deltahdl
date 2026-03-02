@@ -101,4 +101,19 @@ TEST(ParserSection13, Sec13_8_ReturnTypeUsesParam) {
               "endclass\n"));
 }
 
+// §13.8: Parameterized class with multiple methods calling each other.
+TEST(ParserSection13, Sec13_8_MethodsCallEachOther) {
+  EXPECT_TRUE(
+      ParseOk("virtual class Math#(parameter W = 32);\n"
+              "  static function logic [W-1:0] abs_val(\n"
+              "      input logic signed [W-1:0] x);\n"
+              "    return negate(x);\n"
+              "  endfunction\n"
+              "  static function logic [W-1:0] negate(\n"
+              "      input logic signed [W-1:0] x);\n"
+              "    return -x;\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
 }  // namespace
