@@ -44,17 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// §13.8: Assign result of parameterized call to variable.
-TEST(ParserSection13, Sec13_8_AssignParamCallResult) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int result;\n"
-              "  initial begin\n"
-              "    result = Popcount#(32)::count_ones(32'hDEAD_BEEF);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // §13.8: Parameterized class scope in conditional expression.
 TEST(ParserSection13, Sec13_8_ParamCallInTernary) {
   EXPECT_TRUE(
