@@ -44,15 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// §13.8: Specialized call with explicit parameter (no default).
-TEST(ParserSection13, Sec13_8_ExplicitParamSpecialization) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic [31:0] d, r;\n"
-              "  assign r = Shifter#(4)::left(d);\n"
-              "endmodule\n"));
-}
-
 // §13.8: Parameterized class with parameter used in local variable.
 TEST(ParserSection13, Sec13_8_ParamInLocalVar) {
   EXPECT_TRUE(

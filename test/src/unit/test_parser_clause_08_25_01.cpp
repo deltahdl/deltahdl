@@ -92,4 +92,13 @@ TEST(ParserSection13, Sec13_8_ChainedParameterizedCalls) {
               "endmodule\n"));
 }
 
+// §13.8: Specialized call with explicit parameter (no default).
+TEST(ParserSection13, Sec13_8_ExplicitParamSpecialization) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [31:0] d, r;\n"
+              "  assign r = Shifter#(4)::left(d);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
