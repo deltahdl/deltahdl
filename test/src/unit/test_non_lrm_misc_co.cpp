@@ -27,17 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, CheckerCoexistsWithModule) {
-  auto* unit = Parse(R"(
-    module m;
-    endmodule
-    checker c;
-    endchecker
-  )");
-  EXPECT_EQ(unit->modules.size(), 1u);
-  EXPECT_EQ(unit->checkers.size(), 1u);
-}
-
 // =============================================================================
 // §18 Constrained random — randcase
 // =============================================================================

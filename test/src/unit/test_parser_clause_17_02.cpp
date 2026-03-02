@@ -436,4 +436,15 @@ TEST_F(VerifyParseTest, MultipleCheckers) {
   EXPECT_EQ(unit->checkers.size(), 2u);
 }
 
+TEST_F(VerifyParseTest, CheckerCoexistsWithModule) {
+  auto* unit = Parse(R"(
+    module m;
+    endmodule
+    checker c;
+    endchecker
+  )");
+  EXPECT_EQ(unit->modules.size(), 1u);
+  EXPECT_EQ(unit->checkers.size(), 1u);
+}
+
 }  // namespace
