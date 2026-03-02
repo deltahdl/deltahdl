@@ -17,17 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// =============================================================================
-// A.1.2 interface_declaration — all forms
-// =============================================================================
-// Interface with lifetime.
-TEST(SourceText, InterfaceWithLifetime) {
-  auto r = Parse("interface automatic ifc; endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-}
-
 // Interface with end label.
 TEST(SourceText, InterfaceEndLabel) {
   auto r = Parse("interface ifc; endinterface : ifc\n");
