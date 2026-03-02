@@ -953,4 +953,27 @@ TEST(ParserSection14, MultipleClockingBlocks) {
   EXPECT_EQ(cb2->name, "cd2");
 }
 
+// =============================================================================
+// LRM section 14.1 -- Clocking block overview
+// =============================================================================
+// §14.1 introduces clocking blocks as grouping clock-synchronous signals.
+// A minimal clocking block with a single input validates the core construct.
+TEST(ParserSection14, OverviewMinimalClockingBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking bus @(posedge clk);\n"
+      "    input addr;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
+  EXPECT_EQ(item->name, "bus");
+  ASSERT_EQ(item->clocking_event.size(), 1u);
+  EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
+  EXPECT_EQ(item->clocking_signals[0].name, "addr");
+}
+
 }  // namespace
