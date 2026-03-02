@@ -185,4 +185,17 @@ TEST(ParserA29, ImportFunctionVoidReturn) {
               "endinterface\n"));
 }
 
+// Verify import/export flags are mutually exclusive in AST
+TEST(ParserA29, ImportFlag_NotExport) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(import Read);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_TRUE(mp->ports[0].is_import);
+  EXPECT_FALSE(mp->ports[0].is_export);
+}
+
 }  // namespace
