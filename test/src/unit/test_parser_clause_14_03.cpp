@@ -849,4 +849,23 @@ TEST(ParserSection14, SignalDirections) {
                                        });
 }
 
+// =============================================================================
+// §14.3 — Output skew with edge
+// =============================================================================
+TEST(ParserSection14, OutputSkewEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output negedge ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  auto& sig = item->clocking_signals[0];
+  EXPECT_EQ(sig.direction, Direction::kOutput);
+  EXPECT_EQ(sig.name, "ack");
+  EXPECT_EQ(sig.skew_edge, Edge::kNegedge);
+}
+
 }  // namespace
