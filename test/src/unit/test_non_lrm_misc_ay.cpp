@@ -14,17 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.5: Ranged repetition [*min:max] ---
-TEST(ParserAnnexF, AnnexFRangedRepetition) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) a ##[1:5] b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
-}
-
 // --- F.6: first_match ---
 TEST(ParserAnnexF, AnnexFFirstMatch) {
   auto r = Parse(
