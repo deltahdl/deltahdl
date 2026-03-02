@@ -90,4 +90,15 @@ TEST(ParserSection16, PropertyIfElse) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+TEST(ParserSection16, PropertyIfWithoutElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (\n"
+      "    @(posedge clk)\n"
+      "    if (en) a |-> ##[1:3] b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
