@@ -25,24 +25,6 @@ static ParseResult23b Parse(const std::string& src) {
 namespace {
 
 // =============================================================================
-// LRM section 23.10.2 -- Generated instantiation
-// =============================================================================
-TEST(ParserSection23, GenerateForInstantiation) {
-  auto r = Parse(
-      "module top;\n"
-      "  for (genvar i = 0; i < 4; i++) begin : gen_blk\n"
-      "    sub u(.a(w[i]));\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1u);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(mod->items[0]->gen_body.size(), 1u);
-  EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kModuleInst);
-}
-
-// =============================================================================
 // LRM section 23.10.2.2 -- Conditional generate
 // =============================================================================
 TEST(ParserSection23, ConditionalGenerateIfElse) {

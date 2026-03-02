@@ -687,4 +687,40 @@ TEST(SourceText, ProgramGenerateLoop) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateFor));
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 23.10.2 -- Generated instantiation
+// =============================================================================
+TEST(ParserSection23, GenerateForInstantiation) {
+  auto r = Parse(
+      "module top;\n"
+      "  for (genvar i = 0; i < 4; i++) begin : gen_blk\n"
+      "    sub u(.a(w[i]));\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kGenerateFor);
+  ASSERT_EQ(mod->items[0]->gen_body.size(), 1u);
+  EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kModuleInst);
+}
+
 }  // namespace
