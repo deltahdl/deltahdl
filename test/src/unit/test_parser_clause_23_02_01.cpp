@@ -65,4 +65,15 @@ TEST(ParserSection23, ModuleHeaderImport) {
   EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
+TEST(ParserSection23, ModuleHeaderImportDetails) {
+  auto r = Parse(
+      "module m import pkg::*; ();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->import_item.package_name, "pkg");
+  EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
+}
+
 }  // namespace
