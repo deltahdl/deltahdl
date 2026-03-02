@@ -50,4 +50,13 @@ TEST(SourceText, NonAnsiSharedType) {
   EXPECT_EQ(ports[1].direction, Direction::kInput);
 }
 
+TEST(ParserA212, InoutNonAnsi) {
+  auto r = ParseWithPreprocessor("module m(a); inout wire [7:0] a; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kInout);
+}
+
 }  // namespace

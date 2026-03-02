@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, InoutNonAnsi) {
-  auto r = ParseWithPreprocessor("module m(a); inout wire [7:0] a; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kInout);
-}
-
 TEST(ParserA212, InputNonAnsiMultiple) {
   // Non-ANSI: input net_port_type list_of_port_identifiers (comma list)
   auto r =
