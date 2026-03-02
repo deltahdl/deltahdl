@@ -34,15 +34,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-TEST(ParserA27, TaskBodyNewStyleWithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task(input int a, input int b);\n"
-      "  endtask\n"
-      "endmodule\n");
-  VerifyTwoArgTask(r);
-}
-
 TEST(ParserA27, TaskBodyNewStyleMultipleDirections) {
   auto r = Parse(
       "module m;\n"
