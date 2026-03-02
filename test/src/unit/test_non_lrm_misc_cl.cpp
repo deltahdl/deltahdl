@@ -44,18 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// §13.8: Parameter of type int explicitly typed.
-TEST(ParserSection13, Sec13_8_ExplicitlyTypedParam) {
-  auto r = Parse(
-      "virtual class Buffer#(parameter int SIZE = 256);\n"
-      "  static function int capacity();\n"
-      "    return SIZE;\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // §14.3 — Basic clocking block declaration
 // =============================================================================

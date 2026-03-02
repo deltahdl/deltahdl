@@ -54,4 +54,33 @@ TEST(ParserSection13, Sec13_8_StringTypeParam) {
               "endclass\n"));
 }
 
+// --- Test helpers ---
+struct ParseResult14 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult14 Parse(const std::string& src) {
+  ParseResult14 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// §13.8: Parameter of type int explicitly typed.
+TEST(ParserSection13, Sec13_8_ExplicitlyTypedParam) {
+  auto r = Parse(
+      "virtual class Buffer#(parameter int SIZE = 256);\n"
+      "  static function int capacity();\n"
+      "    return SIZE;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
