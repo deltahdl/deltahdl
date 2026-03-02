@@ -45,40 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// §14.3 — Default clocking
-// =============================================================================
-TEST(ParserSection14, DefaultClocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "    output ack;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_TRUE(item->is_default_clocking);
-  EXPECT_FALSE(item->is_global_clocking);
-  EXPECT_EQ(item->name, "cb");
-
-  struct Expected {
-    Direction dir;
-    std::string name;
-  };
-  Expected expected[] = {
-      {Direction::kInput, "data"},
-      {Direction::kOutput, "ack"},
-  };
-  ASSERT_EQ(item->clocking_signals.size(), std::size(expected));
-  for (size_t i = 0; i < std::size(expected); ++i) {
-    EXPECT_EQ(item->clocking_signals[i].direction, expected[i].dir)
-        << "signal " << i;
-    EXPECT_EQ(item->clocking_signals[i].name, expected[i].name)
-        << "signal " << i;
-  }
-}
-
-// =============================================================================
 // §14.14 — Global clocking
 // =============================================================================
 TEST(ParserSection14, GlobalClocking) {
