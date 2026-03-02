@@ -367,4 +367,15 @@ TEST(ParserClause03, Cl3_13_PackageScopeResolution) {
               "endmodule\n"));
 }
 
+TEST(ParserA213, PackageImportItemStar) {
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; import pkg::*; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->import_item.package_name, "pkg");
+  EXPECT_TRUE(item->import_item.is_wildcard);
+}
+
 }  // namespace

@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA213, PackageImportItemStar) {
-  auto r = Parse(
-      "package pkg; endpackage\n"
-      "module m; import pkg::*; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->import_item.package_name, "pkg");
-  EXPECT_TRUE(item->import_item.is_wildcard);
-}
-
 // data_declaration alternative: package_import_declaration
 TEST(ParserA28, ImportInBlock) {
   EXPECT_TRUE(
