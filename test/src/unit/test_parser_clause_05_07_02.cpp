@@ -141,4 +141,14 @@ TEST(ParserA87, SignPlus) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
+// § sign — - (in real exponent)
+TEST(ParserA87, SignMinus) {
+  auto r = Parse("module m; real x; initial x = 1.0e-2; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
 }  // namespace
