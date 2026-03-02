@@ -225,4 +225,11 @@ TEST(ParserSection38, VpiSystemCallRelease) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// § variable_lvalue — force statement LHS
+TEST(ParserA85, VarLvalueForce) {
+  auto r = Parse("module m; logic x; initial force x = 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

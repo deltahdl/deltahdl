@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — force statement LHS
-TEST(ParserA85, VarLvalueForce) {
-  auto r = Parse("module m; logic x; initial force x = 1; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § variable_lvalue — release statement LHS
 TEST(ParserA85, VarLvalueRelease) {
   auto r = Parse(
