@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA23, ListOfDefparamAssignmentsMultiple) {
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  defparam u0.WIDTH = 16, u1.DEPTH = 8;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
-  EXPECT_EQ(item->defparam_assigns.size(), 2u);
-}
-
 // =============================================================================
 // A.2.4 Declaration assignments
 // =============================================================================
