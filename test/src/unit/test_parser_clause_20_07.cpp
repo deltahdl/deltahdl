@@ -144,4 +144,17 @@ TEST(ParserSection20, ArrayHighLowFunctions) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection20, ArrayDimensionsFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0][7:0] data;\n"
+      "  initial begin\n"
+      "    int d;\n"
+      "    d = $dimensions(data);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
