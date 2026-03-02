@@ -18,19 +18,6 @@ bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// program_generate_item ::= elaboration_severity_system_task
-TEST(SourceText, ProgramElabSeverityTask) {
-  auto r = Parse(
-      "program prg;\n"
-      "  $info(\"program loaded\");\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(
-      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kElabSystemTask));
-}
-
 // Combined: program with multiple A.1.7 item types.
 TEST(SourceText, ProgramMultipleItemTypes) {
   auto r = Parse(

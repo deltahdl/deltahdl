@@ -57,4 +57,27 @@ TEST(SourceText, ElabSeverityAllForms) {
   }
 }
 
+using ProgramParseTest = ProgramTestParse;
+
+// Returns true if any item in the list matches the given kind.
+bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
+  for (auto* item : items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+// program_generate_item ::= elaboration_severity_system_task
+TEST(SourceText, ProgramElabSeverityTask) {
+  auto r = Parse(
+      "program prg;\n"
+      "  $info(\"program loaded\");\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kElabSystemTask));
+}
+
 }  // namespace
