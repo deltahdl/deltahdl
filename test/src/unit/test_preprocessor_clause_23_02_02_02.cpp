@@ -192,4 +192,15 @@ TEST(ParserA23, ListOfPortIdentifiersWithUnpackedDim) {
   EXPECT_FALSE(r.cu->modules[0]->ports[0].unpacked_dims.empty());
 }
 
+TEST(ParserA23, ListOfVariableIdentifiersMultipleAnsi) {
+  auto r = ParseWithPreprocessor(
+      "module m(input logic a, input logic b, input logic c); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 3u);
+  for (auto& port : r.cu->modules[0]->ports) {
+    EXPECT_EQ(port.direction, Direction::kInput);
+  }
+}
+
 }  // namespace

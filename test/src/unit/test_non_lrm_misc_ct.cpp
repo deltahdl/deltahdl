@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA23, ListOfVariableIdentifiersMultipleAnsi) {
-  auto r = ParseWithPreprocessor(
-      "module m(input logic a, input logic b, input logic c); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 3u);
-  for (auto& port : r.cu->modules[0]->ports) {
-    EXPECT_EQ(port.direction, Direction::kInput);
-  }
-}
-
 TEST(ParserA23, ListOfVariableIdentifiersWithDim) {
   auto r = ParseWithPreprocessor("module m(input logic d [3:0]); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
