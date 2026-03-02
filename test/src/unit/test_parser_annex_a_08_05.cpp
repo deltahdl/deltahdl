@@ -57,4 +57,18 @@ TEST(ParserA85, NetLvalueConstPartSelect) {
   ASSERT_NE(ca->assign_lhs->index_end, nullptr);
 }
 
+// § net_lvalue — { net_lvalue { , net_lvalue } } (concatenation)
+TEST(ParserA85, NetLvalueConcatenation) {
+  auto r = Parse(
+      "module m; wire [7:0] a; wire [3:0] b, c; assign {b, c} = a; "
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* ca = FirstContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_lhs, nullptr);
+  EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(ca->assign_lhs->elements.size(), 2u);
+}
+
 }  // namespace
