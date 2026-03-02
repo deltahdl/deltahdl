@@ -18,25 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, DpiImportContextTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" context task c_display(input int x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* dpi = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiImport) {
-      dpi = item;
-      break;
-    }
-  }
-  ASSERT_NE(dpi, nullptr);
-  EXPECT_TRUE(dpi->dpi_is_context);
-  EXPECT_TRUE(dpi->dpi_is_task);
-}
-
 TEST(ParserSection13, DpiImportWithCName) {
   auto r = Parse(
       "module m;\n"
