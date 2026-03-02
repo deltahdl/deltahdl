@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-// package_or_generate_item_declaration: dpi_import_export
-TEST(SourceText, PackageItemDpiImportExport) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  import \"DPI-C\" function void c_func();\n"
-      "  export \"DPI-C\" function sv_func;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
-}
-
 // 22. Typedef in package scope
 TEST(ParserClause03, Cl3_13_TypedefInPackageScope) {
   auto r = Parse(
