@@ -191,4 +191,23 @@ TEST(ParserSection27, MultipleGenerateConstructs) {
   EXPECT_EQ(mod->items[2]->kind, ModuleItemKind::kGenerateCase);
 }
 
+// --- generate...endgenerate wrapper (§27.3) ---
+TEST(ParserSection27, GenerateRegion) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    for (genvar i = 0; i < 4; i++) begin\n"
+      "      assign out[i] = in[i];\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found_gen_for = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) found_gen_for = true;
+  }
+  EXPECT_TRUE(found_gen_for);
+}
+
 }  // namespace
