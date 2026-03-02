@@ -42,4 +42,26 @@ TEST(ParserSection11, ConstExprSystemFuncInParam) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// A.8.2 Subroutine calls — system_tf_call
+// =============================================================================
+// § system_tf_call ::= system_tf_identifier [ ( list_of_arguments ) ]
+//   | system_tf_identifier ( data_type [ , expression ] )
+//   | system_tf_identifier ( expression { , [ expression ] } ... )
+// system_tf_call as expression ($clog2 returns a value)
+TEST(ParserA82, SystemTfCallAsExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = $clog2(256);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(stmt->rhs->callee, "$clog2");
+  EXPECT_EQ(stmt->rhs->args.size(), 1u);
+}
+
 }  // namespace
