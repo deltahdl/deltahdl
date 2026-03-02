@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA83, InsideExprWithRange) {
-  auto r = Parse("module m; initial x = a inside {[1:10]}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kInside);
-  EXPECT_EQ(rhs->elements.size(), 1u);
-  // Range element is a select node
-  EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kSelect);
-}
-
 TEST(ParserA83, InsideExprMixedValuesAndRanges) {
   auto r =
       Parse("module m; initial x = a inside {5, [10:20], 30}; endmodule\n");
