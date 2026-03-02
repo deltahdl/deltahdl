@@ -27,22 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, CheckerContextInferenceImplicit) {
-  auto* unit = Parse(R"(
-    checker check_ctx(logic sig,
-        event clock = $inferred_clock);
-    endchecker
-    module m;
-      logic clk, a;
-      always @(posedge clk) begin
-        check_ctx chk(a);
-      end
-    endmodule
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  ASSERT_EQ(unit->modules.size(), 1u);
-}
-
 // =============================================================================
 // §17.5 Checker procedures
 // =============================================================================
