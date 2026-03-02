@@ -61,4 +61,27 @@ TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
+// §3.4:
+TEST(ParserClause03, Cl3_4_RejectsDisallowedItems) {
+  EXPECT_TRUE(
+      ParseWithPreprocessor("program p; always @(*) begin end endprogram\n")
+          .has_errors);
+  EXPECT_TRUE(
+      ParseWithPreprocessor("program p; always_comb begin end endprogram\n")
+          .has_errors);
+  EXPECT_TRUE(ParseWithPreprocessor(
+                  "program p; always_ff @(posedge clk) begin end endprogram\n")
+                  .has_errors);
+  EXPECT_TRUE(
+      ParseWithPreprocessor("program p; always_latch begin end endprogram\n")
+          .has_errors);
+  EXPECT_TRUE(ParseWithPreprocessor("module c; endmodule\n"
+                                    "program p; c i(); endprogram\n")
+                  .has_errors);
+  // Interface and program instances hit the same instantiation path.
+  EXPECT_TRUE(ParseWithPreprocessor("interface ifc; endinterface\n"
+                                    "program p; ifc i(); endprogram\n")
+                  .has_errors);
+}
+
 }  // namespace
