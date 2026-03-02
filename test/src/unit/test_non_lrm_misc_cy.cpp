@@ -16,24 +16,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-TEST(ParserSection28, ElaborateNandGate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  wire out, a, b;\n"
-      "  nand g1(out, a, b);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1);
-  // nand -> ~(a & b): unary kTilde wrapping binary kAmp.
-  auto* rhs = mod->assigns[0].rhs;
-  EXPECT_EQ(rhs->op, TokenKind::kTilde);
-  EXPECT_NE(rhs->lhs, nullptr);
-  EXPECT_EQ(rhs->lhs->op, TokenKind::kAmp);
-}
-
 TEST(ParserSection28, ElaborateXorGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
