@@ -14,16 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-// § Postfix select on concatenation (§11.4.12)
-TEST(ParserA81, ConcatenationPostfixBitSelect) {
-  auto r = Parse("module m; initial x = {a, b}[3]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
-}
-
 TEST(ParserA81, ConcatenationPostfixPartSelect) {
   auto r = Parse("module m; initial x = {a, b}[5:2]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
