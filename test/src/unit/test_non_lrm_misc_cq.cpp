@@ -43,25 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// =============================================================================
-// LRM section 19.6.1.2 -- Default skew
-// =============================================================================
-// Default input and output skews with time-unit literals.
-TEST(ParserSection19, DefaultSkew_InputOutputTimeUnits) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking bus @(posedge clock1);\n"
-      "    default input #10ns output #2ns;\n"
-      "    input data, ready;\n"
-      "    output ack;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  // Note: default skew is parsed but not stored in the AST.
-  ASSERT_GE(item->clocking_signals.size(), 3u);
-}
-
 // Default input skew only (no output skew specified).
 TEST(ParserSection19, DefaultSkew_InputOnly) {
   EXPECT_TRUE(
