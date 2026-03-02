@@ -145,4 +145,18 @@ TEST(ParserA85, VarLvaluePartSelect) {
   ASSERT_NE(stmt->lhs->index_end, nullptr);
 }
 
+// § variable_lvalue — hierarchical_variable_identifier select (indexed part
+// select +)
+TEST(ParserA85, VarLvalueIndexedPartSelectPlus) {
+  auto r =
+      Parse("module m; logic [15:0] x; initial x[4+:4] = 4'hF; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+  EXPECT_TRUE(stmt->lhs->is_part_select_plus);
+}
+
 }  // namespace
