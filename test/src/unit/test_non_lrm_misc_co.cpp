@@ -27,25 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// §17.4 Checker instantiation
-// =============================================================================
-TEST_F(VerifyParseTest, CheckerInstantiationPositional) {
-  auto* unit = Parse(R"(
-    checker mutex(logic [31:0] sig, event clock, output bit failure);
-      assert property (@clock $onehot0(sig))
-        failure = 1'b0; else failure = 1'b1;
-    endchecker
-    module m(wire [31:0] bus, logic clk);
-      logic res;
-      mutex check_bus(bus, posedge clk, res);
-    endmodule
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  ASSERT_EQ(unit->modules.size(), 1u);
-  EXPECT_FALSE(unit->modules[0]->items.empty());
-}
-
 TEST_F(VerifyParseTest, CheckerInstantiationNamed) {
   auto* unit = Parse(R"(
     checker my_check(input logic clk, input logic data);

@@ -129,4 +129,43 @@ TEST_F(CheckerParseTest, CheckerInstantiatedInModule) {
   EXPECT_EQ(inst->inst_name, "chk_inst");
 }
 
+struct ParseResult16c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16c Parse(const std::string& src) {
+  ParseResult16c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using VerifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// §17.4 Checker instantiation
+// =============================================================================
+TEST_F(VerifyParseTest, CheckerInstantiationPositional) {
+  auto* unit = Parse(R"(
+    checker mutex(logic [31:0] sig, event clock, output bit failure);
+      assert property (@clock $onehot0(sig))
+        failure = 1'b0; else failure = 1'b1;
+    endchecker
+    module m(wire [31:0] bus, logic clk);
+      logic res;
+      mutex check_bus(bus, posedge clk, res);
+    endmodule
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  ASSERT_EQ(unit->modules.size(), 1u);
+  EXPECT_FALSE(unit->modules[0]->items.empty());
+}
+
 }  // namespace
