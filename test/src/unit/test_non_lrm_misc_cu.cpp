@@ -24,18 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, ModuleHeaderMultipleImportsFirst) {
-  auto r = Parse(
-      "module m import A::*, B::foo; ();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  ASSERT_GE(mod->items.size(), 2);
-  EXPECT_EQ(mod->items[0]->import_item.package_name, "A");
-  EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
-}
-
 TEST(ParserSection23, ModuleHeaderMultipleImportsSecond) {
   auto r = Parse(
       "module m import A::*, B::foo; ();\n"

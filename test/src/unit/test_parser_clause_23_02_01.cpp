@@ -97,4 +97,16 @@ TEST(ParserSection23, ModuleHeaderImportWithParamsPortsAndParams) {
   ASSERT_EQ(mod->ports.size(), 1);
 }
 
+TEST(ParserSection23, ModuleHeaderMultipleImportsFirst) {
+  auto r = Parse(
+      "module m import A::*, B::foo; ();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "m");
+  ASSERT_GE(mod->items.size(), 2);
+  EXPECT_EQ(mod->items[0]->import_item.package_name, "A");
+  EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
+}
+
 }  // namespace
