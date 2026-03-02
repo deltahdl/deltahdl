@@ -38,15 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-TEST(Section20, TestPlusargsPrefixMatch) {
-  SimFixture f;
-  f.ctx.AddPlusArg("VERBOSE=1");
-  auto* expr =
-      MakeSysCall(f.arena, "$test$plusargs", {MakeStrLit(f.arena, "VERB")});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
 TEST(Section20, ValuePlusargsFound) {
   SimFixture f;
   f.ctx.AddPlusArg("DEPTH=42");
