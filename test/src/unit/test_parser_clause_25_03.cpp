@@ -252,4 +252,13 @@ TEST(SourceText, NonPortInterfaceItemModport) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
 }
 
+// attribute_instance on modport_ports_declaration
+TEST(ParserA29, AttrOnSimplePorts) {
+  EXPECT_TRUE(
+      ParseOk("interface bus;\n"
+              "  logic a;\n"
+              "  modport target((* synthesis *) input a);\n"
+              "endinterface\n"));
+}
+
 }  // namespace

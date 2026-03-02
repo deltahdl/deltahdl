@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// attribute_instance on modport_ports_declaration
-TEST(ParserA29, AttrOnSimplePorts) {
-  EXPECT_TRUE(
-      ParseOk("interface bus;\n"
-              "  logic a;\n"
-              "  modport target((* synthesis *) input a);\n"
-              "endinterface\n"));
-}
-
 // Verify source location is captured on ModportDecl
 TEST(ParserA29, ModportDeclHasSourceLoc) {
   auto r = Parse(
