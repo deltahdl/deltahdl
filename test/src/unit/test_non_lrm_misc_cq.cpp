@@ -43,29 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// =============================================================================
-// LRM section 19.5.2 -- Clocking block scope
-// =============================================================================
-// Clocking block coexists with other module items (variables, always blocks).
-TEST(ParserSection19, ClockingBlockScope_AmongOtherItems) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic clk;\n"
-      "  logic [7:0] data;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "  initial begin\n"
-      "    clk = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "cb");
-  ASSERT_GE(r.cu->modules[0]->items.size(), 4u);
-}
-
 // Multiple clocking blocks in the same module (different clocks).
 TEST(ParserSection19, ClockingBlockScope_MultipleBlocks) {
   auto r = Parse(
