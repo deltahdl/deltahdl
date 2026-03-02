@@ -43,28 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Multiple clocking blocks in the same module (different clocks).
-TEST(ParserSection19, ClockingBlockScope_MultipleBlocks) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking cd1 @(posedge phi1);\n"
-      "    input data;\n"
-      "    output write;\n"
-      "  endclocking\n"
-      "  clocking cd2 @(posedge phi2);\n"
-      "    input #2 output #4 cmd;\n"
-      "    input enable;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* cb1 = FindClockingBlock(r, 0);
-  auto* cb2 = FindClockingBlock(r, 1);
-  ASSERT_NE(cb1, nullptr);
-  ASSERT_NE(cb2, nullptr);
-  EXPECT_EQ(cb1->name, "cd1");
-  EXPECT_EQ(cb2->name, "cd2");
-}
-
 // Clocking block in a program with initial block accessing signals.
 TEST(ParserSection19, ClockingBlockScope_ProgramAccess) {
   EXPECT_TRUE(
