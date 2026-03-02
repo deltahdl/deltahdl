@@ -355,4 +355,20 @@ TEST(ParserA27, TaskBodyOldStylePorts) {
   VerifyTwoArgTask(r);
 }
 
+TEST(ParserA27, TaskBodyOldStyleOutputPort) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task;\n"
+      "    input int a;\n"
+      "    output int b;\n"
+      "    b = a * 2;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
+}
+
 }  // namespace
