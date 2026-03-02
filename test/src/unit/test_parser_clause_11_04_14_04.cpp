@@ -67,4 +67,11 @@ TEST(ParserA81, StreamExprWithFixedRange) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// § array_range_expression ::= expression +: expression
+TEST(ParserA81, StreamExprWithPlusRange) {
+  auto r = Parse("module m; initial x = {<< {a with [0+:4]}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
