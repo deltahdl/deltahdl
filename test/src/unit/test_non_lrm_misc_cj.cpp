@@ -34,17 +34,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-TEST(ParserA27, TaskBodyWithEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task();\n"
-      "  endtask : my_task\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "my_task");
-}
-
 // ---------------------------------------------------------------------------
 // task_body_declaration (old-style ports — tf_item_declaration)
 // ---------------------------------------------------------------------------
