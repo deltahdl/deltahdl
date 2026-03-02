@@ -126,4 +126,18 @@ TEST(ParserSection16, SequenceTriggeredMethod) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+TEST(ParserSection16, SequenceMatchedMethod) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence e1;\n"
+      "    @(posedge clk1) a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence e2;\n"
+      "    @(posedge clk2) reset ##1 e1.matched ##1 done;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
