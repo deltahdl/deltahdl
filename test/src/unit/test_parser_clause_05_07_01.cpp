@@ -496,4 +496,15 @@ TEST(ParserA87, HexNumber) {
   EXPECT_EQ(rhs->int_val, 0xABCDu);
 }
 
+// § size — unsigned_number (various widths)
+TEST(ParserA87, Size1Bit) {
+  auto r = Parse("module m; logic x; initial x = 1'b1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 1u);
+}
+
 }  // namespace
