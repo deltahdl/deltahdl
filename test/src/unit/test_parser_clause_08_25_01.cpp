@@ -109,4 +109,14 @@ TEST(ParserSection13, Sec13_8_CallParamTaskFromInitial) {
               "endmodule\n"));
 }
 
+// §13.8: Parameterized class scope in conditional expression.
+TEST(ParserSection13, Sec13_8_ParamCallInTernary) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [7:0] x, y;\n"
+              "  logic sel;\n"
+              "  assign y = sel ? C#(8)::ENCODER_f(x) : '0;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
