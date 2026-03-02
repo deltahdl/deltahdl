@@ -127,4 +127,18 @@ TEST(ParserSection13, Sec13_8_AssignParamCallResult) {
               "endmodule\n"));
 }
 
+// §13.8: Virtual class with only a static task (no function).
+TEST(ParserSection13, Sec13_8_OnlyStaticTask) {
+  auto r = Parse(
+      "virtual class Printer#(parameter int ID = 0);\n"
+      "  static task print();\n"
+      "    $display(\"ID=%0d\", ID);\n"
+      "  endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_virtual);
+}
+
 }  // namespace
