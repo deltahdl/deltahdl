@@ -27,4 +27,11 @@ TEST(Section20, CountonesZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
+TEST(Section20, CountonesAllBits) {
+  SimFixture f;
+  auto* expr = MakeSysCall(f.arena, "$countones", {MakeInt(f.arena, 0xFF)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 8u);
+}
+
 }  // namespace
