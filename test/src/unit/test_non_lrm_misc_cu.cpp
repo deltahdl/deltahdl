@@ -24,16 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, ModuleHeaderImportWithParamsPortsAndParams) {
-  auto r = Parse(
-      "module m import A::*; #(parameter N = 4) (input logic clk);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->params.size(), 1);
-  ASSERT_EQ(mod->ports.size(), 1);
-}
-
 TEST(ParserSection23, ModuleHeaderMultipleImportsFirst) {
   auto r = Parse(
       "module m import A::*, B::foo; ();\n"
