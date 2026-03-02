@@ -25,4 +25,13 @@ TEST(ParserSection28, EnableGates) {
   }
 }
 
+TEST(Parser, GateBufif0) {
+  auto r = ParseWithPreprocessor("module t; bufif0 b1(out, in, en); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kBufif0);
+  EXPECT_EQ(item->gate_terminals.size(), 3);
+}
+
 }  // namespace
