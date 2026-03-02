@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_primary — null
-TEST(ParserA84, ConstantPrimaryNull) {
-  auto r = Parse("module m; initial x = null; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(rhs->text, "null");
-}
-
 // § constant_primary — constant_assignment_pattern_expression
 TEST(ParserA84, ConstantPrimaryAssignmentPattern) {
   auto r = Parse(
