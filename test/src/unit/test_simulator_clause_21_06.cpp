@@ -33,4 +33,13 @@ TEST(Section20, TestPlusargsNotFound) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
+TEST(Section20, TestPlusargsFound) {
+  SimFixture f;
+  f.ctx.AddPlusArg("VERBOSE");
+  auto* expr =
+      MakeSysCall(f.arena, "$test$plusargs", {MakeStrLit(f.arena, "VERBOSE")});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
