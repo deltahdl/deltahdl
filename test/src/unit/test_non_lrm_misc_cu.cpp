@@ -24,19 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// --- Package import in module headers (LRM section 26.4) ---
-TEST(ParserSection23, ModuleHeaderImport) {
-  auto r = Parse(
-      "module m import pkg::*; ();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  // The header import generates an import item in the module body.
-  ASSERT_GE(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
-}
-
 TEST(ParserSection23, ModuleHeaderImportDetails) {
   auto r = Parse(
       "module m import pkg::*; ();\n"

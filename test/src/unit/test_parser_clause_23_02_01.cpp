@@ -52,4 +52,17 @@ TEST(ParserSection23, EndLabelModuleNoLabel) {
   EXPECT_EQ(r.cu->modules[0]->name, "bar");
 }
 
+// --- Package import in module headers (LRM section 26.4) ---
+TEST(ParserSection23, ModuleHeaderImport) {
+  auto r = Parse(
+      "module m import pkg::*; ();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "m");
+  // The header import generates an import item in the module body.
+  ASSERT_GE(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
+}
+
 }  // namespace
