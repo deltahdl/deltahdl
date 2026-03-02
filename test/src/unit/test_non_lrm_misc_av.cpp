@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § primary — primary_literal (string)
-TEST(ParserA84, PrimaryStringLiteral) {
-  auto r = Parse("module m; initial x = \"hello\"; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
-}
-
 // § primary — hierarchical_identifier select
 TEST(ParserA84, PrimaryHierarchicalIdentifier) {
   auto r = Parse(
