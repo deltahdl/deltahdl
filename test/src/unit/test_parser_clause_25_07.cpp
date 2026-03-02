@@ -178,4 +178,11 @@ TEST(ParserA29, ImportTaskNoArgs) {
   EXPECT_EQ(mp->ports[0].prototype->name, "doWork");
 }
 
+TEST(ParserA29, ImportFunctionVoidReturn) {
+  EXPECT_TRUE(
+      ParseOk("interface bus;\n"
+              "  modport init(import function void reset());\n"
+              "endinterface\n"));
+}
+
 }  // namespace

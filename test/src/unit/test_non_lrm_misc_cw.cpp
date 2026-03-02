@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA29, ImportFunctionVoidReturn) {
-  EXPECT_TRUE(
-      ParseOk("interface bus;\n"
-              "  modport init(import function void reset());\n"
-              "endinterface\n"));
-}
-
 // Verify import/export flags are mutually exclusive in AST
 TEST(ParserA29, ImportFlag_NotExport) {
   auto r = Parse(
