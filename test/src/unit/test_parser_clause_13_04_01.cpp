@@ -408,4 +408,17 @@ TEST(ParserSection13, FunctionReturnTypeVoid) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
 }
 
+TEST(ParserSection13, FunctionReturnTypeLogicVec) {
+  auto r = Parse(
+      "module m;\n"
+      "  function logic [7:0] get_byte();\n"
+      "    return 8'hAB;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "get_byte");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kLogic);
+}
+
 }  // namespace

@@ -18,19 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, FunctionReturnTypeLogicVec) {
-  auto r = Parse(
-      "module m;\n"
-      "  function logic [7:0] get_byte();\n"
-      "    return 8'hAB;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "get_byte");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kLogic);
-}
-
 // =============================================================================
 // LRM section 13.3.1 -- Static and automatic tasks/functions
 // =============================================================================
