@@ -213,4 +213,28 @@ TEST(ParserSection4, Sec4_9_3_StaticTaskDecl) {
   EXPECT_EQ(item->name, "wait_cycles");
 }
 
+static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl &&
+        item->kind != ModuleItemKind::kTaskDecl) {
+      continue;
+    }
+    if (item->name == name) return item;
+  }
+  return nullptr;
+}
+
+TEST(ParserSection13, StaticTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task static do_stuff();\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* tk = FindFunc(r, "do_stuff");
+  ASSERT_NE(tk, nullptr);
+  EXPECT_TRUE(tk->is_static);
+  EXPECT_FALSE(tk->is_automatic);
+}
+
 }  // namespace
