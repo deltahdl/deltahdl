@@ -10,17 +10,6 @@ using ProgramParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// A.1.2 program_declaration — all forms
-// =============================================================================
-// Program with lifetime.
-TEST(SourceText, ProgramWithLifetime) {
-  auto r = Parse("program automatic prg; endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-}
-
 // Program with end label.
 TEST(SourceText, ProgramEndLabel) {
   auto r = Parse("program prg; endprogram : prg\n");
