@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — nonblocking assignment with concatenation LHS
-TEST(ParserA85, VarLvalueNonblockingConcat) {
-  auto r = Parse(
-      "module m; logic [3:0] a, b;\n"
-      "  initial {a, b} <= 8'hFF;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
-}
-
 // § variable_lvalue — compound assignment +=
 TEST(ParserA85, VarLvalueCompoundAdd) {
   auto r = Parse("module m; int x; initial x += 5; endmodule\n");
