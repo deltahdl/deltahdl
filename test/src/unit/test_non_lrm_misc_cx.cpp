@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection27, GenerateIfElseSingleItemParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH > 1)\n"
-      "    assign out = a;\n"
-      "  else\n"
-      "    assign out = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_EQ(gen->gen_body.size(), 1);
-}
-
 TEST(ParserSection27, GenerateIfElseSingleItemBranches) {
   auto r = Parse(
       "module m;\n"
