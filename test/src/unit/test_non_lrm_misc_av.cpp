@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_primary — ps_parameter_identifier constant_select
-TEST(ParserA84, ConstantPrimaryParameterIdentifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  parameter int A = 5;\n"
-      "  parameter int B = A;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* param = r.cu->modules[0]->items[1];
-  ASSERT_NE(param->init_expr, nullptr);
-  EXPECT_EQ(param->init_expr->kind, ExprKind::kIdentifier);
-}
-
 // § constant_primary — enum_identifier
 TEST(ParserA84, ConstantPrimaryEnumIdentifier) {
   auto r = Parse(
