@@ -212,4 +212,17 @@ TEST(ParserAnnexF, AnnexFRangedRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
+// --- F.17: Sequence with chained concatenation ---
+TEST(ParserAnnexF, AnnexFChainedConcat) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s_chain;\n"
+      "    @(posedge clk) a ##1 b ##1 c ##1 d ##1 e;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kSequenceDecl));
+}
+
 }  // namespace
