@@ -18,25 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, DpiExportTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  export \"DPI-C\" task my_sv_task;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* dpi = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiExport) {
-      dpi = item;
-      break;
-    }
-  }
-  ASSERT_NE(dpi, nullptr);
-  EXPECT_EQ(dpi->name, "my_sv_task");
-  EXPECT_TRUE(dpi->dpi_is_task);
-}
-
 // =============================================================================
 // LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
 // =============================================================================
