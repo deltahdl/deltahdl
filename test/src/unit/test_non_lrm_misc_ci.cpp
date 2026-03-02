@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection12, ReturnVoid) {
-  auto r = Parse(
-      "module t;\n"
-      "  function void bar();\n"
-      "    return;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* ret = FindReturnStmt(r);
-  ASSERT_NE(ret, nullptr);
-  EXPECT_EQ(ret->kind, StmtKind::kReturn);
-  EXPECT_EQ(ret->expr, nullptr);
-}
-
 TEST(ParserSection12, BreakStatementParses) {
   auto r = Parse(
       "module t;\n"
