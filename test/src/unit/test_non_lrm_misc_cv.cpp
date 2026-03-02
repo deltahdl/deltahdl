@@ -27,13 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST_F(ProgramParseTest, ProgramWithEndLabel) {
-  auto* unit = Parse("program p; endprogram : p");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-}
-
 // =============================================================================
 // §24.2 Program ports and parameters
 // =============================================================================

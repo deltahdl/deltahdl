@@ -314,4 +314,11 @@ TEST_F(ProgramParseTest, EmptyProgram) {
   EXPECT_TRUE(unit->programs[0]->items.empty());
 }
 
+TEST_F(ProgramParseTest, ProgramWithEndLabel) {
+  auto* unit = Parse("program p; endprogram : p");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+}
+
 }  // namespace
