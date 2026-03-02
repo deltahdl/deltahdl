@@ -465,4 +465,21 @@ TEST(ParserSection13, OldStyleFunction) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kInput);
 }
 
+// =============================================================================
+// LRM section 13.1 -- Tasks and functions overview (additional tests)
+// =============================================================================
+// Function with end label matching the function name (LRM section 13.4).
+TEST(ParserSection13, FunctionEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction : add\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "add");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
+}
+
 }  // namespace

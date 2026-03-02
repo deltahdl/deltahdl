@@ -18,23 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// =============================================================================
-// LRM section 13.1 -- Tasks and functions overview (additional tests)
-// =============================================================================
-// Function with end label matching the function name (LRM section 13.4).
-TEST(ParserSection13, FunctionEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction : add\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "add");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
-}
-
 // Task with end label matching the task name (LRM section 13.3).
 TEST(ParserSection13, TaskEndLabel) {
   auto r = Parse(
