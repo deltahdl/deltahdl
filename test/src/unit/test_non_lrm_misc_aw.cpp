@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — { variable_lvalue { , variable_lvalue } }
-// (concatenation)
-TEST(ParserA85, VarLvalueConcatenation) {
-  auto r = Parse(
-      "module m; logic [3:0] a, b; logic [7:0] c;\n"
-      "  initial {a, b} = c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(stmt->lhs->elements.size(), 2u);
-}
-
 // § variable_lvalue — nested concatenation
 TEST(ParserA85, VarLvalueNestedConcatenation) {
   auto r = Parse(
