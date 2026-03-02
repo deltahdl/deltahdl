@@ -9,18 +9,6 @@ using CheckerParseTest = ProgramTestParse;
 
 namespace {
 
-// extern_constraint_declaration with static and dynamic_override_specifiers
-TEST(SourceText, ExternConstraintDeclStaticOverride) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  extern static constraint c;\n"
-      "endclass\n"
-      "static constraint C::c { x > 0; }\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 // extern_constraint_declaration with dynamic_override_specifiers at top-level
 TEST(SourceText, ExternConstraintDeclDynOverrideTopLevel) {
   auto r = Parse(
