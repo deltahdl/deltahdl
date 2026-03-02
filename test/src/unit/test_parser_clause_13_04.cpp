@@ -407,4 +407,31 @@ TEST(ParserA28, BlockItemInFunction) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
+static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl &&
+        item->kind != ModuleItemKind::kTaskDecl) {
+      continue;
+    }
+    if (item->name == name) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 13.4 -- Array parameters on function args
+// =============================================================================
+TEST(ParserSection13, ArrayParamOnFuncArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int data[3]);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "foo");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 1u);
+  EXPECT_EQ(fn->func_args[0].unpacked_dims.size(), 1u);
+}
+
 }  // namespace
