@@ -41,4 +41,14 @@ TEST(ParserSection22, TimescaleMsUs) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, MultipleTimescales) {
+  EXPECT_TRUE(
+      ParseOk("`timescale 1ns/1ps\n"
+              "module m1;\n"
+              "endmodule\n"
+              "`timescale 10ns/1ns\n"
+              "module m2;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
