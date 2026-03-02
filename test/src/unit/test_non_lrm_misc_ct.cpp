@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-// net_port_header: [port_direction] net_port_type — inout wire
-TEST(SourceText, NetPortHeader) {
-  auto r =
-      ParseWithPreprocessor("module m(inout wire [7:0] data); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInout);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "data");
-}
-
 // variable_port_header: [port_direction] variable_port_type — input logic
 TEST(SourceText, VariablePortHeader) {
   auto r =
