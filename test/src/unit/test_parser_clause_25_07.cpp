@@ -165,4 +165,17 @@ TEST(ParserA29, ImportFunctionPrototype) {
   EXPECT_EQ(mp->ports[0].prototype->name, "compute");
 }
 
+TEST(ParserA29, ImportTaskNoArgs) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport target(import task doWork);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  EXPECT_NE(mp->ports[0].prototype, nullptr);
+  EXPECT_EQ(mp->ports[0].prototype->name, "doWork");
+}
+
 }  // namespace
