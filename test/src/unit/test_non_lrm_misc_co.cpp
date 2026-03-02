@@ -27,21 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// §19 Functional coverage — covergroup
-// =============================================================================
-TEST_F(VerifyParseTest, BasicCovergroup) {
-  auto* unit = Parse(R"(
-    module m;
-      covergroup cg @(posedge clk);
-        coverpoint x;
-      endgroup
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  // Covergroup should parse without error.
-}
-
 TEST_F(VerifyParseTest, CovergroupWithBins) {
   auto* unit = Parse(R"(
     module m;

@@ -278,4 +278,39 @@ TEST(ParserSection40, CovergroupWithCoverpoint) {
   )"));
 }
 
+struct ParseResult16c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16c Parse(const std::string& src) {
+  ParseResult16c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using VerifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// §19 Functional coverage — covergroup
+// =============================================================================
+TEST_F(VerifyParseTest, BasicCovergroup) {
+  auto* unit = Parse(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        coverpoint x;
+      endgroup
+    endmodule
+  )");
+  ASSERT_EQ(unit->modules.size(), 1u);
+  // Covergroup should parse without error.
+}
+
 }  // namespace
