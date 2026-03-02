@@ -92,4 +92,25 @@ TEST(ParserA82, FunctionSubroutineCallNested) {
   EXPECT_EQ(stmt->rhs->args[0]->callee, "g");
 }
 
+// =============================================================================
+// A.8.2 Subroutine calls — list_of_arguments
+// =============================================================================
+// § list_of_arguments ::=
+//   [ expression ] { , [ expression ] } { , . identifier ( [ expression ] ) }
+//   | . identifier ( [ expression ] ) { , . identifier ( [ expression ] ) }
+// Positional arguments only
+TEST(ParserA82, ListOfArgsPositionalOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(1, 2, 3); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  EXPECT_EQ(expr->args.size(), 3u);
+  EXPECT_TRUE(expr->arg_names.empty());
+}
+
 }  // namespace
