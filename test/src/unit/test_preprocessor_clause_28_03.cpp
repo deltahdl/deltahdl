@@ -124,4 +124,14 @@ TEST(ParserSection28, MultipleInstancesWithStrengthAndDelay) {
   VerifyStrengthDelayInstances(mod->items, 2, 4, 4);
 }
 
+TEST(Parser, GateNoInstanceName) {
+  auto r = ParseWithPreprocessor("module t; and (out, a, b); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
+  EXPECT_TRUE(item->gate_inst_name.empty());
+  EXPECT_EQ(item->gate_terminals.size(), 3);
+}
+
 }  // namespace
