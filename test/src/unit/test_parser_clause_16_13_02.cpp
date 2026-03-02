@@ -48,4 +48,15 @@ TEST(ParserSection16, MultichannelAssertPropertyInline) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection16, MulticlockPropertyDeclImplication) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p_multi;\n"
+      "    @(posedge clk1) req |=> @(posedge clk2) ack;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
