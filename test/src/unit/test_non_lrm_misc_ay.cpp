@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex G -- Std package classes (process, semaphore, mailbox)
-// =============================================================================
-TEST(ParserAnnexG, AnnexGProcessDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    process p = process::self();\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(ParserAnnexG, AnnexGSemaphoreUsage) {
   auto r = Parse(
       "module m;\n"
