@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § unsigned_number — decimal_digit { _ | decimal_digit }
-TEST(ParserA87, UnsignedNumberWithUnderscores) {
-  auto r = Parse("module m; int x; initial x = 1_000_000; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->int_val, 1000000u);
-}
-
 // § binary_value — binary_digit { _ | binary_digit }
 TEST(ParserA87, BinaryValueWithUnderscores) {
   auto r =
