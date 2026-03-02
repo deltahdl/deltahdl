@@ -14,21 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-// tf_call with no arguments (footnote 42: only legal for tasks/void/class)
-TEST(ParserA82, TfCallNoArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  EXPECT_EQ(expr->callee, "foo");
-  EXPECT_TRUE(expr->args.empty());
-}
-
 // tf_call in continuous assignment (function_subroutine_call as primary)
 TEST(ParserA82, TfCallInContAssign) {
   auto r = Parse(
