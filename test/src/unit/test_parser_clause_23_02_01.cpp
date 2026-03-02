@@ -76,4 +76,15 @@ TEST(ParserSection23, ModuleHeaderImportDetails) {
   EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
 }
 
+TEST(ParserSection23, ModuleHeaderImportWithParamsImport) {
+  auto r = Parse(
+      "module m import A::*; #(parameter N = 4) (input logic clk);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "m");
+  ASSERT_GE(mod->items.size(), 1);
+  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
+}
+
 }  // namespace
