@@ -18,24 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// =============================================================================
-// LRM section 13.3.1 -- Static and automatic tasks/functions
-// =============================================================================
-TEST(ParserSection13, AutomaticFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int fact(int n);\n"
-      "    if (n <= 1) return 1;\n"
-      "    return n * fact(n - 1);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "fact");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_automatic);
-  EXPECT_FALSE(fn->is_static);
-}
-
 TEST(ParserSection13, StaticTask) {
   auto r = Parse(
       "module m;\n"
