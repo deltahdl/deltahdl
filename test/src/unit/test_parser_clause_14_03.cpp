@@ -685,4 +685,16 @@ TEST(ParserSection19, DefaultSkew_PerSignalOverride) {
               "endmodule\n"));
 }
 
+// Default skew on a clocking block with no edge in the event.
+TEST(ParserSection19, DefaultSkew_NoEdgeEvent) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking ck2 @(clk);\n"
+              "    default input #1step output negedge;\n"
+              "    input a;\n"
+              "    output b;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -43,18 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Default skew on a clocking block with no edge in the event.
-TEST(ParserSection19, DefaultSkew_NoEdgeEvent) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking ck2 @(clk);\n"
-              "    default input #1step output negedge;\n"
-              "    input a;\n"
-              "    output b;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 // Default skew with numeric literals (no time-unit suffix).
 TEST(ParserSection19, DefaultSkew_NumericLiterals) {
   EXPECT_TRUE(
