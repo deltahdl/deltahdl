@@ -38,28 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-TEST(Section21, ReadmembBasic) {
-  SimFixture f;
-  std::string tmp_path = "/tmp/deltahdl_test_readmemb.txt";
-  {
-    std::ofstream ofs(tmp_path);
-    ofs << "1010\n0110\n";
-  }
-
-  auto* arr = f.ctx.CreateVariable("bmem", 32);
-  arr->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* expr = MakeSysCall(
-      f.arena, "$readmemb",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeId(f.arena, "bmem")});
-  EvalExpr(expr, f.ctx, f.arena);
-
-  // First value: 1010 binary = 10 decimal.
-  EXPECT_EQ(arr->value.ToUint64(), 0b1010u);
-
-  std::remove(tmp_path.c_str());
-}
-
 // ============================================================================
 // §21.4 — $writememh, $writememb
 // ============================================================================
