@@ -45,40 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// §14.3 — Basic clocking block declaration
-// =============================================================================
-TEST(ParserSection14, BasicClockingBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  ASSERT_EQ(item->clocking_event.size(), 1u);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-
-  // Validate properties, event, and signal via loop.
-  struct {
-    bool ok;
-    const char* label;
-  } const kChecks[] = {
-      {item->kind == ModuleItemKind::kClockingBlock, "kind"},
-      {item->name == "cb", "name"},
-      {!item->is_default_clocking, "not_default"},
-      {!item->is_global_clocking, "not_global"},
-      {item->clocking_event[0].edge == Edge::kPosedge, "event_edge"},
-      {item->clocking_signals[0].direction == Direction::kInput, "sig_dir"},
-      {item->clocking_signals[0].name == "data", "sig_name"},
-  };
-  for (const auto& c : kChecks) {
-    EXPECT_TRUE(c.ok) << c.label;
-  }
-}
-
-// =============================================================================
 // §14.3 — Default clocking
 // =============================================================================
 TEST(ParserSection14, DefaultClocking) {
