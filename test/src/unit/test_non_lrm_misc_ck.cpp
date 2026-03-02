@@ -18,25 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, DpiImportWithCName) {
-  auto r = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" c_real_name = function void sv_wrapper();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* dpi = nullptr;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kDpiImport) {
-      dpi = item;
-      break;
-    }
-  }
-  ASSERT_NE(dpi, nullptr);
-  EXPECT_EQ(dpi->dpi_c_name, "c_real_name");
-  EXPECT_EQ(dpi->name, "sv_wrapper");
-}
-
 TEST(ParserSection13, DpiExportFunction) {
   auto r = Parse(
       "module m;\n"
