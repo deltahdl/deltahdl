@@ -279,4 +279,19 @@ TEST(ParserA703, MixedInputTerminalsFullPath) {
   EXPECT_EQ(si->path.src_ports[2].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
+// =============================================================================
+// A.8.3 Expressions — module_path_expression
+// =============================================================================
+// § module_path_expression used in specify block path conditions
+TEST(ParserA83, ModulePathExprInSpecify) {
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  specify\n"
+      "    (a => y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
