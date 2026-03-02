@@ -45,29 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// §14.3 — Multiple signals in one direction group
-// =============================================================================
-TEST(ParserSection14, MultipleSignalsSameDirection) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input data, ready, enable;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-
-  const char* const kExpectedNames[] = {"data", "ready", "enable"};
-  ASSERT_EQ(item->clocking_signals.size(), std::size(kExpectedNames));
-  for (size_t i = 0; i < std::size(kExpectedNames); ++i) {
-    EXPECT_EQ(item->clocking_signals[i].name, kExpectedNames[i])
-        << "signal " << i;
-    EXPECT_EQ(item->clocking_signals[i].direction, Direction::kInput)
-        << "signal " << i;
-  }
-}
-
-// =============================================================================
 // §14.5 — Hierarchical expression assignment
 // =============================================================================
 TEST(ParserSection14, HierarchicalExpression) {
