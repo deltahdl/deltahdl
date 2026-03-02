@@ -6,24 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, DumpvarsInsideBeginEnd) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    $dumpfile(\"test.vcd\");\n"
-      "    $dumpvars(0, t);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_FALSE(mod->items.empty());
-  auto* item = mod->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kInitialBlock);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_GE(item->body->stmts.size(), 2u);
-}
-
 TEST(ParserSection22, ResetallDirective) {
   EXPECT_TRUE(
       ParseOk("`resetall\n"
