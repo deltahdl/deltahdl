@@ -356,4 +356,15 @@ TEST(ParserClause03, Cl3_13_MultiplePackageImports) {
   EXPECT_EQ(import_count, 2);
 }
 
+// 20. Package scope resolution (pkg::item)
+TEST(ParserClause03, Cl3_13_PackageScopeResolution) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  parameter int WIDTH = 8;\n"
+              "endpackage\n"
+              "module m;\n"
+              "  logic [pkg::WIDTH-1:0] data;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
