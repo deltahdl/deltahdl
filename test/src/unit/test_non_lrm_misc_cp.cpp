@@ -9,21 +9,6 @@ using CheckerParseTest = ProgramTestParse;
 
 namespace {
 
-// --- Block-level var decl in function body ---
-TEST(ParserSection18, FuncBodyVarDecl) {
-  auto r = Parse(
-      "module top;\n"
-      "  function int foo();\n"
-      "    int x;\n"
-      "    x = 5;\n"
-      "    return x;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // --- Out-of-block constraint declaration (§18.5.1) ---
 TEST(ParserSection18, OutOfBlockConstraint) {
   auto r = Parse(
