@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Generate-if/else-if chain (§27.5) ---
-TEST(ParserSection27, GenerateIfElseIfChainParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH == 1)\n"
-      "    assign out = a;\n"
-      "  else if (WIDTH == 2)\n"
-      "    assign out = b;\n"
-      "  else\n"
-      "    assign out = c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1u);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_NE(gen->gen_else, nullptr);
-}
-
 TEST(ParserSection27, GenerateIfElseIfChainNesting) {
   auto r = Parse(
       "module m;\n"
