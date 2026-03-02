@@ -48,4 +48,11 @@ TEST(ParserSection22, DefaultNettypeTriand) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, DefaultNettypeTrior) {
+  EXPECT_TRUE(
+      ParseOk("`default_nettype trior\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
