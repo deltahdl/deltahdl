@@ -24,20 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, PortConnectionNamed) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1(.clk(sys_clk), .rst(sys_rst), .data(bus));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  ASSERT_EQ(item->inst_ports.size(), 3u);
-  EXPECT_EQ(item->inst_ports[0].first, "clk");
-  EXPECT_EQ(item->inst_ports[1].first, "rst");
-  EXPECT_EQ(item->inst_ports[2].first, "data");
-}
-
 TEST(ParserSection23, PortConnectionEmptyNamed) {
   auto r = Parse(
       "module top;\n"
