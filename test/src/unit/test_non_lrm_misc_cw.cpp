@@ -17,21 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// --- Virtual interface with parameter (LRM §25.9) ---
-TEST(ParserSection25, VirtualInterfaceAssignment) {
-  auto r = Parse(
-      "module top;\n"
-      "  virtual interface simple_bus vif;\n"
-      "  initial begin\n"
-      "    vif = null;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_GE(mod->items.size(), 2);
-  EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kVirtualInterface);
-}
-
 TEST(ParserSection25, VirtualInterfaceMultipleDecls) {
   auto r = Parse(
       "module top;\n"
