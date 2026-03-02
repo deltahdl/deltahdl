@@ -363,4 +363,17 @@ TEST(ParserA84, PrimaryIntegerLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
+// =============================================================================
+// A.8.7 Numbers — Parser
+// =============================================================================
+// § number — integral_number
+TEST(ParserA87, NumberIntegral) {
+  auto r = Parse("module m; logic [7:0] x; initial x = 42; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
