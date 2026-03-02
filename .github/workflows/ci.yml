@@ -8,6 +8,8 @@ jobs:
     outputs:
       clang-tidy-configs-changed: >-
         ${{ steps.check.outputs.clang_tidy_configs_changed }}
+      deltahdl-changed: >-
+        ${{ steps.check.outputs.deltahdl_changed }}
       force-static-analysis: >-
         ${{ steps.check.outputs.force_static_analysis }}
       force-yamllint: >-
@@ -34,6 +36,7 @@ jobs:
             BASE="${{ github.event.pull_request.base.sha }}"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "clang_tidy_configs_changed=false" >> "$GITHUB_OUTPUT"
+            echo "deltahdl_changed=true" >> "$GITHUB_OUTPUT"
             echo "force_static_analysis=false" >> "$GITHUB_OUTPUT"
             echo "force_yamllint=false" >> "$GITHUB_OUTPUT"
             echo "implement_clause=true" >> "$GITHUB_OUTPUT"
@@ -48,6 +51,7 @@ jobs:
           ZERO="0000000000000000000000000000000000000000"
           if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
             echo "clang_tidy_configs_changed=true" >> "$GITHUB_OUTPUT"
+            echo "deltahdl_changed=true" >> "$GITHUB_OUTPUT"
             echo "force_static_analysis=false" >> "$GITHUB_OUTPUT"
             echo "force_yamllint=false" >> "$GITHUB_OUTPUT"
             echo "implement_clause=true" >> "$GITHUB_OUTPUT"
@@ -73,6 +77,12 @@ jobs:
             echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+          DHDL='^(src/|test/src/|lib/run_tests_common/|lib/test/|test/lib/run_tests_common/|test/lib/run_sim_tests/|test/lib/run_sv_tests/|scripts/run_sim_tests/|scripts/run_sv_tests/)'
+          if echo "$CHANGED" | grep -qE "$DHDL"; then
+            echo "deltahdl_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deltahdl_changed=false" >> "$GITHUB_OUTPUT"
           fi
           LIB='^(lib/(lrm|github)/|test/lib/(lrm|github)/)'
           IC='^(scripts/implement_clause/|test/scripts/implement_clause/|\.github/workflows/implement_clause\.yml)'
@@ -316,7 +326,9 @@ jobs:
   trigger-deltahdl-ci:
     env:
       GH_TOKEN: ${{ secrets.GH_PAT }}
-    if: "!failure() && !cancelled()"
+    if: >-
+      !failure() && !cancelled()
+      && needs.detect.outputs.deltahdl-changed == 'true'
     needs:
       - detect
       - static-analysis
