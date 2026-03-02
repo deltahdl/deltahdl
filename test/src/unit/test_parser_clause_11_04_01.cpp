@@ -540,4 +540,15 @@ TEST(ParserA85, VarLvalueCompoundAdd) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
 }
 
+// § variable_lvalue — compound assignment with bit select LHS
+TEST(ParserA85, VarLvalueCompoundBitSelect) {
+  auto r = Parse("module m; logic [7:0] x; initial x[3] |= 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace

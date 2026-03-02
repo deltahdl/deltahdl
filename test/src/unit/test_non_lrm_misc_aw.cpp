@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — compound assignment with bit select LHS
-TEST(ParserA85, VarLvalueCompoundBitSelect) {
-  auto r = Parse("module m; logic [7:0] x; initial x[3] |= 1; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-}
-
 // § variable_lvalue — pre-increment (++ as lvalue modifier)
 TEST(ParserA85, VarLvaluePreIncrement) {
   auto r = Parse("module m; int x; initial ++x; endmodule\n");
