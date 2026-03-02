@@ -541,4 +541,21 @@ TEST(ParserSection16, ImmediateAssertPassOnly) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
+// =============================================================================
+// §16.3 Immediate assertions — assume
+// =============================================================================
+TEST(ParserSection16, ImmediateAssumeBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assume(x != 0);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
+  EXPECT_NE(stmt->assert_expr, nullptr);
+}
+
 }  // namespace

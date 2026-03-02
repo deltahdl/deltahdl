@@ -34,23 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// =============================================================================
-// §16.3 Immediate assertions — assume
-// =============================================================================
-TEST(ParserSection16, ImmediateAssumeBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assume(x != 0);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
-  EXPECT_NE(stmt->assert_expr, nullptr);
-}
-
 TEST(ParserSection16, ImmediateAssumeWithElse) {
   auto r = Parse(
       "module m;\n"
