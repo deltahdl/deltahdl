@@ -139,4 +139,17 @@ TEST(SourceText, NonPortInterfaceItemGenerateRegion) {
   EXPECT_GE(r.cu->interfaces[0]->items.size(), 1u);
 }
 
+// non_port_interface_item ::= program_declaration
+TEST(SourceText, NonPortInterfaceItemProgram) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  program p; endprogram\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_GE(r.cu->interfaces[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->items[0]->kind,
+            ModuleItemKind::kNestedModuleDecl);
+}
+
 }  // namespace
