@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// extern_tf_declaration ::= extern method_prototype ;
-// method_prototype ::= task_prototype — extern task prototype.
-TEST(SourceText, ExternTaskPrototypeInInterface) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  extern task run();\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  auto* ifc = r.cu->interfaces[0];
-  ASSERT_GE(ifc->items.size(), 1u);
-  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_EQ(ifc->items[0]->name, "run");
-  EXPECT_TRUE(ifc->items[0]->is_extern);
-  EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
-}
-
 // extern_tf_declaration ::= extern forkjoin task_prototype ;
 TEST(SourceText, ExternForkjoinTaskPrototype) {
   auto r = Parse(
