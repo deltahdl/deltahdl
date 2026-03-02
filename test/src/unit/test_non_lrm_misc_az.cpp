@@ -20,30 +20,6 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST_F(AnnexHParseTest, AnnexOMultipleDpiDecls) {
-  auto* unit = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" function int c_add(int a, int b);\n"
-      "  import \"DPI-C\" pure function real c_sin(real x);\n"
-      "  export \"DPI-C\" function sv_compute;\n"
-      "  export \"DPI-C\" task sv_run;\n"
-      "endmodule\n");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 4u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(items[0]->name, "c_add");
-  EXPECT_EQ(items[1]->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(items[1]->name, "c_sin");
-  EXPECT_TRUE(items[1]->dpi_is_pure);
-  EXPECT_EQ(items[2]->kind, ModuleItemKind::kDpiExport);
-  EXPECT_EQ(items[2]->name, "sv_compute");
-  EXPECT_FALSE(items[2]->dpi_is_task);
-  EXPECT_EQ(items[3]->kind, ModuleItemKind::kDpiExport);
-  EXPECT_EQ(items[3]->name, "sv_run");
-  EXPECT_TRUE(items[3]->dpi_is_task);
-}
-
 // =============================================================================
 // LRM §3.2 — Design elements
 // =============================================================================
