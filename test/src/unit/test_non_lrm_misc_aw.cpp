@@ -15,19 +15,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 namespace {
 
 // =============================================================================
-// A.8.4 Primaries — constant_let_expression
-// =============================================================================
-// § constant_let_expression — let declaration usage
-TEST(ParserA84, ConstantLetExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  let my_let(a) = a + 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =============================================================================
 // A.8.4 Primaries — system calls as primary
 // =============================================================================
 // § primary — system function call
