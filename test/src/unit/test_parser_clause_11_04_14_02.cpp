@@ -65,4 +65,14 @@ TEST(ParserA81, StreamingWithTypeSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
+TEST(ParserA81, StreamingWithIntSliceSize) {
+  auto r = Parse("module m; initial x = {<< int {a, b}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
+  ASSERT_NE(stmt->rhs->lhs, nullptr);
+}
+
 }  // namespace
