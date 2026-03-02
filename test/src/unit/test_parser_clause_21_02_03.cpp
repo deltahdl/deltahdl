@@ -73,4 +73,11 @@ TEST(ParserSection4, Sec4_5_MonitorSystemCall) {
   EXPECT_EQ(stmt->expr->callee, "$monitor");
 }
 
+TEST(ParserSection21, MonitorBasicCall) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $monitor(\"a=%b b=%b\", a, b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

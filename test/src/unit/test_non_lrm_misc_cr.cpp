@@ -8,13 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, MonitorBasicCall) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $monitor(\"a=%b b=%b\", a, b);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, MonitorbHexOctal) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
