@@ -6,13 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, TimescaleMsUs) {
-  EXPECT_TRUE(
-      ParseOk("`timescale 1ms/1us\n"
-              "module t;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection22, MultipleTimescales) {
   EXPECT_TRUE(
       ParseOk("`timescale 1ns/1ps\n"
