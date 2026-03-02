@@ -19,4 +19,21 @@ TEST(SourceText, ModuleNonAnsiHeader) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
+// Non-ANSI list_of_ports: port with multiple ports and body declarations
+TEST(SourceText, NonAnsiMultiplePorts) {
+  auto r = ParseWithPreprocessor(
+      "module m(a, b, c);\n"
+      "  input [7:0] a;\n"
+      "  output [7:0] b;\n"
+      "  inout c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 3u);
+  EXPECT_EQ(ports[0].direction, Direction::kInput);
+  EXPECT_EQ(ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(ports[2].direction, Direction::kInout);
+}
+
 }  // namespace
