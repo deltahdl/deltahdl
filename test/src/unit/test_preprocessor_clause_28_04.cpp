@@ -52,4 +52,15 @@ TEST(ParserSection28, AllNInputGates) {
   }
 }
 
+// --- Gate primitive tests ---
+TEST(Parser, GateAndInst) {
+  auto r = ParseWithPreprocessor("module t; and g1(out, a, b); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
+  EXPECT_EQ(item->gate_inst_name, "g1");
+  EXPECT_EQ(item->gate_terminals.size(), 3u);
+}
+
 }  // namespace

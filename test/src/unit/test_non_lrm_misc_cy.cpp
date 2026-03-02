@@ -16,17 +16,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-// --- Gate primitive tests ---
-TEST(Parser, GateAndInst) {
-  auto r = ParseWithPreprocessor("module t; and g1(out, a, b); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
-  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
-  EXPECT_EQ(item->gate_inst_name, "g1");
-  EXPECT_EQ(item->gate_terminals.size(), 3u);
-}
-
 TEST(Parser, GateNandWithDelay) {
   auto r =
       ParseWithPreprocessor("module t; nand #(5) g2(out, a, b); endmodule");
