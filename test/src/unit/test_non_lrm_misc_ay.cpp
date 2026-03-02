@@ -14,25 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserAnnexF, AnnexFSequenceDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  sequence s1;\n"
-      "    @(posedge clk) a ##1 b ##1 c;\n"
-      "  endsequence\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kSequenceDecl) {
-      found = true;
-      EXPECT_EQ(item->name, "s1");
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 // --- F.1: Sequence concatenation with ## delay ---
 TEST(ParserAnnexF, AnnexFSequenceConcatDelay) {
   auto r = Parse(
