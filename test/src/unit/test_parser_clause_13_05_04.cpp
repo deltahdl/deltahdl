@@ -198,4 +198,19 @@ TEST(ParserSection13, NamedArgBindingNames) {
   }
 }
 
+TEST(ParserSection13, PositionalArgsHaveEmptyNames) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "  initial foo(1, 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* call = stmt->expr;
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(call->kind, ExprKind::kCall);
+}
+
 }  // namespace
