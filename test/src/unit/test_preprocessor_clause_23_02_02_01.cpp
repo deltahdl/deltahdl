@@ -36,4 +36,18 @@ TEST(SourceText, NonAnsiMultiplePorts) {
   EXPECT_EQ(ports[2].direction, Direction::kInout);
 }
 
+// Non-ANSI port_declaration with shared type: input [7:0] a, b;
+TEST(SourceText, NonAnsiSharedType) {
+  auto r = ParseWithPreprocessor(
+      "module m(a, b);\n"
+      "  input [7:0] a, b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  EXPECT_EQ(ports[0].direction, Direction::kInput);
+  EXPECT_EQ(ports[1].direction, Direction::kInput);
+}
+
 }  // namespace
