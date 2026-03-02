@@ -24,4 +24,29 @@ TEST(SourceText, ExternFunctionPrototypeInModule) {
   EXPECT_TRUE(mod->items[0]->func_body_stmts.empty());
 }
 
+static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
+  for (const auto* item : items)
+    if (item->kind == kind) return true;
+  return false;
+}
+
+// §3.5:
+TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
+  auto r = ParseWithPreprocessor(
+      "interface ifc;\n"
+      "  function automatic int get_data;\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "  task automatic send(input int val);\n"
+      "  endtask\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
+}
+
 }  // namespace

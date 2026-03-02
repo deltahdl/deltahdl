@@ -20,24 +20,6 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// §3.5:
-TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
-  auto r = ParseWithPreprocessor(
-      "interface ifc;\n"
-      "  function automatic int get_data;\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "  task automatic send(input int val);\n"
-      "  endtask\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kFunctionDecl));
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
-}
-
 // §3.5: "an interface can also contain processes (i.e., initial or always
 //        procedures) and continuous assignments"
 TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
