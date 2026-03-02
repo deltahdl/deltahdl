@@ -2,27 +2,53 @@
 
 import subprocess
 import sys
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import pytest
 
 from implement_clause import invoke_implement_subclause, main, parse_args
 
+INVOKE_KWARGS = dict(
+    lrm="/path/lrm.txt", subclause="4.2", issue=123,
+    organization="deltahdl", repo="deltahdl",
+)
 
-def test_invoke_implement_subclause_calls_subprocess() -> None:
+
+@contextmanager
+def _patch_main_with_subclauses(
+    *, subclauses=None, implementable=None,
+    synced_body="body", next_sub="4.2",
+):
+    """Patch all dependencies for main() with subclauses."""
+    if subclauses is None:
+        subclauses = {"4.1": "General", "4.2": "Exec"}
+    if implementable is None:
+        implementable = list(subclauses.keys())
+    with (
+        patch("implement_clause.parse_subclauses",
+              return_value=subclauses),
+        patch("implement_clause.extract_clause_text",
+              return_value="text"),
+        patch("implement_clause.filter_implementable",
+              return_value=implementable),
+        patch("implement_clause.fetch_issue_body", return_value=""),
+        patch("implement_clause.build_synced_body",
+              return_value=synced_body),
+        patch("implement_clause.update_issue_body"),
+        patch("implement_clause.next_unchecked",
+              return_value=next_sub),
+        patch("implement_clause.invoke_implement_subclause") as mock_inv,
+    ):
+        yield mock_inv
+
+
+def test_invoke_implement_subclause_calls_subprocess(
+    invoke_subprocess_ok,
+) -> None:
     """Correct command is passed to subprocess.run."""
-    with patch("implement_clause.subprocess.run") as mock_run:
-        mock_run.return_value = subprocess.CompletedProcess(
-            args=[], returncode=0,
-        )
-        invoke_implement_subclause(
-            lrm="/path/lrm.txt",
-            subclause="4.2",
-            issue=123,
-            organization="deltahdl",
-            repo="deltahdl",
-        )
-    assert mock_run.call_args[0][0] == [
+    invoke_implement_subclause(**INVOKE_KWARGS)
+    assert invoke_subprocess_ok.call_args[0][0] == [
         sys.executable, "-m", "implement_subclause",
         "--lrm", "/path/lrm.txt",
         "--subclause", "4.2",
@@ -32,19 +58,11 @@ def test_invoke_implement_subclause_calls_subprocess() -> None:
     ]
 
 
-def test_invoke_implement_subclause_prints_subclause(capsys) -> None:
+def test_invoke_implement_subclause_prints_subclause(
+    invoke_subprocess_ok, capsys,
+) -> None:
     """Prints which subclause is being invoked."""
-    with patch("implement_clause.subprocess.run") as mock_run:
-        mock_run.return_value = subprocess.CompletedProcess(
-            args=[], returncode=0,
-        )
-        invoke_implement_subclause(
-            lrm="/path/lrm.txt",
-            subclause="4.2",
-            issue=123,
-            organization="deltahdl",
-            repo="deltahdl",
-        )
+    invoke_implement_subclause(**INVOKE_KWARGS)
     assert "4.2" in capsys.readouterr().out
 
 
@@ -140,57 +158,23 @@ def test_main_no_subclauses_prints_leaf(clause_argv, capsys) -> None:
 
 def test_main_with_subclauses(clause_argv) -> None:
     """Next unchecked subclause is passed to implement_subclause."""
-    with (
-        patch("implement_clause.parse_subclauses", return_value={
-            "4.1": "General", "4.2": "Exec",
-        }),
-        patch("implement_clause.extract_clause_text", return_value="text"),
-        patch("implement_clause.filter_implementable",
-              return_value=["4.1", "4.2"]),
-        patch("implement_clause.fetch_issue_body", return_value=""),
-        patch("implement_clause.build_synced_body", return_value="body"),
-        patch("implement_clause.update_issue_body"),
-        patch("implement_clause.next_unchecked", return_value="4.2"),
-        patch("implement_clause.invoke_implement_subclause") as mock_inv,
-    ):
+    with _patch_main_with_subclauses() as mock_inv:
         main(clause_argv)
     assert mock_inv.call_args.kwargs["subclause"] == "4.2"
 
 
 def test_main_prints_subclauses_found(clause_argv, capsys) -> None:
     """Prints how many subclauses were discovered."""
-    with (
-        patch("implement_clause.parse_subclauses", return_value={
-            "4.1": "General", "4.2": "Exec",
-        }),
-        patch("implement_clause.extract_clause_text", return_value="text"),
-        patch("implement_clause.filter_implementable",
-              return_value=["4.1", "4.2"]),
-        patch("implement_clause.fetch_issue_body", return_value=""),
-        patch("implement_clause.build_synced_body", return_value="body"),
-        patch("implement_clause.update_issue_body"),
-        patch("implement_clause.next_unchecked", return_value="4.2"),
-        patch("implement_clause.invoke_implement_subclause"),
-    ):
+    with _patch_main_with_subclauses():
         main(clause_argv)
     assert "Found 2 subclauses" in capsys.readouterr().out
 
 
 def test_main_prints_synced_body(clause_argv, capsys) -> None:
-    """Prints the synced issue body to stderr."""
-    with (
-        patch("implement_clause.parse_subclauses", return_value={
-            "4.1": "General", "4.2": "Exec",
-        }),
-        patch("implement_clause.extract_clause_text", return_value="text"),
-        patch("implement_clause.filter_implementable",
-              return_value=["4.1", "4.2"]),
-        patch("implement_clause.fetch_issue_body", return_value=""),
-        patch("implement_clause.build_synced_body",
-              return_value="## Subclauses\n\n- [ ] 4.1 General\n"),
-        patch("implement_clause.update_issue_body"),
-        patch("implement_clause.next_unchecked", return_value="4.1"),
-        patch("implement_clause.invoke_implement_subclause"),
+    """Prints the synced issue body."""
+    with _patch_main_with_subclauses(
+        synced_body="## Subclauses\n\n- [ ] 4.1 General\n",
+        next_sub="4.1",
     ):
         main(clause_argv)
     assert "## Subclauses" in capsys.readouterr().out
@@ -198,36 +182,15 @@ def test_main_prints_synced_body(clause_argv, capsys) -> None:
 
 def test_main_prints_next_subclause(clause_argv, capsys) -> None:
     """Prints which subclause was picked as next."""
-    with (
-        patch("implement_clause.parse_subclauses", return_value={
-            "4.1": "General", "4.2": "Exec",
-        }),
-        patch("implement_clause.extract_clause_text", return_value="text"),
-        patch("implement_clause.filter_implementable",
-              return_value=["4.1", "4.2"]),
-        patch("implement_clause.fetch_issue_body", return_value=""),
-        patch("implement_clause.build_synced_body", return_value="body"),
-        patch("implement_clause.update_issue_body"),
-        patch("implement_clause.next_unchecked", return_value="4.2"),
-        patch("implement_clause.invoke_implement_subclause"),
-    ):
+    with _patch_main_with_subclauses():
         main(clause_argv)
     assert "Next unchecked: 4.2" in capsys.readouterr().out
 
 
 def test_main_all_done(clause_argv, capsys) -> None:
     """Prints all-done message when no unchecked subclauses remain."""
-    with (
-        patch("implement_clause.parse_subclauses", return_value={
-            "4.1": "General",
-        }),
-        patch("implement_clause.extract_clause_text", return_value="text"),
-        patch("implement_clause.filter_implementable",
-              return_value=["4.1"]),
-        patch("implement_clause.fetch_issue_body", return_value=""),
-        patch("implement_clause.build_synced_body", return_value="body"),
-        patch("implement_clause.update_issue_body"),
-        patch("implement_clause.next_unchecked", return_value=None),
+    with _patch_main_with_subclauses(
+        subclauses={"4.1": "General"}, next_sub=None,
     ):
         main(clause_argv)
     assert "All subclauses are done" in capsys.readouterr().out
