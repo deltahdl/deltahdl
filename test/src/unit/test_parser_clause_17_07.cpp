@@ -51,4 +51,17 @@ TEST_F(VerifyParseTest, CheckerWithRandVariable) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
+TEST_F(VerifyParseTest, CheckerWithRandConstVariable) {
+  auto* unit = Parse(R"(
+    checker reason_about_one_bit(bit [63:0] data1, bit [63:0] data2,
+                                  event clock);
+      rand const bit [5:0] idx;
+      a1: assert property (@clock data1[idx] == data2[idx]);
+    endchecker : reason_about_one_bit
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_EQ(unit->checkers[0]->name, "reason_about_one_bit");
+  EXPECT_FALSE(unit->checkers[0]->items.empty());
+}
+
 }  // namespace
