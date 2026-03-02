@@ -354,4 +354,29 @@ TEST(ParserSection6, Sec6_5_VarWithContAssign) {
   EXPECT_EQ(items[1]->kind, ModuleItemKind::kContAssign);
 }
 
+static Expr* FirstContAssignRHS(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kContAssign) return item->assign_rhs;
+  }
+  return nullptr;
+}
+
+// tf_call in continuous assignment (function_subroutine_call as primary)
+TEST(ParserA82, TfCallInContAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire [7:0] y;\n"
+      "  function logic [7:0] compute(input logic [7:0] a);\n"
+      "    return a + 8'd1;\n"
+      "  endfunction\n"
+      "  assign y = compute(8'd5);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstContAssignRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(rhs->callee, "compute");
+}
+
 }  // namespace
