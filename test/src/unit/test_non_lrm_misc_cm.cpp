@@ -34,27 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §15.5.3: fork with -> trigger and wait(.triggered) (from LRM example).
-TEST(ParserSection15, TriggeredMethodForkPattern) {
-  auto r = Parse(
-      "module m;\n"
-      "  event blast;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      -> blast;\n"
-      "      wait(blast.triggered);\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_GE(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kEventTrigger);
-  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kWait);
-}
-
 // §15.5.3: hierarchical wait(.triggered).
 TEST(ParserSection15, TriggeredMethodHierarchical) {
   auto r = Parse(
