@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 26.2 -- Package declarations
-// =============================================================================
-TEST(ParserSection26, EmptyPackage) {
-  auto r = Parse(
-      "package pkg;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-}
-
 TEST(ParserSection26, PackageWithEndLabel) {
   auto r = Parse(
       "package my_pkg;\n"
