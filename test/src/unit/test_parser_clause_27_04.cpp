@@ -525,4 +525,20 @@ TEST(ParserA83, GenvarExprInGenerateFor) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// --- Single-item generate-for without begin/end (§27.4) ---
+TEST(ParserSection27, GenerateForSingleItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (i = 0; i < 4; i = i + 1)\n"
+      "    assign out[i] = in[i];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  auto* gen = mod->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
+  ASSERT_EQ(gen->gen_body.size(), 1);
+  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
+}
+
 }  // namespace
