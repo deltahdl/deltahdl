@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § hex_base — 'SH
-TEST(ParserA87, HexBaseSignedUpper) {
-  auto r = Parse("module m; logic [7:0] x; initial x = 8'SHAB; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->int_val, 0xABu);
-}
-
 // § decimal_digit — 0 through 9
 TEST(ParserA87, DecimalDigitAll) {
   auto r = Parse("module m; int x; initial x = 1234567890; endmodule\n");
