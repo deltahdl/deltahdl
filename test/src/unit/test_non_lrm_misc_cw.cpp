@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA27, TaskBodyInterfaceScope) {
-  auto r = Parse(
-      "interface intf;\n"
-      "  extern task my_task();\n"
-      "endinterface\n"
-      "task intf.my_task();\n"
-      "endtask\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA27, TaskPrototypeExternNoPorts) {
   auto r = Parse(
       "module m;\n"

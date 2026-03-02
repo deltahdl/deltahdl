@@ -139,4 +139,15 @@ TEST(SourceText, ExternTaskPrototypeInInterface) {
   EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
 }
 
+TEST(ParserA27, TaskBodyInterfaceScope) {
+  auto r = Parse(
+      "interface intf;\n"
+      "  extern task my_task();\n"
+      "endinterface\n"
+      "task intf.my_task();\n"
+      "endtask\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
