@@ -564,4 +564,14 @@ TEST(ParserA87, HexValueWithUnderscores) {
   EXPECT_EQ(rhs->int_val, 0xABCDu);
 }
 
+// § decimal_base — 'd
+TEST(ParserA87, DecimalBaseLower) {
+  auto r = Parse("module m; logic [7:0] x; initial x = 8'd99; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->int_val, 99u);
+}
+
 }  // namespace
