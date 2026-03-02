@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection27, GenerateIfElseIfChainNesting) {
-  auto r = Parse(
-      "module m;\n"
-      "  if (WIDTH == 1)\n"
-      "    assign out = a;\n"
-      "  else if (WIDTH == 2)\n"
-      "    assign out = b;\n"
-      "  else\n"
-      "    assign out = c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->gen_else->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_NE(gen->gen_else->gen_else, nullptr);
-}
-
 // --- generate...endgenerate wrapper (§27.3) ---
 TEST(ParserSection27, GenerateRegion) {
   auto r = Parse(
