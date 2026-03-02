@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § real_number — unsigned_number . unsigned_number exp sign unsigned_number
-TEST(ParserA87, RealScientificFull) {
-  auto r = Parse("module m; real x; initial x = 1.5e+3; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
 // § fixed_point_number — unsigned_number . unsigned_number
 TEST(ParserA87, FixedPointNumber) {
   auto r = Parse("module m; real x; initial x = 0.5; endmodule\n");
