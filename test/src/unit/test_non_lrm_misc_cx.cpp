@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-// package_item: package_export_declaration — export pkg::item
-TEST(SourceText, PackageExportNamed) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  export other_pkg::my_func;\n"
-      "  export another::*;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
-}
-
 TEST(ParserA213, PackageExportSingleItem) {
   auto r = Parse(
       "package pkg;\n"
