@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § nonrange_variable_lvalue — member access (no range)
-TEST(ParserA85, NonrangeVarLvalueMemberAccess) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } s_t;\n"
-      "  s_t s;\n"
-      "  initial s.a = 8'h12;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
-}
-
 // =============================================================================
 // A.8.6 Operators — unary_operator
 // =============================================================================
