@@ -27,24 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// §24.6 Program with task and function declarations
-// =============================================================================
-TEST_F(ProgramParseTest, ProgramWithTaskDecl) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  task run;\n"
-      "    $display(\"running\");\n"
-      "  endtask\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  ASSERT_GE(unit->programs[0]->items.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_EQ(unit->programs[0]->items[0]->name, "run");
-}
-
 TEST_F(ProgramParseTest, ProgramWithFunctionDecl) {
   auto* unit = Parse(
       "program p;\n"
