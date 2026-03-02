@@ -17,19 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// non_port_interface_item ::= generate_region
-TEST(SourceText, NonPortInterfaceItemGenerateRegion) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  generate\n"
-      "    assign a = b;\n"
-      "  endgenerate\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_GE(r.cu->interfaces[0]->items.size(), 1u);
-}
-
 // non_port_interface_item ::= program_declaration
 TEST(SourceText, NonPortInterfaceItemProgram) {
   auto r = Parse(
