@@ -69,4 +69,12 @@ TEST(ParserSection22, DefaultNettypeUwire) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, DefaultNettypeBeforeAndAfterModule) {
+  EXPECT_TRUE(
+      ParseOk("`default_nettype none\n"
+              "module t;\n"
+              "endmodule\n"
+              "`default_nettype wire\n"));
+}
+
 }  // namespace
