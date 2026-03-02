@@ -169,4 +169,23 @@ TEST(ParserA612, RsProductionItemBare) {
   EXPECT_FALSE(r.has_errors);
 }
 
+using CheckerParseTest = ProgramTestParse;
+
+// --- Randsequence statement (§18.17) ---
+TEST(ParserSection18, RandsequenceStmt) {
+  auto r = Parse(
+      "module top;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : first second;\n"
+      "      first : { $display(\"first\"); };\n"
+      "      second : { $display(\"second\"); };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
