@@ -36,4 +36,16 @@ TEST(ParserA27, TaskPrototypeExtern) {
   EXPECT_EQ(item->name, "my_task");
 }
 
+TEST(ParserA27, TaskPrototypeExternNoPorts) {
+  auto r = Parse(
+      "module m;\n"
+      "  extern task run;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->is_extern);
+  EXPECT_TRUE(item->func_args.empty());
+}
+
 }  // namespace
