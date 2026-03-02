@@ -41,4 +41,11 @@ TEST(Section20, CountonesSparse) {
   EXPECT_EQ(result.ToUint64(), 3u);
 }
 
+TEST(Section20, OnehotTrue) {
+  SimFixture f;
+  auto* expr = MakeSysCall(f.arena, "$onehot", {MakeInt(f.arena, 4)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
