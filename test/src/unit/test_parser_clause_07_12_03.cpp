@@ -201,4 +201,13 @@ TEST(ParserA82, ArrayManipCallSum) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
+TEST(ParserA82, ArrayMethodNameAnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = arr.and(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
