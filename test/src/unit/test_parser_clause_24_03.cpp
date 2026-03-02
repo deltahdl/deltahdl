@@ -430,4 +430,19 @@ TEST_F(ProgramParseTest, ProgramWithTaskDecl) {
   EXPECT_EQ(unit->programs[0]->items[0]->name, "run");
 }
 
+TEST_F(ProgramParseTest, ProgramWithFunctionDecl) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  function int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_GE(unit->programs[0]->items.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(unit->programs[0]->items[0]->name, "add");
+}
+
 }  // namespace
