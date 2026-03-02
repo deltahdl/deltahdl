@@ -24,22 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// LRM section 23.3 -- Ports (additional)
-// =============================================================================
-TEST(ParserSection23, AnsiPortsInputOutput) {
-  auto r = Parse(
-      "module m(input logic clk, input logic rst, output logic q);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 3u);
-  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(mod->ports[0].name, "clk");
-  EXPECT_EQ(mod->ports[2].direction, Direction::kOutput);
-  EXPECT_EQ(mod->ports[2].name, "q");
-}
-
 TEST(ParserSection23, AnsiPortsWithDefaultType) {
   auto r = Parse(
       "module m(input a, output b);\n"
