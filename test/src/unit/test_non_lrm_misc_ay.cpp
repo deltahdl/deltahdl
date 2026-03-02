@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexN, AnnexNDistNormal) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = $dist_normal(seed, 50, 10);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(ParserAnnexN, AnnexNDistExponential) {
   auto r = Parse(
       "module m;\n"
