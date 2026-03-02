@@ -408,4 +408,23 @@ TEST(ParserSection12, ContinueStatementParses) {
   EXPECT_EQ(body->kind, StmtKind::kBlock);
 }
 
+TEST(ParserSection12, ContinueStatementInBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin\n"
+      "      if (i == 5) continue;\n"
+      "      x = i;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* body = stmt->for_body;
+  ASSERT_NE(body, nullptr);
+  auto* if_stmt = body->stmts[0];
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
+}
+
 }  // namespace
