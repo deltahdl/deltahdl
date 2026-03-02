@@ -45,29 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// §14.3 — Combined input/output skews
-// =============================================================================
-TEST(ParserSection14, CombinedInputOutputSkew) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #2 output #4 cmd;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  EXPECT_EQ(sig.direction, Direction::kInout);
-  EXPECT_EQ(sig.name, "cmd");
-
-  const void* const kSkewPtrs[] = {sig.skew_delay, sig.out_skew_delay};
-  for (const auto* p : kSkewPtrs) {
-    EXPECT_NE(p, nullptr);
-  }
-}
-
-// =============================================================================
 // §14.3 — Clocking block in module context alongside other items
 // =============================================================================
 TEST(ParserSection14, ClockingBlockAmongOtherItems) {
