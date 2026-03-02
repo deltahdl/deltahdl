@@ -44,4 +44,11 @@ TEST(SimA84, PrimarySystemCallClog2) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
+TEST(Section20, Clog2One) {
+  SimFixture f;
+  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 1)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
 }  // namespace
