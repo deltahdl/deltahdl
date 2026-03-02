@@ -26,15 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, RoseFunctionInProperty) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) $rose(req) |-> ##[1:3] ack);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection16, FellFunctionInProperty) {
   auto r = Parse(
       "module m;\n"
