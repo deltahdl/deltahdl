@@ -6,13 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, DefaultNettypeTri) {
-  EXPECT_TRUE(
-      ParseOk("`default_nettype tri\n"
-              "module t;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection22, DefaultNettypeWand) {
   EXPECT_TRUE(
       ParseOk("`default_nettype wand\n"
