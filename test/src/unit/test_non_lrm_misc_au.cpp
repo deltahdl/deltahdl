@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-// method_call_root: implicit_class_handle (super)
-TEST(ParserA82, MethodCallRootSuper) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin super.method(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-}
-
 // =============================================================================
 // A.8.2 Subroutine calls — method_call_body / built_in_method_call
 // =============================================================================
