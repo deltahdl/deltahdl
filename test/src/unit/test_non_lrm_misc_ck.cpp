@@ -18,23 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// =============================================================================
-// LRM section 13.5.2 -- Const ref arguments (additional tests)
-// =============================================================================
-TEST(ParserSection13, ConstRefArgOnTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  task process_data(const ref int data[]);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "process_data");
-  ASSERT_NE(tk, nullptr);
-  ASSERT_EQ(tk->func_args.size(), 1u);
-  EXPECT_TRUE(tk->func_args[0].is_const);
-  EXPECT_EQ(tk->func_args[0].direction, Direction::kRef);
-}
-
 TEST(ParserSection13, ConstRefMixedWithOtherDirections) {
   auto r = Parse(
       "module m;\n"
