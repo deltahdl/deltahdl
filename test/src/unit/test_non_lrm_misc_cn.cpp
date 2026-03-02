@@ -26,17 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, PropertyDeclWithEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p1;\n"
-      "    @(posedge clk) a |-> b;\n"
-      "  endproperty : p1\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // =============================================================================
 // §16.12.7 Property instances / implication
 // =============================================================================

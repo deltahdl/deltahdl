@@ -262,4 +262,15 @@ TEST(ParserSection16, PropertyDeclWithFormals) {
   EXPECT_EQ(pd->name, "p_req_ack");
 }
 
+TEST(ParserSection16, PropertyDeclWithEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p1;\n"
+      "    @(posedge clk) a |-> b;\n"
+      "  endproperty : p1\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
