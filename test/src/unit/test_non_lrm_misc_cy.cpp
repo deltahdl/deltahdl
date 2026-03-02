@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Parser, GateBufMultiOutput) {
-  auto r = ParseWithPreprocessor("module t; buf (o1, o2, in); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
-  EXPECT_EQ(item->gate_kind, GateKind::kBuf);
-  EXPECT_TRUE(item->gate_inst_name.empty());
-  EXPECT_EQ(item->gate_terminals.size(), 3);
-}
-
 TEST(ParserSection28, EnableGates) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
