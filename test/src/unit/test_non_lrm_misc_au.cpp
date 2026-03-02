@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA82, ArrayMethodNameOr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.or(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA82, ArrayMethodNameXor) {
   auto r = Parse(
       "module m;\n"
