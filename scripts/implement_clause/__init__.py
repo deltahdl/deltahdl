@@ -11,6 +11,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from lib.github import (
+    build_synced_body,
+    fetch_issue_body,
+    next_unchecked,
+    update_issue_body,
+)
+from lib.lrm import extract_clause_text, parse_subclauses
+
 
 def filter_implementable(
     clause_text: str,
@@ -99,3 +107,39 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error(f"LRM file not found: {args.lrm}")
 
     return args
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Orchestrate implementation of an LRM clause."""
+    args = parse_args(argv)
+    clause = args.clause or args.annex
+    lrm = Path(args.lrm)
+
+    subclauses = parse_subclauses(lrm, clause)
+
+    if not subclauses:
+        invoke_implement_subclause(
+            lrm=args.lrm, subclause=clause,
+            issue=args.issue, organization=args.organization,
+            repo=args.repo,
+        )
+        return
+
+    clause_text = extract_clause_text(lrm, clause)
+    implementable = filter_implementable(clause_text, subclauses)
+    impl_items = {k: subclauses[k] for k in implementable}
+
+    body = fetch_issue_body(args.organization, args.repo, args.issue)
+    new_body = build_synced_body(body, impl_items)
+    update_issue_body(args.organization, args.repo, args.issue, new_body)
+
+    subclause = next_unchecked(new_body)
+    if subclause is None:
+        print("All subclauses are done.")
+        return
+
+    invoke_implement_subclause(
+        lrm=args.lrm, subclause=subclause,
+        issue=args.issue, organization=args.organization,
+        repo=args.repo,
+    )
