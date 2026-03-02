@@ -49,4 +49,14 @@ TEST(ParserSection18, StdRandomizeWithMultipleVars) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+// § std::randomize_call (subroutine_call alternative)
+TEST(ParserA82, StdRandomizeCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin std::randomize(x) with { x > 0; }; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
