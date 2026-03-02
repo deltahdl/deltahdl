@@ -125,4 +125,11 @@ TEST(ParserSection23, ModuleEmptyPortList) {
   EXPECT_TRUE(r.cu->modules[0]->ports.empty());
 }
 
+TEST(ParserSection23, ModuleNoPortList) {
+  auto r = Parse("module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
+}
+
 }  // namespace
