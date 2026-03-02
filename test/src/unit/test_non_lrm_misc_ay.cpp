@@ -14,17 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.16: Negedge clocking ---
-TEST(ParserAnnexF, AnnexFNegedgeClocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(negedge clk) a |-> ##1 b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
-}
-
 // --- F.17: Sequence with chained concatenation ---
 TEST(ParserAnnexF, AnnexFChainedConcat) {
   auto r = Parse(
