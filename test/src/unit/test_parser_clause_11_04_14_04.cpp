@@ -60,4 +60,11 @@ TEST(ParserA81, StreamExpressionWithArrayRange) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
 
+// § array_range_expression ::= expression : expression
+TEST(ParserA81, StreamExprWithFixedRange) {
+  auto r = Parse("module m; initial x = {<< {a with [3:0]}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
