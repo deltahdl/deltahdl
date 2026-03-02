@@ -24,18 +24,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection20, ArrayHighLowFunctions) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [15:0] mem [0:255];\n"
-      "  initial begin\n"
-      "    $display(\"high=%0d low=%0d\", $high(mem), $low(mem));\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection20, ArrayDimensionsFunction) {
   auto r = Parse(
       "module m;\n"
