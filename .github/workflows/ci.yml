@@ -12,6 +12,12 @@ jobs:
         ${{ steps.check.outputs.force_static_analysis }}
       force-yamllint: >-
         ${{ steps.check.outputs.force_yamllint }}
+      implement-clause: >-
+        ${{ steps.check.outputs.implement_clause }}
+      implement-subclause: >-
+        ${{ steps.check.outputs.implement_subclause }}
+      lib-changed: >-
+        ${{ steps.check.outputs.lib_changed }}
       scripts-changed: >-
         ${{ steps.check.outputs.scripts_changed }}
       workflows-changed: >-
@@ -30,6 +36,9 @@ jobs:
             echo "clang_tidy_configs_changed=false" >> "$GITHUB_OUTPUT"
             echo "force_static_analysis=false" >> "$GITHUB_OUTPUT"
             echo "force_yamllint=false" >> "$GITHUB_OUTPUT"
+            echo "implement_clause=true" >> "$GITHUB_OUTPUT"
+            echo "implement_subclause=true" >> "$GITHUB_OUTPUT"
+            echo "lib_changed=true" >> "$GITHUB_OUTPUT"
             echo "scripts_changed=false" >> "$GITHUB_OUTPUT"
             echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -41,6 +50,9 @@ jobs:
             echo "clang_tidy_configs_changed=true" >> "$GITHUB_OUTPUT"
             echo "force_static_analysis=false" >> "$GITHUB_OUTPUT"
             echo "force_yamllint=false" >> "$GITHUB_OUTPUT"
+            echo "implement_clause=true" >> "$GITHUB_OUTPUT"
+            echo "implement_subclause=true" >> "$GITHUB_OUTPUT"
+            echo "lib_changed=true" >> "$GITHUB_OUTPUT"
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
             echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -62,6 +74,26 @@ jobs:
           else
             echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
           fi
+          LIB='^(lib/(lrm|github)/|test/lib/(lrm|github)/)'
+          IC='^(scripts/implement_clause/|test/scripts/implement_clause/|\.github/workflows/implement_clause\.yml)'
+          ISC='^(scripts/implement_subclause/|test/scripts/implement_subclause/|\.github/workflows/implement_subclause\.yml)'
+          LIB_HIT=false
+          if echo "$CHANGED" | grep -qE "$LIB"; then
+            LIB_HIT=true
+          fi
+          echo "lib_changed=$LIB_HIT" >> "$GITHUB_OUTPUT"
+          if [ "$LIB_HIT" = "true" ] \
+              || echo "$CHANGED" | grep -qE "$IC"; then
+            echo "implement_clause=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "implement_clause=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$LIB_HIT" = "true" ] \
+              || echo "$CHANGED" | grep -qE "$ISC"; then
+            echo "implement_subclause=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "implement_subclause=false" >> "$GITHUB_OUTPUT"
+          fi
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             SHA="${{ github.event.pull_request.head.sha }}"
             MSG=$(git log -1 --format=%B "$SHA")
@@ -82,6 +114,7 @@ jobs:
   static-analysis:
     if: >-
       needs.detect.outputs.force-static-analysis == 'true'
+      || needs.detect.outputs.lib-changed == 'true'
       || needs.detect.outputs.scripts-changed == 'true'
       || inputs.force-static-analysis
     needs: detect
@@ -179,6 +212,54 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  # ── Lane: lib/github ──
+  test-lib-github:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/ci.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/github/unit/ -v
+          --cov=lib.github
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  # ── Lane: lib/lrm ──
+  test-lib-lrm:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/ci.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/lrm/unit/ -v
+          --cov=lib.lrm
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   # ── Lane: run_sim_tests ──
   test-run-sim-tests:
     needs:
@@ -231,7 +312,7 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  # ── Trigger ──
+  # ── Trigger: deltahdl ──
   trigger-deltahdl-ci:
     env:
       GH_TOKEN: ${{ secrets.GH_PAT }}
@@ -239,15 +320,71 @@ jobs:
     needs:
       - detect
       - static-analysis
+      - test-lib
+      - test-lib-github
+      - test-lib-lrm
       - test-run-sim-tests
       - test-run-sv-tests
-      - test-lib
       - yamllint
     runs-on: ubuntu-24.04
     steps:
       - name: Trigger DeltaHDL workflow
         run: >-
           gh workflow run deltahdl.yml
+          --repo "${{ github.repository }}"
+          -f branch="${{ github.event.pull_request.head.ref
+          || github.ref_name }}"
+          -f event="${{ github.event_name }}"
+          -f sha="${{ github.event.pull_request.head.sha
+          || github.sha }}"
+  # ── Trigger: implement_clause ──
+  trigger-implement-clause:
+    env:
+      GH_TOKEN: ${{ secrets.GH_PAT }}
+    if: >-
+      !failure() && !cancelled()
+      && needs.detect.outputs.implement-clause == 'true'
+    needs:
+      - detect
+      - static-analysis
+      - test-lib
+      - test-lib-github
+      - test-lib-lrm
+      - test-run-sim-tests
+      - test-run-sv-tests
+      - yamllint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Trigger Implement Clause workflow
+        run: >-
+          gh workflow run implement_clause.yml
+          --repo "${{ github.repository }}"
+          -f branch="${{ github.event.pull_request.head.ref
+          || github.ref_name }}"
+          -f event="${{ github.event_name }}"
+          -f sha="${{ github.event.pull_request.head.sha
+          || github.sha }}"
+  # ── Trigger: implement_subclause ──
+  trigger-implement-subclause:
+    env:
+      GH_TOKEN: ${{ secrets.GH_PAT }}
+    if: >-
+      !failure() && !cancelled()
+      && needs.detect.outputs.implement-subclause == 'true'
+    needs:
+      - detect
+      - static-analysis
+      - test-lib
+      - test-lib-github
+      - test-lib-lrm
+      - test-run-sim-tests
+      - test-run-sv-tests
+      - yamllint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Trigger Implement Subclause workflow
+        run: >-
+          gh workflow run implement_subclause.yml
           --repo "${{ github.repository }}"
           -f branch="${{ github.event.pull_request.head.ref
           || github.ref_name }}"
@@ -312,9 +449,13 @@ on:
       - .github/workflows/ci.yml
       - .github/workflows/deltahdl.yml
       - .github/workflows/documentation.yml
+      - .github/workflows/implement_clause.yml
+      - .github/workflows/implement_subclause.yml
       - CMakeLists.txt
       - etc/**
       - lib/**
+      - scripts/implement_clause/**
+      - scripts/implement_subclause/**
       - scripts/run_sim_tests/**
       - scripts/run_sv_tests/**
       - src/**
@@ -322,6 +463,8 @@ on:
       - test/lib/**
       - test/scripts/__init__.py
       - test/scripts/conftest.py
+      - test/scripts/implement_clause/**
+      - test/scripts/implement_subclause/**
       - test/scripts/run_sim_tests/**
       - test/scripts/run_sv_tests/**
       - test/src/**
@@ -331,9 +474,13 @@ on:
       - .github/workflows/ci.yml
       - .github/workflows/deltahdl.yml
       - .github/workflows/documentation.yml
+      - .github/workflows/implement_clause.yml
+      - .github/workflows/implement_subclause.yml
       - CMakeLists.txt
       - etc/**
       - lib/**
+      - scripts/implement_clause/**
+      - scripts/implement_subclause/**
       - scripts/run_sim_tests/**
       - scripts/run_sv_tests/**
       - src/**
@@ -341,6 +488,8 @@ on:
       - test/lib/**
       - test/scripts/__init__.py
       - test/scripts/conftest.py
+      - test/scripts/implement_clause/**
+      - test/scripts/implement_subclause/**
       - test/scripts/run_sim_tests/**
       - test/scripts/run_sv_tests/**
       - test/src/**
