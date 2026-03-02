@@ -1,0 +1,175 @@
+---
+concurrency:
+  cancel-in-progress: true
+  group: lib-${{ github.ref }}
+jobs:
+  static-analysis:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-lib-${{
+            hashFiles('.github/workflows/lib.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-lib-
+      - name: Install tools
+        run: |
+          pip install \
+            assert-no-inline-directives \
+            assert-no-linter-config-files \
+            assert-one-assert-per-pytest \
+            mypy pylint pytest pytest-cov
+          npm install -g jscpd
+      - name: Assert no inline lint disables
+        run: >-
+          assert-no-inline-directives
+          --tools pylint,mypy
+          --verbose
+          ${{ github.workspace }}/lib/lrm/**/*
+          ${{ github.workspace }}/lib/github/**/*
+          ${{ github.workspace }}/test/lib/lrm/**/*
+          ${{ github.workspace }}/test/lib/github/**/*
+      - name: Assert no linter config files
+        run: >-
+          assert-no-linter-config-files
+          --linters pylint,mypy
+          --verbose
+          ${{ github.workspace }}
+      - name: Assert one assert per pytest
+        run: >-
+          assert-one-assert-per-pytest
+          --verbose
+          ${{ github.workspace }}/test/lib/lrm
+          ${{ github.workspace }}/test/lib/github
+      - name: Run pylint on source
+        run: >-
+          python3 -m pylint
+          lib/lrm/ lib/github/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run pylint on tests
+        run: >-
+          python3 -m pylint --recursive=y
+          test/lib/lrm/ test/lib/github/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run mypy on source
+        run: >-
+          python3 -m mypy
+          lib/lrm/ lib/github/
+      - name: Run mypy on tests
+        run: >-
+          python3 -m mypy --explicit-package-bases
+          test/lib/lrm/ test/lib/github/
+      - name: Detect copy-paste in source
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console
+          lib/lrm/ lib/github/
+      - name: Detect copy-paste in tests
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console
+          test/lib/lrm/ test/lib/github/
+  test-lib-github:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-lib-${{
+            hashFiles('.github/workflows/lib.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/github/unit/ -v
+          --cov=lib.github
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  test-lib-lrm:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-lib-${{
+            hashFiles('.github/workflows/lib.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/lrm/unit/ -v
+          --cov=lib.lrm
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  trigger-implement-clause:
+    env:
+      GH_TOKEN: ${{ secrets.GH_PAT }}
+    if: "!failure() && !cancelled()"
+    needs:
+      - test-lib-github
+      - test-lib-lrm
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Trigger Implement Clause workflow
+        run: >-
+          gh workflow run implement_clause.yml
+          --repo "${{ github.repository }}"
+          -f branch="${{ github.event.pull_request.head.ref
+          || github.ref_name }}"
+          -f event="${{ github.event_name }}"
+          -f sha="${{ github.event.pull_request.head.sha
+          || github.sha }}"
+  trigger-implement-subclause:
+    env:
+      GH_TOKEN: ${{ secrets.GH_PAT }}
+    if: "!failure() && !cancelled()"
+    needs:
+      - test-lib-github
+      - test-lib-lrm
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Trigger Implement Subclause workflow
+        run: >-
+          gh workflow run implement_subclause.yml
+          --repo "${{ github.repository }}"
+          -f branch="${{ github.event.pull_request.head.ref
+          || github.ref_name }}"
+          -f event="${{ github.event_name }}"
+          -f sha="${{ github.event.pull_request.head.sha
+          || github.sha }}"
+name: Lib
+on:
+  pull_request:
+    paths:
+      - .github/workflows/lib.yml
+      - lib/github/**
+      - lib/lrm/**
+      - test/lib/github/**
+      - test/lib/lrm/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/lib.yml
+      - lib/github/**
+      - lib/lrm/**
+      - test/lib/github/**
+      - test/lib/lrm/**
+  workflow_dispatch:

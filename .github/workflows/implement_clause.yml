@@ -1,12 +1,14 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: implement-clause-${{ github.ref }}
+  group: implement-clause-${{ inputs.branch || github.ref }}
 jobs:
   static-analysis:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || '' }}
       - name: Restore pip cache
         uses: actions/cache@v4
         with:
@@ -29,11 +31,7 @@ jobs:
           assert-no-inline-directives
           --tools pylint,mypy
           --verbose
-          ${{ github.workspace }}/lib/lrm/**/*
-          ${{ github.workspace }}/lib/github/**/*
           ${{ github.workspace }}/scripts/implement_clause/**/*
-          ${{ github.workspace }}/test/lib/lrm/**/*
-          ${{ github.workspace }}/test/lib/github/**/*
           ${{ github.workspace }}/test/scripts/implement_clause/**/*
       - name: Assert no linter config files
         run: >-
@@ -45,95 +43,42 @@ jobs:
         run: >-
           assert-one-assert-per-pytest
           --verbose
-          ${{ github.workspace }}/test/lib/lrm
-          ${{ github.workspace }}/test/lib/github
           ${{ github.workspace }}/test/scripts/implement_clause
       - name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
-          lib/lrm/ lib/github/ scripts/implement_clause/
+          scripts/implement_clause/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts:test/scripts/implement_clause/unit
           python3 -m pylint --recursive=y
-          test/lib/lrm/ test/lib/github/
           test/scripts/implement_clause/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy
-          lib/lrm/ lib/github/ scripts/implement_clause/
+          scripts/implement_clause/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts:test/scripts/implement_clause/unit
           python3 -m mypy --explicit-package-bases
-          test/lib/lrm/ test/lib/github/
           test/scripts/implement_clause/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console
-          lib/lrm/ lib/github/ scripts/implement_clause/
+          --reporters console scripts/implement_clause/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console
-          test/lib/lrm/ test/lib/github/
-          test/scripts/implement_clause/
-  test-lib-github:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-implement-clause-${{
-            hashFiles('.github/workflows/implement_clause.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-implement-clause-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/github/unit/ -v
-          --cov=lib.github
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  test-lib-lrm:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-implement-clause-${{
-            hashFiles('.github/workflows/implement_clause.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-implement-clause-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/lrm/unit/ -v
-          --cov=lib.lrm
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
+          --reporters console test/scripts/implement_clause/
   test:
-    needs:
-      - test-lib-github
-      - test-lib-lrm
+    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || '' }}
       - name: Restore pip cache
         uses: actions/cache@v4
         with:
@@ -166,20 +111,25 @@ on:
   pull_request:
     paths:
       - .github/workflows/implement_clause.yml
-      - lib/github/**
-      - lib/lrm/**
       - scripts/implement_clause/**
-      - test/lib/github/**
-      - test/lib/lrm/**
       - test/scripts/implement_clause/**
   push:
     branches: [main]
     paths:
       - .github/workflows/implement_clause.yml
-      - lib/github/**
-      - lib/lrm/**
       - scripts/implement_clause/**
-      - test/lib/github/**
-      - test/lib/lrm/**
       - test/scripts/implement_clause/**
   workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch that triggered CI
+        required: false
+        type: string
+      event:
+        description: Event that triggered CI
+        required: false
+        type: string
+      sha:
+        description: Commit SHA to check out
+        required: false
+        type: string
