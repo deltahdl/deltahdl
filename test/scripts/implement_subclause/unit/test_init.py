@@ -49,14 +49,14 @@ def test_parse_args_requires_issue(tmp_path):
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
     with pytest.raises(SystemExit):
-        parse_args(["--lrm", str(lrm), "--clause", "4.1"])
+        parse_args(["--lrm", str(lrm), "--subclause", "4.1"])
 
 
 def test_parse_args_accepts_issue(tmp_path):
     """--issue is parsed as int."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
-    args = parse_args(["--lrm", str(lrm), "--clause", "4.1", "--issue", "8"])
+    args = parse_args(["--lrm", str(lrm), "--subclause", "4.1", "--issue", "8"])
     assert args.issue == 8
 
 
@@ -65,7 +65,7 @@ def test_parse_args_model_default(tmp_path):
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
     args = parse_args([
-        "--lrm", str(lrm), "--clause", "4.1", "--issue", "8",
+        "--lrm", str(lrm), "--subclause", "4.1", "--issue", "8",
     ])
     assert args.model == "opus"
 
@@ -75,7 +75,7 @@ def test_parse_args_model_override(tmp_path):
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
     args = parse_args([
-        "--lrm", str(lrm), "--clause", "4.1", "--issue", "8",
+        "--lrm", str(lrm), "--subclause", "4.1", "--issue", "8",
         "--model", "opus",
     ])
     assert args.model == "opus"
@@ -87,7 +87,7 @@ def test_parse_args_rejects_bad_clause(tmp_path):
     lrm.write_text("")
     with pytest.raises(SystemExit):
         parse_args([
-            "--lrm", str(lrm), "--clause", "bad", "--issue", "8",
+            "--lrm", str(lrm), "--subclause", "bad", "--issue", "8",
         ])
 
 
@@ -95,7 +95,7 @@ def test_parse_args_rejects_missing_lrm(tmp_path):
     """Non-existent LRM file exits."""
     with pytest.raises(SystemExit):
         parse_args([
-            "--lrm", str(tmp_path / "no.txt"), "--clause", "4.1",
+            "--lrm", str(tmp_path / "no.txt"), "--subclause", "4.1",
             "--issue", "8",
         ])
 
@@ -105,9 +105,9 @@ def test_parse_args_accepts_annex_clause(tmp_path):
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
     args = parse_args([
-        "--lrm", str(lrm), "--clause", "B", "--issue", "44",
+        "--lrm", str(lrm), "--subclause", "B", "--issue", "44",
     ])
-    assert (args.clause, args.issue) == ("B", 44)
+    assert (args.subclause, args.issue) == ("B", 44)
 
 
 # ---- main ------------------------------------------------------------------
@@ -119,7 +119,7 @@ def test_main_dispatches_depth_1(_mock_check, mock_run, tmp_path):
     """main() dispatches depth-1 clause to prompt_v handler."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
-    main(["--lrm", str(lrm), "--clause", "4", "--issue", "6", "--model", "opus"])
+    main(["--lrm", str(lrm), "--subclause", "4", "--issue", "6", "--model", "opus"])
     assert mock_run.call_args[1]["model"] == "opus"
 
 
@@ -132,7 +132,7 @@ def test_main_with_figures(_mock_check, mock_run, tmp_path):
     gv = tmp_path / "Figure_4_1.gv"
     gv.write_text("digraph {}")
     main([
-        "--lrm", str(lrm), "--clause", "4", "--issue", "6",
+        "--lrm", str(lrm), "--subclause", "4", "--issue", "6",
         "--figures", str(gv),
     ])
     assert "Figure 4-1" in mock_run.call_args[0][0].keywords["supplementary"]

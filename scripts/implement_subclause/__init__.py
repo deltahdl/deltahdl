@@ -502,10 +502,10 @@ def parse_args(argv=None):
         help="Path to the LRM text file.",
     )
     parser.add_argument(
-        "--clause",
+        "--subclause",
         type=str,
         required=True,
-        help="LRM clause number (V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z).",
+        help="LRM subclause number (V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z).",
     )
     parser.add_argument(
         "--issue",
@@ -542,9 +542,9 @@ def parse_args(argv=None):
     if not args.lrm.is_file():
         parser.error(f"LRM file not found: {args.lrm}")
 
-    if not CLAUSE_RE.match(args.clause):
+    if not CLAUSE_RE.match(args.subclause):
         parser.error(
-            f"Invalid clause format '{args.clause}'. "
+            f"Invalid subclause format '{args.subclause}'. "
             "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
             "(V is a number or uppercase letter; remaining parts are numbers)."
         )
@@ -573,16 +573,16 @@ def clause_depth(clause: str) -> int:
 def main(argv=None):
     """Parse args, dispatch to the depth-appropriate prompt, and invoke Claude."""
     args = parse_args(argv)
-    depth = clause_depth(args.clause)
+    depth = clause_depth(args.subclause)
     handler = _HANDLERS[depth]
     print(
-        f"Clause {args.clause} (depth {depth}),"
+        f"Clause {args.subclause} (depth {depth}),"
         f" issue #{args.issue}, model {args.model}",
         file=sys.stderr,
     )
 
     check_supplementary_args(
-        args.clause, args.lrm,
+        args.subclause, args.lrm,
         figures=args.figures,
         tables=args.tables,
         ignore_figures=args.ignore_figures,
@@ -601,6 +601,6 @@ def main(argv=None):
 
     bound_handler = functools.partial(handler, supplementary=supplementary)
     run_prompt(
-        bound_handler, args.lrm, args.clause,
+        bound_handler, args.lrm, args.subclause,
         issue=args.issue, model=args.model,
     )
