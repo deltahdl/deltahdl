@@ -29,4 +29,20 @@ TEST(SourceText, ConstraintDeclDynamicOverride) {
   EXPECT_EQ(members[4]->name, "c4");
 }
 
+// constraint_prototype with dynamic_override_specifiers
+TEST(SourceText, ConstraintPrototypeDynamicOverride) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern constraint :initial c1;\n"
+      "  pure constraint :final c2;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_GE(members.size(), 3u);
+  EXPECT_EQ(members[1]->name, "c1");
+  EXPECT_EQ(members[2]->name, "c2");
+}
+
 }  // namespace
