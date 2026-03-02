@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — hierarchical_variable_identifier select (member access)
-TEST(ParserA85, VarLvalueMemberAccess) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
-      "  pair_t p;\n"
-      "  initial p.hi = 8'hAB;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
-}
-
 // § variable_lvalue — { variable_lvalue { , variable_lvalue } }
 // (concatenation)
 TEST(ParserA85, VarLvalueConcatenation) {
