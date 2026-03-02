@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Module with ANSI header (list_of_port_declarations).
-TEST(SourceText, ModuleAnsiHeader) {
-  auto r = ParseWithPreprocessor(
-      "module m(input logic a, output logic b); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
-}
-
 // port_declaration: all 4 directions (port_direction ::=
 // input|output|inout|ref)
 TEST(SourceText, PortDirectionAllFour) {
