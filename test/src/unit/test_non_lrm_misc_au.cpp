@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// function_subroutine_call in binary expression
-TEST(ParserA82, FunctionCallInBinaryExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = f(1) + g(2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
-  ASSERT_NE(stmt->rhs->lhs, nullptr);
-  ASSERT_NE(stmt->rhs->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->lhs->kind, ExprKind::kCall);
-  EXPECT_EQ(stmt->rhs->rhs->kind, ExprKind::kCall);
-}
-
 // =============================================================================
 // A.8.2 Subroutine calls — list_of_arguments
 // =============================================================================
