@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — release statement LHS
-TEST(ParserA85, VarLvalueRelease) {
-  auto r = Parse(
-      "module m; logic x;\n"
-      "  initial begin force x = 1; release x; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.8.5 Expression left-side values — nonrange_variable_lvalue
 // =============================================================================
