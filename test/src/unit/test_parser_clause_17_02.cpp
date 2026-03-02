@@ -415,4 +415,15 @@ TEST_F(VerifyParseTest, CheckerWithPorts) {
   EXPECT_GE(unit->checkers[0]->ports.size(), 2u);
 }
 
+TEST_F(VerifyParseTest, CheckerWithBody) {
+  auto* unit = Parse(R"(
+    checker body_check;
+      logic a, b;
+      assign a = b;
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_FALSE(unit->checkers[0]->items.empty());
+}
+
 }  // namespace

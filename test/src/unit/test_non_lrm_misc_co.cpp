@@ -27,17 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, CheckerWithBody) {
-  auto* unit = Parse(R"(
-    checker body_check;
-      logic a, b;
-      assign a = b;
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_FALSE(unit->checkers[0]->items.empty());
-}
-
 TEST_F(VerifyParseTest, MultipleCheckers) {
   auto* unit = Parse(R"(
     checker c1;
