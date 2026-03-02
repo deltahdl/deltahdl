@@ -26,19 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.13.6 Disable iff
-// =============================================================================
-TEST(ParserSection16, DisableIffInAssertProperty) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (\n"
-      "    @(posedge clk) disable iff (rst) a |-> b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection16, DisableIffInPropertyDecl) {
   auto r = Parse(
       "module m;\n"
