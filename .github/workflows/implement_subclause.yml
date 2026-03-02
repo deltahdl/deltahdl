@@ -3,7 +3,7 @@ concurrency:
   cancel-in-progress: true
   group: implement-subclause-${{ inputs.branch }}
 jobs:
-  static-analysis:
+  test:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -72,24 +72,6 @@ jobs:
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console test/scripts/implement_subclause/
-  test:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.sha }}
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-implement-subclause-${{
-            hashFiles('.github/workflows/implement_subclause.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-implement-subclause-
-      - name: Install tools
-        run: pip install pytest pytest-cov
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
@@ -106,7 +88,7 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/implement_subclause/e2e/ -v
-name: Implement Subclause
+name: implement_subclause
 on:
   workflow_dispatch:
     inputs:
