@@ -88,4 +88,11 @@ TEST(Section20, Unsigned) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
+TEST(Section20, Signed) {
+  SimFixture f;
+  auto* expr = MakeSysCall(f.arena, "$signed", {MakeInt(f.arena, 42)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}
+
 }  // namespace
