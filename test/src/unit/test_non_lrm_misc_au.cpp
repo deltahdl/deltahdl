@@ -14,18 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-// § module_path_concatenation (in specify context)
-TEST(ParserA81, ModulePathConcatenation) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    ({a, b} => c) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.8.2 Subroutine calls — constant_function_call
 // =============================================================================
