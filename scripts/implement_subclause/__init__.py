@@ -1,4 +1,4 @@
-"""LRM clause implementation prompt generator.
+"""LRM subclause implementation prompt generator.
 
 Dispatches to depth-appropriate prompt builders and invokes Claude CLI.
 """

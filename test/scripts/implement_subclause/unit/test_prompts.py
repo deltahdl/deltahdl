@@ -1,6 +1,6 @@
 """Unit tests for prompt generation across all clause depths."""
 
-from implement_clause import (
+from implement_subclause import (
     build_prompt_v as build_v,
     build_prompt_v_w as build_v_w,
     build_prompt_v_w_x as build_v_w_x,

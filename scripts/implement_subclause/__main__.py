@@ -1,4 +1,4 @@
-"""Allow running the package with ``python -m implement_clause``."""
+"""Allow running the package with ``python -m implement_subclause``."""
 
 from . import main  # pragma: no cover
 

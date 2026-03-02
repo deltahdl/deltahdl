@@ -1,11 +1,11 @@
-"""Unit tests for implement_clause (arg parsing and dispatch)."""
+"""Unit tests for implement_subclause (arg parsing and dispatch)."""
 
 import runpy
 from unittest.mock import patch
 
 import pytest
 
-from implement_clause import clause_depth, main, parse_args
+from implement_subclause import clause_depth, main, parse_args
 
 
 # ---- clause_depth -----------------------------------------------------------
@@ -113,8 +113,8 @@ def test_parse_args_accepts_annex_clause(tmp_path):
 # ---- main ------------------------------------------------------------------
 
 
-@patch("implement_clause.run_prompt")
-@patch("implement_clause.check_supplementary_args")
+@patch("implement_subclause.run_prompt")
+@patch("implement_subclause.check_supplementary_args")
 def test_main_dispatches_depth_1(_mock_check, mock_run, tmp_path):
     """main() dispatches depth-1 clause to prompt_v handler."""
     lrm = tmp_path / "lrm.txt"
@@ -123,8 +123,8 @@ def test_main_dispatches_depth_1(_mock_check, mock_run, tmp_path):
     assert mock_run.call_args[1]["model"] == "opus"
 
 
-@patch("implement_clause.run_prompt")
-@patch("implement_clause.check_supplementary_args")
+@patch("implement_subclause.run_prompt")
+@patch("implement_subclause.check_supplementary_args")
 def test_main_with_figures(_mock_check, mock_run, tmp_path):
     """main() builds supplementary string when --figures is provided."""
     lrm = tmp_path / "lrm.txt"
@@ -144,4 +144,4 @@ def test_main_with_figures(_mock_check, mock_run, tmp_path):
 def test_main_guard_invokes_main():
     """Running as __main__ calls main()."""
     with pytest.raises(SystemExit):
-        runpy.run_module("implement_clause", run_name="__main__")
+        runpy.run_module("implement_subclause", run_name="__main__")

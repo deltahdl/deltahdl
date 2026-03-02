@@ -1,10 +1,10 @@
-"""Unit tests for implement_clause."""
+"""Unit tests for implement_subclause."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from implement_clause import (
+from implement_subclause import (
     build_hierarchy,
     build_supplementary_lines,
     check_supplementary_args,
@@ -383,7 +383,7 @@ def test_format_prompt_includes_supplementary():
 # ---- invoke_claude --------------------------------------------------------
 
 
-@patch("implement_clause.subprocess.Popen")
+@patch("implement_subclause.subprocess.Popen")
 def test_invoke_claude_success(mock_popen):
     """invoke_claude streams prompt to Claude CLI and returns on success."""
     proc = MagicMock()
@@ -396,8 +396,8 @@ def test_invoke_claude_success(mock_popen):
     assert proc.communicate.called
 
 
-@patch("implement_clause.sys.exit")
-@patch("implement_clause.subprocess.Popen")
+@patch("implement_subclause.sys.exit")
+@patch("implement_subclause.subprocess.Popen")
 def test_invoke_claude_failure_exits(mock_popen, mock_exit):
     """invoke_claude calls sys.exit on non-zero return code."""
     proc = MagicMock()
@@ -413,7 +413,7 @@ def test_invoke_claude_failure_exits(mock_popen, mock_exit):
 # ---- run_prompt -----------------------------------------------------------
 
 
-@patch("implement_clause.invoke_claude")
+@patch("implement_subclause.invoke_claude")
 def test_run_prompt_calls_invoke(mock_invoke, tmp_path):
     """run_prompt loads titles, builds prompt, and invokes Claude."""
     lrm = tmp_path / "lrm.txt"

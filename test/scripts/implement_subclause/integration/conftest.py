@@ -1,1 +1,1 @@
-"""Shared fixtures for implement_clause integration tests."""
+"""Shared fixtures for implement_subclause integration tests."""

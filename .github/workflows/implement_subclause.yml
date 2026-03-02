@@ -1,7 +1,7 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: implement-clause-${{ github.ref }}
+  group: implement-subclause-${{ github.ref }}
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -11,11 +11,11 @@ jobs:
         uses: actions/cache@v4
         with:
           key: >-
-            pip-implement-clause-${{
-            hashFiles('.github/workflows/implement_clause.yml') }}
+            pip-implement-subclause-${{
+            hashFiles('.github/workflows/implement_subclause.yml') }}
           path: ~/.cache/pip
           restore-keys: |
-            pip-implement-clause-
+            pip-implement-subclause-
       - name: Install tools
         run: |
           pip install \
@@ -29,8 +29,8 @@ jobs:
           assert-no-inline-directives
           --tools pylint,mypy
           --verbose
-          ${{ github.workspace }}/scripts/implement_clause/**/*
-          ${{ github.workspace }}/test/scripts/implement_clause/**/*
+          ${{ github.workspace }}/scripts/implement_subclause/**/*
+          ${{ github.workspace }}/test/scripts/implement_subclause/**/*
       - name: Assert no linter config files
         run: >-
           assert-no-linter-config-files
@@ -41,62 +41,62 @@ jobs:
         run: >-
           assert-one-assert-per-pytest
           --verbose
-          ${{ github.workspace }}/test/scripts/implement_clause
+          ${{ github.workspace }}/test/scripts/implement_subclause
       - name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
-          scripts/implement_clause/
+          scripts/implement_subclause/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
-          PYTHONPATH=.:scripts:test/scripts/implement_clause/unit
+          PYTHONPATH=.:scripts:test/scripts/implement_subclause/unit
           python3 -m pylint --recursive=y
-          test/scripts/implement_clause/
+          test/scripts/implement_subclause/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy
-          scripts/implement_clause/
+          scripts/implement_subclause/
       - name: Run mypy on tests
         run: >-
-          MYPYPATH=.:scripts:test/scripts/implement_clause/unit
+          MYPYPATH=.:scripts:test/scripts/implement_subclause/unit
           python3 -m mypy --explicit-package-bases
-          test/scripts/implement_clause/
+          test/scripts/implement_subclause/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console scripts/implement_clause/
+          --reporters console scripts/implement_subclause/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console test/scripts/implement_clause/
+          --reporters console test/scripts/implement_subclause/
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/implement_clause/unit/ -v
-          --cov=implement_clause
+          test/scripts/implement_subclause/unit/ -v
+          --cov=implement_subclause
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
       - name: Run integration tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/implement_clause/integration/ -v
+          test/scripts/implement_subclause/integration/ -v
       - name: Run e2e tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/implement_clause/e2e/ -v
-name: Implement Clause
+          test/scripts/implement_subclause/e2e/ -v
+name: Implement Subclause
 on:
   pull_request:
     paths:
-      - .github/workflows/implement_clause.yml
-      - scripts/implement_clause/**
-      - test/scripts/implement_clause/**
+      - .github/workflows/implement_subclause.yml
+      - scripts/implement_subclause/**
+      - test/scripts/implement_subclause/**
   push:
     branches: [main]
     paths:
-      - .github/workflows/implement_clause.yml
-      - scripts/implement_clause/**
-      - test/scripts/implement_clause/**
+      - .github/workflows/implement_subclause.yml
+      - scripts/implement_subclause/**
+      - test/scripts/implement_subclause/**
   workflow_dispatch:
