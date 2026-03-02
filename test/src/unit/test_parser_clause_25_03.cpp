@@ -227,4 +227,17 @@ TEST(Parser, InterfaceWithPorts) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2);
 }
 
+// interface_item ::= port_declaration ;
+// Verify that port declarations are accepted in interface ANSI port list.
+TEST(SourceText, InterfaceItemPortDecl) {
+  auto r = Parse(
+      "interface ifc(input logic clk, output logic data);\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "clk");
+  EXPECT_EQ(r.cu->interfaces[0]->ports[1].name, "data");
+}
+
 }  // namespace
