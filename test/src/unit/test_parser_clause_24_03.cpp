@@ -590,4 +590,18 @@ TEST(SourceText, ProgramGenerateConditional) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateIf));
 }
 
+// program_generate_item ::= generate_region
+TEST(SourceText, ProgramGenerateRegion) {
+  auto r = Parse(
+      "program prg;\n"
+      "  generate\n"
+      "    int x;\n"
+      "  endgenerate\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_FALSE(r.cu->programs[0]->items.empty());
+}
+
 }  // namespace
