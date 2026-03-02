@@ -10,15 +10,6 @@ using ProgramParseTest = ProgramTestParse;
 
 namespace {
 
-// description: program_declaration
-TEST(SourceText, DescriptionProgram) {
-  auto r = Parse("program prg; endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->name, "prg");
-}
-
 // =============================================================================
 // A.1.2 program_declaration — all forms
 // =============================================================================

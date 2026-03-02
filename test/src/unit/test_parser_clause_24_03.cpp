@@ -646,4 +646,13 @@ TEST(ParserClause03, Cl3_13_ProgramBlockWithDeclarations) {
   EXPECT_FALSE(r.cu->programs[0]->items.empty());
 }
 
+// description: program_declaration
+TEST(SourceText, DescriptionProgram) {
+  auto r = Parse("program prg; endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "prg");
+}
+
 }  // namespace
