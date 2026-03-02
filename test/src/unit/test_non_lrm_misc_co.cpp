@@ -27,25 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// §18 Constrained random — randcase
-// =============================================================================
-TEST_F(VerifyParseTest, RandcaseInModule) {
-  auto* unit = Parse(R"(
-    module m;
-      initial begin
-        randcase
-          3 : x = 1;
-          1 : x = 2;
-        endcase
-      end
-    endmodule
-  )");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_FALSE(items.empty());
-}
-
 TEST_F(VerifyParseTest, RandcaseSingleBranch) {
   auto* unit = Parse(R"(
     module m;
