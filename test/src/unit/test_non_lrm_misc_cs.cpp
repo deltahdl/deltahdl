@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, IfdefWithElse) {
-  EXPECT_TRUE(
-      ParseOk("`ifdef UNDEFINED_MACRO\n"
-              "module alt;\n"
-              "endmodule\n"
-              "`else\n"
-              "module t;\n"
-              "endmodule\n"
-              "`endif\n"));
-}
-
 TEST(ParserSection22, IfndefUndefined) {
   EXPECT_TRUE(
       ParseOk("`ifndef GUARD\n"

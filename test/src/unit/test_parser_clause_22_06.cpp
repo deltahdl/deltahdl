@@ -15,4 +15,15 @@ TEST(ParserSection22, IfdefDefined) {
               "`endif\n"));
 }
 
+TEST(ParserSection22, IfdefWithElse) {
+  EXPECT_TRUE(
+      ParseOk("`ifdef UNDEFINED_MACRO\n"
+              "module alt;\n"
+              "endmodule\n"
+              "`else\n"
+              "module t;\n"
+              "endmodule\n"
+              "`endif\n"));
+}
+
 }  // namespace
