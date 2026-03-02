@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Parser, DefparamMultiple) {
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  defparam u0.WIDTH = 8, u1.DEPTH = 16;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
-  EXPECT_EQ(item->defparam_assigns.size(), 2);
-}
-
 // parameter_override: defparam list_of_defparam_assignments.
 TEST(SourceText, ParameterOverrideDefparam) {
   auto r = ParseWithPreprocessor(
