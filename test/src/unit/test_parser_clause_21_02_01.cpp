@@ -142,4 +142,11 @@ TEST(ParserSection21, DisplayNoArgs) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, DisplayMultipleArgs) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $display(\"x=%d y=%h\", x, y);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

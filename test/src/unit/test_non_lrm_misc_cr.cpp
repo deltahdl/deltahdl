@@ -8,13 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, DisplayMultipleArgs) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $display(\"x=%d y=%h\", x, y);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, WriteBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
