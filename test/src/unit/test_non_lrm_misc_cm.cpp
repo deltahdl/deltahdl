@@ -34,20 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §15.5.2: event wait with hierarchical event identifier.
-TEST(ParserSection15, WaitForEventHierarchical) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(top.sub.done);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-}
-
 // §15.5.2: event wait with posedge-qualified event expression.
 TEST(ParserSection15, WaitForEventPosedge) {
   auto r = Parse(

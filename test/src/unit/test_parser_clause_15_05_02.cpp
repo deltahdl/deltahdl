@@ -50,4 +50,18 @@ TEST(ParserSection15, WaitForEventWithBody) {
   ASSERT_NE(stmt->body, nullptr);
 }
 
+// §15.5.2: event wait with hierarchical event identifier.
+TEST(ParserSection15, WaitForEventHierarchical) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(top.sub.done);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+}
+
 }  // namespace
