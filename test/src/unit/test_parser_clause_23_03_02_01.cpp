@@ -124,4 +124,37 @@ TEST(ParserSection4, Sec4_6_OrderedPortConnections) {
   EXPECT_NE(item->inst_ports[2].second, nullptr);
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 23.10.4 -- Port connection rules (additional)
+// =============================================================================
+TEST(ParserSection23, PortConnectionPositional) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1(a, b, c);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "sub");
+  ASSERT_EQ(item->inst_ports.size(), 3u);
+}
+
 }  // namespace
