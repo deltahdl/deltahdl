@@ -294,4 +294,45 @@ TEST(ParserA83, ModulePathExprInSpecify) {
   EXPECT_FALSE(r.has_errors);
 }
 
+using SpecifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Parser test fixture
+// =============================================================================
+struct SpecifyTest : ::testing::Test {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
+    source_ = src;
+    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
+    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
+    return parser_->Parse();
+  }
+
+  // Helper: get first specify block from first module.
+  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
+    for (auto* item : cu->modules[0]->items) {
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+    }
+    return nullptr;
+  }
+
+  SourceManager mgr_;
+  Arena arena_;
+  DiagEngine diag_{mgr_};
+  std::string source_;
+  std::unique_ptr<Lexer> lexer_;
+  std::unique_ptr<Parser> parser_;
+};
+
+// §3.3 Specify blocks
+TEST(ParserClause03, Cl3_3_SpecifyBlock) {
+  EXPECT_TRUE(
+      ParseOk("module m (input a, output y);\n"
+              "  assign y = a;\n"
+              "  specify\n"
+              "    (a => y) = 1.5;\n"
+              "  endspecify\n"
+              "endmodule\n"));
+}
+
 }  // namespace

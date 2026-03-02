@@ -103,17 +103,6 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
 
 namespace {
 
-// §3.3 Specify blocks
-TEST(ParserClause03, Cl3_3_SpecifyBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m (input a, output y);\n"
-              "  assign y = a;\n"
-              "  specify\n"
-              "    (a => y) = 1.5;\n"
-              "  endspecify\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection28, SpecifyBlockSimplePath) {
   auto r = Parse(
       "module m(input a, output b);\n"
