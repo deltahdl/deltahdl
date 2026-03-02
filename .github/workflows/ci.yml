@@ -125,28 +125,34 @@ jobs:
           ${{ github.workspace }}/test/scripts
       - name: Run pylint on source
         run: >-
-          PYTHONPATH=. python3 -m pylint lib/ scripts/
+          PYTHONPATH=.:scripts python3 -m pylint
+          lib/ scripts/run_sim_tests/ scripts/run_sv_tests/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint --recursive=y
-          test/lib/ test/scripts/
+          test/lib/ test/scripts/run_sim_tests/
+          test/scripts/run_sv_tests/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
-        run: PYTHONPATH=. python3 -m mypy lib/ scripts/
+        run: >-
+          PYTHONPATH=.:scripts python3 -m mypy
+          lib/ scripts/run_sim_tests/ scripts/run_sv_tests/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts python3 -m mypy
-          --exclude classify_test
-          test/lib/ test/scripts/
+          test/lib/ test/scripts/run_sim_tests/
+          test/scripts/run_sv_tests/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console lib/ scripts/
+          --reporters console lib/
+          scripts/run_sim_tests/ scripts/run_sv_tests/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console test/lib/ test/scripts/
+          --reporters console test/lib/
+          test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
   # ── Lane: lib ──
   # DO NOT lower coverage thresholds. Uncovered code is untested code —
   # lowering it hides bugs and lets regressions slip through silently.

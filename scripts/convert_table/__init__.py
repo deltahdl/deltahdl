@@ -1,3 +1,5 @@
+"""Convert tables from the IEEE 1800-2023 SystemVerilog LRM."""
+
 import argparse
 import re
 from pathlib import Path
@@ -9,6 +11,7 @@ _CLAUSE_RE = re.compile(
 
 
 def parse_args(argv=None):
+    """Parse and validate command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Convert tables from the IEEE 1800-2023 SystemVerilog LRM.",
     )
