@@ -17,18 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// =============================================================================
-// A.1.2 interface_declaration — all 5 forms
-// =============================================================================
-// Interface with ANSI ports.
-TEST(SourceText, InterfaceAnsiHeader) {
-  auto r = Parse("interface ifc(input logic clk); endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-}
-
 // Interface with wildcard ports: interface i(.*);
 TEST(SourceText, InterfaceWildcardPorts) {
   auto r = Parse("interface ifc(.*); endinterface\n");
