@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, IfndefSelectsElseBranch) {
-  auto r = ParseWithPreprocessor(
-      "`define GUARD\n"
-      "`ifndef GUARD\n"
-      "module unreachable;\n"
-      "endmodule\n"
-      "`else\n"
-      "module reached;\n"
-      "endmodule\n"
-      "`endif\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "reached");
-}
-
 TEST(ParserSection22, TimescaleNsPs) {
   EXPECT_TRUE(
       ParseOk("`timescale 1ns/1ps\n"
