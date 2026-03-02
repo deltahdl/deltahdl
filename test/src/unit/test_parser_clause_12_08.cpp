@@ -370,4 +370,23 @@ TEST(ParserSection12, BreakStatementParses) {
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
 
+TEST(ParserSection12, BreakStatementInBody) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    forever begin\n"
+      "      if (done) break;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  // The body contains an if whose then_branch is break.
+  auto* if_stmt = stmt->body->stmts[0];
+  ASSERT_NE(if_stmt, nullptr);
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  ASSERT_NE(if_stmt->then_branch, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
+}
+
 }  // namespace
