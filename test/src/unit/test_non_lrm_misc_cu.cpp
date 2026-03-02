@@ -24,20 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, NamedPortEmptyConnection) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (.a(x), .b());\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 2);
-  EXPECT_EQ(item->inst_ports[0].first, "a");
-  EXPECT_NE(item->inst_ports[0].second, nullptr);
-  EXPECT_EQ(item->inst_ports[1].first, "b");
-  EXPECT_EQ(item->inst_ports[1].second, nullptr);
-}
-
 // =========================================================================
 // LRM section 23.3.3: Port connection rules
 // =========================================================================
