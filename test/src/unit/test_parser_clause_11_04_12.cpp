@@ -292,4 +292,14 @@ TEST(ParserA81, ConcatenationPostfixPartSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
+// § constant_primary — constant_concatenation
+TEST(ParserA84, ConstantPrimaryConcatenation) {
+  auto r = Parse("module m; parameter int P = {4'd1, 4'd2}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* param = r.cu->modules[0]->items[0];
+  ASSERT_NE(param->init_expr, nullptr);
+  EXPECT_EQ(param->init_expr->kind, ExprKind::kConcatenation);
+}
+
 }  // namespace
