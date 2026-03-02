@@ -447,4 +447,19 @@ TEST_F(VerifyParseTest, CheckerCoexistsWithModule) {
   EXPECT_EQ(unit->checkers.size(), 1u);
 }
 
+// =============================================================================
+// §17.3 Checker declarations (additional)
+// =============================================================================
+TEST_F(VerifyParseTest, CheckerWithOutputPort) {
+  auto* unit = Parse(R"(
+    checker mutex(logic [31:0] sig, event clock, output bit failure);
+      assert property (@clock $onehot0(sig))
+        failure = 1'b0; else failure = 1'b1;
+    endchecker : mutex
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_EQ(unit->checkers[0]->name, "mutex");
+  EXPECT_GE(unit->checkers[0]->ports.size(), 3u);
+}
+
 }  // namespace
