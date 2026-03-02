@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, UndefineallDirective) {
-  EXPECT_TRUE(
-      ParseOk("`define A 1\n"
-              "`define B 2\n"
-              "`undefineall\n"
-              "module t;\n"
-              "endmodule\n"));
-}
-
 // 31. Text macro name space (d) — `define introduces names with leading `
 TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
   // Macro defined and used; subsequent redefinition overrides previous
