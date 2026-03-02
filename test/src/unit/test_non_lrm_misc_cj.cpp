@@ -21,33 +21,7 @@ static ParseResult12b Parse(const std::string& src) {
   return result;
 }
 
-// Helper: verify first item has 2 func_args: a(input), b.
-static void VerifyTwoArgTask(ParseResult12b& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 2u);
-  EXPECT_EQ(item->func_args[0].name, "a");
-  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-  EXPECT_EQ(item->func_args[1].name, "b");
-}
-
 namespace {
-
-// ---------------------------------------------------------------------------
-// task_body_declaration (old-style ports — tf_item_declaration)
-// ---------------------------------------------------------------------------
-TEST(ParserA27, TaskBodyOldStylePorts) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task;\n"
-      "    input int a;\n"
-      "    input int b;\n"
-      "    $display(\"a=%0d b=%0d\", a, b);\n"
-      "  endtask\n"
-      "endmodule\n");
-  VerifyTwoArgTask(r);
-}
 
 TEST(ParserA27, TaskBodyOldStyleOutputPort) {
   auto r = Parse(

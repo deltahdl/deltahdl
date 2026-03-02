@@ -340,4 +340,19 @@ TEST(ParserA27, TaskBodyWithEndLabel) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "my_task");
 }
 
+// ---------------------------------------------------------------------------
+// task_body_declaration (old-style ports — tf_item_declaration)
+// ---------------------------------------------------------------------------
+TEST(ParserA27, TaskBodyOldStylePorts) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task;\n"
+      "    input int a;\n"
+      "    input int b;\n"
+      "    $display(\"a=%0d b=%0d\", a, b);\n"
+      "  endtask\n"
+      "endmodule\n");
+  VerifyTwoArgTask(r);
+}
+
 }  // namespace
