@@ -47,4 +47,25 @@ TEST(Section21, WritememhBasic) {
   std::remove(tmp_path.c_str());
 }
 
+TEST(Section21, WritemembBasic) {
+  SimFixture f;
+  std::string tmp_path = "/tmp/deltahdl_test_writememb.txt";
+
+  auto* var = f.ctx.CreateVariable("wbmem", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0b10101010);
+
+  auto* expr = MakeSysCall(
+      f.arena, "$writememb",
+      {MakeStrLit(f.arena, tmp_path.c_str()), MakeId(f.arena, "wbmem")});
+  EvalExpr(expr, f.ctx, f.arena);
+
+  std::ifstream ifs(tmp_path);
+  std::string contents((std::istreambuf_iterator<char>(ifs)),
+                       std::istreambuf_iterator<char>());
+  EXPECT_FALSE(contents.empty());
+  EXPECT_NE(contents.find("10101010"), std::string::npos);
+
+  std::remove(tmp_path.c_str());
+}
+
 }  // namespace
