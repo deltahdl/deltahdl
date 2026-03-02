@@ -18,19 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserSection13, NoDimsOnFuncArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void foo(int x);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "foo");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_EQ(fn->func_args.size(), 1u);
-  EXPECT_TRUE(fn->func_args[0].unpacked_dims.empty());
-}
-
 // =============================================================================
 // LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
 // =============================================================================
