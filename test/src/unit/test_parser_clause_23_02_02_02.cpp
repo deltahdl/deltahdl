@@ -159,4 +159,21 @@ TEST(ParserSection23, AnsiPortsInout) {
   EXPECT_EQ(mod->ports[0].name, "data");
 }
 
+// =========================================================================
+// LRM section 23.2: Module declarations (ANSI header style)
+// =========================================================================
+TEST(ParserSection23, AnsiHeaderWithParams) {
+  auto r = Parse(
+      "module m #(parameter N = 8) (input logic [N-1:0] data);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  EXPECT_EQ(mod->name, "m");
+  ASSERT_EQ(mod->params.size(), 1);
+  EXPECT_EQ(mod->params[0].first, "N");
+  ASSERT_EQ(mod->ports.size(), 1);
+  EXPECT_EQ(mod->ports[0].name, "data");
+  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
+}
+
 }  // namespace
