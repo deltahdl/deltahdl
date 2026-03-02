@@ -211,4 +211,15 @@ TEST(ParserAnnexF, AnnexFGotoRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
+// --- F.4: Non-consecutive repetition [=N] ---
+TEST(ParserAnnexF, AnnexFNonconsecutiveRepetition) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req |-> ack[=2]);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
+}
+
 }  // namespace
