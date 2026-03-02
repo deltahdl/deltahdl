@@ -391,4 +391,15 @@ TEST(ParserSection19, InputOutputSkew_ExplicitZero) {
               "endmodule\n"));
 }
 
+// Combined input/output with time-unit suffix on output (#4ps).
+TEST(ParserSection19, InputOutputSkew_MixedUnitSuffix) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cd2 @(posedge phi2);\n"
+              "    input #2 output #4ps cmd;\n"
+              "    input enable;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace

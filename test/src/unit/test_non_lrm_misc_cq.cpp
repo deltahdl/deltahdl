@@ -43,17 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Combined input/output with time-unit suffix on output (#4ps).
-TEST(ParserSection19, InputOutputSkew_MixedUnitSuffix) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking cd2 @(posedge phi2);\n"
-              "    input #2 output #4ps cmd;\n"
-              "    input enable;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // LRM section 19.6.1.2 -- Default skew
 // =============================================================================
