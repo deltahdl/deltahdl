@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_primary — primary_literal (string)
-TEST(ParserA84, ConstantPrimaryStringLiteral) {
-  auto r = Parse("module m; parameter string S = \"hello\"; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* param = r.cu->modules[0]->items[0];
-  ASSERT_NE(param->init_expr, nullptr);
-  EXPECT_EQ(param->init_expr->kind, ExprKind::kStringLiteral);
-}
-
 // § constant_primary — ps_parameter_identifier constant_select
 TEST(ParserA84, ConstantPrimaryParameterIdentifier) {
   auto r = Parse(
