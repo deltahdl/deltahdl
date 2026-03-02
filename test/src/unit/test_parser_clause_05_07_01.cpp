@@ -574,4 +574,14 @@ TEST(ParserA87, DecimalBaseLower) {
   EXPECT_EQ(rhs->int_val, 99u);
 }
 
+// § decimal_base — 'D
+TEST(ParserA87, DecimalBaseUpper) {
+  auto r = Parse("module m; logic [7:0] x; initial x = 8'D99; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->int_val, 99u);
+}
+
 }  // namespace
