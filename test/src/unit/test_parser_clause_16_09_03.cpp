@@ -57,4 +57,13 @@ TEST(ParserSection16, FellFunctionInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection16, StableFunctionInProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) $stable(data) |-> valid);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
