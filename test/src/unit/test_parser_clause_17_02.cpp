@@ -405,4 +405,14 @@ TEST_F(VerifyParseTest, CheckerWithEndLabel) {
   EXPECT_EQ(unit->checkers[0]->name, "labeled_check");
 }
 
+TEST_F(VerifyParseTest, CheckerWithPorts) {
+  auto* unit = Parse(R"(
+    checker port_check(input logic clk, input logic rst);
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_EQ(unit->checkers[0]->name, "port_check");
+  EXPECT_GE(unit->checkers[0]->ports.size(), 2u);
+}
+
 }  // namespace
