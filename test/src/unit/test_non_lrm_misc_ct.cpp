@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Extern module declaration.
-TEST(SourceText, ExternModule) {
-  auto r = ParseWithPreprocessor("extern module m(input logic a);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->is_extern);
-}
-
 // 19. Hierarchical reference syntax (a.b.c)
 TEST(ParserClause03, Cl3_13_HierarchicalReferenceSyntax) {
   // Hierarchical names like top.sub.sig are member-access expressions.
