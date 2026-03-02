@@ -174,4 +174,31 @@ TEST(ParserA609, ArrayMethodXor) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
+// =============================================================================
+// A.8.2 Subroutine calls — method_call_body / built_in_method_call
+// =============================================================================
+// § method_call_body ::= method_identifier { attribute_instance }
+//                        [ ( list_of_arguments ) ]
+//                      | built_in_method_call
+// § built_in_method_call ::= array_manipulation_call | randomize_call
+// =============================================================================
+// A.8.2 Subroutine calls — array_manipulation_call
+// =============================================================================
+// § array_manipulation_call ::= array_method_name { attribute_instance }
+//                              [ ( list_of_arguments ) ]
+//                              [ with ( expression ) ]
+// array_manipulation_call: sum with no args
+TEST(ParserA82, ArrayManipCallSum) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = arr.sum(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+}
+
 }  // namespace
