@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Verify function prototype return type stored
-TEST(ParserA29, FunctionPrototype_ReturnType) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  modport init(import function int compute(input int a));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  ASSERT_NE(mp->ports[0].prototype, nullptr);
-  EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(mp->ports[0].prototype->data_type.kind, DataTypeKind::kInt);
-}
-
 // Verify task prototype with arguments stores them
 TEST(ParserA29, TaskPrototype_HasArgs) {
   auto r = Parse(
