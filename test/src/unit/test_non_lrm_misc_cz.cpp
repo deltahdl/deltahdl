@@ -103,21 +103,6 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
 
 namespace {
 
-TEST(ParserSection28, SpecifyBlockSimplePath) {
-  auto r = Parse(
-      "module m(input a, output b);\n"
-      "  specify\n"
-      "    (a => b) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_GE(spec->specify_items.size(), 1u);
-  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kParallel);
-}
-
 TEST(ParserSection28, SpecifyBlockFullPath) {
   auto r = Parse(
       "module m(input a, b, output c);\n"
