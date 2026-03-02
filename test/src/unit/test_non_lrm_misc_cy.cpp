@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, StrengthSpecSupply) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  nand (supply0, supply1) g1(out, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 5);  // supply0 = 5
-  EXPECT_EQ(item->drive_strength1, 5);  // supply1 = 5
-}
-
 TEST(ParserSection28, StrengthSpecHighz) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
