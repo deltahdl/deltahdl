@@ -279,4 +279,22 @@ TEST(ParserSection6, RegUnsignedDecl) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
+using CheckerParseTest = ProgramTestParse;
+
+// --- int unsigned return type and variable decl (§18.13) ---
+TEST(ParserSection18, IntUnsignedFunctionReturnType) {
+  auto r = Parse(
+      "class C;\n"
+      "  function int unsigned get_val();\n"
+      "    int unsigned x;\n"
+      "    x = 42;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_GE(r.cu->classes[0]->members.size(), 1u);
+}
+
 }  // namespace
