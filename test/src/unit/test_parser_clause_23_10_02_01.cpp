@@ -79,4 +79,17 @@ TEST(ParserSection23, ModuleInstWithParamOverride) {
   ASSERT_EQ(item->inst_params.size(), 2u);
 }
 
+TEST(ParserSection23, ModuleInstanceWithParameters) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub #(8, 16) u1 (.a(x));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "sub");
+  EXPECT_EQ(item->inst_name, "u1");
+  ASSERT_EQ(item->inst_params.size(), 2);
+}
+
 }  // namespace
