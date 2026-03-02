@@ -182,4 +182,18 @@ TEST(ParserSection13, DefaultArgValueOnTask) {
   EXPECT_NE(tk->func_args[1].default_value, nullptr);
 }
 
+TEST(ParserSection13, DefaultArgNoDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "foo");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 2u);
+  EXPECT_EQ(fn->func_args[0].default_value, nullptr);
+  EXPECT_EQ(fn->func_args[1].default_value, nullptr);
+}
+
 }  // namespace
