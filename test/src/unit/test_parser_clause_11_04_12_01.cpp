@@ -224,4 +224,14 @@ TEST(ParserA81, MultipleConcatenationExprCount) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
 }
 
+// § constant_primary — constant_multiple_concatenation
+TEST(ParserA84, ConstantPrimaryMultipleConcatenation) {
+  auto r = Parse("module m; parameter int P = {4{4'd1}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* param = r.cu->modules[0]->items[0];
+  ASSERT_NE(param->init_expr, nullptr);
+  EXPECT_EQ(param->init_expr->kind, ExprKind::kReplicate);
+}
+
 }  // namespace
