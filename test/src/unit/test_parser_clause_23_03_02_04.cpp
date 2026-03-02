@@ -117,4 +117,19 @@ TEST(ParserSection23, WildcardWithNamed) {
   EXPECT_EQ(item->inst_ports[0].first, "clk");
 }
 
+// =========================================================================
+// LRM section 23.3.3.7.2: Implicit named port connections (.*)
+// =========================================================================
+TEST(ParserSection23, WildcardOnly) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1 (.*);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_TRUE(item->inst_wildcard);
+  EXPECT_TRUE(item->inst_ports.empty());
+}
+
 }  // namespace

@@ -24,21 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// =========================================================================
-// LRM section 23.3.3.7.2: Implicit named port connections (.*)
-// =========================================================================
-TEST(ParserSection23, WildcardOnly) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 (.*);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_TRUE(item->inst_wildcard);
-  EXPECT_TRUE(item->inst_ports.empty());
-}
-
 TEST(ParserSection23, WildcardWithNamedOverrides) {
   auto r = Parse(
       "module top;\n"
