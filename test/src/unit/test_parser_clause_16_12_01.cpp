@@ -88,4 +88,48 @@ TEST(ParserAnnexF, AnnexFPropertyReference) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
+struct ParseResult16c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16c Parse(const std::string& src) {
+  ParseResult16c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using VerifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// Section 16.5.1 -- Assert property with named property instance
+// =============================================================================
+// Assert property referencing a previously declared named property.
+TEST(ParserSection16, Sec16_5_1_AssertWithNamedPropertyInstance) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p_handshake;\n"
+      "    @(posedge clk) req |-> ##[1:3] ack;\n"
+      "  endproperty\n"
+      "  assert property (p_handshake);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  auto* pd =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->name, "p_handshake");
+  auto* ap =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(ap, nullptr);
+  EXPECT_NE(ap->assert_expr, nullptr);
+}
+
 }  // namespace

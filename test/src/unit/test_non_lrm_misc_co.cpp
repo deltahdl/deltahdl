@@ -28,30 +28,6 @@ using VerifyParseTest = ProgramTestParse;
 namespace {
 
 // =============================================================================
-// Section 16.5.1 -- Assert property with named property instance
-// =============================================================================
-// Assert property referencing a previously declared named property.
-TEST(ParserSection16, Sec16_5_1_AssertWithNamedPropertyInstance) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p_handshake;\n"
-      "    @(posedge clk) req |-> ##[1:3] ack;\n"
-      "  endproperty\n"
-      "  assert property (p_handshake);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  auto* pd =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl);
-  ASSERT_NE(pd, nullptr);
-  EXPECT_EQ(pd->name, "p_handshake");
-  auto* ap =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
-  ASSERT_NE(ap, nullptr);
-  EXPECT_NE(ap->assert_expr, nullptr);
-}
-
-// =============================================================================
 // Section 16.5.1 -- Assert property with sequence methods
 // =============================================================================
 // Sequence .triggered method used in a sequence declaration.
