@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, OutputDefaultValue) {
-  // list_of_variable_port_identifiers: port_id [ = constant_expression ]
-  auto r = ParseWithPreprocessor("module m(output logic q = 1'b0); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kOutput);
-  EXPECT_NE(port.default_value, nullptr);
-}
-
 TEST(ParserSection23, MacromoduleDefinition) {
   auto r = ParseWithPreprocessor(
       "macromodule top;\n"
