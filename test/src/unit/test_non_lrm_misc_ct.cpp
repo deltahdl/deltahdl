@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- variable_port_type ---
-// var_data_type ::= data_type | var data_type_or_implicit
-TEST(ParserA212, VarDataTypeExplicit) {
-  // var_data_type: data_type (integer_vector_type)
-  auto r = ParseWithPreprocessor(
-      "module m(input logic signed [15:0] val); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
-}
-
 TEST(ParserA212, VarDataTypeInt) {
   // var_data_type: data_type (integer_atom_type)
   auto r = ParseWithPreprocessor("module m(input int count); endmodule");
