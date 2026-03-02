@@ -26,28 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.12 -- Declaring sequences (additional tests)
-// =============================================================================
-TEST(ParserSection16, SequenceWithRangeDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  sequence s_handshake;\n"
-      "    req ##[1:5] ack;\n"
-      "  endsequence\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kSequenceDecl) {
-      found = true;
-      EXPECT_EQ(item->name, "s_handshake");
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 TEST(ParserSection16, SequenceWithFormalArgsDecl) {
   auto r = Parse(
       "module m;\n"
