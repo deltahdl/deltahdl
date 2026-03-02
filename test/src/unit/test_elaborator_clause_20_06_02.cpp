@@ -28,4 +28,14 @@ TEST(ElabA82, SystemTfCallBitsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// ============================================================================
+// §20.6.2 — $bits
+// ============================================================================
+TEST(Section20, BitsOf32BitValue) {
+  SimFixture f;
+  auto* expr = MakeSysCall(f.arena, "$bits", {MakeInt(f.arena, 42)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 32u);
+}
+
 }  // namespace

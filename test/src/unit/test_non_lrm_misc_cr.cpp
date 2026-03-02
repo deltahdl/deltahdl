@@ -38,16 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-// ============================================================================
-// §20.6.2 — $bits
-// ============================================================================
-TEST(Section20, BitsOf32BitValue) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$bits", {MakeInt(f.arena, 42)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 32u);
-}
-
 TEST(Section20, BitsOfVariable) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("wide_var", 64);
