@@ -243,4 +243,17 @@ TEST(ParserSection7, Sec7_2_1_IntCastToPackedStruct) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
 
+// § constant_primary — constant_cast
+TEST(ParserA84, ConstantPrimaryCast) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter int P = int'(3.14);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* param = r.cu->modules[0]->items[0];
+  ASSERT_NE(param->init_expr, nullptr);
+  EXPECT_EQ(param->init_expr->kind, ExprKind::kCast);
+}
+
 }  // namespace
