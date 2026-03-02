@@ -41,4 +41,11 @@ TEST(ParserSection22, DefaultNettypeTri1) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, DefaultNettypeTriand) {
+  EXPECT_TRUE(
+      ParseOk("`default_nettype triand\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
