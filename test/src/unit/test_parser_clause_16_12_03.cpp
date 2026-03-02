@@ -76,4 +76,13 @@ TEST(ParserSection16, PropertyNegation) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+TEST(ParserSection16, PropertyNegationStrong) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) not strong(a ##1 b));\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace

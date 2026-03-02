@@ -26,15 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, PropertyNegationStrong) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) not strong(a ##1 b));\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // =============================================================================
 // §16.14.8 Property disjunction and conjunction
 // =============================================================================
