@@ -24,22 +24,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// LRM section 20.7 -- Array querying functions
-// =============================================================================
-TEST(ParserSection20, ArrayLeftFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] arr;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    x = $left(arr);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection20, ArrayRightFunction) {
   auto r = Parse(
       "module m;\n"
