@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection27, InlineGenvarInForInitBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
-      "    assign out[i] = in[i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  ASSERT_EQ(gen->gen_body.size(), 1);
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
-}
-
 // --- Generate-for with i++ step (§27.4) ---
 TEST(ParserSection27, GenerateForPostIncrement) {
   auto r = Parse(

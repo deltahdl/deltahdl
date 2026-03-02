@@ -557,4 +557,17 @@ TEST(ParserSection27, InlineGenvarInForInitParse) {
   ASSERT_NE(gen->gen_init, nullptr);
 }
 
+TEST(ParserSection27, InlineGenvarInForInitBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
+      "    assign out[i] = in[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
+  ASSERT_EQ(gen->gen_body.size(), 1);
+  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
+}
+
 }  // namespace
