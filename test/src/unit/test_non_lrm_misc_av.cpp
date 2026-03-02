@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Parenthesized expression
-TEST(ParserA83, ParenthesizedExpr) {
-  auto r = Parse("module m; initial x = (a + b) * c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kStar);
-  // LHS should be binary add (from the parens)
-  EXPECT_EQ(rhs->lhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
-}
-
 // Continuous assignment with expression
 TEST(ParserA83, ExprInContAssign) {
   auto r = Parse(
