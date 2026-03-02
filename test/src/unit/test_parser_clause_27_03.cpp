@@ -210,4 +210,22 @@ TEST(ParserSection27, GenerateRegion) {
   EXPECT_TRUE(found_gen_for);
 }
 
+// --- generate...endgenerate with multiple constructs (§27.1/§27.3) ---
+TEST(ParserSection27, GenerateOverview) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    if (A) assign x = 1;\n"
+      "    if (B) assign y = 2;\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  size_t gen_if_count = 0;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kGenerateIf) ++gen_if_count;
+  }
+  EXPECT_EQ(gen_if_count, 2u);
+}
+
 }  // namespace
