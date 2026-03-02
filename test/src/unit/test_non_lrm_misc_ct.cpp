@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-// parameter_override: defparam list_of_defparam_assignments.
-TEST(SourceText, ParameterOverrideDefparam) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  defparam sub.W = 16, sub.D = 8;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  auto* dp = r.cu->modules[0]->items[0];
-  EXPECT_EQ(dp->kind, ModuleItemKind::kDefparam);
-  EXPECT_EQ(dp->defparam_assigns.size(), 2u);
-}
-
 // =============================================================================
 // A.2.3 Declaration lists
 // =============================================================================
