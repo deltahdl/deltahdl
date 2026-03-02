@@ -38,13 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-TEST(Section20, Onehot0FalseMultiple) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeInt(f.arena, 3)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
 TEST(Section20, IsunknownFalse) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$isunknown", {MakeInt(f.arena, 42)});

@@ -76,4 +76,11 @@ TEST(Section20, Onehot0TrueOneBit) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+TEST(Section20, Onehot0FalseMultiple) {
+  SimFixture f;
+  auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeInt(f.arena, 3)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
 }  // namespace
