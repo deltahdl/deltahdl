@@ -251,4 +251,15 @@ TEST(ParserA86, UnaryPlus) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
+// § unary_operator ::= -
+TEST(ParserA86, UnaryMinus) {
+  auto r = Parse("module m; initial x = -a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kMinus);
+}
+
 }  // namespace
