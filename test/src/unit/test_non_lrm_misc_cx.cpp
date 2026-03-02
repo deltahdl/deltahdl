@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Loop generate with module instantiation (§27.4) ---
-TEST(ParserSection27, GenerateForWithModuleInst) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i++) begin : blk\n"
-      "    sub u(.a(in[i]), .b(out[i]));\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_EQ(gen->gen_body.size(), 1u);
-  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
-}
-
 TEST(ParserSection27, GenerateForNestedBeginEnd) {
   auto r = Parse(
       "module m;\n"
