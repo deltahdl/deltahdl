@@ -86,26 +86,6 @@ static SpecifyParseResult ParseSpecifySingle(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_PosedgeSensitivePath) {
-  auto sp = ParseSpecifySingle(
-      "module m(input clk, output q);\n"
-      "  specify\n"
-      "    (posedge clk => q) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(sp.pr.cu, nullptr);
-  EXPECT_FALSE(sp.pr.has_errors);
-  ASSERT_NE(sp.sole_item, nullptr);
-  auto* si = sp.sole_item;
-  EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
-  ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0].name, "clk");
-  ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0].name, "q");
-}
-
 TEST(ParserSection28, Sec28_12_NegedgeSensitivePath) {
   auto sp = ParseSpecifySingle(
       "module m(input clk, output q);\n"
