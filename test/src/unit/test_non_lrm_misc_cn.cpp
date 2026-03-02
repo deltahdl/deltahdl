@@ -26,18 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, PropertyInstanceWithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p1(a, b);\n"
-      "    a |-> ##1 b;\n"
-      "  endproperty\n"
-      "  assert property (@(posedge clk) p1(req, ack));\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // =============================================================================
 // §16.13.6 Disable iff
 // =============================================================================

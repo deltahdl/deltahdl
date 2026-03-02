@@ -132,4 +132,35 @@ TEST(ParserSection16, Sec16_5_1_AssertWithNamedPropertyInstance) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
+// --- Test helpers ---
+struct ParseResult16b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16b Parse(const std::string& src) {
+  ParseResult16b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection16, PropertyInstanceWithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p1(a, b);\n"
+      "    a |-> ##1 b;\n"
+      "  endproperty\n"
+      "  assert property (@(posedge clk) p1(req, ack));\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
