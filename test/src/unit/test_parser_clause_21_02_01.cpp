@@ -149,4 +149,11 @@ TEST(ParserSection21, DisplayMultipleArgs) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, WriteBasicCall) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $write(\"no newline\");\n"
+              "endmodule\n"));
+}
+
 }  // namespace
