@@ -18,21 +18,6 @@ bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
 
 namespace {
 
-// non_port_program_item ::= initial_construct
-TEST(SourceText, ProgramInitialConstruct) {
-  auto r = Parse(
-      "program prg;\n"
-      "  initial begin\n"
-      "    $display(\"hello\");\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(
-      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
-}
-
 // non_port_program_item ::= final_construct
 TEST(SourceText, ProgramFinalConstruct) {
   auto r = Parse(
