@@ -24,24 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// LRM section 23.10.2.2 -- Conditional generate
-// =============================================================================
-TEST(ParserSection23, ConditionalGenerateIfElse) {
-  auto r = Parse(
-      "module top;\n"
-      "  if (WIDTH == 8) begin\n"
-      "    assign out = a;\n"
-      "  end else begin\n"
-      "    assign out = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* gen = r.cu->modules[0]->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
-  ASSERT_NE(gen->gen_else, nullptr);
-}
-
 TEST(ParserSection23, ConditionalGenerateCase) {
   auto r = Parse(
       "module top;\n"

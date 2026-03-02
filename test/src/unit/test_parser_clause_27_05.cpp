@@ -542,4 +542,40 @@ TEST(ParserSection27, GenerateIfElseIfChainNesting) {
   ASSERT_NE(gen->gen_else->gen_else, nullptr);
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 23.10.2.2 -- Conditional generate
+// =============================================================================
+TEST(ParserSection23, ConditionalGenerateIfElse) {
+  auto r = Parse(
+      "module top;\n"
+      "  if (WIDTH == 8) begin\n"
+      "    assign out = a;\n"
+      "  end else begin\n"
+      "    assign out = b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
+  ASSERT_NE(gen->gen_else, nullptr);
+}
+
 }  // namespace
