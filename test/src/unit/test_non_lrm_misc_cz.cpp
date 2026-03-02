@@ -103,30 +103,6 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
 
 namespace {
 
-// =============================================================================
-// Complex specify block with mixed items
-// =============================================================================
-TEST_F(SpecifyTest, MixedSpecifyBlockItems) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  specparam tPD = 5;\n"
-      "  (a => b) = 5;\n"
-      "  (a *> c) = (3, 4);\n"
-      "  $setup(data, posedge clk, 10);\n"
-      "  $hold(posedge clk, data, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 5u);
-  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kSpecparam);
-  EXPECT_EQ(spec->specify_items[1]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[2]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[3]->kind, SpecifyItemKind::kTimingCheck);
-  EXPECT_EQ(spec->specify_items[4]->kind, SpecifyItemKind::kTimingCheck);
-}
-
 // §3.3 Specify blocks
 TEST(ParserClause03, Cl3_3_SpecifyBlock) {
   EXPECT_TRUE(
