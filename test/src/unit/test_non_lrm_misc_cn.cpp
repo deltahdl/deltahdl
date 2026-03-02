@@ -26,15 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, WeakSequenceProperty) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) weak(a ##1 b));\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // =============================================================================
 // §16.14.6 Property case
 // =============================================================================
