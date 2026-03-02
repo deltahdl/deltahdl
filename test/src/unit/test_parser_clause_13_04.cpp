@@ -359,4 +359,19 @@ TEST(ParserA26, FuncBodyWithEndLabel) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "foo");
 }
 
+TEST(ParserA26, FuncBodyOldStyleOutputPort) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void xfer;\n"
+      "    input int a;\n"
+      "    output int b;\n"
+      "    b = a;\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
+}
+
 }  // namespace
