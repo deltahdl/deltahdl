@@ -603,4 +603,20 @@ TEST(ParserSection27, GenerateForLabeled) {
   ASSERT_EQ(gen->gen_body.size(), 1u);
 }
 
+TEST(ParserSection27, GenerateForCompoundAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i += 1) begin\n"
+      "    assign out[i] = in[i];\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1);
+  auto* gen = mod->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
+  ASSERT_NE(gen->gen_step, nullptr);
+  ASSERT_EQ(gen->gen_body.size(), 1);
+}
+
 }  // namespace
