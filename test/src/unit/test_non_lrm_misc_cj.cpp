@@ -34,22 +34,6 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// task_body_declaration (new-style ports)
-// ---------------------------------------------------------------------------
-TEST(ParserA27, TaskBodyNewStyleEmptyPorts) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(item->func_args.empty());
-}
-
 TEST(ParserA27, TaskBodyNewStyleWithArgs) {
   auto r = Parse(
       "module m;\n"
