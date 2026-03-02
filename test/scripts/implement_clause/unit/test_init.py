@@ -9,10 +9,10 @@ import pytest
 
 from implement_clause import invoke_implement_subclause, main, parse_args
 
-INVOKE_KWARGS = dict(
-    lrm="/path/lrm.txt", subclause="4.2", issue=123,
-    organization="deltahdl", repo="deltahdl",
-)
+INVOKE_KWARGS = {
+    "lrm": "/path/lrm.txt", "subclause": "4.2", "issue": 123,
+    "organization": "deltahdl", "repo": "deltahdl",
+}
 
 
 @contextmanager
@@ -58,9 +58,8 @@ def test_invoke_implement_subclause_calls_subprocess(
     ]
 
 
-def test_invoke_implement_subclause_prints_subclause(
-    invoke_subprocess_ok, capsys,
-) -> None:
+@pytest.mark.usefixtures("invoke_subprocess_ok")
+def test_invoke_implement_subclause_prints_subclause(capsys) -> None:
     """Prints which subclause is being invoked."""
     invoke_implement_subclause(**INVOKE_KWARGS)
     assert "4.2" in capsys.readouterr().out

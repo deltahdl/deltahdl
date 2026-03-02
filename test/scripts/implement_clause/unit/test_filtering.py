@@ -33,17 +33,15 @@ def test_filter_implementable_prints_count(capsys) -> None:
     assert "Filtering 2 subclauses" in capsys.readouterr().out
 
 
-def test_filter_implementable_prints_raw_response(
-    patch_filter_ok, capsys,
-) -> None:
+@pytest.mark.usefixtures("patch_filter_ok")
+def test_filter_implementable_prints_raw_response(capsys) -> None:
     """Prints Claude's raw stdout before parsing."""
     filter_implementable("text", THREE_SUBCLAUSES)
     assert '["4.2", "4.3"]' in capsys.readouterr().out
 
 
-def test_filter_implementable_prints_result(
-    patch_filter_ok, capsys,
-) -> None:
+@pytest.mark.usefixtures("patch_filter_ok")
+def test_filter_implementable_prints_result(capsys) -> None:
     """Prints the implementable subclauses returned by Claude."""
     filter_implementable("text", THREE_SUBCLAUSES)
     assert "['4.2', '4.3']" in capsys.readouterr().out
