@@ -403,4 +403,17 @@ TEST(ParserA28, ImportMultipleInBlock) {
               "endmodule\n"));
 }
 
+TEST(Parser, ImportSpecific) {
+  auto r = Parse(
+      "module t;\n"
+      "  import my_pkg::WIDTH;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(item->import_item.package_name, "my_pkg");
+  EXPECT_EQ(item->import_item.item_name, "WIDTH");
+  EXPECT_FALSE(item->import_item.is_wildcard);
+}
+
 }  // namespace
