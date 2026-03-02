@@ -48,4 +48,13 @@ TEST(ParserSection16, RoseFunctionInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection16, FellFunctionInProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) $fell(req) |-> ##1 !ack);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
