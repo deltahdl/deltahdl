@@ -43,27 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// =============================================================================
-// LRM section 19.6.1 -- Input and output skews
-// =============================================================================
-// Input skew with numeric delay.
-TEST(ParserSection19, InputOutputSkew_InputNumeric) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #2 data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto& sig = item->clocking_signals[0];
-  EXPECT_EQ(sig.direction, Direction::kInput);
-  EXPECT_EQ(sig.name, "data");
-  ASSERT_NE(sig.skew_delay, nullptr);
-  EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
-}
-
 // Output skew with edge qualifier.
 TEST(ParserSection19, InputOutputSkew_OutputEdge) {
   auto r = Parse(

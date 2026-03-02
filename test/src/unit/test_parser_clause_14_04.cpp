@@ -258,4 +258,61 @@ TEST(ParserA611, InputWithSkewNoOutput) {
   ASSERT_NE(sig.skew_delay, nullptr);
 }
 
+struct ParseResult19 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult19 Parse(const std::string& src) {
+  ParseResult19 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FindClockingBlock(ParseResult19& r, size_t idx = 0) {
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (count == idx) return item;
+    ++count;
+  }
+  return nullptr;
+}
+
+// Validates parse result and retrieves a clocking block via output param.
+// Must be called through ASSERT_NO_FATAL_FAILURE.
+static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
+                             size_t idx = 0) {
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  out = FindClockingBlock(r, idx);
+  ASSERT_NE(out, nullptr);
+}
+
+// =============================================================================
+// LRM section 19.6.1 -- Input and output skews
+// =============================================================================
+// Input skew with numeric delay.
+TEST(ParserSection19, InputOutputSkew_InputNumeric) {
+  auto r = Parse(
+      "module t;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #2 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  auto& sig = item->clocking_signals[0];
+  EXPECT_EQ(sig.direction, Direction::kInput);
+  EXPECT_EQ(sig.name, "data");
+  ASSERT_NE(sig.skew_delay, nullptr);
+  EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
