@@ -27,16 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, MultipleCheckers) {
-  auto* unit = Parse(R"(
-    checker c1;
-    endchecker
-    checker c2;
-    endchecker
-  )");
-  EXPECT_EQ(unit->checkers.size(), 2u);
-}
-
 TEST_F(VerifyParseTest, CheckerCoexistsWithModule) {
   auto* unit = Parse(R"(
     module m;

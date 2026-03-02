@@ -426,4 +426,14 @@ TEST_F(VerifyParseTest, CheckerWithBody) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
+TEST_F(VerifyParseTest, MultipleCheckers) {
+  auto* unit = Parse(R"(
+    checker c1;
+    endchecker
+    checker c2;
+    endchecker
+  )");
+  EXPECT_EQ(unit->checkers.size(), 2u);
+}
+
 }  // namespace
