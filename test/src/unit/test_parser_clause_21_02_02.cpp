@@ -64,4 +64,11 @@ TEST(ParserSection4, Sec4_5_StrobeSystemCall) {
   EXPECT_EQ(stmt->expr->callee, "$strobe");
 }
 
+TEST(ParserSection21, StrobeBasicCall) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $strobe(\"val=%d\", x);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

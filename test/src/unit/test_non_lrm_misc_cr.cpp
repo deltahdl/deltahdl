@@ -8,13 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, StrobeBasicCall) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $strobe(\"val=%d\", x);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection21, StrobebHexOctal) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
