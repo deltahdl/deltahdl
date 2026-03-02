@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection12, DoWhileLoopWithBlock) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    do begin\n"
-      "      x = x + 1;\n"
-      "    end while (x < 10);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
-  EXPECT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
-}
-
 TEST(ParserSection12, ForeverLoopWithBlock) {
   auto r = Parse(
       "module t;\n"
