@@ -220,4 +220,13 @@ TEST(ParserA23, ListOfVariablePortIdentifiersMultipleAnsi) {
   EXPECT_NE(r.cu->modules[0]->ports[1].default_value, nullptr);
 }
 
+TEST(ParserA25, PortWithPackedDim) {
+  auto r =
+      ParseWithPreprocessor("module m(input logic [15:0] data); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  ASSERT_NE(r.cu->modules[0]->ports[0].data_type.packed_dim_left, nullptr);
+}
+
 }  // namespace
