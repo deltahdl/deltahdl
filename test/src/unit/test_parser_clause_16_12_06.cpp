@@ -56,4 +56,38 @@ TEST(ParserAnnexF, AnnexFPropertyIfElse) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
 }
 
+// --- Test helpers ---
+struct ParseResult16b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16b Parse(const std::string& src) {
+  ParseResult16b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §16.14.6.2 Property if-else
+// =============================================================================
+TEST(ParserSection16, PropertyIfElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (\n"
+      "    @(posedge clk)\n"
+      "    if (mode) a |-> b\n"
+      "    else a |-> c);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace

@@ -26,21 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.14.6.2 Property if-else
-// =============================================================================
-TEST(ParserSection16, PropertyIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (\n"
-      "    @(posedge clk)\n"
-      "    if (mode) a |-> b\n"
-      "    else a |-> c);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection16, PropertyIfWithoutElse) {
   auto r = Parse(
       "module m;\n"
