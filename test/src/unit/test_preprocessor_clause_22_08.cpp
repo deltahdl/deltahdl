@@ -52,3 +52,20 @@ TEST(ParserSection6, DefaultNettypeAffectsImplicit) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// ============================================================================
+// AST-level checks for `default_nettype
+// ============================================================================
+TEST(ParserSection22, DefaultNettypeModuleCount) {
+  auto r = ParseWithPreprocessor(
+      "`default_nettype wire\n"
+      "module m1;\n"
+      "endmodule\n"
+      "`default_nettype none\n"
+      "module m2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m1");
+  EXPECT_EQ(r.cu->modules[1]->name, "m2");
+}
+
