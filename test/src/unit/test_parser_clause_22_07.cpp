@@ -13,4 +13,11 @@ TEST(ParserSection22, TimescaleNsPs) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, Timescale10ns1ns) {
+  EXPECT_TRUE(
+      ParseOk("`timescale 10ns/1ns\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
