@@ -64,4 +64,17 @@ TEST(ParserA82, SystemTfCallAsExpr) {
   EXPECT_EQ(stmt->rhs->args.size(), 1u);
 }
 
+// =============================================================================
+// A.8.4 Primaries — system calls as primary
+// =============================================================================
+// § primary — system function call
+TEST(ParserA84, PrimarySystemCall) {
+  auto r = Parse("module m; initial x = $clog2(16); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
+}
+
 }  // namespace

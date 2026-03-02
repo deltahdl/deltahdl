@@ -14,19 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.8.4 Primaries — system calls as primary
-// =============================================================================
-// § primary — system function call
-TEST(ParserA84, PrimarySystemCall) {
-  auto r = Parse("module m; initial x = $clog2(16); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
-}
-
 // § primary — type_reference
 TEST(ParserA84, PrimaryTypeRef) {
   auto r = Parse(
