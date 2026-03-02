@@ -608,4 +608,21 @@ TEST(ParserSection9, Sec9_3_1_NamedBeginEndNoEndLabel) {
   EXPECT_EQ(body->label, "blk_no_end");
 }
 
+TEST(ParserSection12, NestedNamedBlocks) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : outer\n"
+      "    begin : inner\n"
+      "      x = 1;\n"
+      "    end : inner\n"
+      "  end : outer\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->label, "outer");
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->label, "inner");
+}
+
 }  // namespace
