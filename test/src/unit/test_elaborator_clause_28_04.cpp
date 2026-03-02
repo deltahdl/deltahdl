@@ -81,4 +81,20 @@ TEST(ParserSection28, ElaborateXorGate) {
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kCaret);
 }
 
+TEST(ParserSection28, ElaborateMultiInputAnd) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  wire out, a, b, c;\n"
+      "  and g1(out, a, b, c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->assigns.size(), 1);
+  // 3-input and: (a & b) & c -- nested binary.
+  auto* rhs = mod->assigns[0].rhs;
+  EXPECT_EQ(rhs->op, TokenKind::kAmp);
+}
+
 }  // namespace
