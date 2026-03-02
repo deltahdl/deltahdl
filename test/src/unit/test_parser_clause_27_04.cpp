@@ -587,4 +587,20 @@ TEST(ParserSection27, GenerateForPostIncrement) {
   ASSERT_EQ(gen->gen_body.size(), 1);
 }
 
+// --- Generate-for with labeled begin/end (§27.4) ---
+TEST(ParserSection27, GenerateForLabeled) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 4; i++) begin : gen_blk\n"
+      "    assign out[i] = in[i];\n"
+      "  end : gen_blk\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  auto* gen = mod->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
+  ASSERT_EQ(gen->gen_body.size(), 1u);
+}
+
 }  // namespace
