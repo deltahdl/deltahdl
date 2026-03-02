@@ -161,4 +161,19 @@ TEST(ParserSection23, PortConnectionEmptyNamed) {
   EXPECT_EQ(item->inst_ports[1].second, nullptr);
 }
 
+// =========================================================================
+// LRM section 23.3: Module instances
+// =========================================================================
+TEST(ParserSection23, SimpleModuleInstance) {
+  auto r = Parse(
+      "module top;\n"
+      "  sub u1 (.a(x), .b(y));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
+  EXPECT_EQ(item->inst_module, "sub");
+  EXPECT_EQ(item->inst_name, "u1");
+}
+
 }  // namespace
