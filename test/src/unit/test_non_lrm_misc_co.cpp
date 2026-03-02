@@ -27,15 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, CheckerWithEndLabel) {
-  auto* unit = Parse(R"(
-    checker labeled_check;
-    endchecker : labeled_check
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_EQ(unit->checkers[0]->name, "labeled_check");
-}
-
 TEST_F(VerifyParseTest, CheckerWithPorts) {
   auto* unit = Parse(R"(
     checker port_check(input logic clk, input logic rst);

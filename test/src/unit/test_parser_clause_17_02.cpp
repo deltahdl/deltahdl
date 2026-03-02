@@ -396,4 +396,13 @@ TEST_F(VerifyParseTest, BasicChecker) {
   EXPECT_EQ(unit->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
 }
 
+TEST_F(VerifyParseTest, CheckerWithEndLabel) {
+  auto* unit = Parse(R"(
+    checker labeled_check;
+    endchecker : labeled_check
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_EQ(unit->checkers[0]->name, "labeled_check");
+}
+
 }  // namespace
