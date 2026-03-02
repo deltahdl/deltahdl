@@ -210,4 +210,14 @@ TEST(ParserA23, ListOfVariableIdentifiersWithDim) {
   EXPECT_FALSE(r.cu->modules[0]->ports[0].unpacked_dims.empty());
 }
 
+TEST(ParserA23, ListOfVariablePortIdentifiersMultipleAnsi) {
+  auto r = ParseWithPreprocessor(
+      "module m(output logic a = 1'b0, output logic b = 1'b1); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
+  EXPECT_NE(r.cu->modules[0]->ports[0].default_value, nullptr);
+  EXPECT_NE(r.cu->modules[0]->ports[1].default_value, nullptr);
+}
+
 }  // namespace
