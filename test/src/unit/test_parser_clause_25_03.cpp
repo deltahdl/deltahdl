@@ -108,4 +108,22 @@ TEST(Parser, EmptyInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
 }
 
+// =============================================================================
+// A.1.6 Interface items
+// =============================================================================
+// interface_or_generate_item ::= { attribute_instance } module_common_item
+// Verify that a module_common_item (continuous assign) is accepted inside an
+// interface body, producing an item in the interface's items list.
+TEST(SourceText, InterfaceOrGenerateItemModuleCommon) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  assign a = b;\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto* ifc = r.cu->interfaces[0];
+  ASSERT_GE(ifc->items.size(), 1u);
+  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kContAssign);
+}
+
 }  // namespace
