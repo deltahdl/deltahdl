@@ -545,4 +545,19 @@ TEST(SourceText, ProgramInitialConstruct) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
+// non_port_program_item ::= final_construct
+TEST(SourceText, ProgramFinalConstruct) {
+  auto r = Parse(
+      "program prg;\n"
+      "  final begin\n"
+      "    $display(\"done\");\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(
+      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
+}
+
 }  // namespace
