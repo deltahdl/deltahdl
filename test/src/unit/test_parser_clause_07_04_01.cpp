@@ -135,4 +135,14 @@ TEST(ParserA83, ConstantRangeInPackedDim) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
+// =============================================================================
+// A.8.4 Primaries — constant_bit_select and constant_select
+// =============================================================================
+// § constant_bit_select — in packed dimension
+TEST(ParserA84, ConstantBitSelectPackedDim) {
+  auto r = Parse("module m; logic [7:0] data; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

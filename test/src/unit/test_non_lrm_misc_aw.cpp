@@ -14,16 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.8.4 Primaries — constant_bit_select and constant_select
-// =============================================================================
-// § constant_bit_select — in packed dimension
-TEST(ParserA84, ConstantBitSelectPackedDim) {
-  auto r = Parse("module m; logic [7:0] data; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § constant_select — in parameter expression
 TEST(ParserA84, ConstantSelectParameterExpr) {
   auto r = Parse(
