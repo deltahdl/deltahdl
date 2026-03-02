@@ -95,4 +95,19 @@ TEST(Parser, InterfaceWithModport) {
   VerifyModportPorts(mp->ports, expected, std::size(expected));
 }
 
+TEST(Parser, ModportMultipleGroups) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic addr;\n"
+      "  logic data;\n"
+      "  modport slave(input addr, input data);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_EQ(mp->name, "slave");
+  ASSERT_EQ(mp->ports.size(), 2);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
+}
+
 }  // namespace
