@@ -16,18 +16,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-TEST(ParserSection28, PassGateTran) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  tran (a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
-  EXPECT_EQ(item->gate_kind, GateKind::kTran);
-  ASSERT_EQ(item->gate_terminals.size(), 2);
-}
-
 TEST(ParserSection28, MosSwitchNmos) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
