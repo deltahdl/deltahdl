@@ -103,4 +103,15 @@ TEST(ParserAnnexF, AnnexFOverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
+// --- F.14: Non-overlapping implication |=> ---
+TEST(ParserAnnexF, AnnexFNonoverlapImplication) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req |=> gnt);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
+}
+
 }  // namespace
