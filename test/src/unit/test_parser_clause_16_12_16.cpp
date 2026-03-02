@@ -132,4 +132,21 @@ TEST(ParserSection16, PropertyCaseBasic) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+TEST(ParserSection16, PropertyCaseInAssert) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p1;\n"
+      "    @(posedge clk)\n"
+      "    case (mode)\n"
+      "      2'b00 : a |-> b;\n"
+      "      2'b01 : a |-> ##1 b;\n"
+      "      2'b10 : a |-> ##2 b;\n"
+      "    endcase\n"
+      "  endproperty\n"
+      "  assert property (p1);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
