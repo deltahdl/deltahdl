@@ -74,4 +74,14 @@ TEST(ParserA83, UnaryReductionOr) {
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
 }
 
+TEST(ParserA83, UnaryReductionXor) {
+  auto r = Parse("module m; initial x = ^a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kCaret);
+}
+
 }  // namespace
