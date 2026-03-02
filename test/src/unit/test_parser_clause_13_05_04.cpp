@@ -213,4 +213,20 @@ TEST(ParserSection13, PositionalArgsHaveEmptyNames) {
   EXPECT_EQ(call->kind, ExprKind::kCall);
 }
 
+TEST(ParserSection13, PositionalArgsNoNamedArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "  initial foo(1, 2);\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* call = stmt->expr;
+  ASSERT_NE(call, nullptr);
+  ASSERT_EQ(call->args.size(), 2u);
+  // Positional calls: arg_names is empty (no named args detected)
+  EXPECT_TRUE(call->arg_names.empty());
+}
+
 }  // namespace
