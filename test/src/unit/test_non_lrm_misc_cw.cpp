@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Verify source location is captured on ModportDecl
-TEST(ParserA29, ModportDeclHasSourceLoc) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic a;\n"
-      "  modport target(input a);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  EXPECT_TRUE(mp->loc.IsValid());
-}
-
 // interface_or_generate_item ::= { attribute_instance } extern_tf_declaration
 // extern_tf_declaration ::= extern method_prototype ;
 // Verify extern function prototype inside an interface.

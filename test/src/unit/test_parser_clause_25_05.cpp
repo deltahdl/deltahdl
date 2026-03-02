@@ -160,4 +160,17 @@ TEST(ParserA29, AllFourDirections) {
   EXPECT_EQ(mp->ports[3].direction, Direction::kRef);
 }
 
+// Verify source location is captured on ModportDecl
+TEST(ParserA29, ModportDeclHasSourceLoc) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a;\n"
+      "  modport target(input a);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  EXPECT_TRUE(mp->loc.IsValid());
+}
+
 }  // namespace
