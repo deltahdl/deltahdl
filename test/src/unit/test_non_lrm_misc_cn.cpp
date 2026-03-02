@@ -26,21 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.14 Concurrent assertions — procedural context
-// =============================================================================
-// =============================================================================
-// §16.14.2 Sequence property — strong/weak
-// =============================================================================
-TEST(ParserSection16, StrongSequenceProperty) {
-  auto r = Parse(
-      "module m;\n"
-      "  cover property (@(posedge clk) strong(a ##1 b ##1 c));\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection16, WeakSequenceProperty) {
   auto r = Parse(
       "module m;\n"
