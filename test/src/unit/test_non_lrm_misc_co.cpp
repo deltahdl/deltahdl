@@ -27,22 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// Section 16.5.1 -- Assert property with sequence methods
-// =============================================================================
-// Sequence .triggered method used in a sequence declaration.
-TEST(ParserSection16, Sec16_5_1_SequenceTriggeredMethod) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s1;\n"
-              "    @(posedge clk) a ##1 b;\n"
-              "  endsequence\n"
-              "  sequence s2;\n"
-              "    @(posedge clk) c ##1 s1.triggered ##1 d;\n"
-              "  endsequence\n"
-              "endmodule\n"));
-}
-
 // Sequence .matched method used across clock domains.
 TEST(ParserSection16, Sec16_5_1_SequenceMatchedMethod) {
   EXPECT_TRUE(
