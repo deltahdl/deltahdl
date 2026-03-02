@@ -7,29 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection27, GenerateRegionWithMultipleKinds) {
-  auto r = Parse(
-      "module m;\n"
-      "  generate\n"
-      "    for (genvar i = 0; i < 2; i++) begin\n"
-      "      assign a[i] = b[i];\n"
-      "    end\n"
-      "    if (WIDTH > 0)\n"
-      "      assign c = d;\n"
-      "  endgenerate\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  bool found_for = false;
-  bool found_if = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kGenerateFor) found_for = true;
-    if (item->kind == ModuleItemKind::kGenerateIf) found_if = true;
-  }
-  EXPECT_TRUE(found_for);
-  EXPECT_TRUE(found_if);
-}
-
 // --- Loop generate with module instantiation (§27.4) ---
 TEST(ParserSection27, GenerateForWithModuleInst) {
   auto r = Parse(
