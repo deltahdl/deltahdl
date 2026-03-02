@@ -1,7 +1,7 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: implement-subclause-${{ github.ref }}
+  group: implement-clause-${{ github.ref }}
 jobs:
   static-analysis:
     runs-on: ubuntu-24.04
@@ -11,11 +11,11 @@ jobs:
         uses: actions/cache@v4
         with:
           key: >-
-            pip-implement-subclause-${{
-            hashFiles('.github/workflows/implement_subclause.yml') }}
+            pip-implement-clause-${{
+            hashFiles('.github/workflows/implement_clause.yml') }}
           path: ~/.cache/pip
           restore-keys: |
-            pip-implement-subclause-
+            pip-implement-clause-
       - name: Install tools
         run: |
           pip install \
@@ -31,10 +31,10 @@ jobs:
           --verbose
           ${{ github.workspace }}/lib/lrm/**/*
           ${{ github.workspace }}/lib/github/**/*
-          ${{ github.workspace }}/scripts/implement_subclause/**/*
+          ${{ github.workspace }}/scripts/implement_clause/**/*
           ${{ github.workspace }}/test/lib/lrm/**/*
           ${{ github.workspace }}/test/lib/github/**/*
-          ${{ github.workspace }}/test/scripts/implement_subclause/**/*
+          ${{ github.workspace }}/test/scripts/implement_clause/**/*
       - name: Assert no linter config files
         run: >-
           assert-no-linter-config-files
@@ -47,40 +47,40 @@ jobs:
           --verbose
           ${{ github.workspace }}/test/lib/lrm
           ${{ github.workspace }}/test/lib/github
-          ${{ github.workspace }}/test/scripts/implement_subclause
+          ${{ github.workspace }}/test/scripts/implement_clause
       - name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
-          lib/lrm/ lib/github/ scripts/implement_subclause/
+          lib/lrm/ lib/github/ scripts/implement_clause/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
-          PYTHONPATH=.:scripts:test/scripts/implement_subclause/unit
+          PYTHONPATH=.:scripts:test/scripts/implement_clause/unit
           python3 -m pylint --recursive=y
           test/lib/lrm/ test/lib/github/
-          test/scripts/implement_subclause/
+          test/scripts/implement_clause/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy
-          lib/lrm/ lib/github/ scripts/implement_subclause/
+          lib/lrm/ lib/github/ scripts/implement_clause/
       - name: Run mypy on tests
         run: >-
-          MYPYPATH=.:scripts:test/scripts/implement_subclause/unit
+          MYPYPATH=.:scripts:test/scripts/implement_clause/unit
           python3 -m mypy --explicit-package-bases
           test/lib/lrm/ test/lib/github/
-          test/scripts/implement_subclause/
+          test/scripts/implement_clause/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
-          lib/lrm/ lib/github/ scripts/implement_subclause/
+          lib/lrm/ lib/github/ scripts/implement_clause/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
           test/lib/lrm/ test/lib/github/
-          test/scripts/implement_subclause/
+          test/scripts/implement_clause/
   test-lib-github:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -90,11 +90,11 @@ jobs:
         uses: actions/cache@v4
         with:
           key: >-
-            pip-implement-subclause-${{
-            hashFiles('.github/workflows/implement_subclause.yml') }}
+            pip-implement-clause-${{
+            hashFiles('.github/workflows/implement_clause.yml') }}
           path: ~/.cache/pip
           restore-keys: |
-            pip-implement-subclause-
+            pip-implement-clause-
       - name: Install tools
         run: pip install pytest pytest-cov
       - name: Run tests with 100% coverage gate
@@ -113,11 +113,11 @@ jobs:
         uses: actions/cache@v4
         with:
           key: >-
-            pip-implement-subclause-${{
-            hashFiles('.github/workflows/implement_subclause.yml') }}
+            pip-implement-clause-${{
+            hashFiles('.github/workflows/implement_clause.yml') }}
           path: ~/.cache/pip
           restore-keys: |
-            pip-implement-subclause-
+            pip-implement-clause-
       - name: Install tools
         run: pip install pytest pytest-cov
       - name: Run tests with 100% coverage gate
@@ -138,48 +138,48 @@ jobs:
         uses: actions/cache@v4
         with:
           key: >-
-            pip-implement-subclause-${{
-            hashFiles('.github/workflows/implement_subclause.yml') }}
+            pip-implement-clause-${{
+            hashFiles('.github/workflows/implement_clause.yml') }}
           path: ~/.cache/pip
           restore-keys: |
-            pip-implement-subclause-
+            pip-implement-clause-
       - name: Install tools
         run: pip install pytest pytest-cov
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/implement_subclause/unit/ -v
-          --cov=implement_subclause
+          test/scripts/implement_clause/unit/ -v
+          --cov=implement_clause
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
       - name: Run integration tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/implement_subclause/integration/ -v
+          test/scripts/implement_clause/integration/ -v
       - name: Run e2e tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/implement_subclause/e2e/ -v
-name: Implement Subclause
+          test/scripts/implement_clause/e2e/ -v
+name: Implement Clause
 on:
   pull_request:
     paths:
-      - .github/workflows/implement_subclause.yml
+      - .github/workflows/implement_clause.yml
       - lib/github/**
       - lib/lrm/**
-      - scripts/implement_subclause/**
+      - scripts/implement_clause/**
       - test/lib/github/**
       - test/lib/lrm/**
-      - test/scripts/implement_subclause/**
+      - test/scripts/implement_clause/**
   push:
     branches: [main]
     paths:
-      - .github/workflows/implement_subclause.yml
+      - .github/workflows/implement_clause.yml
       - lib/github/**
       - lib/lrm/**
-      - scripts/implement_subclause/**
+      - scripts/implement_clause/**
       - test/lib/github/**
       - test/lib/lrm/**
-      - test/scripts/implement_subclause/**
+      - test/scripts/implement_clause/**
   workflow_dispatch:
