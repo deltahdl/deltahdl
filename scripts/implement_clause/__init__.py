@@ -27,6 +27,11 @@ def filter_implementable(
     model: str = "sonnet",
 ) -> list[str]:
     """Return subclause numbers that are implementable as software."""
+    print(
+        f"Filtering {len(subclauses)} subclauses"
+        f" for implementability via Claude ({model})...",
+        file=sys.stderr,
+    )
     numbered = "\n".join(
         f"- {k}: {v}" for k, v in subclauses.items()
     )
@@ -60,7 +65,9 @@ def filter_implementable(
         )
         sys.exit(1)
 
-    return json.loads(result.stdout.strip())
+    implementable = json.loads(result.stdout.strip())
+    print(f"Implementable: {implementable}", file=sys.stderr)
+    return implementable
 
 
 def invoke_implement_subclause(
@@ -72,6 +79,10 @@ def invoke_implement_subclause(
     repo: str,
 ) -> None:
     """Shell out to ``python -m implement_subclause``."""
+    print(
+        f"Invoking implement_subclause for {subclause}...",
+        file=sys.stderr,
+    )
     result = subprocess.run(
         [
             sys.executable, "-m", "implement_subclause",
@@ -118,12 +129,21 @@ def main(argv: list[str] | None = None) -> None:
     subclauses = parse_subclauses(lrm, clause)
 
     if not subclauses:
+        print(
+            f"No subclauses for {clause}; invoking directly.",
+            file=sys.stderr,
+        )
         invoke_implement_subclause(
             lrm=args.lrm, subclause=clause,
             issue=args.issue, organization=args.organization,
             repo=args.repo,
         )
         return
+
+    print(
+        f"Found {len(subclauses)} subclauses for {clause}.",
+        file=sys.stderr,
+    )
 
     clause_text = extract_clause_text(lrm, clause)
     implementable = filter_implementable(clause_text, subclauses)
@@ -135,9 +155,10 @@ def main(argv: list[str] | None = None) -> None:
 
     subclause = next_unchecked(new_body)
     if subclause is None:
-        print("All subclauses are done.")
+        print("All subclauses are done.", file=sys.stderr)
         return
 
+    print(f"Next unchecked: {subclause}", file=sys.stderr)
     invoke_implement_subclause(
         lrm=args.lrm, subclause=subclause,
         issue=args.issue, organization=args.organization,
