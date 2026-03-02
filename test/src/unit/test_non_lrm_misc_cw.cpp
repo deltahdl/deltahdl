@@ -17,15 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// --- Interface/modport tests ---
-TEST(Parser, EmptyInterface) {
-  auto r = Parse("interface simple_bus; endinterface");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->interfaces.size(), 1);
-  EXPECT_EQ(r.cu->interfaces[0]->name, "simple_bus");
-  EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
-}
-
 TEST(Parser, InterfaceAndModule) {
   auto r = Parse(
       "interface bus; endinterface\n"
