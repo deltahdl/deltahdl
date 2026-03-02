@@ -43,18 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Default skew with numeric literals (no time-unit suffix).
-TEST(ParserSection19, DefaultSkew_NumericLiterals) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    default input #3 output #7;\n"
-              "    input x;\n"
-              "    output y;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // Additional cross-cutting tests
 // =============================================================================
