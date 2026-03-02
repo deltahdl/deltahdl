@@ -302,4 +302,19 @@ TEST(ParserA84, ConstantPrimaryConcatenation) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kConcatenation);
 }
 
+// § primary — concatenation
+TEST(ParserA84, PrimaryConcatenation) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [15:0] c;\n"
+      "  initial c = {a, b};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
+}
+
 }  // namespace
