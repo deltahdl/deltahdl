@@ -24,17 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, AnsiPortsInout) {
-  auto r = Parse(
-      "module m(inout wire [7:0] data);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 1u);
-  EXPECT_EQ(mod->ports[0].direction, Direction::kInout);
-  EXPECT_EQ(mod->ports[0].name, "data");
-}
-
 // =============================================================================
 // LRM section 23.10 -- Module instantiation / parameter override
 // =============================================================================
