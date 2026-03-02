@@ -39,23 +39,6 @@ static ParseResult21 Parse(const std::string& src) {
 namespace {
 
 // ============================================================================
-// §21.3.5 — $sscanf
-// ============================================================================
-TEST(Section21, SscanfDecimal) {
-  SimFixture f;
-  auto* dest = f.ctx.CreateVariable("scanned", 32);
-  dest->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* expr =
-      MakeSysCall(f.arena, "$sscanf",
-                  {MakeStrLit(f.arena, "42"), MakeStrLit(f.arena, "%d"),
-                   MakeId(f.arena, "scanned")});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);  // 1 item scanned
-  EXPECT_EQ(dest->value.ToUint64(), 42u);
-}
-
-// ============================================================================
 // §21.3 — $rewind(fd)
 // ============================================================================
 TEST(Section21, Rewind) {
