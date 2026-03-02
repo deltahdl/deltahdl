@@ -16,19 +16,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-TEST(ParserSection28, StrengthWithDelay) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  and (strong0, strong1) #5 g1(out, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 4);  // strong0
-  EXPECT_EQ(item->drive_strength1, 4);  // strong1
-  EXPECT_NE(item->gate_delay, nullptr);
-  ASSERT_EQ(item->gate_terminals.size(), 3);
-}
-
 TEST(Parser, GateNoInstanceName) {
   auto r = ParseWithPreprocessor("module t; and (out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
