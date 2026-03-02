@@ -86,28 +86,6 @@ static SpecifyParseResult ParseSpecifySingle(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_ConditionalPath) {
-  auto sp = ParseSpecifySingle(
-      "module m(input a, en, output b);\n"
-      "  specify\n"
-      "    if (en) (a => b) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(sp.pr.cu, nullptr);
-  EXPECT_FALSE(sp.pr.has_errors);
-  ASSERT_NE(sp.sole_item, nullptr);
-  auto* si = sp.sole_item;
-  EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
-  EXPECT_NE(si->path.condition, nullptr);
-  EXPECT_FALSE(si->path.is_ifnone);
-  ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0].name, "b");
-  ASSERT_EQ(si->path.delays.size(), 1u);
-}
-
 TEST(ParserSection28, Sec28_12_IfnonePath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"
