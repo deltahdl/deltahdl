@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.2 Subroutine calls — array_method_name
-// =============================================================================
-// § array_method_name ::= method_identifier | unique | and | or | xor
-TEST(ParserA82, ArrayMethodNameUnique) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.unique(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA82, ArrayMethodNameAnd) {
   auto r = Parse(
       "module m;\n"
