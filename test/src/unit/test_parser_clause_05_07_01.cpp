@@ -443,4 +443,14 @@ TEST(ParserA87, DecimalSizedBase) {
   EXPECT_EQ(rhs->int_val, 200u);
 }
 
+// § decimal_number — [size] decimal_base x_digit
+TEST(ParserA87, DecimalXDigit) {
+  auto r = Parse("module m; logic [7:0] x; initial x = 8'dx; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
