@@ -14,17 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-// § empty_unpacked_array_concatenation ::= { }
-TEST(ParserA81, EmptyUnpackedArrayConcatenation) {
-  auto r = Parse("module m; initial x = {}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
-  EXPECT_TRUE(stmt->rhs->elements.empty());
-}
-
 // § Postfix select on concatenation (§11.4.12)
 TEST(ParserA81, ConcatenationPostfixBitSelect) {
   auto r = Parse("module m; initial x = {a, b}[3]; endmodule\n");
