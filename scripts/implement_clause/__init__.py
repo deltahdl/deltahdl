@@ -51,3 +51,27 @@ def filter_implementable(
         sys.exit(1)
 
     return json.loads(result.stdout.strip())
+
+
+def invoke_implement_subclause(
+    *,
+    lrm: str,
+    subclause: str,
+    issue: int,
+    organization: str,
+    repo: str,
+) -> None:
+    """Shell out to ``python -m implement_subclause``."""
+    result = subprocess.run(
+        [
+            sys.executable, "-m", "implement_subclause",
+            "--lrm", lrm,
+            "--subclause", subclause,
+            "--issue", str(issue),
+            "--organization", organization,
+            "--repo", repo,
+        ],
+        check=False,
+    )
+    if result.returncode != 0:
+        sys.exit(result.returncode)
