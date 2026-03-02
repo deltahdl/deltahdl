@@ -66,4 +66,16 @@ TEST(ParserSection15, MailboxNewParameterizedInt) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+TEST(ParserAnnexG, AnnexGMailboxUsage) {
+  auto r = Parse(
+      "module m;\n"
+      "  mailbox #(int) mb = new();\n"
+      "  initial begin\n"
+      "    mb.put(42);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
