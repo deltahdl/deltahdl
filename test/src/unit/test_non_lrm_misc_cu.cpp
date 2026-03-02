@@ -24,17 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, ModuleInstNamedParamOverride) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub #(.WIDTH(8), .DEPTH(16)) u1(.a(w1));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "sub");
-}
-
 // =============================================================================
 // LRM section 23.10.2 -- Generated instantiation
 // =============================================================================
