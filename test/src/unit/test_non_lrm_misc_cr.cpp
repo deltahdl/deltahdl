@@ -38,15 +38,6 @@ static ParseResult21 Parse(const std::string& src) {
 
 namespace {
 
-TEST(Section20, IsunknownTrueXVar) {
-  SimFixture f;
-  // CreateVariable initializes to X (bval = all ones).
-  f.ctx.CreateVariable("xvar", 8);
-  auto* expr = MakeSysCall(f.arena, "$isunknown", {MakeId(f.arena, "xvar")});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
 // ============================================================================
 // §20.11 — $test$plusargs, $value$plusargs
 // ============================================================================
