@@ -18,4 +18,14 @@ TEST(ParserA23, ListOfVariableIdentifiersSingle) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
 }
 
+TEST(ParserA23, ListOfVariablePortIdentifiersWithDim) {
+  auto r = ParseWithPreprocessor(
+      "module m(output logic q [1:0] = '{0, 0}); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_FALSE(port.unpacked_dims.empty());
+  EXPECT_NE(port.default_value, nullptr);
+}
+
 }  // namespace
