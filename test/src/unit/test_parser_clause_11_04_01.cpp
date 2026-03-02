@@ -529,4 +529,15 @@ TEST(ParserSection10, Sec10_4_1_CompoundShifts) {
   EXPECT_EQ(s3->rhs->op, TokenKind::kGtGtGtEq);
 }
 
+// § variable_lvalue — compound assignment +=
+TEST(ParserA85, VarLvalueCompoundAdd) {
+  auto r = Parse("module m; int x; initial x += 5; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
+}
+
 }  // namespace
