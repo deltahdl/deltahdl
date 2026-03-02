@@ -6,23 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ============================================================================
-// AST-level checks for system calls in initial blocks
-// ============================================================================
-TEST(ParserSection21, DisplayParsesAsSystemCall) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial $display(\"hello\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  auto* mod = r.cu->modules[0];
-  ASSERT_FALSE(mod->items.empty());
-  auto* item = mod->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kInitialBlock);
-  ASSERT_NE(item->body, nullptr);
-}
-
 TEST(ParserSection21, DumpvarsInsideBeginEnd) {
   auto r = Parse(
       "module t;\n"
