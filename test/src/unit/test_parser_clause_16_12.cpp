@@ -324,4 +324,15 @@ TEST(ParserSection16, PropertyWithDisableIffDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection16, PropertyWithFormalArgsDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p_valid(signal, valid);\n"
+      "    @(posedge clk) signal |-> valid;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

@@ -26,17 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, PropertyWithFormalArgsDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p_valid(signal, valid);\n"
-      "    @(posedge clk) signal |-> valid;\n"
-      "  endproperty\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // §16.14.6.2 -- Multiclock support
 // =============================================================================
