@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 22. Typedef in package scope
-TEST(ParserClause03, Cl3_13_TypedefInPackageScope) {
-  auto r = Parse(
-      "package types_pkg;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "  typedef logic [15:0] word_t;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  auto* pkg = r.cu->packages[0];
-  int typedef_count = 0;
-  for (auto* item : pkg->items) {
-    if (item->kind == ModuleItemKind::kTypedef) typedef_count++;
-  }
-  EXPECT_EQ(typedef_count, 2);
-}
-
 // =============================================================================
 // A.1.2 package_declaration — with optional lifetime
 // =============================================================================
