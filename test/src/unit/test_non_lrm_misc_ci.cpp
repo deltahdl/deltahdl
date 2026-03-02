@@ -8,27 +8,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// Combined tests -- qualifiers with named blocks
-// =============================================================================
-TEST(ParserSection12, UniqueCasexQualifier) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    unique casex (sel)\n"
-      "      2'b1?: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
-}
-
-// =============================================================================
 // LRM section 12.8 -- Block names and statement labels (additional tests)
 // =============================================================================
 TEST(ParserSection12, StatementLabelOnAssign) {

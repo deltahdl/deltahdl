@@ -620,4 +620,25 @@ TEST(ParserSection9, Sec9_2_3_Unique0CaseStatement) {
   EXPECT_EQ(item->body->qualifier, CaseQualifier::kUnique0);
 }
 
+// =============================================================================
+// Combined tests -- qualifiers with named blocks
+// =============================================================================
+TEST(ParserSection12, UniqueCasexQualifier) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique casex (sel)\n"
+      "      2'b1?: x = 1;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
 }  // namespace
