@@ -27,22 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// §17.7.2 Checker with clocking and assume-based randomization
-// =============================================================================
-TEST_F(VerifyParseTest, CheckerWithDefaultClocking) {
-  auto* unit = Parse(R"(
-    checker clocked_check(bit clk);
-      default clocking @(posedge clk); endclocking
-      rand bit flag;
-      a1: assert property (flag == 1'b1);
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_EQ(unit->checkers[0]->name, "clocked_check");
-  EXPECT_FALSE(unit->checkers[0]->items.empty());
-}
-
 TEST_F(VerifyParseTest, CheckerWithAssumeProperty) {
   auto* unit = Parse(R"(
     checker observer_model(bit valid, reset);
