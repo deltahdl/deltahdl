@@ -143,4 +143,21 @@ TEST(ParserAnnexA, A1InterfaceDecl) {
   EXPECT_EQ(r.cu->interfaces[0]->modports.size(), 2u);
 }
 
+TEST(ParserA29, AllFourDirections) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a, b, c;\n"
+      "  wire d;\n"
+      "  modport mp(input a, output b, inout c, ref d);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 4u);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(mp->ports[2].direction, Direction::kInout);
+  EXPECT_EQ(mp->ports[3].direction, Direction::kRef);
+}
+
 }  // namespace
