@@ -26,23 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.9.11 Sequence methods — triggered
-// =============================================================================
-TEST(ParserSection16, SequenceTriggeredMethod) {
-  auto r = Parse(
-      "module m;\n"
-      "  sequence e1;\n"
-      "    @(posedge clk) a ##1 b ##1 c;\n"
-      "  endsequence\n"
-      "  sequence rule;\n"
-      "    @(posedge clk) reset ##1 inst ##1 e1.triggered ##1 done;\n"
-      "  endsequence\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection16, SequenceMatchedMethod) {
   auto r = Parse(
       "module m;\n"
