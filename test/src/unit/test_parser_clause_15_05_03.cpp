@@ -87,4 +87,24 @@ TEST(ParserSection15, TriggeredMethodHierarchical) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
+// §15.5.3: event alias and triggered check (from LRM event alias example).
+TEST(ParserSection15, TriggeredMethodEventAlias) {
+  auto r = Parse(
+      "module m;\n"
+      "  event done;\n"
+      "  event done_too;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      @done_too;\n"
+      "      #1 -> done;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_GE(stmt->fork_stmts.size(), 2u);
+}
+
 }  // namespace

@@ -34,26 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// §15.5.3: event alias and triggered check (from LRM event alias example).
-TEST(ParserSection15, TriggeredMethodEventAlias) {
-  auto r = Parse(
-      "module m;\n"
-      "  event done;\n"
-      "  event done_too;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      @done_too;\n"
-      "      #1 -> done;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_GE(stmt->fork_stmts.size(), 2u);
-}
-
 // §15.5.3: wait(.triggered) with subsequent statement body.
 TEST(ParserSection15, TriggeredMethodWithBodyStmt) {
   auto r = Parse(
