@@ -578,4 +578,19 @@ TEST(ParserSection23, ConditionalGenerateIfElse) {
   ASSERT_NE(gen->gen_else, nullptr);
 }
 
+TEST(ParserSection23, ConditionalGenerateCase) {
+  auto r = Parse(
+      "module top;\n"
+      "  case (MODE)\n"
+      "    0: assign out = a;\n"
+      "    1: assign out = b;\n"
+      "    default: assign out = 0;\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateCase);
+  ASSERT_EQ(gen->gen_case_items.size(), 3u);
+}
+
 }  // namespace
