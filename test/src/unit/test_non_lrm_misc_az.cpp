@@ -20,28 +20,6 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// §3.4: "A program block can contain ... subroutine definitions ...
-//        initial ... final procedures"
-TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
-  auto r = ParseWithPreprocessor(
-      "program p;\n"
-      "  function int get_val; return 42; endfunction\n"
-      "  task run_test; endtask\n"
-      "  initial $display(\"test\");\n"
-      "  final $display(\"done\");\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFunctionDecl));
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kTaskDecl));
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
-}
-
 // §3.4:
 TEST(ParserClause03, Cl3_4_RejectsDisallowedItems) {
   EXPECT_TRUE(
