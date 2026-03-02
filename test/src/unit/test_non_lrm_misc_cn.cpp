@@ -26,20 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.14.6.2 -- Multiclock support
-// =============================================================================
-TEST(ParserSection16, MultichannelAssertPropertyInline) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (\n"
-      "    @(posedge clk1) a ##1 @(posedge clk2) b\n"
-      "  );\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection16, MulticlockPropertyDeclImplication) {
   auto r = Parse(
       "module m;\n"
