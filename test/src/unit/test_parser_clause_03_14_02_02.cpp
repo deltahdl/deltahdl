@@ -85,4 +85,19 @@ TEST(ParserSection23, TimeunitAndTimeprecision) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
+using ProgramParseTest = ProgramTestParse;
+
+// non_port_program_item ::= timeunits_declaration
+TEST(SourceText, ProgramTimeunitsDecl) {
+  auto r = Parse(
+      "program prg;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "prg");
+}
+
 }  // namespace
