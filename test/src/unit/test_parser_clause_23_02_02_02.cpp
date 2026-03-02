@@ -100,4 +100,29 @@ TEST(ParserSection23, Sec23_2_2_EmptyPortsAndMiscVariants) {
   EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
 }
 
+struct ParseResult23b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult23b Parse(const std::string& src) {
+  ParseResult23b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection23, ModuleEmptyPortList) {
+  auto r = Parse("module m(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
+}
+
 }  // namespace
