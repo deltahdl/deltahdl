@@ -338,4 +338,17 @@ TEST_F(ProgramParseTest, ProgramWithPorts) {
   EXPECT_EQ(unit->programs[0]->ports[1].direction, Direction::kInput);
 }
 
+TEST_F(ProgramParseTest, ProgramWithParameters) {
+  auto* unit = Parse(
+      "program p #(parameter N = 8)(input logic clk);\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_EQ(unit->programs[0]->params.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->params[0].first, "N");
+  ASSERT_GE(unit->programs[0]->ports.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->ports[0].name, "clk");
+}
+
 }  // namespace
