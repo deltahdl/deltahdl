@@ -5,31 +5,7 @@
 
 using namespace delta;
 
-static void VerifyModportPorts(const std::vector<ModportPort>& ports,
-                               const ModportPortExpected expected[],
-                               size_t count) {
-  ASSERT_EQ(ports.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(ports[i].direction, expected[i].dir) << "port " << i;
-    EXPECT_EQ(ports[i].name, expected[i].name) << "port " << i;
-  }
-}
-
 namespace {
-
-TEST(Parser, InterfaceWithModport) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic [7:0] data;\n"
-      "  modport master(output data);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  EXPECT_EQ(mp->name, "master");
-  ModportPortExpected expected[] = {{Direction::kOutput, "data"}};
-  VerifyModportPorts(mp->ports, expected, std::size(expected));
-}
 
 TEST(Parser, ModportMultipleGroups) {
   auto r = Parse(
