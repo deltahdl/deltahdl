@@ -507,4 +507,14 @@ TEST(ParserA87, Size1Bit) {
   EXPECT_EQ(rhs->int_val, 1u);
 }
 
+TEST(ParserA87, Size32Bit) {
+  auto r = Parse("module m; int x; initial x = 32'd100; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 100u);
+}
+
 }  // namespace
