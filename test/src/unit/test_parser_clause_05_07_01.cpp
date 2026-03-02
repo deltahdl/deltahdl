@@ -350,4 +350,17 @@ TEST(ParserA84, ConstantPrimaryUnbasedUnsizedLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
+// =============================================================================
+// A.8.4 Primaries — primary
+// =============================================================================
+// § primary — primary_literal (integer)
+TEST(ParserA84, PrimaryIntegerLiteral) {
+  auto r = Parse("module m; initial x = 8'hFF; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
