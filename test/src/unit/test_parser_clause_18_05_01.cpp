@@ -45,4 +45,18 @@ TEST(SourceText, ConstraintPrototype) {
   EXPECT_EQ(members[4]->name, "c4");
 }
 
+// extern_constraint_declaration ::=
+//   [static] constraint [dynamic_override_specifiers] class_scope
+//   constraint_identifier constraint_block
+TEST(SourceText, ExternConstraintDeclaration) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern constraint c;\n"
+      "endclass\n"
+      "constraint C::c { x > 0; }\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
 }  // namespace
