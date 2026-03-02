@@ -507,4 +507,22 @@ TEST(ParserSection23, GenerateIfInsideForLoop) {
   EXPECT_TRUE(has_if);
 }
 
+// =============================================================================
+// A.8.3 Expressions — genvar_expression
+// =============================================================================
+// § genvar_expression ::= constant_expression (used in generate for)
+TEST(ParserA83, GenvarExprInGenerateFor) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
+      "      wire w;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
