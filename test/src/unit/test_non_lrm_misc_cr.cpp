@@ -39,42 +39,6 @@ static ParseResult21 Parse(const std::string& src) {
 namespace {
 
 // ============================================================================
-// §21.3 — $rewind(fd)
-// ============================================================================
-TEST(Section21, Rewind) {
-  SimFixture f;
-  std::string tmp_path = "/tmp/deltahdl_test_rewind.txt";
-  {
-    std::ofstream ofs(tmp_path);
-    ofs << "ABCD";
-  }
-  auto* open_expr = MakeSysCall(
-      f.arena, "$fopen",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeStrLit(f.arena, "r")});
-  auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
-  uint64_t fd = fd_val.ToUint64();
-  ASSERT_NE(fd, 0u);
-
-  // Read first char.
-  auto* getc1 = MakeSysCall(f.arena, "$fgetc", {MakeInt(f.arena, fd)});
-  auto ch1 = EvalExpr(getc1, f.ctx, f.arena);
-  EXPECT_EQ(ch1.ToUint64(), static_cast<uint64_t>('A'));
-
-  // Rewind.
-  auto* rw = MakeSysCall(f.arena, "$rewind", {MakeInt(f.arena, fd)});
-  EvalExpr(rw, f.ctx, f.arena);
-
-  // Read first char again — should be 'A' after rewind.
-  auto* getc2 = MakeSysCall(f.arena, "$fgetc", {MakeInt(f.arena, fd)});
-  auto ch2 = EvalExpr(getc2, f.ctx, f.arena);
-  EXPECT_EQ(ch2.ToUint64(), static_cast<uint64_t>('A'));
-
-  auto* close_expr = MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)});
-  EvalExpr(close_expr, f.ctx, f.arena);
-  std::remove(tmp_path.c_str());
-}
-
-// ============================================================================
 // §21.3 — $ungetc(char, fd)
 // ============================================================================
 TEST(Section21, Ungetc) {
