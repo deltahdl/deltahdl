@@ -474,4 +474,15 @@ TEST(ParserA87, BinaryNumber) {
   EXPECT_EQ(rhs->int_val, 0xCu);
 }
 
+// § octal_number — [size] octal_base octal_value
+TEST(ParserA87, OctalNumber) {
+  auto r = Parse("module m; logic [11:0] x; initial x = 12'o7654; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 07654u);
+}
+
 }  // namespace
