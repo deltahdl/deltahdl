@@ -6,36 +6,7 @@
 
 using namespace delta;
 
-struct ParseResult21 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult21 Parse(const std::string& src) {
-  ParseResult21 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 namespace {
-
-TEST(ParserSection20, ArrayUnpackedDimensionsFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic arr [4][8];\n"
-      "  initial begin\n"
-      "    int d;\n"
-      "    d = $unpacked_dimensions(arr);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
 
 // ============================================================================
 // LRM section 21.1 -- Display system tasks (general I/O overview)

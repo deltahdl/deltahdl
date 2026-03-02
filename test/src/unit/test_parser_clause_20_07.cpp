@@ -183,4 +183,17 @@ TEST(ParserSection20, ArraySizeWithDimArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection20, ArrayUnpackedDimensionsFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic arr [4][8];\n"
+      "  initial begin\n"
+      "    int d;\n"
+      "    d = $unpacked_dimensions(arr);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
