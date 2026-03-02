@@ -206,4 +206,16 @@ TEST(SourceText, InterfaceWildcardPorts) {
   EXPECT_TRUE(r.cu->interfaces[0]->has_wildcard_ports);
 }
 
+// Interface parameter port list and ports
+TEST(SourceText, InterfaceParamsAndPorts) {
+  auto r = Parse(
+      "interface ifc #(parameter int W = 8)(input logic clk);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->params.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
+}
+
 }  // namespace
