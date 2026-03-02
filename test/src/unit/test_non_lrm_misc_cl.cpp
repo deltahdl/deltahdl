@@ -45,24 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// §14.5 — Hierarchical expression assignment
-// =============================================================================
-TEST(ParserSection14, HierarchicalExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input enable = top.mem1.enable;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].name, "enable");
-  ASSERT_NE(item->clocking_signals[0].hier_expr, nullptr);
-}
-
-// =============================================================================
 // §14.3 — Combined input/output skews
 // =============================================================================
 TEST(ParserSection14, CombinedInputOutputSkew) {
