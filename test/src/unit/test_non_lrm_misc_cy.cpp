@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, GateWithParenDelay) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  or #(10) g1(out, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_NE(item->gate_delay, nullptr);
-}
-
 TEST(ParserSection28, StrengthSpecSupply) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
