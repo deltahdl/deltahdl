@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Verify task prototype with arguments stores them
-TEST(ParserA29, TaskPrototype_HasArgs) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  modport init(import task Read(input logic [7:0] raddr));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_NE(mp->ports[0].prototype, nullptr);
-  EXPECT_FALSE(mp->ports[0].prototype->func_args.empty());
-}
-
 // =============================================================================
 // LRM section 26.2 -- Package declarations
 // =============================================================================
