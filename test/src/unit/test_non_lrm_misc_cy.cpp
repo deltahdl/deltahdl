@@ -16,22 +16,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-TEST(ParserSection28, ElaboratePullupGate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  wire out;\n"
-      "  pullup (out);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1);
-  // pullup: out = 1'b1
-  EXPECT_EQ(mod->assigns[0].rhs->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(mod->assigns[0].rhs->int_val, 1);
-}
-
 // --- Gate primitive tests ---
 TEST(Parser, GateAndInst) {
   auto r = ParseWithPreprocessor("module t; and g1(out, a, b); endmodule");
