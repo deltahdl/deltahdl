@@ -160,4 +160,23 @@ TEST(ParserA82, ListOfArgsMixed) {
   EXPECT_EQ(expr->arg_names[0], "b");
 }
 
+// =============================================================================
+// LRM section 13.5.4 -- Named argument binding
+// =============================================================================
+TEST(ParserSection13, NamedArgBindingParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int a, int b);\n"
+      "  endfunction\n"
+      "  initial foo(.b(2), .a(1));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+  auto* call = stmt->expr;
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(call->kind, ExprKind::kCall);
+}
+
 }  // namespace
