@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, IfdefElsifChain) {
-  EXPECT_TRUE(
-      ParseOk("`define OPT_B\n"
-              "`ifdef OPT_A\n"
-              "module ma;\n"
-              "endmodule\n"
-              "`elsif OPT_B\n"
-              "module mb;\n"
-              "endmodule\n"
-              "`else\n"
-              "module mc;\n"
-              "endmodule\n"
-              "`endif\n"));
-}
-
 TEST(ParserSection22, NestedIfdef) {
   EXPECT_TRUE(
       ParseOk("`define OUTER\n"

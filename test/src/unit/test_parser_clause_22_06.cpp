@@ -35,4 +35,19 @@ TEST(ParserSection22, IfndefUndefined) {
               "`endif\n"));
 }
 
+TEST(ParserSection22, IfdefElsifChain) {
+  EXPECT_TRUE(
+      ParseOk("`define OPT_B\n"
+              "`ifdef OPT_A\n"
+              "module ma;\n"
+              "endmodule\n"
+              "`elsif OPT_B\n"
+              "module mb;\n"
+              "endmodule\n"
+              "`else\n"
+              "module mc;\n"
+              "endmodule\n"
+              "`endif\n"));
+}
+
 }  // namespace
