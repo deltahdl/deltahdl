@@ -104,25 +104,6 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
 namespace {
 
 // =============================================================================
-// §30.2 Specparam declarations (inside specify)
-// =============================================================================
-TEST_F(SpecifyTest, SpecparamInsideSpecify) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  specparam tRISE = 10;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  auto* item = spec->specify_items[0];
-  EXPECT_EQ(item->kind, SpecifyItemKind::kSpecparam);
-  EXPECT_EQ(item->param_name, "tRISE");
-  EXPECT_NE(item->param_value, nullptr);
-}
-
-// =============================================================================
 // Complex specify block with mixed items
 // =============================================================================
 TEST_F(SpecifyTest, MixedSpecifyBlockItems) {
