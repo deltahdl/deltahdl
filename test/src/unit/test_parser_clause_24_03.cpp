@@ -604,4 +604,29 @@ TEST(SourceText, ProgramGenerateRegion) {
   EXPECT_FALSE(r.cu->programs[0]->items.empty());
 }
 
+// Combined: program with multiple A.1.7 item types.
+TEST(SourceText, ProgramMultipleItemTypes) {
+  auto r = Parse(
+      "program prg(input logic clk);\n"
+      "  timeunit 1ns;\n"
+      "  int count;\n"
+      "  assign count = 0;\n"
+      "  initial begin $display(\"start\"); end\n"
+      "  final begin $display(\"end\"); end\n"
+      "  assert property (@(posedge clk) count >= 0);\n"
+      "  generate int g; endgenerate\n"
+      "  $warning(\"check\");\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  auto& items = r.cu->programs[0]->items;
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kVarDecl));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kContAssign));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kAssertProperty));
+  EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kElabSystemTask));
+}
+
 }  // namespace
