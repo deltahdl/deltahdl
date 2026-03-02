@@ -26,21 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.14.7 -- Inferred clocking and disable functions
-// =============================================================================
-TEST(ParserSection16, InferredClockInProperty) {
-  auto r = Parse(
-      "module m;\n"
-      "  default clocking @(posedge clk); endclocking\n"
-      "  property p_inferred(clk_ev = $inferred_clock);\n"
-      "    @clk_ev a |-> b;\n"
-      "  endproperty\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection16, InferredDisableInProperty) {
   auto r = Parse(
       "module m;\n"

@@ -43,4 +43,38 @@ TEST_F(VerifyParseTest, CheckerContextInferenceImplicit) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
+// --- Test helpers ---
+struct ParseResult16b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16b Parse(const std::string& src) {
+  ParseResult16b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// §16.14.7 -- Inferred clocking and disable functions
+// =============================================================================
+TEST(ParserSection16, InferredClockInProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking @(posedge clk); endclocking\n"
+      "  property p_inferred(clk_ev = $inferred_clock);\n"
+      "    @clk_ev a |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
