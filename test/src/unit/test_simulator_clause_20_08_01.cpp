@@ -58,4 +58,11 @@ TEST(Section20, Clog2PowerOf2) {
   EXPECT_EQ(result.ToUint64(), 8u);
 }
 
+TEST(Section20, Clog2NonPowerOf2) {
+  SimFixture f;
+  auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 257)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 9u);
+}
+
 }  // namespace
