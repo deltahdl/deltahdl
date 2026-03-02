@@ -9,7 +9,7 @@ import pytest
 
 from implement_clause import invoke_implement_subclause, main, parse_args
 
-INVOKE_KWARGS = {
+INVOKE_KWARGS: dict[str, str | int] = {
     "lrm": "/path/lrm.txt", "subclause": "4.2", "issue": 123,
     "organization": "deltahdl", "repo": "deltahdl",
 }
