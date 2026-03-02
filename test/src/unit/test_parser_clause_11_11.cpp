@@ -55,4 +55,15 @@ TEST(ParserA83, MinTypMaxInDelay) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// § mintypmax_expression ::= expression (single form)
+TEST(ParserA83, MinTypMaxSingleExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y;\n"
+      "  assign #5 y = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
