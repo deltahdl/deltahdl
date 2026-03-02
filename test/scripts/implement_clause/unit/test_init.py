@@ -176,6 +176,26 @@ def test_main_prints_subclauses_found(clause_argv, capsys) -> None:
     assert "Found 2 subclauses" in capsys.readouterr().err
 
 
+def test_main_prints_synced_body(clause_argv, capsys) -> None:
+    """Prints the synced issue body to stderr."""
+    with (
+        patch("implement_clause.parse_subclauses", return_value={
+            "4.1": "General", "4.2": "Exec",
+        }),
+        patch("implement_clause.extract_clause_text", return_value="text"),
+        patch("implement_clause.filter_implementable",
+              return_value=["4.1", "4.2"]),
+        patch("implement_clause.fetch_issue_body", return_value=""),
+        patch("implement_clause.build_synced_body",
+              return_value="## Subclauses\n\n- [ ] 4.1 General\n"),
+        patch("implement_clause.update_issue_body"),
+        patch("implement_clause.next_unchecked", return_value="4.1"),
+        patch("implement_clause.invoke_implement_subclause"),
+    ):
+        main(clause_argv)
+    assert "## Subclauses" in capsys.readouterr().err
+
+
 def test_main_prints_next_subclause(clause_argv, capsys) -> None:
     """Prints which subclause was picked as next."""
     with (

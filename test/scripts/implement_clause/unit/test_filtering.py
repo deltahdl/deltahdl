@@ -32,6 +32,19 @@ def test_filter_implementable_prints_count(capsys) -> None:
     assert "Filtering 2 subclauses" in capsys.readouterr().err
 
 
+def test_filter_implementable_prints_raw_response(capsys) -> None:
+    """Prints Claude's raw stdout before parsing."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout='["4.2", "4.3"]\n', stderr="",
+    )
+    with patch("implement_clause.subprocess.run", return_value=cp):
+        filter_implementable(
+            "text",
+            {"4.1": "General", "4.2": "Exec", "4.3": "Sim"},
+        )
+    assert '["4.2", "4.3"]' in capsys.readouterr().err
+
+
 def test_filter_implementable_prints_result(capsys) -> None:
     """Prints the implementable subclauses returned by Claude."""
     cp = subprocess.CompletedProcess(

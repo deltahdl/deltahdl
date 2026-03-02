@@ -65,6 +65,10 @@ def filter_implementable(
         )
         sys.exit(1)
 
+    print(
+        f"Claude response:\n{result.stdout.strip()}",
+        file=sys.stderr,
+    )
     implementable = json.loads(result.stdout.strip())
     print(f"Implementable: {implementable}", file=sys.stderr)
     return implementable
@@ -151,6 +155,7 @@ def main(argv: list[str] | None = None) -> None:
 
     body = fetch_issue_body(args.organization, args.repo, args.issue)
     new_body = build_synced_body(body, impl_items)
+    print(f"Synced issue body:\n{new_body}", file=sys.stderr)
     update_issue_body(args.organization, args.repo, args.issue, new_body)
 
     subclause = next_unchecked(new_body)
