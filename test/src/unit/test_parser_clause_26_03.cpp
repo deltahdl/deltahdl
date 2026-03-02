@@ -313,4 +313,23 @@ TEST(ParserClause03, Cl3_13_PackageImportExplicit) {
   EXPECT_FALSE(item->import_item.is_wildcard);
 }
 
+// 10. Package wildcard import (import pkg::*)
+TEST(ParserClause03, Cl3_13_PackageWildcardImport) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int myint;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::*;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_GE(mod->items.size(), 1u);
+  auto* item = mod->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kImportDecl);
+  EXPECT_EQ(item->import_item.package_name, "pkg");
+  EXPECT_TRUE(item->import_item.is_wildcard);
+}
+
 }  // namespace
