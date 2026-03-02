@@ -234,4 +234,19 @@ TEST(ParserA84, ConstantPrimaryMultipleConcatenation) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kReplicate);
 }
 
+// § primary — multiple_concatenation
+TEST(ParserA84, PrimaryMultipleConcatenation) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial b = {4{a}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
+}
+
 }  // namespace

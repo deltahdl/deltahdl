@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § primary — multiple_concatenation
-TEST(ParserA84, PrimaryMultipleConcatenation) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic [31:0] b;\n"
-      "  initial b = {4{a}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
-}
-
 // § primary — function_subroutine_call
 TEST(ParserA84, PrimaryFunctionCall) {
   auto r = Parse(
