@@ -91,4 +91,17 @@ TEST(ParserSection16, SequenceThroughoutInSeqDecl) {
   ASSERT_NE(sq, nullptr);
 }
 
+// =============================================================================
+// §16.9.4 -- Sequence throughout (additional tests)
+// =============================================================================
+TEST(ParserSection16, SequenceThroughoutWithImplication) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (\n"
+      "    @(posedge clk) req |-> en throughout (##2 ack[*3]));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
