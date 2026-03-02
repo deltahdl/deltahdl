@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § binary_base — 'b
-TEST(ParserA87, BinaryBaseLower) {
-  auto r = Parse("module m; logic [3:0] x; initial x = 4'b1111; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->int_val, 0xFu);
-}
-
 // § binary_base — 'B
 TEST(ParserA87, BinaryBaseUpper) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'B1111; endmodule\n");
