@@ -322,4 +322,18 @@ TEST(ParserAnnexA, A8IntegerLiterals) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// A.8.4 Primaries — constant_primary
+// =============================================================================
+// § constant_primary — primary_literal (integer)
+TEST(ParserA84, ConstantPrimaryIntegerLiteral) {
+  auto r = Parse("module m; parameter int P = 42; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* param = r.cu->modules[0]->items[0];
+  ASSERT_NE(param, nullptr);
+  ASSERT_NE(param->init_expr, nullptr);
+  EXPECT_EQ(param->init_expr->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace
