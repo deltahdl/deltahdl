@@ -84,16 +84,6 @@ static SpecifyParseResult ParseSpecifySingle(const std::string& src) {
   return result;
 }
 
-static bool HasFullPathDecl(ModuleItem* spec_block) {
-  for (auto* si : spec_block->specify_items) {
-    if (si->kind == SpecifyItemKind::kPathDecl &&
-        si->path.path_kind == SpecifyPathKind::kFull) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
   for (auto* si : spec_block->specify_items) {
     if (si->kind == kind) return true;
@@ -102,19 +92,6 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
 }
 
 namespace {
-
-TEST(ParserSection28, SpecifyBlockFullPath) {
-  auto r = Parse(
-      "module m(input a, b, output c);\n"
-      "  specify\n"
-      "    (a, b *> c) = (5, 10);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  EXPECT_TRUE(HasFullPathDecl(spec));
-}
 
 TEST(ParserSection28, SpecifyBlockWithSpecparam) {
   auto r = Parse(

@@ -78,4 +78,27 @@ TEST(ParserSection28, SpecifyBlockSimplePath) {
   EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kParallel);
 }
 
+static bool HasFullPathDecl(ModuleItem* spec_block) {
+  for (auto* si : spec_block->specify_items) {
+    if (si->kind == SpecifyItemKind::kPathDecl &&
+        si->path.path_kind == SpecifyPathKind::kFull) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST(ParserSection28, SpecifyBlockFullPath) {
+  auto r = Parse(
+      "module m(input a, b, output c);\n"
+      "  specify\n"
+      "    (a, b *> c) = (5, 10);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_TRUE(HasFullPathDecl(spec));
+}
+
 }  // namespace
