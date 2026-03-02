@@ -371,4 +371,14 @@ TEST(ParserSection19, InputOutputSkew_OneStep) {
               "endmodule\n"));
 }
 
+// Output skew with negedge and numeric delay combined.
+TEST(ParserSection19, InputOutputSkew_OutputNegedgeWithDelay) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    output negedge #1 address;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace

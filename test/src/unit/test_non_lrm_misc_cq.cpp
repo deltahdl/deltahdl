@@ -43,16 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Output skew with negedge and numeric delay combined.
-TEST(ParserSection19, InputOutputSkew_OutputNegedgeWithDelay) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    output negedge #1 address;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 // Input skew with explicit #0 (Observed region sampling).
 TEST(ParserSection19, InputOutputSkew_ExplicitZero) {
   EXPECT_TRUE(
