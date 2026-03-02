@@ -56,15 +56,6 @@ static ParseResult30 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_PosedgeFullPath) {
-  EXPECT_TRUE(
-      ParseOk("module m(input clk, output q, qb);\n"
-              "  specify\n"
-              "    (posedge clk *> q, qb) = (3, 5);\n"
-              "  endspecify\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection28, Sec28_12_ConditionalFullPath) {
   EXPECT_TRUE(
       ParseOk("module m(input a, b, en, output y);\n"

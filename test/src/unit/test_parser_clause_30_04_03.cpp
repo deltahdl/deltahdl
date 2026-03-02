@@ -428,4 +428,13 @@ TEST(ParserSection28, Sec28_12_NegedgeSensitivePath) {
   EXPECT_EQ(si->path.src_ports[0].name, "clk");
 }
 
+TEST(ParserSection28, Sec28_12_PosedgeFullPath) {
+  EXPECT_TRUE(
+      ParseOk("module m(input clk, output q, qb);\n"
+              "  specify\n"
+              "    (posedge clk *> q, qb) = (3, 5);\n"
+              "  endspecify\n"
+              "endmodule\n"));
+}
+
 }  // namespace
