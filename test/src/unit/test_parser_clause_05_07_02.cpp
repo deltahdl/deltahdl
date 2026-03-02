@@ -101,4 +101,14 @@ TEST(ParserCh50702, RealLiteral_ExponentOnly) {
               "endmodule"));
 }
 
+// § constant_primary — primary_literal (real)
+TEST(ParserA84, ConstantPrimaryRealLiteral) {
+  auto r = Parse("module m; parameter real R = 3.14; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* param = r.cu->modules[0]->items[0];
+  ASSERT_NE(param->init_expr, nullptr);
+  EXPECT_EQ(param->init_expr->kind, ExprKind::kRealLiteral);
+}
+
 }  // namespace
