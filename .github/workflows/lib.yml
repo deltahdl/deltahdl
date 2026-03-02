@@ -3,7 +3,68 @@ concurrency:
   cancel-in-progress: true
   group: lib-${{ github.ref }}
 jobs:
+  # ── Detect: check which paths changed ──
+  detect:
+    outputs:
+      implement-clause: >-
+        ${{ steps.check.outputs.implement_clause }}
+      implement-subclause: >-
+        ${{ steps.check.outputs.implement_subclause }}
+      workflows-changed: >-
+        ${{ steps.check.outputs.workflows_changed }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: check
+        name: Detect changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "implement_clause=true" >> "$GITHUB_OUTPUT"
+            echo "implement_subclause=true" >> "$GITHUB_OUTPUT"
+            echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          ZERO="0000000000000000000000000000000000000000"
+          if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
+            echo "implement_clause=true" >> "$GITHUB_OUTPUT"
+            echo "implement_subclause=true" >> "$GITHUB_OUTPUT"
+            echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
+          LIB='^(lib/(lrm|github)/|test/lib/(lrm|github)/|\.github/workflows/lib\.yml)'
+          IC='^(scripts/implement_clause/|test/scripts/implement_clause/|\.github/workflows/implement_clause\.yml)'
+          ISC='^(scripts/implement_subclause/|test/scripts/implement_subclause/|\.github/workflows/implement_subclause\.yml)'
+          LIB_HIT=false
+          if echo "$CHANGED" | grep -qE "$LIB"; then
+            LIB_HIT=true
+          fi
+          if [ "$LIB_HIT" = "true" ] \
+              || echo "$CHANGED" | grep -qE "$IC"; then
+            echo "implement_clause=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "implement_clause=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$LIB_HIT" = "true" ] \
+              || echo "$CHANGED" | grep -qE "$ISC"; then
+            echo "implement_subclause=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "implement_subclause=false" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$CHANGED" | grep -qE '\.github/workflows/.*\.yml'; then
+            echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+  # ── Gate: static analysis ──
   static-analysis:
+    needs: detect
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -73,6 +134,7 @@ jobs:
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
           test/lib/lrm/ test/lib/github/
+  # ── Lane: lib/github ──
   test-lib-github:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -96,6 +158,7 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  # ── Lane: lib/lrm ──
   test-lib-lrm:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -119,13 +182,19 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  # ── Trigger: implement_clause ──
   trigger-implement-clause:
     env:
       GH_TOKEN: ${{ secrets.GH_PAT }}
-    if: "!failure() && !cancelled()"
+    if: >-
+      !failure() && !cancelled()
+      && needs.detect.outputs.implement-clause == 'true'
     needs:
+      - detect
+      - static-analysis
       - test-lib-github
       - test-lib-lrm
+      - yamllint
     runs-on: ubuntu-24.04
     steps:
       - name: Trigger Implement Clause workflow
@@ -137,13 +206,19 @@ jobs:
           -f event="${{ github.event_name }}"
           -f sha="${{ github.event.pull_request.head.sha
           || github.sha }}"
+  # ── Trigger: implement_subclause ──
   trigger-implement-subclause:
     env:
       GH_TOKEN: ${{ secrets.GH_PAT }}
-    if: "!failure() && !cancelled()"
+    if: >-
+      !failure() && !cancelled()
+      && needs.detect.outputs.implement-subclause == 'true'
     needs:
+      - detect
+      - static-analysis
       - test-lib-github
       - test-lib-lrm
+      - yamllint
     runs-on: ubuntu-24.04
     steps:
       - name: Trigger Implement Subclause workflow
@@ -155,6 +230,55 @@ jobs:
           -f event="${{ github.event_name }}"
           -f sha="${{ github.event.pull_request.head.sha
           || github.sha }}"
+  # ── Gate: yamllint for workflow-only changes ──
+  yamllint:
+    if: >-
+      needs.detect.outputs.workflows-changed == 'true'
+    needs: detect
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-lib-${{
+            hashFiles('.github/workflows/lib.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-lib-
+      - name: Install tools
+        run: >-
+          pip install
+          assert-no-inline-directives
+          assert-no-linter-config-files
+          yamllint
+      - name: Assert no inline yamllint disables
+        run: >-
+          assert-no-inline-directives
+          --tools yamllint
+          --verbose
+          ${{ github.workspace }}/**/*
+      - name: Assert no yamllint config files
+        run: >-
+          assert-no-linter-config-files
+          --linters yamllint
+          --verbose
+          ${{ github.workspace }}
+      - name: Lint YAML
+        run: |
+          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
+          KEY='key-ordering: enable'
+          LL='line-length: disable'
+          NL='new-line-at-end-of-file: enable'
+          TR='truthy: {allowed-values: ["true", "false", "on"]}'
+          RULES="$EMPTY, $KEY, $LL, $NL, $TR"
+          yamllint --strict \
+            --config-data \
+            "{extends: default, rules: {$RULES}}" \
+            .github/workflows/lib.yml \
+            .github/workflows/implement_clause.yml \
+            .github/workflows/implement_subclause.yml
 name: Lib
 on:
   pull_request:
