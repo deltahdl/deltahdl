@@ -113,6 +113,7 @@ jobs:
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
+          PYTHONPATH=.
           python3 -m pylint --recursive=y
           test/lib/lrm/ test/lib/github/
           --fail-on=C,R,W --fail-under=10.0
@@ -122,6 +123,7 @@ jobs:
           lib/lrm/ lib/github/
       - name: Run mypy on tests
         run: >-
+          MYPYPATH=.
           python3 -m mypy --explicit-package-bases
           test/lib/lrm/ test/lib/github/
       - name: Detect copy-paste in source
