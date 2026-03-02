@@ -54,4 +54,15 @@ TEST(ParserSection11, StreamingLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
 }
 
+// § slice_size ::= simple_type | constant_expression
+TEST(ParserA81, StreamingWithTypeSliceSize) {
+  auto r = Parse("module m; initial x = {<< byte {a}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
+  ASSERT_NE(stmt->rhs->lhs, nullptr);
+}
+
 }  // namespace
