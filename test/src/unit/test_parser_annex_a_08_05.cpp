@@ -87,4 +87,34 @@ TEST(ParserA85, NetLvalueNestedConcatenation) {
   EXPECT_EQ(ca->assign_lhs->elements[0]->kind, ExprKind::kConcatenation);
 }
 
+// § net_lvalue — concatenation with selects
+TEST(ParserA85, NetLvalueConcatWithSelects) {
+  auto r = Parse(
+      "module m; wire [7:0] a; wire [3:0] b;\n"
+      "  assign {a[7:4], b} = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* ca = FirstContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_lhs, nullptr);
+  EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(ca->assign_lhs->elements[0]->kind, ExprKind::kSelect);
+}
+
+// =============================================================================
+// A.8.5 Expression left-side values — variable_lvalue
+// =============================================================================
+// § variable_lvalue — hierarchical_variable_identifier (simple variable)
+TEST(ParserA85, VarLvalueSimpleIdent) {
+  auto r = Parse("module m; logic x; initial x = 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(stmt->lhs->text, "x");
+}
+
 }  // namespace
