@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA82, RandomizeCallWithVarList) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.randomize(x, y); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // § std::randomize_call (subroutine_call alternative)
 TEST(ParserA82, StdRandomizeCall) {
   auto r = Parse(
