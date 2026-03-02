@@ -29,4 +29,18 @@ TEST(ParserA85, NetLvalueSimpleIdent) {
   EXPECT_EQ(ca->assign_lhs->text, "a");
 }
 
+// § net_lvalue — ps_or_hierarchical_net_identifier constant_select (bit select)
+TEST(ParserA85, NetLvalueConstBitSelect) {
+  auto r =
+      Parse("module m; wire [7:0] a; wire b; assign a[3] = b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* ca = FirstContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_lhs, nullptr);
+  EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(ca->assign_lhs->base, nullptr);
+  EXPECT_EQ(ca->assign_lhs->base->text, "a");
+}
+
 }  // namespace
