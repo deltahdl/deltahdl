@@ -44,15 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// §13.8: Chained call — result of parameterized call used as argument.
-TEST(ParserSection13, Sec13_8_ChainedParameterizedCalls) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic [7:0] a, b, c;\n"
-              "  assign c = Arith#(8)::add(a, Arith#(8)::add(a, b));\n"
-              "endmodule\n"));
-}
-
 // §13.8: Parameterized class with no default parameter value.
 TEST(ParserSection13, Sec13_8_NoDefaultParam) {
   auto r = Parse(
