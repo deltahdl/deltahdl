@@ -455,4 +455,22 @@ TEST(ParserSection27, GenerateIfElseSingleItemBranches) {
   EXPECT_EQ(gen->gen_else->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
 
+// --- Generate-case (§27.6) ---
+TEST(ParserSection27, GenerateCaseParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (WIDTH)\n"
+      "    1: assign out = in;\n"
+      "    2: assign out = in2;\n"
+      "    default: assign out = 0;\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 1u);
+  auto* gen = mod->items[0];
+  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateCase);
+  ASSERT_EQ(gen->gen_case_items.size(), 3u);
+}
+
 }  // namespace
