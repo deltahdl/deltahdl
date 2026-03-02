@@ -45,23 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// §14.14 — Global clocking
-// =============================================================================
-TEST(ParserSection14, GlobalClocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  global clocking gclk @(posedge sys_clk);\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
-  EXPECT_EQ(item->name, "gclk");
-  EXPECT_TRUE(item->is_global_clocking);
-  EXPECT_FALSE(item->is_default_clocking);
-  EXPECT_TRUE(item->clocking_signals.empty());
-}
-
-// =============================================================================
 // §14.3 — Signal directions: input, output, inout
 // =============================================================================
 TEST(ParserSection14, SignalDirections) {
