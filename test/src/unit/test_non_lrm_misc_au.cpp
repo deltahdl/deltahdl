@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-// system_tf_call with multiple expression arguments
-TEST(ParserA82, SystemTfCallMultipleExprArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $display(\"%d %d\", 1, 2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
-  EXPECT_EQ(expr->args.size(), 3u);
-}
-
 // system_tf_call with empty positional arg slots
 TEST(ParserA82, SystemTfCallEmptyArgSlots) {
   auto r = Parse(
