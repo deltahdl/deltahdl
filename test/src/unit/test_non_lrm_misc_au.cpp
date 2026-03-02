@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA82, RandomizeCallWithConstraintBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.randomize() with { x < 10; }; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA82, RandomizeCallWithNull) {
   auto r = Parse(
       "module m;\n"

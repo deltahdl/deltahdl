@@ -51,4 +51,13 @@ TEST(ParserSection18, RandomizeWithRestrictedIdList) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
+TEST(ParserA82, RandomizeCallWithConstraintBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj.randomize() with { x < 10; }; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
