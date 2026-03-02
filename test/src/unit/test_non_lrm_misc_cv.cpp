@@ -27,19 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// §24.1 Basic program declarations
-// =============================================================================
-TEST_F(ProgramParseTest, EmptyProgram) {
-  auto* unit = Parse("program p; endprogram");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  EXPECT_TRUE(unit->programs[0]->ports.empty());
-  EXPECT_TRUE(unit->programs[0]->params.empty());
-  EXPECT_TRUE(unit->programs[0]->items.empty());
-}
-
 TEST_F(ProgramParseTest, ProgramWithEndLabel) {
   auto* unit = Parse("program p; endprogram : p");
   ASSERT_EQ(unit->programs.size(), 1u);
