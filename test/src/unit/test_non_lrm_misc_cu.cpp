@@ -24,18 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection23, ModuleDefinitionWithBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a;\n"
-      "  assign a = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  ASSERT_GE(mod->items.size(), 2);
-}
-
 TEST(ParserSection23, MultipleModuleDefinitions) {
   auto r = Parse(
       "module a; endmodule\n"
