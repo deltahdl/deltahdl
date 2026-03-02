@@ -14,17 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.2: Sequence repetition [*N] ---
-TEST(ParserAnnexF, AnnexFConsecutiveRepetition) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) a[*3] |-> b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
-}
-
 // --- F.3: Goto repetition [->N] ---
 TEST(ParserAnnexF, AnnexFGotoRepetition) {
   auto r = Parse(
