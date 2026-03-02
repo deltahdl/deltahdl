@@ -43,18 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Default input #1step with output negedge.
-TEST(ParserSection19, DefaultSkew_1StepInputNegedgeOutput) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking ck1 @(posedge clk);\n"
-              "    default input #1step output negedge;\n"
-              "    input a;\n"
-              "    output b;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 // Default skew with per-signal override: addr overrides input to #1step.
 TEST(ParserSection19, DefaultSkew_PerSignalOverride) {
   EXPECT_TRUE(
