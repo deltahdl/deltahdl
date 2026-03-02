@@ -573,4 +573,21 @@ TEST(ParserSection16, ImmediateAssumeWithElse) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
+// =============================================================================
+// §16.3 Immediate assertions — cover
+// =============================================================================
+TEST(ParserSection16, ImmediateCoverBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    cover(cond);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
+  EXPECT_NE(stmt->assert_expr, nullptr);
+}
+
 }  // namespace
