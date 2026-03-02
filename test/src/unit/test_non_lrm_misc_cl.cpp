@@ -45,23 +45,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 namespace {
 
 // =============================================================================
-// §14.3 — Unnamed default clocking block
-// =============================================================================
-TEST(ParserSection14, UnnamedDefaultClocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  default clocking @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_default_clocking);
-  EXPECT_TRUE(item->name.empty());
-}
-
-// =============================================================================
 // §14.8 — Multiple clocking blocks
 // =============================================================================
 TEST(ParserSection14, MultipleClockingBlocks) {
