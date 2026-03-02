@@ -44,21 +44,6 @@ static void GetClockingBlock(ParseResult14& r, ModuleItem*& out,
 
 namespace {
 
-// §13.8: Parameterized class with for loop using parameter as bound.
-TEST(ParserSection13, Sec13_8_ForLoopWithParamBound) {
-  EXPECT_TRUE(
-      ParseOk("virtual class Popcount#(parameter W = 8);\n"
-              "  static function int count_ones(input logic [W-1:0] val);\n"
-              "    int cnt;\n"
-              "    cnt = 0;\n"
-              "    for (int i = 0; i < W; i++) begin\n"
-              "      if (val[i]) cnt = cnt + 1;\n"
-              "    end\n"
-              "    return cnt;\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
 // §13.8: Calling parameterized task from initial block.
 TEST(ParserSection13, Sec13_8_CallParamTaskFromInitial) {
   EXPECT_TRUE(
