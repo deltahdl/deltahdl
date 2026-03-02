@@ -485,4 +485,15 @@ TEST(ParserA87, OctalNumber) {
   EXPECT_EQ(rhs->int_val, 07654u);
 }
 
+// § hex_number — [size] hex_base hex_value
+TEST(ParserA87, HexNumber) {
+  auto r = Parse("module m; logic [15:0] x; initial x = 16'hABCD; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 0xABCDu);
+}
+
 }  // namespace

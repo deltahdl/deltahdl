@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § hex_number — [size] hex_base hex_value
-TEST(ParserA87, HexNumber) {
-  auto r = Parse("module m; logic [15:0] x; initial x = 16'hABCD; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->int_val, 0xABCDu);
-}
-
 // § sign — + (in real exponent)
 TEST(ParserA87, SignPlus) {
   auto r = Parse("module m; real x; initial x = 1.0e+2; endmodule\n");
