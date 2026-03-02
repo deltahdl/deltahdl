@@ -89,4 +89,17 @@ TEST(ParserSection16, InferredDisableInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection16, InferredClockAndDisableTogether) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking @(negedge clk); endclocking\n"
+      "  default disable iff rst;\n"
+      "  property p_both(c = $inferred_clock, d = $inferred_disable);\n"
+      "    @c disable iff (d) req |-> ack;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
