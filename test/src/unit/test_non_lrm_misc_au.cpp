@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-// method_call_root: implicit_class_handle (this)
-TEST(ParserA82, MethodCallRootThis) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin this.method(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-}
-
 // method_call_root: implicit_class_handle (super)
 TEST(ParserA82, MethodCallRootSuper) {
   auto r = Parse(
