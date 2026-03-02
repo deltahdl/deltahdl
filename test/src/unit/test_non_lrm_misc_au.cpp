@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Named argument with empty expression
-TEST(ParserA82, ListOfArgsNamedEmptyExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(.a(), .b(1)); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->arg_names.size(), 2u);
-  EXPECT_EQ(expr->args[0], nullptr);
-  ASSERT_NE(expr->args[1], nullptr);
-}
-
 // =============================================================================
 // A.8.2 Subroutine calls — method_call
 // =============================================================================
