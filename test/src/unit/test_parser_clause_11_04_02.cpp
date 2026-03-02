@@ -227,4 +227,11 @@ TEST(ParserA83, IncDecAsExpression) {
   EXPECT_EQ(rhs->op, TokenKind::kPlusPlus);
 }
 
+// § variable_lvalue — pre-increment (++ as lvalue modifier)
+TEST(ParserA85, VarLvaluePreIncrement) {
+  auto r = Parse("module m; int x; initial ++x; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
