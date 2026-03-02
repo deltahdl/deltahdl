@@ -8,10 +8,7 @@ import sys
 
 def fetch_issue_body(organization: str, repo: str, issue: int) -> str:
     """Fetch the body of a GitHub issue using ``gh api``."""
-    print(
-        f"Fetching issue #{issue} from {organization}/{repo}...",
-        file=sys.stderr,
-    )
+    print(f"Fetching issue #{issue} from {organization}/{repo}...")
     result = subprocess.run(
         ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
          "--jq", ".body"],
@@ -30,10 +27,7 @@ def update_issue_body(
     organization: str, repo: str, issue: int, body: str,
 ) -> None:
     """Update the body of a GitHub issue using ``gh api``."""
-    print(
-        f"Updating issue #{issue} on {organization}/{repo}...",
-        file=sys.stderr,
-    )
+    print(f"Updating issue #{issue} on {organization}/{repo}...")
     payload = json.dumps({"body": body})
     result = subprocess.run(
         ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",

@@ -30,7 +30,7 @@ def test_fetch_issue_body_prints_action(capsys) -> None:
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="body\n")
     with patch("lib.github.subprocess.run", return_value=cp):
         fetch_issue_body("org", "repo", 42)
-    assert "Fetching issue #42" in capsys.readouterr().err
+    assert "Fetching issue #42" in capsys.readouterr().out
 
 
 def test_fetch_issue_body_failure() -> None:
@@ -61,7 +61,7 @@ def test_update_issue_body_prints_action(capsys) -> None:
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
     with patch("lib.github.subprocess.run", return_value=cp):
         update_issue_body("org", "repo", 42, "body")
-    assert "Updating issue #42" in capsys.readouterr().err
+    assert "Updating issue #42" in capsys.readouterr().out
 
 
 def test_update_issue_body_failure() -> None:

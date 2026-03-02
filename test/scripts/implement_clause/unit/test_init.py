@@ -45,7 +45,7 @@ def test_invoke_implement_subclause_prints_subclause(capsys) -> None:
             organization="deltahdl",
             repo="deltahdl",
         )
-    assert "4.2" in capsys.readouterr().err
+    assert "4.2" in capsys.readouterr().out
 
 
 # --- parse_args ---
@@ -135,7 +135,7 @@ def test_main_no_subclauses_prints_leaf(clause_argv, capsys) -> None:
         patch("implement_clause.invoke_implement_subclause"),
     ):
         main(clause_argv)
-    assert "No subclauses" in capsys.readouterr().err
+    assert "No subclauses" in capsys.readouterr().out
 
 
 def test_main_with_subclauses(clause_argv) -> None:
@@ -173,7 +173,7 @@ def test_main_prints_subclauses_found(clause_argv, capsys) -> None:
         patch("implement_clause.invoke_implement_subclause"),
     ):
         main(clause_argv)
-    assert "Found 2 subclauses" in capsys.readouterr().err
+    assert "Found 2 subclauses" in capsys.readouterr().out
 
 
 def test_main_prints_synced_body(clause_argv, capsys) -> None:
@@ -193,7 +193,7 @@ def test_main_prints_synced_body(clause_argv, capsys) -> None:
         patch("implement_clause.invoke_implement_subclause"),
     ):
         main(clause_argv)
-    assert "## Subclauses" in capsys.readouterr().err
+    assert "## Subclauses" in capsys.readouterr().out
 
 
 def test_main_prints_next_subclause(clause_argv, capsys) -> None:
@@ -212,7 +212,7 @@ def test_main_prints_next_subclause(clause_argv, capsys) -> None:
         patch("implement_clause.invoke_implement_subclause"),
     ):
         main(clause_argv)
-    assert "Next unchecked: 4.2" in capsys.readouterr().err
+    assert "Next unchecked: 4.2" in capsys.readouterr().out
 
 
 def test_main_all_done(clause_argv, capsys) -> None:
@@ -230,7 +230,7 @@ def test_main_all_done(clause_argv, capsys) -> None:
         patch("implement_clause.next_unchecked", return_value=None),
     ):
         main(clause_argv)
-    assert "All subclauses are done" in capsys.readouterr().err
+    assert "All subclauses are done" in capsys.readouterr().out
 
 
 def test_main_annex(tmp_path) -> None:

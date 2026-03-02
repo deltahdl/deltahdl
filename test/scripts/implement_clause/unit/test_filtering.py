@@ -29,7 +29,7 @@ def test_filter_implementable_prints_count(capsys) -> None:
         filter_implementable(
             "text", {"4.1": "General", "4.2": "Exec"},
         )
-    assert "Filtering 2 subclauses" in capsys.readouterr().err
+    assert "Filtering 2 subclauses" in capsys.readouterr().out
 
 
 def test_filter_implementable_prints_raw_response(capsys) -> None:
@@ -42,7 +42,7 @@ def test_filter_implementable_prints_raw_response(capsys) -> None:
             "text",
             {"4.1": "General", "4.2": "Exec", "4.3": "Sim"},
         )
-    assert '["4.2", "4.3"]' in capsys.readouterr().err
+    assert '["4.2", "4.3"]' in capsys.readouterr().out
 
 
 def test_filter_implementable_prints_result(capsys) -> None:
@@ -55,7 +55,7 @@ def test_filter_implementable_prints_result(capsys) -> None:
             "text",
             {"4.1": "General", "4.2": "Exec", "4.3": "Sim"},
         )
-    assert "['4.2', '4.3']" in capsys.readouterr().err
+    assert "['4.2', '4.3']" in capsys.readouterr().out
 
 
 def test_filter_implementable_empty() -> None:

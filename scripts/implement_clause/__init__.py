@@ -30,7 +30,6 @@ def filter_implementable(
     print(
         f"Filtering {len(subclauses)} subclauses"
         f" for implementability via Claude ({model})...",
-        file=sys.stderr,
     )
     numbered = "\n".join(
         f"- {k}: {v}" for k, v in subclauses.items()
@@ -65,12 +64,9 @@ def filter_implementable(
         )
         sys.exit(1)
 
-    print(
-        f"Claude response:\n{result.stdout.strip()}",
-        file=sys.stderr,
-    )
+    print(f"Claude response:\n{result.stdout.strip()}")
     implementable = json.loads(result.stdout.strip())
-    print(f"Implementable: {implementable}", file=sys.stderr)
+    print(f"Implementable: {implementable}")
     return implementable
 
 
@@ -83,10 +79,7 @@ def invoke_implement_subclause(
     repo: str,
 ) -> None:
     """Shell out to ``python -m implement_subclause``."""
-    print(
-        f"Invoking implement_subclause for {subclause}...",
-        file=sys.stderr,
-    )
+    print(f"Invoking implement_subclause for {subclause}...")
     result = subprocess.run(
         [
             sys.executable, "-m", "implement_subclause",
@@ -133,10 +126,7 @@ def main(argv: list[str] | None = None) -> None:
     subclauses = parse_subclauses(lrm, clause)
 
     if not subclauses:
-        print(
-            f"No subclauses for {clause}; invoking directly.",
-            file=sys.stderr,
-        )
+        print(f"No subclauses for {clause}; invoking directly.")
         invoke_implement_subclause(
             lrm=args.lrm, subclause=clause,
             issue=args.issue, organization=args.organization,
@@ -144,10 +134,7 @@ def main(argv: list[str] | None = None) -> None:
         )
         return
 
-    print(
-        f"Found {len(subclauses)} subclauses for {clause}.",
-        file=sys.stderr,
-    )
+    print(f"Found {len(subclauses)} subclauses for {clause}.")
 
     clause_text = extract_clause_text(lrm, clause)
     implementable = filter_implementable(clause_text, subclauses)
@@ -155,15 +142,15 @@ def main(argv: list[str] | None = None) -> None:
 
     body = fetch_issue_body(args.organization, args.repo, args.issue)
     new_body = build_synced_body(body, impl_items)
-    print(f"Synced issue body:\n{new_body}", file=sys.stderr)
+    print(f"Synced issue body:\n{new_body}")
     update_issue_body(args.organization, args.repo, args.issue, new_body)
 
     subclause = next_unchecked(new_body)
     if subclause is None:
-        print("All subclauses are done.", file=sys.stderr)
+        print("All subclauses are done.")
         return
 
-    print(f"Next unchecked: {subclause}", file=sys.stderr)
+    print(f"Next unchecked: {subclause}")
     invoke_implement_subclause(
         lrm=args.lrm, subclause=subclause,
         issue=args.issue, organization=args.organization,
