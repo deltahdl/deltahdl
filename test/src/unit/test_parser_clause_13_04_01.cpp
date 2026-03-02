@@ -369,4 +369,31 @@ TEST(ParserA84, PrimaryFunctionCall) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
+static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl &&
+        item->kind != ModuleItemKind::kTaskDecl) {
+      continue;
+    }
+    if (item->name == name) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 13.4.1 -- Function return type
+// =============================================================================
+TEST(ParserSection13, FunctionReturnTypeInt) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "foo");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
+}
+
 }  // namespace
