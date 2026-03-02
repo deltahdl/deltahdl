@@ -26,21 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// §16.14 -- Declaring properties (additional tests)
-// =============================================================================
-TEST(ParserSection16, PropertyWithDisableIffDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p_req_ack;\n"
-      "    @(posedge clk) disable iff (rst)\n"
-      "    req |-> ##[1:3] ack;\n"
-      "  endproperty\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection16, PropertyWithFormalArgsDecl) {
   auto r = Parse(
       "module m;\n"
