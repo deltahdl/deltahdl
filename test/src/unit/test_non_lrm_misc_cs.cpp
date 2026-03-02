@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, MultipleDefaultNettypeDirectives) {
-  EXPECT_TRUE(
-      ParseOk("`default_nettype wire\n"
-              "module m1;\n"
-              "endmodule\n"
-              "`default_nettype none\n"
-              "module m2;\n"
-              "endmodule\n"));
-}
-
 // ============================================================================
 // AST-level checks for `default_nettype
 // ============================================================================

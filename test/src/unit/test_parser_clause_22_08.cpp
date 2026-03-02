@@ -77,4 +77,14 @@ TEST(ParserSection22, DefaultNettypeBeforeAndAfterModule) {
               "`default_nettype wire\n"));
 }
 
+TEST(ParserSection22, MultipleDefaultNettypeDirectives) {
+  EXPECT_TRUE(
+      ParseOk("`default_nettype wire\n"
+              "module m1;\n"
+              "endmodule\n"
+              "`default_nettype none\n"
+              "module m2;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
