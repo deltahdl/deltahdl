@@ -170,4 +170,17 @@ TEST(ParserSection20, ArrayIncrementFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection20, ArraySizeWithDimArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] mem [0:15];\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "    x = $size(mem, 2);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
