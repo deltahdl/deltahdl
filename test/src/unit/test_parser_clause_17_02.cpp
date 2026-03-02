@@ -363,4 +363,37 @@ TEST(SourceText, CheckerFunctionDecl) {
   EXPECT_EQ(r.cu->checkers[0]->items[0]->name, "add");
 }
 
+struct ParseResult16c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult16c Parse(const std::string& src) {
+  ParseResult16c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+using VerifyParseTest = ProgramTestParse;
+
+// =============================================================================
+// §17 Checker declarations
+// =============================================================================
+TEST_F(VerifyParseTest, BasicChecker) {
+  auto* unit = Parse(R"(
+    checker my_check;
+    endchecker
+  )");
+  ASSERT_EQ(unit->checkers.size(), 1u);
+  EXPECT_EQ(unit->checkers[0]->name, "my_check");
+  EXPECT_EQ(unit->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
+}
+
 }  // namespace

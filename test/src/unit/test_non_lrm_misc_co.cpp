@@ -27,19 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// §17 Checker declarations
-// =============================================================================
-TEST_F(VerifyParseTest, BasicChecker) {
-  auto* unit = Parse(R"(
-    checker my_check;
-    endchecker
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_EQ(unit->checkers[0]->name, "my_check");
-  EXPECT_EQ(unit->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
-}
-
 TEST_F(VerifyParseTest, CheckerWithEndLabel) {
   auto* unit = Parse(R"(
     checker labeled_check;
