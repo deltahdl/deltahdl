@@ -286,4 +286,16 @@ TEST(ParserSection16, DisableIffInAssertProperty) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+TEST(ParserSection16, DisableIffInPropertyDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p1;\n"
+      "    disable iff (rst == 2)\n"
+      "    @(posedge clk) not (a ##1 b);\n"
+      "  endproperty\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
