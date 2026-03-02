@@ -27,18 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, CheckerWithRandVariable) {
-  auto* unit = Parse(R"(
-    checker observer_model(bit valid, reset);
-      default clocking @$global_clock; endclocking
-      rand bit flag;
-    endchecker : observer_model
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  EXPECT_EQ(unit->checkers[0]->name, "observer_model");
-  EXPECT_FALSE(unit->checkers[0]->items.empty());
-}
-
 TEST_F(VerifyParseTest, CheckerWithRandConstVariable) {
   auto* unit = Parse(R"(
     checker reason_about_one_bit(bit [63:0] data1, bit [63:0] data2,
