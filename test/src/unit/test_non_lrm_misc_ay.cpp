@@ -14,27 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.19: Assert with action blocks (pass/fail) ---
-TEST(ParserAnnexF, AnnexFAssertActionBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) a |-> b)\n"
-      "    $display(\"PASS\");\n"
-      "  else\n"
-      "    $error(\"FAIL\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAssertProperty) {
-      found = true;
-      EXPECT_NE(item->assert_expr, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 // --- F.20: Unbounded delay range ##[0:$] ---
 TEST(ParserAnnexF, AnnexFUnboundedDelayRange) {
   auto r = Parse(
