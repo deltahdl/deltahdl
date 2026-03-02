@@ -5,25 +5,7 @@
 
 using namespace delta;
 
-bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return true;
-  }
-  return false;
-}
-
 namespace {
-
-// --- F.20: Unbounded delay range ##[0:$] ---
-TEST(ParserAnnexF, AnnexFUnboundedDelayRange) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) req |-> ##[0:$] ack);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
-}
 
 // =============================================================================
 // Annex G -- Std package classes (process, semaphore, mailbox)

@@ -225,4 +225,15 @@ TEST(ParserAnnexF, AnnexFChainedConcat) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kSequenceDecl));
 }
 
+// --- F.20: Unbounded delay range ##[0:$] ---
+TEST(ParserAnnexF, AnnexFUnboundedDelayRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req |-> ##[0:$] ack);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
+}
+
 }  // namespace
