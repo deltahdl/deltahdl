@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from lib.lrm import parse_subclauses
+from lib.lrm import extract_clause_text, parse_subclauses
 
 
 SAMPLE_NUMERIC = """\
@@ -102,3 +102,77 @@ def test_parse_subclauses_annex_deeper(tmp_path: Path) -> None:
         "A.1.1": "Library source text",
         "A.1.2": "SystemVerilog source text",
     }
+
+
+# --- extract_clause_text ---
+
+
+def test_extract_clause_text_numeric(tmp_path: Path) -> None:
+    """Full text of a numeric clause is extracted."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(SAMPLE_NUMERIC)
+    assert extract_clause_text(lrm, "4") == (
+        "4. Scheduling semantics\n"
+        "\n"
+        "4.1 General\n"
+        "Some text about general scheduling.\n"
+        "\n"
+        "4.2 Execution of a hardware model\n"
+        "More text here.\n"
+        "\n"
+        "4.3 Event simulation\n"
+        "Event simulation details.\n"
+        "\n"
+        "4.4 Stratified event scheduler\n"
+        "4.4.1 Preponed events region\n"
+        "Deep subclause text.\n"
+        "4.4.2 Active events region\n"
+        "More deep text."
+    )
+
+
+def test_extract_clause_text_subclause(tmp_path: Path) -> None:
+    """Full text of a subclause is extracted."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(SAMPLE_NUMERIC)
+    assert extract_clause_text(lrm, "4.1") == (
+        "4.1 General\n"
+        "Some text about general scheduling."
+    )
+
+
+def test_extract_clause_text_annex(tmp_path: Path) -> None:
+    """Full text of an annex is extracted."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(SAMPLE_ANNEX)
+    assert extract_clause_text(lrm, "A") == (
+        "Annex A\n"
+        "(normative)\n"
+        "\n"
+        "Formal syntax\n"
+        "\n"
+        "A.1 Source text\n"
+        "A.1.1 Library source text\n"
+        "Some text.\n"
+        "A.1.2 SystemVerilog source text\n"
+        "More text.\n"
+        "\n"
+        "A.2 Declarations\n"
+        "A.2.1 Declaration types\n"
+        "A.2.1.1 Module parameter declarations\n"
+        "Deep text."
+    )
+
+
+def test_extract_clause_text_last_clause(tmp_path: Path) -> None:
+    """Text is extracted when clause extends to end of file."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(SAMPLE_NUMERIC)
+    assert extract_clause_text(lrm, "5.1") == "5.1 Lexical tokens"
+
+
+def test_extract_clause_text_not_found(tmp_path: Path) -> None:
+    """Empty string when the clause is not found."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(SAMPLE_NUMERIC)
+    assert extract_clause_text(lrm, "99") == ""
