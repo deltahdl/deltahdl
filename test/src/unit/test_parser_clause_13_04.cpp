@@ -321,4 +321,16 @@ TEST(ParserA26, FuncBodyNewStyleEmptyPorts) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
+TEST(ParserA26, FuncBodyNewStyleStickyDirection) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(input int a, int b, int c);\n"
+      "  endfunction\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  VerifyFuncArgDirections(
+      r.cu->modules[0]->items[0],
+      {Direction::kInput, Direction::kInput, Direction::kInput});
+}
+
 }  // namespace
