@@ -654,4 +654,14 @@ TEST(ParserA87, OctalBaseLower) {
   EXPECT_EQ(rhs->int_val, 077u);
 }
 
+// § octal_base — 'O
+TEST(ParserA87, OctalBaseUpper) {
+  auto r = Parse("module m; logic [7:0] x; initial x = 8'O77; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->int_val, 077u);
+}
+
 }  // namespace
