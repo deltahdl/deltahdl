@@ -135,4 +135,11 @@ TEST(ParserSection21, DisplayBasicCall) {
               "endmodule\n"));
 }
 
+TEST(ParserSection21, DisplayNoArgs) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $display;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
