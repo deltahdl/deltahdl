@@ -234,4 +234,11 @@ TEST(ParserA85, VarLvaluePreIncrement) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// § variable_lvalue — post-increment
+TEST(ParserA85, VarLvaluePostIncrement) {
+  auto r = Parse("module m; int x; initial x++; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
