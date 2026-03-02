@@ -246,4 +246,21 @@ TEST(ParserSection13, ConstRefArgOnTask) {
   EXPECT_EQ(tk->func_args[0].direction, Direction::kRef);
 }
 
+TEST(ParserSection13, ConstRefMixedWithOtherDirections) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void compute(input int a, const ref int b, output int c);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "compute");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 3u);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kInput);
+  EXPECT_FALSE(fn->func_args[0].is_const);
+  EXPECT_EQ(fn->func_args[1].direction, Direction::kRef);
+  EXPECT_TRUE(fn->func_args[1].is_const);
+  EXPECT_EQ(fn->func_args[2].direction, Direction::kOutput);
+}
+
 }  // namespace
