@@ -20,4 +20,13 @@ TEST(ParserSection28, PullGates) {
   EXPECT_EQ(mod->items[1]->gate_kind, GateKind::kPulldown);
 }
 
+TEST(Parser, GatePullup) {
+  auto r = ParseWithPreprocessor("module t; pullup (o); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kPullup);
+  EXPECT_EQ(item->gate_terminals.size(), 1);
+}
+
 }  // namespace
