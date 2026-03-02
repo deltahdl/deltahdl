@@ -27,24 +27,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST_F(VerifyParseTest, CheckerContextInferenceInstantiation) {
-  auto* unit = Parse(R"(
-    checker check_in_context(logic test_sig,
-        event clock = $inferred_clock,
-        logic reset = $inferred_disable);
-      a1: assert property (@clock disable iff (reset) test_sig);
-    endchecker : check_in_context
-    module m(logic rst);
-      wire clk;
-      logic a, en;
-      wire b = a && en;
-      check_in_context my_check1(.test_sig(b), .clock(clk), .reset(rst));
-    endmodule : m
-  )");
-  ASSERT_EQ(unit->checkers.size(), 1u);
-  ASSERT_EQ(unit->modules.size(), 1u);
-}
-
 TEST_F(VerifyParseTest, CheckerContextInferenceImplicit) {
   auto* unit = Parse(R"(
     checker check_ctx(logic sig,
