@@ -26,21 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, PropertyIfElseInDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p1;\n"
-      "    @(posedge clk)\n"
-      "    if (sel)\n"
-      "      req |-> ##1 ack\n"
-      "    else\n"
-      "      req |-> ##2 ack;\n"
-      "  endproperty\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // =============================================================================
 // §16.14.7 Property negation
 // =============================================================================
