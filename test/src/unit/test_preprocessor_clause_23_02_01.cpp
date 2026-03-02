@@ -59,4 +59,12 @@ TEST(SourceText, EmptyParameterPortList) {
   EXPECT_TRUE(r.cu->modules[0]->params.empty());
 }
 
+TEST(Parser, EmptyModule) {
+  auto r = ParseWithPreprocessor("module empty; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->name, "empty");
+  EXPECT_TRUE(r.cu->modules[0]->items.empty());
+}
+
 }  // namespace
