@@ -794,4 +794,17 @@ TEST(ParserA604, StmtItemSeqBlock) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlock);
 }
 
+// data_declaration alternative: package_import_declaration
+TEST(ParserA28, ImportInBlock) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  int x = 5;\n"
+              "endpackage\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    import pkg::*;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
