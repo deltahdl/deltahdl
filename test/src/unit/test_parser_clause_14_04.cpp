@@ -332,4 +332,22 @@ TEST(ParserSection19, InputOutputSkew_OutputEdge) {
   EXPECT_EQ(sig.skew_edge, Edge::kNegedge);
 }
 
+// Combined input and output skews on a single signal.
+TEST(ParserSection19, InputOutputSkew_CombinedInputOutput) {
+  auto r = Parse(
+      "module t;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #2 output #4 cmd;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  auto& sig = item->clocking_signals[0];
+  EXPECT_EQ(sig.direction, Direction::kInout);
+  EXPECT_EQ(sig.name, "cmd");
+  EXPECT_NE(sig.skew_delay, nullptr);
+  EXPECT_NE(sig.out_skew_delay, nullptr);
+}
+
 }  // namespace
