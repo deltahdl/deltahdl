@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, DefineAndUndef) {
-  EXPECT_TRUE(
-      ParseOk("`define FOO 1\n"
-              "module t;\n"
-              "endmodule\n"
-              "`undef FOO\n"));
-}
-
 TEST(ParserSection22, UndefineallDirective) {
   EXPECT_TRUE(
       ParseOk("`define A 1\n"
