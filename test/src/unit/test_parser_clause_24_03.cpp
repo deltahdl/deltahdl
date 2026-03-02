@@ -445,4 +445,22 @@ TEST_F(ProgramParseTest, ProgramWithFunctionDecl) {
   EXPECT_EQ(unit->programs[0]->items[0]->name, "add");
 }
 
+TEST_F(ProgramParseTest, ProgramWithTaskAndFunction) {
+  auto* unit = Parse(
+      "program p;\n"
+      "  task run;\n"
+      "    $display(\"running\");\n"
+      "  endtask\n"
+      "  function int get_val;\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endprogram\n");
+  ASSERT_EQ(unit->programs.size(), 1u);
+  EXPECT_EQ(unit->programs[0]->name, "p");
+  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_GE(unit->programs[0]->items.size(), 2u);
+  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(unit->programs[0]->items[1]->kind, ModuleItemKind::kFunctionDecl);
+}
+
 }  // namespace
