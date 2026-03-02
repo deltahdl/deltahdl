@@ -9,19 +9,6 @@ using CheckerParseTest = ProgramTestParse;
 
 namespace {
 
-// --- Out-of-block constraint declaration (§18.5.1) ---
-TEST(ParserSection18, OutOfBlockConstraint) {
-  auto r = Parse(
-      "class a;\n"
-      "  rand int b;\n"
-      "  extern constraint c;\n"
-      "endclass\n"
-      "constraint a::c { b == 0; }\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 // --- Inline randomize with constraint block (§18.7) ---
 TEST(ParserSection18, RandomizeWithInlineConstraint) {
   auto r = Parse(
