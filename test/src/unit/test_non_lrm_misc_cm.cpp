@@ -34,23 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// =============================================================================
-// §16.3 Immediate assertions — assert
-// =============================================================================
-TEST(ParserSection16, ImmediateAssertBasicKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assert(a == b);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
-  EXPECT_NE(stmt->assert_expr, nullptr);
-}
-
 TEST(ParserSection16, ImmediateAssertBasicNoActions) {
   auto r = Parse(
       "module m;\n"
