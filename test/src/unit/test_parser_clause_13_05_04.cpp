@@ -144,4 +144,20 @@ TEST(ParserSection13, NamedArgBindingAllNamed) {
   EXPECT_EQ(stmt->rhs->arg_names[2], "b");
 }
 
+// Mixed positional + named arguments
+TEST(ParserA82, ListOfArgsMixed) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(1, .b(2)); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kCall);
+  EXPECT_EQ(expr->args.size(), 2u);
+  ASSERT_EQ(expr->arg_names.size(), 1u);
+  EXPECT_EQ(expr->arg_names[0], "b");
+}
+
 }  // namespace
