@@ -387,4 +387,15 @@ TEST(ParserA87, IntegralDecimal) {
   EXPECT_EQ(rhs->int_val, 255u);
 }
 
+// § integral_number — octal_number
+TEST(ParserA87, IntegralOctal) {
+  auto r = Parse("module m; logic [7:0] x; initial x = 8'o77; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 077u);
+}
+
 }  // namespace
