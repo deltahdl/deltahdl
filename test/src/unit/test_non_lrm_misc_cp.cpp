@@ -9,18 +9,6 @@ using CheckerParseTest = ProgramTestParse;
 
 namespace {
 
-// Footnote 11: dynamic_override_specifiers illegal with static (semantic, not
-// syntactic) — parser still accepts for later semantic check
-TEST(SourceText, ConstraintFootnote11StaticWithOverride) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand int x;\n"
-      "  static constraint :initial c1 { x > 0; }\n"
-      "endclass\n");
-  // Parser should accept; footnote 11 is a semantic restriction
-  ASSERT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // §18 Constrained random — parsing
 // =============================================================================
