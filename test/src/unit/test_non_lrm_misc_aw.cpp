@@ -14,20 +14,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// § primary — type_reference
-TEST(ParserA84, PrimaryTypeRef) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    automatic int w;\n"
-      "    w = $bits(x);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.8.4 Primaries — escaped identifier as primary
 // =============================================================================

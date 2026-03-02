@@ -172,4 +172,18 @@ TEST(ParserSection6, TypeOperatorInDataType) {
   EXPECT_EQ(item->init_expr->kind, ExprKind::kTypeRef);
 }
 
+// § primary — type_reference
+TEST(ParserA84, PrimaryTypeRef) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    automatic int w;\n"
+      "    w = $bits(x);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
