@@ -13,4 +13,13 @@ TEST(ParserSection22, ResetallDirective) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, ResetallBeforeMultipleModules) {
+  EXPECT_TRUE(
+      ParseOk("`resetall\n"
+              "module m1;\n"
+              "endmodule\n"
+              "module m2;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
