@@ -27,4 +27,11 @@ TEST(ParserSection22, DefaultNettypeWor) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, DefaultNettypeTri0) {
+  EXPECT_TRUE(
+      ParseOk("`default_nettype tri0\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
