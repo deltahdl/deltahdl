@@ -348,4 +348,15 @@ TEST(ParserA26, FuncBodyWithBlockItemDecl) {
   EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
+TEST(ParserA26, FuncBodyWithEndLabel) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo();\n"
+      "  endfunction : foo\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "foo");
+}
+
 }  // namespace

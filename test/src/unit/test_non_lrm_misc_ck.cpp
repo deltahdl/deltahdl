@@ -18,17 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-TEST(ParserA26, FuncBodyWithEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void foo();\n"
-      "  endfunction : foo\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "foo");
-}
-
 TEST(ParserA26, FuncBodyOldStyleOutputPort) {
   auto r = Parse(
       "module m;\n"
