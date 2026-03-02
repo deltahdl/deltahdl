@@ -14,18 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.7: throughout ---
-TEST(ParserAnnexF, AnnexFThroughout) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (\n"
-      "    @(posedge clk) enable throughout (a ##1 b ##1 c));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
-}
-
 // --- F.8: within ---
 TEST(ParserAnnexF, AnnexFWithin) {
   auto r = Parse(

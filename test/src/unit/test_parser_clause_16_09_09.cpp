@@ -58,4 +58,23 @@ TEST(ParserSection16, SequenceThroughoutBasic) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+// --- F.7: throughout ---
+TEST(ParserAnnexF, AnnexFThroughout) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (\n"
+      "    @(posedge clk) enable throughout (a ##1 b ##1 c));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
+}
+
 }  // namespace
