@@ -74,4 +74,15 @@ TEST(Parser, GateNandWithDelay) {
   EXPECT_EQ(item->gate_terminals.size(), 3u);
 }
 
+TEST(ParserSection28, GateWithTwoDelays) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  and #(10, 12) a2(out, in1, in2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
+  EXPECT_NE(item->gate_delay, nullptr);
+}
+
 }  // namespace
