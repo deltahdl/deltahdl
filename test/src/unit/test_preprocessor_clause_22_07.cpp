@@ -79,4 +79,14 @@ TEST(ParserClause03, Cl3_14_2_1_DelayConversionWithTimescale) {
   EXPECT_EQ(RealDelayToTicks(1.5, r.timescale, r.global_precision), 15u);
 }
 
+TEST(ParserSection22, TimescaleModuleNamePreserved) {
+  auto r = ParseWithPreprocessor(
+      "`timescale 1ns/1ps\n"
+      "module foo;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "foo");
+}
+
 }  // namespace

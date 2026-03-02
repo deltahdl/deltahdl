@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, TimescaleModuleNamePreserved) {
-  auto r = ParseWithPreprocessor(
-      "`timescale 1ns/1ps\n"
-      "module foo;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "foo");
-}
-
 // 35. LRM example: three modules A, B, C with two `timescale directives.
 // §3.14.2.1:
 // `timescale 1ns / 10ps → modules A and B
