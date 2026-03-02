@@ -19,30 +19,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 namespace {
 
 // =============================================================================
-// LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
-// =============================================================================
-TEST(ParserSection13, OldStyleTaskMultipleInputs) {
-  auto r = Parse(
-      "module m;\n"
-      "  task add;\n"
-      "    input a;\n"
-      "    input b;\n"
-      "    output c;\n"
-      "    c = a + b;\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "add");
-  ASSERT_NE(tk, nullptr);
-  ASSERT_EQ(tk->func_args.size(), 3u);
-  const Direction kExpected[] = {Direction::kInput, Direction::kInput,
-                                 Direction::kOutput};
-  for (size_t i = 0; i < 3u; ++i) {
-    EXPECT_EQ(tk->func_args[i].direction, kExpected[i]);
-  }
-}
-
-// =============================================================================
 // LRM section 13.5.2 -- Const ref arguments (additional tests)
 // =============================================================================
 TEST(ParserSection13, ConstRefArgOnTask) {
