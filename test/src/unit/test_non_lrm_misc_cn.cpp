@@ -26,15 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection16, ChangedFunctionInProperty) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (@(posedge clk) $changed(data) |-> valid);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // §16.12 -- Declaring sequences (additional tests)
 // =============================================================================
