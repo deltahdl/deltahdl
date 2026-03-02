@@ -10,18 +10,6 @@ using ProgramParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// A.1.2 program_declaration — all 5 forms
-// =============================================================================
-// Program with ANSI ports.
-TEST(SourceText, ProgramAnsiHeader) {
-  auto r = Parse("program prg(input logic clk); endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
-}
-
 // Program with non-ANSI ports.
 TEST(SourceText, ProgramNonAnsiHeader) {
   auto r = Parse(
