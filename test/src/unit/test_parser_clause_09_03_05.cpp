@@ -252,4 +252,17 @@ TEST(ParserSection12, StatementLabelOnAssign) {
   EXPECT_EQ(stmt->label, "assign_val");
 }
 
+TEST(ParserSection12, StatementLabelOnForever) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    inf: forever @(posedge clk) x = ~x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kForever);
+}
+
 }  // namespace
