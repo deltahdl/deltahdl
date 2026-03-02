@@ -67,4 +67,18 @@ TEST(ParserSection28, ElaborateNandGate) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kAmp);
 }
 
+TEST(ParserSection28, ElaborateXorGate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  wire out, a, b;\n"
+      "  xor g1(out, a, b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->assigns.size(), 1);
+  EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kCaret);
+}
+
 }  // namespace
