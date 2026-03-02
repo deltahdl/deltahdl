@@ -77,4 +77,13 @@ TEST(ParserA212, OutputNonAnsi) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
 }
 
+TEST(ParserA212, OutputNonAnsiUnpackedDim) {
+  // Non-ANSI: list_of_port_identifiers with unpacked_dimension
+  auto r =
+      ParseWithPreprocessor("module m(q); output logic q [3:0]; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
+}
+
 }  // namespace
