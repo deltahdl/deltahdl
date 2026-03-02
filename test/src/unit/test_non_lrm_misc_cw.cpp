@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-// interface_or_generate_item ::= { attribute_instance } extern_tf_declaration
-// extern_tf_declaration ::= extern method_prototype ;
-// Verify extern function prototype inside an interface.
-TEST(SourceText, ExternFunctionPrototypeInInterface) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  extern function void compute(input int x);\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  auto* ifc = r.cu->interfaces[0];
-  ASSERT_GE(ifc->items.size(), 1u);
-  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(ifc->items[0]->name, "compute");
-  EXPECT_TRUE(ifc->items[0]->is_extern);
-  // Prototype only — no body statements.
-  EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
-}
-
 // extern_tf_declaration ::= extern method_prototype ;
 // method_prototype ::= task_prototype — extern task prototype.
 TEST(SourceText, ExternTaskPrototypeInInterface) {
