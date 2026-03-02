@@ -1,9 +1,9 @@
 """GitHub issue integration for classify_test."""
 
-import json
 import re
-import subprocess
 import sys
+
+from lib.github import fetch_issue_body, update_issue_body
 
 
 def _validate_issue_args(args):
@@ -59,39 +59,6 @@ def remove_checkbox(body, test_name):
             f"Checkbox for {test_name!r} not found in issue body",
         )
     return body[:match.start()] + body[match.end():]
-
-
-def fetch_issue_body(organization, repo, issue):
-    """Fetch the body of a GitHub issue using gh api."""
-    result = subprocess.run(
-        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
-         "--jq", ".body"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to fetch issue #{issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    return result.stdout
-
-
-def update_issue_body(organization, repo, issue, body):
-    """Update the body of a GitHub issue using gh api."""
-    payload = json.dumps({"body": body})
-    result = subprocess.run(
-        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
-         "-X", "PATCH", "--input", "-"],
-        input=payload,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to update issue #{issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
 
 
 def maybe_tick_issue_checkbox(args, tests):

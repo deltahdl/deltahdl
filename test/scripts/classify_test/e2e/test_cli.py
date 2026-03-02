@@ -7,9 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-_SCRIPTS_DIR = str(
-    Path(__file__).resolve().parents[4] / "scripts",
-)
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_SCRIPTS_DIR = str(_REPO_ROOT / "scripts")
 
 
 # ---- Helpers ---------------------------------------------------------------
@@ -22,8 +21,9 @@ def _invoke(*args, cwd=None, env=None):
     """Run classify_test in a child process."""
     run_env = (env or os.environ).copy()
     pypath = run_env.get("PYTHONPATH", "")
+    base = str(_REPO_ROOT) + os.pathsep + _SCRIPTS_DIR
     run_env["PYTHONPATH"] = (
-        _SCRIPTS_DIR + os.pathsep + pypath if pypath else _SCRIPTS_DIR
+        base + os.pathsep + pypath if pypath else base
     )
     return subprocess.run(
         [sys.executable, "-m", "classify_test", *args],
