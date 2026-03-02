@@ -55,4 +55,11 @@ TEST(ParserSection22, DefaultNettypeTrior) {
               "endmodule\n"));
 }
 
+TEST(ParserSection22, DefaultNettypeTrireg) {
+  EXPECT_TRUE(
+      ParseOk("`default_nettype trireg\n"
+              "module t;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

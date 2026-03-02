@@ -6,13 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, DefaultNettypeTrireg) {
-  EXPECT_TRUE(
-      ParseOk("`default_nettype trireg\n"
-              "module t;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection22, DefaultNettypeUwire) {
   EXPECT_TRUE(
       ParseOk("`default_nettype uwire\n"
