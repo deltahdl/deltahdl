@@ -158,4 +158,24 @@ TEST(ParserClause03, Cl3_14_2_1_WhitespaceAroundSlash) {
   EXPECT_EQ(r2.timescale.precision, TimeUnit::kPs);
 }
 
+// 35. LRM example: three modules A, B, C with two `timescale directives.
+// §3.14.2.1:
+// `timescale 1ns / 10ps → modules A and B
+// `timescale 1ps / 1ps  → module C
+TEST(ParserClause03, Cl3_14_2_1_LrmExampleThreeModules) {
+  auto r = ParseWithPreprocessor(
+      "`timescale 1ns / 10ps\n"
+      "module A; endmodule\n"
+      "module B; endmodule\n"
+      "`timescale 1ps / 1ps\n"
+      "module C; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 3u);
+  // All three modules parse; none have explicit timeunit keywords.
+  EXPECT_FALSE(r.cu->modules[0]->has_timeunit);
+  EXPECT_FALSE(r.cu->modules[1]->has_timeunit);
+  EXPECT_FALSE(r.cu->modules[2]->has_timeunit);
+}
+
 }  // namespace
