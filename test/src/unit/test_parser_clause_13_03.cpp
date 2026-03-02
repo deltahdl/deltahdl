@@ -175,4 +175,21 @@ TEST(ParserSection13, MultipleDimsOnFuncArg) {
   EXPECT_EQ(tk->func_args[0].unpacked_dims.size(), 2u);
 }
 
+TEST(ParserSection13, OldStyleTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task mytask;\n"
+      "    input a;\n"
+      "    output b;\n"
+      "    b = a;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* tk = FindFunc(r, "mytask");
+  ASSERT_NE(tk, nullptr);
+  ASSERT_EQ(tk->func_args.size(), 2u);
+  EXPECT_EQ(tk->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(tk->func_args[1].direction, Direction::kOutput);
+}
+
 }  // namespace
