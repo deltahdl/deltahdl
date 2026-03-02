@@ -43,17 +43,6 @@ static void GetClockingBlock(ParseResult19& r, ModuleItem*& out,
 
 namespace {
 
-// Input skew with time-unit suffix (e.g., #1ps).
-TEST(ParserSection19, InputOutputSkew_TimeUnitSuffix) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking dram @(clk);\n"
-              "    input #1ps address;\n"
-              "    input #5 output #6 data;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 // Input skew of #1step (special 1step literal).
 TEST(ParserSection19, InputOutputSkew_OneStep) {
   EXPECT_TRUE(

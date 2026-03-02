@@ -350,4 +350,15 @@ TEST(ParserSection19, InputOutputSkew_CombinedInputOutput) {
   EXPECT_NE(sig.out_skew_delay, nullptr);
 }
 
+// Input skew with time-unit suffix (e.g., #1ps).
+TEST(ParserSection19, InputOutputSkew_TimeUnitSuffix) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking dram @(clk);\n"
+              "    input #1ps address;\n"
+              "    input #5 output #6 data;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace
