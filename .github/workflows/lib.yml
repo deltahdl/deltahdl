@@ -38,7 +38,7 @@ jobs:
             exit 0
           fi
           CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
-          LIB='^(lib/(lrm|github)/|test/lib/(lrm|github)/|\.github/workflows/lib\.yml)'
+          LIB='^(lib/(lrm|github)/|test/lib/(lrm|github)/)'
           IC='^(scripts/implement_clause/|test/scripts/implement_clause/|\.github/workflows/implement_clause\.yml)'
           ISC='^(scripts/implement_subclause/|test/scripts/implement_subclause/|\.github/workflows/implement_subclause\.yml)'
           LIB_HIT=false
