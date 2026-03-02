@@ -165,4 +165,14 @@ TEST(SourceText, NonPortInterfaceItemNestedInterface) {
             ModuleItemKind::kNestedModuleDecl);
 }
 
+// non_port_interface_item ::= timeunits_declaration
+TEST(SourceText, NonPortInterfaceItemTimeunits) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  timeunit 1ns;\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+}
+
 }  // namespace

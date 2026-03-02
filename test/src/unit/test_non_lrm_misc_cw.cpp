@@ -17,16 +17,6 @@ static void VerifyModportPorts(const std::vector<ModportPort>& ports,
 
 namespace {
 
-// non_port_interface_item ::= timeunits_declaration
-TEST(SourceText, NonPortInterfaceItemTimeunits) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  timeunit 1ns;\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-}
-
 // Combined: interface with multiple A.1.6 item types.
 TEST(SourceText, InterfaceMultipleItemTypes) {
   auto r = Parse(
