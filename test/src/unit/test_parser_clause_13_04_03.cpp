@@ -25,4 +25,14 @@ TEST(ParserA82, ConstantFunctionCallInParam) {
   EXPECT_EQ(params[0].second->callee, "calc");
 }
 
+TEST(ParserA82, ConstantFunctionCallInLocalparam) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int clog2_fn(int n); return $clog2(n); endfunction\n"
+      "  localparam int W = clog2_fn(256);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

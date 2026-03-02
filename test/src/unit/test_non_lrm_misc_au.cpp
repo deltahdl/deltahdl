@@ -14,16 +14,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA82, ConstantFunctionCallInLocalparam) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int clog2_fn(int n); return $clog2(n); endfunction\n"
-      "  localparam int W = clog2_fn(256);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =============================================================================
 // A.8.2 Subroutine calls — tf_call
 // =============================================================================
