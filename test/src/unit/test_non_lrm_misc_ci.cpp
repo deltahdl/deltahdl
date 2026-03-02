@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection12, BreakStatementParses) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    forever begin\n"
-      "      if (done) break;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForever);
-}
-
 TEST(ParserSection12, BreakStatementInBody) {
   auto r = Parse(
       "module t;\n"
