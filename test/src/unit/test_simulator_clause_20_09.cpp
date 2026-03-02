@@ -17,4 +17,14 @@ TEST(SysTask, CountbitsMatchingPattern) {
   EXPECT_EQ(result.ToUint64(), 4u);
 }
 
+// ============================================================================
+// §20.9 — $countones, $onehot, $onehot0, $isunknown
+// ============================================================================
+TEST(Section20, CountonesZero) {
+  SimFixture f;
+  auto* expr = MakeSysCall(f.arena, "$countones", {MakeInt(f.arena, 0)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
 }  // namespace
