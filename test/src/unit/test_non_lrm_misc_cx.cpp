@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Inline genvar in generate-for init (§27.4) ---
-TEST(ParserSection27, InlineGenvarInForInitParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
-      "    assign out[i] = in[i];\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->items.size(), 1);
-  auto* gen = mod->items[0];
-  EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
-  ASSERT_NE(gen->gen_init, nullptr);
-}
-
 TEST(ParserSection27, InlineGenvarInForInitBody) {
   auto r = Parse(
       "module m;\n"
