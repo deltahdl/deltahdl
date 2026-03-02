@@ -83,4 +83,21 @@ TEST(ParserA82, SystemTfCallMultipleExprArgs) {
   EXPECT_EQ(expr->args.size(), 3u);
 }
 
+// system_tf_call with empty positional arg slots
+TEST(ParserA82, SystemTfCallEmptyArgSlots) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial $display(,,42);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(expr->args.size(), 3u);
+  EXPECT_EQ(expr->args[0], nullptr);
+  EXPECT_EQ(expr->args[1], nullptr);
+  ASSERT_NE(expr->args[2], nullptr);
+}
+
 }  // namespace
