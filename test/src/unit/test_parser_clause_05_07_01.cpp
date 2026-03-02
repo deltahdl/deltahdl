@@ -410,4 +410,15 @@ TEST(ParserA87, IntegralBinary) {
   EXPECT_EQ(rhs->int_val, 0xAAu);
 }
 
+// § integral_number — hex_number
+TEST(ParserA87, IntegralHex) {
+  auto r = Parse("module m; logic [7:0] x; initial x = 8'hFF; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 0xFFu);
+}
+
 }  // namespace
