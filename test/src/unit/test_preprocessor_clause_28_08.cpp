@@ -19,4 +19,13 @@ TEST(ParserSection28, PassGateTran) {
   ASSERT_EQ(item->gate_terminals.size(), 2);
 }
 
+TEST(Parser, GateTran) {
+  auto r = ParseWithPreprocessor("module t; tran (a, b); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
+  EXPECT_EQ(item->gate_kind, GateKind::kTran);
+  EXPECT_EQ(item->gate_terminals.size(), 2);
+}
+
 }  // namespace
