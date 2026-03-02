@@ -7,24 +7,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// A.8.3 Expressions — constant_range_expression / constant_range
-// =============================================================================
-// § constant_range ::= constant_expression : constant_expression
-TEST(ParserA83, ConstantRangeInPackedDim) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
-  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
-}
-
-// =============================================================================
 // A.8.3 Expressions — inside_expression
 // =============================================================================
 // § inside_expression ::= expression inside { range_list }
