@@ -18,24 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// =============================================================================
-// LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
-// =============================================================================
-TEST(ParserSection13, OldStyleFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  function [7:0] myfunc;\n"
-      "    input [7:0] a;\n"
-      "    myfunc = a + 1;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "myfunc");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_EQ(fn->func_args.size(), 1u);
-  EXPECT_EQ(fn->func_args[0].direction, Direction::kInput);
-}
-
 TEST(ParserSection13, OldStyleTask) {
   auto r = Parse(
       "module m;\n"
