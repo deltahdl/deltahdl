@@ -245,4 +245,21 @@ TEST(ParserAnnexF, AnnexFPropertyDecl) {
   EXPECT_TRUE(found);
 }
 
+// =============================================================================
+// §16.12 Property declarations — with formal arguments
+// =============================================================================
+TEST(ParserSection16, PropertyDeclWithFormals) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p_req_ack(req, ack);\n"
+      "    @(posedge clk) req |-> ##[1:3] ack;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* pd =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->name, "p_req_ack");
+}
+
 }  // namespace
