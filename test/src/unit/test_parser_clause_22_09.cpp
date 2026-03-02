@@ -14,4 +14,12 @@ TEST(ParserSection22, UnconnectedDrivePull1) {
               "`nounconnected_drive\n"));
 }
 
+TEST(ParserSection22, UnconnectedDrivePull0) {
+  EXPECT_TRUE(
+      ParseOk("`unconnected_drive pull0\n"
+              "module t;\n"
+              "endmodule\n"
+              "`nounconnected_drive\n"));
+}
+
 }  // namespace

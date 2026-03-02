@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, UnconnectedDrivePull0) {
-  EXPECT_TRUE(
-      ParseOk("`unconnected_drive pull0\n"
-              "module t;\n"
-              "endmodule\n"
-              "`nounconnected_drive\n"));
-}
-
 TEST(ParserSection22, CelldefineEndcelldefine) {
   EXPECT_TRUE(
       ParseOk("`celldefine\n"
