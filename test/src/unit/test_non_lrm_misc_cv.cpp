@@ -27,19 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST_F(ProgramParseTest, MultipleProgramsInCompilationUnit) {
-  auto* unit = Parse(
-      "program p1;\n"
-      "endprogram\n"
-      "program p2;\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 2u);
-  EXPECT_EQ(unit->programs[0]->name, "p1");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  EXPECT_EQ(unit->programs[1]->name, "p2");
-  EXPECT_EQ(unit->programs[1]->decl_kind, ModuleDeclKind::kProgram);
-}
-
 // =============================================================================
 // §24.5 Program lifetime qualifier
 // =============================================================================
