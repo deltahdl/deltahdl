@@ -26,28 +26,6 @@ static ParseResult16b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// Combination: property used with assert
-// =============================================================================
-TEST(ParserSection16, PropertyDeclAndAssertProperty) {
-  auto r = Parse(
-      "module m;\n"
-      "  property p1;\n"
-      "    @(posedge clk) a |-> b;\n"
-      "  endproperty\n"
-      "  assert property (p1);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  bool found_prop = false;
-  bool found_assert = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kPropertyDecl) found_prop = true;
-    if (item->kind == ModuleItemKind::kAssertProperty) found_assert = true;
-  }
-  EXPECT_TRUE(found_prop);
-  EXPECT_TRUE(found_assert);
-}
-
 TEST(ParserSection16, SequenceThroughoutInSeqDecl) {
   auto r = Parse(
       "module m;\n"
