@@ -201,7 +201,7 @@ jobs:
   # ── Lane: lib ──
   # DO NOT lower coverage thresholds. Uncovered code is untested code —
   # lowering it hides bugs and lets regressions slip through silently.
-  test-lib:
+  test-lib-run-tests-common:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
@@ -276,7 +276,7 @@ jobs:
   test-run-sim-tests:
     needs:
       - static-analysis
-      - test-lib
+      - test-lib-run-tests-common
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -302,7 +302,7 @@ jobs:
   test-run-sv-tests:
     needs:
       - static-analysis
-      - test-lib
+      - test-lib-run-tests-common
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -334,7 +334,7 @@ jobs:
     needs:
       - detect
       - static-analysis
-      - test-lib
+      - test-lib-run-tests-common
       - test-lib-github
       - test-lib-lrm
       - test-run-sim-tests
@@ -361,7 +361,7 @@ jobs:
     needs:
       - detect
       - static-analysis
-      - test-lib
+      - test-lib-run-tests-common
       - test-lib-github
       - test-lib-lrm
       - test-run-sim-tests
@@ -388,7 +388,7 @@ jobs:
     needs:
       - detect
       - static-analysis
-      - test-lib
+      - test-lib-run-tests-common
       - test-lib-github
       - test-lib-lrm
       - test-run-sim-tests
