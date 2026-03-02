@@ -482,4 +482,18 @@ TEST(ParserSection13, FunctionEndLabel) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
 }
 
+// Function with empty body.
+TEST(ParserSection13, FunctionEmptyBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void nop();\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* fn = FindFunc(r, "nop");
+  ASSERT_NE(fn, nullptr);
+  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
+  EXPECT_TRUE(fn->func_body_stmts.empty());
+}
+
 }  // namespace

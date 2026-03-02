@@ -18,20 +18,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
 
 namespace {
 
-// Function with empty body.
-TEST(ParserSection13, FunctionEmptyBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void nop();\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "nop");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
-  EXPECT_TRUE(fn->func_body_stmts.empty());
-}
-
 // =============================================================================
 // LRM section 13.3 -- Tasks (additional tests)
 // =============================================================================
