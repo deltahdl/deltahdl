@@ -411,4 +411,16 @@ TEST(ParserSection27, GenerateIfSingleItemParse) {
   ASSERT_EQ(gen->gen_body.size(), 1);
 }
 
+TEST(ParserSection27, GenerateIfSingleItemBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (WIDTH > 1)\n"
+      "    assign out = in;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* gen = r.cu->modules[0]->items[0];
+  EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
+  EXPECT_EQ(gen->gen_else, nullptr);
+}
+
 }  // namespace
