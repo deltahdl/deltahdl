@@ -205,4 +205,19 @@ TEST(ParserA85, VarLvalueConcatenation) {
   EXPECT_EQ(stmt->lhs->elements.size(), 2u);
 }
 
+// § variable_lvalue — nested concatenation
+TEST(ParserA85, VarLvalueNestedConcatenation) {
+  auto r = Parse(
+      "module m; logic a, b, c, d;\n"
+      "  initial {{a, b}, {c, d}} = 4'hF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(stmt->lhs->elements[0]->kind, ExprKind::kConcatenation);
+}
+
 }  // namespace
