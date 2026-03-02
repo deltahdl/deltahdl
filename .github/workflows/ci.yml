@@ -85,8 +85,8 @@ jobs:
             echo "deltahdl_changed=false" >> "$GITHUB_OUTPUT"
           fi
           LIB='^(lib/(lrm|github)/|test/lib/(lrm|github)/)'
-          IC='^(scripts/implement_clause/|test/scripts/implement_clause/|\.github/workflows/implement_clause\.yml)'
-          ISC='^(scripts/implement_subclause/|test/scripts/implement_subclause/|\.github/workflows/implement_subclause\.yml)'
+          IC='^(scripts/implement_clause/|test/scripts/implement_clause/)'
+          ISC='^(scripts/implement_subclause/|test/scripts/implement_subclause/)'
           LIB_HIT=false
           if echo "$CHANGED" | grep -qE "$LIB"; then
             LIB_HIT=true
