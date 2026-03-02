@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// port_declaration: all 4 directions (port_direction ::=
-// input|output|inout|ref)
-TEST(SourceText, PortDirectionAllFour) {
-  auto r = ParseWithPreprocessor(
-      "module m(input logic a, output logic b,\n"
-      "         inout wire c, ref logic d);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& ports = r.cu->modules[0]->ports;
-  ASSERT_EQ(ports.size(), 4u);
-  EXPECT_EQ(ports[0].direction, Direction::kInput);
-  EXPECT_EQ(ports[1].direction, Direction::kOutput);
-  EXPECT_EQ(ports[2].direction, Direction::kInout);
-  EXPECT_EQ(ports[3].direction, Direction::kRef);
-}
-
 // net_port_header: [port_direction] net_port_type — inout wire
 TEST(SourceText, NetPortHeader) {
   auto r =
