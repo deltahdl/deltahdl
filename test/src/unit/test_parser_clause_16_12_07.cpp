@@ -154,4 +154,18 @@ TEST(ParserSection16, PropertyNonOverlappedImplication) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+TEST(ParserSection16, SequenceUsedInPropertyDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s1;\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "  property p1;\n"
+      "    @(posedge clk) s1 |=> c;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
