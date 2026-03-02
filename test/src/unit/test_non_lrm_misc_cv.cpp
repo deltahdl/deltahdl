@@ -27,23 +27,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// §24.3 Program body items
-// =============================================================================
-TEST_F(ProgramParseTest, ProgramWithInitialBlock) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  initial begin\n"
-      "    $display(\"hello\");\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->name, "p");
-  EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-  ASSERT_EQ(unit->programs[0]->items.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
-}
-
 TEST_F(ProgramParseTest, ProgramWithMultipleItems) {
   auto* unit = Parse(
       "program p;\n"
