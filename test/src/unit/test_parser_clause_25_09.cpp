@@ -58,4 +58,15 @@ TEST(ParserSection25, VirtualInterfaceWithModportKind) {
   EXPECT_EQ(item->name, "bus_if");
 }
 
+TEST(ParserSection25, VirtualInterfaceWithModportNames) {
+  auto r = Parse(
+      "module top;\n"
+      "  virtual interface simple_bus.target bus_if;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->data_type.type_name, "simple_bus");
+  EXPECT_EQ(item->data_type.modport_name, "target");
+}
+
 }  // namespace
