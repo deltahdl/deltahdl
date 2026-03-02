@@ -34,24 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult15& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 15.5.3 -- Persistent trigger: triggered built-in method
-// =============================================================================
-// §15.5.3: wait(event.triggered) — persistent trigger check (from LRM).
-TEST(ParserSection15, TriggeredMethodWait) {
-  auto r = Parse(
-      "module m;\n"
-      "  event blast;\n"
-      "  initial begin\n"
-      "    wait(blast.triggered);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-}
-
 // §15.5.3: fork with -> trigger and wait(.triggered) (from LRM example).
 TEST(ParserSection15, TriggeredMethodForkPattern) {
   auto r = Parse(
