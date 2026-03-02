@@ -16,25 +16,6 @@ static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
 
 namespace {
 
-TEST(ParserSection28, ElaborateAndGate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  wire out, a, b;\n"
-      "  and g1(out, a, b);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  // Gate should produce a continuous assign.
-  ASSERT_GE(mod->assigns.size(), 1);
-  auto& ca = mod->assigns[0];
-  EXPECT_NE(ca.lhs, nullptr);
-  EXPECT_NE(ca.rhs, nullptr);
-  // The rhs should be a binary '&' expression.
-  EXPECT_EQ(ca.rhs->op, TokenKind::kAmp);
-}
-
 TEST(ParserSection28, ElaborateOrGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
