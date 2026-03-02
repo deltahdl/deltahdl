@@ -59,4 +59,15 @@ TEST(ParserA212, InoutNonAnsi) {
   EXPECT_EQ(port.direction, Direction::kInout);
 }
 
+TEST(ParserA212, InputNonAnsiMultiple) {
+  // Non-ANSI: input net_port_type list_of_port_identifiers (comma list)
+  auto r =
+      ParseWithPreprocessor("module m(a, b); input wire [7:0] a, b; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  for (auto& port : r.cu->modules[0]->ports) {
+    EXPECT_EQ(port.direction, Direction::kInput);
+  }
+}
+
 }  // namespace
