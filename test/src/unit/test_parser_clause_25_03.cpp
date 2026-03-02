@@ -175,4 +175,14 @@ TEST(SourceText, NonPortInterfaceItemTimeunits) {
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
 }
 
+// Extern interface declaration.
+TEST(SourceText, ExternInterface) {
+  auto r = Parse("extern interface ifc(input logic clk);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
+}
+
 }  // namespace
