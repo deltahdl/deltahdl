@@ -24,22 +24,6 @@ static ParseResult23b Parse(const std::string& src) {
 
 namespace {
 
-// =========================================================================
-// LRM section 23.2.2.1: Non-ANSI port declarations
-// =========================================================================
-TEST(ParserSection23, NonAnsiInoutPort) {
-  auto r = Parse(
-      "module m(bus);\n"
-      "  inout [7:0] bus;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 1);
-  EXPECT_EQ(mod->ports[0].name, "bus");
-  EXPECT_EQ(mod->ports[0].direction, Direction::kInout);
-  EXPECT_NE(mod->ports[0].data_type.packed_dim_left, nullptr);
-}
-
 TEST(ParserSection23, NonAnsiMultiplePortsSameDir) {
   auto r = Parse(
       "module m(x, y, z);\n"
