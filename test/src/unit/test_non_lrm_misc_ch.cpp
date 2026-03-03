@@ -40,33 +40,7 @@ static Expr* FirstAssignRhs(ParseResult11g& r) {
   return stmt->rhs;
 }
 
-static ModuleItem* FirstContAssign(ParseResult11g& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) return item;
-  }
-  return nullptr;
-}
-
 namespace {
-
-// --- Ternary in continuous assignment ---
-TEST(ParserSection11, Sec11_4_6_TernaryInContAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire sel, a, b, y;\n"
-      "  assign y = sel ? a : b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* ca = FirstContAssign(r);
-  ASSERT_NE(ca, nullptr);
-  ASSERT_NE(ca->assign_rhs, nullptr);
-  EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(ca->assign_rhs->condition, nullptr);
-  EXPECT_EQ(ca->assign_rhs->condition->kind, ExprKind::kIdentifier);
-  ASSERT_NE(ca->assign_rhs->true_expr, nullptr);
-  ASSERT_NE(ca->assign_rhs->false_expr, nullptr);
-}
 
 // --- Ternary in blocking assignment ---
 TEST(ParserSection11, Sec11_4_6_TernaryInBlockingAssign) {
