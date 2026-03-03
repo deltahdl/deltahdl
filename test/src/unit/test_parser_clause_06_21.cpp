@@ -907,4 +907,30 @@ TEST(ParserSection4, Sec4_9_3_AutoVarInStaticFunc) {
   EXPECT_FALSE(var_stmt->var_is_static);
 }
 
+// =============================================================================
+// 11. Explicit static var in automatic function
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_StaticVarInAutoFunc) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int accumulate(int x);\n"
+      "    static int sum = 0;\n"
+      "    sum = sum + x;\n"
+      "    return sum;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  auto* var_stmt = FirstBodyStmt(item);
+  ASSERT_NE(var_stmt, nullptr);
+  EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(var_stmt->var_is_static);
+  EXPECT_FALSE(var_stmt->var_is_automatic);
+  EXPECT_EQ(var_stmt->var_name, "sum");
+  EXPECT_NE(var_stmt->var_init, nullptr);
+}
+
 }  // namespace
