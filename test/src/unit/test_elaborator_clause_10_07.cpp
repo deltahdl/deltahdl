@@ -77,4 +77,35 @@ TEST(SimCh10b, NBAWidthExtension) {
   EXPECT_EQ(var->value.width, 32u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA preserving width — result width matches LHS declaration.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBAPreservesWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    a <= 16'hCAFE;\n"
+      "    b <= 8'hBE;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->value.width, 16u);
+  EXPECT_EQ(a->value.ToUint64(), 0xCAFEu);
+  EXPECT_EQ(b->value.width, 8u);
+  EXPECT_EQ(b->value.ToUint64(), 0xBEu);
+}
+
 }  // namespace
