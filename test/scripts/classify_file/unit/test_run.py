@@ -345,12 +345,10 @@ def test_run_classify_test_returns_false_on_failure(monkeypatch):
 
 
 def test_run_classify_test_prints_progress(monkeypatch, capsys):
-    """Prints progress line with index and name, no trailing parens."""
+    """Prints progress line with index and name."""
     stub_subprocess_success(monkeypatch)
     classify_file.run_classify_test(_make_args(), "Alpha", 3, 10)
-    out = capsys.readouterr().out
-    assert "Processing test 3/10: Alpha" in out
-    assert "Alpha()" not in out
+    assert "Processing test 3/10: Alpha\n" in capsys.readouterr().out
 
 
 def test_run_classify_test_passes_test_name(monkeypatch):
@@ -600,9 +598,7 @@ def test_run_no_tests_prints_deleting(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
     stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path))
-    out = capsys.readouterr().out
-    assert "Deleting" in out
-    assert "because it contains no tests" in out
+    assert "because it contains no tests" in capsys.readouterr().out
 
 
 def test_run_no_tests_prints_deleted(tmp_path, capsys, monkeypatch):

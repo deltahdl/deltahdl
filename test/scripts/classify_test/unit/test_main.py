@@ -484,18 +484,28 @@ def test_run_live_merge_writes_test(tmp_path, monkeypatch):
         (tmp_path / "test_parser_clause_06_01.cpp").read_text()
 
 
-def test_run_live_merge_prints_merge(tmp_path, monkeypatch, capsys):
-    """Live merge prints test name, target, and rationale."""
+def _setup_live_merge(tmp_path, monkeypatch):
+    """Create existing clause file and set up a live merge run."""
     (tmp_path / "test_parser_clause_06_01.cpp").write_text(
         "// \u00a76.1\n\n#include <gtest/gtest.h>\n\n"
         "namespace {\n\nTEST(S, Old) {\n}\n\n}  // namespace\n",
         encoding="utf-8",
     )
-    args = _setup_live_run(tmp_path, monkeypatch)
+    return _setup_live_run(tmp_path, monkeypatch)
+
+
+def test_run_live_merge_prints_test_name(tmp_path, monkeypatch, capsys):
+    """Live merge message includes the test name."""
+    args = _setup_live_merge(tmp_path, monkeypatch)
     _run(args)
-    out = capsys.readouterr().out
-    assert "Merging test T into" in out
-    assert "because" in out
+    assert "Merging test T into" in capsys.readouterr().out
+
+
+def test_run_live_merge_prints_rationale(tmp_path, monkeypatch, capsys):
+    """Live merge message includes a rationale."""
+    args = _setup_live_merge(tmp_path, monkeypatch)
+    _run(args)
+    assert "because" in capsys.readouterr().out
 
 
 def _mixed_classifier(prompt, schema=None):
