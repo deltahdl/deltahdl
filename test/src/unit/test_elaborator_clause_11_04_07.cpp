@@ -146,4 +146,37 @@ TEST(SimCh10, BlockingAssignUnaryOps) {
   EXPECT_EQ(r_bang->value.ToUint64(), 0u);
 }
 
+// ---------------------------------------------------------------------------
+// 16. Blocking assignment with unary logical NOT (!) and unary minus (-).
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, neg_result, not_result;\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "    neg_result = -a;\n"
+      "    not_result = !a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* neg = f.ctx.FindVariable("neg_result");
+  ASSERT_NE(neg, nullptr);
+  // -5 as 32-bit unsigned = 0xFFFFFFFB
+  auto neg5_32bit = static_cast<uint32_t>(-5);
+  EXPECT_EQ(neg->value.ToUint64(), neg5_32bit);
+
+  auto* notv = f.ctx.FindVariable("not_result");
+  ASSERT_NE(notv, nullptr);
+  // !5 = 0
+  EXPECT_EQ(notv->value.ToUint64(), 0u);
+}
+
 }  // namespace
