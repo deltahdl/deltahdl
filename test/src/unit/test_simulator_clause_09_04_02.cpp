@@ -146,4 +146,8 @@ TEST(TimingControl, Posedge0ToX) {
   EXPECT_EQ(DetectEdge(Logic4::kVal0, Logic4::kX), EdgeKind::kPosedge);
 }
 
+TEST(TimingControl, Posedge0ToZ) {
+  EXPECT_EQ(DetectEdge(Logic4::kVal0, Logic4::kZ), EdgeKind::kPosedge);
+}
+
 }  // namespace
