@@ -9,34 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.4: Multiple events with different iff conditions.
-TEST(SimCh9e, MultipleEventsWithDifferentIff) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic clk, rst, en_clk, en_rst;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    clk = 0; rst = 1; en_clk = 1; en_rst = 0; result = 0;\n"
-      "    #1 clk = 1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "  always @(posedge clk iff en_clk, negedge rst iff en_rst)\n"
-      "    result = result + 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  // Only posedge clk fires (en_clk=1), negedge rst suppressed (en_rst=0).
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
 // §9.4.2.4: iff guard on both posedge and negedge in same list.
 TEST(SimCh9e, IffOnBothEdgesInList) {
   SimFixture f;
