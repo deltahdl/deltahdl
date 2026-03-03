@@ -39,4 +39,9 @@ TEST(ParserCh50601, EscapedKeywordAsIdentifier) {
   EXPECT_TRUE(ParseOk("module t; wire \\module ; endmodule"));
 }
 
+// From test_parser_clause_05b.cpp
+TEST(ParserCh50601, EscapedIdent_Basic) {
+  EXPECT_TRUE(ParseOk("module m; wire \\busa+index ; endmodule"));
+}
+
 }  // namespace
