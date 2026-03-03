@@ -100,4 +100,8 @@ TEST(TimingControl, UnknownDelayTreatedAsZero) {
   EXPECT_EQ(EvaluateDelay(0, true, false), 0u);
 }
 
+TEST(TimingControl, HighZDelayTreatedAsZero) {
+  EXPECT_EQ(EvaluateDelay(0, false, true), 0u);
+}
+
 }  // namespace
