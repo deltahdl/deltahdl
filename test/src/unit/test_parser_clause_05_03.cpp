@@ -136,4 +136,20 @@ TEST(ParserCh501, Sec5_1_MixedTokensNoWhitespace) {
   EXPECT_TRUE(ParseOk("module m;logic a;assign a=1'b0;endmodule"));
 }
 
+// =========================================================================
+// Multiple statements on one line
+// =========================================================================
+TEST(ParserCh501, Sec5_1_MultipleStatementsOnOneLine) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = 1; y = 2; z = 3; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->kind, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_EQ(item->body->stmts.size(), 3u);
+}
+
 }  // namespace
