@@ -251,4 +251,28 @@ TEST(ParserSection7, StructWholeAssignment) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
+static ModuleItem* FirstItem(ParseResult7b& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+TEST(ParserSection7, StructMemberDefaultInit) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    int addr = 100;\n"
+      "    int crc;\n"
+      "    byte data [4] = '{4{1}};\n"
+      "  } packet1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->typedef_type.struct_members.size(), 3u);
+  EXPECT_NE(item->typedef_type.struct_members[0].init_expr, nullptr);
+  EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
+  EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
+}
+
 }  // namespace

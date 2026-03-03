@@ -49,24 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7, StructMemberDefaultInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct {\n"
-      "    int addr = 100;\n"
-      "    int crc;\n"
-      "    byte data [4] = '{4{1}};\n"
-      "  } packet1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->typedef_type.struct_members.size(), 3u);
-  EXPECT_NE(item->typedef_type.struct_members[0].init_expr, nullptr);
-  EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
-  EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
-}
-
 TEST(ParserSection7, UnpackedStructDecl) {
   auto r = Parse(
       "module t;\n"
