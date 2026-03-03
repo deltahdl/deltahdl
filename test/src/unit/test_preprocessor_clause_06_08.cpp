@@ -25,4 +25,18 @@ TEST(ParserSection6, VarBareNoType) {
   EXPECT_EQ(item->name, "v");
 }
 
+TEST(ParserSection6, VarWithInitializer) {
+  // §6.8: Variable with initializer "int i = 0;"
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  int i = 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->name, "i");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
 }  // namespace
