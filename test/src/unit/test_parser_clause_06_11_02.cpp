@@ -464,4 +464,12 @@ TEST(ParserSection6, Sec6_11_TimeUnpackedArray) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
+// =========================================================================
+// §6.3: Value set — 4-state vs 2-state type queries
+// =========================================================================
+TEST(ParserSection6, ValueSet_IntegerIs4State) {
+  // §6.3: integer is a 4-state type.
+  EXPECT_TRUE(Is4stateType(DataTypeKind::kInteger));
+}
+
 }  // namespace

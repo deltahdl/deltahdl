@@ -13,14 +13,6 @@ static ModuleItem* FirstItem(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.3: Value set — 4-state vs 2-state type queries
-// =========================================================================
-TEST(ParserSection6, ValueSet_IntegerIs4State) {
-  // §6.3: integer is a 4-state type.
-  EXPECT_TRUE(Is4stateType(DataTypeKind::kInteger));
-}
-
 TEST(ParserSection6, ValueSet_IntIs2State) {
   // §6.3: int is a 2-state type.
   EXPECT_FALSE(Is4stateType(DataTypeKind::kInt));
