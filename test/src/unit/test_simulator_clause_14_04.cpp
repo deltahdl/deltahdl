@@ -34,4 +34,26 @@ TEST(SimA611, PerSignalSkewOverride) {
   EXPECT_EQ(cmgr.GetInputSkew("cb", "other").ticks, 10u);
 }
 
+// =============================================================================
+// 17. Inout direction signal
+// =============================================================================
+TEST(ClockingSim, InoutSignalDirection) {
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{2};
+  block.default_output_skew = SimTime{3};
+
+  ClockingSignal sig;
+  sig.signal_name = "bidir";
+  sig.direction = ClockingDir::kInout;
+  block.signals.push_back(sig);
+  cmgr.Register(block);
+
+  EXPECT_EQ(cmgr.GetInputSkew("cb", "bidir").ticks, 2u);
+  EXPECT_EQ(cmgr.GetOutputSkew("cb", "bidir").ticks, 3u);
+}
+
 }  // namespace
