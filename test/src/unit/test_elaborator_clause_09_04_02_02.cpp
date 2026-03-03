@@ -441,4 +441,33 @@ TEST(SimCh9d, AlwaysStarBitwiseOps) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
+// ---------------------------------------------------------------------------
+// 16. always @* with comparison operators (==, <).
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarComparison) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic y;\n"
+      "  always @* y = (a > b);\n"
+      "  initial begin\n"
+      "    a = 8'h20;\n"
+      "    b = 8'h10;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  // 0x20 > 0x10 is true = 1.
+  EXPECT_EQ(y->value.ToUint64(), 1u);
+}
+
 }  // namespace
