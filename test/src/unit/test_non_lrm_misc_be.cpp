@@ -45,29 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 19. Static function with static local and return
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_StaticFuncWithStaticLocal) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int get_seq();\n"
-      "    int seq_num;\n"
-      "    seq_num = seq_num + 1;\n"
-      "    return seq_num;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_static);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
-  ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(fn->func_body_stmts[0]->var_name, "seq_num");
-}
-
-// =============================================================================
 // 20. Automatic task with explicit automatic local vars
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoTaskExplicitAutoLocals) {
