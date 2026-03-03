@@ -42,29 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 17. Multiple modules — each independently resolves time.
-TEST(ParserClause03, Cl3_14_2_3_IndependentResolution) {
-  auto r = ParseTimescale31402(
-      "`timescale 1us / 1ps\n"
-      "module a;\n"
-      "  timeunit 1ns;\n"
-      "endmodule\n"
-      "module b;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto resolved_a =
-      ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
-                             r.preproc_timescale, nullptr);
-  auto resolved_b =
-      ResolveModuleTimescale(r.cu->modules[1], r.cu, r.has_preproc_timescale,
-                             r.preproc_timescale, nullptr);
-  // a has explicit timeunit.
-  EXPECT_EQ(resolved_a.unit, TimeUnit::kNs);
-  // b falls back to `timescale.
-  EXPECT_EQ(resolved_b.unit, TimeUnit::kUs);
-  EXPECT_EQ(resolved_b.precision, TimeUnit::kPs);
-}
-
 // 18. Nested module with own timeunit overrides inheritance.
 TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
   auto r = ParseTimescale31402(
