@@ -377,4 +377,26 @@ TEST(ParserSection6, Sec6_11_IntWithComplexInit) {
   EXPECT_EQ(item->init_expr->kind, ExprKind::kBinary);
 }
 
+// =============================================================================
+// LRM section 6.11 -- Integer types coexisting with real types
+// =============================================================================
+// 25. Integer types coexisting with real types in the same module.
+TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
+  auto r = Parse(
+      "module t;\n"
+      "  int count;\n"
+      "  real voltage;\n"
+      "  byte flags;\n"
+      "  shortreal gain;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 4u);
+  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kReal);
+  EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(items[3]->data_type.kind, DataTypeKind::kShortreal);
+}
+
 }  // namespace
