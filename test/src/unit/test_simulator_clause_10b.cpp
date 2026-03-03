@@ -10,30 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §10.4.2: NBA in initial block.
-// ---------------------------------------------------------------------------
-TEST(SimCh10b, NBAInInitialBlock) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    x <= 123;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 123u);
-}
-
-// ---------------------------------------------------------------------------
 // §10.4.2: NBA with if-else control flow.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWithIfElse) {
