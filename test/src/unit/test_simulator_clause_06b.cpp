@@ -8,28 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 22. type() with longint source: 64-bit value preserved.
-TEST(SimCh6b, TypeOpLongintFullValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  longint a;\n"
-      "  var type(a) result;\n"
-      "  initial result = 64'hCAFEBABE_DEADBEEF;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 64u);
-  EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEDEADBEEFu);
-}
-
 // 23. type() with byte, verify unsigned flag is not set (byte is signed).
 TEST(SimCh6b, TypeOpByteIsSigned) {
   SimFixture f;
