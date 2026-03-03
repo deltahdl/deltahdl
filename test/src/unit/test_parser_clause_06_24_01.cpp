@@ -532,4 +532,18 @@ TEST(ParserSection6, SignedCast) {
   EXPECT_EQ(rhs->text, "signed");
 }
 
+TEST(ParserSection6, ConstCast) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = const'(y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+  EXPECT_EQ(rhs->text, "const");
+}
+
 }  // namespace
