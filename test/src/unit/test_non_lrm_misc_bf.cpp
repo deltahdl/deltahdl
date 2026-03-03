@@ -37,10 +37,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh506, Ident_SimpleWithDollarSign) {
-  EXPECT_TRUE(ParseOk("module m; logic n$657; endmodule"));
-}
-
 TEST(ParserCh506, Ident_CaseSensitive) {
   // Identifiers are case sensitive: X and x are different.
   auto r = Parse(

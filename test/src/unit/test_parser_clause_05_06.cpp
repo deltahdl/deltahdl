@@ -133,4 +133,8 @@ TEST(ParserCh506, Ident_SimpleWithUnderscore) {
   EXPECT_EQ(item->name, "_bus3");
 }
 
+TEST(ParserCh506, Ident_SimpleWithDollarSign) {
+  EXPECT_TRUE(ParseOk("module m; logic n$657; endmodule"));
+}
+
 }  // namespace
