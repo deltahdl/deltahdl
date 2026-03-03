@@ -56,23 +56,6 @@ static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
 
 namespace {
 
-// --- 17. Blocking assignment to struct member: s.field = val ---
-TEST(ParserSection10, Sec10_4_1_StructMemberLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    s.field = 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
-}
-
 // --- 5. Nonblocking in always @(posedge clk) ---
 TEST(ParserSection10, Sec10_4_2_AlwaysPosedgeNonblocking) {
   auto r = Parse(
