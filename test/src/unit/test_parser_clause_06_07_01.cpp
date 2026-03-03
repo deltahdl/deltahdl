@@ -766,4 +766,25 @@ TEST(ParserSection6, Sec6_7_1_WireWithDelay) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
+// §6.7.1: Multiple net declarations of different types in the same module.
+TEST(ParserSection6, Sec6_7_1_MixedNetTypesInModule) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire w;\n"
+      "  tri t1;\n"
+      "  wand wa;\n"
+      "  supply0 gnd;\n"
+      "  supply1 vdd;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 5u);
+  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kWire);
+  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kTri);
+  EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kWand);
+  EXPECT_EQ(items[3]->data_type.kind, DataTypeKind::kSupply0);
+  EXPECT_EQ(items[4]->data_type.kind, DataTypeKind::kSupply1);
+}
+
 }  // namespace
