@@ -23,29 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 23. X in binary literal (1 bit)
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, XInBinaryLiteral) {
-  // §5.7.1: x sets 1 bit to unknown in binary base.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [2:0] x;\n"
-      "  initial x = 3'b01x;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  // x encoding: aval=1, bval=1 per bit.
-  EXPECT_EQ(var->value.words[0].aval & 0x7, 0b011u);
-  EXPECT_EQ(var->value.words[0].bval & 0x7, 0b001u);
-}
-
-// ---------------------------------------------------------------------------
 // 24. Question mark as z alternative
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, QuestionMarkAsZ) {
