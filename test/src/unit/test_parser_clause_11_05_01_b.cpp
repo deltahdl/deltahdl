@@ -158,4 +158,19 @@ TEST(ParserSection11, Sec11_1_BitSelectIndex) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
+// --- Part-select ---
+TEST(ParserSection11, Sec11_1_PartSelectIndexAndEnd) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = data[15:0];\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->index, nullptr);
+  ASSERT_NE(rhs->index_end, nullptr);
+  EXPECT_FALSE(rhs->is_part_select_plus);
+  EXPECT_FALSE(rhs->is_part_select_minus);
+}
+
 }  // namespace
