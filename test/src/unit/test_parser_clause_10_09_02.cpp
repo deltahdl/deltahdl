@@ -311,4 +311,22 @@ TEST(ParserSection7, Sec7_2_2_DefaultAssignmentPattern) {
   EXPECT_EQ(stmt->rhs->pattern_keys[0], "default");
 }
 
+// 3. Named with default pattern '{a: 1, default: 0}.
+TEST(ParserSection7, Sec7_2_2_NamedWithDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int a; int b; int c; } s_t;\n"
+      "  s_t s;\n"
+      "  initial s = '{a: 1, default: 0};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
+  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
+  EXPECT_EQ(stmt->rhs->pattern_keys.size(), 2u);
+}
+
 }  // namespace
