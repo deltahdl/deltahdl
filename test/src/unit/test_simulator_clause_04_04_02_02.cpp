@@ -174,3 +174,15 @@ TEST(Process, ProcessDefaultState_KindAndCoro) {
   EXPECT_EQ(p.home_region, Region::kActive);
 }
 
+TEST(Scheduler, ScheduleAndRunSingleEvent) {
+  Arena arena;
+  Scheduler sched(arena);
+  bool executed = false;
+  auto* ev = sched.GetEventPool().Acquire();
+  ev->callback = [&executed]() { executed = true; };
+  sched.ScheduleEvent({0}, Region::kActive, ev);
+  EXPECT_TRUE(sched.HasEvents());
+  sched.Run();
+  EXPECT_TRUE(executed);
+}
+
