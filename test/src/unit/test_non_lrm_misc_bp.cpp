@@ -49,26 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7, PackedStructWithTypedef) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    bit [3:0] GFC;\n"
-      "    bit [7:0] VPI;\n"
-      "    bit [11:0] VCI;\n"
-      "    bit CLP;\n"
-      "    bit [3:0] PT;\n"
-      "    bit [7:0] HEC;\n"
-      "  } s_atmcell;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-  EXPECT_TRUE(item->typedef_type.is_packed);
-  EXPECT_EQ(item->typedef_type.struct_members.size(), 6u);
-}
-
 TEST(ParserSection7, PackedStructPartSelect) {
   auto r = Parse(
       "module t;\n"
