@@ -723,4 +723,20 @@ TEST(ParserSection23, GenerateForInstantiation) {
   EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
+// =============================================================================
+// LRM section 6.11 -- Integer types in generate blocks
+// =============================================================================
+// 28. Integer types in generate blocks.
+TEST(ParserSection6, Sec6_11_IntegerTypesInGenerateBlock) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  generate\n"
+              "    genvar i;\n"
+              "    for (i = 0; i < 4; i = i + 1) begin : gen_blk\n"
+              "      int local_count;\n"
+              "    end\n"
+              "  endgenerate\n"
+              "endmodule\n"));
+}
+
 }  // namespace
