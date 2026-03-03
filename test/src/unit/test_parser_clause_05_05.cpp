@@ -76,4 +76,22 @@ TEST(ParserCh501, Sec5_1_TwoCharOperatorTokenKinds) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
 
+// =========================================================================
+// All three-char operators
+// =========================================================================
+TEST(ParserCh501, Sec5_1_ThreeCharOperators) {
+  // ===, !==, <<<, >>>, ==?, !=?
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    x = (a === b);\n"
+              "    x = (a !== b);\n"
+              "    x = a <<< 2;\n"
+              "    x = a >>> 2;\n"
+              "    x = (a ==? b);\n"
+              "    x = (a !=? b);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
