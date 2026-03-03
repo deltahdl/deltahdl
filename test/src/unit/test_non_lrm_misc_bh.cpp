@@ -30,19 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, IntToRealAssignment) {
-  // Implicit conversion from integer to real
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r;\n"
-              "  int i;\n"
-              "  initial begin\n"
-              "    i = 42;\n"
-              "    r = i;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, RealCastExplicit) {
   // Explicit cast: int'(real_val) (LRM 6.24)
   EXPECT_TRUE(

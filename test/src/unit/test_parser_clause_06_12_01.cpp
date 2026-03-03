@@ -20,4 +20,17 @@ TEST(ParserSection6, RealToIntAssignment) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, IntToRealAssignment) {
+  // Implicit conversion from integer to real
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  int i;\n"
+              "  initial begin\n"
+              "    i = 42;\n"
+              "    r = i;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
