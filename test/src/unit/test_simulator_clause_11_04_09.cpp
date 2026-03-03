@@ -261,4 +261,12 @@ TEST(EvalOp, ReductionAndAllOnes) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+TEST(EvalOp, ReductionAndNotAllOnes) {
+  SimFixture f;
+  // &32'd5 = 0 (not all bits 1)
+  auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 5));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
 }  // namespace
