@@ -264,4 +264,29 @@ TEST(ParserClause03, Cl3_14_2_2_LrmExampleE) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kFs);
 }
 
+// 50. Keywords remove file order dependency: the same module always has
+// the same time unit regardless of compilation order.
+// §3.14.2.2: "Defining the timeunit and timeprecision constructs within
+// the design element removes the file order dependency problems with
+// compiler directives."
+TEST(ParserClause03, Cl3_14_2_2_RemovesFileOrderDependency) {
+  // With different preceding timescales, keywords always win.
+  auto r1 = ParseTimescale31402(
+      "`timescale 1us / 1ns\n"
+      "module m;\n"
+      "  timeunit 1ps;\n"
+      "  timeprecision 1fs;\n"
+      "endmodule\n");
+  auto r2 = ParseTimescale31402(
+      "`timescale 1ms / 1us\n"
+      "module m;\n"
+      "  timeunit 1ps;\n"
+      "  timeprecision 1fs;\n"
+      "endmodule\n");
+  EXPECT_EQ(r1.cu->modules[0]->time_unit, r2.cu->modules[0]->time_unit);
+  EXPECT_EQ(r1.cu->modules[0]->time_prec, r2.cu->modules[0]->time_prec);
+  EXPECT_EQ(r1.cu->modules[0]->time_unit, TimeUnit::kPs);
+  EXPECT_EQ(r1.cu->modules[0]->time_prec, TimeUnit::kFs);
+}
+
 }  // namespace
