@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §7.9.3: Exists()
 
 #include <gtest/gtest.h>
 #include <cstdint>
