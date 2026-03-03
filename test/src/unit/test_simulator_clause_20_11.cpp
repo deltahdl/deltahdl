@@ -101,4 +101,32 @@ TEST(SvaEngine, AssertFailOn) {
   EXPECT_TRUE(ctrl.IsFailEnabled("inst1"));
 }
 
+// =============================================================================
+// Test fixture
+// =============================================================================
+struct SvaFixture {
+  SourceManager mgr;
+  Arena arena;
+  Scheduler scheduler{arena};
+  DiagEngine diag{mgr};
+  SimContext ctx{scheduler, arena, diag};
+  SvaEngine engine;
+};
+
+TEST(SvaEngine, AssertionControlIntegration) {
+  SvaFixture f;
+  bool executed = false;
+
+  DeferredAssertion da;
+  da.condition_val = 1;
+  da.instance_name = "my_assert";
+  da.pass_action = [&executed]() { executed = true; };
+
+  f.engine.GetControl().SetOff("my_assert");
+  f.engine.QueueDeferredAssertionIfEnabled(da);
+  f.engine.FlushDeferredAssertions(f.scheduler, SimTime{0});
+  f.scheduler.Run();
+  EXPECT_FALSE(executed);
+}
+
 }  // namespace
