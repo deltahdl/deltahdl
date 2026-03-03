@@ -30,39 +30,7 @@ static ModuleItem* FirstItem(ParseResult4d& r) {
   return r.cu->modules[0]->items[0];
 }
 
-static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
-  for (auto* stmt : item->func_body_stmts) {
-    if (stmt->kind == kind) return stmt;
-  }
-  return nullptr;
-}
-
 namespace {
-
-// =============================================================================
-// 13. Automatic function with for loop variable
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithForLoop) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int sum_to_n(int n);\n"
-      "    int total;\n"
-      "    total = 0;\n"
-      "    for (int i = 0; i < n; i = i + 1)\n"
-      "      total = total + i;\n"
-      "    return total;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_automatic);
-  auto* for_stmt = FindStmtByKind(item, StmtKind::kFor);
-  ASSERT_NE(for_stmt, nullptr);
-  EXPECT_NE(for_stmt->for_cond, nullptr);
-  EXPECT_NE(for_stmt->for_body, nullptr);
-}
 
 // =============================================================================
 // 14. Automatic function with multiple local vars of different types

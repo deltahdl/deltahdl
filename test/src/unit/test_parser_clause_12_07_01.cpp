@@ -761,4 +761,61 @@ TEST(ParserSection4, Sec4_9_4_ForLoopInitInAutoFunc) {
   EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
+struct ParseResult4d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4d Parse(const std::string& src) {
+  ParseResult4d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Returns the first module item from the first module.
+static ModuleItem* FirstItem(ParseResult4d& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
+}
+
+static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
+  for (auto* stmt : item->func_body_stmts) {
+    if (stmt->kind == kind) return stmt;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// 13. Automatic function with for loop variable
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithForLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int sum_to_n(int n);\n"
+      "    int total;\n"
+      "    total = 0;\n"
+      "    for (int i = 0; i < n; i = i + 1)\n"
+      "      total = total + i;\n"
+      "    return total;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  auto* for_stmt = FindStmtByKind(item, StmtKind::kFor);
+  ASSERT_NE(for_stmt, nullptr);
+  EXPECT_NE(for_stmt->for_cond, nullptr);
+  EXPECT_NE(for_stmt->for_body, nullptr);
+}
+
 }  // namespace
