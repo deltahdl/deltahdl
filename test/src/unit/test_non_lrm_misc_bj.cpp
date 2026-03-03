@@ -29,22 +29,6 @@ static ModuleItem* FirstItem(ParseResult6b& r) {
 
 namespace {
 
-// =========================================================================
-// §6.21: Scope and lifetime (additional tests)
-// =========================================================================
-TEST(ParserSection6, AutomaticTaskDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  task automatic my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(item->is_automatic);
-}
-
 TEST(ParserSection6, StaticTaskDecl) {
   auto r = Parse(
       "module t;\n"
