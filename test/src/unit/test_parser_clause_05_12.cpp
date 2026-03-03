@@ -271,4 +271,37 @@ TEST(ParserCh512, AttributeValue_NoNesting_Ok) {
               "endmodule\n"));
 }
 
+static Stmt* FirstInitialStmt(ParseResult512& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+// From test_parser_clause_05b.cpp
+TEST(ParserCh512, Attribute_OnCaseStatement) {
+  // Section 5.12 Example 1: full_case, parallel_case on a case statement.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* full_case, parallel_case *)\n"
+      "    case (a)\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  ASSERT_EQ(stmt->attrs.size(), 2u);
+  EXPECT_EQ(stmt->attrs[0].name, "full_case");
+  EXPECT_EQ(stmt->attrs[1].name, "parallel_case");
+}
+
 }  // namespace
