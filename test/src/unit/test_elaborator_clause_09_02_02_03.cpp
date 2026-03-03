@@ -141,4 +141,45 @@ TEST(SimCh9c, EnableLowRetainsPreviousValue) {
   EXPECT_EQ(q->value.ToUint64(), 0xBBu);
 }
 
+static void LowerRunAndFindQ1Q2(SimFixture& f, RtlirDesign* design,
+                                Variable*& q1_out, Variable*& q2_out) {
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  q1_out = f.ctx.FindVariable("q1");
+  q2_out = f.ctx.FindVariable("q2");
+  ASSERT_NE(q1_out, nullptr);
+  ASSERT_NE(q2_out, nullptr);
+}
+
+// =============================================================================
+// §9.2.3: Multiple latches in one always_latch block
+// =============================================================================
+// 6. Two independent latches in one always_latch begin/end block.
+TEST(SimCh9c, MultipleLatchesInOneBlock) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d1, d2, q1, q2;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d1 = 8'hAA;\n"
+      "    d2 = 8'h55;\n"
+      "  end\n"
+      "  always_latch begin\n"
+      "    if (en) q1 = d1;\n"
+      "    if (en) q2 = d2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Variable* q1 = nullptr;
+  Variable* q2 = nullptr;
+  LowerRunAndFindQ1Q2(f, design, q1, q2);
+  EXPECT_EQ(q1->value.ToUint64(), 0xAAu);
+  EXPECT_EQ(q2->value.ToUint64(), 0x55u);
+}
+
 }  // namespace
