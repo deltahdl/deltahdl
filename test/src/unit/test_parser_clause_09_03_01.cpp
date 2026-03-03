@@ -849,4 +849,22 @@ TEST(ParserSection9, Sec9_3_1_MultipleDifferentTypeVarDecls) {
   EXPECT_EQ(body->stmts[3]->kind, StmtKind::kBlockingAssign);
 }
 
+TEST(ParserSection9, Sec9_3_1_VarDeclWithInitializer) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int count = 10;\n"
+      "    $display(\"%0d\", count);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[0]->var_name, "count");
+  EXPECT_NE(body->stmts[0]->var_init, nullptr);
+}
+
 }  // namespace
