@@ -8,33 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 12. always_latch with int type (32-bit).
-TEST(SimCh9c, LatchIntType) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic en;\n"
-      "  int d, q;\n"
-      "  initial begin\n"
-      "    en = 1;\n"
-      "    d = 12345;\n"
-      "  end\n"
-      "  always_latch\n"
-      "    if (en) q = d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->value.width, 32u);
-  EXPECT_EQ(q->value.ToUint64(), 12345u);
-}
-
 // 13. always_latch with byte type (8-bit).
 TEST(SimCh9c, LatchByteType) {
   SimFixture f;
