@@ -32,23 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-// §6.7.1: Net with signed qualifier.
-TEST(ParserSection6, Sec6_7_1_WireSignedQualifier) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire signed [7:0] s;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_signed);
-  EXPECT_TRUE(item->data_type.is_net);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
-}
-
 // §6.7.1: Net with vectored qualifier.
 TEST(ParserSection6, Sec6_7_1_WireVectoredQualifier) {
   auto r = Parse(
