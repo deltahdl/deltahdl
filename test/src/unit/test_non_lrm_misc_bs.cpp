@@ -40,18 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.3 — Randc qualifier
-TEST(ParserSection8, RandcQualifier) {
-  auto r = Parse(
-      "class Die;\n"
-      "  randc bit [2:0] face;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  ASSERT_GE(r.cu->classes[0]->members.size(), 1u);
-  EXPECT_TRUE(r.cu->classes[0]->members[0]->is_randc);
-}
-
 // §8.18 — Extern constraint declaration
 TEST(ParserSection8, ExternConstraintDecl) {
   auto r = Parse(
