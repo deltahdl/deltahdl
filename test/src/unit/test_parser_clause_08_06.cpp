@@ -106,4 +106,28 @@ TEST(ParserClause03, Cl3_13_ClassMethodsAndProperties) {
   EXPECT_EQ(cls->members[2]->method->name, "reset");
 }
 
+// Returns the first class member of kind kMethod, or nullptr if not found.
+static ClassMember* FindMethodMember(ClassDecl* cls) {
+  for (auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod) {
+      return m;
+    }
+  }
+  return nullptr;
+}
+
+TEST(ParserSection8, ClassWithTask) {
+  auto r = Parse(
+      "class MyClass;\n"
+      "  task do_stuff();\n"
+      "  endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* m = FindMethodMember(r.cu->classes[0]);
+  ASSERT_NE(m, nullptr);
+  ASSERT_NE(m->method, nullptr);
+  EXPECT_EQ(m->method->kind, ModuleItemKind::kTaskDecl);
+}
+
 }  // namespace
