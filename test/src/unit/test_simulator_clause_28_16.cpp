@@ -94,4 +94,10 @@ TEST(GateNetDelays, TwoDelayToZAndXIsMinimum) {
   EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kX), 10u);
 }
 
+// §28.16: Table 28-9 — full three-delay specification.
+TEST(GateNetDelays, ThreeDelay0To1IsD1) {
+  DelaySpec spec{10, 20, 15, 3};
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kV1), 10u);
+}
+
 }  // namespace
