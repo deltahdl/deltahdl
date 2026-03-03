@@ -10,38 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 15. Blocking assignment with unary operators (~, !).
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignUnaryOps) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  int r_not, r_bang;\n"
-      "  initial begin\n"
-      "    a = 0;\n"
-      "    r_not = !a;\n"
-      "    r_bang = !5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r_not = f.ctx.FindVariable("r_not");
-  auto* r_bang = f.ctx.FindVariable("r_bang");
-  ASSERT_NE(r_not, nullptr);
-  ASSERT_NE(r_bang, nullptr);
-  // !0 = 1
-  EXPECT_EQ(r_not->value.ToUint64(), 1u);
-  // !5 = 0
-  EXPECT_EQ(r_bang->value.ToUint64(), 0u);
-}
-
-// ---------------------------------------------------------------------------
 // 16. Blocking assignment with unary logical NOT (!) and unary minus (-).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
