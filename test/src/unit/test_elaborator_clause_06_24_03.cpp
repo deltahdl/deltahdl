@@ -36,4 +36,30 @@ TEST(SimCh6, BitStreamArrayToInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
+// §6.24.3: Bit-stream cast packs shortint array into 32-bit int.
+TEST(SimCh6, BitStreamShortArrayToInt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  shortint arr [2];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    arr[0] = 16'hCAFE;\n"
+      "    arr[1] = 16'hBABE;\n"
+      "    result = int'(arr);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  // 0xCAFE at MSBs, 0xBABE at LSBs → 0xCAFEBABE.
+  EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEu);
+}
+
 }  // namespace
