@@ -437,4 +437,17 @@ TEST(ParserSection11, Sec11_4_1_BitSelectInContAssignLhs) {
   EXPECT_EQ(ca->assign_lhs->index_end, nullptr);
 }
 
+// --- Packed struct continuous assignment ---
+TEST(ParserSection7, Sec7_2_1_PackedContAssign) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct packed {\n"
+              "    logic [7:0] a;\n"
+              "    logic [7:0] b;\n"
+              "  } pair_t;\n"
+              "  pair_t p;\n"
+              "  assign p = 16'h1234;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

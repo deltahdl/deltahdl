@@ -60,19 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// --- Packed struct continuous assignment ---
-TEST(ParserSection7, Sec7_2_1_PackedContAssign) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct packed {\n"
-              "    logic [7:0] a;\n"
-              "    logic [7:0] b;\n"
-              "  } pair_t;\n"
-              "  pair_t p;\n"
-              "  assign p = 16'h1234;\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // LRM section 7.2.2 -- Assigning to structures
 // =============================================================================
