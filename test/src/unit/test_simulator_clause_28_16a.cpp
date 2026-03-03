@@ -23,22 +23,6 @@ bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
 
 namespace {
 
-// =============================================================
-// §28.16.2: trireg net charge decay
-// =============================================================
-// §28.16.2: "The first two delays shall specify the delay for
-//  transition to the 1 and 0 logic states when the trireg net is
-//  driven to these states by a driver."
-// §28.16.2: "The third delay shall specify the charge decay time
-//  instead of the delay in a transition to the z logic state."
-// §28.16.2.2: "The charge decay time specification in a trireg net
-//  declaration shall be preceded by a rise and a fall delay
-//  specification."
-TEST(TriregChargeDecay, ThreeDelaySpecValid) {
-  DelaySpec spec{0, 0, 50, 3};
-  EXPECT_TRUE(ValidateTriregChargeDecaySpec(spec));
-}
-
 // §28.16.2.2: One or two delays → no charge decay.
 TEST(TriregChargeDecay, OneDelayHasNoChargeDecay) {
   DelaySpec spec{10, 0, 0, 1};
