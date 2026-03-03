@@ -41,23 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.3.2 -- Operator precedence (complex expression)
-// =========================================================================
-TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a + b * c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  // * has higher precedence than +, so top-level is +
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
-}
-
 TEST(ParserSection11, OperatorPrecedenceMixedArithRhs) {
   auto r = Parse(
       "module t;\n"
