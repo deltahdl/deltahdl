@@ -25,17 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, TypesEquivalentDiffSignedness) {
-  // §6.22.1: Same kind but different signedness is not equivalent.
-  DataType a;
-  a.kind = DataTypeKind::kInt;
-  a.is_signed = true;
-  DataType b;
-  b.kind = DataTypeKind::kInt;
-  b.is_signed = false;
-  EXPECT_FALSE(TypesEquivalent(a, b));
-}
-
 // =========================================================================
 // §6.22.2: Type compatibility rules — packed width comparison
 // =========================================================================

@@ -17,4 +17,15 @@ TEST(ParserSection6, TypesNotEquivalentDifferentSign) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
+TEST(ParserSection6, TypesEquivalentDiffSignedness) {
+  // §6.22.1: Same kind but different signedness is not equivalent.
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  b.is_signed = false;
+  EXPECT_FALSE(TypesEquivalent(a, b));
+}
+
 }  // namespace
