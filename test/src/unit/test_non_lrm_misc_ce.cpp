@@ -35,18 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-TEST(ParserSection11, PostfixDecrementParses) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a--;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-}
-
 TEST(ParserSection11, PostfixDecrementOp) {
   auto r = Parse(
       "module t;\n"
