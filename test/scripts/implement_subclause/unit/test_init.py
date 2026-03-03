@@ -158,14 +158,15 @@ def test_main_dispatches_depth_1(_mock_check, mock_run, tmp_path):
 @patch("implement_subclause.run_prompt")
 @patch("implement_subclause.check_supplementary_args")
 def test_main_passes_overviews(_mock_check, mock_run, tmp_path):
-    """main() passes --overviews to the handler."""
+    """main() includes overview lines in the supplementary string."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
     main([
         "--lrm", str(lrm), "--subclause", "4.1", "--issue", "8",
         "--overviews", "4.1,4.4",
     ])
-    assert mock_run.call_args[0][0].keywords["overviews"] == ["4.1", "4.4"]
+    supp = mock_run.call_args[0][0].keywords["supplementary"]
+    assert "Thoroughly understand 4.1" in supp
 
 
 @patch("implement_subclause.run_prompt")

@@ -6,6 +6,7 @@ import pytest
 
 from implement_subclause import (
     build_hierarchy,
+    build_overview_lines,
     build_supplementary_lines,
     check_supplementary_args,
     format_prompt,
@@ -380,40 +381,27 @@ def test_format_prompt_includes_supplementary():
     assert "Table 4-1" in result
 
 
-def test_format_prompt_includes_single_overview():
-    """Single overview subclause appears in the formatted prompt."""
-    result = format_prompt(
-        "- hierarchy\n", "4.4.3.1", "~/LRM.txt",
-        issue=6, overviews=["4.1"],
-    )
+def test_build_overview_lines_single():
+    """Single overview generates one line."""
+    result = build_overview_lines(["4.1"], "~/LRM.txt")
+    assert result == "- Thoroughly understand 4.1 per LRM in ~/LRM.txt"
+
+
+def test_build_overview_lines_multiple_includes_first():
+    """First overview appears when multiple are provided."""
+    result = build_overview_lines(["4.1", "4.4"], "~/LRM.txt")
     assert "Thoroughly understand 4.1 per LRM" in result
 
 
-def test_format_prompt_includes_first_of_multiple_overviews():
-    """First overview subclause appears when multiple are provided."""
-    result = format_prompt(
-        "- hierarchy\n", "4.4.3.1", "~/LRM.txt",
-        issue=6, overviews=["4.1", "4.4"],
-    )
-    assert "Thoroughly understand 4.1 per LRM" in result
-
-
-def test_format_prompt_includes_second_of_multiple_overviews():
-    """Second overview subclause appears when multiple are provided."""
-    result = format_prompt(
-        "- hierarchy\n", "4.4.3.1", "~/LRM.txt",
-        issue=6, overviews=["4.1", "4.4"],
-    )
+def test_build_overview_lines_multiple_includes_second():
+    """Second overview appears when multiple are provided."""
+    result = build_overview_lines(["4.1", "4.4"], "~/LRM.txt")
     assert "Thoroughly understand 4.4 per LRM" in result
 
 
-def test_format_prompt_excludes_overviews_by_default():
-    """No overview line appears when overviews is not provided."""
-    result = format_prompt(
-        "- hierarchy\n", "4.1", "~/LRM.txt",
-        issue=6,
-    )
-    assert "Thoroughly understand 4.1 per LRM" not in result
+def test_build_overview_lines_empty():
+    """Empty list returns empty string."""
+    assert build_overview_lines([], "~/LRM.txt") == ""
 
 
 # ---- invoke_claude --------------------------------------------------------

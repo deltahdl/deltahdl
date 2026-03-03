@@ -104,10 +104,11 @@ class TestPromptVW:
         prompt = build_v_w("4.1", _TITLES, "~/LRM.txt", issue=6)
         assert not _check_common_structure(prompt, "4.1", 6)
 
-    def test_overviews_propagated(self):
-        """Overview subclauses appear in the prompt."""
+    def test_overviews_via_supplementary(self):
+        """Overview lines passed via supplementary appear in the prompt."""
         prompt = build_v_w(
-            "4.1", _TITLES, "~/LRM.txt", issue=6, overviews=["4.1"],
+            "4.1", _TITLES, "~/LRM.txt", issue=6,
+            supplementary="- Thoroughly understand 4.1 per LRM\n",
         )
         assert "Thoroughly understand 4.1 per LRM" in prompt
 
