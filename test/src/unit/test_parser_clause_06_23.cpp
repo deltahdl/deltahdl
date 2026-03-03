@@ -304,4 +304,29 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefExprIdent) {
   EXPECT_EQ(ref->text, "x");
 }
 
+// 6. var type(binary_expr) stores a binary expression reference.
+TEST(ParserSection6, Sec6_11_1_VarTypeRefBinaryExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  real a, b;\n"
+      "  var type(a + b) c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  // a, b are separate VarDecl items, c is the type(a+b) item.
+  ModuleItem* c_item = nullptr;
+  for (auto* item : items) {
+    if (item->name == "c") {
+      c_item = item;
+      break;
+    }
+  }
+  ASSERT_NE(c_item, nullptr);
+  EXPECT_EQ(c_item->kind, ModuleItemKind::kVarDecl);
+  auto* ref = c_item->data_type.type_ref_expr;
+  ASSERT_NE(ref, nullptr);
+  EXPECT_EQ(ref->kind, ExprKind::kBinary);
+}
+
 }  // namespace
