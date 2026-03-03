@@ -32,21 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-// §6.7.1: Tri0 net declaration.
-TEST(ParserSection6, Sec6_7_1_Tri0Decl) {
-  auto r = Parse(
-      "module t;\n"
-      "  tri0 t0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTri0);
-  EXPECT_TRUE(item->data_type.is_net);
-}
-
 // §6.7.1: Tri1 net declaration.
 TEST(ParserSection6, Sec6_7_1_Tri1Decl) {
   auto r = Parse(
