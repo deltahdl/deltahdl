@@ -886,4 +886,24 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithReplication) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kReplicate);
 }
 
+// --- Ternary with bit-select operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithBitSelectOperands) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial x = sel ? a[3] : b[3];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kSelect);
+  EXPECT_EQ(rhs->true_expr->index_end, nullptr);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kSelect);
+  EXPECT_EQ(rhs->false_expr->index_end, nullptr);
+}
+
 }  // namespace
