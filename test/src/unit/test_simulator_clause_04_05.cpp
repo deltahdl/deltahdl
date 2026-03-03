@@ -216,4 +216,28 @@ TEST(SimCh45, ActiveSetIterationReExecutesActiveAfterInactive) {
   EXPECT_EQ(order[1], "active_from_inactive");
 }
 
+// ---------------------------------------------------------------------------
+// §4.5 Active set iteration: NBA generates Active event -> re-iterates.
+// An NBA callback schedules an Active event; Active set must re-iterate.
+// ---------------------------------------------------------------------------
+TEST(SimCh45, ActiveSetReIteratesWhenNBAGeneratesActiveEvent) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* nba = sched.GetEventPool().Acquire();
+  nba->callback = [&]() {
+    order.push_back("nba");
+    auto* new_active = sched.GetEventPool().Acquire();
+    new_active->callback = [&]() { order.push_back("active_from_nba"); };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, new_active);
+  };
+  sched.ScheduleEvent({0}, Region::kNBA, nba);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 2u);
+  EXPECT_EQ(order[0], "nba");
+  EXPECT_EQ(order[1], "active_from_nba");
+}
+
 }  // namespace
