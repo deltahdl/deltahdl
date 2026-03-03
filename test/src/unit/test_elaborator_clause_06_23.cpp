@@ -242,4 +242,26 @@ TEST(SimCh6b, TypeOpPreservesSignedInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
+// 9. type() preserves unsigned flag from scalar logic source.
+TEST(SimCh6b, TypeOpPreservesUnsignedLogic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a;\n"
+      "  var type(a) result;\n"
+      "  initial result = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->is_signed);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace
