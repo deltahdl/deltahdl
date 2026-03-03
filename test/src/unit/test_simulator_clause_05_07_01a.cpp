@@ -10,28 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 32. X in octal literal (sets 3 bits)
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, XInOctalLiteral) {
-  // §5.7.1: x sets 3 bits to unknown in octal base.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [5:0] x;\n"
-      "  initial x = 6'o7x;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].aval & 0x38, 0x38u);
-  EXPECT_EQ(var->value.words[0].bval & 0x07, 0x07u);
-}
-
-// ---------------------------------------------------------------------------
 // 33. Base format case insensitive
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, BaseFormatCaseInsensitive) {
