@@ -646,4 +646,14 @@ TEST(ParserSection6, TypeRefInferWidth) {
   EXPECT_EQ(InferExprWidth(ref, typedefs), 32u);
 }
 
+// Step 3a: var type(expr) declarations (fixes 6.23-type_op)
+TEST(ParserSection6, VarTypeOp_Basic) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  real a = 4.76;\n"
+               "  real b = 0.74;\n"
+               "  var type(a+b) c;\n"
+               "endmodule\n"));
+}
+
 }  // namespace
