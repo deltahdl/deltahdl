@@ -152,4 +152,29 @@ TEST(ParserCh501, Sec5_1_MultipleStatementsOnOneLine) {
   EXPECT_EQ(item->body->stmts.size(), 3u);
 }
 
+// =========================================================================
+// Statement spanning many lines
+// =========================================================================
+TEST(ParserCh501, Sec5_1_StatementSpanningManyLines) {
+  // A single continuous assignment split across many lines.
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c, d;\n"
+      "  assign\n"
+      "    a\n"
+      "    =\n"
+      "    b\n"
+      "    +\n"
+      "    c\n"
+      "    +\n"
+      "    d\n"
+      "    ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  // The declarations produce 4 items (a,b,c,d) and the assign produces 1.
+  ASSERT_GE(r.cu->modules[0]->items.size(), 5u);
+  auto* assign_item = r.cu->modules[0]->items[4];
+  EXPECT_EQ(assign_item->kind, ModuleItemKind::kContAssign);
+}
+
 }  // namespace
