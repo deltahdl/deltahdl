@@ -496,4 +496,25 @@ TEST(SimCh6b, TypeOpIntOverflow) {
   EXPECT_EQ(var->value.ToUint64(), 0x12345678u);
 }
 
+// 20. type() on int, verify both source and destination have same width.
+TEST(SimCh6b, TypeOpMatchingWidths) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  var type(a) b;\n"
+      "  initial begin\n"
+      "    a = 0;\n"
+      "    b = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Variable* va = nullptr;
+  Variable* vb = nullptr;
+  LowerRunAndCompareWidths(f, design, va, vb);
+  EXPECT_EQ(va->is_signed, vb->is_signed);
+}
+
 }  // namespace
