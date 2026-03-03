@@ -1,7 +1,6 @@
-// §4.9.5: Switch (transistor) processing
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -9,7 +8,6 @@
 using namespace delta;
 
 // --- Local types for switch processing ---
-
 enum class SwitchKind : uint8_t {
   kTran,
   kRtran,
@@ -28,7 +26,6 @@ struct SwitchInst {
 };
 
 // --- Implementation ---
-
 static bool SwitchConducts(SwitchKind kind, Logic4Word control) {
   uint8_t c_aval = control.aval & 1;
   uint8_t c_bval = control.bval & 1;
@@ -158,7 +155,6 @@ void ResolveSwitchNetwork(std::vector<SwitchInst>& switches, Arena& /*arena*/) {
 }
 
 // --- Helpers ---
-
 static Net MakeNet1(Arena& arena, Variable* var, uint64_t val) {
   Net net;
   net.type = NetType::kWire;
@@ -185,8 +181,11 @@ static uint8_t ValOf(const Variable& v) {
 }
 
 static constexpr uint8_t kVal0 = 0;
+
 static constexpr uint8_t kVal1 = 1;
+
 static constexpr uint8_t kValX = 2;
+
 static constexpr uint8_t kValZ = 3;
 
 struct NetPair {
@@ -210,16 +209,6 @@ static NetPair MakeNetPair(uint64_t a_val) {
 
 namespace {
 
-// --- Bidirectional signal flow ---
-
-TEST(SwitchProcessing, TranPropagatesDrivenToUndriven) {
-  auto np = MakeNetPair(1);
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTran, {}, false});
-  ResolveSwitchNetwork(sw, np.arena);
-  EXPECT_EQ(ValOf(*np.vb), kVal1);
-}
-
 TEST(SwitchProcessing, TranBidirectionalPropagation) {
   Arena arena;
   auto* va = arena.Create<Variable>();
@@ -237,7 +226,6 @@ TEST(SwitchProcessing, TranBidirectionalPropagation) {
 }
 
 // --- Coordinated processing ---
-
 TEST(SwitchProcessing, NetworkResolvesAllDevicesTogether) {
   Arena arena;
   auto* va = arena.Create<Variable>();
@@ -260,7 +248,6 @@ TEST(SwitchProcessing, NetworkResolvesAllDevicesTogether) {
 }
 
 // --- tranif1 / tranif0 control semantics ---
-
 TEST(SwitchProcessing, Tranif1ConductsWhenControlHigh) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
@@ -294,7 +281,6 @@ TEST(SwitchProcessing, Tranif0BlocksWhenControlHigh) {
 }
 
 // --- Built-in net type, x/z control: exhaustive combination ---
-
 TEST(SwitchProcessing, BuiltinNetXControlNonUniqueProducesX) {
   auto np = MakeNetPair(1);
   // control = x: on->b=1, off->b=z. Not unique -> x.
@@ -314,7 +300,6 @@ TEST(SwitchProcessing, BuiltinNetZControlNonUniqueProducesX) {
 }
 
 // --- User-defined net type, x/z control: treated as off ---
-
 TEST(SwitchProcessing, UserDefinedNetXControlTreatedAsOff) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
@@ -332,7 +317,6 @@ TEST(SwitchProcessing, UserDefinedNetZControlTreatedAsOff) {
 }
 
 // --- User-defined net type: on -> single net, off -> separate ---
-
 TEST(SwitchProcessing, UserDefinedNetControlOnSingleNet) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
