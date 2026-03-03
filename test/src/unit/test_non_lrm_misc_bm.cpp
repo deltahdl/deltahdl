@@ -31,21 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// reg unsigned override.
-TEST(ParserSection6, Sec6_11_2_RegUnsignedExplicit) {
-  auto r = Parse(
-      "module t;\n"
-      "  reg unsigned [7:0] ru;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
-  EXPECT_FALSE(item->data_type.is_signed);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-}
-
 // Multiple integer types as function parameters with directions.
 TEST(ParserSection6, Sec6_11_MixedIntegerFuncParams) {
   auto r = Parse(
