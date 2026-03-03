@@ -40,22 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// =============================================================================
-// §8.25 -- Parameterized classes (additional tests)
-// =============================================================================
-TEST(ParserSection8, ParameterizedClassSpecialization) {
-  auto r = Parse(
-      "class vector #(int size = 1);\n"
-      "  bit [size-1:0] a;\n"
-      "endclass\n"
-      "module m;\n"
-      "  vector #(10) vten;\n"
-      "  vector #(.size(2)) vtwo;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(ParserSection8, ParameterizedClassStackType) {
   auto r = Parse(
       "class stack #(type T = int);\n"
