@@ -701,4 +701,32 @@ TEST(SimCh9e, IffPreservesPreviousValueWhenSuppressed) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
+// §9.4.2.4: Verify result .width is correct after iff-guarded update.
+TEST(SimCh9e, ResultWidthAfterIffUpdate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, en;\n"
+      "  logic [15:0] result;\n"
+      "  initial begin\n"
+      "    clk = 0; en = 1; result = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk iff en)\n"
+      "    result = 16'hABCD;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 16u);
+  EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
+}
+
 }  // namespace
