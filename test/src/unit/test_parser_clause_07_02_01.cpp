@@ -598,4 +598,15 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberSignedType) {
   EXPECT_FALSE(item->typedef_type.struct_members[1].is_signed);
 }
 
+// --- Packed struct as port type (inline struct in port list) ---
+TEST(ParserSection7, Sec7_2_1_PackedAsPortType) {
+  EXPECT_TRUE(ParseOk(
+      "module inner(\n"
+      "  input struct packed { logic [7:0] a; logic [7:0] b; } data_in,\n"
+      "  output logic [15:0] data_out\n"
+      ");\n"
+      "  assign data_out = data_in;\n"
+      "endmodule\n"));
+}
+
 }  // namespace

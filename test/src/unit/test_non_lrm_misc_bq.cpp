@@ -60,17 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// --- Packed struct as port type (inline struct in port list) ---
-TEST(ParserSection7, Sec7_2_1_PackedAsPortType) {
-  EXPECT_TRUE(ParseOk(
-      "module inner(\n"
-      "  input struct packed { logic [7:0] a; logic [7:0] b; } data_in,\n"
-      "  output logic [15:0] data_out\n"
-      ");\n"
-      "  assign data_out = data_in;\n"
-      "endmodule\n"));
-}
-
 // --- Packed struct indexed part-select minus ---
 TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectMinus) {
   auto r = Parse(
