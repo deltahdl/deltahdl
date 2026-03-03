@@ -200,4 +200,46 @@ TEST(SimCh4095, RelaxationTechnique) {
   EXPECT_EQ(iterations, 2);
 }
 
+// ---------------------------------------------------------------------------
+// §4.9.5 — Switch processing intermingled with other active events
+// ---------------------------------------------------------------------------
+TEST(SimCh4095, IntermingledWithOtherActiveEvents) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  // Schedule a switch processing event and other active events at the same
+  // time. All execute in the Active region, intermingled.
+  auto* switch_proc = sched.GetEventPool().Acquire();
+  switch_proc->kind = EventKind::kEvaluation;
+  switch_proc->callback = [&]() { order.push_back("switch_process"); };
+  sched.ScheduleEvent({0}, Region::kActive, switch_proc);
+
+  auto* gate_eval = sched.GetEventPool().Acquire();
+  gate_eval->kind = EventKind::kEvaluation;
+  gate_eval->callback = [&]() { order.push_back("gate_eval"); };
+  sched.ScheduleEvent({0}, Region::kActive, gate_eval);
+
+  auto* proc_stmt = sched.GetEventPool().Acquire();
+  proc_stmt->kind = EventKind::kEvaluation;
+  proc_stmt->callback = [&]() { order.push_back("proc_stmt"); };
+  sched.ScheduleEvent({0}, Region::kActive, proc_stmt);
+
+  sched.Run();
+  // All three events execute in the same time slot (order is
+  // nondeterministic per §4.7, but all must execute).
+  ASSERT_EQ(order.size(), 3u);
+  bool has_switch = false;
+  bool has_gate = false;
+  bool has_proc = false;
+  for (const auto& s : order) {
+    if (s == "switch_process") has_switch = true;
+    if (s == "gate_eval") has_gate = true;
+    if (s == "proc_stmt") has_proc = true;
+  }
+  EXPECT_TRUE(has_switch);
+  EXPECT_TRUE(has_gate);
+  EXPECT_TRUE(has_proc);
+}
+
 }  // namespace
