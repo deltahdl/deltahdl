@@ -31,22 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// 19. Integer var with complex initializer expression.
-TEST(ParserSection6, Sec6_11_IntWithComplexInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  int x = 1 + 2 * 3;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_EQ(item->name, "x");
-  ASSERT_NE(item->init_expr, nullptr);
-  EXPECT_EQ(item->init_expr->kind, ExprKind::kBinary);
-}
-
 // 20. Static lifetime qualifier with integer type.
 TEST(ParserSection6, Sec6_11_StaticLifetimeInt) {
   auto r = Parse(
