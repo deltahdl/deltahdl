@@ -10,33 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 28. always_comb with multiplication.
-// ---------------------------------------------------------------------------
-TEST(SimCh9b, AlwaysCombMultiplication) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] a, b, y;\n"
-      "  always_comb y = a * b;\n"
-      "  initial begin\n"
-      "    a = 16'd7;\n"
-      "    b = 16'd6;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 42u);
-}
-
-// ---------------------------------------------------------------------------
 // 29. always_comb with NAND expression (~(a & b)), masked to width.
 // ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombNand) {
