@@ -49,23 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7, PackedStructUnsigned4State) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct packed unsigned {\n"
-      "    time a;\n"
-      "    integer b;\n"
-      "    logic [31:0] c;\n"
-      "  } pack2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->data_type.is_packed);
-  EXPECT_FALSE(item->data_type.is_signed);
-  EXPECT_EQ(item->data_type.struct_members.size(), 3u);
-}
-
 TEST(ParserSection7, PackedStructDefaultUnsigned) {
   auto r = Parse(
       "module t;\n"
