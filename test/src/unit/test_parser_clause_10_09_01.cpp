@@ -202,4 +202,47 @@ TEST(ParserSection11, Sec11_1_AssignmentPatternExpression) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
+struct ParseResult7b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ModuleItem* FirstItem(ParseResult7b& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// --- Test helpers ---
+struct ParseResult7c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult7c Parse(const std::string& src) {
+  ParseResult7c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+TEST(ParserSection7, AssignmentPatternPositional) {
+  auto r = Parse(
+      "module t;\n"
+      "  int C[3] = '{10, 20, 30};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_NE(item->init_expr, nullptr);
+  EXPECT_EQ(item->init_expr->kind, ExprKind::kAssignmentPattern);
+}
+
 }  // namespace

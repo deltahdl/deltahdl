@@ -49,18 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7, AssignmentPatternPositional) {
-  auto r = Parse(
-      "module t;\n"
-      "  int C[3] = '{10, 20, 30};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->init_expr, nullptr);
-  EXPECT_EQ(item->init_expr->kind, ExprKind::kAssignmentPattern);
-}
-
 // =========================================================================
 // §7.2.1: Packed structures
 // =========================================================================
