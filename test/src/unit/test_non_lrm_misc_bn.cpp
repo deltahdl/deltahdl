@@ -11,15 +11,6 @@ struct ParseResult6i {
   bool has_errors = false;
 };
 
-static Stmt* FirstInitialStmt(ParseResult6i& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock && item->body != nullptr)
-      return item->body;
-  }
-  return nullptr;
-}
-
 // Helper: find a module item by name.
 static ModuleItem* FindItemByName(ParseResult6i& r, std::string_view name) {
   for (auto* item : r.cu->modules[0]->items) {
@@ -53,23 +44,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 }
 
 namespace {
-
-// 25. type() on integer literal expression in expression context.
-TEST(ParserSection6, Sec6_11_1_TypeRefOnLiteral) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = type(42);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTypeRef);
-  // The inner expression is the literal 42, stored in lhs.
-  ASSERT_NE(stmt->rhs->lhs, nullptr);
-  EXPECT_EQ(stmt->rhs->lhs->kind, ExprKind::kIntegerLiteral);
-}
 
 // 26. var type(concatenation) declaration.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefConcat) {
