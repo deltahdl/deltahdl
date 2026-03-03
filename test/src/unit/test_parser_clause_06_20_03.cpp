@@ -43,4 +43,15 @@ TEST(ParserA24, TypeAssignmentComplexType) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =============================================================================
+// Section 8.10 -- Type parameters
+// =============================================================================
+// Module with type parameter.
+TEST(ParserSection8, TypeParameterModule) {
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter type T = int);\n"
+              "  T data;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

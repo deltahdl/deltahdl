@@ -22,17 +22,6 @@ static ParseResult8b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// Section 8.10 -- Type parameters
-// =============================================================================
-// Module with type parameter.
-TEST(ParserSection8, TypeParameterModule) {
-  EXPECT_TRUE(
-      ParseOk("module m #(parameter type T = int);\n"
-              "  T data;\n"
-              "endmodule\n"));
-}
-
 // Module with type parameter defaulting to logic vector.
 TEST(ParserSection8, TypeParameterLogicVector) {
   EXPECT_TRUE(
