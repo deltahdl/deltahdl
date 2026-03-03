@@ -131,4 +131,11 @@ TEST(ParserSection11, RelationalGtEq) {
   EXPECT_EQ(rhs->op, TokenKind::kGtEq);
 }
 
+TEST(Eval, Comparison) {
+  ExprFixture f;
+  auto* expr = ParseExprFrom("5 > 3", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
