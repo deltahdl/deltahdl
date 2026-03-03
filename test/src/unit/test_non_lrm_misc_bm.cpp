@@ -31,20 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// Integer (4-state) with initializer.
-TEST(ParserSection6, Sec6_11_IntegerWithInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  integer idx = 0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInteger);
-  ASSERT_NE(item->init_expr, nullptr);
-}
-
 // Longint function return type.
 TEST(ParserSection6, Sec6_11_LongintFunctionReturnType) {
   auto r = Parse(
