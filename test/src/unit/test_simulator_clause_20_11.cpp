@@ -176,4 +176,22 @@ TEST(SvaEngine, FailOffSkipsFailAction) {
   EXPECT_FALSE(fail_called);
 }
 
+TEST(SvaEngine, KillClearsPendingAssertions) {
+  SvaFixture f;
+  int count = 0;
+
+  for (int i = 0; i < 3; ++i) {
+    DeferredAssertion da;
+    da.condition_val = 1;
+    da.instance_name = "killed_inst";
+    da.pass_action = [&count]() { ++count; };
+    f.engine.QueueDeferredAssertion(da);
+  }
+
+  f.engine.KillAssertionsForInstance("killed_inst");
+  f.engine.FlushDeferredAssertions(f.scheduler, SimTime{0});
+  f.scheduler.Run();
+  EXPECT_EQ(count, 0);
+}
+
 }  // namespace
