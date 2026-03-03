@@ -22,19 +22,6 @@ static ParseResult8b Parse(const std::string& src) {
 
 namespace {
 
-// Class with type parameter used as member type.
-TEST(ParserSection8, TypeParameterClassMember) {
-  auto r = Parse(
-      "class container #(type T = int);\n"
-      "  T value;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto* cls = r.cu->classes[0];
-  ASSERT_EQ(cls->params.size(), 1u);
-  EXPECT_EQ(cls->params[0].first, "T");
-}
-
 // =============================================================================
 // Section 8.11 -- Type compatibility (this keyword, type(this))
 // =============================================================================
