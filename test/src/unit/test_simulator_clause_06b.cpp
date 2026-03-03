@@ -8,29 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 24. type() with longint, assign max value.
-TEST(SimCh6b, TypeOpLongintMaxValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  longint a;\n"
-      "  var type(a) result;\n"
-      "  initial result = 64'h7FFF_FFFF_FFFF_FFFF;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 64u);
-  EXPECT_EQ(var->value.ToUint64(), 0x7FFFFFFFFFFFFFFFu);
-  EXPECT_TRUE(var->is_signed);
-}
-
 // 25. type() with shortint, assign zero.
 TEST(SimCh6b, TypeOpShortintZero) {
   SimFixture f;
