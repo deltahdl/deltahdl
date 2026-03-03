@@ -81,4 +81,9 @@ TEST(ForceRelease, LegalTargetConstBitSelectNet) {
   EXPECT_TRUE(ValidateForceTarget(info));
 }
 
+TEST(ForceRelease, LegalTargetConstPartSelectNet) {
+  ForceInfo info{ForceTarget::kConstPartSelectNet};
+  EXPECT_TRUE(ValidateForceTarget(info));
+}
+
 }  // namespace
