@@ -45,4 +45,23 @@ TEST(SimCh6, NettypeCreatesNet) {
   ASSERT_NE(net, nullptr);
 }
 
+// §6.6.7: Nettype with 16-bit type creates correctly-sized net.
+TEST(SimCh6, NettypeWideNet) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic [15:0] wide_net;\n"
+      "  wide_net y;\n"
+      "  assign y = 16'hBEEF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* mod = design->top_modules[0];
+  bool found_net = false;
+  VerifyNetByName(mod, "y", 16u, found_net);
+  EXPECT_TRUE(found_net) << "y should be elaborated as a net";
+}
+
 }  // namespace
