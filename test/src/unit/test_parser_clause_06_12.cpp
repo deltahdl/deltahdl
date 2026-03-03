@@ -268,4 +268,14 @@ TEST(ParserSection6, MultipleRealDecls) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
+TEST(ParserSection6, AllRealTypes) {
+  // All three real-family types in one module
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  shortreal sr;\n"
+              "  realtime rt;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

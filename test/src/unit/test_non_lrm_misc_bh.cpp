@@ -30,16 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, AllRealTypes) {
-  // All three real-family types in one module
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r;\n"
-              "  shortreal sr;\n"
-              "  realtime rt;\n"
-              "endmodule\n"));
-}
-
 // --- Real literals (LRM 5.7/5.8, used with §6.12 types) ---
 TEST(ParserSection6, RealLiteralDecimalPoint) {
   // Standard decimal point real literal
