@@ -41,4 +41,13 @@ TEST(Parser, ClassExtends) {
   EXPECT_EQ(cls->base_class, "parent");
 }
 
+// Class with extends.
+TEST(SourceText, ClassWithExtends) {
+  auto r = Parse("class Child extends Parent; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->base_class, "Parent");
+}
+
 }  // namespace

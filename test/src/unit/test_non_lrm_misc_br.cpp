@@ -17,15 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// Class with extends.
-TEST(SourceText, ClassWithExtends) {
-  auto r = Parse("class Child extends Parent; endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->base_class, "Parent");
-}
-
 // =============================================================================
 // A.1.2 class_declaration — additional forms
 // =============================================================================
