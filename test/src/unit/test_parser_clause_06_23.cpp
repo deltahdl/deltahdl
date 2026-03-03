@@ -474,4 +474,30 @@ TEST(ParserSection6, Sec6_11_1_TypeRefPackedArray) {
               "endmodule\n"));
 }
 
+// Helper: find a module item by name.
+static ModuleItem* FindItemByName(ParseResult6i& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->name == name) return item;
+  }
+  return nullptr;
+}
+
+// 22. var type(expr) with ternary expression.
+TEST(ParserSection6, Sec6_11_1_VarTypeRefTernary) {
+  auto r = Parse(
+      "module t;\n"
+      "  int a;\n"
+      "  real b;\n"
+      "  var type(1 ? a : b) c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* c_item = FindItemByName(r, "c");
+  ASSERT_NE(c_item, nullptr);
+  EXPECT_EQ(c_item->kind, ModuleItemKind::kVarDecl);
+  auto* ref = c_item->data_type.type_ref_expr;
+  ASSERT_NE(ref, nullptr);
+  EXPECT_EQ(ref->kind, ExprKind::kTernary);
+}
+
 }  // namespace
