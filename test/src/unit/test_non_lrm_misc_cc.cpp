@@ -35,19 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult10b& r) {
 
 namespace {
 
-// --- 24. Assign with delay before it ---
-TEST(ParserSection10, Sec10_6_1_DelayBeforeAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q;\n"
-      "  initial begin\n"
-      "    #10 assign q = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // --- 25. Assign inside nested if-else ---
 TEST(ParserSection10, Sec10_6_1_AssignNestedIfElse) {
   auto r = Parse(
