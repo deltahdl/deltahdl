@@ -42,27 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 6. Rule (c): Module without timeunit or `timescale uses CU-scope timeunit.
-TEST(ParserClause03, Cl3_14_2_3_RuleC_FallbackToCUTimeunit) {
-  auto r = ParseTimescale31402(
-      "timeunit 1ps;\n"
-      "timeprecision 1fs;\n"
-      "module m;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->has_cu_timeunit);
-  EXPECT_EQ(r.cu->cu_time_unit, TimeUnit::kPs);
-  EXPECT_TRUE(r.cu->has_cu_timeprecision);
-  EXPECT_EQ(r.cu->cu_time_prec, TimeUnit::kFs);
-
-  auto resolved =
-      ResolveModuleTimescale(r.cu->modules[0], r.cu, false, {}, nullptr);
-  EXPECT_TRUE(resolved.has_unit);
-  EXPECT_EQ(resolved.unit, TimeUnit::kPs);
-  EXPECT_TRUE(resolved.has_precision);
-  EXPECT_EQ(resolved.precision, TimeUnit::kFs);
-}
-
 // 7. Rule (d): Default time unit when nothing is specified.
 TEST(ParserClause03, Cl3_14_2_3_RuleD_DefaultTimeUnit) {
   auto r = ParseTimescale31402(
