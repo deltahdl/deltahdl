@@ -52,11 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh505, Operator_CaseInequality) {
-  // !== is the case inequality operator.
-  EXPECT_TRUE(ParseOk("module m; initial x = (a !== b); endmodule"));
-}
-
 TEST(ParserCh505, Operator_ReductionAnd) {
   auto r = Parse(
       "module m;\n"

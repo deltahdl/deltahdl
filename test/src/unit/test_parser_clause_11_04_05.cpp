@@ -260,4 +260,9 @@ TEST(ParserCh505, Operator_CaseEquality) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
 }
 
+TEST(ParserCh505, Operator_CaseInequality) {
+  // !== is the case inequality operator.
+  EXPECT_TRUE(ParseOk("module m; initial x = (a !== b); endmodule"));
+}
+
 }  // namespace
