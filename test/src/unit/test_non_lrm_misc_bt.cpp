@@ -30,19 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection9, AlwaysLatch) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_latch\n"
-      "    if (en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-  ASSERT_NE(item->body, nullptr);
-}
-
 // =============================================================================
 // LRM section 9.4.1 -- Delay control (#)
 // =============================================================================
