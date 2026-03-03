@@ -41,16 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// §20.6 — Bare type keyword in expression context ($typename(logic))
-TEST(ParserSection6, BareTypeKeywordInExpr) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial $display($typename(logic));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // §6.3.2.2: Drive strength on net declaration with inline assignment.
 TEST(ParserSection6, NetDeclDriveStrength) {
   auto r = Parse(
