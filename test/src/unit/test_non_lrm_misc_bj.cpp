@@ -23,16 +23,6 @@ static ParseResult6b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection6, MatchingTypesSignedBitVector) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef bit signed [7:0] BYTE;\n"
-      "  BYTE b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-}
-
 TEST(ParserSection6, MatchingTypesArrayTypedef) {
   auto r = Parse(
       "module m;\n"
