@@ -249,4 +249,18 @@ TEST(ParserSection6, Sec6_11_Int2DUnpackedArray) {
   ASSERT_GE(item->unpacked_dims.size(), 2u);
 }
 
+// Integer type with unpacked dimension using range notation.
+TEST(ParserSection6, Sec6_11_IntUnpackedRangeNotation) {
+  auto r = Parse(
+      "module t;\n"
+      "  int data [0:7];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
 }  // namespace
