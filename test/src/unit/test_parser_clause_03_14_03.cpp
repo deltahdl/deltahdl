@@ -162,4 +162,19 @@ TEST(ParserClause03, Cl3_14_3_MinOfTimeprecisionStatements) {
   EXPECT_EQ(gp, TimeUnit::kPs);  // min of ns, ps, us = ps
 }
 
+// 20. Global precision considers timeunit precision argument (slash syntax).
+TEST(ParserClause03, Cl3_14_3_ConsidersTimeunitPrecArg) {
+  auto r = ParseTimescale31402(
+      "module a;\n"
+      "  timeunit 1us / 1fs;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  timeprecision 1ns;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+                                       r.preproc_global_precision);
+  EXPECT_EQ(gp, TimeUnit::kFs);  // min of fs, ns = fs
+}
+
 }  // namespace
