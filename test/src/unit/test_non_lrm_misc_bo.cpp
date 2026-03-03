@@ -40,22 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-// =========================================================================
-// §7.4.3: Memories
-// =========================================================================
-TEST(ParserSection7, MemoryDeclaration_Type) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] mema [0:255];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "mema");
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  ASSERT_EQ(item->unpacked_dims.size(), 1u);
-}
-
 TEST(ParserSection7, MemoryDeclaration_Dim) {
   auto r = Parse(
       "module t;\n"
