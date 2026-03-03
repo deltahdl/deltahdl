@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Lexical, Timeunit_DifferentValues) {
-  // Various time unit values
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  timeunit 100us;\n"
-      "  timeprecision 10ns;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-}
-
 TEST(Lexical, Timeunit_StoredInModuleDecl_Values) {
   // The timeunit/timeprecision values should be stored in ModuleDecl.
   auto r = ParseWithPreprocessor(

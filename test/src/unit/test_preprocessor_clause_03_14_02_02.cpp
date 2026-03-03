@@ -88,4 +88,15 @@ TEST(Lexical, Timeunit_WithSlash) {
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
+TEST(Lexical, Timeunit_DifferentValues) {
+  // Various time unit values
+  auto r = ParseWithPreprocessor(
+      "module top;\n"
+      "  timeunit 100us;\n"
+      "  timeprecision 10ns;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+}
+
 }  // namespace
