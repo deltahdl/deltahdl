@@ -674,4 +674,48 @@ TEST(ParserSection4, Sec4_9_4_ProgramBlockVarAutoDefault) {
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
+// Returns the first function or task declaration from the first module.
+static ModuleItem* FirstFuncOrTask(ParseResult4e& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl)
+      return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// 13. Multiple static vars in same function
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_MultipleStaticVarsInFunc) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic void multi_static();\n"
+      "    static int a = 0;\n"
+      "    static int b = 0;\n"
+      "    static int c = 0;\n"
+      "    a = a + 1;\n"
+      "    b = b + 2;\n"
+      "    c = c + 3;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FirstFuncOrTask(r);
+  ASSERT_NE(fn, nullptr);
+  EXPECT_TRUE(fn->is_automatic);
+  // First three statements should be static variable declarations.
+  ASSERT_GE(fn->func_body_stmts.size(), 3u);
+  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(fn->func_body_stmts[1]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(fn->func_body_stmts[2]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(fn->func_body_stmts[0]->var_is_static);
+  EXPECT_TRUE(fn->func_body_stmts[1]->var_is_static);
+  EXPECT_TRUE(fn->func_body_stmts[2]->var_is_static);
+  EXPECT_EQ(fn->func_body_stmts[0]->var_name, "a");
+  EXPECT_EQ(fn->func_body_stmts[1]->var_name, "b");
+  EXPECT_EQ(fn->func_body_stmts[2]->var_name, "c");
+}
+
 }  // namespace
