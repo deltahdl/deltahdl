@@ -322,4 +322,17 @@ TEST(Parser, DisableStatement) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
+TEST(ParserSection9, DisableIdentStillWorks) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    disable my_block;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
+}
+
 }  // namespace
