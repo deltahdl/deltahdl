@@ -37,4 +37,13 @@ TEST(SysTask, AssertControlDoesNotCrash) {
   EXPECT_EQ(result.width, 1u);
 }
 
+// =============================================================================
+// AssertionControl: $assertoff/$asserton/$assertkill (section 16.13)
+// =============================================================================
+TEST(SvaEngine, AssertionControlDefaultOn) {
+  AssertionControl ctrl;
+  EXPECT_TRUE(ctrl.IsEnabled("inst1"));
+  EXPECT_TRUE(ctrl.IsEnabled("inst2"));
+}
+
 }  // namespace

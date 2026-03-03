@@ -1,11 +1,9 @@
-// §20.11: Assertion control system tasks
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include <cstdint>
 #include <string_view>
 #include <vector>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -29,15 +27,6 @@ struct SvaFixture {
 };
 
 namespace {
-
-// =============================================================================
-// AssertionControl: $assertoff/$asserton/$assertkill (section 16.13)
-// =============================================================================
-TEST(SvaEngine, AssertionControlDefaultOn) {
-  AssertionControl ctrl;
-  EXPECT_TRUE(ctrl.IsEnabled("inst1"));
-  EXPECT_TRUE(ctrl.IsEnabled("inst2"));
-}
 
 TEST(SvaEngine, AssertoffDisablesInstance) {
   AssertionControl ctrl;
