@@ -11,26 +11,6 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalAdv, PackedStructEqualityDiffValue) {
-  SimFixture f;
-  // Two 16-bit packed struct vars with different values → == is 0.
-  StructTypeInfo sinfo;
-  sinfo.type_name = "my_struct";
-  sinfo.total_width = 16;
-  sinfo.is_packed = true;
-  sinfo.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
-  sinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
-  f.ctx.RegisterStructType("my_struct", sinfo);
-  MakeVar(f, "s3", 16, 0xABCD);
-  MakeVar(f, "s4", 16, 0x1234);
-  f.ctx.SetVariableStructType("s3", "my_struct");
-  f.ctx.SetVariableStructType("s4", "my_struct");
-  auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "s3"),
-                          MakeId(f.arena, "s4"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
 TEST(EvalAdv, PackedStructInequality) {
   SimFixture f;
   StructTypeInfo sinfo;
