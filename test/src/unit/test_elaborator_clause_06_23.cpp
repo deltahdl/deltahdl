@@ -331,4 +331,38 @@ TEST(SimCh6b, TypeOpWidthTruncation) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
+static void LowerRunAndCompareWidths(SimFixture& f, RtlirDesign* design,
+                                     Variable*& va_out, Variable*& vb_out) {
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  va_out = f.ctx.FindVariable("a");
+  vb_out = f.ctx.FindVariable("b");
+  ASSERT_NE(va_out, nullptr);
+  ASSERT_NE(vb_out, nullptr);
+  EXPECT_EQ(va_out->value.width, vb_out->value.width);
+}
+
+// 13. type() referencing int, both variables assigned different values.
+TEST(SimCh6b, TypeOpIntDifferentValues) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  var type(a) b;\n"
+      "  initial begin\n"
+      "    a = 1000;\n"
+      "    b = 2000;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Variable* va = nullptr;
+  Variable* vb = nullptr;
+  LowerRunAndCompareWidths(f, design, va, vb);
+  EXPECT_EQ(va->value.ToUint64(), 1000u);
+  EXPECT_EQ(vb->value.ToUint64(), 2000u);
+}
+
 }  // namespace

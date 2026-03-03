@@ -20,28 +20,6 @@ static void LowerRunAndCompareWidths(SimFixture& f, RtlirDesign* design,
 
 namespace {
 
-// 13. type() referencing int, both variables assigned different values.
-TEST(SimCh6b, TypeOpIntDifferentValues) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  var type(a) b;\n"
-      "  initial begin\n"
-      "    a = 1000;\n"
-      "    b = 2000;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Variable* va = nullptr;
-  Variable* vb = nullptr;
-  LowerRunAndCompareWidths(f, design, va, vb);
-  EXPECT_EQ(va->value.ToUint64(), 1000u);
-  EXPECT_EQ(vb->value.ToUint64(), 2000u);
-}
-
 // 14. type() with signed shortint — verify sign extension on assignment.
 TEST(SimCh6b, TypeOpShortintSignExtension) {
   SimFixture f;
