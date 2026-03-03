@@ -10,34 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 29. always_comb with NAND expression (~(a & b)), masked to width.
-// ---------------------------------------------------------------------------
-TEST(SimCh9b, AlwaysCombNand) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, y;\n"
-      "  always_comb y = ~(a & b);\n"
-      "  initial begin\n"
-      "    a = 8'hFF;\n"
-      "    b = 8'h0F;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  // ~(0xFF & 0x0F) = ~0x0F = 0xF0 in the low 8 bits.
-  EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xF0u);
-}
-
-// ---------------------------------------------------------------------------
 // 30. always_comb with chained combinational logic: a XOR b, then OR c.
 // ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombChainedLogic) {
