@@ -159,4 +159,24 @@ TEST(SimA86, BinaryCaseNeq) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+TEST(EvalAdv, PackedStructEqualitySameValue) {
+  SimFixture f;
+  // Two 16-bit packed struct vars with same value → == is 1.
+  StructTypeInfo sinfo;
+  sinfo.type_name = "my_struct";
+  sinfo.total_width = 16;
+  sinfo.is_packed = true;
+  sinfo.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
+  sinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("my_struct", sinfo);
+  MakeVar(f, "s1", 16, 0xABCD);
+  MakeVar(f, "s2", 16, 0xABCD);
+  f.ctx.SetVariableStructType("s1", "my_struct");
+  f.ctx.SetVariableStructType("s2", "my_struct");
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "s1"),
+                          MakeId(f.arena, "s2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
