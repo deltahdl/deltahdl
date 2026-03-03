@@ -138,4 +138,17 @@ TEST(ParserA83, ExprRightShift) {
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
 }
 
+// =========================================================================
+// Section 11.4.10 -- Shift operators (logical)
+// =========================================================================
+TEST(ParserSection11, LogicalShiftLeft) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a << 2;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kLtLt);
+}
+
 }  // namespace

@@ -41,19 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.4.10 -- Shift operators (logical)
-// =========================================================================
-TEST(ParserSection11, LogicalShiftLeft) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a << 2;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kLtLt);
-}
-
 TEST(ParserSection11, LogicalShiftRight) {
   auto r = Parse(
       "module t;\n"
