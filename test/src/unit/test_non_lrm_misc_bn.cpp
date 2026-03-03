@@ -54,14 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 16. type() on byte data type.
-TEST(ParserSection6, Sec6_11_1_TypeRefOnByte) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial x = type(byte);\n"
-              "endmodule\n"));
-}
-
 // 17. type() on shortint data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnShortint) {
   EXPECT_TRUE(

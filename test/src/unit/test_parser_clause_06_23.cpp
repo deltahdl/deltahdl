@@ -426,4 +426,12 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnBit) {
               "endmodule\n"));
 }
 
+// 16. type() on byte data type.
+TEST(ParserSection6, Sec6_11_1_TypeRefOnByte) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(byte);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
