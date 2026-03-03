@@ -565,4 +565,18 @@ TEST(SimCh50701, SimpleDecimalNumber) {
   EXPECT_EQ(result, 659u);
 }
 
+// ---------------------------------------------------------------------------
+// 9. Sized binary literal constant
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, SizedBinaryLiteral) {
+  // §5.7.1: Sized binary literal — 4-bit binary number.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 4'b1001;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 9u);
+}
+
 }  // namespace
