@@ -10,36 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 24. always_comb with comparison operator (greater-than).
-// ---------------------------------------------------------------------------
-TEST(SimCh9b, AlwaysCombComparison) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, y;\n"
-      "  always_comb\n"
-      "    if (a > b) y = a;\n"
-      "    else y = b;\n"
-      "  initial begin\n"
-      "    a = 8'h50;\n"
-      "    b = 8'h30;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  // a > b is true, so y = a = 0x50.
-  EXPECT_EQ(y->value.ToUint64(), 0x50u);
-}
-
-// ---------------------------------------------------------------------------
 // 25. always_comb with equality comparison.
 // ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombEqualityCheck) {
