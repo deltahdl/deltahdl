@@ -75,4 +75,20 @@ TEST(ParserSection8, NestedClass) {
   EXPECT_EQ(r.cu->classes[0]->name, "Outer");
 }
 
+// =============================================================================
+// §8.23 -- Class scope resolution operator ::
+// =============================================================================
+TEST(ParserSection8, ClassScopeResolutionStaticMethod) {
+  auto r = Parse(
+      "class Base;\n"
+      "  static function void display();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial Base::display();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
