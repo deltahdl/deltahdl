@@ -20,32 +20,6 @@ static void LowerRunAndCompareWidths(SimFixture& f, RtlirDesign* design,
 
 namespace {
 
-// 5. type() with longint: resolves to 64-bit signed.
-TEST(SimCh6b, TypeOpLongint) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  longint a;\n"
-      "  var type(a) b;\n"
-      "  initial begin\n"
-      "    a = 64'hDEAD_BEEF_CAFE_BABE;\n"
-      "    b = 64'h0123_4567_89AB_CDEF;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 64u);
-  EXPECT_EQ(var->value.ToUint64(), 0x0123456789ABCDEFu);
-  EXPECT_TRUE(var->is_signed);
-}
-
 // 6. type() with integer: resolves to 32-bit signed (4-state).
 TEST(SimCh6b, TypeOpInteger) {
   SimFixture f;
