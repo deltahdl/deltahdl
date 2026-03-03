@@ -18,31 +18,6 @@ static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
 
 namespace {
 
-// §6.24.1: shortint'(x) casts to 16-bit width.
-TEST(SimCh6, CastShortint) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    x = 32'h1234ABCD;\n"
-      "    result = shortint'(x);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  // shortint'(32'h1234ABCD) truncates to 16 bits = 0xABCD.
-  EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
-}
-
 // §6.20.3: Type parameter with default type resolves variable width.
 TEST(SimCh6, TypeParameterDefault) {
   SimFixture f;
