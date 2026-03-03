@@ -789,4 +789,13 @@ TEST(ParserCh50701, SizedLiteral_ExactFit) {
   delete r.diag;
 }
 
+TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 3'b1111;\n"
+      "endmodule\n");
+  EXPECT_GE(r.diag->WarningCount(), 1u);
+  delete r.diag;
+}
+
 }  // namespace

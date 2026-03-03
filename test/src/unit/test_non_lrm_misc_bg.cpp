@@ -4,23 +4,6 @@
 
 using namespace delta;
 
-struct ParseDiag50701 {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine* diag = nullptr;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseDiag50701 ParseWithDiag(const std::string& src) {
-  ParseDiag50701 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  result.diag = new DiagEngine(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, *result.diag);
-  Parser parser(lexer, result.arena, *result.diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 static void VerifyPatternKeys(const Expr* rhs,
                               const std::string expected_keys[], size_t count) {
   ASSERT_EQ(rhs->pattern_keys.size(), count);
@@ -73,15 +56,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 }
 
 namespace {
-
-TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
-  auto r = ParseWithDiag(
-      "module t;\n"
-      "  initial x = 3'b1111;\n"
-      "endmodule\n");
-  EXPECT_GE(r.diag->WarningCount(), 1u);
-  delete r.diag;
-}
 
 TEST(ParserCh510, AssignmentPatternNamed) {
   auto r = Parse(
