@@ -34,4 +34,9 @@ TEST(ParserCh50601, EscapedIdentifierAsName) {
   EXPECT_TRUE(ParseOk("module t; wire \\bus+index ; endmodule"));
 }
 
+TEST(ParserCh50601, EscapedKeywordAsIdentifier) {
+  // §5.6.1: escaped keyword is treated as a user-defined identifier.
+  EXPECT_TRUE(ParseOk("module t; wire \\module ; endmodule"));
+}
+
 }  // namespace
