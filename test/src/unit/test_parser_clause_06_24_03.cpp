@@ -23,4 +23,16 @@ TEST(ParserSection6, BitstreamCastStructToInt) {
       "endmodule\n"));
 }
 
+TEST(ParserSection6, BitstreamCastIntToStruct) {
+  // §6.24.3: Cast from int to packed struct (bit-stream).
+  EXPECT_TRUE(ParseOk(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
+      "  initial begin\n"
+      "    ab_t s;\n"
+      "    s = ab_t'(16'hABCD);\n"
+      "  end\n"
+      "endmodule\n"));
+}
+
 }  // namespace
