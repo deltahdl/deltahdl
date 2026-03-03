@@ -380,6 +380,34 @@ def test_format_prompt_includes_supplementary():
     assert "Table 4-1" in result
 
 
+def test_format_prompt_includes_single_overview():
+    """Single overview subclause appears in the formatted prompt."""
+    result = format_prompt(
+        "- hierarchy\n", "4.4.3.1", "~/LRM.txt",
+        issue=6, overviews=["4.1"],
+    )
+    assert "Thoroughly understand 4.1 per LRM" in result
+
+
+def test_format_prompt_includes_multiple_overviews():
+    """Multiple overview subclauses each appear in the formatted prompt."""
+    result = format_prompt(
+        "- hierarchy\n", "4.4.3.1", "~/LRM.txt",
+        issue=6, overviews=["4.1", "4.4"],
+    )
+    assert "Thoroughly understand 4.1 per LRM" in result
+    assert "Thoroughly understand 4.4 per LRM" in result
+
+
+def test_format_prompt_excludes_overviews_by_default():
+    """No overview line appears when overviews is not provided."""
+    result = format_prompt(
+        "- hierarchy\n", "4.1", "~/LRM.txt",
+        issue=6,
+    )
+    assert "Thoroughly understand 4.1 per LRM" not in result
+
+
 # ---- invoke_claude --------------------------------------------------------
 
 

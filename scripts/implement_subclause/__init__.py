@@ -280,12 +280,20 @@ def format_prompt(
     *,
     issue: int,
     supplementary: str = "",
+    overviews: list[str] | None = None,
 ) -> str:
     """Assemble the standard implementation prompt from hierarchy steps."""
+    overview_lines = ""
+    for ov in overviews or []:
+        overview_lines += (
+            f"- Thoroughly understand {ov}"
+            f" per LRM in {lrm}\n"
+        )
     return (
         "Create and execute a Claude task list."
         " Each task must be blocked by the preceding task.\n\n"
         f"{hierarchy}"
+        f"{overview_lines}"
         f"{supplementary}"
         f"- Implement ALL aspects (not just parsing) of"
         f" {subclause} per LRM in {lrm}"
@@ -388,12 +396,13 @@ def build_prompt_v(
     *,
     issue: int,
     supplementary: str = "",
+    overviews: list[str] | None = None,
 ) -> str:
     """Build the implementation prompt for a depth-1 clause."""
     h = build_hierarchy(clause)
     top = build_top_level_line(h, titles, lrm)
     hierarchy = f"{top}\n"
-    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary)
+    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary, overviews=overviews)
 
 
 def build_prompt_v_w(
@@ -403,6 +412,7 @@ def build_prompt_v_w(
     *,
     issue: int,
     supplementary: str = "",
+    overviews: list[str] | None = None,
 ) -> str:
     """Build the implementation prompt for a depth-2 clause."""
     h = build_hierarchy(clause)
@@ -412,7 +422,7 @@ def build_prompt_v_w(
         f"- Thoroughly understand {h['subclause']}"
         f" per LRM in {lrm}\n"
     )
-    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary)
+    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary, overviews=overviews)
 
 
 def build_prompt_v_w_x(
@@ -422,6 +432,7 @@ def build_prompt_v_w_x(
     *,
     issue: int,
     supplementary: str = "",
+    overviews: list[str] | None = None,
 ) -> str:
     """Build the implementation prompt for a depth-3 clause."""
     h = build_hierarchy(clause)
@@ -446,7 +457,7 @@ def build_prompt_v_w_x(
             f" per LRM in {lrm}\n"
         )
 
-    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary)
+    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary, overviews=overviews)
 
 
 def build_prompt_v_w_x_y(
@@ -456,11 +467,12 @@ def build_prompt_v_w_x_y(
     *,
     issue: int,
     supplementary: str = "",
+    overviews: list[str] | None = None,
 ) -> str:
     """Build the implementation prompt for a depth-4 clause."""
     h = build_hierarchy(clause)
     hierarchy = _build_hierarchy_steps(h, titles, lrm)
-    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary)
+    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary, overviews=overviews)
 
 
 def build_prompt_v_w_x_y_z(
@@ -470,11 +482,12 @@ def build_prompt_v_w_x_y_z(
     *,
     issue: int,
     supplementary: str = "",
+    overviews: list[str] | None = None,
 ) -> str:
     """Build the implementation prompt for a depth-5 clause."""
     h = build_hierarchy(clause)
     hierarchy = _build_hierarchy_steps(h, titles, lrm)
-    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary)
+    return format_prompt(hierarchy, h["subclause"], lrm, issue=issue, supplementary=supplementary, overviews=overviews)
 
 
 # ---------------------------------------------------------------------------
@@ -537,6 +550,12 @@ def parse_args(argv=None):
         default="",
         help="Comma-separated shorthand labels (e.g. 4-1,16-5) to skip.",
     )
+    parser.add_argument(
+        "--overviews",
+        type=str,
+        default="",
+        help="Comma-separated subclauses that provide context for the target.",
+    )
     args = parser.parse_args(argv)
 
     if not args.lrm.is_file():
@@ -560,6 +579,10 @@ def parse_args(argv=None):
     args.ignore_figures = (
         [s.strip() for s in args.ignore_figures.split(",") if s.strip()]
         if args.ignore_figures else []
+    )
+    args.overviews = (
+        [s.strip() for s in args.overviews.split(",") if s.strip()]
+        if args.overviews else []
     )
 
     return args
@@ -599,7 +622,9 @@ def main(argv=None):
         )
         supplementary += "\n"
 
-    bound_handler = functools.partial(handler, supplementary=supplementary)
+    bound_handler = functools.partial(
+        handler, supplementary=supplementary, overviews=args.overviews,
+    )
     run_prompt(
         bound_handler, args.lrm, args.subclause,
         issue=args.issue, model=args.model,
