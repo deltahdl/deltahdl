@@ -308,4 +308,27 @@ TEST(SimCh6b, TypeOpIntegerWidth32) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
+// 12. type() preserves width across assignment — value truncated to type width.
+TEST(SimCh6b, TypeOpWidthTruncation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte a;\n"
+      "  var type(a) result;\n"
+      "  initial result = 32'hFFFF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 8u);
+  // 0xFFFF truncated to 8 bits = 0xFF.
+  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
+}
+
 }  // namespace
