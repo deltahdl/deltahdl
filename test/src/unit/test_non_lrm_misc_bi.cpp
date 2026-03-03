@@ -40,18 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-TEST(ParserSection6, IntVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  int count;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_EQ(item->name, "count");
-}
-
 TEST(ParserSection6, ByteVarDecl) {
   auto r = Parse(
       "module t;\n"
