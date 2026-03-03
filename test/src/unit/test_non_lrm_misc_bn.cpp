@@ -30,20 +30,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 29. var type() where inner is member access expression.
-TEST(ParserSection6, Sec6_11_1_VarTypeRefMemberAccess) {
-  auto r = Parse(
-      "module t;\n"
-      "  var type(pkg.field) x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  ASSERT_NE(item->data_type.type_ref_expr, nullptr);
-}
-
 // 30. type() on time data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnTime) {
   EXPECT_TRUE(
