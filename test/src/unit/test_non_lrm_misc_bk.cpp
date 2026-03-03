@@ -25,15 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, AssignCompatibleEnumToLogic) {
-  // §6.22.3: enum base type is integral, so enum to integral is compatible.
-  DataType a;
-  a.kind = DataTypeKind::kEnum;
-  DataType b;
-  b.kind = DataTypeKind::kLogic;
-  EXPECT_TRUE(IsAssignmentCompatible(a, b));
-}
-
 // =========================================================================
 // §6.23: Type operator — type() in declarations
 // =========================================================================

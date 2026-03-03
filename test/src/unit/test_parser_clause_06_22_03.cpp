@@ -40,4 +40,13 @@ TEST(ParserSection6, AssignCompatibleRealToReal) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
+TEST(ParserSection6, AssignCompatibleEnumToLogic) {
+  // §6.22.3: enum base type is integral, so enum to integral is compatible.
+  DataType a;
+  a.kind = DataTypeKind::kEnum;
+  DataType b;
+  b.kind = DataTypeKind::kLogic;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
 }  // namespace
