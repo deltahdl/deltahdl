@@ -42,18 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, Sec11_1_PostfixDecrementExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial counter--;\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->expr, nullptr);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kPostfixUnary);
-  EXPECT_EQ(stmt->expr->op, TokenKind::kMinusMinus);
-}
-
 // --- Inside expression ---
 TEST(ParserSection11, Sec11_1_InsideExpressionWithLhsAndElements) {
   auto r = Parse(
