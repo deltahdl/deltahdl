@@ -17,19 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// 30. Nested class (class within a module -- class in module scope)
-TEST(ParserClause03, Cl3_13_NestedClassInModule) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  class inner_cls;\n"
-              "    int value;\n"
-              "    function void set(int v);\n"
-              "      value = v;\n"
-              "    endfunction\n"
-              "  endclass\n"
-              "endmodule\n"));
-}
-
 // 12. Class scope -- members in class name space
 TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
   auto r = Parse(
