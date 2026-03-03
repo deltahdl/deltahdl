@@ -624,4 +624,13 @@ TEST(ParserSection11, CompoundAssignSlashEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserSection11, CompoundAssignPercentEq) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial a %= 3;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
