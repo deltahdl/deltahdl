@@ -240,4 +240,35 @@ TEST(SimCh9d, AlwaysStarConcatenation) {
   EXPECT_EQ(y->value.ToUint64(), 0xC3u);
 }
 
+// ---------------------------------------------------------------------------
+// 9. always @* with bit-select -- reading a single bit from a vector.
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarBitSelect) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  logic [7:0] copy;\n"
+      "  logic y;\n"
+      "  always @* begin\n"
+      "    copy = data;\n"
+      "    y = data[5];\n"
+      "  end\n"
+      "  initial begin\n"
+      "    data = 8'b0010_0000;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 1u);
+}
+
 }  // namespace
