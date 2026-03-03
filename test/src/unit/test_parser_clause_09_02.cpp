@@ -83,4 +83,24 @@ TEST(ParserSection9b, StructuredProcInitialAndAlways) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kAlwaysBlock);
 }
 
+// =============================================================================
+// LRM section 9.2 -- Structured procedures overview
+// Multiple initial/always procedures coexist within a module.
+// =============================================================================
+TEST(ParserSection9c, MultipleInitialProcedures) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial a = 0;\n"
+      "  initial b = 1;\n"
+      "  initial c = 2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) ++count;
+  }
+  EXPECT_EQ(count, 3);
+}
+
 }  // namespace
