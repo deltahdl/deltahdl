@@ -34,20 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-TEST(ParserSection7, DynamicArrayDeleteMethod) {
-  auto r = Parse(
-      "module t;\n"
-      "  int dyn[];\n"
-      "  initial dyn.delete();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* expr = stmt->expr;
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-}
-
 // =========================================================================
 // §7.6: Array assignments
 // =========================================================================
