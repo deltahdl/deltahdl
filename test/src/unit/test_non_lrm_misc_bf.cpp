@@ -52,10 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh505, Operator_Power) {
-  EXPECT_TRUE(ParseOk("module m; initial x = 2 ** 10; endmodule"));
-}
-
 TEST(ParserCh505, Operator_WildcardEquality) {
   // ==? is the wildcard equality operator.
   EXPECT_TRUE(ParseOk("module m; initial x = (a ==? b); endmodule"));

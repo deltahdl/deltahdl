@@ -381,4 +381,8 @@ TEST(ParserCh505, Operator_BinaryAdd) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
+TEST(ParserCh505, Operator_Power) {
+  EXPECT_TRUE(ParseOk("module m; initial x = 2 ** 10; endmodule"));
+}
+
 }  // namespace
