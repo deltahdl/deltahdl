@@ -41,15 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, TypesNotEquivalentDifferentState) {
-  // §6.22.2c: bit (2-state) and logic (4-state) are NOT equivalent.
-  DataType a;
-  a.kind = DataTypeKind::kBit;
-  DataType b;
-  b.kind = DataTypeKind::kLogic;
-  EXPECT_FALSE(TypesEquivalent(a, b));
-}
-
 TEST(ParserSection6, AssignmentCompatibleIntegral) {
   // §6.22.3: All integral types are assignment compatible.
   DataType a;

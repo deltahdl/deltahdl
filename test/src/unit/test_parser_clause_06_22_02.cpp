@@ -53,4 +53,13 @@ TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
   EXPECT_TRUE(TypesEquivalent(a, b));  // Same kind → match → equivalent.
 }
 
+TEST(ParserSection6, TypesNotEquivalentDifferentState) {
+  // §6.22.2c: bit (2-state) and logic (4-state) are NOT equivalent.
+  DataType a;
+  a.kind = DataTypeKind::kBit;
+  DataType b;
+  b.kind = DataTypeKind::kLogic;
+  EXPECT_FALSE(TypesEquivalent(a, b));
+}
+
 }  // namespace
