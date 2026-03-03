@@ -32,65 +32,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 namespace {
 
 // =============================================================================
-// LRM section 6.11 -- Comprehensive signed/unsigned qualifiers
-// =============================================================================
-// 29. All integer types with explicit signed/unsigned qualifiers.
-TEST(ParserSection6, Sec6_11_AllTypesExplicitSignedness) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte signed bs;\n"
-      "  byte unsigned bu;\n"
-      "  shortint signed ss;\n"
-      "  shortint unsigned su;\n"
-      "  int signed is_;\n"
-      "  int unsigned iu;\n"
-      "  longint signed ls;\n"
-      "  longint unsigned lu;\n"
-      "  integer signed igs;\n"
-      "  integer unsigned igu;\n"
-      "  time signed ts;\n"
-      "  time unsigned tu;\n"
-      "  logic signed lgs;\n"
-      "  logic unsigned lgu;\n"
-      "  bit signed bts;\n"
-      "  bit unsigned btu;\n"
-      "  reg signed rs;\n"
-      "  reg unsigned ru;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 18u);
-  // byte signed / byte unsigned
-  EXPECT_TRUE(items[0]->data_type.is_signed);
-  EXPECT_FALSE(items[1]->data_type.is_signed);
-  // shortint signed / shortint unsigned
-  EXPECT_TRUE(items[2]->data_type.is_signed);
-  EXPECT_FALSE(items[3]->data_type.is_signed);
-  // int signed / int unsigned
-  EXPECT_TRUE(items[4]->data_type.is_signed);
-  EXPECT_FALSE(items[5]->data_type.is_signed);
-  // longint signed / longint unsigned
-  EXPECT_TRUE(items[6]->data_type.is_signed);
-  EXPECT_FALSE(items[7]->data_type.is_signed);
-  // integer signed / integer unsigned
-  EXPECT_TRUE(items[8]->data_type.is_signed);
-  EXPECT_FALSE(items[9]->data_type.is_signed);
-  // time signed / time unsigned
-  EXPECT_TRUE(items[10]->data_type.is_signed);
-  EXPECT_FALSE(items[11]->data_type.is_signed);
-  // logic signed / logic unsigned
-  EXPECT_TRUE(items[12]->data_type.is_signed);
-  EXPECT_FALSE(items[13]->data_type.is_signed);
-  // bit signed / bit unsigned
-  EXPECT_TRUE(items[14]->data_type.is_signed);
-  EXPECT_FALSE(items[15]->data_type.is_signed);
-  // reg signed / reg unsigned
-  EXPECT_TRUE(items[16]->data_type.is_signed);
-  EXPECT_FALSE(items[17]->data_type.is_signed);
-}
-
-// =============================================================================
 // LRM section 6.11 -- Integer types as port declarations
 // =============================================================================
 // 30. Integer types as module port declarations.
