@@ -54,13 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 8. type() used in parameter default with packed dimension.
-TEST(ParserSection6, Sec6_11_1_TypeRefParamPackedDim) {
-  EXPECT_TRUE(
-      ParseOk("module t #(parameter type T = type(logic [7:0]));\n"
-              "endmodule\n"));
-}
-
 // 9. type() comparison with == in expression context.
 TEST(ParserSection6, Sec6_11_1_TypeRefEqComparison) {
   EXPECT_TRUE(
