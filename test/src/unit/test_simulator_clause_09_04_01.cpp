@@ -90,4 +90,14 @@ TEST(SimCh4, SimulationTimeAdvances) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+uint64_t EvaluateDelay(int64_t value, bool is_unknown, bool is_highz) {
+  if (is_unknown || is_highz) return 0;
+  if (value < 0) return static_cast<uint64_t>(value);
+  return static_cast<uint64_t>(value);
+}
+
+TEST(TimingControl, UnknownDelayTreatedAsZero) {
+  EXPECT_EQ(EvaluateDelay(0, true, false), 0u);
+}
+
 }  // namespace

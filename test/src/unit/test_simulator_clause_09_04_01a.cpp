@@ -1,7 +1,6 @@
-// §9.4.1: Delay control
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include <cstdint>
 
 uint64_t EvaluateDelay(int64_t value, bool is_unknown, bool is_highz) {
@@ -11,10 +10,6 @@ uint64_t EvaluateDelay(int64_t value, bool is_unknown, bool is_highz) {
 }
 
 namespace {
-
-TEST(TimingControl, UnknownDelayTreatedAsZero) {
-  EXPECT_EQ(EvaluateDelay(0, true, false), 0u);
-}
 
 TEST(TimingControl, HighZDelayTreatedAsZero) {
   EXPECT_EQ(EvaluateDelay(0, false, true), 0u);
