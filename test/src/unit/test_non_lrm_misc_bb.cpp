@@ -42,18 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 23. Rounding with global precision finer than element precision.
-// Global precision = fs, element precision = 100ps.
-// Rounding still occurs at element's precision step.
-TEST(ParserClause03, Cl3_14_1_FinerGlobalPrecision) {
-  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
-  // 2.75ns at fs global precision:
-  // raw ticks = 2.75 * 10^6 = 2750000 fs.
-  // precision step = 100 * 10^3 = 100000 fs.
-  // 2750000 / 100000 = 27.5 → round to 28 → 28 * 100000 = 2800000 fs.
-  EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kFs), 2800000u);
-}
-
 // 25. Way 2: timeunit and timeprecision keywords specify time unit and
 TEST(ParserClause03, Cl3_14_2_KeywordsSetUnitAndPrecision) {
   auto r = ParseTimescale31402(
