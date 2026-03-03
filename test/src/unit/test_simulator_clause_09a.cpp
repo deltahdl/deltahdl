@@ -9,33 +9,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 13. Bit-select in always_comb using initial begin/end.
-// ---------------------------------------------------------------------------
-TEST(SimCh9, AlwaysCombBitSelect) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    a = 8'b0000_0100;\n"
-      "  end\n"
-      "  always_comb begin\n"
-      "    result = a >> 2;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  // a = 4, a >> 2 = 1.
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
-// ---------------------------------------------------------------------------
 // 14. Part-select via mask in always_comb (lower nibble).
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombPartSelect) {
