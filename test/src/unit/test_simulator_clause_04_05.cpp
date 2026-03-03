@@ -139,4 +139,30 @@ TEST(SimCh45, ExecuteSimulationStartsAtTimeZero) {
   EXPECT_EQ(observed_time, 0u);
 }
 
+// ---------------------------------------------------------------------------
+// §4.5 execute_simulation: "while (some time slot is nonempty) { move to the
+// first nonempty time slot and set T; execute_time_slot(T); }"
+// Time advances through nonempty slots in order, skipping empty ones.
+// ---------------------------------------------------------------------------
+TEST(SimCh45, ExecuteSimulationAdvancesThroughNonemptyTimeSlots) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<uint64_t> times;
+
+  // Schedule at times 0, 5, 10 — gaps at 1-4 and 6-9 must be skipped.
+  for (uint64_t t : {0, 5, 10}) {
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = [&times, &sched]() {
+      times.push_back(sched.CurrentTime().ticks);
+    };
+    sched.ScheduleEvent({t}, Region::kActive, ev);
+  }
+
+  sched.Run();
+  ASSERT_EQ(times.size(), 3u);
+  EXPECT_EQ(times[0], 0u);
+  EXPECT_EQ(times[1], 5u);
+  EXPECT_EQ(times[2], 10u);
+}
+
 }  // namespace
