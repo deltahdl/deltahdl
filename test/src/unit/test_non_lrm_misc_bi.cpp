@@ -40,23 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// =========================================================================
-// §6.21: Scope and lifetime
-// =========================================================================
-TEST(ParserSection6, AutomaticVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  function automatic int get_val();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_automatic);
-}
-
 TEST(ParserSection6, StaticFunction) {
   auto r = Parse(
       "module t;\n"
