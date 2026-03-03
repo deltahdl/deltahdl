@@ -650,4 +650,18 @@ TEST(SimCh50701, UnaryMinusBeforeSize) {
   EXPECT_EQ(result, 250u);
 }
 
+// ---------------------------------------------------------------------------
+// 16. Negative numbers in two's complement
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, NegativeTwosComplement) {
+  // §5.7.1: Negative numbers use two's-complement representation.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = -1;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 255u);
+}
+
 }  // namespace
