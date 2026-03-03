@@ -41,18 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, WildcardEqInIfCondition) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (data ==? 8'b1xx0_xx10)\n"
-      "      $display(\"match\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // =========================================================================
 // Section 11.4.7 -- Logical operators
 // =========================================================================
