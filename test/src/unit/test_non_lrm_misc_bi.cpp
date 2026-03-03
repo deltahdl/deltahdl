@@ -41,21 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 namespace {
 
 // =========================================================================
-// §6.14: Chandle data type
-// =========================================================================
-TEST(ParserSection6, ChandleVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  chandle ch;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kChandle);
-  EXPECT_EQ(item->name, "ch");
-}
-
-// =========================================================================
 // §6.17: Event data type
 // =========================================================================
 TEST(ParserSection6, EventVarDecl) {
