@@ -1,7 +1,6 @@
-// §14.4: Input and output skews
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -12,23 +11,6 @@
 using namespace delta;
 
 namespace {
-
-// =============================================================================
-// Skew resolution
-// =============================================================================
-TEST(Clocking, DefaultInputSkew) {
-  ClockingManager mgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.default_input_skew = SimTime{5};
-  block.default_output_skew = SimTime{10};
-  mgr.Register(block);
-
-  // No per-signal skew, should return default.
-  auto skew = mgr.GetInputSkew("cb", "data_in");
-  EXPECT_EQ(skew.ticks, 5u);
-}
 
 TEST(Clocking, PerSignalSkewOverridesDefault) {
   ClockingManager mgr;

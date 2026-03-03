@@ -203,4 +203,21 @@ TEST(ClockingSim, DefaultSkewAppliedToAllSignals) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "b").ticks, 7u);
 }
 
+// =============================================================================
+// Skew resolution
+// =============================================================================
+TEST(Clocking, DefaultInputSkew) {
+  ClockingManager mgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.default_input_skew = SimTime{5};
+  block.default_output_skew = SimTime{10};
+  mgr.Register(block);
+
+  // No per-signal skew, should return default.
+  auto skew = mgr.GetInputSkew("cb", "data_in");
+  EXPECT_EQ(skew.ticks, 5u);
+}
+
 }  // namespace
