@@ -143,4 +143,31 @@ TEST(SimCh9b, AlwaysCombLeftShift) {
   EXPECT_EQ(y->value.ToUint64(), 0x3Cu);
 }
 
+// ---------------------------------------------------------------------------
+// 23. always_comb with right shift.
+// ---------------------------------------------------------------------------
+TEST(SimCh9b, AlwaysCombRightShift) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data, y;\n"
+      "  always_comb y = data >> 4;\n"
+      "  initial begin\n"
+      "    data = 8'hF0;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  // 0xF0 >> 4 = 0x0F.
+  EXPECT_EQ(y->value.ToUint64(), 0x0Fu);
+}
+
 }  // namespace
