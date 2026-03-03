@@ -154,4 +154,41 @@ TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
   EXPECT_EQ(ca->drive_strength1, 3u);  // pull1
 }
 
+struct ParseResult6b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6b Parse(const std::string& src) {
+  ParseResult6b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult6b& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// §6.3.2.2: Drive strength on net declaration with inline assignment.
+TEST(ParserSection6, NetDeclDriveStrength) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (weak0, strong1) w = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  // 2=weak, 4=strong (parser encoding)
+  EXPECT_EQ(item->drive_strength0, 2u);
+  EXPECT_EQ(item->drive_strength1, 4u);
+}
+
 }  // namespace
