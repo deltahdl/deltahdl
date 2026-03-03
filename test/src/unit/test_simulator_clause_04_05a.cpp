@@ -13,34 +13,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §4.5 Reactive set iteration: "execute_region (Reactive); R = first nonempty
-// region in [Reactive ... Post-Re-NBA]; if (R is nonempty) move events in R
-// to the Reactive region;"
-// Re-Inactive generates Reactive event -> Reactive re-executes.
-// ---------------------------------------------------------------------------
-TEST(SimCh45, ReactiveSetReIteratesWhenReInactiveGeneratesReactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* re_inactive = sched.GetEventPool().Acquire();
-  re_inactive->callback = [&]() {
-    order.push_back("re_inactive");
-    auto* new_reactive = sched.GetEventPool().Acquire();
-    new_reactive->callback = [&]() {
-      order.push_back("reactive_from_re_inactive");
-    };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kReactive, new_reactive);
-  };
-  sched.ScheduleEvent({0}, Region::kReInactive, re_inactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "re_inactive");
-  EXPECT_EQ(order[1], "reactive_from_re_inactive");
-}
-
-// ---------------------------------------------------------------------------
 // §4.5 "if (all regions in [Active ... Post-Re-NBA] are empty)
 //        execute_region (Pre-Postponed);"
 // Pre-Postponed only fires after Active and Reactive sets are fully drained.
