@@ -366,4 +366,24 @@ TEST(ParserSection9c, AlwaysFFWithNegedge) {
               "endmodule\n"));
 }
 
+static ModuleItem* FirstAlwaysItem(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
+  }
+  return nullptr;
+}
+
+TEST(ParserSection9, AlwaysFF) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
+  ASSERT_FALSE(item->sensitivity.empty());
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+}
+
 }  // namespace

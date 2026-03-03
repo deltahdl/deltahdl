@@ -30,19 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection9, AlwaysFF) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-  ASSERT_FALSE(item->sensitivity.empty());
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-}
-
 TEST(ParserSection9, AlwaysLatch) {
   auto r = Parse(
       "module m;\n"
