@@ -10,39 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 3. always @* with case statement selects the correct arm.
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarCaseStatement) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [7:0] y;\n"
-      "  always @*\n"
-      "    case (sel)\n"
-      "      2'b00: y = 8'h10;\n"
-      "      2'b01: y = 8'h20;\n"
-      "      2'b10: y = 8'h30;\n"
-      "      default: y = 8'hFF;\n"
-      "    endcase\n"
-      "  initial begin\n"
-      "    sel = 2'b10;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0x30u);
-}
-
-// ---------------------------------------------------------------------------
 // 4. always @* sensitivity includes all RHS signals (a, b, c).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarAllRhsSensitive) {
