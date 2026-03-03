@@ -263,4 +263,39 @@ TEST(ParserSection6, Sec6_11_IntUnpackedRangeNotation) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
+static bool ParseOk5(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+// =========================================================================
+// Section 5.6.3: System tasks and system functions
+// =========================================================================
+struct ParseResult50603 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult50603 Parse(const std::string& src) {
+  ParseResult50603 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// --- Unpacked range dimensions [M:N] ---
+TEST(ParserCh5, UnpackedDim_Range) {
+  EXPECT_TRUE(ParseOk5("module m; int a[1:0]; endmodule"));
+}
+
 }  // namespace
