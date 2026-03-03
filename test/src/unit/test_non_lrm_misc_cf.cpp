@@ -41,16 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, LogicalShiftRight) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a >> 2;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kGtGt);
-}
-
 // =========================================================================
 // Section 11.3.2 -- Operator precedence (complex expression)
 // =========================================================================

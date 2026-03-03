@@ -151,4 +151,14 @@ TEST(ParserSection11, LogicalShiftLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
 }
 
+TEST(ParserSection11, LogicalShiftRight) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a >> 2;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kGtGt);
+}
+
 }  // namespace
