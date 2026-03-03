@@ -417,4 +417,20 @@ TEST(ParserSection6, VarImplicitInProcedural) {
               "endmodule\n"));
 }
 
+// --- Mixed types in one module ---
+TEST(ParserSection6, MixedIntegerRealStringTypes) {
+  // All major type families coexisting
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int i;\n"
+              "  real r;\n"
+              "  shortreal sr;\n"
+              "  string s;\n"
+              "  byte b;\n"
+              "  logic [7:0] l;\n"
+              "  integer ig;\n"
+              "  realtime rt;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

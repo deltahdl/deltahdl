@@ -30,22 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-// --- Mixed types in one module ---
-TEST(ParserSection6, MixedIntegerRealStringTypes) {
-  // All major type families coexisting
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int i;\n"
-              "  real r;\n"
-              "  shortreal sr;\n"
-              "  string s;\n"
-              "  byte b;\n"
-              "  logic [7:0] l;\n"
-              "  integer ig;\n"
-              "  realtime rt;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, IntegerTypesInProcedural) {
   // All integer types declared inside initial block
   EXPECT_TRUE(
