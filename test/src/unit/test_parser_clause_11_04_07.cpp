@@ -225,4 +225,14 @@ TEST(ParserSection11, LogicalAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
+TEST(ParserSection11, LogicalOr) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a || b);\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
+}
+
 }  // namespace
