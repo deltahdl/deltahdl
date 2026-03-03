@@ -47,4 +47,13 @@ TEST(ParserA26, FuncPrototypePureVirtual) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserA27, TaskPrototypePureVirtual) {
+  auto r = Parse(
+      "class C;\n"
+      "  pure virtual task do_work(input int x);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

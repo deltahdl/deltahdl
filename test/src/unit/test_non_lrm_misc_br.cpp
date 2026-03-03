@@ -17,15 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-TEST(ParserA27, TaskPrototypePureVirtual) {
-  auto r = Parse(
-      "class C;\n"
-      "  pure virtual task do_work(input int x);\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // 21. Class scope resolution (cls::member)
 TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
   EXPECT_TRUE(
