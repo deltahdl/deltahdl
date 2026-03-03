@@ -166,4 +166,35 @@ TEST(ParserSection9, Sec9_3_2_ForkWithNonblockingAssigns) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
+// ---------------------------------------------------------------------------
+// 23. Multiple sequential fork blocks
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_MultipleSequentialForks) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      #5 a = 1;\n"
+      "    join\n"
+      "    fork\n"
+      "      #10 b = 2;\n"
+      "    join\n"
+      "    fork\n"
+      "      #15 c = 3;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kFork);
+  EXPECT_EQ(body->stmts[0]->join_kind, TokenKind::kKwJoin);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kFork);
+  EXPECT_EQ(body->stmts[1]->join_kind, TokenKind::kKwJoin);
+  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kFork);
+  EXPECT_EQ(body->stmts[2]->join_kind, TokenKind::kKwJoinAny);
+}
+
 }  // namespace
