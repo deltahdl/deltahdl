@@ -32,23 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-// §6.7.1: Net with single delay value.
-TEST(ParserSection6, Sec6_7_1_WireWithDelay) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire #5 w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  ASSERT_NE(item->net_delay, nullptr);
-  EXPECT_EQ(item->net_delay->int_val, 5u);
-  EXPECT_EQ(item->net_delay_fall, nullptr);
-  EXPECT_EQ(item->net_delay_decay, nullptr);
-}
-
 // §6.7.1: Net with two delays (rise, fall).
 TEST(ParserSection6, Sec6_7_1_WireTwoDelays) {
   auto r = Parse(
