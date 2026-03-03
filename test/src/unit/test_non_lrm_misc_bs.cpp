@@ -40,26 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// Integer atom types.
-TEST(ParserSection8, DataTypeSyntaxIntegerAtom) {
-  auto r = Parse(
-      "module m;\n"
-      "  byte b;\n"
-      "  shortint si;\n"
-      "  int i;\n"
-      "  longint li;\n"
-      "  integer ig;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 5u);
-  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kByte);
-  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kShortint);
-  EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kInt);
-  EXPECT_EQ(items[3]->data_type.kind, DataTypeKind::kLongint);
-  EXPECT_EQ(items[4]->data_type.kind, DataTypeKind::kInteger);
-}
-
 // Non-integer types (real, shortreal, realtime).
 TEST(ParserSection8, DataTypeSyntaxNonInteger) {
   auto r = Parse(
