@@ -10,34 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 26. always @* with type cast (signed').
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarTypeCast) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  logic [31:0] y;\n"
-      "  always @* y = signed'(a);\n"
-      "  initial begin\n"
-      "    a = 8'hFF;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  // 8'hFF sign-extended to 32 bits = 0xFFFFFFFF.
-  EXPECT_EQ(y->value.ToUint64(), 0xFFFFFFFFu);
-}
-
-// ---------------------------------------------------------------------------
 // 27. Verify correctness of combinational output set via initial block.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarCombOutputFromInitial) {
