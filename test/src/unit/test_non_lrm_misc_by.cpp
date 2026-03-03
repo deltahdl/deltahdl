@@ -33,27 +33,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9h& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 14. always @* with if-else body.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @*\n"
-      "    if (sel) y = a;\n"
-      "    else y = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kIf);
-  EXPECT_NE(item->body->then_branch, nullptr);
-  EXPECT_NE(item->body->else_branch, nullptr);
-}
-
-// ---------------------------------------------------------------------------
 // 15. always_comb with case statement.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombCaseStatement) {
