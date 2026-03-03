@@ -1,9 +1,7 @@
-// §10.6.2: The force and release procedural statements
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include <cstdint>
-
 #include "common/arena.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -26,17 +24,6 @@ struct ForceInfo {
   ForceTarget target;
   bool has_mixed_assignments = false;
 };
-
-bool ValidateForceTarget(const ForceInfo& info);
-
-void ForceVariable(Variable& var, const Logic4Vec& value);
-
-void ReleaseVariable(Variable& var, bool has_continuous_driver,
-                     const Logic4Vec* continuous_value, Arena& arena);
-
-void ForceNet(Net& net, const Logic4Vec& value, Arena& arena);
-
-void ReleaseNet(Net& net, Arena& arena);
 
 bool ValidateForceTarget(const ForceInfo& info) {
   if (info.has_mixed_assignments) return false;
@@ -95,19 +82,31 @@ static constexpr uint8_t kVal0 = 0;
 
 static constexpr uint8_t kVal1 = 1;
 
-namespace {
+// --- Normative example (§10.6.2) ---
+struct TwoNets {
+  Arena arena;
+  Variable* vd = nullptr;
+  Variable* ve = nullptr;
+  Net net_d;
+  Net net_e;
+};
 
-// =============================================================
-// §10.6.2: The force and release procedural statements
-// =============================================================
-// --- Legal LHS targets ---
-// §10.6.2: "The left-hand side of the assignment can be a reference to
-//  a singular variable, a net, a constant bit-select of a vector net,
-//  a constant part-select of a vector net, or a concatenation of these."
-TEST(ForceRelease, LegalTargetSingularVariable) {
-  ForceInfo info{ForceTarget::kSingularVariable};
-  EXPECT_TRUE(ValidateForceTarget(info));
+static TwoNets MakeTwoWireNets() {
+  TwoNets tn;
+  tn.vd = tn.arena.Create<Variable>();
+  tn.vd->value = MakeLogic4Vec(tn.arena, 1);
+  tn.ve = tn.arena.Create<Variable>();
+  tn.ve->value = MakeLogic4Vec(tn.arena, 1);
+  tn.net_d.type = NetType::kWire;
+  tn.net_d.resolved = tn.vd;
+  tn.net_d.drivers.push_back(MakeLogic4VecVal(tn.arena, 1, 0));
+  tn.net_e.type = NetType::kWire;
+  tn.net_e.resolved = tn.ve;
+  tn.net_e.drivers.push_back(MakeLogic4VecVal(tn.arena, 1, 0));
+  return tn;
 }
+
+namespace {
 
 TEST(ForceRelease, LegalTargetNet) {
   ForceInfo info{ForceTarget::kNet};
@@ -240,30 +239,6 @@ TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
   ReleaseNet(net, arena);
   // Should immediately restore to driver value (0).
   EXPECT_EQ(ValOf(*var), kVal0);
-}
-
-// --- Normative example (§10.6.2) ---
-struct TwoNets {
-  Arena arena;
-  Variable* vd = nullptr;
-  Variable* ve = nullptr;
-  Net net_d;
-  Net net_e;
-};
-
-static TwoNets MakeTwoWireNets() {
-  TwoNets tn;
-  tn.vd = tn.arena.Create<Variable>();
-  tn.vd->value = MakeLogic4Vec(tn.arena, 1);
-  tn.ve = tn.arena.Create<Variable>();
-  tn.ve->value = MakeLogic4Vec(tn.arena, 1);
-  tn.net_d.type = NetType::kWire;
-  tn.net_d.resolved = tn.vd;
-  tn.net_d.drivers.push_back(MakeLogic4VecVal(tn.arena, 1, 0));
-  tn.net_e.type = NetType::kWire;
-  tn.net_e.resolved = tn.ve;
-  tn.net_e.drivers.push_back(MakeLogic4VecVal(tn.arena, 1, 0));
-  return tn;
 }
 
 // §10.6.2 example: at time 0, d=0 (a&b&c=1&0&1=0), e=0 (and gate).
