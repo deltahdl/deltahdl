@@ -17,17 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// class_type (ps_class_identifier [param] { :: class_identifier [param] })
-TEST(ParserA221, DataTypeClassType) {
-  auto r = Parse(
-      "class my_cls;\n"
-      "  typedef int my_type;\n"
-      "endclass\n"
-      "module m; my_cls::my_type x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // method_prototype ::= task_prototype | function_prototype
 TEST(SourceText, ClassMethodPrototype) {
   auto r = Parse(

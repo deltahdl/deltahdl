@@ -107,4 +107,15 @@ TEST(ParserA221, StructUnionStruct) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
 }
 
+// class_type (ps_class_identifier [param] { :: class_identifier [param] })
+TEST(ParserA221, DataTypeClassType) {
+  auto r = Parse(
+      "class my_cls;\n"
+      "  typedef int my_type;\n"
+      "endclass\n"
+      "module m; my_cls::my_type x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
