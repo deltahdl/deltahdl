@@ -358,4 +358,20 @@ TEST(ParserCh512, Attribute_OnAssignment) {
               "endmodule"));
 }
 
+TEST(ParserCh512, Attribute_OnContAssign) {
+  // Attribute on a continuous assignment statement.
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  (* synthesis_on *)\n"
+      "  assign a = b;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+  auto* item = r.cu->modules[0]->items[2];
+  EXPECT_EQ(item->kind, ModuleItemKind::kContAssign);
+  ASSERT_EQ(item->attrs.size(), 1u);
+  EXPECT_EQ(item->attrs[0].name, "synthesis_on");
+}
+
 }  // namespace
