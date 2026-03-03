@@ -42,17 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, Sec11_1_RealLiteralAsExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  real r;\n"
-      "  initial r = 3.14;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
 // --- Call expressions ---
 TEST(ParserSection11, Sec11_1_SystemFunctionCallExpression) {
   auto r = Parse(

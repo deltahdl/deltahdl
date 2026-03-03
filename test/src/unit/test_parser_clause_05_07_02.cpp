@@ -211,4 +211,32 @@ TEST(ParserA87, ExpUppercase) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
+static Stmt* FirstInitialStmt(ParseResult11e& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+static Expr* FirstAssignRhs(ParseResult11e& r) {
+  auto* stmt = FirstInitialStmt(r);
+  if (!stmt) return nullptr;
+  return stmt->rhs;
+}
+
+TEST(ParserSection11, Sec11_1_RealLiteralAsExpression) {
+  auto r = Parse(
+      "module t;\n"
+      "  real r;\n"
+      "  initial r = 3.14;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
 }  // namespace
