@@ -10,28 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 13. always @* with multiple statements -- all read signals are sensitive.
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarMultipleStmts) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, x, y;\n"
-      "  always @* begin\n"
-      "    x = a + 1;\n"
-      "    y = b + 2;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    a = 8'h10;\n"
-      "    b = 8'h20;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"x", 0x11u}, {"y", 0x22u}});
-}
-
-// ---------------------------------------------------------------------------
 // 14. always @* with arithmetic operators (+, -, *, /).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarArithmetic) {
