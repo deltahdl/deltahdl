@@ -39,4 +39,10 @@ TEST(TriregChargeDecay, ThreeDelaySpecValid) {
   EXPECT_TRUE(ValidateTriregChargeDecaySpec(spec));
 }
 
+// §28.16.2.2: One or two delays → no charge decay.
+TEST(TriregChargeDecay, OneDelayHasNoChargeDecay) {
+  DelaySpec spec{10, 0, 0, 1};
+  EXPECT_FALSE(ValidateTriregChargeDecaySpec(spec));
+}
+
 }  // namespace

@@ -23,12 +23,6 @@ bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
 
 namespace {
 
-// §28.16.2.2: One or two delays → no charge decay.
-TEST(TriregChargeDecay, OneDelayHasNoChargeDecay) {
-  DelaySpec spec{10, 0, 0, 1};
-  EXPECT_FALSE(ValidateTriregChargeDecaySpec(spec));
-}
-
 TEST(TriregChargeDecay, TwoDelaysHasNoChargeDecay) {
   DelaySpec spec{10, 20, 0, 2};
   EXPECT_FALSE(ValidateTriregChargeDecaySpec(spec));
