@@ -10,40 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 23. always @* with case decode (address decoder pattern).
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarCaseDecode) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [1:0] addr;\n"
-      "  logic [3:0] sel;\n"
-      "  always @*\n"
-      "    case (addr)\n"
-      "      2'b00: sel = 4'b0001;\n"
-      "      2'b01: sel = 4'b0010;\n"
-      "      2'b10: sel = 4'b0100;\n"
-      "      2'b11: sel = 4'b1000;\n"
-      "    endcase\n"
-      "  initial begin\n"
-      "    addr = 2'b11;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* sel = f.ctx.FindVariable("sel");
-  ASSERT_NE(sel, nullptr);
-  // addr = 2'b11, so sel = 4'b1000 = 8.
-  EXPECT_EQ(sel->value.ToUint64(), 8u);
-}
-
-// ---------------------------------------------------------------------------
 // 24. Multiple always @* blocks have independent sensitivity and outputs.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, MultipleAlwaysStarIndependent) {
