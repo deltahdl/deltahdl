@@ -24,4 +24,24 @@ TEST(Dpi, RegisterExport) {
   EXPECT_FALSE(ctx.HasExport("missing"));
 }
 
+// =============================================================================
+// DpiRuntime: export registration and invocation
+// =============================================================================
+TEST(DpiRuntime, RegisterExportAndCall) {
+  DpiRuntime rt;
+  DpiRtExport exp;
+  exp.c_name = "c_callback";
+  exp.sv_name = "sv_callback";
+  exp.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
+    return DpiArgValue::FromInt(args[0].AsInt() * 2);
+  };
+  rt.RegisterExport(exp);
+
+  EXPECT_EQ(rt.ExportCount(), 1u);
+  EXPECT_TRUE(rt.HasExport("sv_callback"));
+
+  auto result = rt.CallExport("sv_callback", {DpiArgValue::FromInt(21)});
+  EXPECT_EQ(result.AsInt(), 42);
+}
+
 }  // namespace
