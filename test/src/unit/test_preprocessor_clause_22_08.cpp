@@ -83,3 +83,22 @@ TEST(ParserSection6, DefaultNettypeWire) {
   EXPECT_EQ(r.cu->default_nettype, NetType::kWire);
 }
 
+static ModuleItem* FirstItem(ParseResult& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+TEST(ParserSection6, DefaultNettypeNone) {
+  // §6.10: `default_nettype none disables implicit declarations.
+  auto r = ParseWithPreprocessor(
+      "`default_nettype none\n"
+      "module t;\n"
+      "  wire explicit_w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+}
+

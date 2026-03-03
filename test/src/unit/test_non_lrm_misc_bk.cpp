@@ -25,19 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, DefaultNettypeNone) {
-  // §6.10: `default_nettype none disables implicit declarations.
-  auto r = ParseWithPreprocessor(
-      "`default_nettype none\n"
-      "module t;\n"
-      "  wire explicit_w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-}
-
 // =========================================================================
 // §6.11.1: Integral types — automatic variables in functions
 // =========================================================================
