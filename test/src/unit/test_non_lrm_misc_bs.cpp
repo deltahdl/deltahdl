@@ -40,20 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-TEST(ParserSection8, ParameterizedClassStackType) {
-  auto r = Parse(
-      "class stack #(type T = int);\n"
-      "  T items[];\n"
-      "  function void push(T a);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto* cls = r.cu->classes[0];
-  ASSERT_EQ(cls->params.size(), 1u);
-  EXPECT_EQ(cls->params[0].first, "T");
-}
-
 TEST(ParserSection8, ParameterizedClassDefaultInstantiation) {
   auto r = Parse(
       "class stack #(type T = int);\n"
