@@ -31,29 +31,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9c& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.2.2.2 -- always_comb procedure
-// Combinational logic with begin/end block and multiple statements.
-// =============================================================================
-TEST(ParserSection9c, AlwaysCombBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic a, b, c, y;\n"
-      "  always_comb begin\n"
-      "    a = b & c;\n"
-      "    y = a | b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_GE(item->body->stmts.size(), 2u);
-}
-
 TEST(ParserSection9c, AlwaysCombWithIf) {
   auto r = Parse(
       "module m;\n"

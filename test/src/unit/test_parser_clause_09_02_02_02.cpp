@@ -735,4 +735,52 @@ TEST(ParserSection9, Sec9_2_2_BeginEndBlock) {
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
+struct ParseResult9c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9c Parse(const std::string& src) {
+  ParseResult9c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysItem(ParseResult9c& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.2.2.2 -- always_comb procedure
+// Combinational logic with begin/end block and multiple statements.
+// =============================================================================
+TEST(ParserSection9c, AlwaysCombBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c, y;\n"
+      "  always_comb begin\n"
+      "    a = b & c;\n"
+      "    y = a | b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_GE(item->body->stmts.size(), 2u);
+}
+
 }  // namespace
