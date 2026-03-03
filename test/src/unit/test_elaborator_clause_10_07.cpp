@@ -51,4 +51,30 @@ TEST(SimCh10, BlockingAssignTruncation) {
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA with different widths — zero extension.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBAWidthExtension) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] wide;\n"
+      "  initial begin\n"
+      "    wide <= 8'hFF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("wide");
+  ASSERT_NE(var, nullptr);
+  // 8'hFF zero-extended to 32 bits = 0x000000FF.
+  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
+  EXPECT_EQ(var->value.width, 32u);
+}
+
 }  // namespace
