@@ -28,4 +28,20 @@ TEST(EvalOp, StreamingLeftShift) {
   EXPECT_EQ(result.ToUint64(), 0xD5u);
 }
 
+TEST(EvalOp, StreamingRightShift) {
+  SimFixture f;
+  // {>>{8'hAB}} — same order (no reversal)
+  auto* var = f.ctx.CreateVariable("sv2", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
+
+  auto* sc = f.arena.Create<Expr>();
+  sc->kind = ExprKind::kStreamingConcat;
+  sc->op = TokenKind::kGtGt;
+  sc->elements.push_back(MakeId(f.arena, "sv2"));
+
+  auto result = EvalExpr(sc, f.ctx, f.arena);
+  // Right-shift streaming: no bit reversal, just concatenate in order.
+  EXPECT_EQ(result.ToUint64(), 0xABu);
+}
+
 }  // namespace
