@@ -52,15 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-// =========================================================================
-// From test_parser_clause_05.cpp — §5.1 General
-// =========================================================================
-TEST(ParserCh501, FreeFormatLayout) {
-  // Spaces and newlines are not syntactically significant (except in
-  // escaped identifiers and string literals). Tokens can be on one line.
-  EXPECT_TRUE(ParseOk("module t; logic a; endmodule"));
-}
-
 TEST(ParserCh501, FreeFormatMultiline) {
   // Same construct spread over many lines.
   EXPECT_TRUE(
