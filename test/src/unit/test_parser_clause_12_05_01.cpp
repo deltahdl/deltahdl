@@ -298,4 +298,31 @@ TEST(ParserSection9, Sec9_2_2_CasexStatement) {
   ASSERT_EQ(stmt->case_items.size(), 3u);
 }
 
+// ---------------------------------------------------------------------------
+// 6. always_comb with casez statement
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_CasezStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0] req;\n"
+      "  logic [1:0] grant;\n"
+      "  always_comb begin\n"
+      "    casez (req)\n"
+      "      4'b???1: grant = 2'b00;\n"
+      "      4'b??10: grant = 2'b01;\n"
+      "      4'b?100: grant = 2'b10;\n"
+      "      4'b1000: grant = 2'b11;\n"
+      "      default: grant = 2'b00;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstAlwaysCombStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
+  ASSERT_EQ(stmt->case_items.size(), 5u);
+}
+
 }  // namespace
