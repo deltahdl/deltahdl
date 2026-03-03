@@ -105,4 +105,53 @@ TEST(EvalAdv, LetDeclarativeScope) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
+static Expr* SLMakeId(Arena& arena, std::string_view name) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIdentifier;
+  e->text = name;
+  return e;
+}
+
+static Expr* SLMakeSysCall(Arena& arena, std::string_view callee,
+                           std::vector<Expr*> args) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kSystemCall;
+  e->callee = callee;
+  e->args = std::move(args);
+  return e;
+}
+
+static Expr* SLMakeCall(Arena& arena, std::string_view callee,
+                        std::vector<Expr*> args) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kCall;
+  e->callee = callee;
+  e->args = std::move(args);
+  return e;
+}
+
+static ModuleItem* SLMakeLetDecl(Arena& arena, std::string_view name,
+                                 Expr* body,
+                                 std::vector<FunctionArg> args = {}) {
+
+}
+TEST(Assertion, LetWithPastInBody) {
+  SampledLetFixture f;
+  // let get_past(x) = $past(x);
+  FunctionArg arg;
+  arg.name = "x";
+  auto* body = SLMakeSysCall(f.arena, "$past", {SLMakeId(f.arena, "x")});
+  auto* decl = SLMakeLetDecl(f.arena, "get_past", body, {arg});
+  f.ctx.RegisterLetDecl("get_past", decl);
+
+  // Create variable sig = 42.
+  auto* var = f.ctx.CreateVariable("sig", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 42);
+
+  // get_past(sig) → let expansion → $past(x) with x=42 → stub returns 42.
+  auto* call = SLMakeCall(f.arena, "get_past", {SLMakeId(f.arena, "sig")});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}
+
 }  // namespace
