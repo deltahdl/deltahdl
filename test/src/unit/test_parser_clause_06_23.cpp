@@ -378,4 +378,15 @@ TEST(ParserSection6, Sec6_11_1_TypeRefCaseEq) {
               "endmodule\n"));
 }
 
+// 12. type() comparison with !== (case inequality).
+TEST(ParserSection6, Sec6_11_1_TypeRefCaseNeq) {
+  EXPECT_TRUE(
+      ParseOk("module t #(parameter type T = int)\n"
+              "  ();\n"
+              "  initial begin\n"
+              "    if (type(T) !== type(real)) $display(\"not exact\");\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
