@@ -152,4 +152,36 @@ TEST(ParserA604, StatementWithMultipleAttributes) {
   EXPECT_EQ(stmt->attrs[1].name, "bar");
 }
 
+// --- §5.12 Attributes ---
+struct ParseResult512 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult512 Parse(const std::string& src) {
+  ParseResult512 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// From test_parser_clause_05.cpp
+TEST(ParserCh512, AttributeOnModuleItem) {
+  auto r = Parse(
+      "module t;\n"
+      "  (* full_case *)\n"
+      "  logic [7:0] x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->attrs.size(), 1u);
+  EXPECT_EQ(item->attrs[0].name, "full_case");
+  EXPECT_EQ(item->attrs[0].value, nullptr);
+}
+
 }  // namespace

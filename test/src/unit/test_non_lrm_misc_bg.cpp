@@ -49,21 +49,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-// From test_parser_clause_05.cpp
-TEST(ParserCh512, AttributeOnModuleItem) {
-  auto r = Parse(
-      "module t;\n"
-      "  (* full_case *)\n"
-      "  logic [7:0] x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->attrs.size(), 1u);
-  EXPECT_EQ(item->attrs[0].name, "full_case");
-  EXPECT_EQ(item->attrs[0].value, nullptr);
-}
-
 TEST(ParserCh512, AttributeWithValue_Names) {
   auto r = Parse(
       "module t;\n"
