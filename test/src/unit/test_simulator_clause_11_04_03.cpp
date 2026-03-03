@@ -366,4 +366,16 @@ TEST(CompiledSim, ExecuteExpressionEval) {
   EXPECT_EQ(c_var->value.ToUint64(), 30u);
 }
 
+TEST(EvalAdv, PowZeroExp) {
+  SimFixture f;
+  // a ** 0 = 1 for any a (Table 11-4).
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeInt(f.arena, 7);
+  expr->rhs = MakeInt(f.arena, 0);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
