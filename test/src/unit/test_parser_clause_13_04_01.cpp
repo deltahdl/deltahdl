@@ -421,4 +421,45 @@ TEST(ParserSection13, FunctionReturnTypeLogicVec) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kLogic);
 }
 
+struct ParseResult7e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult7e Parse(const std::string& src) {
+  ParseResult7e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* NthItem(ParseResult7e& r, size_t n) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
+    return nullptr;
+  return r.cu->modules[0]->items[n];
+}
+
+// 13. Struct as function return value.
+TEST(ParserSection7, Sec7_2_2_FunctionReturnStruct) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int x; int y; } point_t;\n"
+      "  function point_t make_point;\n"
+      "    input int a, b;\n"
+      "    make_point = '{a, b};\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = NthItem(r, 1);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+}
+
 }  // namespace

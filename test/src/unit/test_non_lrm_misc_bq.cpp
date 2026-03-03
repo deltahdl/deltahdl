@@ -22,12 +22,6 @@ static ParseResult7e Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* NthItem(ParseResult7e& r, size_t n) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
-    return nullptr;
-  return r.cu->modules[0]->items[n];
-}
-
 static Stmt* FirstInitialStmt(ParseResult7e& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
@@ -41,23 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult7e& r) {
 }
 
 namespace {
-
-// 13. Struct as function return value.
-TEST(ParserSection7, Sec7_2_2_FunctionReturnStruct) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { int x; int y; } point_t;\n"
-      "  function point_t make_point;\n"
-      "    input int a, b;\n"
-      "    make_point = '{a, b};\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = NthItem(r, 1);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-}
 
 // 14. Struct as function argument.
 TEST(ParserSection7, Sec7_2_2_FunctionArgStruct) {
