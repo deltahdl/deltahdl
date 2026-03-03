@@ -15,40 +15,13 @@ struct DelaySpec {
   uint8_t count = 0;  // 0, 1, 2, or 3
 };
 
-struct MinTypMax {
-  uint64_t min_val = 0;
-  uint64_t typ_val = 0;
-  uint64_t max_val = 0;
-};
-
 enum class ChargeDecayState : uint8_t { kIdle, kDecaying, kDone };
-
-uint64_t SelectMinTypMax(const MinTypMax& mtm, uint8_t selector) {
-  switch (selector) {
-    case 0:
-      return mtm.min_val;
-    case 1:
-      return mtm.typ_val;
-    case 2:
-      return mtm.max_val;
-    default:
-      return mtm.typ_val;
-  }
-}
 
 bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
   return spec.count == 3;
 }
 
 namespace {
-
-// §28.16.1: No required relation — max can be less than min.
-TEST(MinTypMaxDelays, NoRequiredOrdering) {
-  MinTypMax mtm{20, 5, 10};
-  EXPECT_EQ(SelectMinTypMax(mtm, 0), 20u);
-  EXPECT_EQ(SelectMinTypMax(mtm, 1), 5u);
-  EXPECT_EQ(SelectMinTypMax(mtm, 2), 10u);
-}
 
 // =============================================================
 // §28.16.2: trireg net charge decay

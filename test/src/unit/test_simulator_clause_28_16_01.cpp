@@ -52,4 +52,12 @@ TEST(MinTypMaxDelays, SelectMax) {
   EXPECT_EQ(SelectMinTypMax(mtm, 2), 15u);
 }
 
+// §28.16.1: No required relation — max can be less than min.
+TEST(MinTypMaxDelays, NoRequiredOrdering) {
+  MinTypMax mtm{20, 5, 10};
+  EXPECT_EQ(SelectMinTypMax(mtm, 0), 20u);
+  EXPECT_EQ(SelectMinTypMax(mtm, 1), 5u);
+  EXPECT_EQ(SelectMinTypMax(mtm, 2), 10u);
+}
+
 }  // namespace
