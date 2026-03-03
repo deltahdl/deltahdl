@@ -329,4 +329,13 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefBinaryExpr) {
   EXPECT_EQ(ref->kind, ExprKind::kBinary);
 }
 
+// 7. type() used in parameter type default: parameter type T = type(logic).
+TEST(ParserSection6, Sec6_11_1_TypeRefParamDefault) {
+  auto r = Parse(
+      "module t #(parameter type T = type(logic));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

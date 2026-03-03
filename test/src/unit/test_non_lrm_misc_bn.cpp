@@ -54,15 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 7. type() used in parameter type default: parameter type T = type(logic).
-TEST(ParserSection6, Sec6_11_1_TypeRefParamDefault) {
-  auto r = Parse(
-      "module t #(parameter type T = type(logic));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // 8. type() used in parameter default with packed dimension.
 TEST(ParserSection6, Sec6_11_1_TypeRefParamPackedDim) {
   EXPECT_TRUE(
