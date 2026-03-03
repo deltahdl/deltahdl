@@ -42,16 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Ternary conditional expression ---
-TEST(ParserSection11, Sec11_1_TernaryConditionalFields) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = en ? val_a : val_b;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  VerifyTernaryFieldsAllIdentifier(rhs);
-}
-
 // --- Concatenation ---
 TEST(ParserSection11, Sec11_1_ConcatenationElements) {
   auto r = Parse(

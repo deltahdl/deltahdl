@@ -923,4 +923,14 @@ TEST(ParserSection11, Sec11_4_6_TernaryInIfCondition) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
 }
 
+// --- Ternary conditional expression ---
+TEST(ParserSection11, Sec11_1_TernaryConditionalFields) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = en ? val_a : val_b;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  VerifyTernaryFieldsAllIdentifier(rhs);
+}
+
 }  // namespace
