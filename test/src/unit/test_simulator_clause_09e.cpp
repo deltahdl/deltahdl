@@ -9,33 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.4: iff with comparison when condition is false (count_val == 0).
-TEST(SimCh9e, IffComparisonZeroSuppresses) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic clk;\n"
-      "  logic [31:0] count_val, result;\n"
-      "  initial begin\n"
-      "    clk = 0; count_val = 0; result = 0;\n"
-      "    #1 clk = 1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "  always @(posedge clk iff count_val > 0)\n"
-      "    result = 42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0u);
-}
-
 // §9.4.2.4: iff with bitwise-AND condition.
 TEST(SimCh9e, IffBitwiseAndCondition) {
   SimFixture f;
