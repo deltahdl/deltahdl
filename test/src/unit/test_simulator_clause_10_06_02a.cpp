@@ -20,17 +20,6 @@ enum class ForceTarget : uint8_t {
   kUserDefinedNettypePartSelect,
 };
 
-void ForceVariable(Variable& var, const Logic4Vec& value) { var.value = value; }
-
-void ReleaseVariable(Variable& var, bool has_continuous_driver,
-                     const Logic4Vec* continuous_value, Arena& arena) {
-  (void)arena;
-  if (has_continuous_driver && continuous_value) {
-    var.value = *continuous_value;
-  }
-  // Otherwise keep current value.
-}
-
 void ForceNet(Net& net, const Logic4Vec& value, Arena& arena) {
   (void)arena;
   net.resolved->value = value;
@@ -85,24 +74,6 @@ static TwoNets MakeTwoWireNets() {
 }
 
 namespace {
-
-// §10.6.2: "Releasing a variable that is driven by a continuous
-//  assignment ... shall reestablish that assignment."
-TEST(ForceRelease, ReleaseContinuouslyDrivenVariableReestablishes) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 1, 0);
-
-  // Continuous driver has value 0.
-  Logic4Vec continuous_val = MakeLogic4VecVal(arena, 1, 0);
-
-  ForceVariable(*var, MakeLogic4VecVal(arena, 1, 1));
-  EXPECT_EQ(ValOf(*var), kVal1);
-
-  ReleaseVariable(*var, true, &continuous_val, arena);
-  // Should reestablish continuous assignment value (0).
-  EXPECT_EQ(ValOf(*var), kVal0);
-}
 
 // --- Force on net ---
 // §10.6.2: "A force procedural statement on a net shall override all

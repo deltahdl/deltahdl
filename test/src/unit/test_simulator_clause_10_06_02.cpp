@@ -140,4 +140,22 @@ TEST(ForceRelease, ReleaseUndrivenVariableHoldsValue) {
   EXPECT_EQ(ValOf(*var), kVal1);
 }
 
+// §10.6.2: "Releasing a variable that is driven by a continuous
+//  assignment ... shall reestablish that assignment."
+TEST(ForceRelease, ReleaseContinuouslyDrivenVariableReestablishes) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4VecVal(arena, 1, 0);
+
+  // Continuous driver has value 0.
+  Logic4Vec continuous_val = MakeLogic4VecVal(arena, 1, 0);
+
+  ForceVariable(*var, MakeLogic4VecVal(arena, 1, 1));
+  EXPECT_EQ(ValOf(*var), kVal1);
+
+  ReleaseVariable(*var, true, &continuous_val, arena);
+  // Should reestablish continuous assignment value (0).
+  EXPECT_EQ(ValOf(*var), kVal0);
+}
+
 }  // namespace
