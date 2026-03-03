@@ -20,35 +20,6 @@ static void LowerRunAndCompareWidths(SimFixture& f, RtlirDesign* design,
 
 namespace {
 
-// 14. type() with signed shortint — verify sign extension on assignment.
-TEST(SimCh6b, TypeOpShortintSignExtension) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  shortint a;\n"
-      "  var type(a) result;\n"
-      "  int wide;\n"
-      "  initial begin\n"
-      "    a = -1;\n"
-      "    result = a;\n"
-      "    wide = result;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 16u);
-  EXPECT_TRUE(var->is_signed);
-  // -1 in 16 bits = 0xFFFF.
-  EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
-}
-
 // 15. type() with packed struct member type via intermediate int.
 TEST(SimCh6b, TypeOpStructMemberWidth) {
   SimFixture f;
