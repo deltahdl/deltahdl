@@ -189,4 +189,31 @@ TEST(SimCh45, ExecuteSimulationStopsWhenAllTimeSlotsEmpty) {
 // ---------------------------------------------------------------------------
 TEST(SimCh45, ExecuteTimeSlotFullRegionOrdering) { VerifyAllRegionOrder(); }
 
+// ---------------------------------------------------------------------------
+// §4.5 Active set iteration: "execute_region (Active); R = first nonempty
+// region in [Active ... Post-Observed]; if (R is nonempty) move events in R
+// to the Active region;"
+// An Inactive callback that generates Active events: Active re-executes.
+// ---------------------------------------------------------------------------
+TEST(SimCh45, ActiveSetIterationReExecutesActiveAfterInactive) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  // Inactive callback schedules a new Active event.
+  auto* inactive = sched.GetEventPool().Acquire();
+  inactive->callback = [&]() {
+    order.push_back("inactive");
+    auto* new_active = sched.GetEventPool().Acquire();
+    new_active->callback = [&]() { order.push_back("active_from_inactive"); };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, new_active);
+  };
+  sched.ScheduleEvent({0}, Region::kInactive, inactive);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 2u);
+  EXPECT_EQ(order[0], "inactive");
+  EXPECT_EQ(order[1], "active_from_inactive");
+}
+
 }  // namespace
