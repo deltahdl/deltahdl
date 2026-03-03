@@ -406,4 +406,24 @@ TEST(ParserA605, ProceduralTimingControlDelayControl) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
+// =============================================================================
+// LRM section 9.3.1 -- Blocks with timing controls.
+// =============================================================================
+TEST(ParserSection9, Sec9_3_1_BlockWithDelayControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #5 a = 1;\n"
+      "    #10 b = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDelay);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDelay);
+}
+
 }  // namespace
