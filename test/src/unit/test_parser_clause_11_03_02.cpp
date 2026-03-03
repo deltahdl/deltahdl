@@ -189,4 +189,19 @@ TEST(ParserA83, ParenthesizedExpr) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
 }
 
+// --- Parenthesized expression ---
+TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a + b) * c;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kStar);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
+}
+
 }  // namespace
