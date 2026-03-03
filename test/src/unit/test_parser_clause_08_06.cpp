@@ -44,4 +44,18 @@ TEST(ParserA82, MethodCallBasic) {
   EXPECT_EQ(expr->lhs->kind, ExprKind::kMemberAccess);
 }
 
+TEST(Parser, ClassWithMethod) {
+  auto r = Parse(
+      "class pkt;\n"
+      "  function int get_data();\n"
+      "    return data;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->members.size(), 1);
+  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kMethod);
+  EXPECT_NE(cls->members[0]->method, nullptr);
+}
+
 }  // namespace
