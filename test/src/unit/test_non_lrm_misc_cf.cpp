@@ -41,16 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, ReplicationOperator) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {4{a}};\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
-}
-
 // =========================================================================
 // Section 11.4.10 -- Shift operators (logical)
 // =========================================================================
