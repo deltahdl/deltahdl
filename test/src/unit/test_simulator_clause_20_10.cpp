@@ -33,4 +33,9 @@ TEST(SvaEngine, SeverityToString) {
   EXPECT_EQ(SeverityToString(AssertionSeverity::kFatal), "FATAL");
 }
 
+TEST(SvaEngine, SeverityDefaultIsError) {
+  AssertionSeverity sev = AssertionSeverity::kError;
+  EXPECT_EQ(SeverityToString(sev), "ERROR");
+}
+
 }  // namespace
