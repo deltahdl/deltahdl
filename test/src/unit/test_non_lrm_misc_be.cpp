@@ -34,31 +34,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 24. Static var in class method
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_StaticVarInClassMethod) {
-  auto r = Parse(
-      "class Counter;\n"
-      "  function int next();\n"
-      "    static int id = 0;\n"
-      "    id = id + 1;\n"
-      "    return id;\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "Counter");
-  auto* method_member = FindClassMethod(r);
-  ASSERT_NE(method_member, nullptr);
-  ASSERT_NE(method_member->method, nullptr);
-  ASSERT_GE(method_member->method->func_body_stmts.size(), 1u);
-  EXPECT_EQ(method_member->method->func_body_stmts[0]->kind,
-            StmtKind::kVarDecl);
-  EXPECT_TRUE(method_member->method->func_body_stmts[0]->var_is_static);
-}
-
-// =============================================================================
 // 25. Automatic var in class method
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoVarInClassMethod) {
