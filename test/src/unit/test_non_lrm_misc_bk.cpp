@@ -25,17 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.20.3: Local parameters (localparam) and type parameters
-// =========================================================================
-TEST(ParserSection6, LocalparamInHeaderPort) {
-  // §6.20.3: localparam in module parameter port list.
-  EXPECT_TRUE(
-      ParseOk("module m #(parameter int W = 8, localparam int W2 = W * 2)\n"
-              "  (input logic [W-1:0] d);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, TypeParamDefaultLogicVector) {
   // §6.20.3: Type parameter with a vector default.
   EXPECT_TRUE(

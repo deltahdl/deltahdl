@@ -106,4 +106,15 @@ TEST(ParserSection6, LocalparamConstant) {
               "endmodule\n"));
 }
 
+// =========================================================================
+// §6.20.3: Local parameters (localparam) and type parameters
+// =========================================================================
+TEST(ParserSection6, LocalparamInHeaderPort) {
+  // §6.20.3: localparam in module parameter port list.
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter int W = 8, localparam int W2 = W * 2)\n"
+              "  (input logic [W-1:0] d);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
