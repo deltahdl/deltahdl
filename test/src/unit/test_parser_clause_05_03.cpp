@@ -106,4 +106,25 @@ TEST(ParserCh501, Sec5_1_EmptyModuleExcessiveWhitespace) {
       ParseOk("  \t\n  module  \t  t  \n  ;  \n\n\t  endmodule  \n\n  "));
 }
 
+// =========================================================================
+// Operator followed immediately by number
+// =========================================================================
+TEST(ParserCh501, Sec5_1_OperatorFollowedByNumber) {
+  // No space between operator and number: "a+1" must tokenize correctly.
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = a+1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->rhs->int_val, 1u);
+}
+
 }  // namespace
