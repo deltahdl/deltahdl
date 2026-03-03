@@ -50,4 +50,9 @@ TEST(ParserCh50601, EscapedIdent_Keyword) {
   EXPECT_TRUE(ParseOk("module m; wire \\net ; endmodule"));
 }
 
+TEST(ParserCh50601, EscapedIdent_SpecialChars) {
+  // Escaped identifiers can contain any printable ASCII character.
+  EXPECT_TRUE(ParseOk("module m; wire \\***error-condition*** ; endmodule"));
+}
+
 }  // namespace

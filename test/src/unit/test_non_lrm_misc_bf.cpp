@@ -37,11 +37,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh50601, EscapedIdent_SpecialChars) {
-  // Escaped identifiers can contain any printable ASCII character.
-  EXPECT_TRUE(ParseOk("module m; wire \\***error-condition*** ; endmodule"));
-}
-
 TEST(ParserCh50601, EscapedIdent_ForwardSlash) {
   // \net1/\net2 is a valid escaped identifier containing a slash.
   EXPECT_TRUE(ParseOk("module m; wire \\net1/\\net2 ; endmodule"));
