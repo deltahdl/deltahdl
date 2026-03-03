@@ -361,4 +361,28 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInPackage) {
   EXPECT_EQ(items[2]->name, "pkg_id");
 }
 
+// =============================================================================
+// LRM section 6.11 -- Integer types in class members
+// =============================================================================
+// 27. Integer types in class members.
+TEST(ParserSection6, Sec6_11_IntegerTypesInClassMembers) {
+  auto r = Parse(
+      "class Counter;\n"
+      "  int value;\n"
+      "  byte status;\n"
+      "  longint timestamp;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_GE(members.size(), 3u);
+  EXPECT_EQ(members[0]->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(members[0]->name, "value");
+  EXPECT_EQ(members[1]->data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(members[1]->name, "status");
+  EXPECT_EQ(members[2]->data_type.kind, DataTypeKind::kLongint);
+  EXPECT_EQ(members[2]->name, "timestamp");
+}
+
 }  // namespace
