@@ -153,4 +153,15 @@ TEST(ParserSection11, Sec11_1_UnaryReductionNand) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeAmp);
 }
 
+TEST(ParserSection11, Sec11_1_UnaryReductionNor) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = ~|data;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kTildePipe);
+}
+
 }  // namespace
