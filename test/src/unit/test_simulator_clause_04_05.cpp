@@ -183,4 +183,10 @@ TEST(SimCh45, ExecuteSimulationStopsWhenAllTimeSlotsEmpty) {
   EXPECT_FALSE(sched.HasEvents());
 }
 
+// ---------------------------------------------------------------------------
+// §4.5 execute_time_slot: full region chain ordering.
+// Preponed -> Pre-Active -> Active set -> Reactive set -> Postponed.
+// ---------------------------------------------------------------------------
+TEST(SimCh45, ExecuteTimeSlotFullRegionOrdering) { VerifyAllRegionOrder(); }
+
 }  // namespace

@@ -13,12 +13,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §4.5 execute_time_slot: full region chain ordering.
-// Preponed -> Pre-Active -> Active set -> Reactive set -> Postponed.
-// ---------------------------------------------------------------------------
-TEST(SimCh45, ExecuteTimeSlotFullRegionOrdering) { VerifyAllRegionOrder(); }
-
-// ---------------------------------------------------------------------------
 // §4.5 Active set iteration: "execute_region (Active); R = first nonempty
 // region in [Active ... Post-Observed]; if (R is nonempty) move events in R
 // to the Active region;"
