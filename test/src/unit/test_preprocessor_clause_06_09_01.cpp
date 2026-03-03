@@ -31,4 +31,19 @@ TEST(ParserSection6, VectorBigEndian) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
+TEST(ParserSection6, VectorLittleEndian) {
+  // §6.9: Vector [lsb:msb] with lsb < msb (little-endian).
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  logic [0:7] le;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 0u);
+  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 7u);
+}
+
 }  // namespace
