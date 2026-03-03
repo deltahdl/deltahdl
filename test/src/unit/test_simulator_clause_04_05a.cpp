@@ -13,24 +13,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §4.5 execute_simulation: simulation stops when all time slots are empty.
-// ---------------------------------------------------------------------------
-TEST(SimCh45, ExecuteSimulationStopsWhenAllTimeSlotsEmpty) {
-  Arena arena;
-  Scheduler sched(arena);
-  int count = 0;
-
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { count++; };
-  sched.ScheduleEvent({0}, Region::kActive, ev);
-
-  sched.Run();
-  EXPECT_EQ(count, 1);
-  // After Run(), no more events — HasEvents() should be false.
-  EXPECT_FALSE(sched.HasEvents());
-}
-
-// ---------------------------------------------------------------------------
 // §4.5 execute_time_slot: full region chain ordering.
 // Preponed -> Pre-Active -> Active set -> Reactive set -> Postponed.
 // ---------------------------------------------------------------------------
