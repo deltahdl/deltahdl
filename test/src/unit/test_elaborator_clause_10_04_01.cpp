@@ -161,4 +161,31 @@ TEST(SimCh10, BlockingAssignPartSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
+// ---------------------------------------------------------------------------
+// 13. Blocking assignment with function call on RHS.
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignFunctionCall) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  function integer add(integer a, integer b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = add(7, 3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
 }  // namespace
