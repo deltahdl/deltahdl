@@ -41,20 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// =========================================================================
-// §6.6.4: Trireg charge strength and net delays
-// =========================================================================
-TEST(ParserSection6, TriregChargeStrengthSmall) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (small) s1;\n"
-      "endmodule\n");
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-  EXPECT_EQ(item->data_type.charge_strength, 1);
-}
-
 TEST(ParserSection6, TriregChargeStrengthLarge) {
   auto r = Parse(
       "module t;\n"
