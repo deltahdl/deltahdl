@@ -72,4 +72,19 @@ TEST(SourceText, ClassMethodPrototype) {
   EXPECT_EQ(members[1]->method->name, "do_work");
 }
 
+// ---------------------------------------------------------------------------
+// function_body_declaration (scope qualifiers)
+// ---------------------------------------------------------------------------
+TEST(ParserA26, FuncBodyClassScope) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern function int foo();\n"
+      "endclass\n"
+      "function int C::foo();\n"
+      "  return 42;\n"
+      "endfunction\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

@@ -17,21 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// function_body_declaration (scope qualifiers)
-// ---------------------------------------------------------------------------
-TEST(ParserA26, FuncBodyClassScope) {
-  auto r = Parse(
-      "class C;\n"
-      "  extern function int foo();\n"
-      "endclass\n"
-      "function int C::foo();\n"
-      "  return 42;\n"
-      "endfunction\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA26, FuncBodyOutOfBlockConstructor) {
   auto r = Parse(
       "class C;\n"
