@@ -89,4 +89,15 @@ TEST(ParserSection6, TypesMatchDifferent) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
+TEST(ParserSection6, TypesMatchSignedness) {
+  // Same kind but different signedness should not match.
+  DataType a;
+  a.kind = DataTypeKind::kLogic;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kLogic;
+  b.is_signed = false;
+  EXPECT_FALSE(TypesMatch(a, b));
+}
+
 }  // namespace

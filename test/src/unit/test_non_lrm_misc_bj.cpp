@@ -41,17 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, TypesMatchSignedness) {
-  // Same kind but different signedness should not match.
-  DataType a;
-  a.kind = DataTypeKind::kLogic;
-  a.is_signed = true;
-  DataType b;
-  b.kind = DataTypeKind::kLogic;
-  b.is_signed = false;
-  EXPECT_FALSE(TypesMatch(a, b));
-}
-
 TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
   // §6.22.2c: same width+signing+state-ness → equivalent.
   // byte (8-bit, 2-state) and shortint differ in width → not equivalent.
