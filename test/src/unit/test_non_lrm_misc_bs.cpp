@@ -40,21 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.25.1 — Parameterized class scope resolution: ClassName#(params)::member
-TEST(ParserSection8, ParameterizedClassScopeResolution) {
-  auto r = Parse(
-      "module m;\n"
-      "  class par_cls #(parameter int a = 25);\n"
-      "    parameter int b = 23;\n"
-      "  endclass\n"
-      "  initial begin\n"
-      "    $display(par_cls#()::b);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // §8.8 — Typed constructor with parameterized scope: ClassName#(params)::new
 TEST(ParserSection8, ParameterizedClassScopeNew) {
   auto r = Parse(

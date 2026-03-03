@@ -119,4 +119,35 @@ TEST(ParserSection13, Sec13_8_ParamCallInTernary) {
               "endmodule\n"));
 }
 
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// §8.25.1 — Parameterized class scope resolution: ClassName#(params)::member
+TEST(ParserSection8, ParameterizedClassScopeResolution) {
+  auto r = Parse(
+      "module m;\n"
+      "  class par_cls #(parameter int a = 25);\n"
+      "    parameter int b = 23;\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    $display(par_cls#()::b);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
