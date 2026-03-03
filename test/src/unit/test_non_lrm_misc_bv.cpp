@@ -39,27 +39,6 @@ static Stmt* FirstInitialStmt(ParseResult9d& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.3.1 -- Variable declarations inside sequential blocks.
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_VarDeclAsFirstStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int temp;\n"
-      "    temp = 99;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[0]->var_name, "temp");
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(ParserSection9, Sec9_3_1_MultipleDifferentTypeVarDecls) {
   auto r = Parse(
       "module m;\n"
