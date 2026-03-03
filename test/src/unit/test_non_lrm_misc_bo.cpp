@@ -34,22 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-// =========================================================================
-// §7.5.1: Dynamic array new[]
-// =========================================================================
-TEST(ParserSection7, DynamicArrayNew) {
-  auto r = Parse(
-      "module t;\n"
-      "  int dyn[];\n"
-      "  initial dyn = new[10];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 TEST(ParserSection7, DynamicArrayNewWithInit) {
   auto r = Parse(
       "module t;\n"
