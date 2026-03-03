@@ -595,4 +595,25 @@ TEST(ParserSection9, Sec9_2_2_PriorityEncoderPattern) {
   EXPECT_EQ(item->body->stmts[2]->kind, StmtKind::kIf);
 }
 
+// ---------------------------------------------------------------------------
+// 13. always_comb with if-else body.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysCombIfElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb\n"
+      "    if (sel) y = a;\n"
+      "    else y = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kIf);
+  EXPECT_NE(item->body->then_branch, nullptr);
+  EXPECT_NE(item->body->else_branch, nullptr);
+}
+
 }  // namespace
