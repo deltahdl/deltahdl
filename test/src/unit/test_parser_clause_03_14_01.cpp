@@ -98,4 +98,10 @@ TEST(ParserClause03, Cl3_14_1_ThreeOrdersNoRounding) {
   EXPECT_EQ(RealDelayToTicks(2.756, ts, TimeUnit::kPs), 2756u);
 }
 
+// 19. Zero delay: rounds to zero regardless of precision.
+TEST(ParserClause03, Cl3_14_1_ZeroDelay) {
+  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
+  EXPECT_EQ(RealDelayToTicks(0.0, ts, TimeUnit::kPs), 0u);
+}
+
 }  // namespace
