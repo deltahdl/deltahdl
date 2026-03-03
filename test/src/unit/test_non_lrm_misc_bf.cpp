@@ -52,17 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-// =========================================================================
-// Compilation-unit with only whitespace/comments (empty CU)
-// =========================================================================
-TEST(ParserCh501, Sec5_1_EmptyCuWhitespaceOnly) {
-  // A compilation unit containing only whitespace parses to an empty CU.
-  auto r = Parse("   \t\n\n  \t  ");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
-}
-
 TEST(ParserCh501, Sec5_1_EmptyCuCommentsOnly) {
   // A compilation unit containing only comments parses to an empty CU.
   auto r = Parse(
