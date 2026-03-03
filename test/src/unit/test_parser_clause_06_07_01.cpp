@@ -787,4 +787,19 @@ TEST(ParserSection6, Sec6_7_1_MixedNetTypesInModule) {
   EXPECT_EQ(items[4]->data_type.kind, DataTypeKind::kSupply1);
 }
 
+// §6.7.1: Net declaration with unpacked dimension.
+TEST(ParserSection6, Sec6_7_1_WireUnpackedDim) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire w [0:3];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->name, "w");
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
 }  // namespace
