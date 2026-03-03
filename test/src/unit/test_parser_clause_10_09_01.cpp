@@ -260,4 +260,11 @@ TEST(ParserCh510, AssignmentPattern_Replication) {
               "endmodule"));
 }
 
+TEST(ParserCh510, AssignmentPattern_NestedReplication) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
+              "endmodule"));
+}
+
 }  // namespace

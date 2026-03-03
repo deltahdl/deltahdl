@@ -49,13 +49,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-TEST(ParserCh510, AssignmentPattern_NestedReplication) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
-              "endmodule"));
-}
-
 // From test_parser_clause_05b.cpp
 TEST(ParserCh510, StructLiteral_Positional) {
   // c = '{0, 0.0}; -- positional structure literal.
