@@ -57,22 +57,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-TEST(ParserCh510, AssignmentPatternNamed) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = '{a: 0, b: 1};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
-  EXPECT_EQ(rhs->elements.size(), 2u);
-  std::string expected_keys[] = {"a", "b"};
-  VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
-}
-
 TEST(ParserCh510, AssignmentPatternDefault) {
   auto r = Parse(
       "module t;\n"

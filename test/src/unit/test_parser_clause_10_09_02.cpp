@@ -377,4 +377,57 @@ TEST(ParserSection7, Sec7_2_2_NestedStructPattern) {
   EXPECT_EQ(stmt->rhs->elements[1]->kind, ExprKind::kAssignmentPattern);
 }
 
+static void VerifyPatternKeys(const Expr* rhs,
+                              const std::string expected_keys[], size_t count) {
+  ASSERT_EQ(rhs->pattern_keys.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
+  }
+}
+
+// --- §5.12 Attributes ---
+struct ParseResult512 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult512 Parse(const std::string& src) {
+  ParseResult512 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static Stmt* FirstInitialStmt(ParseResult512& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+TEST(ParserCh510, AssignmentPatternNamed) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{a: 0, b: 1};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
+  EXPECT_EQ(rhs->elements.size(), 2u);
+  std::string expected_keys[] = {"a", "b"};
+  VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
+}
+
 }  // namespace
