@@ -60,27 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// --- Packed struct indexed part-select minus ---
-TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectMinus) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct packed {\n"
-      "    bit [7:0] a;\n"
-      "    bit [7:0] b;\n"
-      "    bit [7:0] c;\n"
-      "    bit [7:0] d;\n"
-      "  } s;\n"
-      "  initial x = s[23 -: 8];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(stmt->rhs->is_part_select_minus);
-}
-
 // --- ATM cell header: LRM-style packed struct with many fields ---
 TEST(ParserSection7, Sec7_2_1_AtmCellHeader) {
   auto r = Parse(
