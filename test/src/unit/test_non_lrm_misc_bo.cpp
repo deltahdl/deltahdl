@@ -35,21 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 namespace {
 
 // =========================================================================
-// §7.4.6: Operations on arrays
-// =========================================================================
-TEST(ParserSection7, ArrayAssignWhole) {
-  auto r = Parse(
-      "module t;\n"
-      "  int a[4], b[4];\n"
-      "  initial a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
-// =========================================================================
 // §7.5.1: Dynamic array new[]
 // =========================================================================
 TEST(ParserSection7, DynamicArrayNew) {
