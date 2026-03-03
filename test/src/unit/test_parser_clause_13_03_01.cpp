@@ -275,4 +275,17 @@ TEST(ParserSection6, AutomaticTaskDecl) {
   EXPECT_TRUE(item->is_automatic);
 }
 
+TEST(ParserSection6, StaticTaskDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  task static my_task();\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->is_static);
+}
+
 }  // namespace

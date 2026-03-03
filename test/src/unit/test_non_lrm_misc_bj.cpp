@@ -21,26 +21,7 @@ static ParseResult6b Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FirstItem(ParseResult6b& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 namespace {
-
-TEST(ParserSection6, StaticTaskDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  task static my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(item->is_static);
-}
 
 TEST(ParserSection6, ModuleLifetimeAutomatic) {
   auto r = Parse("module automatic t; endmodule\n");
