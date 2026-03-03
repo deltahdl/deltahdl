@@ -209,4 +209,34 @@ TEST(SimCh9c, MultipleLatchesEnableLow) {
   EXPECT_EQ(q2->value.ToUint64(), 0u);
 }
 
+// =============================================================================
+// §9.2.3: always_latch with incomplete case creates latch
+// =============================================================================
+// 8. Incomplete case (no default) retains value for unmatched selectors.
+TEST(SimCh9c, IncompleteCaseRetainsValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [7:0] q;\n"
+      "  initial sel = 2'b00;\n"
+      "  always_latch\n"
+      "    case (sel)\n"
+      "      2'b01: q = 8'hAA;\n"
+      "      2'b10: q = 8'hBB;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  // sel=0 matches no case item; q retains default 0.
+  EXPECT_EQ(q->value.ToUint64(), 0u);
+}
+
 }  // namespace
