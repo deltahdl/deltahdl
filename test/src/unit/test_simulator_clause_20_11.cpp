@@ -93,4 +93,12 @@ TEST(SvaEngine, AssertPassOff) {
   EXPECT_TRUE(ctrl.IsPassEnabled("inst2"));
 }
 
+TEST(SvaEngine, AssertFailOn) {
+  AssertionControl ctrl;
+  ctrl.SetFailOff("inst1");
+  EXPECT_FALSE(ctrl.IsFailEnabled("inst1"));
+  ctrl.SetFailOn("inst1");
+  EXPECT_TRUE(ctrl.IsFailEnabled("inst1"));
+}
+
 }  // namespace

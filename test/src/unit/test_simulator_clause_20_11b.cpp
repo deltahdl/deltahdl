@@ -28,14 +28,6 @@ struct SvaFixture {
 
 namespace {
 
-TEST(SvaEngine, AssertFailOn) {
-  AssertionControl ctrl;
-  ctrl.SetFailOff("inst1");
-  EXPECT_FALSE(ctrl.IsFailEnabled("inst1"));
-  ctrl.SetFailOn("inst1");
-  EXPECT_TRUE(ctrl.IsFailEnabled("inst1"));
-}
-
 TEST(SvaEngine, AssertionControlIntegration) {
   SvaFixture f;
   bool executed = false;
