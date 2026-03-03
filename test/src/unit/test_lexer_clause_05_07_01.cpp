@@ -66,3 +66,17 @@ TEST(SimCh50701, LeftPadWithZeros) {
   EXPECT_EQ(result, 0x0Fu);
 }
 
+// ---------------------------------------------------------------------------
+// 34. White space between size and base format
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, WhiteSpaceSizeAndBase) {
+  // §5.7.1: White space allowed between size, base, and value tokens.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 5 'd 3;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 3u);
+}
+
