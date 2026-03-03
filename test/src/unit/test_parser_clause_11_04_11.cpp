@@ -812,4 +812,23 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithComplexCondition) {
   EXPECT_EQ(rhs->condition->op, TokenKind::kGt);
 }
 
+// --- Ternary with binary expression operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithBinaryOperands) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel ? (a + b) : (c - d);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->true_expr->op, TokenKind::kPlus);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->false_expr->op, TokenKind::kMinus);
+}
+
 }  // namespace
