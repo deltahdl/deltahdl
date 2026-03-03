@@ -131,4 +131,10 @@ TEST(GateNetDelays, ThreeDelayXTo1IsD1) {
   EXPECT_EQ(ComputePropagationDelay(spec, Val4::kX, Val4::kV1), 10u);
 }
 
+// §28.16: Table 28-9 — z→0 = d2, z→1 = d1.
+TEST(GateNetDelays, ThreeDelayZTo0IsD2) {
+  DelaySpec spec{10, 20, 15, 3};
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kV0), 20u);
+}
+
 }  // namespace
