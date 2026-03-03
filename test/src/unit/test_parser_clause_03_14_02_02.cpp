@@ -144,4 +144,19 @@ TEST(ParserClause03, Cl3_14_2_KeywordsSetUnitAndPrecision) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
 }
 
+// 26. Way 2 alternate: timeunit with slash separator combines both.
+TEST(ParserClause03, Cl3_14_2_TimeunitSlashCombinesBoth) {
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns / 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  EXPECT_TRUE(mod->has_timeunit);
+  EXPECT_TRUE(mod->has_timeprecision);
+  EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
+  EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
+}
+
 }  // namespace
