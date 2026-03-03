@@ -625,4 +625,36 @@ TEST(ParserSection12, NestedNamedBlocks) {
   EXPECT_EQ(body->stmts[0]->label, "inner");
 }
 
+static Stmt* FirstInitialStmt(ParseResult9c& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (item->body && item->body->kind == StmtKind::kBlock) {
+      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+    }
+    return item->body;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.3.2 -- Parallel blocks (additional tests)
+// =============================================================================
+TEST(ParserSection9, ParallelBlockNamedForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : par_blk\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 2;\n"
+      "    join : par_blk\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "par_blk");
+  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
+}
+
 }  // namespace

@@ -49,27 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.3.2 -- Parallel blocks (additional tests)
-// =============================================================================
-TEST(ParserSection9, ParallelBlockNamedForkJoin) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork : par_blk\n"
-      "      #10 a = 1;\n"
-      "      #20 b = 2;\n"
-      "    join : par_blk\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->label, "par_blk");
-  EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
-}
-
 TEST(ParserSection9b, BlockingAssignBitSelect) {
   auto r = Parse(
       "module m;\n"
