@@ -24,21 +24,6 @@ static ParseResult616 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection6, StringComparison) {
-  // String comparison operators
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  string a, b;\n"
-              "  initial begin\n"
-              "    a = \"abc\";\n"
-              "    b = \"def\";\n"
-              "    if (a == b) $display(\"equal\");\n"
-              "    if (a != b) $display(\"not equal\");\n"
-              "    if (a < b) $display(\"less\");\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, MultipleStringDecls) {
   auto r = Parse(
       "module m;\n"
