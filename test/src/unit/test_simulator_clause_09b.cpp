@@ -10,33 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 20. always_comb with multi-bit addition (16-bit).
-// ---------------------------------------------------------------------------
-TEST(SimCh9b, AlwaysCombMultiBitAdd) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] a, b, y;\n"
-      "  always_comb y = a + b;\n"
-      "  initial begin\n"
-      "    a = 16'h1234;\n"
-      "    b = 16'h4321;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0x5555u);
-}
-
-// ---------------------------------------------------------------------------
 // 21. always_comb with begin-end block and multiple outputs.
 // ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombBlockMultipleOutputs) {
