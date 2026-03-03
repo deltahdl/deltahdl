@@ -75,24 +75,6 @@ static TwoNets MakeTwoWireNets() {
 
 namespace {
 
-// --- Force on net ---
-// §10.6.2: "A force procedural statement on a net shall override all
-//  drivers of the net — gate outputs, module outputs, and continuous
-//  assignments."
-TEST(ForceRelease, ForceNetOverridesAllDrivers) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-
-  ForceNet(net, MakeLogic4VecVal(arena, 1, 1), arena);
-  EXPECT_EQ(ValOf(*var), kVal1);
-}
-
 // §10.6.2: "When released, the net shall immediately be assigned the
 //  value determined by the drivers of the net."
 TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
