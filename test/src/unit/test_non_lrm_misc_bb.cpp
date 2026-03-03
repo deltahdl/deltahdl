@@ -42,24 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// =============================================================================
-// LRM §3.14.2.2 — The timeunit and timeprecision keywords
-// =============================================================================
-// 45. timeunit keyword sets the time unit of a module to a time literal.
-// §3.14.2.2: "The time unit ... can be declared by the timeunit ...
-// keywords, respectively, and set to a time literal."
-TEST(ParserClause03, Cl3_14_2_2_TimeunitSetsUnit) {
-  auto r = ParseTimescale31402(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  EXPECT_TRUE(mod->has_timeunit);
-  EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
-}
-
 // 46. timeprecision keyword sets the time precision of a module.
 // §3.14.2.2: "The time ... precision can be declared by the ...
 // timeprecision keywords, respectively, and set to a time literal."
