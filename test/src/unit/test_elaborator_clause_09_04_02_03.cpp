@@ -729,4 +729,32 @@ TEST(SimCh9e, ResultWidthAfterIffUpdate) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
+// §9.4.2.4: Verify .width and .ToUint64() on 8-bit result.
+TEST(SimCh9e, ResultWidth8BitAfterIffUpdate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, en;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    clk = 0; en = 1; result = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk iff en)\n"
+      "    result = 8'hFF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 8u);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
+}
+
 }  // namespace
