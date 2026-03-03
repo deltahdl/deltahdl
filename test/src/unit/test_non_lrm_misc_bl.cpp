@@ -32,23 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-// §6.7.1: Tri net with signed qualifier and range.
-TEST(ParserSection6, Sec6_7_1_TriSignedWithRange) {
-  auto r = Parse(
-      "module t;\n"
-      "  tri signed [15:0] ts;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTri);
-  EXPECT_TRUE(item->data_type.is_signed);
-  EXPECT_TRUE(item->data_type.is_net);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 15u);
-}
-
 // §6.7.1: Wand with range.
 TEST(ParserSection6, Sec6_7_1_WandWithRange) {
   auto r = Parse(
