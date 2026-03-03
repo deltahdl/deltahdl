@@ -90,4 +90,12 @@ TEST(ParserClause03, Cl3_14_1_TwoOrdersSmaller) {
   EXPECT_EQ(RealDelayToTicks(2.754, ts, TimeUnit::kPs), 2750u);
 }
 
+// 18. Three orders (full precision): no rounding needed.
+TEST(ParserClause03, Cl3_14_1_ThreeOrdersNoRounding) {
+  // 1ns unit, 1ps precision → 3 decimal places in ns.
+  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 1};
+  // 2.756ns = 2756ps exactly, no rounding.
+  EXPECT_EQ(RealDelayToTicks(2.756, ts, TimeUnit::kPs), 2756u);
+}
+
 }  // namespace
