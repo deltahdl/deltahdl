@@ -35,13 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-TEST(ParserA210, AssertionItemDecl_LetDecl) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let max(a, b) = (a > b) ? a : b;\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // Section 11.3.6 -- Assignment operators in expressions
 // =========================================================================

@@ -730,4 +730,11 @@ TEST(ParserA28, LetDeclInForkJoin) {
               "endmodule\n"));
 }
 
+TEST(ParserA210, AssertionItemDecl_LetDecl) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let max(a, b) = (a > b) ? a : b;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
