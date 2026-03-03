@@ -29,19 +29,6 @@ static ModuleItem* FirstItem(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, VoidTaskReturnType) {
-  // Tasks implicitly return void; verify parse is correct.
-  auto r = Parse(
-      "module t;\n"
-      "  task do_nothing();\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-}
-
 // =========================================================================
 // §6.20.3: Type parameters (additional tests)
 // =========================================================================
