@@ -269,4 +269,28 @@ TEST(ParserSection7, StructAssignmentPattern) {
   EXPECT_EQ(stmt->var_init->kind, ExprKind::kAssignmentPattern);
 }
 
+// =============================================================================
+// LRM section 7.2.2 -- Assigning to structures
+// =============================================================================
+// 1. Named assignment pattern '{a: 1, b: 2}.
+TEST(ParserSection7, Sec7_2_2_NamedAssignmentPattern) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int a; int b; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial p = '{a: 10, b: 20};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
+  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
+  ASSERT_EQ(stmt->rhs->pattern_keys.size(), 2u);
+  EXPECT_EQ(stmt->rhs->pattern_keys[0], "a");
+  EXPECT_EQ(stmt->rhs->pattern_keys[1], "b");
+}
+
 }  // namespace
