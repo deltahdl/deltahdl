@@ -69,4 +69,30 @@ TEST(SimCh9b, AlwaysCombCaseMatch) {
   EXPECT_EQ(y->value.ToUint64(), 0x30u);
 }
 
+// 9. Incomplete case with matching selector assigns value.
+TEST(SimCh9c, IncompleteCaseMatchAssigns) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [7:0] q;\n"
+      "  initial sel = 2'b01;\n"
+      "  always_latch\n"
+      "    case (sel)\n"
+      "      2'b01: q = 8'hAA;\n"
+      "      2'b10: q = 8'hBB;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 0xAAu);
+}
+
 }  // namespace
