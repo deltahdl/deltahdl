@@ -137,4 +137,9 @@ TEST(GateNetDelays, ThreeDelayZTo0IsD2) {
   EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kV0), 20u);
 }
 
+TEST(GateNetDelays, ThreeDelayZTo1IsD1) {
+  DelaySpec spec{10, 20, 15, 3};
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kV1), 10u);
+}
+
 }  // namespace

@@ -23,35 +23,6 @@ struct MinTypMax {
 
 enum class ChargeDecayState : uint8_t { kIdle, kDecaying, kDone };
 
-uint64_t ComputePropagationDelay(const DelaySpec& spec, Val4 from, Val4 to) {
-  if (spec.count == 0) return 0;
-  if (spec.count == 1) return spec.d1;
-  if (from == to) return 0;
-  if (spec.count == 2) {
-    switch (to) {
-      case Val4::kV1:
-        return spec.d1;
-      case Val4::kV0:
-        return spec.d2;
-      case Val4::kZ:
-      case Val4::kX:
-        return std::min(spec.d1, spec.d2);
-    }
-  }
-  // count == 3
-  switch (to) {
-    case Val4::kV1:
-      return spec.d1;
-    case Val4::kV0:
-      return spec.d2;
-    case Val4::kZ:
-      return spec.d3;
-    case Val4::kX:
-      return std::min({spec.d1, spec.d2, spec.d3});
-  }
-  return 0;
-}
-
 uint64_t SelectMinTypMax(const MinTypMax& mtm, uint8_t selector) {
   switch (selector) {
     case 0:
@@ -70,11 +41,6 @@ bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
 }
 
 namespace {
-
-TEST(GateNetDelays, ThreeDelayZTo1IsD1) {
-  DelaySpec spec{10, 20, 15, 3};
-  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kV1), 10u);
-}
 
 // §28.16: "The strength of the input signal shall not affect the
 //  propagation delay from an input to an output."
