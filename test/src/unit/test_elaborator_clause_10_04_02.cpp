@@ -37,4 +37,18 @@ TEST(Lowerer, NbaDefersUpdate) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
+TEST(Lowerer, NbaAppliesToValue) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b;\n"
+      "  initial begin\n"
+      "    a <= 10;\n"
+      "    b <= 20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
+}
+
 }  // namespace
