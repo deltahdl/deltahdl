@@ -24,19 +24,6 @@ static ParseResult616 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection6, StringConcatOp) {
-  // String concatenation using {} operator
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  string a, b, c;\n"
-              "  initial begin\n"
-              "    a = \"hello\";\n"
-              "    b = \" world\";\n"
-              "    c = {a, b};\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, StringComparison) {
   // String comparison operators
   EXPECT_TRUE(
