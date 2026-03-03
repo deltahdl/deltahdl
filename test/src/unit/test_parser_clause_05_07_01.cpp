@@ -744,4 +744,31 @@ TEST(ParserA87, BinaryDigitZeroOne) {
   EXPECT_EQ(rhs->int_val, 5u);
 }
 
+struct ParseDiag50701 {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine* diag = nullptr;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseDiag50701 ParseWithDiag(const std::string& src) {
+  ParseDiag50701 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  result.diag = new DiagEngine(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, *result.diag);
+  Parser parser(lexer, result.arena, *result.diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// From test_parser_clause_05.cpp
+TEST(ParserCh50701, SizedLiteral_NoOverflow) {
+  auto r = ParseWithDiag(
+      "module t;\n"
+      "  initial x = 4'hF;\n"
+      "endmodule\n");
+  EXPECT_EQ(r.diag->WarningCount(), 0u);
+  delete r.diag;
+}
+
 }  // namespace
