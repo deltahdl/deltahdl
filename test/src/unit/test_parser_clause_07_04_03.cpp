@@ -158,4 +158,19 @@ TEST(ParserSection7, MemoryDeclaration_Type) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
 
+TEST(ParserSection7, MemoryDeclaration_Dim) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] mema [0:255];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+  auto* dim = item->unpacked_dims[0];
+  ASSERT_NE(dim, nullptr);
+  EXPECT_EQ(dim->kind, ExprKind::kBinary);
+  EXPECT_EQ(dim->op, TokenKind::kColon);
+}
+
 }  // namespace
