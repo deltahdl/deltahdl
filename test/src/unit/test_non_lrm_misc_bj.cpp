@@ -29,16 +29,6 @@ static ModuleItem* FirstItem(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, VoidFunctionInClass) {
-  auto r = Parse(
-      "class C;\n"
-      "  function void setup();\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(ParserSection6, VoidTaskReturnType) {
   // Tasks implicitly return void; verify parse is correct.
   auto r = Parse(
