@@ -228,4 +228,18 @@ TEST(ParserSection7, ArrayMethodMax) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
+TEST(ParserSection7, ArrayMethodUniqueIndex) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 1, 3};\n"
+      "  int idx[$];\n"
+      "  initial idx = arr.unique_index;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
+}
+
 }  // namespace
