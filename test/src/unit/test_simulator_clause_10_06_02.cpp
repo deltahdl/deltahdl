@@ -86,4 +86,10 @@ TEST(ForceRelease, LegalTargetConstPartSelectNet) {
   EXPECT_TRUE(ValidateForceTarget(info));
 }
 
+// §10.6.2: "... or of a net with a user-defined nettype."
+TEST(ForceRelease, IllegalUserDefinedNettypePartSelect) {
+  ForceInfo info{ForceTarget::kUserDefinedNettypePartSelect};
+  EXPECT_FALSE(ValidateForceTarget(info));
+}
+
 }  // namespace
