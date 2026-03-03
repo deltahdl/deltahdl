@@ -659,4 +659,56 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombComplexLogic) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
+struct ParseResult9g {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9g Parse(const std::string& src) {
+  ParseResult9g result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysComb(ParseResult9g& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.2.2 -- Always_comb procedure
+//
+// The always_comb procedure is a combinational logic process with an
+// implicit sensitivity list. It executes once at time zero and then
+// re-executes whenever any of its input signals change. No explicit
+// sensitivity list is permitted.
+// =============================================================================
+// ---------------------------------------------------------------------------
+// 1. Simple blocking assignment in always_comb
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_SimpleBlockingAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c;\n"
+      "  always_comb a = b & c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysComb(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace

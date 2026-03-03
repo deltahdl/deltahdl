@@ -40,33 +40,6 @@ static Stmt* FirstAlwaysCombStmt(ParseResult9g& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.2.2 -- Always_comb procedure
-//
-// The always_comb procedure is a combinational logic process with an
-// implicit sensitivity list. It executes once at time zero and then
-// re-executes whenever any of its input signals change. No explicit
-// sensitivity list is permitted.
-// =============================================================================
-// ---------------------------------------------------------------------------
-// 1. Simple blocking assignment in always_comb
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_SimpleBlockingAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "  always_comb a = b & c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-}
-
 // ---------------------------------------------------------------------------
 // 2. always_comb with begin-end block containing multiple assignments
 // ---------------------------------------------------------------------------
