@@ -86,20 +86,6 @@ static TwoNets MakeTwoWireNets() {
 
 namespace {
 
-// --- Force on variable ---
-// §10.6.2: "A force statement to a variable shall override a procedural
-//  assignment, continuous assignment or an assign procedural continuous
-//  assignment to the variable."
-TEST(ForceRelease, ForceVariableOverridesValue) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 1, 1);
-  EXPECT_EQ(ValOf(*var), kVal1);
-
-  ForceVariable(*var, MakeLogic4VecVal(arena, 1, 0));
-  EXPECT_EQ(ValOf(*var), kVal0);
-}
-
 // §10.6.2: "When released, then if the variable is not driven by a
 //  continuous assignment ... the variable shall not immediately change
 //  value and shall maintain its current value."

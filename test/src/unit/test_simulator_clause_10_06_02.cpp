@@ -92,4 +92,27 @@ TEST(ForceRelease, IllegalUserDefinedNettypePartSelect) {
   EXPECT_FALSE(ValidateForceTarget(info));
 }
 
+void ForceVariable(Variable& var, const Logic4Vec& value) { var.value = value; }
+
+// --- Helpers ---
+static uint8_t ValOf(const Variable& v) {
+  uint8_t a = v.value.words[0].aval & 1;
+  uint8_t b = v.value.words[0].bval & 1;
+  return static_cast<uint8_t>((b << 1) | a);
+}
+
+// --- Force on variable ---
+// §10.6.2: "A force statement to a variable shall override a procedural
+//  assignment, continuous assignment or an assign procedural continuous
+//  assignment to the variable."
+TEST(ForceRelease, ForceVariableOverridesValue) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4VecVal(arena, 1, 1);
+  EXPECT_EQ(ValOf(*var), kVal1);
+
+  ForceVariable(*var, MakeLogic4VecVal(arena, 1, 0));
+  EXPECT_EQ(ValOf(*var), kVal0);
+}
+
 }  // namespace
