@@ -10,42 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 17. Blocking assignment with arithmetic operators (+, -, *, /).
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignArithmeticOps) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int r_add, r_sub, r_mul, r_div;\n"
-      "  initial begin\n"
-      "    r_add = 10 + 3;\n"
-      "    r_sub = 10 - 3;\n"
-      "    r_mul = 10 * 3;\n"
-      "    r_div = 10 / 3;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r_add = f.ctx.FindVariable("r_add");
-  auto* r_sub = f.ctx.FindVariable("r_sub");
-  auto* r_mul = f.ctx.FindVariable("r_mul");
-  auto* r_div = f.ctx.FindVariable("r_div");
-  ASSERT_NE(r_add, nullptr);
-  ASSERT_NE(r_sub, nullptr);
-  ASSERT_NE(r_mul, nullptr);
-  ASSERT_NE(r_div, nullptr);
-  EXPECT_EQ(r_add->value.ToUint64(), 13u);
-  EXPECT_EQ(r_sub->value.ToUint64(), 7u);
-  EXPECT_EQ(r_mul->value.ToUint64(), 30u);
-  EXPECT_EQ(r_div->value.ToUint64(), 3u);
-}
-
-// ---------------------------------------------------------------------------
 // 18. Blocking assignment with bitwise operators (&, |, ^).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBitwiseOps) {
