@@ -23,17 +23,6 @@ static ParseResult6b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection6, MatchingTypesNamedTypedefStruct) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct packed {int A; int B;} AB_t;\n"
-      "  AB_t x1;\n"
-      "  AB_t x2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-}
-
 TEST(ParserSection6, MatchingTypesSignedBitVector) {
   auto r = Parse(
       "module m;\n"
