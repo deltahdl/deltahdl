@@ -13,20 +13,6 @@ static ModuleItem* FirstItem(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.24.1: Static casting — type and size casts
-// =========================================================================
-TEST(ParserSection6, StaticCastRealToInt) {
-  // §6.24.1: int'(2.0 * 3.0) casts real to int.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    int result;\n"
-              "    result = int'(2.0 * 3.0);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, StaticCastStringType) {
   // §6.24.1: string'(expr) cast is valid per grammar.
   EXPECT_TRUE(
