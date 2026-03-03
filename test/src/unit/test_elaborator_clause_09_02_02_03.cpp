@@ -415,4 +415,38 @@ TEST(SimCh9c, ConcatenationRetainedWhenLow) {
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
+// =============================================================================
+// §9.2.3: always_latch with nested if-else
+// =============================================================================
+// 22. Nested if-else: outer condition true, inner condition true.
+TEST(SimCh9c, NestedIfElseBothTrue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic en, sel;\n"
+      "  logic [7:0] a, b, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    sel = 1;\n"
+      "    a = 8'h11;\n"
+      "    b = 8'h22;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) begin\n"
+      "      if (sel) q = a;\n"
+      "      else q = b;\n"
+      "    end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 0x11u);
+}
+
 }  // namespace
