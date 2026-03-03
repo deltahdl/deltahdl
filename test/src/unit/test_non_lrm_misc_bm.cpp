@@ -31,20 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// 20. Static lifetime qualifier with integer type.
-TEST(ParserSection6, Sec6_11_StaticLifetimeInt) {
-  auto r = Parse(
-      "module t;\n"
-      "  function automatic int count();\n"
-      "    static int counter = 0;\n"
-      "    counter = counter + 1;\n"
-      "    return counter;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // 21. Automatic lifetime qualifier with integer type.
 TEST(ParserSection6, Sec6_11_AutomaticLifetimeInt) {
   auto r = Parse(

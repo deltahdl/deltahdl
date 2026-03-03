@@ -441,4 +441,36 @@ TEST_F(ProgramParseTest, ProgramWithAutomaticLifetime) {
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
+struct ParseResult6h {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6h Parse(const std::string& src) {
+  ParseResult6h result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// 20. Static lifetime qualifier with integer type.
+TEST(ParserSection6, Sec6_11_StaticLifetimeInt) {
+  auto r = Parse(
+      "module t;\n"
+      "  function automatic int count();\n"
+      "    static int counter = 0;\n"
+      "    counter = counter + 1;\n"
+      "    return counter;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
