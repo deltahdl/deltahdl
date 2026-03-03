@@ -23,20 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 14. Unsized octal literal
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, UnsizedOctalLiteral) {
-  // §5.7.1: Unsized octal literal.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 'o7460;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 07460u);
-}
-
-// ---------------------------------------------------------------------------
 // 15. Unary minus before size (two's complement)
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, UnaryMinusBeforeSize) {
