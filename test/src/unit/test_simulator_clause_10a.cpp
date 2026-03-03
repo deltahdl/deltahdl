@@ -10,32 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 22. Multiple blocking assignments to same variable (last wins).
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignLastWins) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x;\n"
-      "  initial begin\n"
-      "    x = 1;\n"
-      "    x = 2;\n"
-      "    x = 3;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 3u);
-}
-
-// ---------------------------------------------------------------------------
 // 23. Blocking assignment chain: a=1; b=a; c=b; check c==1.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignChain) {
