@@ -292,4 +292,14 @@ TEST(ParserSection6, ShortrealInModule) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
 }
 
+TEST(ParserSection6, ShortrealInFunctionArg) {
+  // shortreal as function argument type
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function shortreal scale(shortreal val, shortreal factor);\n"
+              "    return val * factor;\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
 }  // namespace

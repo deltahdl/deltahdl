@@ -30,16 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, ShortrealInFunctionArg) {
-  // shortreal as function argument type
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function shortreal scale(shortreal val, shortreal factor);\n"
-              "    return val * factor;\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, ShortrealCast) {
   // Cast to shortreal
   EXPECT_TRUE(
