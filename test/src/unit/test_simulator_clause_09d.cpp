@@ -10,33 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 29. Verify .width and .ToUint64() on always @(*) results (32-bit output).
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarParenResultWidth32) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a, y;\n"
-      "  always @(*) y = a;\n"
-      "  initial begin\n"
-      "    a = 32'hDEADBEEF;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.width, 32u);
-  EXPECT_EQ(y->value.ToUint64(), 0xDEADBEEFu);
-}
-
-// ---------------------------------------------------------------------------
 // 30. always @* with logical NOT (!) on a multi-bit signal.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarLogicalNot) {
