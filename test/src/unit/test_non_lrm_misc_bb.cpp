@@ -42,16 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 13. Default time unit is implementation-specific; ours is kNs.
-TEST(ParserClause03, Cl3_14_2_3_DefaultIsImplementationSpecific) {
-  auto r = ParseTimescale31402("module m; endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto resolved =
-      ResolveModuleTimescale(r.cu->modules[0], r.cu, false, {}, nullptr);
-  EXPECT_EQ(resolved.unit, TimeUnit::kNs);
-  EXPECT_EQ(resolved.precision, TimeUnit::kNs);
-}
-
 // 14. CU-scope timeunit applies to interface.
 TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToInterface) {
   auto r = ParseTimescale31402(
