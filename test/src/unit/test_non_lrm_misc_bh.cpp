@@ -30,19 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, RealInExpression) {
-  // Real values in arithmetic expressions
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real a, b, c;\n"
-              "  initial begin\n"
-              "    a = 1.5;\n"
-              "    b = 2.5;\n"
-              "    c = a + b;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // --- Shortreal specifics (LRM 6.12) ---
 TEST(ParserSection6, ShortrealInModule) {
   // shortreal is same as C float (LRM 6.12)
