@@ -184,4 +184,15 @@ TEST(ParserSection6, TypesMatchNamedSame) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
+TEST(ParserSection6, TypesMatchNamedDifferent) {
+  // Two named types with different names should not match.
+  DataType a;
+  a.kind = DataTypeKind::kNamed;
+  a.type_name = "type_a";
+  DataType b;
+  b.kind = DataTypeKind::kNamed;
+  b.type_name = "type_b";
+  EXPECT_FALSE(TypesMatch(a, b));
+}
+
 }  // namespace
