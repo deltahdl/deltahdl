@@ -195,4 +195,28 @@ TEST(SimCh6b, TypeOpInteger) {
   EXPECT_TRUE(var->is_signed);
 }
 
+// 7. type() with real: resolves to 64-bit real variable.
+TEST(SimCh6b, TypeOpReal) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  real a;\n"
+      "  var type(a) b;\n"
+      "  initial begin\n"
+      "    a = 3.14;\n"
+      "    b = 2.71;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 64u);
+}
+
 }  // namespace
