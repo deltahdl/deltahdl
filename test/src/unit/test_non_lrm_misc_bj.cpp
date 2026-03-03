@@ -41,15 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// Step 1d: localparam type declaration (fixes 6.23-localparam_type_decl)
-TEST(ParserSection6, LocalparamTypeDecl) {
-  EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  localparam type testtype = logic;\n"
-               "  testtype x;\n"
-               "endmodule\n"));
-}
-
 // Step 2a: user-defined type cast (fixes 6.19.4-cast)
 TEST(ParserSection6, TypeCast_UserDefined) {
   EXPECT_TRUE(

@@ -76,4 +76,13 @@ TEST(ParserSection6, TypeParamPort) {
   EXPECT_TRUE(ParseOk6("module top #(type T = real); endmodule\n"));
 }
 
+// Step 1d: localparam type declaration (fixes 6.23-localparam_type_decl)
+TEST(ParserSection6, LocalparamTypeDecl) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  localparam type testtype = logic;\n"
+               "  testtype x;\n"
+               "endmodule\n"));
+}
+
 }  // namespace
