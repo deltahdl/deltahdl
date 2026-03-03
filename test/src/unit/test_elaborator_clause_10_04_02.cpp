@@ -393,4 +393,35 @@ TEST(SimCh10b, NBAWithIfElse) {
   EXPECT_EQ(b->value.ToUint64(), 300u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA with case statement.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBAWithCase) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] sel;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    sel = 2;\n"
+      "    case (sel)\n"
+      "      0: result <= 10;\n"
+      "      1: result <= 20;\n"
+      "      2: result <= 30;\n"
+      "      default: result <= 40;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 30u);
+}
+
 }  // namespace
