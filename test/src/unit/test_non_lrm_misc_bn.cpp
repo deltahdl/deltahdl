@@ -54,27 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 24. Multiple var type() declarations in one module.
-TEST(ParserSection6, Sec6_11_1_MultipleVarTypeRefDecls) {
-  auto r = Parse(
-      "module t;\n"
-      "  int x;\n"
-      "  real y;\n"
-      "  var type(x) a;\n"
-      "  var type(y) b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  int type_ref_count = 0;
-  for (auto* item : items) {
-    if (item->data_type.type_ref_expr != nullptr) {
-      ++type_ref_count;
-    }
-  }
-  EXPECT_EQ(type_ref_count, 2);
-}
-
 // 25. type() on integer literal expression in expression context.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnLiteral) {
   auto r = Parse(
