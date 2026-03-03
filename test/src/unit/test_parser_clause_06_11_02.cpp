@@ -449,4 +449,19 @@ TEST(ParserSection6, Sec6_11_MixedIntegerFuncParams) {
   EXPECT_EQ(item->func_args[2].direction, Direction::kOutput);
 }
 
+// time type with unpacked dimensions.
+TEST(ParserSection6, Sec6_11_TimeUnpackedArray) {
+  auto r = Parse(
+      "module t;\n"
+      "  time timestamps[10];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
+  EXPECT_EQ(item->name, "timestamps");
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
 }  // namespace
