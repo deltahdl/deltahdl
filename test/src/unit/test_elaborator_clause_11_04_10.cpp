@@ -170,4 +170,36 @@ TEST(SimCh9b, AlwaysCombRightShift) {
   EXPECT_EQ(y->value.ToUint64(), 0x0Fu);
 }
 
+// ---------------------------------------------------------------------------
+// 19. Blocking assignment with shift operators (<<, >>).
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignShiftOps) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] r_shl, r_shr;\n"
+      "  initial begin\n"
+      "    a = 8'h0F;\n"
+      "    r_shl = a << 2;\n"
+      "    r_shr = a >> 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* shl = f.ctx.FindVariable("r_shl");
+  auto* shr = f.ctx.FindVariable("r_shr");
+  ASSERT_NE(shl, nullptr);
+  ASSERT_NE(shr, nullptr);
+  // 0x0F << 2 = 0x3C (8-bit)
+  EXPECT_EQ(shl->value.ToUint64(), 0x3Cu);
+  // 0x0F >> 2 = 0x03
+  EXPECT_EQ(shr->value.ToUint64(), 0x03u);
+}
+
 }  // namespace
