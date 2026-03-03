@@ -626,4 +626,12 @@ TEST(ParserSection6, VarTypeOpDecl) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, TypeOpInParamDefault) {
+  // §6.23: type(data_type) as parameter default.
+  EXPECT_TRUE(
+      ParseOk("module t #(parameter type T = type(logic [7:0]));\n"
+              "  T data;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
