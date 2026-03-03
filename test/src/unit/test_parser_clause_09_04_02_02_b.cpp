@@ -154,4 +154,27 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarIfElse) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
+// ---------------------------------------------------------------------------
+// 16. always @* with case statement.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysStarCaseStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @*\n"
+      "    case (sel)\n"
+      "      2'b00: y = 4'h0;\n"
+      "      2'b01: y = 4'h1;\n"
+      "      default: y = 4'hf;\n"
+      "    endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kCase);
+  EXPECT_GE(item->body->case_items.size(), 3u);
+}
+
 }  // namespace
