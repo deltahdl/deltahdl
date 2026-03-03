@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §6.11.3: Signed and unsigned integer types
 
 #include "fixture_parser.h"
 #include "elaborator/type_eval.h"
