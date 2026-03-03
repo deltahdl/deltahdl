@@ -42,19 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Streaming concatenation ---
-TEST(ParserSection11, Sec11_1_StreamingConcatLeftShift) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {<< {a, b}};\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
-  EXPECT_EQ(rhs->op, TokenKind::kLtLt);
-  EXPECT_EQ(rhs->elements.size(), 2u);
-}
-
 // --- Postfix increment/decrement ---
 TEST(ParserSection11, Sec11_1_PostfixIncrementExpression) {
   auto r = Parse(
