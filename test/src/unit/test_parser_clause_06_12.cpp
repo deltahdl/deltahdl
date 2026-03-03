@@ -258,4 +258,14 @@ TEST(ParserSection6, RealtimeDecl) {
   EXPECT_EQ(item->name, "rt");
 }
 
+TEST(ParserSection6, MultipleRealDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  real a, b, c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
 }  // namespace

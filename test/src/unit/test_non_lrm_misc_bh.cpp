@@ -30,16 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, MultipleRealDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  real a, b, c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
-}
-
 TEST(ParserSection6, AllRealTypes) {
   // All three real-family types in one module
   EXPECT_TRUE(
