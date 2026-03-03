@@ -798,4 +798,11 @@ TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   delete r.diag;
 }
 
+TEST(Eval, IntegerLiteral) {
+  ExprFixture f;
+  auto* expr = ParseExprFrom("42", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}
+
 }  // namespace
