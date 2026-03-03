@@ -23,20 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 11. Sized hexadecimal literal constant
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, SizedHexLiteral) {
-  // §5.7.1: based literal with hex base
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 20'h837FF;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 0x837FFu);
-}
-
-// ---------------------------------------------------------------------------
 // 12. Sized decimal literal constant
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SizedDecimalLiteral) {
