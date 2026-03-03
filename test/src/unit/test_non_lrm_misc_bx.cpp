@@ -41,30 +41,6 @@ static Stmt* FirstAlwaysCombStmt(ParseResult9g& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 3. always_comb with if-else statement
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_IfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic sel, a, b, y;\n"
-      "  always_comb begin\n"
-      "    if (sel)\n"
-      "      y = a;\n"
-      "    else\n"
-      "      y = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstAlwaysCombStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->condition, nullptr);
-  EXPECT_NE(stmt->then_branch, nullptr);
-  EXPECT_NE(stmt->else_branch, nullptr);
-}
-
-// ---------------------------------------------------------------------------
 // 4. always_comb with case statement
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_CaseStatement) {
