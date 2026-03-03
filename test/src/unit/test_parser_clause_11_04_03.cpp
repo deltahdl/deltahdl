@@ -298,4 +298,19 @@ TEST(ParserA86, BinaryMul) {
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
 
+TEST(ParserSection11, Sec11_1_BinaryPowerOperator) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = base ** exp;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPower);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
+}
+
 }  // namespace
