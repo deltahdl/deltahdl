@@ -198,4 +198,31 @@ TEST(SimCh9b, AlwaysCombOrGate) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
+// ---------------------------------------------------------------------------
+// 5. always_comb XOR gate.
+// ---------------------------------------------------------------------------
+TEST(SimCh9b, AlwaysCombXorGate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, y;\n"
+      "  always_comb y = a ^ b;\n"
+      "  initial begin\n"
+      "    a = 8'hAA;\n"
+      "    b = 8'h55;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 0xFFu);
+}
+
 }  // namespace
