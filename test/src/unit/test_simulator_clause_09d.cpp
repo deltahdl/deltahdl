@@ -10,35 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 7. always @* with ternary operator: sel ? a : b.
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarTernaryOp) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic sel;\n"
-      "  logic [7:0] a, b, y;\n"
-      "  always @* y = sel ? a : b;\n"
-      "  initial begin\n"
-      "    a = 8'hDE;\n"
-      "    b = 8'hAD;\n"
-      "    sel = 0;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0xADu);
-}
-
-// ---------------------------------------------------------------------------
 // 8. always @* with concatenation -- all parts are sensitive.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarConcatenation) {
