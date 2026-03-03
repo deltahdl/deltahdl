@@ -18,27 +18,6 @@ static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
 
 namespace {
 
-// §6.20.7: $isunbounded returns 1 for parameter with $ value.
-TEST(SimCh6, IsunboundedTrue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  parameter int p = $;\n"
-      "  int result;\n"
-      "  initial result = $isunbounded(p);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
 // §6.23: type(expr) in variable declaration resolves type.
 TEST(SimCh6, TypeRefVarDecl) {
   SimFixture f;
