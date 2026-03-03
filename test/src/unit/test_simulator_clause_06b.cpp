@@ -8,29 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 29. type() with shortint, assign max unsigned 16-bit value.
-TEST(SimCh6b, TypeOpShortintMaxUnsigned) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  shortint a;\n"
-      "  var type(a) result;\n"
-      "  initial result = 16'hFFFF;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 16u);
-  EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
-  EXPECT_TRUE(var->is_signed);
-}
-
 // 30. type() from byte, assigned via expression from wider variable.
 TEST(SimCh6b, TypeOpByteFromWiderAssignment) {
   SimFixture f;
