@@ -557,4 +557,35 @@ TEST(SimCh9d, AlwaysStarMultipleOutputs) {
   EXPECT_EQ(diff->value.ToUint64(), 0x20u);
 }
 
+// ---------------------------------------------------------------------------
+// 20. always @* with local variable (not in sensitivity).
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarLocalVar) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, y;\n"
+      "  always @* begin\n"
+      "    logic [7:0] tmp;\n"
+      "    tmp = a + b;\n"
+      "    y = tmp;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 8'h11;\n"
+      "    b = 8'h22;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 0x33u);
+}
+
 }  // namespace
