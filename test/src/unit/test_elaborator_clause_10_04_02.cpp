@@ -480,4 +480,39 @@ TEST(SimCh10b, NBAFunctionCallRHS) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA pipeline pattern — both stages use old values.
+// stage2 <= stage1; stage1 <= in; (simulates a two-stage pipeline)
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBAPipelinePattern) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] in_val;\n"
+      "  logic [31:0] stage1;\n"
+      "  logic [31:0] stage2;\n"
+      "  initial begin\n"
+      "    in_val = 99;\n"
+      "    stage1 = 55;\n"
+      "    stage2 = 0;\n"
+      "    stage2 <= stage1;\n"
+      "    stage1 <= in_val;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* s1 = f.ctx.FindVariable("stage1");
+  auto* s2 = f.ctx.FindVariable("stage2");
+  ASSERT_NE(s1, nullptr);
+  ASSERT_NE(s2, nullptr);
+  // Both RHS values are sampled from old values.
+  EXPECT_EQ(s2->value.ToUint64(), 55u);  // Old stage1.
+  EXPECT_EQ(s1->value.ToUint64(), 99u);  // Old in_val.
+}
+
 }  // namespace
