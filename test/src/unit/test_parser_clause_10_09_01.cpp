@@ -267,4 +267,13 @@ TEST(ParserCh510, AssignmentPattern_NestedReplication) {
               "endmodule"));
 }
 
+TEST(ParserCh510, StructLiteral_NestedBraces) {
+  // ab abarr[1:0] = '{'{1, 1.0}, '{2, 2.0}};
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {int a; shortreal b;} ab;\n"
+              "  ab abarr[1:0] = '{'{1, 1.0}, '{2, 2.0}};\n"
+              "endmodule"));
+}
+
 }  // namespace
