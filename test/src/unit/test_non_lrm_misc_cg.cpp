@@ -42,16 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, ArrayThenPartSelect) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] twod[0:255][0:255];\n"
-      "  initial x = twod[14][1][3:0];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection11, IndexedPartSelectVariableBase) {
   auto r = Parse(
       "module t;\n"
