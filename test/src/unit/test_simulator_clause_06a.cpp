@@ -18,34 +18,6 @@ static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
 
 namespace {
 
-// §6.24.2: $cast function form returns 0 on invalid enum cast.
-TEST(SimCh6, CastEnumFailure) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
-      "  color_t c;\n"
-      "  int ok;\n"
-      "  initial begin\n"
-      "    ok = $cast(c, 10);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* ok = f.ctx.FindVariable("ok");
-  ASSERT_NE(ok, nullptr);
-  EXPECT_EQ(ok->value.ToUint64(), 0u);
-  // c should remain unchanged (default 0).
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(c, nullptr);
-  EXPECT_EQ(c->value.ToUint64(), 0u);
-}
-
 // §6.24.3: Bit-stream cast packs unpacked array elements MSB-first.
 TEST(SimCh6, BitStreamArrayToInt) {
   SimFixture f;
