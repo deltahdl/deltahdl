@@ -144,4 +144,31 @@ TEST(SimCh9e, IffComplexAndCondition) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §9.4.2.4: iff with logical-AND when one operand is false.
+TEST(SimCh9e, IffComplexAndConditionOneFalse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, a, b;\n"
+      "  logic [31:0] count;\n"
+      "  initial begin\n"
+      "    clk = 0; a = 1; b = 0; count = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk iff (a && b))\n"
+      "    count = count + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("count");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
 }  // namespace
