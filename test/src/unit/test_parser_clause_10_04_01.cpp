@@ -736,4 +736,17 @@ TEST(ParserSection10, Sec10_4_1_StructMemberLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
+TEST(ParserSection9b, BlockingAssignBitSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial rega[3] = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace

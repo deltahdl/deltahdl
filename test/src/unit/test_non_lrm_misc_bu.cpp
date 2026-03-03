@@ -49,19 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9b, BlockingAssignBitSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial rega[3] = 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-}
-
 TEST(ParserSection9b, BlockingAssignPartSelect) {
   auto r = Parse(
       "module m;\n"
