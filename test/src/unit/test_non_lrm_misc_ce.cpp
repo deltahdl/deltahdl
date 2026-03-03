@@ -35,16 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// let_declaration in fork/join
-TEST(ParserA28, LetDeclInForkJoin) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial fork\n"
-              "    let val = 99;\n"
-              "  join\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA210, AssertionItemDecl_LetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

@@ -720,4 +720,14 @@ TEST(ParserA28, LetDeclInTask) {
               "endmodule\n"));
 }
 
+// let_declaration in fork/join
+TEST(ParserA28, LetDeclInForkJoin) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial fork\n"
+              "    let val = 99;\n"
+              "  join\n"
+              "endmodule\n"));
+}
+
 }  // namespace
