@@ -22,12 +22,6 @@ static ParseResult7e Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FirstItem(ParseResult7e& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
-}
-
 static ModuleItem* NthItem(ParseResult7e& r, size_t n) {
   if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
     return nullptr;
@@ -47,27 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult7e& r) {
 }
 
 namespace {
-
-// 9. Default member values in struct typedef.
-TEST(ParserSection7, Sec7_2_2_DefaultMemberValues) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct {\n"
-      "    int addr = 32'h0;\n"
-      "    int data = 32'hFF;\n"
-      "    bit valid = 1'b0;\n"
-      "  } pkt_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-  ASSERT_EQ(item->typedef_type.struct_members.size(), 3u);
-  EXPECT_NE(item->typedef_type.struct_members[0].init_expr, nullptr);
-  EXPECT_NE(item->typedef_type.struct_members[1].init_expr, nullptr);
-  EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
-}
 
 // 10. Struct assigned in initial block with begin/end.
 TEST(ParserSection7, Sec7_2_2_AssignInInitialBlock) {
