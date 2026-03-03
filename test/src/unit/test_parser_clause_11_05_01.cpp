@@ -917,4 +917,22 @@ TEST(ParserA84, NonrangeSelectBitSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// --- Bit-select assigned from function call ---
+TEST(ParserSection11, Sec11_4_1_BitSelectAssignedFromFuncCall) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] vec;\n"
+      "  initial vec[0] = get_bit();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+}
+
 }  // namespace
