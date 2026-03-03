@@ -150,4 +150,72 @@ TEST(SimA82, FunctionCallInBinaryExpr) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
+// =============================================================================
+// Function output argument writeback
+// =============================================================================
+TEST(Eval, FunctionOutputArgWriteback) {
+  ExprFixture f;
+
+  // Create variable "result" in global scope.
+  auto* result_var = f.ctx.CreateVariable("result", 32);
+  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  // Build function: function void compute(input int a, output int b);
+  //   b = a * 2;
+  // endfunction
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "compute";
+  func->func_args = {
+      {Direction::kInput, false, {}, "a", nullptr, {}},
+      {Direction::kOutput, false, {}, "b", nullptr, {}},
+  };
+
+  // Body: b = a * 2
+  auto* lhs = f.arena.Create<Expr>();
+  lhs->kind = ExprKind::kIdentifier;
+  lhs->text = "b";
+
+  auto* a_ref = f.arena.Create<Expr>();
+  a_ref->kind = ExprKind::kIdentifier;
+  a_ref->text = "a";
+
+  auto* two = f.arena.Create<Expr>();
+  two->kind = ExprKind::kIntegerLiteral;
+  two->int_val = 2;
+
+  auto* mul = f.arena.Create<Expr>();
+  mul->kind = ExprKind::kBinary;
+  mul->op = TokenKind::kStar;
+  mul->lhs = a_ref;
+  mul->rhs = two;
+
+  auto* assign = f.arena.Create<Stmt>();
+  assign->kind = StmtKind::kBlockingAssign;
+  assign->lhs = lhs;
+  assign->rhs = mul;
+  func->func_body_stmts.push_back(assign);
+
+  f.ctx.RegisterFunction("compute", func);
+
+  // Build call expression: compute(21, result)
+  auto* arg0 = f.arena.Create<Expr>();
+  arg0->kind = ExprKind::kIntegerLiteral;
+  arg0->int_val = 21;
+
+  auto* arg1 = f.arena.Create<Expr>();
+  arg1->kind = ExprKind::kIdentifier;
+  arg1->text = "result";
+
+  auto* call = f.arena.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->callee = "compute";
+  call->args = {arg0, arg1};
+
+  EvalExpr(call, f.ctx, f.arena);
+
+  // Output arg "b" should have been written back to "result".
+  EXPECT_EQ(result_var->value.ToUint64(), 42u);
+}
+
 }  // namespace
