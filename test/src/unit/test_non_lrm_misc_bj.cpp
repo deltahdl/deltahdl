@@ -41,14 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// Step 1c: parameter unpacked dims (fixes 6.20.2)
-TEST(ParserSection6, ParamDecl_UnpackedDims) {
-  EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  parameter logic [31:0] p [3:0] = '{1, 2, 3, 4};\n"
-               "endmodule\n"));
-}
-
 // Step 1d: type parameter in module header (fixes 6.20.3)
 TEST(ParserSection6, TypeParamPort) {
   EXPECT_TRUE(ParseOk6("module top #(type T = real); endmodule\n"));

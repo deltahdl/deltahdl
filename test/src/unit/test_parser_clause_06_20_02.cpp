@@ -92,4 +92,12 @@ TEST(ParserSection6, ParamDecl_ImplicitType) {
                "endmodule\n"));
 }
 
+// Step 1c: parameter unpacked dims (fixes 6.20.2)
+TEST(ParserSection6, ParamDecl_UnpackedDims) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  parameter logic [31:0] p [3:0] = '{1, 2, 3, 4};\n"
+               "endmodule\n"));
+}
+
 }  // namespace
