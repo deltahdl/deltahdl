@@ -324,4 +324,22 @@ TEST(ParserClause03, Cl3_14_2_2_WorksInInterface) {
   EXPECT_EQ(ifc->time_prec, TimeUnit::kNs);
 }
 
+// 53. timeunit and timeprecision work in program declarations.
+// §3.14.2.2: "... for any module, program, package, or interface ..."
+TEST(ParserClause03, Cl3_14_2_2_WorksInProgram) {
+  auto r = ParseTimescale31402(
+      "program p;\n"
+      "  timeunit 10ns;\n"
+      "  timeprecision 100ps;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  auto* prog = r.cu->programs[0];
+  EXPECT_TRUE(prog->has_timeunit);
+  EXPECT_TRUE(prog->has_timeprecision);
+  EXPECT_EQ(prog->time_unit, TimeUnit::kNs);
+  EXPECT_EQ(prog->time_prec, TimeUnit::kPs);
+}
+
 }  // namespace
