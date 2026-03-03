@@ -652,4 +652,28 @@ TEST(SimCh50701, BaseFormatCaseInsensitive) {
   EXPECT_EQ(vd->value.ToUint64(), 0xFFu);
 }
 
+// ---------------------------------------------------------------------------
+// 35. Left padding: known value (0x3x -> yields 03x)
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, LeftPadKnownHex) {
+  // §5.7.1: Known value with x in low nibble — yields 03x.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [11:0] x;\n"
+      "  initial x = 'h3x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // x: aval=1, bval=1. Lower nibble = x, middle = 3, upper = 0-pad.
+  EXPECT_EQ(var->value.words[0].aval & 0xFFF, 0x03Fu);
+  EXPECT_EQ(var->value.words[0].bval & 0x00F, 0x00Fu);
+  EXPECT_EQ(var->value.words[0].bval & 0xF00, 0x000u);
+}
+
 }  // namespace
