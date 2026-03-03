@@ -239,4 +239,13 @@ TEST(ParserSection11, Sec11_1_RealLiteralAsExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
+// --- Real literals (LRM 5.7/5.8, used with §6.12 types) ---
+TEST(ParserSection6, RealLiteralDecimalPoint) {
+  // Standard decimal point real literal
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1.5;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

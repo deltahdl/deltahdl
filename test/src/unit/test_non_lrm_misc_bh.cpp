@@ -30,15 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-// --- Real literals (LRM 5.7/5.8, used with §6.12 types) ---
-TEST(ParserSection6, RealLiteralDecimalPoint) {
-  // Standard decimal point real literal
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 1.5;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, RealLiteralScientificNotation) {
   // Scientific notation: 1.3e2 = 130.0
   EXPECT_TRUE(
