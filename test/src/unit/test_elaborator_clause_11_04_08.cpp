@@ -52,4 +52,30 @@ TEST(ElabA86, BinaryBitwiseXnorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// ---------------------------------------------------------------------------
+// 14. Part-select via mask in always_comb (lower nibble).
+// ---------------------------------------------------------------------------
+TEST(SimCh9, AlwaysCombPartSelect) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    a = 8'hAB;\n"
+      "  end\n"
+      "  always_comb begin\n"
+      "    result = a & 8'h0F;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xBu);
+}
+
 }  // namespace
