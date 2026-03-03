@@ -41,15 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// Step 1c: localparam implicit type (fixes 6.20.4)
-TEST(ParserSection6, ParamDecl_ImplicitType) {
-  EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  localparam [10:0] p = 1 << 5;\n"
-               "  localparam logic [10:0] q = 1 << 5;\n"
-               "endmodule\n"));
-}
-
 // Step 1c: parameter unpacked dims (fixes 6.20.2)
 TEST(ParserSection6, ParamDecl_UnpackedDims) {
   EXPECT_TRUE(

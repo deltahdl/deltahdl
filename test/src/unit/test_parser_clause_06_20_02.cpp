@@ -83,4 +83,13 @@ TEST(ParserSection13, Sec13_8_ExplicitlyTypedParam) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// Step 1c: localparam implicit type (fixes 6.20.4)
+TEST(ParserSection6, ParamDecl_ImplicitType) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  localparam [10:0] p = 1 << 5;\n"
+               "  localparam logic [10:0] q = 1 << 5;\n"
+               "endmodule\n"));
+}
+
 }  // namespace
