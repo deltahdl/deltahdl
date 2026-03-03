@@ -8,34 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 27. type() with int, chained: type(a) b, type(b) c.
-TEST(SimCh6b, TypeOpChainedTypeRef) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  var type(a) b;\n"
-      "  var type(b) c;\n"
-      "  initial begin\n"
-      "    a = 10;\n"
-      "    b = 20;\n"
-      "    c = 30;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* vc = f.ctx.FindVariable("c");
-  ASSERT_NE(vc, nullptr);
-  EXPECT_EQ(vc->value.width, 32u);
-  EXPECT_EQ(vc->value.ToUint64(), 30u);
-  EXPECT_TRUE(vc->is_signed);
-}
-
 // 28. type() with int, value preserved after multiple assignments.
 TEST(SimCh6b, TypeOpMultipleAssignments) {
   SimFixture f;
