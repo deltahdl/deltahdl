@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §16.9.2.1: Repetition, concatenation, and empty matches
 
 #include <gtest/gtest.h>
 #include <cstdint>
