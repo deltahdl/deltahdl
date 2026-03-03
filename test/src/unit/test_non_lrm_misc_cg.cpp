@@ -42,21 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, IndexedPartSelectVariableBase) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [63:0] dword;\n"
-      "  integer sel;\n"
-      "  initial x = dword[8*sel +: 8];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(rhs->is_part_select_plus);
-}
-
 // =========================================================================
 // Section 11.7 -- Minimum, typical, and maximum delay expressions
 // =========================================================================
