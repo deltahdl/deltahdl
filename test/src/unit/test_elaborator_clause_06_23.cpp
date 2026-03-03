@@ -517,4 +517,26 @@ TEST(SimCh6b, TypeOpMatchingWidths) {
   EXPECT_EQ(va->is_signed, vb->is_signed);
 }
 
+// 21. type() with byte, verify full 8-bit range.
+TEST(SimCh6b, TypeOpByteFullRange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte a;\n"
+      "  var type(a) result;\n"
+      "  initial result = 8'hFF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 8u);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
+}
+
 }  // namespace
