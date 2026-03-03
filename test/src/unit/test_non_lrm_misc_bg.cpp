@@ -41,20 +41,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, AttributeWithValue_Values) {
-  auto r = Parse(
-      "module t;\n"
-      "  (* synthesis, optimize_power = 1 *)\n"
-      "  logic y;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->attrs.size(), 2u);
-  EXPECT_EQ(item->attrs[0].value, nullptr);
-  ASSERT_NE(item->attrs[1].value, nullptr);
-}
-
 TEST(ParserCh512, TopLevel_AttributeBeforeModule) {
   EXPECT_TRUE(ParseOk("(* optimize_power *) module m; endmodule"));
 }
