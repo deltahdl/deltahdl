@@ -1,7 +1,6 @@
-// §5.7.1: Integer literal constants
+// Non-LRM tests
 
 #include <cstring>
-
 #include "fixture_simulator.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
@@ -19,17 +18,8 @@ static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
   e->int_val = val;
   return e;
 }
-namespace {
 
-TEST(EvalAdv, SignedBaseLiteralIsSigned) {
-  SimFixture f;
-  // §11.3.3: 4'sd3 should produce is_signed=true on the Logic4Vec.
-  auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_signed);
-  EXPECT_EQ(result.width, 4u);
-  EXPECT_EQ(result.ToUint64(), 3u);
-}
+namespace {
 
 TEST(EvalAdv, UnsignedBaseLiteralNotSigned) {
   SimFixture f;

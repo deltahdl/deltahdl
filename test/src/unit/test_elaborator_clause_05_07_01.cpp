@@ -698,4 +698,24 @@ TEST(SimCh50701, DecimalSingleDigitX) {
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
+// Shared fixture for advanced expression evaluation tests (§11 phases 22+).
+static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
+                              uint64_t val) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->text = text;
+  e->int_val = val;
+  return e;
+}
+
+TEST(EvalAdv, SignedBaseLiteralIsSigned) {
+  SimFixture f;
+  // §11.3.3: 4'sd3 should produce is_signed=true on the Logic4Vec.
+  auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_signed);
+  EXPECT_EQ(result.width, 4u);
+  EXPECT_EQ(result.ToUint64(), 3u);
+}
+
 }  // namespace
