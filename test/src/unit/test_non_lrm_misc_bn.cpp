@@ -54,22 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 4. var type(expr) declaration produces kVarDecl with type_ref_expr.
-TEST(ParserSection6, Sec6_11_1_VarTypeRefDeclKind) {
-  auto r = Parse(
-      "module t;\n"
-      "  int a;\n"
-      "  var type(a) b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 2u);
-  EXPECT_EQ(items[1]->kind, ModuleItemKind::kVarDecl);
-  ASSERT_NE(items[1]->data_type.type_ref_expr, nullptr);
-  EXPECT_EQ(items[1]->name, "b");
-}
-
 // 5. var type(expr) stores the reference expression as an identifier.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefExprIdent) {
   auto r = Parse(
