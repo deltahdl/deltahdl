@@ -99,4 +99,16 @@ TEST(ParserA85, VarLvalueStreamingConcatSliceSize) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
 }
 
+// --- Streaming operator with type-sized slice (§11.4.14) ---
+TEST(ParserSection11, StreamingWithTypedSlice) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte a;\n"
+      "  int b;\n"
+      "  initial b = {<< byte {a}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
