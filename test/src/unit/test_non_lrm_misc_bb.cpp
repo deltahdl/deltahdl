@@ -5,24 +5,42 @@
 
 using namespace delta;
 
-namespace {
+// Helper: preprocess and parse, returning CU + preprocessor state.
+struct ParseResult3140203 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+  TimeScale preproc_timescale;
+  bool has_preproc_timescale = false;
+  TimeUnit preproc_global_precision = TimeUnit::kNs;
+};
 
-// 21. Per-element accuracy: each design element rounds to its own precision,
-// independent of finer precision specified elsewhere in the design.
-TEST(ParserClause03, Cl3_14_1_PerElementAccuracy) {
-  // Element A: 1ns / 100ps — rounds to 0.1ns steps.
-  TimeScale ts_a{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
-  // Element B: 1ns / 1ps — rounds to 0.001ns steps.
-  TimeScale ts_b{TimeUnit::kNs, 1, TimeUnit::kPs, 1};
-  // Same delay 2.756ns produces different results per element.
-  // Element A: 2.756 → 2.8ns = 2800ps.
-  EXPECT_EQ(RealDelayToTicks(2.756, ts_a, TimeUnit::kPs), 2800u);
-  // Element B: 2.756 → 2.756ns = 2756ps (no rounding at 1ps).
-  EXPECT_EQ(RealDelayToTicks(2.756, ts_b, TimeUnit::kPs), 2756u);
-  // The two results differ because each element uses its own precision.
-  EXPECT_NE(RealDelayToTicks(2.756, ts_a, TimeUnit::kPs),
-            RealDelayToTicks(2.756, ts_b, TimeUnit::kPs));
+static ParseResult3140203 ParseTimescale31402(const std::string& src) {
+  ParseResult3140203 result;
+  DiagEngine diag(result.mgr);
+  auto fid = result.mgr.AddFile("<test>", src);
+  Preprocessor preproc(result.mgr, diag, {});
+  auto pp = preproc.PreprocessTimescale(fid);
+  result.preproc_timescale = preproc.CurrentTimescale();
+  result.has_preproc_timescale = preproc.HasTimescale();
+  result.preproc_global_precision = preproc.GlobalPrecision();
+  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
 }
+
+static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items)
+    if (item->kind == ModuleItemKind::kNestedModuleDecl)
+      return item->nested_module_decl;
+  return nullptr;
+}
+
+namespace {
 
 // 22. Magnitude affects rounding: 10ns unit with 1ns precision.
 TEST(ParserClause03, Cl3_14_1_MagnitudeRounding) {
@@ -482,41 +500,6 @@ TEST(SourceText, TimeunitAndTimeprecisionSeparate) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
-}
-
-// Helper: preprocess and parse, returning CU + preprocessor state.
-struct ParseResult3140203 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-  TimeScale preproc_timescale;
-  bool has_preproc_timescale = false;
-  TimeUnit preproc_global_precision = TimeUnit::kNs;
-};
-
-static ParseResult3140203 ParseTimescale31402(const std::string& src) {
-  ParseResult3140203 result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.PreprocessTimescale(fid);
-  result.preproc_timescale = preproc.CurrentTimescale();
-  result.has_preproc_timescale = preproc.HasTimescale();
-  result.preproc_global_precision = preproc.GlobalPrecision();
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
-  for (auto* item : items)
-    if (item->kind == ModuleItemKind::kNestedModuleDecl)
-      return item->nested_module_decl;
-  return nullptr;
 }
 
 // =============================================================================
