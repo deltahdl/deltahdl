@@ -372,4 +372,16 @@ TEST(ParserClause03, Cl3_14_2_2_TimeunitAloneNoPrec) {
   EXPECT_FALSE(r.cu->modules[0]->has_timeprecision);
 }
 
+// 57. timeprecision keyword alone: only has_timeprecision is set, not
+// has_timeunit.
+TEST(ParserClause03, Cl3_14_2_2_TimeprecisionAloneNoUnit) {
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->modules[0]->has_timeunit);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
+}
+
 }  // namespace

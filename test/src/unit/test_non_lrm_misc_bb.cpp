@@ -42,18 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 57. timeprecision keyword alone: only has_timeprecision is set, not
-// has_timeunit.
-TEST(ParserClause03, Cl3_14_2_2_TimeprecisionAloneNoUnit) {
-  auto r = ParseTimescale31402(
-      "module m;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_FALSE(r.cu->modules[0]->has_timeunit);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
-}
-
 // 58. Keywords must precede other items in the time scope.
 // §3.14.2.2: "If specified, the timeunit and timeprecision declarations
 // shall precede any other items in the current time scope."
