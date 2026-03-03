@@ -235,4 +235,15 @@ TEST(ParserSection11, ReductionAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
+TEST(ParserSection11, ReductionOr) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = |a;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kPipe);
+}
+
 }  // namespace

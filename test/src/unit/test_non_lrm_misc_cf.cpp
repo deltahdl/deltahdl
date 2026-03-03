@@ -41,17 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, ReductionOr) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = |a;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
-  EXPECT_EQ(rhs->op, TokenKind::kPipe);
-}
-
 TEST(ParserSection11, ReductionXor) {
   auto r = Parse(
       "module t;\n"
