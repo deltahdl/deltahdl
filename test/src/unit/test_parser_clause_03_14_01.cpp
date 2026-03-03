@@ -70,4 +70,14 @@ TEST(ParserClause03, Cl3_14_1_OneOrderSmallerRoundsToOneDecimal) {
   EXPECT_EQ(RealDelayToTicks(2.73, ts, TimeUnit::kPs), 2700u);
 }
 
+// 16. Rounding example: 1ns unit, 100ps precision, 2.75ns rounds to 2.8ns.
+TEST(ParserClause03, Cl3_14_1_LrmExample_2_75ns) {
+  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
+  // 2.75ns rounded to nearest 100ps = 2.8ns = 2800 ticks at ps.
+  EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kPs), 2800u);
+  // Verify in ns-tick form: at ns precision, 2800ps = 2.8ns ≈ 3 ticks.
+  // But at ps global precision the value is 2800.
+  EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kPs), 2800u);
+}
+
 }  // namespace
