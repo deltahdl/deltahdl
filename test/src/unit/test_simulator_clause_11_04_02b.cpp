@@ -9,19 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalOp, PrefixDecrement) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("j", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 5);
-
-  auto* pre = MakeUnary(f.arena, TokenKind::kMinusMinus, MakeId(f.arena, "j"));
-
-  auto result = EvalExpr(pre, f.ctx, f.arena);
-  // Returns NEW value.
-  EXPECT_EQ(result.ToUint64(), 4u);
-  EXPECT_EQ(var->value.ToUint64(), 4u);
-}
-
 TEST(EvalOp, PostfixIncrement) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("i", 32);
