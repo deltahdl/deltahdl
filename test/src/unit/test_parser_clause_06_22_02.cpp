@@ -62,4 +62,15 @@ TEST(ParserSection6, TypesNotEquivalentDifferentState) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
+TEST(ParserSection6, TypesEquivalentSameKind) {
+  // §6.22.2: Same kind, same signedness, same state-ness -> equivalent.
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  b.is_signed = true;
+  EXPECT_TRUE(TypesEquivalent(a, b));
+}
+
 }  // namespace
