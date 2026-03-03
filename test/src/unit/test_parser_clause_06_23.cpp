@@ -450,4 +450,12 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnLongint) {
               "endmodule\n"));
 }
 
+// 19. type() on real data type.
+TEST(ParserSection6, Sec6_11_1_TypeRefOnReal) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(real);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -54,14 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 19. type() on real data type.
-TEST(ParserSection6, Sec6_11_1_TypeRefOnReal) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial x = type(real);\n"
-              "endmodule\n"));
-}
-
 // 20. type() on string data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnString) {
   EXPECT_TRUE(
