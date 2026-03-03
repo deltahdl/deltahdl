@@ -104,4 +104,9 @@ TEST(TimingControl, HighZDelayTreatedAsZero) {
   EXPECT_EQ(EvaluateDelay(0, false, true), 0u);
 }
 
+TEST(TimingControl, NegativeDelayUnsignedInterpretation) {
+  uint64_t result = EvaluateDelay(-1, false, false);
+  EXPECT_GT(result, 0u);
+}
+
 }  // namespace
