@@ -338,4 +338,12 @@ TEST(SwitchProcessing, Tranif0BlocksWhenControlHigh) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
+TEST(SwitchProcessing, UserDefinedNetZControlTreatedAsOff) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 1}, true});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
+}
+
 }  // namespace
