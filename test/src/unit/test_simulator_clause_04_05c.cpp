@@ -1,7 +1,6 @@
-// §4.5: SystemVerilog simulation reference algorithm
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/scheduler.h"
@@ -9,13 +8,6 @@
 using namespace delta;
 
 namespace {
-
-TEST(Scheduler, InitialState) {
-  Arena arena;
-  Scheduler sched(arena);
-  EXPECT_FALSE(sched.HasEvents());
-  EXPECT_EQ(sched.CurrentTime().ticks, 0);
-}
 
 TEST(Scheduler, ScheduleAndRunSingleEvent) {
   Arena arena;

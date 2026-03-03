@@ -358,4 +358,11 @@ TEST(SimCh45, IterativeRegionOrderMatchesAlgorithm) {
   }
 }
 
+TEST(Scheduler, InitialState) {
+  Arena arena;
+  Scheduler sched(arena);
+  EXPECT_FALSE(sched.HasEvents());
+  EXPECT_EQ(sched.CurrentTime().ticks, 0);
+}
+
 }  // namespace
