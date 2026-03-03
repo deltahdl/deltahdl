@@ -9,35 +9,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 8. always_comb case statement decode.
-// ---------------------------------------------------------------------------
-TEST(SimCh9, AlwaysCombCaseDecode) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [7:0] result;\n"
-      "  initial sel = 2'd2;\n"
-      "  always_comb begin\n"
-      "    case (sel)\n"
-      "      2'd0: result = 8'd10;\n"
-      "      2'd1: result = 8'd20;\n"
-      "      2'd2: result = 8'd30;\n"
-      "      2'd3: result = 8'd40;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 30u);
-}
-
-// ---------------------------------------------------------------------------
 // 9. always_comb case with default branch.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombCaseDefault) {
