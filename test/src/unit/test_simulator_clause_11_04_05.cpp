@@ -199,4 +199,23 @@ TEST(EvalAdv, PackedStructEqualityDiffValue) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
+TEST(EvalAdv, PackedStructInequality) {
+  SimFixture f;
+  StructTypeInfo sinfo;
+  sinfo.type_name = "my_struct";
+  sinfo.total_width = 16;
+  sinfo.is_packed = true;
+  sinfo.fields.push_back({"a", 8, 8, DataTypeKind::kLogic});
+  sinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("my_struct", sinfo);
+  MakeVar(f, "s5", 16, 0xABCD);
+  MakeVar(f, "s6", 16, 0x1234);
+  f.ctx.SetVariableStructType("s5", "my_struct");
+  f.ctx.SetVariableStructType("s6", "my_struct");
+  auto* expr = MakeBinary(f.arena, TokenKind::kBangEq, MakeId(f.arena, "s5"),
+                          MakeId(f.arena, "s6"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
