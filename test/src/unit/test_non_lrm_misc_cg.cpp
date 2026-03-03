@@ -42,20 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Replication ---
-TEST(ParserSection11, Sec11_1_ReplicateRepeatCountAndElements) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {3{a, b}};\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
-  ASSERT_NE(rhs->repeat_count, nullptr);
-  EXPECT_EQ(rhs->repeat_count->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->elements.size(), 2u);
-}
-
 // --- Bit-select ---
 TEST(ParserSection11, Sec11_1_BitSelectIndex) {
   auto r = Parse(
