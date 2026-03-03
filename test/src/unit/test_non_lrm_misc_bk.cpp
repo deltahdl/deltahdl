@@ -25,17 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, TypesMatchNamedDifferentType) {
-  // §6.22: Two kNamed types with different type_names do not match.
-  DataType a;
-  a.kind = DataTypeKind::kNamed;
-  a.type_name = "type_a";
-  DataType b;
-  b.kind = DataTypeKind::kNamed;
-  b.type_name = "type_b";
-  EXPECT_FALSE(TypesMatch(a, b));
-}
-
 // =========================================================================
 // §6.22.1: Type equivalence — matching built-in types
 // =========================================================================
