@@ -85,4 +85,16 @@ TEST(ParserSection6, LocalparamTypeDecl) {
                "endmodule\n"));
 }
 
+// =========================================================================
+// §6.20.3: Type parameters (additional tests)
+// =========================================================================
+TEST(ParserSection6, TypeParameterWithMultipleParams) {
+  EXPECT_TRUE(
+      ParseOk6("module m #(parameter type T = int, parameter type U = real)\n"
+               "  ();\n"
+               "  T x;\n"
+               "  U y;\n"
+               "endmodule\n"));
+}
+
 }  // namespace

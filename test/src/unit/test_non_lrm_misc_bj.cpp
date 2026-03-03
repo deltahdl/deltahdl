@@ -29,18 +29,6 @@ static ModuleItem* FirstItem(ParseResult6b& r) {
 
 namespace {
 
-// =========================================================================
-// §6.20.3: Type parameters (additional tests)
-// =========================================================================
-TEST(ParserSection6, TypeParameterWithMultipleParams) {
-  EXPECT_TRUE(
-      ParseOk6("module m #(parameter type T = int, parameter type U = real)\n"
-               "  ();\n"
-               "  T x;\n"
-               "  U y;\n"
-               "endmodule\n"));
-}
-
 TEST(ParserSection6, TypeParameterDefaultShortint) {
   EXPECT_TRUE(
       ParseOk6("module ma #(parameter p1 = 1, parameter type p2 = shortint)\n"
