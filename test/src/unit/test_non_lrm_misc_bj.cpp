@@ -23,20 +23,6 @@ static ParseResult6b Parse(const std::string& src) {
 
 namespace {
 
-// =========================================================================
-// §6.22.1 -- Matching types
-// =========================================================================
-TEST(ParserSection6, MatchingTypesBuiltinTypedef) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef bit node;\n"
-      "  node n1;\n"
-      "  bit n2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-}
-
 TEST(ParserSection6, MatchingTypesAnonymousStruct) {
   auto r = Parse(
       "module m;\n"

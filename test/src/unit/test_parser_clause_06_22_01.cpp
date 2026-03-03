@@ -100,4 +100,34 @@ TEST(ParserSection6, TypesMatchSignedness) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
+struct ParseResult6b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6b Parse(const std::string& src) {
+  ParseResult6b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =========================================================================
+// §6.22.1 -- Matching types
+// =========================================================================
+TEST(ParserSection6, MatchingTypesBuiltinTypedef) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef bit node;\n"
+      "  node n1;\n"
+      "  bit n2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
 }  // namespace
