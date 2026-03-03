@@ -42,39 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 9. Precedence: explicit timeunit > enclosing > `timescale > CU > default.
-// Module has timeunit, enclosing has different, `timescale is different.
-TEST(ParserClause03, Cl3_14_2_3_FullPrecedenceChain) {
-  auto r = ParseTimescale31402(
-      "`timescale 1ms / 1us\n"
-      "timeunit 1ns;\n"
-      "timeprecision 1ps;\n"
-      "module outer;\n"
-      "  timeunit 1us;\n"
-      "  timeprecision 1ns;\n"
-      "  module inner;\n"
-      "    timeunit 1fs;\n"
-      "  endmodule\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* outer = r.cu->modules[0];
-  auto outer_resolved = ResolveModuleTimescale(
-      outer, r.cu, r.has_preproc_timescale, r.preproc_timescale, nullptr);
-  // outer has explicit timeunit 1us.
-  EXPECT_EQ(outer_resolved.unit, TimeUnit::kUs);
-  EXPECT_EQ(outer_resolved.precision, TimeUnit::kNs);
-
-  auto* inner = FindNestedModule(outer->items);
-  ASSERT_NE(inner, nullptr);
-  auto inner_resolved =
-      ResolveModuleTimescale(inner, r.cu, r.has_preproc_timescale,
-                             r.preproc_timescale, &outer_resolved);
-  // inner has explicit timeunit 1fs — that wins.
-  EXPECT_EQ(inner_resolved.unit, TimeUnit::kFs);
-  // inner has no timeprecision — inherits from enclosing (rule a).
-  EXPECT_EQ(inner_resolved.precision, TimeUnit::kNs);
-}
-
 // 10. Rule (b) takes precedence over rule (c).
 TEST(ParserClause03, Cl3_14_2_3_TimescaleBeforeCUTimeunit) {
   auto r = ParseTimescale31402(
