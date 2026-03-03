@@ -728,4 +728,14 @@ TEST(EvalAdv, UnsignedBaseLiteralNotSigned) {
   EXPECT_EQ(result.ToUint64(), 3u);
 }
 
+TEST(EvalAdv, SignedHexLiteralIsSigned) {
+  SimFixture f;
+  // 8'shFF should produce is_signed=true.
+  auto* lit = MakeSizedLiteral(f.arena, "8'shFF", 0xFF);
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_signed);
+  EXPECT_EQ(result.width, 8u);
+  EXPECT_EQ(result.ToUint64(), 0xFFu);
+}
+
 }  // namespace
