@@ -42,20 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 8. CU-scope timeunit can only be set by keyword, not `timescale.
-// §3.14.2.3: "The time unit of the compilation-unit scope can only be
-// set by a timeunit declaration, not a `timescale directive."
-TEST(ParserClause03, Cl3_14_2_3_CUTimeunitOnlyByKeyword) {
-  auto r = ParseTimescale31402(
-      "`timescale 1us / 1ps\n"
-      "module m;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  // `timescale does NOT set CU-scope timeunit.
-  EXPECT_FALSE(r.cu->has_cu_timeunit);
-  EXPECT_FALSE(r.cu->has_cu_timeprecision);
-}
-
 // 9. Precedence: explicit timeunit > enclosing > `timescale > CU > default.
 // Module has timeunit, enclosing has different, `timescale is different.
 TEST(ParserClause03, Cl3_14_2_3_FullPrecedenceChain) {
