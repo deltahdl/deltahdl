@@ -49,4 +49,21 @@ TEST(ParserSection7, ArrayAssignWhole) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
+// =========================================================================
+// §7.6: Array assignments
+// =========================================================================
+TEST(ParserSection7, ArraySliceAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  int a[8], b[8];\n"
+      "  initial a[3:0] = b[7:4];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace
