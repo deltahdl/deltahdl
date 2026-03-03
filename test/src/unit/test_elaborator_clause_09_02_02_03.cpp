@@ -182,4 +182,31 @@ TEST(SimCh9c, MultipleLatchesInOneBlock) {
   EXPECT_EQ(q2->value.ToUint64(), 0x55u);
 }
 
+// 7. Multiple latches with enable low: both retain default 0.
+TEST(SimCh9c, MultipleLatchesEnableLow) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d1, d2, q1, q2;\n"
+      "  initial begin\n"
+      "    en = 0;\n"
+      "    d1 = 8'hAA;\n"
+      "    d2 = 8'h55;\n"
+      "  end\n"
+      "  always_latch begin\n"
+      "    if (en) q1 = d1;\n"
+      "    if (en) q2 = d2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Variable* q1 = nullptr;
+  Variable* q2 = nullptr;
+  LowerRunAndFindQ1Q2(f, design, q1, q2);
+  EXPECT_EQ(q1->value.ToUint64(), 0u);
+  EXPECT_EQ(q2->value.ToUint64(), 0u);
+}
+
 }  // namespace
