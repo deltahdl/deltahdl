@@ -223,4 +223,12 @@ TEST(ParserCh512, TopLevel_AttributeBeforeModule) {
   EXPECT_TRUE(ParseOk("(* optimize_power *) module m; endmodule"));
 }
 
+TEST(ParserCh512, Expr_AttributeOnOperator) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic a, b, c;\n"
+              "  assign a = b + (* mode = \"cla\" *) c;\n"
+              "endmodule"));
+}
+
 }  // namespace
