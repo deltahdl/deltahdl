@@ -28,4 +28,16 @@ TEST(ParserSection6, AssignCompatibleByteToShortint) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
+// =========================================================================
+// §6.22.3: Type assignment compatibility
+// =========================================================================
+TEST(ParserSection6, AssignCompatibleRealToReal) {
+  // §6.22.3: real to real is assignment compatible.
+  DataType a;
+  a.kind = DataTypeKind::kReal;
+  DataType b;
+  b.kind = DataTypeKind::kReal;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
 }  // namespace

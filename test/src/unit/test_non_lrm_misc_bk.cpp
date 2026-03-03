@@ -25,18 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.22.3: Type assignment compatibility
-// =========================================================================
-TEST(ParserSection6, AssignCompatibleRealToReal) {
-  // §6.22.3: real to real is assignment compatible.
-  DataType a;
-  a.kind = DataTypeKind::kReal;
-  DataType b;
-  b.kind = DataTypeKind::kReal;
-  EXPECT_TRUE(IsAssignmentCompatible(a, b));
-}
-
 TEST(ParserSection6, AssignCompatibleEnumToLogic) {
   // §6.22.3: enum base type is integral, so enum to integral is compatible.
   DataType a;
