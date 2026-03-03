@@ -68,4 +68,39 @@ TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeprecisionTakesPriority) {
   EXPECT_EQ(resolved.precision, TimeUnit::kFs);
 }
 
+static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items)
+    if (item->kind == ModuleItemKind::kNestedModuleDecl)
+      return item->nested_module_decl;
+  return nullptr;
+}
+
+// 3. Rule (a): Nested module inherits time unit from enclosing module.
+TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInheritsUnit) {
+  auto r = ParseTimescale31402(
+      "module outer;\n"
+      "  timeunit 1ps;\n"
+      "  timeprecision 1fs;\n"
+      "  module inner;\n"
+      "  endmodule\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* outer = r.cu->modules[0];
+  auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
+  EXPECT_TRUE(outer_resolved.has_unit);
+  EXPECT_EQ(outer_resolved.unit, TimeUnit::kPs);
+
+  // Find the nested module.
+  auto* inner = FindNestedModule(outer->items);
+  ASSERT_NE(inner, nullptr);
+  EXPECT_FALSE(inner->has_timeunit);
+
+  auto inner_resolved =
+      ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
+  EXPECT_TRUE(inner_resolved.has_unit);
+  EXPECT_EQ(inner_resolved.unit, TimeUnit::kPs);
+  EXPECT_TRUE(inner_resolved.has_precision);
+  EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
+}
+
 }  // namespace
