@@ -108,4 +108,30 @@ TEST(SimCh10b, NBADeferredUpdate) {
   EXPECT_EQ(a->value.ToUint64(), 20u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: Multiple NBAs to same variable — last one wins in NBA region.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, MultipleNBASameVarLastWins) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  initial begin\n"
+      "    a <= 1;\n"
+      "    a <= 2;\n"
+      "    a <= 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
 }  // namespace
