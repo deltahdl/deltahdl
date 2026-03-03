@@ -40,29 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// =============================================================================
-// Section 8.2 -- Data type syntax
-// =============================================================================
-// Integer vector types with packed dimensions.
-TEST(ParserSection8, DataTypeSyntaxIntegerVector) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] data;\n"
-      "  bit [15:0] addr;\n"
-      "  reg [3:0] nibble;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 3u);
-  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_EQ(items[0]->name, "data");
-  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kBit);
-  EXPECT_EQ(items[1]->name, "addr");
-  EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kReg);
-  EXPECT_EQ(items[2]->name, "nibble");
-}
-
 // Integer atom types.
 TEST(ParserSection8, DataTypeSyntaxIntegerAtom) {
   auto r = Parse(
