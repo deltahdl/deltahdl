@@ -10,24 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 23. Blocking assignment chain: a=1; b=a; c=b; check c==1.
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignChain) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b, c;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = a;\n"
-      "    c = b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}, {"c", 1u}});
-}
-
-// ---------------------------------------------------------------------------
 // 24. Blocking assignment with type cast (signed').
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTypeCast) {

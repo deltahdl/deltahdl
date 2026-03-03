@@ -214,4 +214,22 @@ TEST(SimCh10, BlockingAssignLastWins) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
+// ---------------------------------------------------------------------------
+// 23. Blocking assignment chain: a=1; b=a; c=b; check c==1.
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignChain) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b, c;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = a;\n"
+      "    c = b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}, {"c", 1u}});
+}
+
 }  // namespace
