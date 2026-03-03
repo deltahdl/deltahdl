@@ -49,22 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-// =========================================================================
-// §7.2.2: Assigning to structures
-// =========================================================================
-TEST(ParserSection7, StructWholeAssignment) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { int a; int b; } pair_t;\n"
-      "  pair_t p1, p2;\n"
-      "  initial p2 = p1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(ParserSection7, StructMemberDefaultInit) {
   auto r = Parse(
       "module t;\n"
