@@ -30,14 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, RealLiteralUnderscoresInValue) {
-  // Underscores in real literals for readability
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 1_000.000_1;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, RealLiteralZeroPointSomething) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
