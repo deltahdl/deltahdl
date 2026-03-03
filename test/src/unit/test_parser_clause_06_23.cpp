@@ -458,4 +458,12 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnReal) {
               "endmodule\n"));
 }
 
+// 20. type() on string data type.
+TEST(ParserSection6, Sec6_11_1_TypeRefOnString) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(string);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
