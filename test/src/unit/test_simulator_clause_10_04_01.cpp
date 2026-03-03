@@ -115,4 +115,27 @@ TEST(CompiledSim, ExecuteBlockingAssign) {
   EXPECT_EQ(x_var->value.ToUint64(), 42u);
 }
 
+// =============================================================================
+// 24. Blocking assignment to bit-select LHS (§7.4 / §10.3)
+// =============================================================================
+TEST(StmtExec, BlockingAssignBitSelect) {
+  StmtFixture f;
+  auto* var = f.ctx.CreateVariable("bs", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0);
+
+  // bs[3] = 1;
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "bs");
+  sel->index = MakeInt(f.arena, 3);
+
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kBlockingAssign;
+  stmt->lhs = sel;
+  stmt->rhs = MakeInt(f.arena, 1);
+
+  RunStmt(stmt, f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64(), 0x08u);  // bit 3 set
+}
+
 }  // namespace

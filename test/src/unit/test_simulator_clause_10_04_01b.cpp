@@ -1,8 +1,7 @@
-// §10.4.1: Blocking procedural assignments
+// Non-LRM tests
 
 #include <cstdint>
 #include <string_view>
-
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -18,29 +17,6 @@
 using namespace delta;
 
 namespace {
-
-// =============================================================================
-// 24. Blocking assignment to bit-select LHS (§7.4 / §10.3)
-// =============================================================================
-TEST(StmtExec, BlockingAssignBitSelect) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("bs", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 0);
-
-  // bs[3] = 1;
-  auto* sel = f.arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  sel->base = MakeId(f.arena, "bs");
-  sel->index = MakeInt(f.arena, 3);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kBlockingAssign;
-  stmt->lhs = sel;
-  stmt->rhs = MakeInt(f.arena, 1);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 0x08u);  // bit 3 set
-}
 
 // =============================================================================
 // 25. Blocking assignment to part-select LHS (§7.4.5 / §10.3)
