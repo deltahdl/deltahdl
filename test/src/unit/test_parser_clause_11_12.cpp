@@ -665,4 +665,18 @@ TEST(ParserLet, InstantiationNamedArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserLet, InstantiationDefaultArgs) {
+  auto r = Parse(
+      "module t;\n"
+      "  let at_least_two(sig, rst = 1'b0) = rst || sig;\n"
+      "  initial begin\n"
+      "    logic [15:0] sig1;\n"
+      "    logic q;\n"
+      "    q = at_least_two(sig1);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
