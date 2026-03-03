@@ -322,4 +322,12 @@ TEST(SwitchProcessing, Tranif1BlocksWhenControlLow) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
+TEST(SwitchProcessing, Tranif0ConductsWhenControlLow) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif0, {0, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
+}
+
 }  // namespace
