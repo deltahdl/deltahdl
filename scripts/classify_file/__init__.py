@@ -213,7 +213,11 @@ def _run(args: argparse.Namespace) -> None:
         sys.exit(1)
     test_names = extract_test_names(filepath)
     if not test_names:
-        print("ERROR: No TEST blocks found")
+        filepath.unlink()
+        if not args.create_issue and args.issue is not None:
+            close_issue(args)
+            return
+        print(f"ERROR: {filepath} has no TEST blocks")
         sys.exit(1)
     if args.create_issue:
         args.issue = create_issue(args, test_names)

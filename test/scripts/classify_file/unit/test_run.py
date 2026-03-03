@@ -520,11 +520,42 @@ def test_run_missing_file_without_issue_exits(tmp_path):
         ))
 
 
-def test_run_no_tests(tmp_path):
-    """Exits when file has no TEST blocks."""
-    make_test_file(tmp_path, "#include <gtest/gtest.h>\n")
+def test_run_no_tests_with_issue_deletes_file(
+    tmp_path, monkeypatch,
+):
+    """Empty file + --issue → file is deleted."""
+    f = make_test_file(tmp_path, "")
+    stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path))
+    assert not f.exists()
+
+
+def test_run_no_tests_with_issue_closes_issue(
+    tmp_path, monkeypatch,
+):
+    """Empty file + --issue → close_issue called."""
+    make_test_file(tmp_path, "")
+    log = stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path))
+    assert len(log) == 1
+
+
+def test_run_no_tests_with_issue_returns(
+    tmp_path, monkeypatch,
+):
+    """Empty file + --issue → returns without SystemExit."""
+    make_test_file(tmp_path, "")
+    stub_close_issue(monkeypatch)
+    assert _run(_make_run_args(tmp_path)) is None
+
+
+def test_run_no_tests_without_issue_exits(tmp_path):
+    """Empty file + --create-issue → SystemExit."""
+    make_test_file(tmp_path, "")
     with pytest.raises(SystemExit):
-        _run(_make_run_args(tmp_path))
+        _run(_make_run_args(
+            tmp_path, create_issue=True, issue=None,
+        ))
 
 
 def test_run_all_succeed(tmp_path, monkeypatch):
