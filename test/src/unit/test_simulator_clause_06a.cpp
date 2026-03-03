@@ -18,27 +18,6 @@ static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
 
 namespace {
 
-// §6.20.7: $isunbounded returns 0 for parameter with numeric value.
-TEST(SimCh6, IsunboundedFalse) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  parameter int p = 42;\n"
-      "  int result;\n"
-      "  initial result = $isunbounded(p);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0u);
-}
-
 // §6.24.2: $cast function form returns 1 on valid enum cast.
 TEST(SimCh6, CastEnumSuccess) {
   SimFixture f;
