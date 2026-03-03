@@ -738,4 +738,27 @@ TEST(ParserSection4, Sec4_9_4_ForLoopInitInStaticFunc) {
   EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
+// =============================================================================
+// 23. For-loop init var in automatic function
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_ForLoopInitInAutoFunc) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int sum_auto(int n);\n"
+      "    int total = 0;\n"
+      "    for (int i = 0; i < n; i = i + 1)\n"
+      "      total = total + i;\n"
+      "    return total;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FirstFuncOrTask(r);
+  ASSERT_NE(fn, nullptr);
+  EXPECT_TRUE(fn->is_automatic);
+  auto* for_stmt = FindStmtByKind(fn, StmtKind::kFor);
+  ASSERT_NE(for_stmt, nullptr);
+  EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
+}
+
 }  // namespace

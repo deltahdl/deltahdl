@@ -23,17 +23,6 @@ static ParseResult4e Parse(const std::string& src) {
   return result;
 }
 
-// Returns the first function or task declaration from the first module.
-static ModuleItem* FirstFuncOrTask(ParseResult4e& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl ||
-        item->kind == ModuleItemKind::kTaskDecl)
-      return item;
-  }
-  return nullptr;
-}
-
 static ClassMember* FindClassMethod(ParseResult4e& r) {
   if (r.cu->classes.empty()) return nullptr;
   for (auto* m : r.cu->classes[0]->members) {
@@ -43,29 +32,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 }
 
 namespace {
-
-// =============================================================================
-// 23. For-loop init var in automatic function
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_ForLoopInitInAutoFunc) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int sum_auto(int n);\n"
-      "    int total = 0;\n"
-      "    for (int i = 0; i < n; i = i + 1)\n"
-      "      total = total + i;\n"
-      "    return total;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_automatic);
-  auto* for_stmt = FindStmtByKind(fn, StmtKind::kFor);
-  ASSERT_NE(for_stmt, nullptr);
-  EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
-}
 
 // =============================================================================
 // 24. Static var in class method
