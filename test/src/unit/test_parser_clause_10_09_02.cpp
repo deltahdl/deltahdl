@@ -329,4 +329,20 @@ TEST(ParserSection7, Sec7_2_2_NamedWithDefault) {
   EXPECT_EQ(stmt->rhs->pattern_keys.size(), 2u);
 }
 
+// 4. Assignment pattern with replication '{4{8'h00}}.
+TEST(ParserSection7, Sec7_2_2_ReplicationPattern) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { byte a; byte b; byte c; byte d; } quad_t;\n"
+      "  quad_t q;\n"
+      "  initial q = '{4{8'h00}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
+}
+
 }  // namespace
