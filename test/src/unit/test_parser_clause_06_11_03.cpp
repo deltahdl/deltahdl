@@ -297,4 +297,20 @@ TEST(ParserSection18, IntUnsignedFunctionReturnType) {
   EXPECT_GE(r.cu->classes[0]->members.size(), 1u);
 }
 
+// 24. reg with signed qualifier.
+TEST(ParserSection6, Sec6_11_2_RegSignedQualifier) {
+  auto r = Parse(
+      "module t;\n"
+      "  reg signed [7:0] sr;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
+  EXPECT_TRUE(item->data_type.is_signed);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
+}
+
 }  // namespace
