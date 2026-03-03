@@ -93,4 +93,27 @@ TEST(SimCh9, AlwaysCombUpperPartSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
+// ---------------------------------------------------------------------------
+// 26. always_comb with shift operations.
+// ---------------------------------------------------------------------------
+TEST(SimCh9, AlwaysCombShift) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, result;\n"
+      "  initial a = 8'b0000_0011;\n"
+      "  always_comb begin\n"
+      "    result = a << 4;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x30u);
+}
+
 }  // namespace
