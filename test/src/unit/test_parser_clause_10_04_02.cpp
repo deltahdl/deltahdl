@@ -954,4 +954,20 @@ TEST(ParserSection9b, NonblockingAssignSimple) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
+TEST(ParserSection9b, NonblockingAssignMultiple) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= b;\n"
+      "    b <= a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
+}
+
 }  // namespace
