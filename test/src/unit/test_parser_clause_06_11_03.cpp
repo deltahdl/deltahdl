@@ -472,4 +472,16 @@ TEST(ParserSection6, LongintDefaultSigned) {
   EXPECT_TRUE(item->data_type.is_signed) << "longint is signed by default";
 }
 
+TEST(ParserSection6, IntegerDefaultSigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  integer i;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInteger);
+  EXPECT_TRUE(item->data_type.is_signed) << "integer is signed by default";
+}
+
 }  // namespace
