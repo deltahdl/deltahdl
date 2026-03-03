@@ -360,4 +360,16 @@ TEST(ParserClause03, Cl3_14_2_2_AllThreeMagnitudes) {
                    .has_errors);
 }
 
+// 56. timeunit keyword alone: only has_timeunit is set, not
+// has_timeprecision.
+TEST(ParserClause03, Cl3_14_2_2_TimeunitAloneNoPrec) {
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+  EXPECT_FALSE(r.cu->modules[0]->has_timeprecision);
+}
+
 }  // namespace
