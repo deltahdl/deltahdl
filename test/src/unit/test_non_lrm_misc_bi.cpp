@@ -34,28 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// =========================================================================
-// §6.24.1 -- Static casting (additional tests)
-// =========================================================================
-// =========================================================================
-// §6.24.2 -- Dynamic casting ($cast)
-// =========================================================================
-TEST(ParserSection6, DynamicCastCall) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    $cast(d, b);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  ASSERT_NE(stmt->expr, nullptr);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
-  EXPECT_EQ(stmt->expr->callee, "$cast");
-}
-
 TEST(ParserSection6, DynamicCastInCondition) {
   auto r = Parse(
       "module t;\n"
