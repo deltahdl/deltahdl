@@ -53,15 +53,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 namespace {
 
 // =========================================================================
-// Mixed tokens without whitespace where unambiguous
-// =========================================================================
-TEST(ParserCh501, Sec5_1_MixedTokensNoWhitespace) {
-  // Whitespace is only required where absence would create ambiguity.
-  // Operators and punctuation are self-delimiting.
-  EXPECT_TRUE(ParseOk("module m;logic a;assign a=1'b0;endmodule"));
-}
-
-// =========================================================================
 // Multiple statements on one line
 // =========================================================================
 TEST(ParserCh501, Sec5_1_MultipleStatementsOnOneLine) {

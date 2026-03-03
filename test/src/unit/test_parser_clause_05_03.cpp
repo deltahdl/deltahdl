@@ -127,4 +127,13 @@ TEST(ParserCh501, Sec5_1_OperatorFollowedByNumber) {
   EXPECT_EQ(rhs->rhs->int_val, 1u);
 }
 
+// =========================================================================
+// Mixed tokens without whitespace where unambiguous
+// =========================================================================
+TEST(ParserCh501, Sec5_1_MixedTokensNoWhitespace) {
+  // Whitespace is only required where absence would create ambiguity.
+  // Operators and punctuation are self-delimiting.
+  EXPECT_TRUE(ParseOk("module m;logic a;assign a=1'b0;endmodule"));
+}
+
 }  // namespace
