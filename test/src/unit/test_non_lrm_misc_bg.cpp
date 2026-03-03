@@ -4,14 +4,6 @@
 
 using namespace delta;
 
-static void VerifyPatternKeys(const Expr* rhs,
-                              const std::string expected_keys[], size_t count) {
-  ASSERT_EQ(rhs->pattern_keys.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
-  }
-}
-
 // --- §5.12 Attributes ---
 struct ParseResult512 {
   SourceManager mgr;
@@ -56,21 +48,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 }
 
 namespace {
-
-TEST(ParserCh510, AssignmentPatternDefault) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = '{default: 0};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
-  std::string expected_keys[] = {"default"};
-  VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
-}
 
 TEST(ParserCh510, AssignmentPattern_TypeKey) {
   EXPECT_TRUE(

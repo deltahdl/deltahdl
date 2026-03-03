@@ -430,4 +430,19 @@ TEST(ParserCh510, AssignmentPatternNamed) {
   VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
 }
 
+TEST(ParserCh510, AssignmentPatternDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{default: 0};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
+  std::string expected_keys[] = {"default"};
+  VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
+}
+
 }  // namespace
