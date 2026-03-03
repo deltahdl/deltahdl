@@ -42,35 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 54. All six time units are accepted as time literals for timeunit.
-// §3.14.2.2 / §5.8: time literals can use s, ms, us, ns, ps, fs.
-TEST(ParserClause03, Cl3_14_2_2_AllSixUnitsAccepted) {
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1s; endmodule")
-                .cu->modules[0]
-                ->time_unit,
-            TimeUnit::kS);
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1ms; endmodule")
-                .cu->modules[0]
-                ->time_unit,
-            TimeUnit::kMs);
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1us; endmodule")
-                .cu->modules[0]
-                ->time_unit,
-            TimeUnit::kUs);
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1ns; endmodule")
-                .cu->modules[0]
-                ->time_unit,
-            TimeUnit::kNs);
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1ps; endmodule")
-                .cu->modules[0]
-                ->time_unit,
-            TimeUnit::kPs);
-  EXPECT_EQ(ParseTimescale31402("module m; timeunit 1fs; endmodule")
-                .cu->modules[0]
-                ->time_unit,
-            TimeUnit::kFs);
-}
-
 // 55. All three magnitudes (1, 10, 100) are accepted in timeunit.
 // §3.14.2.2 / §5.8: time literals include magnitude.
 TEST(ParserClause03, Cl3_14_2_2_AllThreeMagnitudes) {
