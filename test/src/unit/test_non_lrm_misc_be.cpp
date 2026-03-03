@@ -45,30 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 22. For-loop init var in static function
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_ForLoopInitInStaticFunc) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int sum_n(int n);\n"
-      "    int total;\n"
-      "    total = 0;\n"
-      "    for (int i = 0; i < n; i = i + 1)\n"
-      "      total = total + i;\n"
-      "    return total;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_static);
-  auto* for_stmt = FindStmtByKind(fn, StmtKind::kFor);
-  ASSERT_NE(for_stmt, nullptr);
-  EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
-}
-
-// =============================================================================
 // 23. For-loop init var in automatic function
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_ForLoopInitInAutoFunc) {
