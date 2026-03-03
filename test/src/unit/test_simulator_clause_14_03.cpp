@@ -98,4 +98,28 @@ TEST(SimA611, MultipleClockingBlocks) {
   EXPECT_NE(cmgr.Find("cb_slow"), nullptr);
 }
 
+// Helper fixture for clocking simulation tests.
+// Schedule posedge at a given time through the scheduler.
+// Schedule negedge at a given time through the scheduler.
+// =============================================================================
+// 1. Clocking block declaration with clock event (S14.3)
+// =============================================================================
+TEST(ClockingSim, DeclareWithClockEvent) {
+  ClockingSimFixture f;
+  ClockingManager cmgr;
+
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
+  cmgr.Register(block);
+
+  const auto* found = cmgr.Find("cb");
+  ASSERT_NE(found, nullptr);
+  EXPECT_EQ(found->clock_signal, "clk");
+  EXPECT_EQ(found->clock_edge, Edge::kPosedge);
+}
+
 }  // namespace
