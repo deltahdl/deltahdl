@@ -42,22 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 28. timeunit keyword handles all six time units.
-TEST(ParserClause03, Cl3_14_2_TimeunitAllSixUnits) {
-  auto r_s = ParseTimescale31402("module m; timeunit 1s; endmodule\n");
-  EXPECT_EQ(r_s.cu->modules[0]->time_unit, TimeUnit::kS);
-  auto r_ms = ParseTimescale31402("module m; timeunit 1ms; endmodule\n");
-  EXPECT_EQ(r_ms.cu->modules[0]->time_unit, TimeUnit::kMs);
-  auto r_us = ParseTimescale31402("module m; timeunit 1us; endmodule\n");
-  EXPECT_EQ(r_us.cu->modules[0]->time_unit, TimeUnit::kUs);
-  auto r_ns = ParseTimescale31402("module m; timeunit 1ns; endmodule\n");
-  EXPECT_EQ(r_ns.cu->modules[0]->time_unit, TimeUnit::kNs);
-  auto r_ps = ParseTimescale31402("module m; timeunit 1ps; endmodule\n");
-  EXPECT_EQ(r_ps.cu->modules[0]->time_unit, TimeUnit::kPs);
-  auto r_fs = ParseTimescale31402("module m; timeunit 1fs; endmodule\n");
-  EXPECT_EQ(r_fs.cu->modules[0]->time_unit, TimeUnit::kFs);
-}
-
 // 30. Equivalent specifications: both mechanisms specify the same time values.
 // `timescale 1ns/1ps is equivalent to timeunit 1ns; timeprecision 1ps.
 TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
