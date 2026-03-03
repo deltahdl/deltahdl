@@ -481,13 +481,12 @@ def test_create_issue_exits_on_failure(monkeypatch):
 
 
 def test_run_file_not_found(tmp_path):
-    """Exits when input file does not exist."""
+    """Returns cleanly when input file does not exist."""
     args = _make_run_args(
         tmp_path, file=str(tmp_path / "missing.cpp"),
         create_issue=True, issue=None,
     )
-    with pytest.raises(SystemExit):
-        _run(args)
+    assert _run(args) is None
 
 
 def test_run_missing_file_with_issue_closes_issue(
@@ -511,13 +510,12 @@ def test_run_missing_file_with_issue_returns(
     )) is None
 
 
-def test_run_missing_file_without_issue_exits(tmp_path):
-    """Missing file + --create-issue → SystemExit."""
-    with pytest.raises(SystemExit):
-        _run(_make_run_args(
-            tmp_path, file=str(tmp_path / "missing.cpp"),
-            create_issue=True, issue=None,
-        ))
+def test_run_missing_file_with_create_issue_returns(tmp_path):
+    """Missing file + --create-issue → returns without SystemExit."""
+    assert _run(_make_run_args(
+        tmp_path, file=str(tmp_path / "missing.cpp"),
+        create_issue=True, issue=None,
+    )) is None
 
 
 def test_run_no_tests_with_issue_deletes_file(
@@ -549,13 +547,21 @@ def test_run_no_tests_with_issue_returns(
     assert _run(_make_run_args(tmp_path)) is None
 
 
-def test_run_no_tests_without_issue_exits(tmp_path):
-    """Empty file + --create-issue → SystemExit."""
+def test_run_no_tests_with_create_issue_deletes_file(tmp_path):
+    """Empty file + --create-issue → file is deleted."""
+    f = make_test_file(tmp_path, "")
+    _run(_make_run_args(
+        tmp_path, create_issue=True, issue=None,
+    ))
+    assert not f.exists()
+
+
+def test_run_no_tests_with_create_issue_returns(tmp_path):
+    """Empty file + --create-issue → returns without SystemExit."""
     make_test_file(tmp_path, "")
-    with pytest.raises(SystemExit):
-        _run(_make_run_args(
-            tmp_path, create_issue=True, issue=None,
-        ))
+    assert _run(_make_run_args(
+        tmp_path, create_issue=True, issue=None,
+    )) is None
 
 
 def test_run_all_succeed(tmp_path, monkeypatch):
