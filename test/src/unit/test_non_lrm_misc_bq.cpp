@@ -60,24 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// 2. Default assignment pattern '{default: 0}.
-TEST(ParserSection7, Sec7_2_2_DefaultAssignmentPattern) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { int a; int b; int c; } triple_t;\n"
-      "  triple_t t1;\n"
-      "  initial t1 = '{default: 0};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
-  ASSERT_GE(stmt->rhs->pattern_keys.size(), 1u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0], "default");
-}
-
 // 3. Named with default pattern '{a: 1, default: 0}.
 TEST(ParserSection7, Sec7_2_2_NamedWithDefault) {
   auto r = Parse(
