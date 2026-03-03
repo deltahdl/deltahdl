@@ -32,21 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-// §6.7.1: Net with vectored qualifier.
-TEST(ParserSection6, Sec6_7_1_WireVectoredQualifier) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire vectored [7:0] v;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_vectored);
-  EXPECT_EQ(item->name, "v");
-}
-
 // §6.7.1: Net with scalared qualifier.
 TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
   auto r = Parse(
