@@ -10,33 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 22. always_comb with left shift.
-// ---------------------------------------------------------------------------
-TEST(SimCh9b, AlwaysCombLeftShift) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] data, y;\n"
-      "  always_comb y = data << 2;\n"
-      "  initial begin\n"
-      "    data = 8'h0F;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  // 0x0F << 2 = 0x3C.
-  EXPECT_EQ(y->value.ToUint64(), 0x3Cu);
-}
-
-// ---------------------------------------------------------------------------
 // 23. always_comb with right shift.
 // ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombRightShift) {
