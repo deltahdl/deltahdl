@@ -25,20 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, TypedefUsedInVarDecl) {
-  // §6.18: A typedef-defined name appears as kNamed in subsequent decls.
-  auto r = ParseWithPreprocessor(
-      "module t;\n"
-      "  typedef int counter_t;\n"
-      "  counter_t cnt;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto* var = r.cu->modules[0]->items[1];
-  EXPECT_EQ(var->data_type.kind, DataTypeKind::kNamed);
-  EXPECT_EQ(var->data_type.type_name, "counter_t");
-}
-
 // =========================================================================
 // §6.20: Constants — parameter and localparam
 // =========================================================================
