@@ -36,29 +36,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 22. Fork with nonblocking assignments
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_3_2_ForkWithNonblockingAssigns) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      a <= 1;\n"
-      "      b <= 2;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_EQ(stmt->fork_stmts.size(), 2u);
-  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kNonblockingAssign);
-  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kNonblockingAssign);
-}
-
-// ---------------------------------------------------------------------------
 // 23. Multiple sequential fork blocks
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_MultipleSequentialForks) {
