@@ -32,30 +32,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 namespace {
 
 // =============================================================================
-// LRM section 6.11 -- Integer types in package scope
-// =============================================================================
-// 26. Integer types in package scope.
-TEST(ParserSection6, Sec6_11_IntegerTypesInPackage) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  int pkg_count;\n"
-      "  byte pkg_flags;\n"
-      "  longint pkg_id;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  auto& items = r.cu->packages[0]->items;
-  ASSERT_EQ(items.size(), 3u);
-  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kInt);
-  EXPECT_EQ(items[0]->name, "pkg_count");
-  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kByte);
-  EXPECT_EQ(items[1]->name, "pkg_flags");
-  EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kLongint);
-  EXPECT_EQ(items[2]->name, "pkg_id");
-}
-
-// =============================================================================
 // LRM section 6.11 -- Integer types in class members
 // =============================================================================
 // 27. Integer types in class members.
