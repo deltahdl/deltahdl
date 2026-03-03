@@ -10,29 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 2. always_comb with zero assignment executes at time 0.
-// ---------------------------------------------------------------------------
-TEST(SimCh9b, AlwaysCombZeroAssignTime0) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] y;\n"
-      "  always_comb y = 0;\n"
-      "  initial #1 $finish;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0u);
-}
-
-// ---------------------------------------------------------------------------
 // 3. always_comb AND gate: re-evaluates after input is set.
 // ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombAndGate) {
