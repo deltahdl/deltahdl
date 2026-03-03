@@ -169,4 +169,30 @@ TEST(SimCh6b, TypeOpLongint) {
   EXPECT_TRUE(var->is_signed);
 }
 
+// 6. type() with integer: resolves to 32-bit signed (4-state).
+TEST(SimCh6b, TypeOpInteger) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer a;\n"
+      "  var type(a) b;\n"
+      "  initial begin\n"
+      "    a = 32'hDEAD;\n"
+      "    b = 32'hBEEF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 32u);
+  EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
+  EXPECT_TRUE(var->is_signed);
+}
+
 }  // namespace
