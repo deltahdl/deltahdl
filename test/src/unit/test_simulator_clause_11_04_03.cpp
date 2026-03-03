@@ -473,4 +473,16 @@ TEST(EvalAdv, SignedMulNeg) {
   EXPECT_TRUE(result.is_signed);
 }
 
+// ==========================================================================
+// Power operator (**)
+// ==========================================================================
+TEST(EvalOp, PowerBasic) {
+  SimFixture f;
+  // 2 ** 10 = 1024
+  auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 2),
+                          MakeInt(f.arena, 10));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1024u);
+}
+
 }  // namespace
