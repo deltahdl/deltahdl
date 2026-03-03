@@ -186,4 +186,16 @@ TEST(ParserSection7, Sec7_2_2_DefaultMemberValues) {
   EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
 }
 
+// 14. Struct as function argument.
+TEST(ParserSection7, Sec7_2_2_FunctionArgStruct) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int a; int b; } pair_t;\n"
+              "  function int sum_pair;\n"
+              "    input pair_t p;\n"
+              "    sum_pair = p.a + p.b;\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
 }  // namespace
