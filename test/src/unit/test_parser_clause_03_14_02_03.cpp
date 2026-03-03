@@ -301,4 +301,18 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToProgram) {
   EXPECT_EQ(resolved.precision, TimeUnit::kNs);
 }
 
+// 16. Programs and packages cannot be nested (§3.14.2.3 rule a note).
+// Only modules and interfaces can inherit via nesting.
+TEST(ParserClause03, Cl3_14_2_3_ProgramsCannotBeNested) {
+  // A standalone program without timeunit uses CU scope or default.
+  auto r = ParseTimescale31402(
+      "program p;\n"
+      "endprogram\n");
+  EXPECT_FALSE(r.has_errors);
+  auto resolved =
+      ResolveModuleTimescale(r.cu->programs[0], r.cu, false, {}, nullptr);
+  // No enclosing, no `timescale, no CU timeunit → default.
+  EXPECT_FALSE(resolved.has_unit);
+}
+
 }  // namespace
