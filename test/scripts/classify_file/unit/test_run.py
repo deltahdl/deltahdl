@@ -532,6 +532,7 @@ def test_run_no_tests_with_issue_deletes_file(
 ):
     """Empty file + --issue → file is deleted."""
     f = make_test_file(tmp_path, "")
+    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
     stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path))
     assert not f.exists()
@@ -542,6 +543,7 @@ def test_run_no_tests_with_issue_closes_issue(
 ):
     """Empty file + --issue → close_issue called."""
     make_test_file(tmp_path, "")
+    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
     log = stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path))
     assert len(log) == 1
@@ -552,25 +554,95 @@ def test_run_no_tests_with_issue_returns(
 ):
     """Empty file + --issue → returns without SystemExit."""
     make_test_file(tmp_path, "")
+    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
     stub_close_issue(monkeypatch)
     assert _run(_make_run_args(tmp_path)) is None
 
 
-def test_run_no_tests_with_create_issue_deletes_file(tmp_path):
+def test_run_no_tests_with_create_issue_deletes_file(
+    tmp_path, monkeypatch,
+):
     """Empty file + --create-issue → file is deleted."""
     f = make_test_file(tmp_path, "")
+    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
     _run(_make_run_args(
         tmp_path, create_issue=True, issue=None,
     ))
     assert not f.exists()
 
 
-def test_run_no_tests_with_create_issue_returns(tmp_path):
+def test_run_no_tests_with_create_issue_returns(
+    tmp_path, monkeypatch,
+):
     """Empty file + --create-issue → returns without SystemExit."""
     make_test_file(tmp_path, "")
+    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
     assert _run(_make_run_args(
         tmp_path, create_issue=True, issue=None,
     )) is None
+
+
+def test_run_no_tests_prints_deleting(tmp_path, capsys, monkeypatch):
+    """Empty file → stdout contains 'Deleting'."""
+    make_test_file(tmp_path, "")
+    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
+    stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path))
+    assert "Deleting" in capsys.readouterr().out
+
+
+def test_run_no_tests_prints_deleted(tmp_path, capsys, monkeypatch):
+    """Empty file → stdout contains 'Deleted'."""
+    make_test_file(tmp_path, "")
+    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
+    stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path))
+    assert "Deleted" in capsys.readouterr().out
+
+
+def test_run_no_tests_with_issue_commits_deletion(
+    tmp_path, monkeypatch,
+):
+    """Empty file + --issue → commit_and_push called with deleted filepath."""
+    make_test_file(tmp_path, "")
+    log = []
+    monkeypatch.setattr(
+        "classify_file.commit_and_push",
+        lambda changed, deleted, msg: log.append((changed, deleted, msg)),
+    )
+    stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path))
+    assert len(log) == 1
+
+
+def test_run_no_tests_with_issue_dry_run_skips_commit(
+    tmp_path, monkeypatch,
+):
+    """Empty file + --issue + --dry-run → commit_and_push not called."""
+    make_test_file(tmp_path, "")
+    log = []
+    monkeypatch.setattr(
+        "classify_file.commit_and_push",
+        lambda changed, deleted, msg: log.append(1),
+    )
+    stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path, dry_run=True))
+    assert len(log) == 0
+
+
+def test_run_no_tests_with_issue_no_commit_skips_commit(
+    tmp_path, monkeypatch,
+):
+    """Empty file + --issue + --no-commit → commit_and_push not called."""
+    make_test_file(tmp_path, "")
+    log = []
+    monkeypatch.setattr(
+        "classify_file.commit_and_push",
+        lambda changed, deleted, msg: log.append(1),
+    )
+    stub_close_issue(monkeypatch)
+    _run(_make_run_args(tmp_path, no_commit=True))
+    assert len(log) == 0
 
 
 def test_run_all_succeed(tmp_path, monkeypatch):

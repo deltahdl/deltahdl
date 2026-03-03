@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from classify_test._git import commit_and_push
 from classify_test._github import fetch_issue_body, update_issue_body
 
 
@@ -212,7 +213,11 @@ def _run(args: argparse.Namespace) -> None:
         return
     test_names = extract_test_names(filepath)
     if not test_names:
+        print(f"Deleting empty file {filepath.name}...")
         filepath.unlink()
+        print(f"Deleted {filepath.name}")
+        if not args.dry_run and not args.no_commit:
+            commit_and_push([], [filepath], f"Delete empty {filepath.name}\n")
         if not args.create_issue and args.issue is not None:
             close_issue(args)
         return

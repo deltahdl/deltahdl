@@ -28,6 +28,11 @@ def _install_fake_classify_test(tmp_path, exit_code=0):
         f"import sys; sys.exit({exit_code})\n",
         encoding="utf-8",
     )
+    (fake_pkg / "_git.py").write_text(
+        "def commit_and_push(changed, deleted, message):\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
     (fake_pkg / "_github.py").write_text(
         "import json\n"
         "import subprocess\n"
