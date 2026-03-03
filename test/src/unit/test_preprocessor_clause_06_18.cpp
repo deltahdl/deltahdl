@@ -36,4 +36,26 @@ TEST(ParserSection6, TypedefUnion) {
   EXPECT_FALSE(r.has_errors);
 }
 
+static ModuleItem* FirstItem(ParseResult& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// =========================================================================
+// §6.18: User-defined types (typedef)
+// =========================================================================
+TEST(ParserSection6, TypedefLogicVector) {
+  // §6.18: typedef creates a user-defined type from a built-in type.
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->name, "byte_t");
+}
+
 }  // namespace

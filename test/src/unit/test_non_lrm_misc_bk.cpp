@@ -25,22 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.18: User-defined types (typedef)
-// =========================================================================
-TEST(ParserSection6, TypedefLogicVector) {
-  // §6.18: typedef creates a user-defined type from a built-in type.
-  auto r = ParseWithPreprocessor(
-      "module t;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(item->name, "byte_t");
-}
-
 TEST(ParserSection6, TypedefUsedInVarDecl) {
   // §6.18: A typedef-defined name appears as kNamed in subsequent decls.
   auto r = ParseWithPreprocessor(
