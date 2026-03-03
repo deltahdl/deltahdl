@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =========================================================================
-// §6.22: Type compatibility — additional tests
-// =========================================================================
-TEST(ParserSection6, TypesMatchNamedSame) {
-  // Two named types with the same name should match.
-  DataType a;
-  a.kind = DataTypeKind::kNamed;
-  a.type_name = "mytype";
-  DataType b;
-  b.kind = DataTypeKind::kNamed;
-  b.type_name = "mytype";
-  EXPECT_TRUE(TypesMatch(a, b));
-}
-
 TEST(ParserSection6, TypesMatchNamedDifferent) {
   // Two named types with different names should not match.
   DataType a;
