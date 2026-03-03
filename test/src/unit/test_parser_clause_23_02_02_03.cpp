@@ -221,4 +221,17 @@ TEST(ParserSection6, Sec6_11_LogicPackedDimsAsPort) {
   EXPECT_EQ(ports[1].data_type.packed_dim_left->int_val, 15u);
 }
 
+// integer (4-state) as port declaration.
+TEST(ParserSection6, Sec6_11_IntegerAsPort) {
+  auto r = Parse(
+      "module m(input integer idx);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 1u);
+  EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kInteger);
+  EXPECT_EQ(ports[0].direction, Direction::kInput);
+}
+
 }  // namespace
