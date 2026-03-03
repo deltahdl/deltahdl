@@ -387,4 +387,41 @@ TEST(ParserSection6, Sec6_11_2_RegUnsignedExplicit) {
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
+struct ParseResult6 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6 Parse(const std::string& src) {
+  ParseResult6 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult6& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// =========================================================================
+// §6.11.3: Default signedness per Table 6-8
+// =========================================================================
+TEST(ParserSection6, IntDefaultSigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  int x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_TRUE(item->data_type.is_signed) << "int is signed by default";
+}
+
 }  // namespace

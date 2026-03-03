@@ -40,21 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// =========================================================================
-// §6.11.3: Default signedness per Table 6-8
-// =========================================================================
-TEST(ParserSection6, IntDefaultSigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  int x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_TRUE(item->data_type.is_signed) << "int is signed by default";
-}
-
 TEST(ParserSection6, IntExplicitUnsigned) {
   auto r = Parse(
       "module t;\n"
