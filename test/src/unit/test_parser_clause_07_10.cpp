@@ -170,4 +170,16 @@ TEST(ParserSection7, QueueOfStrings) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
+// =============================================================================
+// LRM section 7.7 -- Queues
+// =============================================================================
+TEST(ParserSection7c, QueueDecl) {
+  auto r = Parse(
+      "module m;\n"
+      "  int q[$];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
