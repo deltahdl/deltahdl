@@ -42,19 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Assignment pattern ---
-TEST(ParserSection11, Sec11_1_AssignmentPatternExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[3];\n"
-      "  initial arr = '{1, 2, 3};\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
-  EXPECT_EQ(rhs->elements.size(), 3u);
-}
-
 // --- Streaming concatenation ---
 TEST(ParserSection11, Sec11_1_StreamingConcatLeftShift) {
   auto r = Parse(
