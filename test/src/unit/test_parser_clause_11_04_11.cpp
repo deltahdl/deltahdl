@@ -741,4 +741,20 @@ TEST(ParserSection11, Sec11_4_6_TernaryInBlockingAssign) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
+// --- Ternary in nonblocking assignment ---
+TEST(ParserSection11, Sec11_4_6_TernaryInNonblockingAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  reg q;\n"
+      "  initial q <= sel ? a : b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
+}
+
 }  // namespace
