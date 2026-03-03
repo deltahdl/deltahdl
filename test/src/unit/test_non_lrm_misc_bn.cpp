@@ -54,24 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 6.11.1 -- Type operator
-// =============================================================================
-// 1. type(expr) used as expression produces kTypeRef node.
-TEST(ParserSection6, Sec6_11_1_TypeRefExprKind) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = type(y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
-}
-
 // 2. type(expr) inner expression is stored in lhs for identifiers.
 TEST(ParserSection6, Sec6_11_1_TypeRefInnerIdent) {
   auto r = Parse(

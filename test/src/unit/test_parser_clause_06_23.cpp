@@ -186,4 +186,56 @@ TEST(ParserA84, PrimaryTypeRef) {
   EXPECT_FALSE(r.has_errors);
 }
 
+struct ParseResult6i {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static Stmt* FirstInitialStmt(ParseResult6i& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock && item->body != nullptr)
+      return item->body;
+  }
+  return nullptr;
+}
+
+struct ParseResult6j {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6j Parse(const std::string& src) {
+  ParseResult6j result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 6.11.1 -- Type operator
+// =============================================================================
+// 1. type(expr) used as expression produces kTypeRef node.
+TEST(ParserSection6, Sec6_11_1_TypeRefExprKind) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = type(y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
+}
+
 }  // namespace
