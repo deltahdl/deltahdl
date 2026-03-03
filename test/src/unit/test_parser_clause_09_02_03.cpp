@@ -311,4 +311,21 @@ TEST(ParserSection4, Sec4_5_FinalBlock) {
   ASSERT_NE(item->body, nullptr);
 }
 
+TEST(ParserSection9, FinalBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  final $display(\"done\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  bool found = false;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kFinalBlock) {
+      found = true;
+      ASSERT_NE(item->body, nullptr);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 }  // namespace
