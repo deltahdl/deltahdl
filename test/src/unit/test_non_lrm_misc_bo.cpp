@@ -35,23 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 namespace {
 
 // =========================================================================
-// §7.10.1: Queue operators
-// =========================================================================
-TEST(ParserSection7, QueueConcatAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  int q[$];\n"
-      "  initial q = {1, 2, 3};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
-}
-
-// =========================================================================
 // §7.10.2: Queue methods
 // =========================================================================
 TEST(ParserSection7, QueuePushBack) {
