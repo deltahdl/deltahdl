@@ -68,4 +68,14 @@ TEST(SvaEngine, AssertkillKillsAndDisables) {
   EXPECT_TRUE(ctrl.WasKilled("inst1"));
 }
 
+// =============================================================================
+// $assertcontrol, $assertpassoff, $assertfailon (section 16.13)
+// =============================================================================
+TEST(SvaEngine, AssertControlGlobalOff) {
+  AssertionControl ctrl;
+  ctrl.SetGlobalOff();
+  EXPECT_FALSE(ctrl.IsEnabled("any_instance"));
+  EXPECT_FALSE(ctrl.IsEnabled("another_inst"));
+}
+
 }  // namespace
