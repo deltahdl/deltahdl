@@ -453,4 +453,12 @@ TEST(SourceText, TimeunitOnly) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
 }
 
+// Form 2: timeprecision time_literal ;
+TEST(SourceText, TimeprecisionOnly) {
+  auto r = ParseTimescale31402("module m; timeprecision 1ps; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
+}
+
 }  // namespace
