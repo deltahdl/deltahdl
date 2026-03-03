@@ -271,4 +271,36 @@ TEST(SimCh9d, AlwaysStarBitSelect) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
+// ---------------------------------------------------------------------------
+// 10. always @* with part-select -- extracting a sub-range from a vector.
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarPartSelect) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  logic [7:0] copy;\n"
+      "  logic [3:0] y;\n"
+      "  always @* begin\n"
+      "    copy = data;\n"
+      "    y = data[3:0];\n"
+      "  end\n"
+      "  initial begin\n"
+      "    data = 8'hBE;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  // data[3:0] of 0xBE = 0xE.
+  EXPECT_EQ(y->value.ToUint64(), 0xEu);
+}
+
 }  // namespace
