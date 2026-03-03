@@ -30,14 +30,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 30. type() on time data type.
-TEST(ParserSection6, Sec6_11_1_TypeRefOnTime) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial x = type(time);\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // LRM section 6.7.1 -- Net declarations with built-in net types
 // =============================================================================

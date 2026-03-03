@@ -606,4 +606,12 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefMemberAccess) {
   ASSERT_NE(item->data_type.type_ref_expr, nullptr);
 }
 
+// 30. type() on time data type.
+TEST(ParserSection6, Sec6_11_1_TypeRefOnTime) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(time);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
