@@ -57,4 +57,33 @@ TEST(ParserA82, MethodCallRootThis) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// §8.11 — 'this' keyword
+TEST(ParserSection8, ThisExpression) {
+  auto r = Parse(
+      "class MyClass;\n"
+      "  int data;\n"
+      "  function void set(int data);\n"
+      "    this.data = data;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
 }  // namespace

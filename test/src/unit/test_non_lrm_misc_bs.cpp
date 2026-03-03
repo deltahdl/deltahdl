@@ -40,19 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.11 — 'this' keyword
-TEST(ParserSection8, ThisExpression) {
-  auto r = Parse(
-      "class MyClass;\n"
-      "  int data;\n"
-      "  function void set(int data);\n"
-      "    this.data = data;\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 // §8.15 — super.new() expression
 TEST(ParserSection8, SuperNewExpression) {
   auto r = Parse(
