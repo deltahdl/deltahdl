@@ -49,14 +49,6 @@ static ModuleItem* FirstContAssign(ParseResult11g& r) {
 
 namespace {
 
-// --- Select on system function result ---
-TEST(ParserSection11, Sec11_4_1_SelectOnSystemFuncResult) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial x = $random[3:0];\n"
-              "endmodule\n"));
-}
-
 // --- Multiple bit-selects in concatenation ---
 TEST(ParserSection11, Sec11_4_1_BitSelectsInConcatenation) {
   auto r = Parse(

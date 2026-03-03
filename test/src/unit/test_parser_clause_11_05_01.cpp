@@ -983,4 +983,12 @@ TEST(ParserSection11, Sec11_4_1_SelectOnFuncReturnValue) {
   ASSERT_NE(rhs->index_end, nullptr);
 }
 
+// --- Select on system function result ---
+TEST(ParserSection11, Sec11_4_1_SelectOnSystemFuncResult) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = $random[3:0];\n"
+              "endmodule\n"));
+}
+
 }  // namespace
