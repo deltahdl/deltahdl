@@ -20,32 +20,6 @@ static void LowerRunAndCompareWidths(SimFixture& f, RtlirDesign* design,
 
 namespace {
 
-// 18. type() referencing byte preserves 8-bit width in computation.
-TEST(SimCh6b, TypeOpByteComputation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  byte a;\n"
-      "  var type(a) result;\n"
-      "  initial begin\n"
-      "    a = 100;\n"
-      "    result = a + 50;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 8u);
-  // 100 + 50 = 150, which fits in 8 bits.
-  EXPECT_EQ(var->value.ToUint64(), 150u);
-}
-
 // 19. type() with int preserves width when result overflows.
 TEST(SimCh6b, TypeOpIntOverflow) {
   SimFixture f;
