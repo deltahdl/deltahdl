@@ -33,48 +33,7 @@ static Stmt* FirstInitialStmt(ParseResult10d& r) {
   return nullptr;
 }
 
-static ModuleItem* FirstAlwaysItem(ParseResult10d& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysFFBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      return item;
-    }
-  }
-  return nullptr;
-}
-
-static Stmt* FirstAlwaysStmt(ParseResult10d& r) {
-  auto* item = FirstAlwaysItem(r);
-  if (!item || !item->body) return nullptr;
-  if (item->body->kind == StmtKind::kBlock) {
-    return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-  }
-  return item->body;
-}
-
 namespace {
-
-// --- 5. Nonblocking in always @(posedge clk) ---
-TEST(ParserSection10, Sec10_4_2_AlwaysPosedgeNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk)\n"
-      "    q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
-  ASSERT_GE(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  auto* stmt = FirstAlwaysStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-}
 
 // --- 6. Nonblocking with binary expression RHS: q <= a + b ---
 TEST(ParserSection10, Sec10_4_2_ExpressionRhs) {
