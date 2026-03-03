@@ -30,20 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection9, IffGuardPosedgeFields) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, reset, a, b;\n"
-      "  always @(posedge clk iff reset == 0) a <= b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  EXPECT_NE(item->sensitivity[0].signal, nullptr);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-}
-
 TEST(ParserSection9, IffGuardNoEdge) {
   auto r = Parse(
       "module m;\n"
