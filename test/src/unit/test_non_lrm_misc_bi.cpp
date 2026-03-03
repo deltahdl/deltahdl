@@ -20,33 +20,7 @@ static ParseResult6 Parse(const std::string& src) {
   return result;
 }
 
-static Stmt* FirstInitialStmt(ParseResult6& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
 namespace {
-
-TEST(ParserSection6, DynamicCastInCondition) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if ($cast(d, b))\n"
-      "      $display(\"cast ok\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-}
 
 TEST(ParserSection6, DynamicCastAssignResult) {
   auto r = Parse(

@@ -85,4 +85,18 @@ TEST(ParserSection6, DynamicCastCall) {
   EXPECT_EQ(stmt->expr->callee, "$cast");
 }
 
+TEST(ParserSection6, DynamicCastInCondition) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if ($cast(d, b))\n"
+      "      $display(\"cast ok\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+}
+
 }  // namespace
