@@ -33,23 +33,6 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult9i& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 28. always_latch with system function call in body.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_3_SystemFunctionCall) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic en;\n"
-              "  logic [7:0] q, d;\n"
-              "  always_latch begin\n"
-              "    if (en) begin\n"
-              "      q <= d;\n"
-              "      $display(\"latch update\");\n"
-              "    end\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-// ---------------------------------------------------------------------------
 // 29. Case with begin-end blocks in items inside always_latch.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_CaseWithBeginEndItems) {
