@@ -47,4 +47,14 @@ TEST(ParserSection20, IsUnboundedBasic) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// =========================================================================
+// §6.20.7: $ as a constant
+// =========================================================================
+TEST(ParserSection6, DollarConstant_ParamAssign) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  parameter p = $;\n"
+               "endmodule\n"));
+}
+
 }  // namespace

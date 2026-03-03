@@ -42,16 +42,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 namespace {
 
 // =========================================================================
-// §6.20.7: $ as a constant
-// =========================================================================
-TEST(ParserSection6, DollarConstant_ParamAssign) {
-  EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  parameter p = $;\n"
-               "endmodule\n"));
-}
-
-// =========================================================================
 // §6.6.4: Trireg charge strength and net delays
 // =========================================================================
 TEST(ParserSection6, TriregChargeStrengthSmall) {
