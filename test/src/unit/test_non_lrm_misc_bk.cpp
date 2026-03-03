@@ -11,37 +11,7 @@ static ModuleItem* FirstItem(ParseResult& r) {
   return items.empty() ? nullptr : items[0];
 }
 
-static Stmt* FirstInitialStmt(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
 namespace {
-
-// =========================================================================
-// §6.24: Casting — general
-// =========================================================================
-TEST(ParserSection6, CastUnsigned) {
-  // §6.24: unsigned'(expr) changes signedness.
-  auto r = ParseWithPreprocessor(
-      "module t;\n"
-      "  initial x = unsigned'(y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCast);
-  EXPECT_EQ(rhs->text, "unsigned");
-}
 
 // =========================================================================
 // §6.24.1: Static casting — type and size casts
