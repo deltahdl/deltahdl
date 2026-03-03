@@ -609,4 +609,29 @@ TEST(ParserSection7, Sec7_2_1_PackedAsPortType) {
       "endmodule\n"));
 }
 
+// --- ATM cell header: LRM-style packed struct with many fields ---
+TEST(ParserSection7, Sec7_2_1_AtmCellHeader) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    bit [3:0] GFC;\n"
+      "    bit [7:0] VPI;\n"
+      "    bit [11:0] VCI;\n"
+      "    bit CLP;\n"
+      "    bit [3:0] PT;\n"
+      "    bit [7:0] HEC;\n"
+      "    bit [47:0][7:0] Payload;\n"
+      "  } s_atmcell;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 7u);
+  EXPECT_EQ(item->typedef_type.struct_members[0].name, "GFC");
+  EXPECT_EQ(item->typedef_type.struct_members[3].name, "CLP");
+  EXPECT_EQ(item->typedef_type.struct_members[6].name, "Payload");
+}
+
 }  // namespace
