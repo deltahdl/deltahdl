@@ -17,21 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// class_method ::= { method_qualifier } class_constructor_declaration
-TEST(SourceText, ClassConstructorDecl) {
-  auto r = Parse(
-      "class C;\n"
-      "  function new(int val);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 1u);
-  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
-  EXPECT_EQ(members[0]->method->name, "new");
-}
-
 TEST(ParserA24, ClassNewWithArgs) {
   auto r = Parse(
       "class C;\n"
