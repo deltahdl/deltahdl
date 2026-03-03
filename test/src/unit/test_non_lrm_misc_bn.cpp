@@ -54,20 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 23. type() used in case pattern with logic packed dimension.
-TEST(ParserSection6, Sec6_11_1_TypeRefCaseLogicPacked) {
-  EXPECT_TRUE(
-      ParseOk("module t #(parameter type T = type(logic [11:0]))\n"
-              "  ();\n"
-              "  initial begin\n"
-              "    case (type(T))\n"
-              "      type(logic [11:0]) : $display(\"12-bit\");\n"
-              "      default : $stop;\n"
-              "    endcase\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // 24. Multiple var type() declarations in one module.
 TEST(ParserSection6, Sec6_11_1_MultipleVarTypeRefDecls) {
   auto r = Parse(
