@@ -577,4 +577,13 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnShortreal) {
               "endmodule\n"));
 }
 
+// 28. type() in parameter type default with type(int).
+TEST(ParserSection6, Sec6_11_1_ParamTypeDefaultInt) {
+  auto r = Parse(
+      "module t #(parameter type T = type(int));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
