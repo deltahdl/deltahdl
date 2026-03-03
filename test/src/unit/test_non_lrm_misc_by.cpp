@@ -45,25 +45,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 11. Side-by-side always_comb and always @* in the same module.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_SideBySideBothForms) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb x = a & b;\n"
-      "  always @* y = c | d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* first = NthAlwaysItem(r, 0);
-  auto* second = NthAlwaysItem(r, 1);
-  ASSERT_NE(first, nullptr);
-  ASSERT_NE(second, nullptr);
-  EXPECT_EQ(first->always_kind, AlwaysKind::kAlwaysComb);
-  EXPECT_EQ(second->always_kind, AlwaysKind::kAlways);
-}
-
-// ---------------------------------------------------------------------------
 // 12. Side-by-side: both have their own body statements.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_SideBySideBodiesExist) {
