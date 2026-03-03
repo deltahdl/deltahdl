@@ -378,4 +378,19 @@ TEST(EvalAdv, PowZeroExp) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+TEST(EvalAdv, PowNegExpInt) {
+  SimFixture f;
+  // 3 ** (-2) = 0 for integer (Table 11-4: |base|>1, negative exp → 0).
+  MakeSignedVarAdv(f, "pb", 8, 3);
+  // -2 in 8-bit signed = 0xFE
+  MakeSignedVarAdv(f, "pe", 8, 0xFE);
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeId(f.arena, "pb");
+  expr->rhs = MakeId(f.arena, "pe");
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
 }  // namespace
