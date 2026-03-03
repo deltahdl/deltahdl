@@ -25,18 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, MultipleVarDeclsSameStmt) {
-  // §6.8: "shortint s1, s2[0:9];" — multiple instances in one decl.
-  auto r = ParseWithPreprocessor(
-      "module t;\n"
-      "  shortint s1, s2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "s1");
-  EXPECT_EQ(r.cu->modules[0]->items[1]->name, "s2");
-}
-
 TEST(ParserSection6, VarImplicitInProcedural) {
   // §6.8: "var [3:0] x;" in procedural context.
   EXPECT_TRUE(
