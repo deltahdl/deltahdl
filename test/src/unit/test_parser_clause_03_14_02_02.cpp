@@ -208,4 +208,22 @@ TEST(ParserClause03, Cl3_14_2_2_TimeprecisionSetsPrecision) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
 }
 
+// 47. Combined syntax: timeunit with slash separator sets both unit and
+// precision.  §3.14.2.2: "The time precision may also be declared using
+// an optional second argument to the timeunit keyword using the slash
+// separator."
+TEST(ParserClause03, Cl3_14_2_2_TimeunitSlashSetsBoth) {
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 100ps / 10fs;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  EXPECT_TRUE(mod->has_timeunit);
+  EXPECT_TRUE(mod->has_timeprecision);
+  EXPECT_EQ(mod->time_unit, TimeUnit::kPs);
+  EXPECT_EQ(mod->time_prec, TimeUnit::kFs);
+}
+
 }  // namespace
