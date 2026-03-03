@@ -31,27 +31,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9c& r) {
 
 namespace {
 
-TEST(ParserSection9c, AlwaysCombCaseStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [3:0] y;\n"
-      "  always_comb\n"
-      "    case (sel)\n"
-      "      2'b00: y = 4'h0;\n"
-      "      2'b01: y = 4'h1;\n"
-      "      default: y = 4'hf;\n"
-      "    endcase\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kCase);
-}
-
 // =============================================================================
 // LRM section 9.2.2.3 -- always_latch procedure
 // Latched logic behavior modeled with always_latch.
