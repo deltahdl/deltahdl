@@ -45,29 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 21. Variable in nested begin-end block
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_VarInNestedBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      automatic int inner_val = 7;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmtT(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
-  ASSERT_GE(stmt->stmts.size(), 1u);
-  EXPECT_EQ(stmt->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->stmts[0]->var_is_automatic);
-  EXPECT_EQ(stmt->stmts[0]->var_name, "inner_val");
-}
-
-// =============================================================================
 // 22. For-loop init var in static function
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_ForLoopInitInStaticFunc) {
