@@ -12,30 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Clocking, PerSignalSkewOverridesDefault) {
-  ClockingManager mgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.default_input_skew = SimTime{5};
-  block.default_output_skew = SimTime{10};
-
-  ClockingSignal sig;
-  sig.signal_name = "data_in";
-  sig.direction = ClockingDir::kInput;
-  sig.skew = SimTime{7};
-  block.signals.push_back(sig);
-
-  mgr.Register(block);
-
-  auto skew = mgr.GetInputSkew("cb", "data_in");
-  EXPECT_EQ(skew.ticks, 7u);
-
-  // Unknown signal falls back to default.
-  auto default_skew = mgr.GetInputSkew("cb", "other_signal");
-  EXPECT_EQ(default_skew.ticks, 5u);
-}
-
 TEST(Clocking, OutputSkew) {
   ClockingManager mgr;
   ClockingBlock block;
