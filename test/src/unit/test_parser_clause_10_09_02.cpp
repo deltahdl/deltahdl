@@ -461,4 +461,15 @@ TEST(ParserCh510, AssignmentPattern_DefaultKey) {
               "endmodule"));
 }
 
+// From test_parser_clause_05b.cpp
+TEST(ParserCh510, StructLiteral_Positional) {
+  // c = '{0, 0.0}; -- positional structure literal.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {int a; shortreal b;} ab;\n"
+              "  ab c;\n"
+              "  initial c = '{0, 0.0};\n"
+              "endmodule"));
+}
+
 }  // namespace
