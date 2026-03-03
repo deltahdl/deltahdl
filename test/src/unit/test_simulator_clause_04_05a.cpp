@@ -1,8 +1,8 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-
 #include "common/arena.h"
 #include "common/types.h"
 #include "helpers_scheduler_event.h"
@@ -10,43 +10,7 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.5 SystemVerilog simulation reference algorithm
-//
-// LRM §4.5 specifies three pseudocode functions:
-//
-//   execute_simulation:
-//     T = 0; initialize all nets/variables; schedule initialization events
-//     into time zero; advance through nonempty time slots in order.
-//
-//   execute_time_slot:
-//     Preponed -> Pre-Active -> iterative {Active set -> Reactive set ->
-//     Pre-Postponed} -> Postponed
-//
-//   execute_region:
-//     While region is nonempty, remove event, dispatch (update or eval).
-//
-// The iterative regions are: Active, Inactive, Pre-NBA, NBA, Post-NBA,
-// Pre-Observed, Observed, Post-Observed, Reactive, Re-Inactive, Pre-Re-NBA,
-// Re-NBA, Post-Re-NBA, and Pre-Postponed.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.5 execute_simulation: "T = 0"
-// Simulation time starts at 0 and advances through nonempty time slots.
-// ---------------------------------------------------------------------------
-TEST(SimCh45, ExecuteSimulationStartsAtTimeZero) {
-  Arena arena;
-  Scheduler sched(arena);
-  uint64_t observed_time = UINT64_MAX;
-
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { observed_time = sched.CurrentTime().ticks; };
-  sched.ScheduleEvent({0}, Region::kActive, ev);
-
-  sched.Run();
-  EXPECT_EQ(observed_time, 0u);
-}
+namespace {
 
 // ---------------------------------------------------------------------------
 // §4.5 execute_simulation: "while (some time slot is nonempty) { move to the
@@ -266,3 +230,5 @@ TEST(SimCh45, IterativeRegionOrderMatchesAlgorithm) {
     EXPECT_EQ(curr, prev + 1) << "Region ordinal gap at index " << i;
   }
 }
+
+}  // namespace
