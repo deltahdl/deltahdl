@@ -52,13 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh501, Sec5_1_EmptyCuCompletelyEmpty) {
-  // An entirely empty source file parses to an empty CU.
-  auto r = Parse("");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.cu->modules.empty());
-}
-
 // =========================================================================
 // From test_parser_clause_05.cpp — §5.1 General
 // =========================================================================

@@ -247,4 +247,30 @@ TEST(ParserAnnexA, A2ClassDecl) {
   EXPECT_EQ(r.cu->classes[0]->members.size(), 2u);
 }
 
+// =========================================================================
+// Section 5.6.3: System tasks and system functions
+// =========================================================================
+struct ParseResult50603 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult50603 Parse(const std::string& src) {
+  ParseResult50603 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(ParserCh501, Sec5_1_EmptyCuCompletelyEmpty) {
+  // An entirely empty source file parses to an empty CU.
+  auto r = Parse("");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->modules.empty());
+}
+
 }  // namespace
