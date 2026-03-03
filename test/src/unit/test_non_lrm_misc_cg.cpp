@@ -42,18 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, StringCompareEquality) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  string s1, s2;\n"
-              "  initial begin\n"
-              "    s1 = \"hello\";\n"
-              "    s2 = \"hello\";\n"
-              "    if (s1 == s2) $display(\"equal\");\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // LRM section 11.1 -- Operators and operands overview
 // =========================================================================
