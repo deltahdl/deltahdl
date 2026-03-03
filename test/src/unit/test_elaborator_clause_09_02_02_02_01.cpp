@@ -314,4 +314,32 @@ TEST(SimCh9b, AlwaysCombIfElseFalseBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xBBu);
 }
 
+// ---------------------------------------------------------------------------
+// 14. always_comb with concatenation.
+// ---------------------------------------------------------------------------
+TEST(SimCh9b, AlwaysCombConcatenation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] hi, lo;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb y = {hi, lo};\n"
+      "  initial begin\n"
+      "    hi = 4'hA;\n"
+      "    lo = 4'h5;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 0xA5u);
+}
+
 }  // namespace
