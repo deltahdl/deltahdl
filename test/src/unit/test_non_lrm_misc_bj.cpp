@@ -41,23 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// =========================================================================
-// §6.21: Scope and lifetime — block-level automatic/static qualifiers
-// =========================================================================
-TEST(ParserSection6, BlockVarDecl_Automatic) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    automatic int auto1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_automatic);
-}
-
 TEST(ParserSection6, BlockVarDecl_Automatic_Props) {
   auto r = Parse(
       "module t;\n"
