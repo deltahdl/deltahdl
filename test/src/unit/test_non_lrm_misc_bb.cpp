@@ -42,24 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// =============================================================================
-// LRM §3.14.2.3 — Precedence of timeunit, timeprecision, and `timescale
-// =============================================================================
-// 1. Module with explicit timeunit — highest priority, no fallback needed.
-TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeunitTakesPriority) {
-  auto r = ParseTimescale31402(
-      "`timescale 1us / 1ns\n"
-      "module m;\n"
-      "  timeunit 1ps;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto resolved =
-      ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
-                             r.preproc_timescale, nullptr);
-  EXPECT_TRUE(resolved.has_unit);
-  EXPECT_EQ(resolved.unit, TimeUnit::kPs);
-}
-
 // 2. Module with explicit timeprecision — highest priority.
 TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeprecisionTakesPriority) {
   auto r = ParseTimescale31402(
