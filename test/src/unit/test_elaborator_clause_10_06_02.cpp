@@ -65,4 +65,9 @@ TEST(ForceRelease, IllegalBitSelectVariable) {
   EXPECT_FALSE(ValidateForceTarget(info));
 }
 
+TEST(ForceRelease, IllegalPartSelectVariable) {
+  ForceInfo info{ForceTarget::kPartSelectVariable};
+  EXPECT_FALSE(ValidateForceTarget(info));
+}
+
 }  // namespace

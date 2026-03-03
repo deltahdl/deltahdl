@@ -108,11 +108,6 @@ static TwoNets MakeTwoWireNets() {
 
 namespace {
 
-TEST(ForceRelease, IllegalPartSelectVariable) {
-  ForceInfo info{ForceTarget::kPartSelectVariable};
-  EXPECT_FALSE(ValidateForceTarget(info));
-}
-
 // §10.6.2: "... or of a net with a user-defined nettype."
 TEST(ForceRelease, IllegalUserDefinedNettypePartSelect) {
   ForceInfo info{ForceTarget::kUserDefinedNettypePartSelect};
