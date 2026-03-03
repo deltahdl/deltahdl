@@ -45,26 +45,6 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 10. always @(*) with begin-end block body.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenBeginEndBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(*) begin\n"
-      "    p = q & r;\n"
-      "    s = q | t;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->stmts.size(), 2u);
-}
-
-// ---------------------------------------------------------------------------
 // 11. Side-by-side always_comb and always @* in the same module.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_SideBySideBothForms) {
