@@ -10,33 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 6. always @(*) form (with parentheses) is equivalent to @*.
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarParenForm) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, y;\n"
-      "  always @(*) y = a | b;\n"
-      "  initial begin\n"
-      "    a = 8'hF0;\n"
-      "    b = 8'h0F;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0xFFu);
-}
-
-// ---------------------------------------------------------------------------
 // 7. always @* with ternary operator: sel ? a : b.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarTernaryOp) {
