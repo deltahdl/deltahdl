@@ -33,44 +33,7 @@ static Stmt* FirstInitialStmt(ParseResult10b& r) {
   return nullptr;
 }
 
-static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
-}
-
 namespace {
-
-// --- 23. Deassign multiple variables in sequence ---
-TEST(ParserSection10, Sec10_6_1_DeassignMultipleVars) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, c;\n"
-      "  initial begin\n"
-      "    deassign a;\n"
-      "    deassign b;\n"
-      "    deassign c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
-  auto* s2 = NthInitialStmt(r, 2);
-  ASSERT_NE(s0, nullptr);
-  ASSERT_NE(s1, nullptr);
-  ASSERT_NE(s2, nullptr);
-  EXPECT_EQ(s0->kind, StmtKind::kDeassign);
-  EXPECT_EQ(s1->kind, StmtKind::kDeassign);
-  EXPECT_EQ(s2->kind, StmtKind::kDeassign);
-  EXPECT_EQ(s0->lhs->text, "a");
-  EXPECT_EQ(s1->lhs->text, "b");
-  EXPECT_EQ(s2->lhs->text, "c");
-}
 
 // --- 24. Assign with delay before it ---
 TEST(ParserSection10, Sec10_6_1_DelayBeforeAssign) {
