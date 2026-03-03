@@ -821,4 +821,39 @@ TEST(ParserSection9c, AlwaysCombCaseStatement) {
   EXPECT_EQ(item->body->kind, StmtKind::kCase);
 }
 
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysItem(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
+  }
+  return nullptr;
+}
+
+TEST(ParserSection9, AlwaysComb) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_comb a = b & c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+}
+
 }  // namespace

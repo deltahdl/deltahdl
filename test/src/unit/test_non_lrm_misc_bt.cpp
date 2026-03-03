@@ -30,18 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection9, AlwaysComb) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb a = b & c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-  ASSERT_NE(item->body, nullptr);
-}
-
 TEST(ParserSection9, AlwaysFF) {
   auto r = Parse(
       "module m;\n"
