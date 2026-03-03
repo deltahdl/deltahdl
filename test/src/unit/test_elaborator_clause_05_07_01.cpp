@@ -291,4 +291,31 @@ TEST(ElabA87, UnderscoredDecimalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// ---------------------------------------------------------------------------
+// 17. Hex digits case insensitive
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, HexDigitsCaseInsensitive) {
+  // §5.7.1: Hex digits a-f are case insensitive.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 16'hABcd;\n"
+      "    b = 16'habCD;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), vb->value.ToUint64());
+  EXPECT_EQ(va->value.ToUint64(), 0xABCDu);
+}
+
 }  // namespace
