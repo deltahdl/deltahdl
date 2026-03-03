@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §7.5.3: Delete()
 
 #include <gtest/gtest.h>
 #include <cstdint>
