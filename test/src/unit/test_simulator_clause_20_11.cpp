@@ -160,4 +160,20 @@ TEST(SvaEngine, PassOffSkipsPassAction) {
   EXPECT_FALSE(pass_called);
 }
 
+TEST(SvaEngine, FailOffSkipsFailAction) {
+  SvaFixture f;
+  bool fail_called = false;
+
+  DeferredAssertion da;
+  da.condition_val = 0;
+  da.instance_name = "check_b";
+  da.fail_action = [&fail_called]() { fail_called = true; };
+
+  f.engine.GetControl().SetFailOff("check_b");
+  f.engine.QueueDeferredAssertionIfEnabled(da);
+  f.engine.FlushDeferredAssertionsRespectingControl(f.scheduler, SimTime{0});
+  f.scheduler.Run();
+  EXPECT_FALSE(fail_called);
+}
+
 }  // namespace
