@@ -30,14 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, RealLiteralPositiveExponent) {
-  // Explicit positive exponent
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 2.5E+4;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, RealLiteralUnderscoresInValue) {
   // Underscores in real literals for readability
   EXPECT_TRUE(

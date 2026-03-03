@@ -264,4 +264,12 @@ TEST(ParserSection6, RealLiteralNegativeExponent) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, RealLiteralPositiveExponent) {
+  // Explicit positive exponent
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 2.5E+4;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
