@@ -389,13 +389,21 @@ def test_format_prompt_includes_single_overview():
     assert "Thoroughly understand 4.1 per LRM" in result
 
 
-def test_format_prompt_includes_multiple_overviews():
-    """Multiple overview subclauses each appear in the formatted prompt."""
+def test_format_prompt_includes_first_of_multiple_overviews():
+    """First overview subclause appears when multiple are provided."""
     result = format_prompt(
         "- hierarchy\n", "4.4.3.1", "~/LRM.txt",
         issue=6, overviews=["4.1", "4.4"],
     )
     assert "Thoroughly understand 4.1 per LRM" in result
+
+
+def test_format_prompt_includes_second_of_multiple_overviews():
+    """Second overview subclause appears when multiple are provided."""
+    result = format_prompt(
+        "- hierarchy\n", "4.4.3.1", "~/LRM.txt",
+        issue=6, overviews=["4.1", "4.4"],
+    )
     assert "Thoroughly understand 4.4 per LRM" in result
 
 
