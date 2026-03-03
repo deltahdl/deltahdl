@@ -87,4 +87,28 @@ TEST(SimCh10, SequentialBlockingImmediate) {
   EXPECT_EQ(b->value.ToUint64(), 2u);
 }
 
+// ---------------------------------------------------------------------------
+// 3. Blocking assignment with arithmetic expression.
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignExpression) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    a = 3 * 4 + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 13u);
+}
+
 }  // namespace
