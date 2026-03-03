@@ -219,4 +219,27 @@ TEST(SimCh6b, TypeOpReal) {
   EXPECT_EQ(var->value.width, 64u);
 }
 
+// 8. type() preserves signed flag from int source.
+TEST(SimCh6b, TypeOpPreservesSignedInt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  var type(a) result;\n"
+      "  initial result = -1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->is_signed);
+  // -1 in 32-bit = 0xFFFFFFFF.
+  EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
+}
+
 }  // namespace
