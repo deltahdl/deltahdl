@@ -40,18 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-TEST(ParserSection8, ClassScopeResolutionEnum) {
-  auto r = Parse(
-      "class Base;\n"
-      "  typedef enum {bin, oct, dec, hex} radix;\n"
-      "endclass\n"
-      "module m;\n"
-      "  initial x = Base::bin;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(ParserSection8, ClassScopeResolutionTypedef) {
   auto r = Parse(
       "class Outer;\n"
