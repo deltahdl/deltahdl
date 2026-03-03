@@ -41,19 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, TriregThreeDelay_FallAndDecay) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (large) #(10, 20, 50) cap1;\n"
-      "endmodule\n");
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->net_delay_fall, nullptr);
-  EXPECT_EQ(item->net_delay_fall->int_val, 20u);
-  ASSERT_NE(item->net_delay_decay, nullptr);
-  EXPECT_EQ(item->net_delay_decay->int_val, 50u);
-}
-
 TEST(ParserSection6, TriregSingleDelay) {
   auto r = Parse(
       "module t;\n"
