@@ -284,4 +284,11 @@ TEST(ParserCh511, ArrayLiteral_Nested) {
               "endmodule"));
 }
 
+TEST(ParserCh511, ArrayLiteral_Simple) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int arr[0:2] = '{10, 20, 30};\n"
+              "endmodule"));
+}
+
 }  // namespace
