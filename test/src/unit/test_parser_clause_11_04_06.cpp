@@ -144,4 +144,9 @@ TEST(ParserCh501, Sec5_1_ThreeCharOperatorWildcardInequality) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
 }
 
+TEST(ParserCh505, Operator_WildcardEquality) {
+  // ==? is the wildcard equality operator.
+  EXPECT_TRUE(ParseOk("module m; initial x = (a ==? b); endmodule"));
+}
+
 }  // namespace

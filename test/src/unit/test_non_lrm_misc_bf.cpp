@@ -52,11 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh505, Operator_WildcardEquality) {
-  // ==? is the wildcard equality operator.
-  EXPECT_TRUE(ParseOk("module m; initial x = (a ==? b); endmodule"));
-}
-
 TEST(ParserCh506, Ident_SimpleWithUnderscore) {
   auto r = Parse("module m; logic _bus3; endmodule");
   ASSERT_NE(r.cu, nullptr);
