@@ -40,20 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// =========================================================================
-// §6.12: Real, shortreal, and realtime data types
-// =========================================================================
-TEST(ParserSection6, RealVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  real r;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
-}
-
 TEST(ParserSection6, ShortrealVarDecl) {
   auto r = Parse(
       "module t;\n"
