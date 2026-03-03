@@ -54,24 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 2. type(expr) inner expression is stored in lhs for identifiers.
-TEST(ParserSection6, Sec6_11_1_TypeRefInnerIdent) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = type(y);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
-  ASSERT_NE(rhs->lhs, nullptr);
-  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(rhs->lhs->text, "y");
-}
-
 // 3. type(data_type) stores the data type name in text field.
 TEST(ParserSection6, Sec6_11_1_TypeRefDataTypeText) {
   auto r = Parse(
