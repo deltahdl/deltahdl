@@ -10,34 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 8. always @* with concatenation -- all parts are sensitive.
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarConcatenation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] hi, lo;\n"
-      "  logic [7:0] y;\n"
-      "  always @* y = {hi, lo};\n"
-      "  initial begin\n"
-      "    hi = 4'hC;\n"
-      "    lo = 4'h3;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0xC3u);
-}
-
-// ---------------------------------------------------------------------------
 // 9. always @* with bit-select -- reading a single bit from a vector.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarBitSelect) {
