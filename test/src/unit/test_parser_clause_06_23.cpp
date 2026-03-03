@@ -256,4 +256,19 @@ TEST(ParserSection6, Sec6_11_1_TypeRefInnerIdent) {
   EXPECT_EQ(rhs->lhs->text, "y");
 }
 
+// 3. type(data_type) stores the data type name in text field.
+TEST(ParserSection6, Sec6_11_1_TypeRefDataTypeText) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = type(int);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
+}
+
 }  // namespace
