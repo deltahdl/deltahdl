@@ -484,4 +484,16 @@ TEST(ParserSection6, IntegerDefaultSigned) {
   EXPECT_TRUE(item->data_type.is_signed) << "integer is signed by default";
 }
 
+TEST(ParserSection6, TimeDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  time t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
+  EXPECT_FALSE(item->data_type.is_signed) << "time is unsigned by default";
+}
+
 }  // namespace
