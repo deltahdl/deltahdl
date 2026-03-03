@@ -67,4 +67,43 @@ TEST(ParserSection23, ModuleDefinitionWithBody) {
   ASSERT_GE(mod->items.size(), 2);
 }
 
+struct ParseResult9c {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult9c Parse(const std::string& src) {
+  ParseResult9c result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return true;
+  }
+  return false;
+}
+
+TEST(ParserSection9c, MixedProcedureTypes) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial a = 0;\n"
+      "  always @(posedge clk) q <= d;\n"
+      "  final $display(\"done\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kFinalBlock));
+}
+
 }  // namespace
