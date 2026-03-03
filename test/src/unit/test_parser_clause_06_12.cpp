@@ -177,4 +177,16 @@ TEST(ParserSection6, RealtimeVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kRealtime);
 }
 
+TEST(ParserSection6, RealTypesInProcedural) {
+  // All real types declared inside initial block
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    real r;\n"
+              "    shortreal sr;\n"
+              "    realtime rt;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -30,18 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, RealTypesInProcedural) {
-  // All real types declared inside initial block
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    real r;\n"
-              "    shortreal sr;\n"
-              "    realtime rt;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, StringInProcedural) {
   // String declared inside procedural block
   EXPECT_TRUE(
