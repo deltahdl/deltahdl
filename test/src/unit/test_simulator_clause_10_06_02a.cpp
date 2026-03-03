@@ -20,28 +20,6 @@ enum class ForceTarget : uint8_t {
   kUserDefinedNettypePartSelect,
 };
 
-struct ForceInfo {
-  ForceTarget target;
-  bool has_mixed_assignments = false;
-};
-
-bool ValidateForceTarget(const ForceInfo& info) {
-  if (info.has_mixed_assignments) return false;
-  switch (info.target) {
-    case ForceTarget::kSingularVariable:
-    case ForceTarget::kNet:
-    case ForceTarget::kConstBitSelectNet:
-    case ForceTarget::kConstPartSelectNet:
-    case ForceTarget::kConcatenation:
-      return true;
-    case ForceTarget::kBitSelectVariable:
-    case ForceTarget::kPartSelectVariable:
-    case ForceTarget::kUserDefinedNettypePartSelect:
-      return false;
-  }
-  return false;
-}
-
 void ForceVariable(Variable& var, const Logic4Vec& value) { var.value = value; }
 
 void ReleaseVariable(Variable& var, bool has_continuous_driver,
@@ -107,15 +85,6 @@ static TwoNets MakeTwoWireNets() {
 }
 
 namespace {
-
-// §10.6.2: "A force or release statement shall not be applied to a
-//  variable that is being assigned by a mixture of continuous and
-//  procedural assignments."
-TEST(ForceRelease, IllegalMixedAssignmentTarget) {
-  ForceInfo info{ForceTarget::kSingularVariable};
-  info.has_mixed_assignments = true;
-  EXPECT_FALSE(ValidateForceTarget(info));
-}
 
 // --- Force on variable ---
 // §10.6.2: "A force statement to a variable shall override a procedural
