@@ -1,3 +1,4 @@
+// Non-LRM tests
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -6,29 +7,7 @@
 
 using namespace delta;
 
-// ---------------------------------------------------------------------------
-// §10.4.2: Simple nonblocking assignment — value updates after scheduler run.
-// ---------------------------------------------------------------------------
-TEST(SimCh10b, SimpleNBA) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a;\n"
-      "  initial begin\n"
-      "    a <= 5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("a");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 5u);
-}
+namespace {
 
 // ---------------------------------------------------------------------------
 // §10.4.2: NBA does NOT take effect immediately — uses NBA region scheduling.
@@ -882,3 +861,5 @@ TEST(SimCh10b, NBAReplicationRHS) {
   // {4{2'b10}} = 8'b10101010 = 0xAA.
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
+
+}  // namespace
