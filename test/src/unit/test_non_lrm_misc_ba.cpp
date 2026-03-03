@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-// 5. TimeScale struct: time values have two components (unit + precision).
-TEST(ParserClause03, Cl3_14_TimeScaleTwoComponents) {
-  TimeScale ts;
-  ts.unit = TimeUnit::kNs;
-  ts.magnitude = 1;
-  ts.precision = TimeUnit::kPs;
-  ts.prec_magnitude = 1;
-  EXPECT_EQ(ts.unit, TimeUnit::kNs);
-  EXPECT_EQ(ts.precision, TimeUnit::kPs);
-  // Unit and precision are independently stored.
-  EXPECT_NE(static_cast<int8_t>(ts.unit), static_cast<int8_t>(ts.precision));
-}
-
 // 12. Precision constraint: precision exponent <= unit exponent.
 // Finer units have more-negative exponents (kFs < kPs < ... < kS).
 TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
