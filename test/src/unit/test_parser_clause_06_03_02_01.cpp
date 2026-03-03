@@ -148,4 +148,14 @@ TEST(ParserSection6, TriregChargeStrengthSmall) {
   EXPECT_EQ(item->data_type.charge_strength, 1);
 }
 
+TEST(ParserSection6, TriregChargeStrengthLarge) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) l1;\n"
+      "endmodule\n");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.charge_strength, 4);
+}
+
 }  // namespace
