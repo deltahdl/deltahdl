@@ -59,4 +59,12 @@ TEST(ParserSection6, InterconnectWithPackedDim) {
               "endmodule\n"));
 }
 
+// Step 2b: interconnect (fixes 6.6.8)
+TEST(ParserSection6, Interconnect_Basic) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  interconnect bus;\n"
+               "endmodule\n"));
+}
+
 }  // namespace

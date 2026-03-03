@@ -41,14 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// Step 2b: interconnect (fixes 6.6.8)
-TEST(ParserSection6, Interconnect_Basic) {
-  EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  interconnect bus;\n"
-               "endmodule\n"));
-}
-
 // Step 3a: var type(expr) declarations (fixes 6.23-type_op)
 TEST(ParserSection6, VarTypeOp_Basic) {
   EXPECT_TRUE(
