@@ -524,4 +524,37 @@ TEST(SimCh9d, AlwaysStarUnaryOps) {
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x5Au);
 }
 
+// ---------------------------------------------------------------------------
+// 19. always @* with multiple outputs computed from same inputs.
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarMultipleOutputs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, sum, diff;\n"
+      "  always @* begin\n"
+      "    sum = a + b;\n"
+      "    diff = a - b;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 8'h30;\n"
+      "    b = 8'h10;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* sum = f.ctx.FindVariable("sum");
+  auto* diff = f.ctx.FindVariable("diff");
+  ASSERT_NE(sum, nullptr);
+  ASSERT_NE(diff, nullptr);
+  EXPECT_EQ(sum->value.ToUint64(), 0x40u);
+  EXPECT_EQ(diff->value.ToUint64(), 0x20u);
+}
+
 }  // namespace
