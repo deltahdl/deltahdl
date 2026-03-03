@@ -230,4 +230,18 @@ TEST(ParserSection6, RealDecl) {
   EXPECT_EQ(item->name, "r");
 }
 
+TEST(ParserSection6, ShortrealDecl) {
+  // shortreal is same as C float (LRM 6.12)
+  auto r = Parse(
+      "module m;\n"
+      "  shortreal sr;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
+  EXPECT_EQ(item->name, "sr");
+}
+
 }  // namespace
