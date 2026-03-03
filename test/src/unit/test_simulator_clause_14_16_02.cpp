@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §14.16.2: Driving clocking output signals
 
 #include <cstdint>
 #include <string_view>
@@ -13,14 +13,17 @@ using namespace delta;
 
 namespace {
 
+// Helper fixture for clocking simulation tests.
+// Schedule posedge at a given time through the scheduler.
+// Schedule negedge at a given time through the scheduler.
 // =============================================================================
-// 10. Synchronous drives via clocking block (S14.14)
+// 6. Clocking block output driving (S14.7)
 // =============================================================================
-TEST(ClockingSim, SynchronousDriveSchedulesAtNextClock) {
+TEST(ClockingSim, OutputDriving) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* out = f.ctx.CreateVariable("sync_out", 8);
+  auto* out = f.ctx.CreateVariable("out_data", 8);
   out->value = MakeLogic4VecVal(f.arena, 8, 0);
 
   ClockingManager cmgr;
@@ -29,10 +32,10 @@ TEST(ClockingSim, SynchronousDriveSchedulesAtNextClock) {
   block.clock_signal = "clk";
   block.clock_edge = Edge::kPosedge;
   block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{2};
+  block.default_output_skew = SimTime{0};
 
   ClockingSignal sig;
-  sig.signal_name = "sync_out";
+  sig.signal_name = "out_data";
   sig.direction = ClockingDir::kOutput;
   block.signals.push_back(sig);
   cmgr.Register(block);
@@ -40,12 +43,12 @@ TEST(ClockingSim, SynchronousDriveSchedulesAtNextClock) {
 
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&cmgr, &f]() {
-    cmgr.ScheduleOutputDrive("cb", "sync_out", 0x42, f.ctx, f.scheduler);
+    cmgr.ScheduleOutputDrive("cb", "out_data", 0xFE, f.ctx, f.scheduler);
   };
   f.scheduler.ScheduleEvent(SimTime{5}, Region::kActive, ev);
   f.scheduler.Run();
 
-  EXPECT_EQ(out->value.ToUint64(), 0x42u);
+  EXPECT_EQ(out->value.ToUint64(), 0xFEu);
 }
 
 }  // namespace
