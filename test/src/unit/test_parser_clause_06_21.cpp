@@ -718,4 +718,30 @@ TEST(ParserSection4, Sec4_9_4_MultipleStaticVarsInFunc) {
   EXPECT_EQ(fn->func_body_stmts[2]->var_name, "c");
 }
 
+// =============================================================================
+// 14. Multiple automatic vars in same function
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_MultipleAutoVarsInFunc) {
+  auto r = Parse(
+      "module m;\n"
+      "  function static void multi_auto(int x);\n"
+      "    automatic int p = x + 1;\n"
+      "    automatic int q = x + 2;\n"
+      "    $display(p, q);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FirstFuncOrTask(r);
+  ASSERT_NE(fn, nullptr);
+  EXPECT_TRUE(fn->is_static);
+  ASSERT_GE(fn->func_body_stmts.size(), 2u);
+  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(fn->func_body_stmts[0]->var_is_automatic);
+  EXPECT_EQ(fn->func_body_stmts[0]->var_name, "p");
+  EXPECT_EQ(fn->func_body_stmts[1]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(fn->func_body_stmts[1]->var_is_automatic);
+  EXPECT_EQ(fn->func_body_stmts[1]->var_name, "q");
+}
+
 }  // namespace
