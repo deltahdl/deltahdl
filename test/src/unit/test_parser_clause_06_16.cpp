@@ -339,4 +339,13 @@ TEST(ParserSection6, StringDeclEmptyInit) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, StringParameterDecl) {
+  // parameter string (LRM 6.16)
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter string DEFAULT_NAME = \"John Smith\";\n"
+              "  string myName = DEFAULT_NAME;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
