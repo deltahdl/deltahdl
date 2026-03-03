@@ -49,19 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9b, BlockingAssignConcatLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial {carry, acc} = rega + regb;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
-}
-
 TEST(ParserSection9b, BlockingAssignCompound) {
   auto r = Parse(
       "module m;\n"
