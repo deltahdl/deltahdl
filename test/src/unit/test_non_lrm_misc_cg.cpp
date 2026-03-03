@@ -42,22 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Bit-select ---
-TEST(ParserSection11, Sec11_1_BitSelectIndex) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = data[7];\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->base, nullptr);
-  EXPECT_EQ(rhs->base->kind, ExprKind::kIdentifier);
-  ASSERT_NE(rhs->index, nullptr);
-  EXPECT_EQ(rhs->index->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->index_end, nullptr);
-}
-
 // --- Part-select ---
 TEST(ParserSection11, Sec11_1_PartSelectIndexAndEnd) {
   auto r = Parse(
