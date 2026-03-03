@@ -257,4 +257,17 @@ TEST(SourceText, ClassQualifierCombinations) {
   EXPECT_TRUE(members[2]->is_virtual);
 }
 
+TEST(Parser, ClassPropertyQualifiers) {
+  auto r = Parse(
+      "class pkt;\n"
+      "  rand int data;\n"
+      "  local int secret;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->members.size(), 2);
+  EXPECT_TRUE(cls->members[0]->is_rand);
+  EXPECT_TRUE(cls->members[1]->is_local);
+}
+
 }  // namespace
