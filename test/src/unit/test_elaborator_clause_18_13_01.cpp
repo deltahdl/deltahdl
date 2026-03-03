@@ -1,4 +1,4 @@
-// §18.13: Random number system functions and methods
+// §18.13.1: $urandom
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
