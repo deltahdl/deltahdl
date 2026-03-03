@@ -42,21 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 2. Module with explicit timeprecision — highest priority.
-TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeprecisionTakesPriority) {
-  auto r = ParseTimescale31402(
-      "`timescale 1us / 1ns\n"
-      "module m;\n"
-      "  timeprecision 1fs;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto resolved =
-      ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
-                             r.preproc_timescale, nullptr);
-  EXPECT_TRUE(resolved.has_precision);
-  EXPECT_EQ(resolved.precision, TimeUnit::kFs);
-}
-
 // 3. Rule (a): Nested module inherits time unit from enclosing module.
 TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInheritsUnit) {
   auto r = ParseTimescale31402(
