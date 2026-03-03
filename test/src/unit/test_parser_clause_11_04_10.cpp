@@ -161,4 +161,8 @@ TEST(ParserSection11, LogicalShiftRight) {
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
 }
 
+TEST(ParserCh505, Operator_LogicalShiftLeft) {
+  EXPECT_TRUE(ParseOk("module m; initial x = a <<< 2; endmodule"));
+}
+
 }  // namespace

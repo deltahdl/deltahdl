@@ -52,10 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh505, Operator_LogicalShiftLeft) {
-  EXPECT_TRUE(ParseOk("module m; initial x = a <<< 2; endmodule"));
-}
-
 TEST(ParserCh505, Operator_ArithShiftRight) {
   EXPECT_TRUE(ParseOk("module m; initial x = a >>> 1; endmodule"));
 }
