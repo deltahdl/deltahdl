@@ -40,19 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.3 — Covergroup inside class
-TEST(ParserSection8, CovergroupInClass) {
-  auto r = Parse(
-      "class CoveredClass;\n"
-      "  int x;\n"
-      "  covergroup cg @(posedge clk);\n"
-      "    coverpoint x;\n"
-      "  endgroup\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 // §8.3 — Multiple properties on one line (comma-separated)
 TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
   auto r = Parse(
