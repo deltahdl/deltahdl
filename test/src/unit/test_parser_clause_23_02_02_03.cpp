@@ -189,4 +189,19 @@ TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
   EXPECT_EQ(ports[1].name, "b");
 }
 
+// 30b. More integer types as ports: longint and shortint.
+TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
+  auto r = Parse(
+      "module m(input longint addr, output shortint result);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kLongint);
+  EXPECT_EQ(ports[0].name, "addr");
+  EXPECT_EQ(ports[1].data_type.kind, DataTypeKind::kShortint);
+  EXPECT_EQ(ports[1].name, "result");
+}
+
 }  // namespace
