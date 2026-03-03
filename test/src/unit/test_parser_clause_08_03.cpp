@@ -294,4 +294,20 @@ TEST(SourceText, ClassPureVirtualAndExtern) {
   EXPECT_TRUE(members[3]->is_static);
 }
 
+// class_item ::= { attribute_instance } interface_class_declaration
+TEST(SourceText, ClassNestedInterfaceClass) {
+  auto r = Parse(
+      "class Outer;\n"
+      "  interface class IFace;\n"
+      "    pure virtual function void do_it();\n"
+      "  endclass\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 1u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kClassDecl);
+  EXPECT_TRUE(members[0]->nested_class->is_interface);
+}
+
 }  // namespace
