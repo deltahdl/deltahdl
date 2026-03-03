@@ -69,4 +69,16 @@ TEST(ParserSection6, TypesEquivalentSameSignedInt) {
   EXPECT_TRUE(TypesEquivalent(a, b));
 }
 
+// =========================================================================
+// §6.22: Type compatibility
+// =========================================================================
+TEST(ParserSection6, TypesMatchBuiltin) {
+  // Two identical built-in types should match.
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_TRUE(TypesMatch(a, b));
+}
+
 }  // namespace
