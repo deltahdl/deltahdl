@@ -29,17 +29,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult9c& r) {
   return nullptr;
 }
 
-static Stmt* FirstInitialStmt(ParseResult9c& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
 static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return true;
@@ -48,17 +37,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 }
 
 namespace {
-
-TEST(ParserSection9b, NonblockingAssignWithEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial a <= @(posedge clk) b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-}
 
 // =============================================================================
 // LRM section 9.2 -- Structured procedures overview

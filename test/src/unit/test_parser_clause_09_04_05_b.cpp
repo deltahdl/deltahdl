@@ -244,4 +244,15 @@ TEST(ParserSection9b, NonblockingAssignWithDelay) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
+TEST(ParserSection9b, NonblockingAssignWithEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial a <= @(posedge clk) b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+}
+
 }  // namespace
