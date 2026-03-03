@@ -89,4 +89,18 @@ TEST(EvalAdv, TaggedExprWithValue) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
+TEST(EvalAdv, TaggedExprVoidMember) {
+  SimFixture f;
+  // tagged Invalid (void member, no value) → 0.
+  auto* tagged = f.arena.Create<Expr>();
+  tagged->kind = ExprKind::kTagged;
+  auto* member = f.arena.Create<Expr>();
+  member->kind = ExprKind::kIdentifier;
+  member->text = "Invalid";
+  tagged->rhs = member;
+  tagged->lhs = nullptr;
+  auto result = EvalExpr(tagged, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
 }  // namespace
