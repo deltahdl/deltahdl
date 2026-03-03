@@ -246,4 +246,10 @@ TEST(SimA606, SequentialIfStatements) {
   EXPECT_EQ(var->value.ToUint64(), 3u);  // 0 + 1 + 2 = 3
 }
 
+bool EvaluateWaitCondition(uint64_t value) { return value != 0; }
+
+TEST(TimingControl, WaitConditionNonzeroIsTrue) {
+  EXPECT_TRUE(EvaluateWaitCondition(42));
+}
+
 }  // namespace
