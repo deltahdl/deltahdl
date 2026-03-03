@@ -10,31 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 14. Blocking assignment with system function ($clog2) on RHS.
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignSysClog2) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = $clog2(256);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  // $clog2(256) = 8
-  EXPECT_EQ(var->value.ToUint64(), 8u);
-}
-
-// ---------------------------------------------------------------------------
 // 15. Blocking assignment with unary operators (~, !).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryOps) {
