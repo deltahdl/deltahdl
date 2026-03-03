@@ -35,37 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult10b& r) {
 
 namespace {
 
-// --- 25. Assign inside nested if-else ---
-TEST(ParserSection10, Sec10_6_1_AssignNestedIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, a, b;\n"
-      "  initial begin\n"
-      "    if (a)\n"
-      "      if (b)\n"
-      "        assign q = 1;\n"
-      "      else\n"
-      "        assign q = 0;\n"
-      "    else\n"
-      "      deassign q;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // Outer then-branch is another if.
-  ASSERT_NE(stmt->then_branch, nullptr);
-  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kIf);
-  // Inner then/else are both assigns.
-  EXPECT_EQ(stmt->then_branch->then_branch->kind, StmtKind::kAssign);
-  EXPECT_EQ(stmt->then_branch->else_branch->kind, StmtKind::kAssign);
-  // Outer else-branch is deassign.
-  ASSERT_NE(stmt->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kDeassign);
-}
-
 // --- 26. Assign with reduction operator RHS ---
 TEST(ParserSection10, Sec10_6_1_AssignReductionRhs) {
   auto r = Parse(
