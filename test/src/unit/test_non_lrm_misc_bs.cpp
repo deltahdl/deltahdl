@@ -40,17 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.5 — Typedef inside class body (enum, struct)
-TEST(ParserSection8, ClassWithTypedef) {
-  auto r = Parse(
-      "class test_cls;\n"
-      "  typedef enum {A = 10, B = 20} e_type;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "test_cls");
-}
-
 // §8.7 — Constructor with arguments
 TEST(ParserSection8, NewWithArgs) {
   auto r = Parse(

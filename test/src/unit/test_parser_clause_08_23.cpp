@@ -34,4 +34,31 @@ TEST(SourceText, ClassNestedClass) {
   EXPECT_EQ(members[0]->nested_class->name, "Inner");
 }
 
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// §8.5 — Typedef inside class body (enum, struct)
+TEST(ParserSection8, ClassWithTypedef) {
+  auto r = Parse(
+      "class test_cls;\n"
+      "  typedef enum {A = 10, B = 20} e_type;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "test_cls");
+}
+
 }  // namespace
