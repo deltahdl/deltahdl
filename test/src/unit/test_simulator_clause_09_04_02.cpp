@@ -198,4 +198,8 @@ TEST(TimingControl, NoEdgeZToX) {
   EXPECT_EQ(DetectEdge(Logic4::kZ, Logic4::kX), EdgeKind::kNone);
 }
 
+TEST(TimingControl, NoEdgeZToZ) {
+  EXPECT_EQ(DetectEdge(Logic4::kZ, Logic4::kZ), EdgeKind::kNone);
+}
+
 }  // namespace

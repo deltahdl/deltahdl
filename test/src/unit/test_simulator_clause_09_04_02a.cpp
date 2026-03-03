@@ -38,10 +38,6 @@ bool IsEdge(Logic4 from, Logic4 to) {
 
 namespace {
 
-TEST(TimingControl, NoEdgeZToZ) {
-  EXPECT_EQ(DetectEdge(Logic4::kZ, Logic4::kZ), EdgeKind::kNone);
-}
-
 TEST(TimingControl, EdgeDetectedOnPosedge) {
   EXPECT_TRUE(IsEdge(Logic4::kVal0, Logic4::kVal1));
 }
