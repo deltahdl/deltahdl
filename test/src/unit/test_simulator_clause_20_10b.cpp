@@ -1,11 +1,9 @@
-// §20.10: Severity system tasks
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include <cstdint>
 #include <string_view>
 #include <vector>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -16,29 +14,7 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
-struct SvaFixture {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler{arena};
-  DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag};
-  SvaEngine engine;
-};
-
 namespace {
-
-// =============================================================================
-// Assertion severity levels ($fatal, $error, $warning, $info)
-// =============================================================================
-TEST(SvaEngine, SeverityLevelValues) {
-  EXPECT_EQ(static_cast<int>(AssertionSeverity::kInfo), 0);
-  EXPECT_EQ(static_cast<int>(AssertionSeverity::kWarning), 1);
-  EXPECT_EQ(static_cast<int>(AssertionSeverity::kError), 2);
-  EXPECT_EQ(static_cast<int>(AssertionSeverity::kFatal), 3);
-}
 
 TEST(SvaEngine, SeverityToString) {
   EXPECT_EQ(SeverityToString(AssertionSeverity::kInfo), "INFO");

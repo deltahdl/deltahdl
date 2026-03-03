@@ -1,0 +1,29 @@
+// §20.10: Severity system tasks
+
+#include <gtest/gtest.h>
+#include <cstdint>
+#include <string_view>
+#include <vector>
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "common/types.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
+#include "simulator/sva_engine.h"
+
+using namespace delta;
+
+namespace {
+
+// =============================================================================
+// Assertion severity levels ($fatal, $error, $warning, $info)
+// =============================================================================
+TEST(SvaEngine, SeverityLevelValues) {
+  EXPECT_EQ(static_cast<int>(AssertionSeverity::kInfo), 0);
+  EXPECT_EQ(static_cast<int>(AssertionSeverity::kWarning), 1);
+  EXPECT_EQ(static_cast<int>(AssertionSeverity::kError), 2);
+  EXPECT_EQ(static_cast<int>(AssertionSeverity::kFatal), 3);
+}
+
+}  // namespace
