@@ -29,13 +29,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, Attribute_OnPortConnection) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sub u1(.a(x), (* no_connect *) .b(y));\n"
-              "endmodule"));
-}
-
 TEST(ParserCh512, Attribute_OnContAssign) {
   // Attribute on a continuous assignment statement.
   auto r = Parse(

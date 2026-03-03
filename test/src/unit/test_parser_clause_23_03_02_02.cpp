@@ -265,4 +265,11 @@ TEST(ParserSection23, NamedPortWithConcatenation) {
   EXPECT_EQ(item->inst_ports[0].second->kind, ExprKind::kConcatenation);
 }
 
+TEST(ParserCh512, Attribute_OnPortConnection) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  sub u1(.a(x), (* no_connect *) .b(y));\n"
+              "endmodule"));
+}
+
 }  // namespace
