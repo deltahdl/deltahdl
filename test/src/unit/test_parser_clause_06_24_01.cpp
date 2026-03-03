@@ -518,4 +518,18 @@ TEST(ParserSection6, IntCast_Details) {
   ASSERT_NE(rhs->lhs, nullptr);
 }
 
+TEST(ParserSection6, SignedCast) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = signed'(y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+  EXPECT_EQ(rhs->text, "signed");
+}
+
 }  // namespace
