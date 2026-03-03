@@ -1,3 +1,4 @@
+// Non-LRM tests
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -16,34 +17,7 @@ static void LowerRunAndFindQ1Q2(SimFixture& f, RtlirDesign* design,
   ASSERT_NE(q2_out, nullptr);
 }
 
-// =============================================================================
-// §9.2.3: always_latch executes at time 0
-// The always_latch procedure executes once automatically at time 0.
-// =============================================================================
-
-// 1. always_latch body executes at time 0 with default variable values.
-TEST(SimCh9c, ExecutesAtTimeZero) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic en;\n"
-      "  logic [7:0] d, q;\n"
-      "  always_latch\n"
-      "    if (en) q = d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  // en defaults to 0, so q should retain its default value of 0.
-  auto* q = f.ctx.FindVariable("q");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->value.width, 8u);
-  EXPECT_EQ(q->value.ToUint64(), 0u);
-}
+namespace {
 
 // 2. always_latch with unconditional assignment sets output at time 0.
 TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
@@ -70,7 +44,6 @@ TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
 // §9.2.3: always_latch with if-without-else creates latch behavior
 // When the enable condition is false, the output retains its previous value.
 // =============================================================================
-
 // 3. if-without-else: enable low retains default (zero) value.
 TEST(SimCh9c, IfWithoutElseRetainsDefault) {
   SimFixture f;
@@ -154,7 +127,6 @@ TEST(SimCh9c, EnableLowRetainsPreviousValue) {
 // =============================================================================
 // §9.2.3: Multiple latches in one always_latch block
 // =============================================================================
-
 // 6. Two independent latches in one always_latch begin/end block.
 TEST(SimCh9c, MultipleLatchesInOneBlock) {
   SimFixture f;
@@ -212,7 +184,6 @@ TEST(SimCh9c, MultipleLatchesEnableLow) {
 // =============================================================================
 // §9.2.3: always_latch with incomplete case creates latch
 // =============================================================================
-
 // 8. Incomplete case (no default) retains value for unmatched selectors.
 TEST(SimCh9c, IncompleteCaseRetainsValue) {
   SimFixture f;
@@ -295,7 +266,6 @@ TEST(SimCh9c, IncompleteCaseSecondArm) {
 // =============================================================================
 // §9.2.3: always_latch with different data types
 // =============================================================================
-
 // 11. always_latch with logic type.
 TEST(SimCh9c, LatchLogicType) {
   SimFixture f;
@@ -380,7 +350,6 @@ TEST(SimCh9c, LatchByteType) {
 // =============================================================================
 // §9.2.3: always_latch with bit-select
 // =============================================================================
-
 // 14. Bit-select on RHS within always_latch.
 TEST(SimCh9c, BitSelectRHS) {
   SimFixture f;
@@ -440,7 +409,6 @@ TEST(SimCh9c, BitSelectHighBit) {
 // =============================================================================
 // §9.2.3: always_latch with part-select
 // =============================================================================
-
 // 16. Part-select extracting lower nibble.
 TEST(SimCh9c, PartSelectLowerNibble) {
   SimFixture f;
@@ -502,7 +470,6 @@ TEST(SimCh9c, PartSelectUpperNibble) {
 // =============================================================================
 // §9.2.3: always_latch with concatenation
 // =============================================================================
-
 // 18. Concatenation on RHS within always_latch.
 TEST(SimCh9c, ConcatenationRHS) {
   SimFixture f;
@@ -564,7 +531,6 @@ TEST(SimCh9c, ConcatenationRetainedWhenLow) {
 // =============================================================================
 // §9.2.3: always_latch with ternary operator
 // =============================================================================
-
 // 20. Ternary operator in always_latch selects first operand.
 TEST(SimCh9c, TernarySelectsFirst) {
   SimFixture f;
@@ -622,7 +588,6 @@ TEST(SimCh9c, TernarySelectsSecond) {
 // =============================================================================
 // §9.2.3: always_latch with nested if-else
 // =============================================================================
-
 // 22. Nested if-else: outer condition true, inner condition true.
 TEST(SimCh9c, NestedIfElseBothTrue) {
   SimFixture f;
@@ -720,7 +685,6 @@ TEST(SimCh9c, NestedIfElseOuterFalse) {
 // =============================================================================
 // §9.2.3: always_latch with multiple outputs
 // =============================================================================
-
 // 25. Multiple outputs assigned from different data sources.
 TEST(SimCh9c, MultipleOutputsDifferentSources) {
   SimFixture f;
@@ -797,7 +761,6 @@ TEST(SimCh9c, MultipleOutputsIndependentEnables) {
 // =============================================================================
 // §9.2.3: always_latch output available after scheduler run
 // =============================================================================
-
 // 27. Output is available after scheduler.Run() completes.
 TEST(SimCh9c, OutputAvailableAfterRun) {
   SimFixture f;
@@ -855,7 +818,6 @@ TEST(SimCh9c, WidthVerificationSingleBit) {
 // =============================================================================
 // §9.2.3: Verify .width and .ToUint64() on results
 // =============================================================================
-
 // 29. 32-bit always_latch output verifies width and value.
 TEST(SimCh9c, Width32BitAndToUint64) {
   SimFixture f;
@@ -912,3 +874,5 @@ TEST(SimCh9c, BeginEndBlockWithArithmetic) {
   // 0x10 + 0x20 = 0x30.
   EXPECT_EQ(q->value.ToUint64(), 0x30u);
 }
+
+}  // namespace
