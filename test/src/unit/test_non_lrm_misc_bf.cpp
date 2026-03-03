@@ -37,11 +37,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh50602, Keyword_AllLowercase) {
-  // Keywords are lowercase only; MODULE is not a keyword, so this fails.
-  EXPECT_FALSE(ParseOk("MODULE m; endmodule"));
-}
-
 TEST(ParserCh50603, SystemTask_Display) {
   // $display is a system task call (Section 5.6.3, Section 21.2).
   auto r = Parse(

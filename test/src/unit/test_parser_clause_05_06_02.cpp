@@ -24,4 +24,9 @@ TEST(ParserCh501, Sec5_1_KeywordsAreReserved) {
               "endmodule\n"));
 }
 
+TEST(ParserCh50602, Keyword_AllLowercase) {
+  // Keywords are lowercase only; MODULE is not a keyword, so this fails.
+  EXPECT_FALSE(ParseOk("MODULE m; endmodule"));
+}
+
 }  // namespace
