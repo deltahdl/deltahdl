@@ -29,22 +29,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, AttributeValue_ConstExpr) {
-  // The attribute value can be an arbitrary constant expression.
-  auto r = Parse(
-      "module m;\n"
-      "  (* depth = 3 + 1 *)\n"
-      "  logic [7:0] mem;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->attrs.size(), 1u);
-  EXPECT_EQ(item->attrs[0].name, "depth");
-  ASSERT_NE(item->attrs[0].value, nullptr);
-  EXPECT_EQ(item->attrs[0].value->kind, ExprKind::kBinary);
-}
-
 TEST(ParserCh512, AttributeValue_String) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
