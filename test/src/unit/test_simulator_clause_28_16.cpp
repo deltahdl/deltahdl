@@ -70,4 +70,15 @@ TEST(GateNetDelays, SingleDelayUsedForAll) {
   EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kZ), 10u);
 }
 
+// §28.16: "When two delays are given, the first delay shall specify
+//  the rise delay, and the second delay shall specify the fall
+//  delay."
+TEST(GateNetDelays, TwoDelayRiseAndFall) {
+  DelaySpec spec{10, 20, 0, 2};
+  // 0→1 = d1 (rise)
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kV1), 10u);
+  // 1→0 = d2 (fall)
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kV0), 20u);
+}
+
 }  // namespace
