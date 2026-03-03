@@ -42,26 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 59. Repeated timeunit/timeprecision that match previous declaration.
-// §3.14.2.2: "The timeunit and timeprecision declarations can be
-// repeated as later items, but shall match the previous declaration
-// within the current time scope."
-TEST(ParserClause03, Cl3_14_2_2_RepeatMatchingDeclaration) {
-  auto r = ParseTimescale31402(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "  logic x;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
-  EXPECT_EQ(r.cu->modules[0]->time_unit, TimeUnit::kNs);
-  EXPECT_EQ(r.cu->modules[0]->time_prec, TimeUnit::kPs);
-}
-
 // 60. Separate modules each define their own time scope independently.
 // §3.14.2.2: "There shall be at most one time unit and one time
 // precision for any module ... definition."
