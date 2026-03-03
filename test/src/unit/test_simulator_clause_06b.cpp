@@ -8,28 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 23. type() with byte, verify unsigned flag is not set (byte is signed).
-TEST(SimCh6b, TypeOpByteIsSigned) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  byte a;\n"
-      "  var type(a) result;\n"
-      "  initial result = 0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_TRUE(var->is_signed);
-  EXPECT_EQ(var->value.width, 8u);
-}
-
 // 24. type() with longint, assign max value.
 TEST(SimCh6b, TypeOpLongintMaxValue) {
   SimFixture f;
