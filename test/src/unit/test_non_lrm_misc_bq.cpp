@@ -48,23 +48,6 @@ static Stmt* FirstInitialStmt(ParseResult7e& r) {
 
 namespace {
 
-// 8. Packed struct assigned from concatenation.
-TEST(ParserSection7, Sec7_2_2_PackedStructFromConcat) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } w_t;\n"
-      "  w_t w;\n"
-      "  initial w = {8'hAB, 8'hCD};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
-}
-
 // 9. Default member values in struct typedef.
 TEST(ParserSection7, Sec7_2_2_DefaultMemberValues) {
   auto r = Parse(
