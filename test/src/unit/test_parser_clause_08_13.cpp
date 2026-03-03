@@ -50,4 +50,17 @@ TEST(SourceText, ClassWithExtends) {
   EXPECT_EQ(r.cu->classes[0]->base_class, "Parent");
 }
 
+// =============================================================================
+// A.1.2 class_declaration — additional forms
+// =============================================================================
+// Class with final_specifier: class :final C;
+TEST(SourceText, ClassWithFinal) {
+  auto r = Parse("class :final C; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_final);
+  EXPECT_EQ(r.cu->classes[0]->name, "C");
+}
+
 }  // namespace
