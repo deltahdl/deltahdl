@@ -163,4 +163,31 @@ TEST(SimCh9d, AlwaysStarTypeCast) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFFFFFFFu);
 }
 
+// ---------------------------------------------------------------------------
+// 24. Blocking assignment with type cast (signed').
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignTypeCast) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    x = 8'hFF;\n"
+      "    result = signed'(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  // 8'hFF sign-extended to 32 bits = 0xFFFFFFFF.
+  EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
+}
+
 }  // namespace
