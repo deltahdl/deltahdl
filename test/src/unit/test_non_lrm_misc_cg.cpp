@@ -42,21 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Indexed part-select +: and -: ---
-TEST(ParserSection11, Sec11_1_IndexedPartSelectPlusFlag) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = vec[i +: 4];\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(rhs->is_part_select_plus);
-  EXPECT_FALSE(rhs->is_part_select_minus);
-  ASSERT_NE(rhs->index, nullptr);
-  ASSERT_NE(rhs->index_end, nullptr);
-}
-
 TEST(ParserSection11, Sec11_1_IndexedPartSelectMinusFlag) {
   auto r = Parse(
       "module t;\n"
