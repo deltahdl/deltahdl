@@ -621,4 +621,37 @@ TEST(SimCh9d, AlwaysStarBeginEnd) {
   EXPECT_EQ(y->value.ToUint64(), 0x05u);
 }
 
+// ---------------------------------------------------------------------------
+// 22. always @* with nested if-else (priority encoder using full-signal reads).
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarPriorityEncoder) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] req;\n"
+      "  logic [1:0] grant;\n"
+      "  always @* begin\n"
+      "    if (req >= 4'd8) grant = 2'b11;\n"
+      "    else if (req >= 4'd4) grant = 2'b10;\n"
+      "    else if (req >= 4'd2) grant = 2'b01;\n"
+      "    else grant = 2'b00;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    req = 4'd3;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* grant = f.ctx.FindVariable("grant");
+  ASSERT_NE(grant, nullptr);
+  // req = 3 >= 2, so grant = 2'b01 = 1.
+  EXPECT_EQ(grant->value.ToUint64(), 1u);
+}
+
 }  // namespace
