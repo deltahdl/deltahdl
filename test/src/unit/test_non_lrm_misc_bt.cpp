@@ -30,26 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.2.1 -- Initial and final blocks
-// =============================================================================
-TEST(ParserSection9, InitialBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  bool found = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      found = true;
-      ASSERT_NE(item->body, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 TEST(ParserSection9, FinalBlock) {
   auto r = Parse(
       "module m;\n"
