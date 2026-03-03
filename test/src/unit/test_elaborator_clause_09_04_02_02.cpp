@@ -129,4 +129,31 @@ TEST(SimCh9d, AlwaysStarAllRhsSensitive) {
   EXPECT_EQ(y->value.ToUint64(), 0x33u);
 }
 
+// ---------------------------------------------------------------------------
+// 5. always @* does NOT include LHS signal 'y' in sensitivity.
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarLhsNotSensitive) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, y;\n"
+      "  always @* y = a + 1;\n"
+      "  initial begin\n"
+      "    a = 8'h09;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  // y = 0x09 + 1 = 0x0A. No infinite loop from self-triggering.
+  EXPECT_EQ(y->value.ToUint64(), 0x0Au);
+}
+
 }  // namespace
