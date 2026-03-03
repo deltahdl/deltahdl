@@ -25,4 +25,30 @@ TEST(Elaboration, WidthInference_ContAssignWidth) {
   EXPECT_EQ(mod->assigns[0].width, 8);
 }
 
+// ---------------------------------------------------------------------------
+// 25. Blocking assignment preserving width/truncation.
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignTruncation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] narrow;\n"
+      "  initial begin\n"
+      "    narrow = 8'hFF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("narrow");
+  ASSERT_NE(var, nullptr);
+  // 8'hFF truncated to 4 bits = 0xF.
+  EXPECT_EQ(var->value.width, 4u);
+  EXPECT_EQ(var->value.ToUint64(), 0xFu);
+}
+
 }  // namespace
