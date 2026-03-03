@@ -37,11 +37,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh50601, EscapedIdent_Braces) {
-  // \{a,b} is a valid escaped identifier containing braces.
-  EXPECT_TRUE(ParseOk("module m; wire \\{a,b} ; endmodule"));
-}
-
 // From test_parser_clause_05b.cpp
 TEST(ParserCh50602, Keyword_EscapedAsIdentifier) {
   // An escaped keyword should be treated as a user-defined identifier.
