@@ -127,4 +127,15 @@ TEST(ParserSection8, ClassScopeResolutionParameter) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+// 21. Class scope resolution (cls::member)
+TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
+  EXPECT_TRUE(
+      ParseOk("class base;\n"
+              "  typedef int my_type;\n"
+              "endclass\n"
+              "module m;\n"
+              "  base::my_type x;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
