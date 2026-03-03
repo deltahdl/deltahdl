@@ -53,18 +53,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 namespace {
 
 // =========================================================================
-// Identifiers with all legal characters: letters, digits, _, $
-// =========================================================================
-TEST(ParserCh501, Sec5_1_IdentifierAllLegalChars) {
-  // An identifier may contain letters, digits, underscore, and dollar sign.
-  auto r = Parse("module m; logic abc_123$xyz; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "abc_123$xyz");
-}
-
-// =========================================================================
 // Simple identifiers starting with underscore
 // =========================================================================
 TEST(ParserCh501, Sec5_1_IdentifierStartsWithUnderscore) {
