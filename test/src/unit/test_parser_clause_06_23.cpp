@@ -434,4 +434,12 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnByte) {
               "endmodule\n"));
 }
 
+// 17. type() on shortint data type.
+TEST(ParserSection6, Sec6_11_1_TypeRefOnShortint) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(shortint);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
