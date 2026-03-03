@@ -55,4 +55,9 @@ TEST(ParserCh50601, EscapedIdent_SpecialChars) {
   EXPECT_TRUE(ParseOk("module m; wire \\***error-condition*** ; endmodule"));
 }
 
+TEST(ParserCh50601, EscapedIdent_ForwardSlash) {
+  // \net1/\net2 is a valid escaped identifier containing a slash.
+  EXPECT_TRUE(ParseOk("module m; wire \\net1/\\net2 ; endmodule"));
+}
+
 }  // namespace

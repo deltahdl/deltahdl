@@ -37,11 +37,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh50601, EscapedIdent_ForwardSlash) {
-  // \net1/\net2 is a valid escaped identifier containing a slash.
-  EXPECT_TRUE(ParseOk("module m; wire \\net1/\\net2 ; endmodule"));
-}
-
 TEST(ParserCh50601, EscapedIdent_Braces) {
   // \{a,b} is a valid escaped identifier containing braces.
   EXPECT_TRUE(ParseOk("module m; wire \\{a,b} ; endmodule"));
