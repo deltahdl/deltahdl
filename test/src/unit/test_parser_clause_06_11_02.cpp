@@ -429,4 +429,24 @@ TEST(ParserSection6, Sec6_11_IntegerFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInteger);
 }
 
+// Multiple integer types as function parameters with directions.
+TEST(ParserSection6, Sec6_11_MixedIntegerFuncParams) {
+  auto r = Parse(
+      "module t;\n"
+      "  function void process(input byte cmd, input int data,\n"
+      "                        output longint result);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  ASSERT_EQ(item->func_args.size(), 3u);
+  EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->func_args[2].data_type.kind, DataTypeKind::kLongint);
+  EXPECT_EQ(item->func_args[2].direction, Direction::kOutput);
+}
+
 }  // namespace
