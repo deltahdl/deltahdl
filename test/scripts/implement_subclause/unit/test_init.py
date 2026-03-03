@@ -116,7 +116,7 @@ def test_parse_args_accepts_annex_clause(tmp_path):
 @patch("implement_subclause.run_prompt")
 @patch("implement_subclause.check_supplementary_args")
 def test_main_dispatches_depth_1(_mock_check, mock_run, tmp_path):
-    """main() dispatches depth-1 clause to prompt_v handler."""
+    """main() passes model through to run_prompt."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
     main(["--lrm", str(lrm), "--subclause", "4", "--issue", "6", "--model", "opus"])

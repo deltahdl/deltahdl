@@ -1,6 +1,6 @@
 """LRM subclause implementation prompt generator.
 
-Dispatches to depth-appropriate prompt builders and invokes Claude CLI.
+Builds an optimized prompt and invokes Claude CLI.
 """
 
 import argparse
@@ -120,21 +120,6 @@ def build_hierarchy(clause: str) -> dict:
         result["ancestors"] = ancestors
 
     return result
-
-
-def build_top_level_line(h: dict, titles: dict[str, str], lrm: str) -> str:
-    """Return the first hierarchy line for the top-level clause or annex."""
-    if h["is_annex"]:
-        subject = titles.get(h["letter"], "")
-        return (
-            f"- Thoroughly understand that {h['collection']}"
-            f" is about '{subject}' per LRM in {lrm}"
-        )
-    title = titles.get(h["clause_number"], "")
-    return (
-        f"- Thoroughly understand that Clause {h['clause_number']}"
-        f" is about '{title}' per LRM in {lrm}"
-    )
 
 
 def find_context_subclauses(
@@ -268,21 +253,21 @@ def check_supplementary_args(
 def build_supplementary_lines(
     *, figures: list[Path], tables: list[Path],
 ) -> str:
-    """Build prompt lines acknowledging available Figures/Tables."""
+    """Build prompt lines referencing available Figures/Tables."""
     if not figures and not tables:
         return ""
     lines: list[str] = []
     for path in figures:
         label = _label_from_gv(path)
         lines.append(
-            f"- Acknowledge that you know {label} is available"
-            f" at {path} as a DOT GraphViz"
+            f"Consult {label} at {path} (DOT GraphViz)"
+            f" when implementing."
         )
     for path in tables:
         label = _label_from_md(path)
         lines.append(
-            f"- Acknowledge that you know {label} is available"
-            f" at {path} as a Markdown file"
+            f"Consult {label} at {path} (Markdown)"
+            f" when implementing."
         )
     return "\n".join(lines)
 
@@ -291,29 +276,92 @@ def build_supplementary_lines(
 # Prompt formatting
 # ---------------------------------------------------------------------------
 
+def _build_section_list(
+    clause: str, titles: dict[str, str],
+) -> list[str]:
+    """Build the list of related LRM sections to read for context.
+
+    Collects the top-level clause/annex, any General/Overview siblings
+    at each ancestry level, and intermediate ancestors — all deduplicated.
+    """
+    h = build_hierarchy(clause)
+    sections: list[str] = []
+
+    # Top-level clause or annex letter
+    top: str = h.get("letter") or h.get("clause_number")  # type: ignore[assignment]
+    if top != clause:
+        sections.append(top)
+
+    # Context subclauses (General/Overview siblings), deduped vs ancestors
+    ancestor_set = set(h["ancestors"])
+    for ctx in find_context_subclauses(clause, titles):
+        if ctx not in ancestor_set:
+            sections.append(ctx)
+
+    # Intermediate ancestors
+    sections.extend(h["ancestors"])
+
+    return sections
+
+
 def format_prompt(
-    hierarchy: str,
     subclause: str,
+    lrm: str,
+    sections: list[str],
+    *,
+    issue: int,
+    supplementary: str = "",
+) -> str:
+    """Assemble the implementation prompt from structured inputs."""
+    lines = [f"Implement §{subclause} from the LRM at {lrm}.\n"]
+
+    if sections:
+        refs = ", ".join(f"§{s}" for s in sections)
+        lines.append(
+            f"Read §{subclause} and related sections"
+            f" ({refs}) for context.",
+        )
+    else:
+        lines.append(f"Read §{subclause} for context.")
+
+    lines.append(
+        "Search the codebase for existing related code"
+        " before writing anything new.",
+    )
+
+    if supplementary:
+        lines.append(supplementary.rstrip("\n"))
+
+    lines.append(
+        "For each requirement in the LRM section,"
+        " write a failing test, then implement."
+        " Cover all affected pipeline stages."
+        " Include error conditions and edge cases.",
+    )
+
+    lines.append("Do not copy LRM prose into source comments.")
+
+    lines.append(
+        f"After implementation, mark §{subclause}"
+        f" complete in Issue #{issue}.",
+    )
+
+    return "\n".join(lines) + "\n"
+
+
+def build_prompt(
+    clause: str,
+    titles: dict[str, str],
     lrm: str,
     *,
     issue: int,
     supplementary: str = "",
 ) -> str:
-    """Assemble the standard implementation prompt from hierarchy steps."""
-    return (
-        "Create and execute a Claude task list."
-        " Each task must be blocked by the preceding task.\n\n"
-        f"{hierarchy}"
-        f"{supplementary}"
-        f"- Implement ALL aspects (not just parsing) of"
-        f" {subclause} per LRM in {lrm}"
-        f" through test-driven development unit tests\n"
-        f"- Prove that the unit tests cover ALL aspects of"
-        f" {subclause} per LRM in {lrm} not just parsing\n"
-        f"- Prove that the implementation covers ALL aspects of"
-        f" {subclause} per LRM in {lrm} not just parsing\n"
-        f"- Read all of Issue {issue}\n"
-        f"- Correct Issue {issue}\n"
+    """Build the implementation prompt for any clause depth."""
+    sections = _build_section_list(clause, titles)
+    return format_prompt(
+        clause, lrm, sections,
+        issue=issue, supplementary=supplementary,
     )
 
 
@@ -370,166 +418,8 @@ def run_prompt(
 
 
 # ---------------------------------------------------------------------------
-# Prompt builders (depth 1-5)
+# CLI
 # ---------------------------------------------------------------------------
-
-def _build_context_lines(
-    clause: str, titles: dict, lrm: str, ancestors: list,
-) -> list[str]:
-    """Build 'Thoroughly understand' lines for auto-detected context."""
-    ancestor_set = set(ancestors)
-    lines: list[str] = []
-    for ctx in find_context_subclauses(clause, titles):
-        if ctx not in ancestor_set:
-            lines.append(
-                f"- Thoroughly understand {ctx}"
-                f" per LRM in {lrm}",
-            )
-    return lines
-
-
-def _build_hierarchy_steps(h: dict, titles: dict, lrm: str) -> str:
-    """Build the 'Thoroughly understand' hierarchy lines for depth 3+."""
-    lines = [build_top_level_line(h, titles, lrm)]
-
-    lines.extend(
-        _build_context_lines(
-            h["subclause"], titles, lrm, h["ancestors"],
-        ),
-    )
-
-    parent = None
-    for ancestor in h["ancestors"]:
-        if parent is None:
-            lines.append(
-                f"- Thoroughly understand {ancestor}"
-                f" per LRM in {lrm}",
-            )
-        else:
-            lines.append(
-                f"- Thoroughly understand {ancestor}"
-                f" and how it fits within {parent}"
-                f" per LRM in {lrm}",
-            )
-        parent = ancestor
-    lines.append(
-        f"- Thoroughly understand {h['subclause']}"
-        f" and how it fits within {parent}"
-        f" per LRM in {lrm}",
-    )
-
-    return "\n".join(lines) + "\n"
-
-
-def build_prompt_v(
-    clause: str,
-    titles: dict[str, str],
-    lrm: str,
-    *,
-    issue: int,
-    supplementary: str = "",
-) -> str:
-    """Build the implementation prompt for a depth-1 clause."""
-    h = build_hierarchy(clause)
-    lines = [build_top_level_line(h, titles, lrm)]
-    lines.extend(
-        _build_context_lines(clause, titles, lrm, []),
-    )
-    hierarchy = "\n".join(lines) + "\n"
-    return format_prompt(
-        hierarchy, h["subclause"], lrm,
-        issue=issue, supplementary=supplementary,
-    )
-
-
-def build_prompt_v_w(
-    clause: str,
-    titles: dict[str, str],
-    lrm: str,
-    *,
-    issue: int,
-    supplementary: str = "",
-) -> str:
-    """Build the implementation prompt for a depth-2 clause."""
-    h = build_hierarchy(clause)
-    lines = [build_top_level_line(h, titles, lrm)]
-    lines.extend(
-        _build_context_lines(clause, titles, lrm, []),
-    )
-    lines.append(
-        f"- Thoroughly understand {h['subclause']}"
-        f" per LRM in {lrm}",
-    )
-    hierarchy = "\n".join(lines) + "\n"
-    return format_prompt(
-        hierarchy, h["subclause"], lrm,
-        issue=issue, supplementary=supplementary,
-    )
-
-
-def build_prompt_v_w_x(
-    clause: str,
-    titles: dict[str, str],
-    lrm: str,
-    *,
-    issue: int,
-    supplementary: str = "",
-) -> str:
-    """Build the implementation prompt for a depth-3 clause."""
-    h = build_hierarchy(clause)
-    hierarchy = _build_hierarchy_steps(h, titles, lrm)
-    return format_prompt(
-        hierarchy, h["subclause"], lrm,
-        issue=issue, supplementary=supplementary,
-    )
-
-
-def build_prompt_v_w_x_y(
-    clause: str,
-    titles: dict[str, str],
-    lrm: str,
-    *,
-    issue: int,
-    supplementary: str = "",
-) -> str:
-    """Build the implementation prompt for a depth-4 clause."""
-    h = build_hierarchy(clause)
-    hierarchy = _build_hierarchy_steps(h, titles, lrm)
-    return format_prompt(
-        hierarchy, h["subclause"], lrm,
-        issue=issue, supplementary=supplementary,
-    )
-
-
-def build_prompt_v_w_x_y_z(
-    clause: str,
-    titles: dict[str, str],
-    lrm: str,
-    *,
-    issue: int,
-    supplementary: str = "",
-) -> str:
-    """Build the implementation prompt for a depth-5 clause."""
-    h = build_hierarchy(clause)
-    hierarchy = _build_hierarchy_steps(h, titles, lrm)
-    return format_prompt(
-        hierarchy, h["subclause"], lrm,
-        issue=issue, supplementary=supplementary,
-    )
-
-
-# ---------------------------------------------------------------------------
-# CLI dispatch
-# ---------------------------------------------------------------------------
-
-_HANDLERS = {
-    1: build_prompt_v,
-    2: build_prompt_v_w,
-    3: build_prompt_v_w_x,
-    4: build_prompt_v_w_x_y,
-    5: build_prompt_v_w_x_y_z,
-}
-
 
 def parse_args(argv=None):
     """Parse command-line arguments for clause implementation."""
@@ -612,10 +502,9 @@ def clause_depth(clause: str) -> int:
 
 
 def main(argv=None):
-    """Parse args, dispatch to the depth-appropriate prompt, and invoke Claude."""
+    """Parse args, build prompt, and invoke Claude."""
     args = parse_args(argv)
     depth = clause_depth(args.subclause)
-    handler = _HANDLERS[depth]
     print(
         f"Clause {args.subclause} (depth {depth}),"
         f" issue #{args.issue}, model {args.model}",
@@ -638,10 +527,9 @@ def main(argv=None):
             f"Found {n_supp} supplementary files",
             file=sys.stderr,
         )
-        supplementary += "\n"
 
     bound_handler = functools.partial(
-        handler, supplementary=supplementary,
+        build_prompt, supplementary=supplementary,
     )
     run_prompt(
         bound_handler, args.lrm, args.subclause,

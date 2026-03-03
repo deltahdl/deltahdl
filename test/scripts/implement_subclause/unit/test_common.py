@@ -6,6 +6,7 @@ import pytest
 
 from implement_subclause import (
     build_hierarchy,
+    build_prompt,
     build_supplementary_lines,
     check_supplementary_args,
     find_context_subclauses,
@@ -209,7 +210,7 @@ class TestBuildHierarchyAnnex:
 
 
 def test_build_supplementary_lines_with_figure(tmp_path):
-    """Generates acknowledgment line for a .gv figure."""
+    """Generates consult line for a .gv figure."""
     gv = tmp_path / "Figure_4_1.gv"
     gv.write_text("digraph {}")
     lines = build_supplementary_lines(figures=[gv], tables=[])
@@ -217,7 +218,7 @@ def test_build_supplementary_lines_with_figure(tmp_path):
 
 
 def test_build_supplementary_lines_with_table(tmp_path):
-    """Generates acknowledgment line for a .md table."""
+    """Generates consult line for a .md table."""
     md = tmp_path / "TABLE_B_1.md"
     md.write_text("| keyword |\n")
     lines = build_supplementary_lines(figures=[], tables=[md])
@@ -368,8 +369,10 @@ def test_load_annex_no_title_found(tmp_path):
 def test_format_prompt_includes_supplementary():
     """Supplementary text appears in the formatted prompt."""
     result = format_prompt(
-        "- hierarchy\n", "4.1", "~/LRM.txt",
-        issue=6, supplementary="- Table 4-1\n",
+        "4.1", "~/LRM.txt", ["4"],
+        issue=6,
+        supplementary="Consult Table 4-1 at /t (Markdown)"
+        " when implementing.",
     )
     assert "Table 4-1" in result
 
