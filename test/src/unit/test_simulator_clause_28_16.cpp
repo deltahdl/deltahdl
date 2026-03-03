@@ -120,4 +120,10 @@ TEST(GateNetDelays, ThreeDelayToXIsMinOfAll) {
   EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kX), 10u);
 }
 
+// §28.16: Table 28-9 — x→0 = d2, x→1 = d1.
+TEST(GateNetDelays, ThreeDelayXTo0IsD2) {
+  DelaySpec spec{10, 20, 15, 3};
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kX, Val4::kV0), 20u);
+}
+
 }  // namespace
