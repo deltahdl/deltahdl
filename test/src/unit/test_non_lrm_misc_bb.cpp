@@ -42,20 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 15. CU-scope timeunit applies to program.
-TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToProgram) {
-  auto r = ParseTimescale31402(
-      "timeunit 1us;\n"
-      "timeprecision 1ns;\n"
-      "program p;\n"
-      "endprogram\n");
-  EXPECT_FALSE(r.has_errors);
-  auto resolved =
-      ResolveModuleTimescale(r.cu->programs[0], r.cu, false, {}, nullptr);
-  EXPECT_EQ(resolved.unit, TimeUnit::kUs);
-  EXPECT_EQ(resolved.precision, TimeUnit::kNs);
-}
-
 // 16. Programs and packages cannot be nested (§3.14.2.3 rule a note).
 // Only modules and interfaces can inherit via nesting.
 TEST(ParserClause03, Cl3_14_2_3_ProgramsCannotBeNested) {

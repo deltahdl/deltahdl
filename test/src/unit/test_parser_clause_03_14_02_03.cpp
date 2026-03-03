@@ -287,4 +287,18 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToInterface) {
   EXPECT_EQ(resolved.precision, TimeUnit::kFs);
 }
 
+// 15. CU-scope timeunit applies to program.
+TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToProgram) {
+  auto r = ParseTimescale31402(
+      "timeunit 1us;\n"
+      "timeprecision 1ns;\n"
+      "program p;\n"
+      "endprogram\n");
+  EXPECT_FALSE(r.has_errors);
+  auto resolved =
+      ResolveModuleTimescale(r.cu->programs[0], r.cu, false, {}, nullptr);
+  EXPECT_EQ(resolved.unit, TimeUnit::kUs);
+  EXPECT_EQ(resolved.precision, TimeUnit::kNs);
+}
+
 }  // namespace
