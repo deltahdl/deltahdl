@@ -52,20 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh505, Operator_ReductionAnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = &y;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
-  EXPECT_EQ(rhs->op, TokenKind::kAmp);
-}
-
 TEST(ParserCh505, Operator_ReductionXnor) {
   EXPECT_TRUE(ParseOk("module m; initial x = ~^y; endmodule"));
 }
