@@ -1,4 +1,4 @@
-// §20.3: Simulation time system functions
+// §20.3.3: $realtime
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
