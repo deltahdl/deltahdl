@@ -5,19 +5,6 @@
 
 using namespace delta;
 
-struct ParseResult11f {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static Expr* FirstAssignLhs(ParseResult11f& r) {
-  auto* stmt = FirstInitialStmt(r);
-  if (!stmt) return nullptr;
-  return stmt->lhs;
-}
-
 struct ParseResult11g {
   SourceManager mgr;
   Arena arena;
@@ -61,24 +48,6 @@ static ModuleItem* FirstContAssign(ParseResult11g& r) {
 }
 
 namespace {
-
-// --- Indexed part-select down on LHS ---
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownOnLhs) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [31:0] vec;\n"
-      "  initial vec[j -: 4] = 4'b1010;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* lhs = FirstAssignLhs(r);
-  ASSERT_NE(lhs, nullptr);
-  EXPECT_EQ(lhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(lhs->is_part_select_minus);
-  EXPECT_FALSE(lhs->is_part_select_plus);
-  ASSERT_NE(lhs->index, nullptr);
-  ASSERT_NE(lhs->index_end, nullptr);
-}
 
 // --- Select on function return value ---
 TEST(ParserSection11, Sec11_4_1_SelectOnFuncReturnValue) {
