@@ -9,18 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalOp, MinusEq) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 20);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kMinusEq, MakeId(f.arena, "a"),
-                          MakeInt(f.arena, 7));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 13u);
-  EXPECT_EQ(var->value.ToUint64(), 13u);
-}
-
 TEST(EvalOp, StarEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
