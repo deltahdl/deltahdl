@@ -6,7 +6,6 @@ import pytest
 
 from implement_subclause import (
     build_hierarchy,
-    build_prompt,
     build_supplementary_lines,
     check_supplementary_args,
     find_context_subclauses,
