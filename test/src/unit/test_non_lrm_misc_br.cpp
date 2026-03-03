@@ -17,15 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// Class with parameters.
-TEST(SourceText, ClassWithParams) {
-  auto r = Parse("class C #(type T = int); endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
-}
-
 // class_item ::= { attribute_instance } interface_class_declaration
 TEST(SourceText, ClassNestedInterfaceClass) {
   auto r = Parse(

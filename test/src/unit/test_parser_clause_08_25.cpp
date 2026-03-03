@@ -253,4 +253,13 @@ TEST(ParserSection8, TypeParameterClassMember) {
   EXPECT_EQ(cls->params[0].first, "T");
 }
 
+// Class with parameters.
+TEST(SourceText, ClassWithParams) {
+  auto r = Parse("class C #(type T = int); endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
+}
+
 }  // namespace
