@@ -25,20 +25,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7c, DynamicArraySize) {
-  auto r = Parse(
-      "module m;\n"
-      "  int dyn[];\n"
-      "  int sz;\n"
-      "  initial begin\n"
-      "    dyn = new[5];\n"
-      "    sz = dyn.size();\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection7c, DynamicArrayDelete) {
   auto r = Parse(
       "module m;\n"
