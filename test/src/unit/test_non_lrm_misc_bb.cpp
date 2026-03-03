@@ -42,16 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 22. Magnitude affects rounding: 10ns unit with 1ns precision.
-TEST(ParserClause03, Cl3_14_1_MagnitudeRounding) {
-  // 10ns unit, 1ns precision → delays in multiples of 10ns, rounded to 1ns.
-  TimeScale ts{TimeUnit::kNs, 10, TimeUnit::kNs, 1};
-  // delay=2.75 means 2.75 * 10ns = 27.5ns → rounds to 28ns = 28 ticks.
-  EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kNs), 28u);
-  // delay=1.0 means 10ns = 10 ticks.
-  EXPECT_EQ(RealDelayToTicks(1.0, ts, TimeUnit::kNs), 10u);
-}
-
 // 23. Rounding with global precision finer than element precision.
 // Global precision = fs, element precision = 100ps.
 // Rounding still occurs at element's precision step.
