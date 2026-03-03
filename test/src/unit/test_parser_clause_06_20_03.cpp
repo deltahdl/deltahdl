@@ -62,4 +62,13 @@ TEST(ParserSection8, TypeParameterLogicVector) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, TypeParamDefaultLogicVector) {
+  // §6.20.3: Type parameter with a vector default.
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter type DATA_T = logic [15:0])\n"
+              "  ();\n"
+              "  DATA_T data;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
