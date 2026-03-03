@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §18.13.2: $urandom_range()
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"
