@@ -555,4 +555,44 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
+// ---------------------------------------------------------------------------
+// 23. always_comb with complex combinational logic (priority encoder)
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_PriorityEncoderPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0] req;\n"
+      "  logic [1:0] enc;\n"
+      "  logic valid;\n"
+      "  always_comb begin\n"
+      "    enc = 2'b00;\n"
+      "    valid = 1'b0;\n"
+      "    if (req[3]) begin\n"
+      "      enc = 2'b11;\n"
+      "      valid = 1'b1;\n"
+      "    end else if (req[2]) begin\n"
+      "      enc = 2'b10;\n"
+      "      valid = 1'b1;\n"
+      "    end else if (req[1]) begin\n"
+      "      enc = 2'b01;\n"
+      "      valid = 1'b1;\n"
+      "    end else if (req[0]) begin\n"
+      "      enc = 2'b00;\n"
+      "      valid = 1'b1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysComb(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  // Two default assignments plus an if-else-if chain
+  ASSERT_GE(item->body->stmts.size(), 3u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(item->body->stmts[2]->kind, StmtKind::kIf);
+}
+
 }  // namespace
