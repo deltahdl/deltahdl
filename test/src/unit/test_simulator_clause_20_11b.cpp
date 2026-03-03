@@ -28,13 +28,6 @@ struct SvaFixture {
 
 namespace {
 
-TEST(SvaEngine, AssertControlGlobalOn) {
-  AssertionControl ctrl;
-  ctrl.SetGlobalOff();
-  ctrl.SetGlobalOn();
-  EXPECT_TRUE(ctrl.IsEnabled("any_instance"));
-}
-
 TEST(SvaEngine, AssertPassOff) {
   AssertionControl ctrl;
   EXPECT_TRUE(ctrl.IsPassEnabled("inst1"));

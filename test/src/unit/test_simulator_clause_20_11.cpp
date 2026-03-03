@@ -78,4 +78,11 @@ TEST(SvaEngine, AssertControlGlobalOff) {
   EXPECT_FALSE(ctrl.IsEnabled("another_inst"));
 }
 
+TEST(SvaEngine, AssertControlGlobalOn) {
+  AssertionControl ctrl;
+  ctrl.SetGlobalOff();
+  ctrl.SetGlobalOn();
+  EXPECT_TRUE(ctrl.IsEnabled("any_instance"));
+}
+
 }  // namespace
