@@ -162,4 +162,8 @@ TEST(TimingControl, Negedge1To0) {
   EXPECT_EQ(DetectEdge(Logic4::kVal1, Logic4::kVal0), EdgeKind::kNegedge);
 }
 
+TEST(TimingControl, Negedge1ToX) {
+  EXPECT_EQ(DetectEdge(Logic4::kVal1, Logic4::kX), EdgeKind::kNegedge);
+}
+
 }  // namespace
