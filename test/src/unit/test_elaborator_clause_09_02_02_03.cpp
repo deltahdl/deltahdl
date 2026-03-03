@@ -645,4 +645,34 @@ TEST(SimCh9c, WidthVerificationSingleBit) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
+// =============================================================================
+// §9.2.3: Verify .width and .ToUint64() on results
+// =============================================================================
+// 29. 32-bit always_latch output verifies width and value.
+TEST(SimCh9c, Width32BitAndToUint64) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [31:0] d, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 32'hDEADBEEF;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.width, 32u);
+  EXPECT_EQ(q->value.ToUint64(), 0xDEADBEEFu);
+}
+
 }  // namespace
