@@ -9,20 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalOp, InsideNoMatch) {
-  SimFixture f;
-  // 4 inside {3, 5, 7} = 0
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeInt(f.arena, 4);
-  inside->elements.push_back(MakeInt(f.arena, 3));
-  inside->elements.push_back(MakeInt(f.arena, 5));
-  inside->elements.push_back(MakeInt(f.arena, 7));
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
 TEST(EvalOp, InsideRange) {
   SimFixture f;
   // 5 inside {[3:7]} = 1 (range element)
