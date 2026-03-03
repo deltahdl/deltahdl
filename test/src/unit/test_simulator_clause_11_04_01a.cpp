@@ -1,4 +1,4 @@
-// §11.4.1: Assignment operators
+// Non-LRM tests
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
@@ -8,21 +8,6 @@
 using namespace delta;
 
 namespace {
-
-// ==========================================================================
-// Compound assignment operators (+=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
-// ==========================================================================
-TEST(EvalOp, PlusEq) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 10);
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlusEq, MakeId(f.arena, "a"),
-                          MakeInt(f.arena, 5));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 15u);
-  EXPECT_EQ(var->value.ToUint64(), 15u);
-}
 
 TEST(EvalOp, MinusEq) {
   SimFixture f;

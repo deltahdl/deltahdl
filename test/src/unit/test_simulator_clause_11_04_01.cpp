@@ -26,4 +26,19 @@ TEST(SimA85, VarLvalueCompoundAdd) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
+// ==========================================================================
+// Compound assignment operators (+=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
+// ==========================================================================
+TEST(EvalOp, PlusEq) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("a", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 10);
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kPlusEq, MakeId(f.arena, "a"),
+                          MakeInt(f.arena, 5));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 15u);
+  EXPECT_EQ(var->value.ToUint64(), 15u);
+}
+
 }  // namespace
