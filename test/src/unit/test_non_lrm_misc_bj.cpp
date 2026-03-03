@@ -41,15 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, NotAssignmentCompatibleStringInt) {
-  // string and int are not assignment compatible.
-  DataType a;
-  a.kind = DataTypeKind::kString;
-  DataType b;
-  b.kind = DataTypeKind::kInt;
-  EXPECT_FALSE(IsAssignmentCompatible(a, b));
-}
-
 TEST(ParserSection6, CastCompatibleIntToEnum) {
   // §6.22.4: integral → enum requires cast (cast compatible).
   DataType a;

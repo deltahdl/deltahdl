@@ -67,4 +67,13 @@ TEST(ParserSection6, AssignmentCompatibleEnumToInt) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
+TEST(ParserSection6, NotAssignmentCompatibleStringInt) {
+  // string and int are not assignment compatible.
+  DataType a;
+  a.kind = DataTypeKind::kString;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_FALSE(IsAssignmentCompatible(a, b));
+}
+
 }  // namespace
