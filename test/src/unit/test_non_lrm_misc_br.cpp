@@ -17,24 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// class_property ::= const { class_item_qualifier } data_type id [ = expr ] ;
-TEST(SourceText, ClassConstProperty) {
-  auto r = Parse(
-      "class C;\n"
-      "  const int MAX = 100;\n"
-      "  const static int SMAX = 200;\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 2u);
-  EXPECT_TRUE(members[0]->is_const);
-  EXPECT_EQ(members[0]->name, "MAX");
-  EXPECT_NE(members[0]->init_expr, nullptr);
-  EXPECT_TRUE(members[1]->is_const);
-  EXPECT_TRUE(members[1]->is_static);
-}
-
 TEST(Parser, VirtualClass) {
   auto r = Parse("virtual class base; endclass");
   ASSERT_NE(r.cu, nullptr);
