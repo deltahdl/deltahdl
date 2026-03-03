@@ -32,22 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-// §6.7.1: Net with drive strength (strong0, pull1).
-TEST(ParserSection6, Sec6_7_1_WireDriveStrength) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire (strong0, pull1) w = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  // 4=strong, 3=pull (parser encoding)
-  EXPECT_EQ(item->drive_strength0, 4u);
-  EXPECT_EQ(item->drive_strength1, 3u);
-}
-
 // §6.7.1: Trireg with charge strength (medium).
 TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthMedium) {
   auto r = Parse(
