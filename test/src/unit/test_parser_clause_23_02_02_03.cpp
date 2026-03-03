@@ -204,4 +204,21 @@ TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
   EXPECT_EQ(ports[1].name, "result");
 }
 
+// 30c. Integer type port with packed dimensions.
+TEST(ParserSection6, Sec6_11_LogicPackedDimsAsPort) {
+  auto r = Parse(
+      "module m(input logic [7:0] data, output logic [15:0] addr);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kLogic);
+  ASSERT_NE(ports[0].data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(ports[0].data_type.packed_dim_left->int_val, 7u);
+  EXPECT_EQ(ports[1].data_type.kind, DataTypeKind::kLogic);
+  ASSERT_NE(ports[1].data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(ports[1].data_type.packed_dim_left->int_val, 15u);
+}
+
 }  // namespace
