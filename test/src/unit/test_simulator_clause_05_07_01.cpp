@@ -635,4 +635,19 @@ TEST(SimCh50701, UnsizedOctalLiteral) {
   EXPECT_EQ(result, 07460u);
 }
 
+// ---------------------------------------------------------------------------
+// 15. Unary minus before size (two's complement)
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, UnaryMinusBeforeSize) {
+  // §5.7.1: Unary minus before size — two's complement of 6, held in 8 bits.
+  // equivalent to -(8'd 6) = 250 in unsigned 8-bit
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = -8'd6;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 250u);
+}
+
 }  // namespace
