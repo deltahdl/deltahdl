@@ -349,4 +349,13 @@ TEST(ParserCh512, Attribute_OnForLoop) {
               "endmodule"));
 }
 
+TEST(ParserCh512, Attribute_OnAssignment) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    (* mark *) x = 1;\n"
+              "  end\n"
+              "endmodule"));
+}
+
 }  // namespace

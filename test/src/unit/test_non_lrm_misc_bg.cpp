@@ -29,15 +29,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, Attribute_OnAssignment) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* mark *) x = 1;\n"
-              "  end\n"
-              "endmodule"));
-}
-
 TEST(ParserCh512, Attribute_OnPortConnection) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
