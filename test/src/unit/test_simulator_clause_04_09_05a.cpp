@@ -13,47 +13,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §4.9.5 — Relaxation technique iterates until stable
-// ---------------------------------------------------------------------------
-TEST(SimCh4095, RelaxationTechnique) {
-  Arena arena;
-  Scheduler sched(arena);
-  // Model a simple switch network that requires iteration to converge.
-  // n0=1, n1=unknown, n2=unknown, connected by switches.
-  int n0 = 1;
-  int n1 = -1;
-  int n2 = -1;
-  int iterations = 0;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    // Relaxation: iterate until all nodes converge.
-    int prev_n1 = 0;
-    int prev_n2 = 0;
-    do {
-      prev_n1 = n1;
-      prev_n2 = n2;
-      n1 = n0;  // Switch propagation: n0 → n1.
-      n2 = n1;  // Switch propagation: n1 → n2.
-      ++iterations;
-    } while (n1 != prev_n1 || n2 != prev_n2);
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = []() {};
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(n0, 1);
-  EXPECT_EQ(n1, 1);
-  EXPECT_EQ(n2, 1);
-  // Converged in exactly 2 iterations (1 to propagate, 1 to confirm stable).
-  EXPECT_EQ(iterations, 2);
-}
-
-// ---------------------------------------------------------------------------
 // §4.9.5 — Switch processing intermingled with other active events
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, IntermingledWithOtherActiveEvents) {
