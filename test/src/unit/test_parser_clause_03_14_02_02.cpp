@@ -442,4 +442,15 @@ TEST(ParserClause03, Cl3_14_2_2_SeparateModulesIndependentScope) {
   EXPECT_EQ(r.cu->modules[1]->time_prec, TimeUnit::kNs);
 }
 
+// =============================================================================
+// A.1.2 timeunits_declaration — all 4 forms
+// =============================================================================
+// Form 1: timeunit time_literal ;
+TEST(SourceText, TimeunitOnly) {
+  auto r = ParseTimescale31402("module m; timeunit 1ns; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+}
+
 }  // namespace
