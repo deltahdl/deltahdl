@@ -116,4 +116,17 @@ TEST(SimA86, BinaryGreaterOrEqual) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// ==========================================================================
+// Signed comparison — §11.4.4, §11.4.5, §11.8.1
+// ==========================================================================
+TEST(EvalAdv, SignedLtNeg) {
+  SimFixture f;
+  MakeSignedVarAdv(f, "sa", 8, 0xFF);
+  MakeSignedVarAdv(f, "sb", 8, 0x01);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "sa"),
+                          MakeId(f.arena, "sb"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
