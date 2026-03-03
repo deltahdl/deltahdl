@@ -85,4 +85,20 @@ TEST(ParserSection6, Sec6_7_1_Supply0Decl) {
   EXPECT_EQ(item->name, "gnd");
 }
 
+// §6.7.1: Supply1 net declaration.
+TEST(ParserSection6, Sec6_7_1_Supply1Decl) {
+  auto r = Parse(
+      "module t;\n"
+      "  supply1 vdd;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kSupply1);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_EQ(item->name, "vdd");
+}
+
 }  // namespace
