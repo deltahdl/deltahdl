@@ -24,15 +24,6 @@ static ParseResult616 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection6, StringInFunctionArg) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function void greet(string name);\n"
-              "    $display(\"Hello %s\", name);\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, StringFunctionReturn) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

@@ -348,4 +348,13 @@ TEST(ParserSection6, StringParameterDecl) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, StringInFunctionArg) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void greet(string name);\n"
+              "    $display(\"Hello %s\", name);\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
 }  // namespace
