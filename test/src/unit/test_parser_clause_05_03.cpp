@@ -189,4 +189,15 @@ TEST(ParserCh501, Sec5_1_TabCharactersAsWhitespace) {
               "endmodule\n"));
 }
 
+// =========================================================================
+// Carriage return + line feed
+// =========================================================================
+TEST(ParserCh501, Sec5_1_CarriageReturnLineFeed) {
+  // Windows-style \r\n line endings must parse identically to \n.
+  EXPECT_TRUE(
+      ParseOk("module t;\r\n"
+              "  logic a;\r\n"
+              "endmodule\r\n"));
+}
+
 }  // namespace

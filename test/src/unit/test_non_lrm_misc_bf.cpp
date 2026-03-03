@@ -53,17 +53,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 namespace {
 
 // =========================================================================
-// Carriage return + line feed
-// =========================================================================
-TEST(ParserCh501, Sec5_1_CarriageReturnLineFeed) {
-  // Windows-style \r\n line endings must parse identically to \n.
-  EXPECT_TRUE(
-      ParseOk("module t;\r\n"
-              "  logic a;\r\n"
-              "endmodule\r\n"));
-}
-
-// =========================================================================
 // Compilation-unit with only whitespace/comments (empty CU)
 // =========================================================================
 TEST(ParserCh501, Sec5_1_EmptyCuWhitespaceOnly) {
