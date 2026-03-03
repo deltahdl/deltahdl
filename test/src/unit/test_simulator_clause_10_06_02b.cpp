@@ -18,17 +18,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StmtExec, ForceNullLhsNoOp) {
-  StmtFixture f;
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kForce;
-  stmt->lhs = nullptr;
-  stmt->rhs = MakeInt(f.arena, 5);
-
-  auto result = RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result, StmtResult::kDone);
-}
-
 TEST(StmtExec, ReleaseClearsForce) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("y", 32);

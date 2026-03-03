@@ -290,4 +290,15 @@ TEST(StmtExec, ForceOverridesValue) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
+TEST(StmtExec, ForceNullLhsNoOp) {
+  StmtFixture f;
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kForce;
+  stmt->lhs = nullptr;
+  stmt->rhs = MakeInt(f.arena, 5);
+
+  auto result = RunStmt(stmt, f.ctx, f.arena);
+  EXPECT_EQ(result, StmtResult::kDone);
+}
+
 }  // namespace
