@@ -41,18 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, TriregSingleDelay) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg #5 t1;\n"
-      "endmodule\n");
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-  ASSERT_NE(item->net_delay, nullptr);
-  EXPECT_EQ(item->net_delay->int_val, 5u);
-}
-
 TEST(ParserSection6, TriregSingleDelay_NoFallDecay) {
   auto r = Parse(
       "module t;\n"
