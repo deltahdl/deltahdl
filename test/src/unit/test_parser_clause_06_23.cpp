@@ -389,4 +389,19 @@ TEST(ParserSection6, Sec6_11_1_TypeRefCaseNeq) {
               "endmodule\n"));
 }
 
+// 13. type() used in case statement as matching expression.
+TEST(ParserSection6, Sec6_11_1_TypeRefInCaseExpr) {
+  EXPECT_TRUE(
+      ParseOk("module t #(parameter type T = int)\n"
+              "  ();\n"
+              "  initial begin\n"
+              "    case (type(T))\n"
+              "      type(int) : $display(\"int\");\n"
+              "      type(real) : $display(\"real\");\n"
+              "      default : $display(\"other\");\n"
+              "    endcase\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
