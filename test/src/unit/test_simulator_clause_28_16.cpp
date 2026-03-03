@@ -1,0 +1,63 @@
+// §28.16: Gate and net delays
+
+#include <gtest/gtest.h>
+#include <algorithm>
+#include <cstdint>
+#include <initializer_list>
+
+// --- Local types for gate/net delays (§28.16) ---
+enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
+
+struct DelaySpec {
+  uint64_t d1 = 0;    // rise
+  uint64_t d2 = 0;    // fall
+  uint64_t d3 = 0;    // turn-off (z) or charge decay for trireg
+  uint8_t count = 0;  // 0, 1, 2, or 3
+};
+
+enum class ChargeDecayState : uint8_t { kIdle, kDecaying, kDone };
+
+uint64_t ComputePropagationDelay(const DelaySpec& spec, Val4 from, Val4 to) {
+  if (spec.count == 0) return 0;
+  if (spec.count == 1) return spec.d1;
+  if (from == to) return 0;
+  if (spec.count == 2) {
+    switch (to) {
+      case Val4::kV1:
+        return spec.d1;
+      case Val4::kV0:
+        return spec.d2;
+      case Val4::kZ:
+      case Val4::kX:
+        return std::min(spec.d1, spec.d2);
+    }
+  }
+  // count == 3
+  switch (to) {
+    case Val4::kV1:
+      return spec.d1;
+    case Val4::kV0:
+      return spec.d2;
+    case Val4::kZ:
+      return spec.d3;
+    case Val4::kX:
+      return std::min({spec.d1, spec.d2, spec.d3});
+  }
+  return 0;
+}
+
+namespace {
+
+// =============================================================
+// §28.16: Gate and net delays
+// =============================================================
+// §28.16: "the default delay shall be zero when no delay
+//  specification is given."
+TEST(GateNetDelays, DefaultDelayIsZero) {
+  DelaySpec spec;
+  spec.count = 0;
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kV1), 0u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kV0), 0u);
+}
+
+}  // namespace

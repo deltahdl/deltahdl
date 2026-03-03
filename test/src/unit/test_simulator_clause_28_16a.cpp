@@ -1,7 +1,6 @@
-// §28.16: Gate and net delays
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include <algorithm>
 #include <cstdint>
 #include <initializer_list>
@@ -23,12 +22,6 @@ struct MinTypMax {
 };
 
 enum class ChargeDecayState : uint8_t { kIdle, kDecaying, kDone };
-
-uint64_t ComputePropagationDelay(const DelaySpec& spec, Val4 from, Val4 to);
-
-uint64_t SelectMinTypMax(const MinTypMax& mtm, uint8_t selector);
-
-bool ValidateTriregChargeDecaySpec(const DelaySpec& spec);
 
 uint64_t ComputePropagationDelay(const DelaySpec& spec, Val4 from, Val4 to) {
   if (spec.count == 0) return 0;
@@ -77,18 +70,6 @@ bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
 }
 
 namespace {
-
-// =============================================================
-// §28.16: Gate and net delays
-// =============================================================
-// §28.16: "the default delay shall be zero when no delay
-//  specification is given."
-TEST(GateNetDelays, DefaultDelayIsZero) {
-  DelaySpec spec;
-  spec.count = 0;
-  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kV1), 0u);
-  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kV0), 0u);
-}
 
 // §28.16: "When one delay value is given, then this value shall be
 //  used for all propagation delays."
