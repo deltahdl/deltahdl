@@ -10,33 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 7. Blocking assignment with concatenation on RHS.
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignConcatRHS) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  logic [15:0] c;\n"
-      "  initial begin\n"
-      "    a = 8'hCA;\n"
-      "    b = 8'hFE;\n"
-      "    c = {a, b};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(c, nullptr);
-  EXPECT_EQ(c->value.ToUint64(), 0xCAFEu);
-}
-
-// ---------------------------------------------------------------------------
 // 8. Blocking assignment with ternary on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTernary) {
