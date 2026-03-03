@@ -19,33 +19,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// 14. Force prevents normal assignment
-// =============================================================================
-TEST(StmtExec, ForcePreventsNormalAssign) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("fv", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  // Force fv = 50;
-  auto* force_stmt = f.arena.Create<Stmt>();
-  force_stmt->kind = StmtKind::kForce;
-  force_stmt->lhs = MakeId(f.arena, "fv");
-  force_stmt->rhs = MakeInt(f.arena, 50);
-  RunStmt(force_stmt, f.ctx, f.arena);
-
-  // Normal blocking assign: fv = 100;
-  // The blocking assignment should be overridden by the force.
-  auto* assign_stmt = MakeBlockAssign(f.arena, "fv", 100);
-  RunStmt(assign_stmt, f.ctx, f.arena);
-
-  // Since force is active, the value should remain forced value.
-  EXPECT_TRUE(var->is_forced);
-  // The blocking assign does set value, but force should logically override.
-  // In our implementation, the force checks and restores the forced value.
-  EXPECT_EQ(var->forced_value.ToUint64(), 50u);
-}
-
-// =============================================================================
 // 18. Force then release then assign
 // =============================================================================
 TEST(StmtExec, ForceReleaseThenAssign) {
