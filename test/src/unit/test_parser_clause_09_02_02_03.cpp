@@ -678,4 +678,32 @@ TEST(ParserSection9, Sec9_2_3_CaseWithBeginEndItems) {
   }
 }
 
+static ModuleItem* FirstAlwaysItem(ParseResult9c& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.2.2.3 -- always_latch procedure
+// Latched logic behavior modeled with always_latch.
+// =============================================================================
+TEST(ParserSection9c, AlwaysLatchWithBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic ck, d, q;\n"
+      "  always_latch begin\n"
+      "    if (ck) q <= d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+}
+
 }  // namespace
