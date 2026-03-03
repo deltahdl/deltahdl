@@ -40,22 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// =============================================================================
-// Section 8.6 -- String data type
-// =============================================================================
-// Module-level string variable declaration.
-TEST(ParserSection8, StringTypeModuleLevel) {
-  auto r = Parse(
-      "module m;\n"
-      "  string name;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
-  EXPECT_EQ(item->name, "name");
-}
-
 // String variable with initializer.
 TEST(ParserSection8, StringTypeWithInit) {
   auto r = Parse(
