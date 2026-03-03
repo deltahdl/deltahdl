@@ -555,4 +555,33 @@ TEST(SwitchProcessing, NetworkResolvesAllDevicesTogether) {
   EXPECT_EQ(ValOf(*vc), kVal1);
 }
 
+struct NetPair {
+  Arena arena;
+  Variable* va = nullptr;
+  Variable* vb = nullptr;
+  Net a;
+  Net b;
+};
+
+static NetPair MakeNetPair(uint64_t a_val) {
+  NetPair np;
+  np.va = np.arena.Create<Variable>();
+  np.va->value = MakeLogic4Vec(np.arena, 1);
+  np.vb = np.arena.Create<Variable>();
+  np.vb->value = MakeLogic4Vec(np.arena, 1);
+  np.a = MakeNet1(np.arena, np.va, a_val);
+  np.b = MakeUndrivenNet(np.arena, np.vb);
+  return np;
+}
+
+// --- Built-in net type, x/z control: exhaustive combination ---
+TEST(SwitchProcessing, BuiltinNetXControlNonUniqueProducesX) {
+  auto np = MakeNetPair(1);
+  // control = x: on->b=1, off->b=z. Not unique -> x.
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 1}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValX);
+}
+
 }  // namespace
