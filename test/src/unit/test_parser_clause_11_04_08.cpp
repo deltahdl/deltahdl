@@ -283,4 +283,14 @@ TEST(ParserSection11, BitwiseOr) {
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
 }
 
+TEST(ParserSection11, BitwiseXor) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a ^ b;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kCaret);
+}
+
 }  // namespace
