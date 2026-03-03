@@ -41,22 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 namespace {
 
 // =========================================================================
-// §6.19: Enumerations
-// =========================================================================
-TEST(ParserSection6, EnumBasic) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef enum { RED, GREEN, BLUE } color_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
-  EXPECT_EQ(item->typedef_type.enum_members.size(), 3u);
-}
-
-// =========================================================================
 // §6.20: Constants
 // =========================================================================
 TEST(ParserSection6, ConstVarDecl) {

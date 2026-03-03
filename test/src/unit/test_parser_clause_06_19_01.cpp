@@ -138,4 +138,26 @@ TEST(ParserSection8, TypedefEnumWithMembers) {
   EXPECT_EQ(items[0]->typedef_type.kind, DataTypeKind::kEnum);
 }
 
+static ModuleItem* FirstItem(ParseResult6& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// =========================================================================
+// §6.19: Enumerations
+// =========================================================================
+TEST(ParserSection6, EnumBasic) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef enum { RED, GREEN, BLUE } color_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
+  EXPECT_EQ(item->typedef_type.enum_members.size(), 3u);
+}
+
 }  // namespace
