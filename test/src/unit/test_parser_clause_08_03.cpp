@@ -237,4 +237,24 @@ TEST(SourceText, ClassPropertyWithQualifiers) {
   EXPECT_TRUE(members[4]->is_local);
 }
 
+// class_item_qualifier / property_qualifier / method_qualifier (footnote 10)
+TEST(SourceText, ClassQualifierCombinations) {
+  auto r = Parse(
+      "class C;\n"
+      "  static local int a;\n"
+      "  protected rand int b;\n"
+      "  static virtual function void sv_fn(); endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 3u);
+  EXPECT_TRUE(members[0]->is_static);
+  EXPECT_TRUE(members[0]->is_local);
+  EXPECT_TRUE(members[1]->is_protected);
+  EXPECT_TRUE(members[1]->is_rand);
+  EXPECT_TRUE(members[2]->is_static);
+  EXPECT_TRUE(members[2]->is_virtual);
+}
+
 }  // namespace
