@@ -501,4 +501,31 @@ TEST(SimCh9e, IffGuardAlwaysBlockBeginEnd) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
+// §9.4.2.4: iff with edge on data signal (not just clock).
+TEST(SimCh9e, IffEdgeOnDataSignal) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic data, valid;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    data = 0; valid = 1; result = 0;\n"
+      "    #1 data = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge data iff valid)\n"
+      "    result = 88;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 88u);
+}
+
 }  // namespace
