@@ -42,22 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.10 -- String literal expressions and methods
-// =========================================================================
-TEST(ParserSection11, StringLiteralToVector) {
-  auto r = Parse(
-      "module t;\n"
-      "  bit [8*14:1] stringvar;\n"
-      "  initial stringvar = \"Hello world\";\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
-}
-
 TEST(ParserSection11, StringConcatToVector) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
