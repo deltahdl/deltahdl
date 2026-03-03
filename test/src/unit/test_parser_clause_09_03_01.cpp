@@ -828,4 +828,25 @@ TEST(ParserSection9, Sec9_3_1_VarDeclAsFirstStatement) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
+TEST(ParserSection9, Sec9_3_1_MultipleDifferentTypeVarDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "    logic [7:0] y;\n"
+      "    real z;\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 4u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[3]->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace
