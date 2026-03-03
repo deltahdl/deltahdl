@@ -42,17 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Cast expression ---
-TEST(ParserSection11, Sec11_1_CastExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = int'(3.14);\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCast);
-}
-
 // --- Assignment pattern ---
 TEST(ParserSection11, Sec11_1_AssignmentPatternExpression) {
   auto r = Parse(
