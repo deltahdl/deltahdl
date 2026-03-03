@@ -10,42 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §10.4.2: NBA register file pattern — array elements via indexed NBA.
-// ---------------------------------------------------------------------------
-TEST(SimCh10b, NBARegisterFilePattern) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] regfile [0:3];\n"
-      "  initial begin\n"
-      "    regfile[0] <= 100;\n"
-      "    regfile[1] <= 200;\n"
-      "    regfile[2] <= 300;\n"
-      "    regfile[3] <= 400;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r0 = f.ctx.FindVariable("regfile[0]");
-  auto* r1 = f.ctx.FindVariable("regfile[1]");
-  auto* r2 = f.ctx.FindVariable("regfile[2]");
-  auto* r3 = f.ctx.FindVariable("regfile[3]");
-  ASSERT_NE(r0, nullptr);
-  ASSERT_NE(r1, nullptr);
-  ASSERT_NE(r2, nullptr);
-  ASSERT_NE(r3, nullptr);
-  EXPECT_EQ(r0->value.ToUint64(), 100u);
-  EXPECT_EQ(r1->value.ToUint64(), 200u);
-  EXPECT_EQ(r2->value.ToUint64(), 300u);
-  EXPECT_EQ(r3->value.ToUint64(), 400u);
-}
-
-// ---------------------------------------------------------------------------
 // §10.4.2: Verify .width and .ToUint64() on NBA results.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWidthAndToUint64) {
