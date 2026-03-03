@@ -103,4 +103,21 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInTaskPorts) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
+// =============================================================================
+// LRM section 6.11 -- Additional coverage for integer types
+// =============================================================================
+// Longint with initializer.
+TEST(ParserSection6, Sec6_11_LongintWithInit) {
+  auto r = Parse(
+      "module t;\n"
+      "  longint big = 64'hDEAD_BEEF_CAFE_BABE;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
+  ASSERT_NE(item->init_expr, nullptr);
+}
+
 }  // namespace
