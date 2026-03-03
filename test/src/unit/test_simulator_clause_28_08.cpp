@@ -346,4 +346,13 @@ TEST(SwitchProcessing, UserDefinedNetZControlTreatedAsOff) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
+// --- User-defined net type: on -> single net, off -> separate ---
+TEST(SwitchProcessing, UserDefinedNetControlOnSingleNet) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 0}, true});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
+}
+
 }  // namespace
