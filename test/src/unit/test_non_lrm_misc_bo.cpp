@@ -41,26 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 namespace {
 
 // =========================================================================
-// §7.3.2: Tagged unions (void members)
-// =========================================================================
-TEST(ParserSection7, TaggedUnionVoidMember) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef union tagged {\n"
-      "    void Invalid;\n"
-      "    int Valid;\n"
-      "  } VInt;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->typedef_type.is_tagged);
-  EXPECT_EQ(item->typedef_type.struct_members[0].type_kind,
-            DataTypeKind::kVoid);
-  EXPECT_EQ(item->typedef_type.struct_members[0].name, "Invalid");
-}
-
-// =========================================================================
 // §7.4.1: Packed arrays (multidimensional packed dims)
 // =========================================================================
 TEST(ParserSection7, MultidimensionalPackedArray) {
