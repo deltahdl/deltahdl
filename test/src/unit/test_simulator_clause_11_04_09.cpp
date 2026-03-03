@@ -309,4 +309,12 @@ TEST(EvalOp, ReductionNand) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+TEST(EvalOp, ReductionNor) {
+  SimFixture f;
+  // ~|32'd0 = 1
+  auto* expr = MakeUnary(f.arena, TokenKind::kTildePipe, MakeInt(f.arena, 0));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
