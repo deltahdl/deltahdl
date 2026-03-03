@@ -42,11 +42,6 @@ bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
 
 namespace {
 
-TEST(MinTypMaxDelays, SelectMax) {
-  MinTypMax mtm{5, 10, 15};
-  EXPECT_EQ(SelectMinTypMax(mtm, 2), 15u);
-}
-
 // §28.16.1: No required relation — max can be less than min.
 TEST(MinTypMaxDelays, NoRequiredOrdering) {
   MinTypMax mtm{20, 5, 10};
