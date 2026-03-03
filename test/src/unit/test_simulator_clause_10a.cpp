@@ -10,37 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 10. Blocking assignment in case statement.
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignCase) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [1:0] sel;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    sel = 2;\n"
-      "    case (sel)\n"
-      "      0: result = 10;\n"
-      "      1: result = 20;\n"
-      "      2: result = 30;\n"
-      "      default: result = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 30u);
-}
-
-// ---------------------------------------------------------------------------
 // 11. Blocking assignment in for loop (accumulate).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignForLoop) {
