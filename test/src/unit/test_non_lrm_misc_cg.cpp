@@ -42,17 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.7 -- Minimum, typical, and maximum delay expressions
-// =========================================================================
-TEST(ParserSection11, MinTypMaxInGateDelay) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  wire a, b, c;\n"
-              "  and #(2:3:4) g1(c, a, b);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection11, MinTypMaxInSpecparam) {
   EXPECT_TRUE(
       ParseOk("module t(input a, output b);\n"

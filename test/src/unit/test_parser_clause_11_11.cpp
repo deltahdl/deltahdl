@@ -76,4 +76,15 @@ TEST(ParserA84, ConstantPrimaryParenthesized) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kBinary);
 }
 
+// =========================================================================
+// Section 11.7 -- Minimum, typical, and maximum delay expressions
+// =========================================================================
+TEST(ParserSection11, MinTypMaxInGateDelay) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wire a, b, c;\n"
+              "  and #(2:3:4) g1(c, a, b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
