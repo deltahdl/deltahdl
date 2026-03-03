@@ -710,4 +710,14 @@ TEST(ParserA28, LetDeclNoArgsInBlock) {
               "endmodule\n"));
 }
 
+// let_declaration in task body
+TEST(ParserA28, LetDeclInTask) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task my_task();\n"
+              "    let inc(x) = x + 1;\n"
+              "  endtask\n"
+              "endmodule\n"));
+}
+
 }  // namespace

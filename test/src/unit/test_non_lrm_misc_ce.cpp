@@ -35,16 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// let_declaration in task body
-TEST(ParserA28, LetDeclInTask) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  task my_task();\n"
-              "    let inc(x) = x + 1;\n"
-              "  endtask\n"
-              "endmodule\n"));
-}
-
 // let_declaration in fork/join
 TEST(ParserA28, LetDeclInForkJoin) {
   EXPECT_TRUE(
