@@ -43,4 +43,12 @@ TEST(ParserClause03, Cl3_14_Table3_1_InvalidStrings) {
   EXPECT_FALSE(ParseTimeUnitStr("NS", u));  // case-sensitive
 }
 
+// 4. "us" represents microseconds (substitution for the mu-s symbol).
+TEST(ParserClause03, Cl3_14_UsForMicroseconds) {
+  TimeUnit u = TimeUnit::kNs;
+  EXPECT_TRUE(ParseTimeUnitStr("us", u));
+  EXPECT_EQ(u, TimeUnit::kUs);
+  EXPECT_EQ(static_cast<int8_t>(u), -6);  // 10^-6 = microsecond
+}
+
 }  // namespace

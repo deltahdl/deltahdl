@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-// 4. "us" represents microseconds (substitution for the mu-s symbol).
-TEST(ParserClause03, Cl3_14_UsForMicroseconds) {
-  TimeUnit u = TimeUnit::kNs;
-  EXPECT_TRUE(ParseTimeUnitStr("us", u));
-  EXPECT_EQ(u, TimeUnit::kUs);
-  EXPECT_EQ(static_cast<int8_t>(u), -6);  // 10^-6 = microsecond
-}
-
 // 5. TimeScale struct: time values have two components (unit + precision).
 TEST(ParserClause03, Cl3_14_TimeScaleTwoComponents) {
   TimeScale ts;
