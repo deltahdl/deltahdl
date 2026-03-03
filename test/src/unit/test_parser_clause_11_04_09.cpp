@@ -335,4 +335,8 @@ TEST(ParserCh505, Operator_ReductionAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
+TEST(ParserCh505, Operator_ReductionXnor) {
+  EXPECT_TRUE(ParseOk("module m; initial x = ~^y; endmodule"));
+}
+
 }  // namespace
