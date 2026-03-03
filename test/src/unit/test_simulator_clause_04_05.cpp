@@ -278,4 +278,35 @@ TEST(SimCh45, PrePostponedOnlyAfterActiveAndReactiveSetsEmpty) {
                          "reactive", Region::kPrePostponed, "pre_postponed");
 }
 
+// ---------------------------------------------------------------------------
+// §4.5 Outer loop: Reactive region schedules Active event -> active set
+// re-processes before Pre-Postponed can fire.
+// ---------------------------------------------------------------------------
+TEST(SimCh45, ReactiveRestartsActiveSetBeforePrePostponed) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  // Reactive generates an Active event.
+  auto* reactive = sched.GetEventPool().Acquire();
+  reactive->callback = [&]() {
+    order.push_back("reactive");
+    auto* new_active = sched.GetEventPool().Acquire();
+    new_active->callback = [&]() { order.push_back("active_from_reactive"); };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, new_active);
+  };
+  sched.ScheduleEvent({0}, Region::kReactive, reactive);
+
+  // Pre-Postponed must wait until both active and reactive are fully drained.
+  auto* pre_postponed = sched.GetEventPool().Acquire();
+  pre_postponed->callback = [&]() { order.push_back("pre_postponed"); };
+  sched.ScheduleEvent({0}, Region::kPrePostponed, pre_postponed);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 3u);
+  EXPECT_EQ(order[0], "reactive");
+  EXPECT_EQ(order[1], "active_from_reactive");
+  EXPECT_EQ(order[2], "pre_postponed");
+}
+
 }  // namespace
