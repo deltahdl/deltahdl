@@ -473,4 +473,27 @@ TEST(SimCh6b, TypeOpByteComputation) {
   EXPECT_EQ(var->value.ToUint64(), 150u);
 }
 
+// 19. type() with int preserves width when result overflows.
+TEST(SimCh6b, TypeOpIntOverflow) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  var type(a) result;\n"
+      "  initial result = 64'hFFFF_FFFF_1234_5678;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 32u);
+  // Truncated to 32 bits: 0x12345678.
+  EXPECT_EQ(var->value.ToUint64(), 0x12345678u);
+}
+
 }  // namespace
