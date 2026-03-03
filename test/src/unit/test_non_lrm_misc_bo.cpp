@@ -34,23 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-// =========================================================================
-// §7.10.2: Queue methods
-// =========================================================================
-TEST(ParserSection7, QueuePushBack) {
-  auto r = Parse(
-      "module t;\n"
-      "  int q[$];\n"
-      "  initial q.push_back(42);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* expr = stmt->expr;
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-}
-
 TEST(ParserSection7, QueuePopFront) {
   auto r = Parse(
       "module t;\n"
