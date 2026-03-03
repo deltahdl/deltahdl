@@ -691,4 +691,14 @@ TEST(ParserLet, DeclInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §A.2.8 block_item_declaration alternative 4: let_declaration
+TEST(ParserA28, LetDeclInBlock) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    let my_add(x, y) = x + y;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
