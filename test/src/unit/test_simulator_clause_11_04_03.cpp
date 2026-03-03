@@ -451,4 +451,15 @@ TEST(EvalAdv, SignedDivTruncToZero) {
   EXPECT_TRUE(result.is_signed);
 }
 
+TEST(EvalAdv, SignedModSignOfFirst) {
+  SimFixture f;
+  MakeSignedVarAdv(f, "sm", 8, 0xF9);
+  MakeSignedVarAdv(f, "sn", 8, 2);
+  auto* expr = MakeBinary(f.arena, TokenKind::kPercent, MakeId(f.arena, "sm"),
+                          MakeId(f.arena, "sn"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFFu);
+  EXPECT_TRUE(result.is_signed);
+}
+
 }  // namespace
