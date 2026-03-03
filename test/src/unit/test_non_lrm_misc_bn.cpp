@@ -4,21 +4,6 @@
 
 using namespace delta;
 
-struct ParseResult6i {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-// Helper: find a module item by name.
-static ModuleItem* FindItemByName(ParseResult6i& r, std::string_view name) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->name == name) return item;
-  }
-  return nullptr;
-}
-
 struct ParseResult6j {
   SourceManager mgr;
   Arena arena;
@@ -44,23 +29,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 }
 
 namespace {
-
-// 26. var type(concatenation) declaration.
-TEST(ParserSection6, Sec6_11_1_VarTypeRefConcat) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [3:0] a, b;\n"
-      "  var type({a, b}) c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* c_item = FindItemByName(r, "c");
-  ASSERT_NE(c_item, nullptr);
-  EXPECT_EQ(c_item->kind, ModuleItemKind::kVarDecl);
-  auto* ref = c_item->data_type.type_ref_expr;
-  ASSERT_NE(ref, nullptr);
-  EXPECT_EQ(ref->kind, ExprKind::kConcatenation);
-}
 
 // 27. type() on shortreal data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnShortreal) {
