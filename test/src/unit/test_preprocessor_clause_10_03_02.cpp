@@ -55,4 +55,18 @@ TEST(Parser, ContinuousAssignment) {
   EXPECT_TRUE(found_assign);
 }
 
+TEST(ParserSection10, ContinuousAssignBasic) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  auto* ca = FindItemByKind(mod->items, ModuleItemKind::kContAssign);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_lhs, nullptr);
+  ASSERT_NE(ca->assign_rhs, nullptr);
+}
+
 }  // namespace
