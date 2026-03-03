@@ -22,24 +22,6 @@ static ParseResult8b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// Section 8.18 -- User-defined types (typedef)
-// =============================================================================
-// Simple typedef of built-in type.
-TEST(ParserSection8, TypedefSimpleBuiltin) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef int my_int;\n"
-      "  my_int x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 2u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(items[0]->name, "my_int");
-}
-
 // Forward typedef declaration for enum.
 TEST(ParserSection8, TypedefForwardEnum) {
   EXPECT_TRUE(

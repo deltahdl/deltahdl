@@ -150,4 +150,38 @@ TEST(ParserSection26, PackageWithTypedef) {
   EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
 
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// Section 8.18 -- User-defined types (typedef)
+// =============================================================================
+// Simple typedef of built-in type.
+TEST(ParserSection8, TypedefSimpleBuiltin) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef int my_int;\n"
+      "  my_int x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(items[0]->name, "my_int");
+}
+
 }  // namespace
