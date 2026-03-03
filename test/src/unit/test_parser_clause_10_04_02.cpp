@@ -873,4 +873,23 @@ TEST(ParserSection10, Sec10_4_2_ExpressionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
+// --- 7. Nonblocking to bit-select: q[3] <= 1 ---
+TEST(ParserSection10, Sec10_4_2_BitSelectLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] q;\n"
+      "  initial begin\n"
+      "    q[3] <= 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
