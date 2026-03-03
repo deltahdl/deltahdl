@@ -1,4 +1,4 @@
-
+// Non-LRM tests
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -20,23 +20,7 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
   EXPECT_EQ(va->value.words[0].bval & mask, vb->value.words[0].bval & mask);
 }
 
-// ===========================================================================
-// §5.7.1 Integer literal constants
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// 8. Simple decimal number
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, SimpleDecimalNumber) {
-  // §5.7.1: Simple decimal number — sequence of digits 0-9.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 659;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 659u);
-}
+namespace {
 
 // ---------------------------------------------------------------------------
 // 9. Sized binary literal constant
@@ -616,3 +600,5 @@ TEST(SimCh50701, SizeConstantNonzero) {
       "x");
   EXPECT_EQ(result, 1u);
 }
+
+}  // namespace

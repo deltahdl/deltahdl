@@ -548,4 +548,21 @@ TEST(SimA87, HexDigitUppercase) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDEFu);
 }
 
+// ===========================================================================
+// §5.7.1 Integer literal constants
+// ===========================================================================
+// ---------------------------------------------------------------------------
+// 8. Simple decimal number
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, SimpleDecimalNumber) {
+  // §5.7.1: Simple decimal number — sequence of digits 0-9.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 659;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 659u);
+}
+
 }  // namespace
