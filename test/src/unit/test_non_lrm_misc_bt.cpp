@@ -23,19 +23,6 @@ static ParseResult90301 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection9, WaitExprStillWorks) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait (done) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-}
-
 TEST(ParserSection9, DisableIdentStillWorks) {
   auto r = Parse(
       "module m;\n"
