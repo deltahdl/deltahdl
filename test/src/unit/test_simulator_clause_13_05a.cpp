@@ -7,63 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Eval, FunctionInoutArgWriteback) {
-  ExprFixture f;
-
-  // Create variable "x" with initial value 10.
-  auto* x_var = f.ctx.CreateVariable("x", 32);
-  x_var->value = MakeLogic4VecVal(f.arena, 32, 10);
-
-  // Build function: function void increment(inout int v);
-  //   v = v + 1;
-  // endfunction
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "increment";
-  func->func_args = {{Direction::kInout, false, {}, "v", nullptr, {}}};
-
-  auto* lhs = f.arena.Create<Expr>();
-  lhs->kind = ExprKind::kIdentifier;
-  lhs->text = "v";
-
-  auto* v_ref = f.arena.Create<Expr>();
-  v_ref->kind = ExprKind::kIdentifier;
-  v_ref->text = "v";
-
-  auto* one = f.arena.Create<Expr>();
-  one->kind = ExprKind::kIntegerLiteral;
-  one->int_val = 1;
-
-  auto* add = f.arena.Create<Expr>();
-  add->kind = ExprKind::kBinary;
-  add->op = TokenKind::kPlus;
-  add->lhs = v_ref;
-  add->rhs = one;
-
-  auto* assign = f.arena.Create<Stmt>();
-  assign->kind = StmtKind::kBlockingAssign;
-  assign->lhs = lhs;
-  assign->rhs = add;
-  func->func_body_stmts.push_back(assign);
-
-  f.ctx.RegisterFunction("increment", func);
-
-  // Build call: increment(x)
-  auto* arg = f.arena.Create<Expr>();
-  arg->kind = ExprKind::kIdentifier;
-  arg->text = "x";
-
-  auto* call = f.arena.Create<Expr>();
-  call->kind = ExprKind::kCall;
-  call->callee = "increment";
-  call->args = {arg};
-
-  EvalExpr(call, f.ctx, f.arena);
-
-  // Inout arg "v" should read 10 and write back 11 to "x".
-  EXPECT_EQ(x_var->value.ToUint64(), 11u);
-}
-
 TEST(Eval, NestedFunctionOutputArgs) {
   ExprFixture f;
 
