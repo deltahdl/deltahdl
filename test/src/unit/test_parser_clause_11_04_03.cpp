@@ -313,4 +313,14 @@ TEST(ParserSection11, Sec11_1_BinaryPowerOperator) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
+TEST(ParserSection11, ArithmeticDiv) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a / b;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kSlash);
+}
+
 }  // namespace

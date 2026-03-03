@@ -41,16 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, ArithmeticDiv) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a / b;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kSlash);
-}
-
 // =========================================================================
 // Section 11.4.6 -- Wildcard equality operators
 // =========================================================================
