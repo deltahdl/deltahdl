@@ -113,4 +113,15 @@ TEST(ParserA27, TaskBodyClassScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserA27, TaskBodyOutOfBlockMethod) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern task run();\n"
+      "endclass\n"
+      "task C::run();\n"
+      "endtask\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
