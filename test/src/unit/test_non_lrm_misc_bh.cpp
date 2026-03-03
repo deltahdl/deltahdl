@@ -22,27 +22,7 @@ static ParseResult616 Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FirstItem(ParseResult616& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 namespace {
-
-TEST(ParserSection6, StringDeclWithInitializer) {
-  // string variable with initial value
-  auto r = Parse(
-      "module m;\n"
-      "  string name = \"hello\";\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
-  EXPECT_NE(item->init_expr, nullptr);
-}
 
 TEST(ParserSection6, StringDeclEmptyInit) {
   // string initialized to empty string

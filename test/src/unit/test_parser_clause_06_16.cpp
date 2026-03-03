@@ -317,4 +317,18 @@ TEST(ParserSection6, StringDeclBasic) {
   EXPECT_EQ(item->name, "s");
 }
 
+TEST(ParserSection6, StringDeclWithInitializer) {
+  // string variable with initial value
+  auto r = Parse(
+      "module m;\n"
+      "  string name = \"hello\";\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
 }  // namespace
