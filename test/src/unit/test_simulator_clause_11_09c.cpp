@@ -9,11 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(TaggedUnion, TagDefaultEmpty) {
-  SimFixture f;
-  EXPECT_TRUE(f.ctx.GetVariableTag("nonexistent").empty());
-}
-
 TEST(TaggedUnion, ChangeTag) {
   SimFixture f;
   f.ctx.CreateVariable("u", 32);

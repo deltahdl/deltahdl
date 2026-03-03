@@ -21,4 +21,9 @@ TEST(ElabA83, TaggedUnionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(TaggedUnion, TagDefaultEmpty) {
+  SimFixture f;
+  EXPECT_TRUE(f.ctx.GetVariableTag("nonexistent").empty());
+}
+
 }  // namespace
