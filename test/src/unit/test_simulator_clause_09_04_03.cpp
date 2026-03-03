@@ -59,4 +59,8 @@ TEST(TimingControl, WaitConditionTrueUnblocks) {
   EXPECT_TRUE(EvaluateWaitCondition(1));
 }
 
+TEST(TimingControl, WaitConditionFalseBlocks) {
+  EXPECT_FALSE(EvaluateWaitCondition(0));
+}
+
 }  // namespace
