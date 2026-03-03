@@ -256,4 +256,12 @@ TEST(ParserSection6, RealLiteralScientificNotation) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, RealLiteralNegativeExponent) {
+  // Negative exponent: 1.0e-3 = 0.001
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1.0e-3;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

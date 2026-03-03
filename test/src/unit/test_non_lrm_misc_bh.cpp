@@ -30,14 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, RealLiteralNegativeExponent) {
-  // Negative exponent: 1.0e-3 = 0.001
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 1.0e-3;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, RealLiteralPositiveExponent) {
   // Explicit positive exponent
   EXPECT_TRUE(
