@@ -590,4 +590,41 @@ TEST(ParserSection9, Sec9_2_3_ConcatenationLHS) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kConcatenation);
 }
 
+// ---------------------------------------------------------------------------
+// 27. always_latch with deeply nested if-else-if chain.
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_3_DeepIfElseIfChain) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c, d, q;\n"
+      "  always_latch\n"
+      "    if (a)\n"
+      "      q <= 4'h1;\n"
+      "    else if (b)\n"
+      "      q <= 4'h2;\n"
+      "    else if (c)\n"
+      "      q <= 4'h3;\n"
+      "    else\n"
+      "      q <= d;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysLatchItem(r);
+  ASSERT_NE(item, nullptr);
+  auto* top_if = item->body;
+  ASSERT_NE(top_if, nullptr);
+  EXPECT_EQ(top_if->kind, StmtKind::kIf);
+  // First else branch is an if.
+  ASSERT_NE(top_if->else_branch, nullptr);
+  EXPECT_EQ(top_if->else_branch->kind, StmtKind::kIf);
+  // Second else branch is also an if.
+  auto* mid_if = top_if->else_branch;
+  ASSERT_NE(mid_if->else_branch, nullptr);
+  EXPECT_EQ(mid_if->else_branch->kind, StmtKind::kIf);
+  // Terminal else is a plain assignment.
+  auto* inner_if = mid_if->else_branch;
+  ASSERT_NE(inner_if->else_branch, nullptr);
+  EXPECT_EQ(inner_if->else_branch->kind, StmtKind::kNonblockingAssign);
+}
+
 }  // namespace
