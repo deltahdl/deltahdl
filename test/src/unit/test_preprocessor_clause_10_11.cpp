@@ -46,4 +46,23 @@ TEST(ParserSection10, NetAliasTwoNets) {
   ASSERT_EQ(alias_item->alias_nets.size(), 2u);
 }
 
+TEST(ParserSection10, NetAliasThreeNets) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire a, b, c;\n"
+      "  alias a = b = c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ModuleItem* alias_item = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kAlias) {
+      alias_item = item;
+      break;
+    }
+  }
+  ASSERT_NE(alias_item, nullptr);
+  ASSERT_EQ(alias_item->alias_nets.size(), 3u);
+}
+
 }  // namespace
