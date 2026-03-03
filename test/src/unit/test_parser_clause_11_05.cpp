@@ -68,4 +68,16 @@ TEST(ParserSection11, Sec11_1_SystemFunctionCallExpression) {
   EXPECT_EQ(rhs->callee, "$clog2");
 }
 
+TEST(ParserSection11, Sec11_1_FunctionCallExpression) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = my_func(a, b);\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(rhs->callee, "my_func");
+  EXPECT_EQ(rhs->args.size(), 2u);
+}
+
 }  // namespace

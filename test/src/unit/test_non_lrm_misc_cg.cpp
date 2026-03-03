@@ -42,18 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, Sec11_1_FunctionCallExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = my_func(a, b);\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCall);
-  EXPECT_EQ(rhs->callee, "my_func");
-  EXPECT_EQ(rhs->args.size(), 2u);
-}
-
 // --- Member access ---
 TEST(ParserSection11, Sec11_1_MemberAccessExpression) {
   auto r = Parse(
