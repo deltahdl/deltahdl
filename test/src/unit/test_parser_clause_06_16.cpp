@@ -237,4 +237,32 @@ TEST(ParserSection8, StringTypeWithInit) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
+static Stmt* FirstInitialStmt(ParseResult8b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+// String variable inside block-level declaration.
+TEST(ParserSection8, StringTypeBlockLevel) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    string s;\n"
+      "    s = \"world\";\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
+}
+
 }  // namespace
