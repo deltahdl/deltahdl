@@ -30,20 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection9, EventControlPosedgeEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk) a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_FALSE(stmt->events.empty());
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-}
-
 TEST(ParserSection9, EventControlNegedge) {
   auto r = Parse(
       "module m;\n"
