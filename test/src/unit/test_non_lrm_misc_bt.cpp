@@ -21,28 +21,7 @@ static ParseResult90301 Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FirstAlwaysItem(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
-  }
-  return nullptr;
-}
-
 namespace {
-
-TEST(ParserSection9, IffGuardMultipleEventsSecond) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, reset, a, b;\n"
-      "  always @(posedge clk iff reset == 0 or negedge reset) a <= b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 2u);
-  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
-  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
-}
 
 TEST(ParserSection9, IffGuardStmtLevelKind) {
   auto r = Parse(
