@@ -50,4 +50,11 @@ TEST(ParserCh505, Operator_Ternary) {
   ASSERT_NE(rhs->false_expr, nullptr);
 }
 
+TEST(Eval, Ternary) {
+  ExprFixture f;
+  auto* expr = ParseExprFrom("1 ? 42 : 99", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}
+
 }  // namespace
