@@ -907,4 +907,12 @@ TEST(ParserSection6, Sec6_7_1_WandWithRange) {
   EXPECT_EQ(item->name, "bus");
 }
 
+// §6.7.1: Supply0 with range.
+TEST(ParserSection6, Sec6_7_1_Supply0WithRange) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  supply0 [3:0] gnd_bus;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
