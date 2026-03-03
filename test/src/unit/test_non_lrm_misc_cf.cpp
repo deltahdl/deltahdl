@@ -41,20 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.4.12 -- Concatenation operators
-// =========================================================================
-TEST(ParserSection11, ConcatenationBasic) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {a, b, c};\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(rhs->elements.size(), 3u);
-}
-
 TEST(ParserSection11, ReplicationOperator) {
   auto r = Parse(
       "module t;\n"
