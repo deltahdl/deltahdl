@@ -32,21 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-// §6.7.1: Wire with explicit bit type.
-TEST(ParserSection6, Sec6_7_1_WireWithBitType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire bit [3:0] b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "b");
-}
-
 // §6.7.1: Net with single delay value.
 TEST(ParserSection6, Sec6_7_1_WireWithDelay) {
   auto r = Parse(

@@ -734,4 +734,19 @@ TEST(ParserSection6, Sec6_7_1_WireSignedQualifier) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
 }
 
+// §6.7.1: Wire with explicit bit type.
+TEST(ParserSection6, Sec6_7_1_WireWithBitType) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire bit [3:0] b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_EQ(item->name, "b");
+}
+
 }  // namespace
