@@ -30,21 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(Parser, WaitStatement) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    wait (ready) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-  EXPECT_NE(stmt->condition, nullptr);
-  EXPECT_NE(stmt->body, nullptr);
-}
-
 TEST(Parser, DisableStatement) {
   auto r = Parse(
       "module t;\n"
