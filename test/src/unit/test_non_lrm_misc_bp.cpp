@@ -10,12 +10,6 @@ struct ParseResult7b {
   CompilationUnit* cu = nullptr;
 };
 
-static ModuleItem* FirstItem(ParseResult7b& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 static Stmt* FirstInitialStmt(ParseResult7b& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
@@ -48,23 +42,6 @@ static ParseResult7c Parse(const std::string& src) {
 }
 
 namespace {
-
-TEST(ParserSection7, UnpackedStructTypedefDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct {\n"
-      "    int addr;\n"
-      "    int crc;\n"
-      "    byte data [4];\n"
-      "  } packet;\n"
-      "  packet p;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-  EXPECT_FALSE(item->typedef_type.is_packed);
-}
 
 TEST(ParserSection7, StructMemberAccess) {
   auto r = Parse(

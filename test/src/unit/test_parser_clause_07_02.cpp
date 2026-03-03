@@ -275,4 +275,21 @@ TEST(ParserSection7, UnpackedStructDecl) {
   EXPECT_EQ(item->data_type.struct_members.size(), 3u);
 }
 
+TEST(ParserSection7, UnpackedStructTypedefDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    int addr;\n"
+      "    int crc;\n"
+      "    byte data [4];\n"
+      "  } packet;\n"
+      "  packet p;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_FALSE(item->typedef_type.is_packed);
+}
+
 }  // namespace
