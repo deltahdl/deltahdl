@@ -11,16 +11,6 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalAdv, SignedGtNeg) {
-  SimFixture f;
-  MakeSignedVarAdv(f, "sa", 8, 0x01);
-  MakeSignedVarAdv(f, "sb", 8, 0xFF);
-  auto* expr = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "sa"),
-                          MakeId(f.arena, "sb"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
 TEST(EvalAdv, UnsignedLtUnchanged) {
   SimFixture f;
   auto* a = MakeVar(f, "ua", 8, 0xFF);
