@@ -16,13 +16,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SvaEngine, SeverityToString) {
-  EXPECT_EQ(SeverityToString(AssertionSeverity::kInfo), "INFO");
-  EXPECT_EQ(SeverityToString(AssertionSeverity::kWarning), "WARNING");
-  EXPECT_EQ(SeverityToString(AssertionSeverity::kError), "ERROR");
-  EXPECT_EQ(SeverityToString(AssertionSeverity::kFatal), "FATAL");
-}
-
 TEST(SvaEngine, SeverityDefaultIsError) {
   AssertionSeverity sev = AssertionSeverity::kError;
   EXPECT_EQ(SeverityToString(sev), "ERROR");

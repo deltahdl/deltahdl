@@ -26,4 +26,11 @@ TEST(SvaEngine, SeverityLevelValues) {
   EXPECT_EQ(static_cast<int>(AssertionSeverity::kFatal), 3);
 }
 
+TEST(SvaEngine, SeverityToString) {
+  EXPECT_EQ(SeverityToString(AssertionSeverity::kInfo), "INFO");
+  EXPECT_EQ(SeverityToString(AssertionSeverity::kWarning), "WARNING");
+  EXPECT_EQ(SeverityToString(AssertionSeverity::kError), "ERROR");
+  EXPECT_EQ(SeverityToString(AssertionSeverity::kFatal), "FATAL");
+}
+
 }  // namespace
