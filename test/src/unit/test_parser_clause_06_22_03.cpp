@@ -15,4 +15,17 @@ TEST(ParserSection6, AssignmentCompatibleRealToReal) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
+// =========================================================================
+// §6.22.2: Type compatibility rules — packed width comparison
+// =========================================================================
+TEST(ParserSection6, AssignCompatibleByteToShortint) {
+  // §6.22.2: byte (8-bit 2-state) and shortint (16-bit 2-state) differ
+  // in width, but both are integral so assignment compatible.
+  DataType a;
+  a.kind = DataTypeKind::kByte;
+  DataType b;
+  b.kind = DataTypeKind::kShortint;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
 }  // namespace
