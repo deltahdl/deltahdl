@@ -226,4 +226,24 @@ TEST(ParserClause03, Cl3_14_2_2_TimeunitSlashSetsBoth) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kFs);
 }
 
+// 48. LRM Example D: timeunit and timeprecision as separate keywords.
+// §3.14.2.2:
+//   module D (...);
+//     timeunit 100ps;
+//     timeprecision 10fs;
+TEST(ParserClause03, Cl3_14_2_2_LrmExampleD) {
+  auto r = ParseTimescale31402(
+      "module D;\n"
+      "  timeunit 100ps;\n"
+      "  timeprecision 10fs;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  EXPECT_TRUE(mod->has_timeunit);
+  EXPECT_TRUE(mod->has_timeprecision);
+  EXPECT_EQ(mod->time_unit, TimeUnit::kPs);
+  EXPECT_EQ(mod->time_prec, TimeUnit::kFs);
+}
+
 }  // namespace
