@@ -810,4 +810,29 @@ TEST(ParserA85, VarLvalueNonblocking) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
 }
 
+// --- 30. Full register file pattern with nonblocking in always_ff ---
+TEST(ParserSection10, Sec10_4_2_RegisterFilePattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    if (wr_en)\n"
+      "      regfile[wr_addr] <= wr_data;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  auto* if_stmt = item->body->stmts[0];
+  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
+  ASSERT_NE(if_stmt->then_branch, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(if_stmt->then_branch->lhs, nullptr);
+  EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace
