@@ -76,4 +76,14 @@ TEST(ParserSection11, WildcardEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqQuestion);
 }
 
+TEST(ParserSection11, WildcardNeq) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a !=? b);\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
+}
+
 }  // namespace
