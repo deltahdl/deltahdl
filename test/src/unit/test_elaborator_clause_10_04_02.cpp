@@ -453,4 +453,31 @@ TEST(SimCh10b, NBAInForLoop) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA with function call on RHS.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBAFunctionCallRHS) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function int double_val(int x);\n"
+      "    return x * 2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result <= double_val(21);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
 }  // namespace
