@@ -22,4 +22,28 @@ TEST(SourceText, NetAlias) {
   EXPECT_EQ(alias_item->alias_nets.size(), 3u);
 }
 
+// =============================================================================
+// LRM section 10.11 -- Net aliasing
+// =============================================================================
+TEST(ParserSection10, NetAliasTwoNets) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  alias a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  auto* mod = r.cu->modules[0];
+  // Find the alias item.
+  ModuleItem* alias_item = nullptr;
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kAlias) {
+      alias_item = item;
+      break;
+    }
+  }
+  ASSERT_NE(alias_item, nullptr);
+  ASSERT_EQ(alias_item->alias_nets.size(), 2u);
+}
+
 }  // namespace
