@@ -680,4 +680,20 @@ TEST(ParserA604, StmtItemProceduralDeassign) {
   EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
 }
 
+TEST(ParserSection10, DeassignConcatLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial begin\n"
+      "    deassign {a, b};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
+}
+
 }  // namespace
