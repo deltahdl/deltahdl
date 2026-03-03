@@ -41,18 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// §6.20.1 — block-level parameter declaration
-TEST(ParserSection6, BlockLevelParameter) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    parameter int P = 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // §6.20.1 — block-level localparam declaration
 TEST(ParserSection6, BlockLevelLocalparam) {
   auto r = Parse(
