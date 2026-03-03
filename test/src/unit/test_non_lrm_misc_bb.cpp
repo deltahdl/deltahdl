@@ -42,22 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 10. Rule (b) takes precedence over rule (c).
-TEST(ParserClause03, Cl3_14_2_3_TimescaleBeforeCUTimeunit) {
-  auto r = ParseTimescale31402(
-      "timeunit 1fs;\n"
-      "`timescale 1us / 1ps\n"
-      "module m;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto resolved =
-      ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
-                             r.preproc_timescale, nullptr);
-  // `timescale (rule b) takes precedence over CU timeunit (rule c).
-  EXPECT_EQ(resolved.unit, TimeUnit::kUs);
-  EXPECT_EQ(resolved.precision, TimeUnit::kPs);
-}
-
 // 11. CU-scope combined timeunit X / Y syntax.
 TEST(ParserClause03, Cl3_14_2_3_CUTimeunitSlashSyntax) {
   auto r = ParseTimescale31402(

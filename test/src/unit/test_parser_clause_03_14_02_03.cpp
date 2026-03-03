@@ -224,4 +224,20 @@ TEST(ParserClause03, Cl3_14_2_3_FullPrecedenceChain) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kNs);
 }
 
+// 10. Rule (b) takes precedence over rule (c).
+TEST(ParserClause03, Cl3_14_2_3_TimescaleBeforeCUTimeunit) {
+  auto r = ParseTimescale31402(
+      "timeunit 1fs;\n"
+      "`timescale 1us / 1ps\n"
+      "module m;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto resolved =
+      ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
+                             r.preproc_timescale, nullptr);
+  // `timescale (rule b) takes precedence over CU timeunit (rule c).
+  EXPECT_EQ(resolved.unit, TimeUnit::kUs);
+  EXPECT_EQ(resolved.precision, TimeUnit::kPs);
+}
+
 }  // namespace
