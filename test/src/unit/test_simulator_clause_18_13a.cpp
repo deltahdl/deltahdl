@@ -1,4 +1,4 @@
-// §18.13: Random number system functions and methods
+// Non-LRM tests
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -8,13 +8,6 @@
 using namespace delta;
 
 namespace {
-
-TEST(SysTask, UrandomReturns32Bit) {
-  SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$urandom", {});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 32u);
-}
 
 TEST(SysTask, UrandomRangeInBounds) {
   SysTaskFixture f;
