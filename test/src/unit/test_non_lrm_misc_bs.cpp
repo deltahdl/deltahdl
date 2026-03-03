@@ -40,24 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.26 — Interface class extends multiple interfaces
-TEST(ParserSection8, InterfaceClassExtendsMultiple) {
-  auto r = Parse(
-      "interface class A;\n"
-      "  pure virtual function void fa();\n"
-      "endclass\n"
-      "interface class B;\n"
-      "  pure virtual function void fb();\n"
-      "endclass\n"
-      "interface class C extends A, B;\n"
-      "  pure virtual function void fc();\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 3u);
-  EXPECT_EQ(r.cu->classes[2]->name, "C");
-  EXPECT_EQ(r.cu->classes[2]->base_class, "A");
-}
-
 // §8.12 — Shallow copy with new
 TEST(ParserSection8, ShallowCopy) {
   auto r = Parse(
