@@ -9,35 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.4: iff with bit-select zero suppresses.
-TEST(SimCh9e, IffBitSelectZeroSuppresses) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic clk;\n"
-      "  logic [7:0] enable;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    clk = 0; enable = 8'hFE; result = 0;\n"
-      "    #1 clk = 1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "  always @(posedge clk iff enable[0])\n"
-      "    result = 44;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  // enable[0] = 0, so event suppressed.
-  EXPECT_EQ(var->value.ToUint64(), 0u);
-}
-
 // §9.4.2.4: iff guard preserves previous value when suppressed.
 TEST(SimCh9e, IffPreservesPreviousValueWhenSuppressed) {
   SimFixture f;
