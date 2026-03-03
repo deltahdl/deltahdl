@@ -424,4 +424,16 @@ TEST(ParserSection6, IntDefaultSigned) {
   EXPECT_TRUE(item->data_type.is_signed) << "int is signed by default";
 }
 
+TEST(ParserSection6, IntExplicitUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  int unsigned x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_FALSE(item->data_type.is_signed) << "int unsigned is unsigned";
+}
+
 }  // namespace
