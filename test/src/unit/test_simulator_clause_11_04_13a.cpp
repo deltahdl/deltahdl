@@ -1,7 +1,6 @@
-// §11.4.13: for an explanation of range list syntax.
+// Non-LRM tests
 
 #include <cstring>
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -26,20 +25,8 @@ static Expr* MakeDollar(Arena& arena) {
   e->text = "$";
   return e;
 }
-namespace {
 
-TEST(EvalAdv, InsideDollarLowerBound) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("dv", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 5);
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "dv");
-  inside->elements.push_back(
-      MakeRange(f.arena, MakeDollar(f.arena), MakeInt(f.arena, 10)));
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
+namespace {
 
 TEST(EvalAdv, InsideDollarUpperBound) {
   SimFixture f;

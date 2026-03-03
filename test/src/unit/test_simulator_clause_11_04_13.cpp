@@ -167,4 +167,24 @@ TEST(EvalOp, InsideRangeNoMatch) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
+static Expr* MakeDollar(Arena& arena) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIdentifier;
+  e->text = "$";
+  return e;
+}
+
+TEST(EvalAdv, InsideDollarLowerBound) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("dv", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 5);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "dv");
+  inside->elements.push_back(
+      MakeRange(f.arena, MakeDollar(f.arena), MakeInt(f.arena, 10)));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
