@@ -83,4 +83,24 @@ TEST(ParserSection6, Sec6_5_EventVarDecl) {
   EXPECT_EQ(item->name, "done");
 }
 
+static ModuleItem* FirstItem(ParseResult6& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// =========================================================================
+// §6.17: Event data type
+// =========================================================================
+TEST(ParserSection6, EventVarDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  event e;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
+}
+
 }  // namespace

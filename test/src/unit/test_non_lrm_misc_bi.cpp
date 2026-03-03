@@ -41,20 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 namespace {
 
 // =========================================================================
-// §6.17: Event data type
-// =========================================================================
-TEST(ParserSection6, EventVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  event e;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
-}
-
-// =========================================================================
 // §6.18: User-defined types (typedef)
 // =========================================================================
 TEST(ParserSection6, TypedefInt) {
