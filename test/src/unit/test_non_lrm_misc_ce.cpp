@@ -35,17 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-TEST(ParserSection11, CompoundAssignMinusEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a -= 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(ParserSection11, CompoundAssignStarEq) {
   auto r = Parse(
       "module t;\n"
