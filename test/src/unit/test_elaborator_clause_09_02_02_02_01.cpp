@@ -225,4 +225,31 @@ TEST(SimCh9b, AlwaysCombXorGate) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
+// ---------------------------------------------------------------------------
+// 6. always_comb NOT (bitwise invert).
+// ---------------------------------------------------------------------------
+TEST(SimCh9b, AlwaysCombNotGate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, y;\n"
+      "  always_comb y = ~a;\n"
+      "  initial begin\n"
+      "    a = 8'hA5;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  // ~0xA5 = 0x5A in the low 8 bits; mask to declared width.
+  EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x5Au);
+}
+
 }  // namespace
