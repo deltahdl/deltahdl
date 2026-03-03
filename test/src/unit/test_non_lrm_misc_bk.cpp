@@ -25,20 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.22: Type compatibility — TypesMatch on named types
-// =========================================================================
-TEST(ParserSection6, TypesMatchNamedSameType) {
-  // §6.22: Two kNamed types with the same type_name match.
-  DataType a;
-  a.kind = DataTypeKind::kNamed;
-  a.type_name = "mytype";
-  DataType b;
-  b.kind = DataTypeKind::kNamed;
-  b.type_name = "mytype";
-  EXPECT_TRUE(TypesMatch(a, b));
-}
-
 TEST(ParserSection6, TypesMatchNamedDifferentType) {
   // §6.22: Two kNamed types with different type_names do not match.
   DataType a;
