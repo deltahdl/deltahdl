@@ -480,4 +480,25 @@ TEST(SimCh9e, AlwaysFFIffSuppressed) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// §9.4.2.4: iff guard in always block with begin/end body.
+TEST(SimCh9e, IffGuardAlwaysBlockBeginEnd) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, en;\n"
+      "  logic [31:0] a, b;\n"
+      "  initial begin\n"
+      "    clk = 0; en = 1; a = 0; b = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk iff en) begin\n"
+      "    a = 10;\n"
+      "    b = 20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
+}
+
 }  // namespace
