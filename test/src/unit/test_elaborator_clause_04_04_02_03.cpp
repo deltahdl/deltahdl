@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §4.4.2.3: Inactive events region
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
