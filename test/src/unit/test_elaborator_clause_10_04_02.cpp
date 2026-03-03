@@ -568,4 +568,29 @@ TEST(SimCh10b, NBAArithmeticExpression) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA with bitwise operators on RHS.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBABitwiseOperators) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  logic [7:0] r_and;\n"
+      "  logic [7:0] r_or;\n"
+      "  logic [7:0] r_xor;\n"
+      "  initial begin\n"
+      "    a = 8'hF0;\n"
+      "    b = 8'h3C;\n"
+      "    r_and <= a & b;\n"
+      "    r_or  <= a | b;\n"
+      "    r_xor <= a ^ b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r_and", 0x30u}, {"r_or", 0xFCu}, {"r_xor", 0xCCu}});
+}
+
 }  // namespace
