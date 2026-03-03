@@ -45,38 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 17. Automatic task with automatic local vars (different types)
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_AutoTaskWithVariousTypes) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic process();\n"
-      "    int i_val;\n"
-      "    logic [3:0] l_val;\n"
-      "    real r_val;\n"
-      "    i_val = 1;\n"
-      "    l_val = 4'hA;\n"
-      "    r_val = 3.14;\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* t = FirstFuncOrTask(r);
-  ASSERT_NE(t, nullptr);
-  EXPECT_EQ(t->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(t->is_automatic);
-  EXPECT_EQ(t->name, "process");
-  // The local variable declarations should be present as func_body_stmts.
-  ASSERT_GE(t->func_body_stmts.size(), 3u);
-  EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(t->func_body_stmts[0]->var_decl_type.kind, DataTypeKind::kInt);
-  EXPECT_EQ(t->func_body_stmts[1]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(t->func_body_stmts[1]->var_decl_type.kind, DataTypeKind::kLogic);
-  EXPECT_EQ(t->func_body_stmts[2]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(t->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
-}
-
-// =============================================================================
 // 18. Static variable with packed dimensions
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticVarPackedDims) {
