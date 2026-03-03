@@ -81,4 +81,17 @@ TEST(GateNetDelays, TwoDelayRiseAndFall) {
   EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kV0), 20u);
 }
 
+// §28.16: "The delay when the signal changes to high impedance or
+//  to unknown shall be the lesser of the two delay values."
+TEST(GateNetDelays, TwoDelayToZAndXIsMinimum) {
+  DelaySpec spec{10, 20, 0, 2};
+  // *→z = min(d1, d2)
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kZ), 10u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kZ), 10u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kX, Val4::kZ), 10u);
+  // *→x = min(d1, d2)
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kX), 10u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kX), 10u);
+}
+
 }  // namespace
