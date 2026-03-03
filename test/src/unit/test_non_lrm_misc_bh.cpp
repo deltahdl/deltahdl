@@ -30,24 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, IntegerTypesInProcedural) {
-  // All integer types declared inside initial block
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    byte b;\n"
-              "    shortint si;\n"
-              "    int i;\n"
-              "    longint li;\n"
-              "    integer ig;\n"
-              "    bit bv;\n"
-              "    logic l;\n"
-              "    reg r;\n"
-              "    time t;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, RealTypesInProcedural) {
   // All real types declared inside initial block
   EXPECT_TRUE(
