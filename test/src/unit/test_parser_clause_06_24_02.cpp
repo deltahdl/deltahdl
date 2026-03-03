@@ -22,4 +22,17 @@ TEST(ParserSection6, DynamicCastTask) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, DynamicCastFunction) {
+  // §6.24.2: $cast as a function returns int.
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef enum { X, Y, Z } xyz_t;\n"
+              "  initial begin\n"
+              "    xyz_t e;\n"
+              "    int ok;\n"
+              "    ok = $cast(e, 2);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
