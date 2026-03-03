@@ -167,4 +167,12 @@ TEST(ParserCh503, BlockCommentSpanningLines) {
               "endmodule\n"));
 }
 
+TEST(ParserCh503, OneLineCommentEndsAtNewline) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic a; // comment\n"
+              "  logic b;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

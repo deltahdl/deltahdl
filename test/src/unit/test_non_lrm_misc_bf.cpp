@@ -52,14 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh503, OneLineCommentEndsAtNewline) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic a; // comment\n"
-              "  logic b;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserCh505, Operator_UnaryBitwiseNegate) {
   auto r = Parse(
       "module m;\n"
