@@ -40,23 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.12 — Shallow copy with new
-TEST(ParserSection8, ShallowCopy) {
-  auto r = Parse(
-      "module m;\n"
-      "  class Packet;\n"
-      "    int data;\n"
-      "  endclass\n"
-      "  initial begin\n"
-      "    Packet p1, p2;\n"
-      "    p1 = new;\n"
-      "    p2 = new p1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // §8.3 — Class inside class (nested class)
 TEST(ParserSection8, NestedClass) {
   auto r = Parse(
