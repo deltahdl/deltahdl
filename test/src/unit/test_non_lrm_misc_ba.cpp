@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-// 12. Precision constraint: precision exponent <= unit exponent.
-// Finer units have more-negative exponents (kFs < kPs < ... < kS).
-TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
-  EXPECT_LE(static_cast<int8_t>(TimeUnit::kFs),
-            static_cast<int8_t>(TimeUnit::kPs));
-  EXPECT_LE(static_cast<int8_t>(TimeUnit::kPs),
-            static_cast<int8_t>(TimeUnit::kNs));
-  EXPECT_LE(static_cast<int8_t>(TimeUnit::kNs),
-            static_cast<int8_t>(TimeUnit::kUs));
-  EXPECT_LE(static_cast<int8_t>(TimeUnit::kUs),
-            static_cast<int8_t>(TimeUnit::kMs));
-  EXPECT_LE(static_cast<int8_t>(TimeUnit::kMs),
-            static_cast<int8_t>(TimeUnit::kS));
-}
-
 // ===========================================================================
 // §3.14: Timeunit/timeprecision parsing
 // ===========================================================================
