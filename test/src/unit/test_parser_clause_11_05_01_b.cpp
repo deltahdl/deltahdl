@@ -188,4 +188,16 @@ TEST(ParserSection11, Sec11_1_IndexedPartSelectPlusFlag) {
   ASSERT_NE(rhs->index_end, nullptr);
 }
 
+TEST(ParserSection11, Sec11_1_IndexedPartSelectMinusFlag) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = vec[j -: 8];\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  EXPECT_TRUE(rhs->is_part_select_minus);
+  EXPECT_FALSE(rhs->is_part_select_plus);
+}
+
 }  // namespace
