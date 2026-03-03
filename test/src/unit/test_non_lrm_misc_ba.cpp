@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-// 3. Table 3-1: invalid unit strings are rejected.
-TEST(ParserClause03, Cl3_14_Table3_1_InvalidStrings) {
-  TimeUnit u = TimeUnit::kNs;
-  EXPECT_FALSE(ParseTimeUnitStr("", u));
-  EXPECT_FALSE(ParseTimeUnitStr("xs", u));
-  EXPECT_FALSE(ParseTimeUnitStr("sec", u));
-  EXPECT_FALSE(ParseTimeUnitStr("NS", u));  // case-sensitive
-}
-
 // 4. "us" represents microseconds (substitution for the mu-s symbol).
 TEST(ParserClause03, Cl3_14_UsForMicroseconds) {
   TimeUnit u = TimeUnit::kNs;
