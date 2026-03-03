@@ -35,4 +35,35 @@ TEST(ParserSection6, BitstreamCastIntToStruct) {
       "endmodule\n"));
 }
 
+struct ParseResult6 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6 Parse(const std::string& src) {
+  ParseResult6 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =========================================================================
+// §6.24.3 -- Bit-stream casting
+// =========================================================================
+TEST(ParserSection6, BitStreamCastToType) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
+      "  initial begin\n"
+      "    pair_t p;\n"
+      "    p = pair_t'(8'hAB);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
