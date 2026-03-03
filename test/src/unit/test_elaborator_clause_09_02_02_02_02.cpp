@@ -59,4 +59,30 @@ TEST(SimCh9, AlwaysCombAndGate) {
   EXPECT_EQ(var->value.ToUint64(), 0x30u);
 }
 
+// ---------------------------------------------------------------------------
+// 3. always_comb OR gate: result = a | b.
+// ---------------------------------------------------------------------------
+TEST(SimCh9, AlwaysCombOrGate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, result;\n"
+      "  initial begin\n"
+      "    a = 8'hF0;\n"
+      "    b = 8'h0F;\n"
+      "  end\n"
+      "  always_comb begin\n"
+      "    result = a | b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
+}
+
 }  // namespace
