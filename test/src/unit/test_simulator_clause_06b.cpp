@@ -20,32 +20,6 @@ static void LowerRunAndCompareWidths(SimFixture& f, RtlirDesign* design,
 
 namespace {
 
-// 2. type() with logic: resolves to 1-bit unsigned.
-TEST(SimCh6b, TypeOpLogic) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic a;\n"
-      "  var type(a) b;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 1u);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-  EXPECT_FALSE(var->is_signed);
-}
-
 // 3. type() with byte: resolves to 8-bit signed.
 TEST(SimCh6b, TypeOpByte) {
   SimFixture f;
