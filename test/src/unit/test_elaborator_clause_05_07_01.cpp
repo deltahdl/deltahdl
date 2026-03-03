@@ -349,4 +349,25 @@ TEST(SimCh50701, UnderscoreInNumber) {
   EXPECT_EQ(vc->value.ToUint64(), 0x12ABF001u);
 }
 
+// ---------------------------------------------------------------------------
+// 21. X value in hex literal
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, XValueInHexLiteral) {
+  // §5.7.1: x sets 4 bits to unknown in hex base.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [11:0] x;\n"
+      "  initial x = 12'hx;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_NE(var->value.words[0].bval, 0u);
+}
+
 }  // namespace
