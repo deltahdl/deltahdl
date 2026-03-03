@@ -258,4 +258,21 @@ TEST(ParserSection7, StructMultipleMembersSameType) {
   }
 }
 
+TEST(ParserSection7, UnpackedStructDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  struct {\n"
+      "    int x;\n"
+      "    real y;\n"
+      "    string s;\n"
+      "  } my_unpacked;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kStruct);
+  EXPECT_FALSE(item->data_type.is_packed);
+  EXPECT_EQ(item->data_type.struct_members.size(), 3u);
+}
+
 }  // namespace
