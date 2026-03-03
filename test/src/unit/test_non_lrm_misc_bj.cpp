@@ -41,17 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, TriregSingleDelay_NoFallDecay) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg #5 t1;\n"
-      "endmodule\n");
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->net_delay_fall, nullptr);
-  EXPECT_EQ(item->net_delay_decay, nullptr);
-}
-
 // §6.20.1 — block-level parameter declaration
 TEST(ParserSection6, BlockLevelParameter) {
   auto r = Parse(

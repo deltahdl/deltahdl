@@ -115,4 +115,15 @@ TEST(ParserSection6, TriregSingleDelay) {
   EXPECT_EQ(item->net_delay->int_val, 5u);
 }
 
+TEST(ParserSection6, TriregSingleDelay_NoFallDecay) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg #5 t1;\n"
+      "endmodule\n");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->net_delay_fall, nullptr);
+  EXPECT_EQ(item->net_delay_decay, nullptr);
+}
+
 }  // namespace
