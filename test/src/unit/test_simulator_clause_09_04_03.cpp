@@ -53,4 +53,10 @@ TEST(SimA605, WaitAlreadyTrue) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
+bool EvaluateWaitCondition(uint64_t value) { return value != 0; }
+
+TEST(TimingControl, WaitConditionTrueUnblocks) {
+  EXPECT_TRUE(EvaluateWaitCondition(1));
+}
+
 }  // namespace
