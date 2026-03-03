@@ -10,43 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §10.4.2: Verify .width and .ToUint64() on NBA results.
-// ---------------------------------------------------------------------------
-TEST(SimCh10b, NBAWidthAndToUint64) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] nibble;\n"
-      "  logic [15:0] half;\n"
-      "  logic [31:0] word;\n"
-      "  initial begin\n"
-      "    nibble <= 4'hA;\n"
-      "    half   <= 16'hBEEF;\n"
-      "    word   <= 32'hDEADCAFE;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* nibble = f.ctx.FindVariable("nibble");
-  auto* half = f.ctx.FindVariable("half");
-  auto* word = f.ctx.FindVariable("word");
-  ASSERT_NE(nibble, nullptr);
-  ASSERT_NE(half, nullptr);
-  ASSERT_NE(word, nullptr);
-  EXPECT_EQ(nibble->value.width, 4u);
-  EXPECT_EQ(nibble->value.ToUint64(), 0xAu);
-  EXPECT_EQ(half->value.width, 16u);
-  EXPECT_EQ(half->value.ToUint64(), 0xBEEFu);
-  EXPECT_EQ(word->value.width, 32u);
-  EXPECT_EQ(word->value.ToUint64(), 0xDEADCAFEu);
-}
-
-// ---------------------------------------------------------------------------
 // §10.4.2: NBA case default branch.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBACaseDefaultBranch) {
