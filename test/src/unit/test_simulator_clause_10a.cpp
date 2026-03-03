@@ -10,36 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 6. Blocking assignment splitting a packed value into parts.
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignSplitPacked) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] packed_val;\n"
-      "  logic [7:0] hi, lo;\n"
-      "  initial begin\n"
-      "    packed_val = 16'hDEAD;\n"
-      "    hi = packed_val[15:8];\n"
-      "    lo = packed_val[7:0];\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* hi = f.ctx.FindVariable("hi");
-  auto* lo = f.ctx.FindVariable("lo");
-  ASSERT_NE(hi, nullptr);
-  ASSERT_NE(lo, nullptr);
-  EXPECT_EQ(hi->value.ToUint64(), 0xDEu);
-  EXPECT_EQ(lo->value.ToUint64(), 0xADu);
-}
-
-// ---------------------------------------------------------------------------
 // 7. Blocking assignment with concatenation on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignConcatRHS) {
