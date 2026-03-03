@@ -184,4 +184,13 @@ TEST(ParserSection8, TypedefSimpleBuiltin) {
   EXPECT_EQ(items[0]->name, "my_int");
 }
 
+// Forward typedef declaration for enum.
+TEST(ParserSection8, TypedefForwardEnum) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef enum my_enum;\n"
+              "  typedef enum {A, B, C} my_enum;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

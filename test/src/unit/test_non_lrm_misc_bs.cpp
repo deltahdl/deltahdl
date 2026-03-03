@@ -22,15 +22,6 @@ static ParseResult8b Parse(const std::string& src) {
 
 namespace {
 
-// Forward typedef declaration for enum.
-TEST(ParserSection8, TypedefForwardEnum) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef enum my_enum;\n"
-              "  typedef enum {A, B, C} my_enum;\n"
-              "endmodule\n"));
-}
-
 // Typedef of enum with named type for reuse.
 TEST(ParserSection8, TypedefEnumWithMembers) {
   auto r = Parse(
