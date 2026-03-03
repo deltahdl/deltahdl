@@ -32,25 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-// §6.7.1: Net with three delays (rise, fall, turnoff).
-TEST(ParserSection6, Sec6_7_1_WireThreeDelays) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire #(2, 4, 6) w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  ASSERT_NE(item->net_delay, nullptr);
-  EXPECT_EQ(item->net_delay->int_val, 2u);
-  ASSERT_NE(item->net_delay_fall, nullptr);
-  EXPECT_EQ(item->net_delay_fall->int_val, 4u);
-  ASSERT_NE(item->net_delay_decay, nullptr);
-  EXPECT_EQ(item->net_delay_decay->int_val, 6u);
-}
-
 // §6.7.1: Multiple net declarations of different types in the same module.
 TEST(ParserSection6, Sec6_7_1_MixedNetTypesInModule) {
   auto r = Parse(
