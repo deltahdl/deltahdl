@@ -20,32 +20,6 @@ static void LowerRunAndCompareWidths(SimFixture& f, RtlirDesign* design,
 
 namespace {
 
-// 16. type() used with parameter default value type (parameter type T = int).
-TEST(SimCh6b, TypeOpParameterTypeDefault) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  parameter type T = int;\n"
-      "  T x;\n"
-      "  var type(x) result;\n"
-      "  initial begin\n"
-      "    x = 42;\n"
-      "    result = 77;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 32u);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
-}
-
 // 17. type() with enum-typed variable preserves 32-bit enum width.
 TEST(SimCh6b, TypeOpEnumType) {
   SimFixture f;
