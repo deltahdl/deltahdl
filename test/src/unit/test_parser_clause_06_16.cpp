@@ -381,4 +381,14 @@ TEST(ParserSection6, StringComparison) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, MultipleStringDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  string x, y, z;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+}
+
 }  // namespace
