@@ -656,4 +656,22 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInInitialBlock) {
   EXPECT_NE(stmt->var_init, nullptr);
 }
 
+// =============================================================================
+// 12. Variable in program block (automatic by default)
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_ProgramBlockVarAutoDefault) {
+  auto r = Parse(
+      "program p;\n"
+      "  initial begin\n"
+      "    int x = 5;\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_GE(r.cu->programs[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
+}
+
 }  // namespace
