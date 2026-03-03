@@ -757,4 +757,21 @@ TEST(ParserSection11, Sec11_4_6_TernaryInNonblockingAssign) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
+// --- Nested ternary with parentheses ---
+TEST(ParserSection11, Sec11_4_6_NestedTernaryWithParens) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel1 ? (sel2 ? a : b) : c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIdentifier);
+}
+
 }  // namespace
