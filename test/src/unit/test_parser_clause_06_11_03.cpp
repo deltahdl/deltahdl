@@ -448,4 +448,16 @@ TEST(ParserSection6, ByteDefaultSigned) {
   EXPECT_TRUE(item->data_type.is_signed) << "byte is signed by default";
 }
 
+TEST(ParserSection6, ShortintDefaultSigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  shortint s;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortint);
+  EXPECT_TRUE(item->data_type.is_signed) << "shortint is signed by default";
+}
+
 }  // namespace
