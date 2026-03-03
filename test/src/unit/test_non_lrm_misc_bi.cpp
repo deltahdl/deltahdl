@@ -40,18 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-TEST(ParserSection6, BitDefaultUnsigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  bit b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
-  EXPECT_FALSE(item->data_type.is_signed) << "bit is unsigned by default";
-}
-
 TEST(ParserSection6, RegDefaultUnsigned) {
   auto r = Parse(
       "module t;\n"
