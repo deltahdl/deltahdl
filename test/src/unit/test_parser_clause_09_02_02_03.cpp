@@ -742,4 +742,24 @@ TEST(ParserSection9, AlwaysLatch) {
   ASSERT_NE(item->body, nullptr);
 }
 
+// =============================================================================
+// §4.6: always_latch guarantees latch semantics
+// =============================================================================
+TEST(ParserSection4, Sec4_6_AlwaysLatchLatch) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch begin\n"
+      "    if (en) q <= d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
+  ASSERT_NE(item->body, nullptr);
+}
+
 }  // namespace
