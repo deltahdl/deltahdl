@@ -915,4 +915,12 @@ TEST(ParserSection6, Sec6_7_1_Supply0WithRange) {
               "endmodule\n"));
 }
 
+// §6.7.1: Supply1 with range.
+TEST(ParserSection6, Sec6_7_1_Supply1WithRange) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  supply1 [3:0] vdd_bus;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
