@@ -108,11 +108,6 @@ static TwoNets MakeTwoWireNets() {
 
 namespace {
 
-TEST(ForceRelease, LegalTargetConstBitSelectNet) {
-  ForceInfo info{ForceTarget::kConstBitSelectNet};
-  EXPECT_TRUE(ValidateForceTarget(info));
-}
-
 TEST(ForceRelease, LegalTargetConstPartSelectNet) {
   ForceInfo info{ForceTarget::kConstPartSelectNet};
   EXPECT_TRUE(ValidateForceTarget(info));
