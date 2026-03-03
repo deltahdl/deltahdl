@@ -323,4 +323,35 @@ TEST(SimCh9c, LatchByteType) {
   EXPECT_EQ(q->value.ToUint64(), 0xFEu);
 }
 
+// =============================================================================
+// §9.2.3: always_latch with bit-select
+// =============================================================================
+// 14. Bit-select on RHS within always_latch.
+TEST(SimCh9c, BitSelectRHS) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d;\n"
+      "  logic q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 8'b1010_0101;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d[0];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  // d = 0xA5 = 0b10100101; d[0] = 1.
+  EXPECT_EQ(q->value.ToUint64(), 1u);
+}
+
 }  // namespace
