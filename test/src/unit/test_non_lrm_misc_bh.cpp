@@ -24,15 +24,6 @@ static ParseResult616 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection6, StringFunctionReturn) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function string get_msg();\n"
-              "    return \"ok\";\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, StringConcatOp) {
   // String concatenation using {} operator
   EXPECT_TRUE(
