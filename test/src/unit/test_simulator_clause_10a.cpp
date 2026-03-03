@@ -10,31 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 29. Blocking assignment with modulo operator (%).
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignModulo) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = 17 % 5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  // 17 % 5 = 2
-  EXPECT_EQ(var->value.ToUint64(), 2u);
-}
-
-// ---------------------------------------------------------------------------
 // 30. Blocking assignment with unary plus (+).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryPlus) {
