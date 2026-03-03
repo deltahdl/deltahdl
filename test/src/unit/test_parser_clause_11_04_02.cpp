@@ -375,4 +375,16 @@ TEST(ParserSection11, PostfixDecrementParses) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
+TEST(ParserSection11, PostfixDecrementOp) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial a--;\n"
+      "endmodule\n");
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->expr, nullptr);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kPostfixUnary);
+  EXPECT_EQ(stmt->expr->op, TokenKind::kMinusMinus);
+}
+
 }  // namespace

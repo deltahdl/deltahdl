@@ -35,18 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-TEST(ParserSection11, PostfixDecrementOp) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a--;\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->expr, nullptr);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kPostfixUnary);
-  EXPECT_EQ(stmt->expr->op, TokenKind::kMinusMinus);
-}
-
 // =========================================================================
 // Section 11.4.13 -- Inside operator (set membership)
 // =========================================================================
