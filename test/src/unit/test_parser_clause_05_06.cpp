@@ -76,4 +76,15 @@ TEST(ParserCh501, Sec5_1_IdentifierStartsWithUnderscore) {
   EXPECT_EQ(item->name, "_start_val");
 }
 
+// =========================================================================
+// Identifiers starting with letter
+// =========================================================================
+TEST(ParserCh501, Sec5_1_IdentifierStartsWithLetter) {
+  auto r = Parse("module m; logic Data0; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "Data0");
+}
+
 }  // namespace

@@ -53,17 +53,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 namespace {
 
 // =========================================================================
-// Identifiers starting with letter
-// =========================================================================
-TEST(ParserCh501, Sec5_1_IdentifierStartsWithLetter) {
-  auto r = Parse("module m; logic Data0; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "Data0");
-}
-
-// =========================================================================
 // Number followed by identifier (separate tokens)
 // =========================================================================
 TEST(ParserCh501, Sec5_1_NumberFollowedByIdentifier) {
