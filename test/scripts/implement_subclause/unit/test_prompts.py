@@ -81,7 +81,7 @@ class TestDepth1:
         assert "~/LRM.txt" in prompt
 
     def test_depth_1_reads_only_target(self):
-        """Depth-1 prompt reads only the target section, no ancestors."""
+        """Depth-1 prompt reads only the target subclause, no ancestors."""
         prompt = build_prompt("4", _TITLES, "~/LRM.txt", issue=6)
         assert "Read §4 for context." in prompt
 
@@ -94,15 +94,15 @@ class TestDepth1:
 class TestDepth2:
     """Tests for depth-2 prompt generation."""
 
-    def test_numeric_includes_top_level_and_subclause(self):
-        """Numeric prompt lists top-level as related section."""
+    def test_numeric_no_top_level_in_context(self):
+        """Numeric prompt does not list top-level clause in context."""
         prompt = build_prompt("4.1", _TITLES, "~/LRM.txt", issue=6)
-        assert "§4" in prompt and "§4.1" in prompt
+        assert "related subclauses (§4.2)" in prompt
 
-    def test_annex_includes_top_level_and_subclause(self):
-        """Annex prompt lists top-level as related section."""
+    def test_annex_no_top_level_in_context(self):
+        """Annex prompt does not list top-level annex in context."""
         prompt = build_prompt("A.8", _TITLES, "~/LRM.txt", issue=44)
-        assert "§A" in prompt and "§A.8" in prompt
+        assert "Read §A.8 for context." in prompt
 
     def test_numeric_has_common_structure(self):
         """Numeric prompt has all common structure elements."""
@@ -128,19 +128,19 @@ class TestDepth2:
 class TestDepth3:
     """Tests for depth-3 prompt generation."""
 
-    def test_numeric_lists_related_sections(self):
-        """Numeric prompt lists top-level, context, and ancestors."""
+    def test_numeric_lists_related_subclauses(self):
+        """Numeric prompt lists context and ancestor subclauses."""
         prompt = build_prompt("6.24.1", _TITLES, "~/LRM.txt", issue=8)
         assert all(
             f"§{s}" in prompt
-            for s in ["6", "6.1", "6.24", "6.24.1"]
+            for s in ["6.1", "6.24", "6.24.1"]
         )
 
-    def test_annex_lists_related_sections(self):
-        """Annex prompt lists top-level and ancestors."""
+    def test_annex_lists_related_subclauses(self):
+        """Annex prompt lists ancestor subclauses."""
         prompt = build_prompt("A.8.1", _TITLES, "~/LRM.txt", issue=44)
         assert all(
-            f"§{s}" in prompt for s in ["A", "A.8", "A.8.1"]
+            f"§{s}" in prompt for s in ["A.8", "A.8.1"]
         )
 
     def test_numeric_has_common_structure(self):
@@ -177,28 +177,28 @@ class TestDepth4:
     """Tests for depth-4 prompt generation."""
 
     def test_numeric_lists_full_hierarchy(self):
-        """Numeric prompt lists top-level, context, all ancestors."""
+        """Numeric prompt lists context and all ancestor subclauses."""
         prompt = build_prompt("4.4.3.1", _TITLES, "~/LRM.txt", issue=6)
         assert all(
             f"§{s}" in prompt
-            for s in ["4", "4.1", "4.4", "4.4.3", "4.4.3.1"]
+            for s in ["4.1", "4.4", "4.4.3", "4.4.3.1"]
         )
 
     def test_annex_lists_full_hierarchy(self):
-        """Annex prompt lists top-level and all ancestors."""
+        """Annex prompt lists all ancestor subclauses."""
         prompt = build_prompt("A.7.5.3", _TITLES, "~/LRM.txt", issue=44)
         assert all(
             f"§{s}" in prompt
-            for s in ["A", "A.7", "A.7.5", "A.7.5.3"]
+            for s in ["A.7", "A.7.5", "A.7.5.3"]
         )
 
-    def test_numeric_section_order(self):
-        """Related sections appear in top-down order."""
+    def test_numeric_subclause_order(self):
+        """Related subclauses appear in top-down order."""
         prompt = build_prompt("4.4.3.1", _TITLES, "~/LRM.txt", issue=6)
         start = prompt.index("(") + 1
         end = prompt.index(")")
-        sections = [s.strip() for s in prompt[start:end].split(",")]
-        assert sections == ["§4", "§4.1", "§4.2", "§4.4", "§4.4.3"]
+        refs = [s.strip() for s in prompt[start:end].split(",")]
+        assert refs == ["§4.1", "§4.2", "§4.4", "§4.4.3"]
 
     def test_has_common_structure(self):
         """Prompt has all common structure elements."""
@@ -215,25 +215,25 @@ class TestDepth5:
     """Tests for depth-5 prompt generation."""
 
     def test_numeric_lists_full_hierarchy(self):
-        """Numeric prompt includes all hierarchy levels."""
+        """Numeric prompt includes all ancestor and context subclauses."""
         prompt = build_prompt(
             "4.4.3.1.2", _TITLES, "~/LRM.txt", issue=6,
         )
         assert all(
             f"§{s}" in prompt
             for s in [
-                "4", "4.1", "4.4", "4.4.3", "4.4.3.1", "4.4.3.1.2",
+                "4.1", "4.4", "4.4.3", "4.4.3.1", "4.4.3.1.2",
             ]
         )
 
     def test_annex_lists_full_hierarchy(self):
-        """Annex prompt includes all hierarchy levels."""
+        """Annex prompt includes all ancestor subclauses."""
         prompt = build_prompt(
             "A.7.5.3.1", _TITLES, "~/LRM.txt", issue=44,
         )
         assert all(
             f"§{s}" in prompt
-            for s in ["A", "A.7", "A.7.5", "A.7.5.3", "A.7.5.3.1"]
+            for s in ["A.7", "A.7.5", "A.7.5.3", "A.7.5.3.1"]
         )
 
     def test_has_common_structure(self):

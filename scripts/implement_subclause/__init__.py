@@ -276,38 +276,33 @@ def build_supplementary_lines(
 # Prompt formatting
 # ---------------------------------------------------------------------------
 
-def _build_section_list(
+def _build_context_list(
     clause: str, titles: dict[str, str],
 ) -> list[str]:
-    """Build the list of related LRM sections to read for context.
+    """Build the list of related LRM subclauses to read for context.
 
-    Collects the top-level clause/annex, any General/Overview siblings
-    at each ancestry level, and intermediate ancestors — all deduplicated.
+    Collects General/Overview siblings at each ancestry level and
+    intermediate ancestors — all deduplicated.
     """
     h = build_hierarchy(clause)
-    sections: list[str] = []
-
-    # Top-level clause or annex letter
-    top: str = h["letter"] if h["is_annex"] else h["clause_number"]
-    if top != clause:
-        sections.append(top)
+    context: list[str] = []
 
     # Context subclauses (General/Overview siblings), deduped vs ancestors
     ancestor_set = set(h["ancestors"])
     for ctx in find_context_subclauses(clause, titles):
         if ctx not in ancestor_set:
-            sections.append(ctx)
+            context.append(ctx)
 
     # Intermediate ancestors
-    sections.extend(h["ancestors"])
+    context.extend(h["ancestors"])
 
-    return sections
+    return context
 
 
 def format_prompt(
     subclause: str,
     lrm: str,
-    sections: list[str],
+    context: list[str],
     *,
     issue: int,
     supplementary: str = "",
@@ -315,10 +310,10 @@ def format_prompt(
     """Assemble the implementation prompt from structured inputs."""
     lines = [f"Implement §{subclause} from the LRM at {lrm}.\n"]
 
-    if sections:
-        refs = ", ".join(f"§{s}" for s in sections)
+    if context:
+        refs = ", ".join(f"§{s}" for s in context)
         lines.append(
-            f"Read §{subclause} and related sections"
+            f"Read §{subclause} and related subclauses"
             f" ({refs}) for context.",
         )
     else:
@@ -334,7 +329,7 @@ def format_prompt(
 
     lines.append(
         "Use strict test-driven development:"
-        " for each requirement in the LRM section,"
+        f" for each requirement in §{subclause},"
         " write a failing unit test, then implement."
         " Cover all affected pipeline stages."
         " Include error conditions and edge cases.",
@@ -359,9 +354,9 @@ def build_prompt(
     supplementary: str = "",
 ) -> str:
     """Build the implementation prompt for any clause depth."""
-    sections = _build_section_list(clause, titles)
+    context = _build_context_list(clause, titles)
     return format_prompt(
-        clause, lrm, sections,
+        clause, lrm, context,
         issue=issue, supplementary=supplementary,
     )
 
