@@ -212,4 +212,17 @@ TEST(ParserSection11, Sec11_1_UnaryLogicalNot) {
   EXPECT_EQ(rhs->op, TokenKind::kBang);
 }
 
+// =========================================================================
+// Section 11.4.7 -- Logical operators
+// =========================================================================
+TEST(ParserSection11, LogicalAnd) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a && b);\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
+}
+
 }  // namespace
