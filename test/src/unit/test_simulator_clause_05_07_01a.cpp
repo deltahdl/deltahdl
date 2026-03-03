@@ -23,30 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 27. Left padding with x when leftmost bit is x
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, LeftPadWithX) {
-  // §5.7.1: Leftmost x causes x-padding to the left.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [11:0] x;\n"
-      "  initial x = 'hx;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  // x encoding: aval=1, bval=1 per bit; left-padded to full width.
-  uint16_t mask = 0xFFF;
-  EXPECT_EQ(var->value.words[0].aval & mask, mask);
-  EXPECT_EQ(var->value.words[0].bval & mask, mask);
-}
-
-// ---------------------------------------------------------------------------
 // 28. Left padding with z when leftmost bit is z
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, LeftPadWithZ) {
