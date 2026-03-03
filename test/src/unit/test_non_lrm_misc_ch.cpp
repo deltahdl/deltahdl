@@ -62,19 +62,6 @@ static ModuleItem* FirstContAssign(ParseResult11g& r) {
 
 namespace {
 
-// --- Indexed part-select in for loop ---
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInForLoop) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic [31:0] data;\n"
-              "  logic [7:0] bytes [4];\n"
-              "  initial begin\n"
-              "    for (int i = 0; i < 4; i++)\n"
-              "      bytes[i] = data[i*8 +: 8];\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // --- Indexed part-select down on LHS ---
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownOnLhs) {
   auto r = Parse(

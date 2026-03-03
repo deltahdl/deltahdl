@@ -935,4 +935,17 @@ TEST(ParserSection11, Sec11_4_1_BitSelectAssignedFromFuncCall) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
+// --- Indexed part-select in for loop ---
+TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInForLoop) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic [31:0] data;\n"
+              "  logic [7:0] bytes [4];\n"
+              "  initial begin\n"
+              "    for (int i = 0; i < 4; i++)\n"
+              "      bytes[i] = data[i*8 +: 8];\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
