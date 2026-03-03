@@ -85,4 +85,12 @@ TEST(SvaEngine, AssertControlGlobalOn) {
   EXPECT_TRUE(ctrl.IsEnabled("any_instance"));
 }
 
+TEST(SvaEngine, AssertPassOff) {
+  AssertionControl ctrl;
+  EXPECT_TRUE(ctrl.IsPassEnabled("inst1"));
+  ctrl.SetPassOff("inst1");
+  EXPECT_FALSE(ctrl.IsPassEnabled("inst1"));
+  EXPECT_TRUE(ctrl.IsPassEnabled("inst2"));
+}
+
 }  // namespace
