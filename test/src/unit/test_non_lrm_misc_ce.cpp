@@ -35,15 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-TEST(ParserA28, LetDeclNoArgsInBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    let val = 42;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // let_declaration in task body
 TEST(ParserA28, LetDeclInTask) {
   EXPECT_TRUE(

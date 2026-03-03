@@ -701,4 +701,13 @@ TEST(ParserA28, LetDeclInBlock) {
               "endmodule\n"));
 }
 
+TEST(ParserA28, LetDeclNoArgsInBlock) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    let val = 42;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
