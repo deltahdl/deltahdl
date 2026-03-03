@@ -218,4 +218,14 @@ TEST(EvalAdv, PackedStructInequality) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+TEST(EvalAdv, SignedEqNeg) {
+  SimFixture f;
+  MakeSignedVarAdv(f, "sa", 8, 0xFF);
+  MakeSignedVarAdv(f, "sb", 8, 0xFF);
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "sa"),
+                          MakeId(f.arena, "sb"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
