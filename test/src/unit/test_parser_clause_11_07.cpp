@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §11.7: Signed expressions
 
 #include "fixture_parser.h"
 
@@ -41,43 +41,20 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, UnsignedSystemCall) {
+// =========================================================================
+// Section 11.7 -- Signed expressions ($signed, $unsigned)
+// =========================================================================
+TEST(ParserSection11, SignedSystemCall) {
   auto r = Parse(
       "module t;\n"
-      "  initial x = $unsigned(a);\n"
+      "  initial x = $signed(a);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
-  EXPECT_EQ(rhs->callee, "$unsigned");
-}
-
-// --- Streaming operator with type-sized slice (§11.4.14) ---
-TEST(ParserSection11, StreamingWithTypedSlice) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte a;\n"
-      "  int b;\n"
-      "  initial b = {<< byte {a}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// --- Tagged union expressions (§11.9) ---
-TEST(ParserSection11, TaggedUnionExpr) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    int a;\n"
-      "    a = tagged Invalid;\n"
-      "    a = tagged Valid (42);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(rhs->callee, "$signed");
 }
 
 }  // namespace
