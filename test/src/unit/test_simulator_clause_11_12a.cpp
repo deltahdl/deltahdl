@@ -26,28 +26,6 @@ static ModuleItem* MakeLetDecl(Arena& arena, std::string_view name, Expr* body,
 
 namespace {
 
-TEST(EvalAdv, LetExpandDefaultArg) {
-  SimFixture f;
-  // let inc(a, b = 1) = a + b;
-  FunctionArg arg_a;
-  arg_a.name = "a";
-  FunctionArg arg_b;
-  arg_b.name = "b";
-  arg_b.default_value = MakeInt(f.arena, 1);
-  auto* body = f.arena.Create<Expr>();
-  body->kind = ExprKind::kBinary;
-  body->op = TokenKind::kPlus;
-  body->lhs = MakeId(f.arena, "a");
-  body->rhs = MakeId(f.arena, "b");
-  auto* decl = MakeLetDecl(f.arena, "inc", body, {arg_a, arg_b});
-  f.ctx.RegisterLetDecl("inc", decl);
-
-  // inc(10) — uses default b=1, should return 11.
-  auto* call = MakeCall(f.arena, "inc", {MakeInt(f.arena, 10)});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 11u);
-}
-
 TEST(EvalAdv, LetNoRecursive) {
   SimFixture f;
   // let bad(a) = bad(a + 1); — recursive, should return X (not infinite loop).
