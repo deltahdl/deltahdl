@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §7.3.2: Tagged unions
 
 #include "fixture_simulator.h"
 #include "parser/ast.h"
