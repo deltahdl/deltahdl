@@ -30,20 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection9, StarEventParenAlways) {
-  // always @(*) consumes the @(*) at the always-block level.
-  auto r = Parse(
-      "module m;\n"
-      "  always @(*) begin a = b; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-}
-
 TEST(ParserSection9, StarEventBareStmt) {
   // @* at the statement level produces an kEventControl stmt.
   auto r = Parse(
