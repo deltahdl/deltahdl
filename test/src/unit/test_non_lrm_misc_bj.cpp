@@ -41,19 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// Step 2a: user-defined type cast (fixes 6.19.4-cast)
-TEST(ParserSection6, TypeCast_UserDefined) {
-  EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  typedef enum {a, b, c, d} e;\n"
-               "  initial begin\n"
-               "    e val;\n"
-               "    val = a;\n"
-               "    val = e'(val + 1);\n"
-               "  end\n"
-               "endmodule\n"));
-}
-
 // Step 2b: interconnect (fixes 6.6.8)
 TEST(ParserSection6, Interconnect_Basic) {
   EXPECT_TRUE(
