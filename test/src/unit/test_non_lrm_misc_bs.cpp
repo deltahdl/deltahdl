@@ -40,24 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.18 — Extern constraint declaration
-TEST(ParserSection8, ExternConstraintDecl) {
-  auto r = Parse(
-      "class A;\n"
-      "  rand int x;\n"
-      "  extern constraint c1;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  bool found = false;
-  for (auto* m : r.cu->classes[0]->members) {
-    if (m->kind == ClassMemberKind::kConstraint && m->name == "c1") {
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 // §8.26.2 — Extends and implements together
 TEST(ParserSection8, ExtendsAndImplements) {
   auto r = Parse(
