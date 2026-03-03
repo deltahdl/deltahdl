@@ -215,4 +215,8 @@ TEST(TimingControl, EdgeDetectedOnNegedge) {
   EXPECT_TRUE(IsEdge(Logic4::kVal1, Logic4::kVal0));
 }
 
+TEST(TimingControl, NoEdgeDetectedOnSame) {
+  EXPECT_FALSE(IsEdge(Logic4::kVal0, Logic4::kVal0));
+}
+
 }  // namespace
