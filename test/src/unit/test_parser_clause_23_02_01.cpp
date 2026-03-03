@@ -163,4 +163,8 @@ TEST(ParserSection6, ModuleLifetimeAutomatic) {
   EXPECT_EQ(r.cu->modules[0]->name, "t");
 }
 
+TEST(ParserCh512, TopLevel_TrailingSemicolonAfterEndmodule) {
+  EXPECT_TRUE(ParseOk("module m; endmodule;"));
+}
+
 }  // namespace

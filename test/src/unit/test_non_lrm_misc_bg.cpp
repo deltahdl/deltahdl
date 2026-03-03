@@ -41,10 +41,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, TopLevel_TrailingSemicolonAfterEndmodule) {
-  EXPECT_TRUE(ParseOk("module m; endmodule;"));
-}
-
 TEST(ParserCh512, Expr_AttributeOnOperator) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
