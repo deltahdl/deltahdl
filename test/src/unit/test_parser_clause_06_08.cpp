@@ -407,4 +407,14 @@ TEST(ParserSection6, VarRegDecl) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, VarImplicitInProcedural) {
+  // §6.8: "var [3:0] x;" in procedural context.
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    var [3:0] x;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

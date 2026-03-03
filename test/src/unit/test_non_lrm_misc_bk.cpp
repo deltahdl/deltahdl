@@ -25,16 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, VarImplicitInProcedural) {
-  // §6.8: "var [3:0] x;" in procedural context.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    var [3:0] x;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, VarImplicitInPort) {
   // §6.8: "input var [7:0] data_in;" in port list.
   EXPECT_TRUE(
