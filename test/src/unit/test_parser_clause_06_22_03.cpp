@@ -58,4 +58,13 @@ TEST(ParserSection6, AssignmentCompatibleIntegral) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
+TEST(ParserSection6, AssignmentCompatibleEnumToInt) {
+  // §6.22.3: enum → integral is assignment compatible.
+  DataType a;
+  a.kind = DataTypeKind::kEnum;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
 }  // namespace
