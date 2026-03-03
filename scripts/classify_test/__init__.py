@@ -27,14 +27,11 @@ from ._github import (
     update_issue_body,
 )
 from ._git import commit_classification
-from ._patterns import CLAUSE_PROMPT_TEMPLATE
-from ._patterns import CLAUSE_SCHEMA
-from ._patterns import PREFIX_PATTERNS
-from ._patterns import PREFIX_PROMPT_TEMPLATE
-from ._patterns import PREFIX_SCHEMA
-from ._patterns import STAGE_TO_PREFIX
-from ._patterns import TOPIC_PROMPT_TEMPLATE
-from ._patterns import TOPIC_SCHEMA
+from ._patterns import (
+    CLAUSE_PROMPT_TEMPLATE, CLAUSE_SCHEMA, PREFIX_PATTERNS,
+    PREFIX_PROMPT_TEMPLATE, PREFIX_SCHEMA, STAGE_TO_PREFIX,
+    TOPIC_PROMPT_TEMPLATE, TOPIC_SCHEMA,
+)
 from ._output import print_classification_table
 from ._split import (
     _batch_tests,
@@ -351,9 +348,8 @@ def _detect_prefix(test, clause, lrm_path):
         if pattern in body:
             test.prefix_rationale = f"body contains '{pattern}'"
             return prefix
-    print(f"Calling Claude to detect pipeline stage"
-          f" for {test.test_name} because body does not"
-          " match any known pattern...")
+    print(f"Calling Claude to detect pipeline stage for {test.test_name}"
+          " because body does not match any known pattern...")
     prompt = _PREFIX_PROMPT_TEMPLATE.format(
         lrm_path=lrm_path,
         suite=test.suite_name,
@@ -544,8 +540,8 @@ def classify_tests(tests, test_dir, lrm_path):
         topic_resp = None
         clause = clause_resp.get("clause", "")
         if clause.replace("_", "-") == "non-lrm":
-            print(f"Calling Claude to classify topic for {test.test_name}"
-                  " because clause is non-lrm...")
+            print(f"Calling Claude to classify topic for"
+                  f" {test.test_name} because clause is non-lrm...")
             topic_prompt = _build_topic_prompt(test, test_dir)
             topic_resp = _call_claude(topic_prompt, _TOPIC_SCHEMA)
         _apply_classification(test, clause_resp, topic_resp,
@@ -929,8 +925,7 @@ def _update_source(filepath, parsed, ctx):
         content = generate_file("non-lrm", "", parsed, others)
         filepath.write_text(content, encoding="utf-8")
     else:
-        print(f"Deleting {filepath.name} because all its tests"
-              " were moved elsewhere")
+        print(f"Deleting {filepath.name} because all its tests were moved elsewhere")
         filepath.unlink()
     return 0
 
@@ -939,7 +934,6 @@ def _run(args):
     """Execute the split operation."""
     _validate_issue_args(args)
     filepath = Path(args.file).resolve()
-    test_name = filepath.stem
     parsed, target = _validate_input(filepath, args.test)
     classify_tests(
         target, Path(args.output_dir).resolve(),
@@ -949,7 +943,7 @@ def _run(args):
     maybe_tick_issue_checkbox(args, target)
     groups = _group_tests(target)
     source_is_target = any(
-        clause_to_filename(p, c) == test_name
+        clause_to_filename(p, c) == filepath.stem
         for p, c in groups
     )
     to_create, to_merge, n_removed = _resolve_destinations(
@@ -960,16 +954,13 @@ def _run(args):
         print(f"  Target: {dest}.cpp")
     for merge_into, merge_tests in to_merge:
         for t in merge_tests:
-            print(f"  Merging test {t.test_name} into"
-                  f" {merge_into.name} because that's where"
-                  " it belongs and because adding it to that"
-                  " file would not increase the file's number"
-                  f" of lines to more than {args.max_lines}"
-                  " lines")
+            print(f"  Merging test {t.test_name} into {merge_into.name}"
+                  " because that's where it belongs and because adding"
+                  " it to that file would not increase the file's"
+                  f" number of lines to more than {args.max_lines} lines")
     if args.dry_run:
         return
-    if not to_create and not to_merge and source_is_target \
-            and n_removed == 0:
+    if not to_create and not to_merge and source_is_target and n_removed == 0:
         return
     titles = load_lrm_titles(Path(args.lrm).resolve())
     new_names = _write_files(to_create, to_merge, parsed, {
@@ -979,13 +970,12 @@ def _run(args):
     })
     _update_source(filepath, parsed, {
         "test": args.test, "groups": groups,
-        "titles": titles, "stem": test_name,
+        "titles": titles, "stem": filepath.stem,
         "source_is_target": source_is_target,
     })
-    print("Updating `CMakeLists.txt` because the test"
-          " moved to a new file...")
+    print("Updating `CMakeLists.txt` because the test moved to a new file...")
     update_cmake(
-        test_name, new_names,
+        filepath.stem, new_names,
         keep_old=source_is_target or any(
             t.test_name != args.test for t in parsed.all_tests
         ),
