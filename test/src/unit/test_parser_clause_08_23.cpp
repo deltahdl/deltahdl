@@ -61,4 +61,18 @@ TEST(ParserSection8, ClassWithTypedef) {
   EXPECT_EQ(r.cu->classes[0]->name, "test_cls");
 }
 
+// §8.3 — Class inside class (nested class)
+TEST(ParserSection8, NestedClass) {
+  auto r = Parse(
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    int x;\n"
+      "  endclass\n"
+      "  Inner inst;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "Outer");
+}
+
 }  // namespace
