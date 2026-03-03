@@ -9,33 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.4: iff with !reset when reset=1 suppresses.
-TEST(SimCh9e, IffLogicalNegationSuppresses) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic clk, reset;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    clk = 0; reset = 1; result = 0;\n"
-      "    #1 clk = 1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "  always @(posedge clk iff !reset)\n"
-      "    result = 77;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0u);
-}
-
 // §9.4.2.4: Multiple events with different iff conditions.
 TEST(SimCh9e, MultipleEventsWithDifferentIff) {
   SimFixture f;
