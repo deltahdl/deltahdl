@@ -240,4 +240,27 @@ TEST(ParserClause03, Cl3_14_2_3_TimescaleBeforeCUTimeunit) {
   EXPECT_EQ(resolved.precision, TimeUnit::kPs);
 }
 
+// 12. Same precedence rules apply for timeprecision (§3.14.2.3).
+TEST(ParserClause03, Cl3_14_2_3_SameRulesForPrecision) {
+  // Module has no timeprecision, enclosing has it.
+  auto r = ParseTimescale31402(
+      "module outer;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "  module inner;\n"
+      "    timeunit 1ns;\n"
+      "  endmodule\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* outer = r.cu->modules[0];
+  auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
+
+  auto* inner = FindNestedModule(outer->items);
+  ASSERT_NE(inner, nullptr);
+  auto inner_resolved =
+      ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
+  // inner's precision comes from enclosing (rule a).
+  EXPECT_EQ(inner_resolved.precision, TimeUnit::kPs);
+}
+
 }  // namespace
