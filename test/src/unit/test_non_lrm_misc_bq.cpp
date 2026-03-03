@@ -42,23 +42,6 @@ static Stmt* FirstInitialStmt(ParseResult7e& r) {
 
 namespace {
 
-// 12. Struct assigned via continuous assign statement.
-TEST(ParserSection7, Sec7_2_2_ContinuousAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } s_t;\n"
-      "  s_t s;\n"
-      "  assign s = 8'hFF;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = NthItem(r, 2);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kContAssign);
-  ASSERT_NE(item->assign_lhs, nullptr);
-  ASSERT_NE(item->assign_rhs, nullptr);
-}
-
 // 13. Struct as function return value.
 TEST(ParserSection7, Sec7_2_2_FunctionReturnStruct) {
   auto r = Parse(

@@ -450,4 +450,45 @@ TEST(ParserSection7, Sec7_2_1_PackedContAssign) {
               "endmodule\n"));
 }
 
+struct ParseResult7e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult7e Parse(const std::string& src) {
+  ParseResult7e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* NthItem(ParseResult7e& r, size_t n) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
+    return nullptr;
+  return r.cu->modules[0]->items[n];
+}
+
+// 12. Struct assigned via continuous assign statement.
+TEST(ParserSection7, Sec7_2_2_ContinuousAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } s_t;\n"
+      "  s_t s;\n"
+      "  assign s = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = NthItem(r, 2);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kContAssign);
+  ASSERT_NE(item->assign_lhs, nullptr);
+  ASSERT_NE(item->assign_rhs, nullptr);
+}
+
 }  // namespace
