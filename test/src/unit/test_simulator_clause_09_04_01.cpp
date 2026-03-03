@@ -109,4 +109,8 @@ TEST(TimingControl, NegativeDelayUnsignedInterpretation) {
   EXPECT_GT(result, 0u);
 }
 
+TEST(TimingControl, PositiveDelayPassesThrough) {
+  EXPECT_EQ(EvaluateDelay(10, false, false), 10u);
+}
+
 }  // namespace

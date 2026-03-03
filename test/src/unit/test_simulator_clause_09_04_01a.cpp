@@ -11,10 +11,6 @@ uint64_t EvaluateDelay(int64_t value, bool is_unknown, bool is_highz) {
 
 namespace {
 
-TEST(TimingControl, PositiveDelayPassesThrough) {
-  EXPECT_EQ(EvaluateDelay(10, false, false), 10u);
-}
-
 TEST(TimingControl, ZeroDelayIsZero) {
   EXPECT_EQ(EvaluateDelay(0, false, false), 0u);
 }
