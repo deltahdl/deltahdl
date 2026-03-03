@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §7.5.1: New[ ]
 
 #include <gtest/gtest.h>
 #include <cstdint>
@@ -11,12 +11,13 @@ using namespace delta;
 
 namespace {
 
-TEST(AdvSim, DynArrayDelete) {
+TEST(AdvSim, DynArrayPushAndAccess) {
   DynArray arr;
-  arr.Push(10);
-  arr.Push(20);
-  arr.Delete();
-  EXPECT_EQ(arr.Size(), 0u);
+  arr.Push(42);
+  arr.Push(99);
+  EXPECT_EQ(arr.Size(), 2u);
+  EXPECT_EQ(arr.At(0), 42u);
+  EXPECT_EQ(arr.At(1), 99u);
 }
 
 }  // namespace
