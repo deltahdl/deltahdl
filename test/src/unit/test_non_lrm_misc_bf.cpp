@@ -37,12 +37,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-// From test_parser_clause_05.cpp
-TEST(ParserCh50601, EscapedIdentifierAsName) {
-  // §5.6.1: escaped identifiers include special characters.
-  EXPECT_TRUE(ParseOk("module t; wire \\bus+index ; endmodule"));
-}
-
 TEST(ParserCh50601, EscapedKeywordAsIdentifier) {
   // §5.6.1: escaped keyword is treated as a user-defined identifier.
   EXPECT_TRUE(ParseOk("module t; wire \\module ; endmodule"));

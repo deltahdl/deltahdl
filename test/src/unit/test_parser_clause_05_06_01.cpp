@@ -28,4 +28,10 @@ TEST(ParserA84, PrimaryEscapedIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// From test_parser_clause_05.cpp
+TEST(ParserCh50601, EscapedIdentifierAsName) {
+  // §5.6.1: escaped identifiers include special characters.
+  EXPECT_TRUE(ParseOk("module t; wire \\bus+index ; endmodule"));
+}
+
 }  // namespace
