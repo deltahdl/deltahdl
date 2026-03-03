@@ -1,4 +1,4 @@
-// §11.4.11: Conditional operator
+// Non-LRM tests
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
@@ -8,23 +8,6 @@
 using namespace delta;
 
 namespace {
-
-// ==========================================================================
-// Inside operator (expr inside {val1, val2, [lo:hi]})
-// ==========================================================================
-TEST(EvalOp, InsideMatch) {
-  SimFixture f;
-  // 5 inside {3, 5, 7} = 1
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeInt(f.arena, 5);
-  inside->elements.push_back(MakeInt(f.arena, 3));
-  inside->elements.push_back(MakeInt(f.arena, 5));
-  inside->elements.push_back(MakeInt(f.arena, 7));
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
 
 TEST(EvalOp, InsideNoMatch) {
   SimFixture f;

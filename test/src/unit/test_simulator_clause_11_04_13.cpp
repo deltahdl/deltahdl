@@ -102,4 +102,21 @@ TEST(SimA83, InsideValueMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// ==========================================================================
+// Inside operator (expr inside {val1, val2, [lo:hi]})
+// ==========================================================================
+TEST(EvalOp, InsideMatch) {
+  SimFixture f;
+  // 5 inside {3, 5, 7} = 1
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeInt(f.arena, 5);
+  inside->elements.push_back(MakeInt(f.arena, 3));
+  inside->elements.push_back(MakeInt(f.arena, 5));
+  inside->elements.push_back(MakeInt(f.arena, 7));
+
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
