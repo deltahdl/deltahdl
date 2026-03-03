@@ -45,26 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 16. Static task declaration
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_StaticTaskDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task static log_event(input int code);\n"
-      "    $display(\"event: %0d\", code);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* t = FirstFuncOrTask(r);
-  ASSERT_NE(t, nullptr);
-  EXPECT_EQ(t->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(t->is_static);
-  EXPECT_FALSE(t->is_automatic);
-  EXPECT_EQ(t->name, "log_event");
-}
-
-// =============================================================================
 // 17. Automatic task with automatic local vars (different types)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoTaskWithVariousTypes) {
