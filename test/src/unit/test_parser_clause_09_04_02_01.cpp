@@ -234,4 +234,38 @@ TEST(ParserSection15, WaitForEventOrExpr) {
   EXPECT_GE(stmt->events.size(), 2u);
 }
 
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(ParserSection9, EventControlMultiple) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk or negedge rst) a = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_GE(stmt->events.size(), 2u);
+  const Edge kExpectedEdges[] = {Edge::kPosedge, Edge::kNegedge};
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(stmt->events[i].edge, kExpectedEdges[i]);
+  }
+}
+
 }  // namespace

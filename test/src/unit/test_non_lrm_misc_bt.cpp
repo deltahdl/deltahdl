@@ -30,24 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection9, EventControlMultiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk or negedge rst) a = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_GE(stmt->events.size(), 2u);
-  const Edge kExpectedEdges[] = {Edge::kPosedge, Edge::kNegedge};
-  for (size_t i = 0; i < 2; ++i) {
-    EXPECT_EQ(stmt->events[i].edge, kExpectedEdges[i]);
-  }
-}
-
 TEST(ParserSection9, EventControlComma) {
   auto r = Parse(
       "module m;\n"
