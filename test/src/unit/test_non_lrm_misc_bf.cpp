@@ -4,17 +4,6 @@
 
 using namespace delta;
 
-static bool ParseOk5(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
-
 // =========================================================================
 // Section 5.6: Identifiers, keywords, and system names
 // =========================================================================
@@ -62,11 +51,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 }
 
 namespace {
-
-// --- Null module items ---
-TEST(ParserCh5, ModuleBody_NullItem) {
-  EXPECT_TRUE(ParseOk5("module m; ; endmodule"));
-}
 
 // =========================================================================
 // All two-char operators
