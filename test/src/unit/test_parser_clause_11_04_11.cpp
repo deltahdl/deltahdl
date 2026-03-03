@@ -685,4 +685,19 @@ TEST(ParserSection11, Sec11_4_1_BitSelectInTernaryCondition) {
   EXPECT_EQ(rhs->condition->index_end, nullptr);
 }
 
+// =========================================================================
+// LRM section 11.4.6 -- Conditional operator (ternary ? :)
+// =========================================================================
+// --- Simple ternary: sel ? a : b ---
+TEST(ParserSection11, Sec11_4_6_SimpleTernary) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel ? a : b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  VerifyTernaryFieldsAllIdentifier(rhs);
+}
+
 }  // namespace
