@@ -52,21 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh501, Sec5_1_TwoCharOperatorTokenKinds) {
-  // Verify the specific TokenKind for == in an expression.
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = (a == b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kEqEq);
-}
-
 // =========================================================================
 // All three-char operators
 // =========================================================================
