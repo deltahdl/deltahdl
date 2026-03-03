@@ -17,19 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-TEST(ParserA24, ClassNewWithArgs) {
-  auto r = Parse(
-      "class C;\n"
-      "  function new(int a, int b);\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c = new(1, 2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA26, FuncBodyConstructorNew) {
   auto r = Parse(
       "class C;\n"

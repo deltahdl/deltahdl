@@ -137,4 +137,17 @@ TEST(SourceText, ClassConstructorDecl) {
   EXPECT_EQ(members[0]->method->name, "new");
 }
 
+TEST(ParserA24, ClassNewWithArgs) {
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int a, int b);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c = new(1, 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
