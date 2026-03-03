@@ -588,4 +588,34 @@ TEST(SimCh9c, MultipleOutputsIndependentEnables) {
   EXPECT_EQ(q2->value.ToUint64(), 0u);
 }
 
+// =============================================================================
+// §9.2.3: always_latch output available after scheduler run
+// =============================================================================
+// 27. Output is available after scheduler.Run() completes.
+TEST(SimCh9c, OutputAvailableAfterRun) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [15:0] d, q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 16'hBEEF;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.width, 16u);
+  EXPECT_EQ(q->value.ToUint64(), 0xBEEFu);
+}
+
 }  // namespace
