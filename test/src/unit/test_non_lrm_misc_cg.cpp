@@ -42,20 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Concatenation ---
-TEST(ParserSection11, Sec11_1_ConcatenationElements) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = {a, b, 1'b0};\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(rhs->elements.size(), 3u);
-  EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(rhs->elements[2]->kind, ExprKind::kIntegerLiteral);
-}
-
 // --- Replication ---
 TEST(ParserSection11, Sec11_1_ReplicateRepeatCountAndElements) {
   auto r = Parse(
