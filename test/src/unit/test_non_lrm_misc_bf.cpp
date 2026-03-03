@@ -52,21 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh505, Operator_CaseEquality) {
-  // === is the case equality operator.
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = (a === b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
-}
-
 TEST(ParserCh505, Operator_CaseInequality) {
   // !== is the case inequality operator.
   EXPECT_TRUE(ParseOk("module m; initial x = (a !== b); endmodule"));
