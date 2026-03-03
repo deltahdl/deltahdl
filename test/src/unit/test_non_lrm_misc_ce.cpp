@@ -35,18 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// ==========================================================================
-// §11.12: Let in package scope
-// ==========================================================================
-TEST(ParserLet, DeclInPackage) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  let my_op(x, y) = x & y;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §A.2.8 block_item_declaration alternative 4: let_declaration
 TEST(ParserA28, LetDeclInBlock) {
   EXPECT_TRUE(

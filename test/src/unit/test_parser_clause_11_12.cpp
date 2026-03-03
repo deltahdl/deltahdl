@@ -679,4 +679,16 @@ TEST(ParserLet, InstantiationDefaultArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// ==========================================================================
+// §11.12: Let in package scope
+// ==========================================================================
+TEST(ParserLet, DeclInPackage) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  let my_op(x, y) = x & y;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
