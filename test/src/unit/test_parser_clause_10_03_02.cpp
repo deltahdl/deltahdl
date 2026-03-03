@@ -395,4 +395,46 @@ TEST(ParserA83, ExprInContAssign) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
+struct ParseResult11g {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult11g Parse(const std::string& src) {
+  ParseResult11g result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstContAssign(ParseResult11g& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kContAssign) return item;
+  }
+  return nullptr;
+}
+
+// --- Bit-select in continuous assignment LHS ---
+TEST(ParserSection11, Sec11_4_1_BitSelectInContAssignLhs) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire [7:0] vec;\n"
+      "  wire val;\n"
+      "  assign vec[0] = val;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* ca = FirstContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_lhs, nullptr);
+  EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kSelect);
+  EXPECT_EQ(ca->assign_lhs->index_end, nullptr);
+}
+
 }  // namespace

@@ -62,23 +62,6 @@ static ModuleItem* FirstContAssign(ParseResult11g& r) {
 
 namespace {
 
-// --- Bit-select in continuous assignment LHS ---
-TEST(ParserSection11, Sec11_4_1_BitSelectInContAssignLhs) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] vec;\n"
-      "  wire val;\n"
-      "  assign vec[0] = val;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* ca = FirstContAssign(r);
-  ASSERT_NE(ca, nullptr);
-  ASSERT_NE(ca->assign_lhs, nullptr);
-  EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kSelect);
-  EXPECT_EQ(ca->assign_lhs->index_end, nullptr);
-}
-
 // --- Bit-select assigned from function call ---
 TEST(ParserSection11, Sec11_4_1_BitSelectAssignedFromFuncCall) {
   auto r = Parse(
