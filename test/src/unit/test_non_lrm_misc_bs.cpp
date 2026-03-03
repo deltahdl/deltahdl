@@ -22,20 +22,6 @@ static ParseResult8b Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// Section 8.11 -- Type compatibility (this keyword, type(this))
-// =============================================================================
-// Use of 'this' to access class properties.
-TEST(ParserSection8, ThisKeywordPropertyAccess) {
-  EXPECT_TRUE(
-      ParseOk("class MyClass;\n"
-              "  int value;\n"
-              "  function void set_value(int value);\n"
-              "    this.value = value;\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
 // Use of type(this) as return type for singleton pattern.
 // =============================================================================
 // Section 8.16 -- Casting

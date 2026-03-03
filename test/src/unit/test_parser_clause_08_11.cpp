@@ -86,4 +86,18 @@ TEST(ParserSection8, ThisExpression) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
+// =============================================================================
+// Section 8.11 -- Type compatibility (this keyword, type(this))
+// =============================================================================
+// Use of 'this' to access class properties.
+TEST(ParserSection8, ThisKeywordPropertyAccess) {
+  EXPECT_TRUE(
+      ParseOk("class MyClass;\n"
+              "  int value;\n"
+              "  function void set_value(int value);\n"
+              "    this.value = value;\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
 }  // namespace
