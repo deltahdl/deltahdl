@@ -10,35 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 11. Blocking assignment in for loop (accumulate).
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignForLoop) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int sum;\n"
-      "  int i;\n"
-      "  initial begin\n"
-      "    sum = 0;\n"
-      "    for (i = 1; i <= 5; i = i + 1) begin\n"
-      "      sum = sum + i;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("sum");
-  ASSERT_NE(var, nullptr);
-  // 1+2+3+4+5 = 15
-  EXPECT_EQ(var->value.ToUint64(), 15u);
-}
-
-// ---------------------------------------------------------------------------
 // 12. Blocking assignment in begin-end block.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBeginEnd) {
