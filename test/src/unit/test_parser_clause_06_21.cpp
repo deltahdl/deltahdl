@@ -846,4 +846,28 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInClassMethod) {
   EXPECT_TRUE(method_member->method->func_body_stmts[0]->var_is_static);
 }
 
+// =============================================================================
+// 25. Automatic var in class method
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_AutoVarInClassMethod) {
+  auto r = Parse(
+      "class Worker;\n"
+      "  task run();\n"
+      "    automatic int local_data = 42;\n"
+      "    $display(local_data);\n"
+      "  endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* method_member = FindClassMethod(r);
+  ASSERT_NE(method_member, nullptr);
+  ASSERT_NE(method_member->method, nullptr);
+  ASSERT_GE(method_member->method->func_body_stmts.size(), 1u);
+  EXPECT_EQ(method_member->method->func_body_stmts[0]->kind,
+            StmtKind::kVarDecl);
+  EXPECT_TRUE(method_member->method->func_body_stmts[0]->var_is_automatic);
+  EXPECT_EQ(method_member->method->func_body_stmts[0]->var_name, "local_data");
+}
+
 }  // namespace
