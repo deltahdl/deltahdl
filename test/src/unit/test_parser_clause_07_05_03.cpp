@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §7.5.3: Delete()
 
 #include "fixture_parser.h"
 
@@ -25,22 +25,14 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// LRM section 7.7 -- Queues
-// =============================================================================
-TEST(ParserSection7c, QueueDecl) {
+TEST(ParserSection7c, DynamicArrayDelete) {
   auto r = Parse(
       "module m;\n"
-      "  int q[$];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParserSection7c, QueueWithMaxSize) {
-  auto r = Parse(
-      "module m;\n"
-      "  int q[$:255];\n"
+      "  int dyn[];\n"
+      "  initial begin\n"
+      "    dyn = new[5];\n"
+      "    dyn.delete();\n"
+      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
