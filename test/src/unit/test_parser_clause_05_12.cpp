@@ -184,4 +184,25 @@ TEST(ParserCh512, AttributeOnModuleItem) {
   EXPECT_EQ(item->attrs[0].value, nullptr);
 }
 
+static void VerifyAttrNames(const ModuleItem* item,
+                            const std::string expected_names[], size_t count) {
+  ASSERT_EQ(item->attrs.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(item->attrs[i].name, expected_names[i]) << "attr " << i;
+  }
+}
+
+TEST(ParserCh512, AttributeWithValue_Names) {
+  auto r = Parse(
+      "module t;\n"
+      "  (* synthesis, optimize_power = 1 *)\n"
+      "  logic y;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
+  std::string expected_names[] = {"synthesis", "optimize_power"};
+  VerifyAttrNames(r.cu->modules[0]->items[0], expected_names,
+                  std::size(expected_names));
+}
+
 }  // namespace
