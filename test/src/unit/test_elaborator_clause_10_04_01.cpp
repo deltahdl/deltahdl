@@ -136,4 +136,29 @@ TEST(SimCh10, BlockingAssignBitSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0x01u);
 }
 
+// ---------------------------------------------------------------------------
+// 5. Blocking assignment to part-select.
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignPartSelect) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 8'h00;\n"
+      "    a[3:0] = 4'hF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
+}
+
 }  // namespace
