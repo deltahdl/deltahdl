@@ -144,4 +144,20 @@ TEST(SvaEngine, AssertionControlEnabledExecution) {
   EXPECT_TRUE(executed);
 }
 
+TEST(SvaEngine, PassOffSkipsPassAction) {
+  SvaFixture f;
+  bool pass_called = false;
+
+  DeferredAssertion da;
+  da.condition_val = 1;
+  da.instance_name = "check_a";
+  da.pass_action = [&pass_called]() { pass_called = true; };
+
+  f.engine.GetControl().SetPassOff("check_a");
+  f.engine.QueueDeferredAssertionIfEnabled(da);
+  f.engine.FlushDeferredAssertionsRespectingControl(f.scheduler, SimTime{0});
+  f.scheduler.Run();
+  EXPECT_FALSE(pass_called);
+}
+
 }  // namespace
