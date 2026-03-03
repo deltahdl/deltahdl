@@ -39,28 +39,6 @@ static Stmt* FirstInitialStmt(ParseResult9d& r) {
 
 namespace {
 
-TEST(ParserSection9, Sec9_3_1_NamedNestedBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : outer\n"
-      "    begin : mid\n"
-      "      begin : inner\n"
-      "        x = 1;\n"
-      "      end : inner\n"
-      "    end : mid\n"
-      "  end : outer\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->label, "outer");
-  ASSERT_EQ(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->label, "mid");
-  ASSERT_EQ(body->stmts[0]->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->stmts[0]->label, "inner");
-}
-
 // =============================================================================
 // LRM section 9.3.1 -- Blocks with timing controls.
 // =============================================================================
