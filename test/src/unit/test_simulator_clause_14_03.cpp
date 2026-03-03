@@ -170,4 +170,9 @@ TEST(Clocking, RegisterAndFind) {
   EXPECT_EQ(found->default_input_skew.ticks, 2u);
 }
 
+TEST(Clocking, FindNonexistent) {
+  ClockingManager mgr;
+  EXPECT_EQ(mgr.Find("nonexistent"), nullptr);
+}
+
 }  // namespace
