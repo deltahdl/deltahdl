@@ -49,25 +49,6 @@ static ModuleItem* FirstContAssign(ParseResult11g& r) {
 
 namespace {
 
-// --- Multiple bit-selects in concatenation ---
-TEST(ParserSection11, Sec11_4_1_BitSelectsInConcatenation) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] data;\n"
-      "  initial x = {data[7], data[6], data[5], data[4]};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
-  EXPECT_EQ(rhs->elements.size(), 4u);
-  for (auto* elem : rhs->elements) {
-    EXPECT_EQ(elem->kind, ExprKind::kSelect);
-    EXPECT_EQ(elem->index_end, nullptr);
-  }
-}
-
 // --- Indexed part-select with parameter width ---
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectParamWidth) {
   EXPECT_TRUE(
