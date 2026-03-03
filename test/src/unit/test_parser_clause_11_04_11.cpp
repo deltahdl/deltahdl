@@ -726,4 +726,19 @@ TEST(ParserSection11, Sec11_4_6_TernaryInContAssign) {
   ASSERT_NE(ca->assign_rhs->false_expr, nullptr);
 }
 
+// --- Ternary in blocking assignment ---
+TEST(ParserSection11, Sec11_4_6_TernaryInBlockingAssign) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial y = sel ? a : b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
+}
+
 }  // namespace
