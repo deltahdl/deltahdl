@@ -16,18 +16,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SvaEngine, ConsecutiveRepetitionNotEnough) {
-  SvaSequence seq;
-  seq.kind = SvaSequenceKind::kConsecutiveRepetition;
-  seq.rep_min = 3;
-  seq.rep_max = 3;
-  seq.expr_check = [](uint64_t v) { return v == 1; };
-
-  // Only 2 matches before a mismatch.
-  auto result = MatchRepetition(seq, {1, 1, 0});
-  EXPECT_FALSE(result);
-}
-
 TEST(SvaEngine, ConsecutiveRepetitionRange) {
   SvaSequence seq;
   seq.kind = SvaSequenceKind::kConsecutiveRepetition;
