@@ -192,4 +192,30 @@ TEST(SimCh10b, NBAExpressionRHS) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA with bit-select on LHS.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBABitSelectLHS) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 8'b0000_0000;\n"
+      "    a[3] <= 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("a");
+  ASSERT_NE(var, nullptr);
+  // Bit 3 set: 0000_1000 = 8.
+  EXPECT_EQ(var->value.ToUint64(), 8u);
+}
+
 }  // namespace
