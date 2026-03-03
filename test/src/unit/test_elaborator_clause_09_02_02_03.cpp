@@ -554,4 +554,38 @@ TEST(SimCh9c, MultipleOutputsDifferentSources) {
   EXPECT_EQ(q3->value.ToUint64(), 0x30u);
 }
 
+// 26. Multiple outputs with independent enable conditions.
+TEST(SimCh9c, MultipleOutputsIndependentEnables) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic en1, en2;\n"
+      "  logic [7:0] d1, d2, q1, q2;\n"
+      "  initial begin\n"
+      "    en1 = 1;\n"
+      "    en2 = 0;\n"
+      "    d1 = 8'hDE;\n"
+      "    d2 = 8'hAD;\n"
+      "  end\n"
+      "  always_latch begin\n"
+      "    if (en1) q1 = d1;\n"
+      "    if (en2) q2 = d2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* q1 = f.ctx.FindVariable("q1");
+  auto* q2 = f.ctx.FindVariable("q2");
+  ASSERT_NE(q1, nullptr);
+  ASSERT_NE(q2, nullptr);
+  // en1=1, so q1=d1=0xDE. en2=0, so q2 retains default 0.
+  EXPECT_EQ(q1->value.ToUint64(), 0xDEu);
+  EXPECT_EQ(q2->value.ToUint64(), 0u);
+}
+
 }  // namespace
