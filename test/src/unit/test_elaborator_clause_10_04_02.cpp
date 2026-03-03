@@ -424,4 +424,33 @@ TEST(SimCh10b, NBAWithCase) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA in for loop.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBAInForLoop) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] acc;\n"
+      "  initial begin\n"
+      "    acc = 0;\n"
+      "    for (int i = 0; i < 5; i = i + 1) begin\n"
+      "      acc <= acc + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("acc");
+  ASSERT_NE(var, nullptr);
+  // All 5 iterations read acc's blocking value (0) and schedule NBA.
+  // The last NBA wins: acc <= 0 + 1 = 1.
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace
