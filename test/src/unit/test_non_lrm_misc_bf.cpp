@@ -37,19 +37,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh506, Ident_CaseSensitive) {
-  // Identifiers are case sensitive: X and x are different.
-  auto r = Parse(
-      "module m;\n"
-      "  logic X;\n"
-      "  logic x;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "X");
-  EXPECT_EQ(r.cu->modules[0]->items[1]->name, "x");
-}
-
 // From test_parser_clause_05.cpp
 TEST(ParserCh50601, EscapedIdentifierAsName) {
   // §5.6.1: escaped identifiers include special characters.

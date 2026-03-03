@@ -137,4 +137,17 @@ TEST(ParserCh506, Ident_SimpleWithDollarSign) {
   EXPECT_TRUE(ParseOk("module m; logic n$657; endmodule"));
 }
 
+TEST(ParserCh506, Ident_CaseSensitive) {
+  // Identifiers are case sensitive: X and x are different.
+  auto r = Parse(
+      "module m;\n"
+      "  logic X;\n"
+      "  logic x;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "X");
+  EXPECT_EQ(r.cu->modules[0]->items[1]->name, "x");
+}
+
 }  // namespace
