@@ -253,4 +253,11 @@ TEST(ParserCh510, AssignmentPattern_IntKey) {
               "endmodule"));
 }
 
+TEST(ParserCh510, AssignmentPattern_Replication) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int a[1:3] = '{3{1}};\n"
+              "endmodule"));
+}
+
 }  // namespace

@@ -49,13 +49,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-TEST(ParserCh510, AssignmentPattern_Replication) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int a[1:3] = '{3{1}};\n"
-              "endmodule"));
-}
-
 TEST(ParserCh510, AssignmentPattern_NestedReplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
