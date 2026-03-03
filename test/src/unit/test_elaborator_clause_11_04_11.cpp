@@ -37,4 +37,28 @@ TEST(ElabA83, TernaryInContAssignElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// ---------------------------------------------------------------------------
+// 17. Ternary operator in always_comb.
+// ---------------------------------------------------------------------------
+TEST(SimCh9, AlwaysCombTernaryTrue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic sel;\n"
+      "  logic [7:0] result;\n"
+      "  initial sel = 1;\n"
+      "  always_comb begin\n"
+      "    result = sel ? 8'd42 : 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
 }  // namespace
