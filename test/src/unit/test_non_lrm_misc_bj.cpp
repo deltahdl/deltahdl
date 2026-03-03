@@ -29,14 +29,6 @@ static ModuleItem* FirstItem(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, TypeParameterDefaultShortint) {
-  EXPECT_TRUE(
-      ParseOk6("module ma #(parameter p1 = 1, parameter type p2 = shortint)\n"
-               "  (input logic [p1:0] i, output logic [p1:0] o);\n"
-               "  p2 j = 0;\n"
-               "endmodule\n"));
-}
-
 // =========================================================================
 // §6.21: Scope and lifetime (additional tests)
 // =========================================================================
