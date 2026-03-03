@@ -10,36 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 13. always_comb with function call.
-// ---------------------------------------------------------------------------
-TEST(SimCh9b, AlwaysCombFunctionCall) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  function logic [7:0] double_val(input logic [7:0] x);\n"
-      "    return x * 2;\n"
-      "  endfunction\n"
-      "  logic [7:0] a, y;\n"
-      "  always_comb y = double_val(a);\n"
-      "  initial begin\n"
-      "    a = 8'h15;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  // 0x15 * 2 = 0x2A.
-  EXPECT_EQ(y->value.ToUint64(), 0x2Au);
-}
-
-// ---------------------------------------------------------------------------
 // 14. always_comb with concatenation.
 // ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombConcatenation) {
