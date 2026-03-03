@@ -593,4 +593,37 @@ TEST(SimCh10b, NBABitwiseOperators) {
                    {{"r_and", 0x30u}, {"r_or", 0xFCu}, {"r_xor", 0xCCu}});
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA with shift operators on RHS.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBAShiftOperators) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] val;\n"
+      "  logic [7:0] r_shl;\n"
+      "  logic [7:0] r_shr;\n"
+      "  initial begin\n"
+      "    val = 8'h0F;\n"
+      "    r_shl <= val << 2;\n"
+      "    r_shr <= val >> 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* r_shl = f.ctx.FindVariable("r_shl");
+  auto* r_shr = f.ctx.FindVariable("r_shr");
+  ASSERT_NE(r_shl, nullptr);
+  ASSERT_NE(r_shr, nullptr);
+  // 0x0F << 2 = 0x3C (truncated to 8 bits).
+  EXPECT_EQ(r_shl->value.ToUint64(), 0x3Cu);
+  // 0x0F >> 1 = 0x07.
+  EXPECT_EQ(r_shr->value.ToUint64(), 0x07u);
+}
+
 }  // namespace
