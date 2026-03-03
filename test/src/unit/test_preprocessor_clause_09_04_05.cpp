@@ -119,4 +119,19 @@ TEST(ParserSection10, NonblockingIntraAssignEventKind) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
+TEST(ParserSection10, NonblockingIntraAssignEventEdge) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  reg a, b, clk;\n"
+      "  initial begin\n"
+      "    a <= @(negedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
+}
+
 }  // namespace
