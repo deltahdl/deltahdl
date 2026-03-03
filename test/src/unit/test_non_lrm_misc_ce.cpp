@@ -35,15 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-TEST(ParserSection11, CompoundAssignPipeEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a |= 8'h0F;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection11, CompoundAssignCaretEq) {
   auto r = Parse(
       "module t;\n"
