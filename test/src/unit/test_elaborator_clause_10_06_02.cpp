@@ -53,4 +53,9 @@ TEST(ForceRelease, LegalTargetNet) {
   EXPECT_TRUE(ValidateForceTarget(info));
 }
 
+TEST(ForceRelease, LegalTargetConcatenation) {
+  ForceInfo info{ForceTarget::kConcatenation};
+  EXPECT_TRUE(ValidateForceTarget(info));
+}
+
 }  // namespace
