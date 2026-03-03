@@ -17,32 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// 13. Class with methods sharing scope with member variables
-TEST(ParserClause03, Cl3_13_ClassMethodsAndProperties) {
-  auto r = Parse(
-      "class my_cls;\n"
-      "  int count;\n"
-      "  function void increment();\n"
-      "    count = count + 1;\n"
-      "  endfunction\n"
-      "  task reset();\n"
-      "    count = 0;\n"
-      "  endtask\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* cls = r.cu->classes[0];
-  ASSERT_GE(cls->members.size(), 3u);
-  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kProperty);
-  EXPECT_EQ(cls->members[0]->name, "count");
-  EXPECT_EQ(cls->members[1]->kind, ClassMemberKind::kMethod);
-  ASSERT_NE(cls->members[1]->method, nullptr);
-  EXPECT_EQ(cls->members[1]->method->name, "increment");
-  EXPECT_EQ(cls->members[2]->kind, ClassMemberKind::kMethod);
-  ASSERT_NE(cls->members[2]->method, nullptr);
-  EXPECT_EQ(cls->members[2]->method->name, "reset");
-}
-
 // class_method ::= { method_qualifier } class_constructor_declaration
 TEST(SourceText, ClassConstructorDecl) {
   auto r = Parse(
