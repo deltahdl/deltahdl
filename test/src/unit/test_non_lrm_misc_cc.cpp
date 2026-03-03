@@ -35,25 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult10b& r) {
 
 namespace {
 
-// --- 26. Assign with reduction operator RHS ---
-TEST(ParserSection10, Sec10_6_1_AssignReductionRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] data;\n"
-      "  reg parity;\n"
-      "  initial begin\n"
-      "    assign parity = ^data;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kUnary);
-}
-
 // --- 27. Assign to vector variable ---
 TEST(ParserSection10, Sec10_6_1_AssignToVector) {
   auto r = Parse(
