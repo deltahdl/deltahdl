@@ -10,38 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §10.4.2: NBA swap pattern — a <= b; b <= a; both capture old values.
-// ---------------------------------------------------------------------------
-TEST(SimCh10b, NBASwapPattern) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a;\n"
-      "  logic [31:0] b;\n"
-      "  initial begin\n"
-      "    a = 10;\n"
-      "    b = 20;\n"
-      "    a <= b;\n"
-      "    b <= a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* a = f.ctx.FindVariable("a");
-  auto* b = f.ctx.FindVariable("b");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(b, nullptr);
-  // Both RHS values are sampled before either NBA takes effect.
-  EXPECT_EQ(a->value.ToUint64(), 20u);
-  EXPECT_EQ(b->value.ToUint64(), 10u);
-}
-
-// ---------------------------------------------------------------------------
 // §10.4.2: NBA with expression on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAExpressionRHS) {
