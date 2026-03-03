@@ -417,4 +417,36 @@ TEST(SimCh50701, XInBinaryLiteral) {
   EXPECT_EQ(var->value.words[0].bval & 0x7, 0b001u);
 }
 
+static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
+                                          uint32_t mask) {
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.words[0].aval & mask, vb->value.words[0].aval & mask);
+  EXPECT_EQ(va->value.words[0].bval & mask, vb->value.words[0].bval & mask);
+}
+
+// ---------------------------------------------------------------------------
+// 24. Question mark as z alternative
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, QuestionMarkAsZ) {
+  // §5.7.1: ? is an alternative for the z character.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 4'b1?0?;\n"
+      "    b = 4'b1z0z;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerRunAndCompareBitPatterns(f, design, 0xF);
+}
+
 }  // namespace

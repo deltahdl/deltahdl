@@ -23,25 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 24. Question mark as z alternative
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, QuestionMarkAsZ) {
-  // §5.7.1: ? is an alternative for the z character.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 4'b1?0?;\n"
-      "    b = 4'b1z0z;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerRunAndCompareBitPatterns(f, design, 0xF);
-}
-
-// ---------------------------------------------------------------------------
 // 25. Unbased unsized literal '0 and '1
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, UnbasedUnsizedLiteral01) {
