@@ -238,4 +238,55 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinSingleBeginEnd) {
   EXPECT_EQ(stmt->fork_stmts[0]->stmts.size(), 3u);
 }
 
+struct ParseResult4d {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult4d Parse(const std::string& src) {
+  ParseResult4d result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// Returns the first module item from the first module.
+static ModuleItem* FirstItem(ParseResult4d& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
+}
+
+// =============================================================================
+// 12. Automatic task with fork-join
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic parallel_work(input int a, input int b);\n"
+      "    fork\n"
+      "      $display(\"a=%0d\", a);\n"
+      "      $display(\"b=%0d\", b);\n"
+      "    join\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->is_automatic);
+  ASSERT_GE(item->func_body_stmts.size(), 1u);
+  auto* fork_stmt = item->func_body_stmts[0];
+  EXPECT_EQ(fork_stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(fork_stmt->join_kind, TokenKind::kKwJoin);
+  EXPECT_GE(fork_stmt->fork_stmts.size(), 2u);
+}
+
 }  // namespace

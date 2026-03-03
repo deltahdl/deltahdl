@@ -40,32 +40,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// 12. Automatic task with fork-join
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithForkJoin) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic parallel_work(input int a, input int b);\n"
-      "    fork\n"
-      "      $display(\"a=%0d\", a);\n"
-      "      $display(\"b=%0d\", b);\n"
-      "    join\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(item->is_automatic);
-  ASSERT_GE(item->func_body_stmts.size(), 1u);
-  auto* fork_stmt = item->func_body_stmts[0];
-  EXPECT_EQ(fork_stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(fork_stmt->join_kind, TokenKind::kKwJoin);
-  EXPECT_GE(fork_stmt->fork_stmts.size(), 2u);
-}
-
-// =============================================================================
 // 13. Automatic function with for loop variable
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithForLoop) {
