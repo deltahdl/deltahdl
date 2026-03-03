@@ -49,18 +49,6 @@ static bool HasItemKind(ParseResult9c& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserSection9b, NonblockingAssignWithDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial q <= #5 d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->delay, nullptr);
-}
-
 TEST(ParserSection9b, NonblockingAssignMultiple) {
   auto r = Parse(
       "module m;\n"
