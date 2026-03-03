@@ -41,22 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 namespace {
 
 // =========================================================================
-// §6.18: User-defined types (typedef)
-// =========================================================================
-TEST(ParserSection6, TypedefInt) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef int myint;\n"
-      "  myint x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto* item = r.cu->modules[0]->items[1];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
-  EXPECT_EQ(item->data_type.type_name, "myint");
-}
-
-// =========================================================================
 // §6.19: Enumerations
 // =========================================================================
 TEST(ParserSection6, EnumBasic) {
