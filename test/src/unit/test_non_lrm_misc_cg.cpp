@@ -42,15 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, MinTypMaxInSpecparam) {
-  EXPECT_TRUE(
-      ParseOk("module t(input a, output b);\n"
-              "  specify\n"
-              "    specparam tRise = 1:2:3;\n"
-              "  endspecify\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // Section 11.10 -- String literal expressions and methods
 // =========================================================================

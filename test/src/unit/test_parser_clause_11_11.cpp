@@ -87,4 +87,13 @@ TEST(ParserSection11, MinTypMaxInGateDelay) {
               "endmodule\n"));
 }
 
+TEST(ParserSection11, MinTypMaxInSpecparam) {
+  EXPECT_TRUE(
+      ParseOk("module t(input a, output b);\n"
+              "  specify\n"
+              "    specparam tRise = 1:2:3;\n"
+              "  endspecify\n"
+              "endmodule\n"));
+}
+
 }  // namespace
