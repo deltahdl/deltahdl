@@ -504,4 +504,18 @@ TEST(ParserSection6, IntCast) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
+TEST(ParserSection6, IntCast_Details) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = int'(y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->text, "int");
+  ASSERT_NE(rhs->lhs, nullptr);
+}
+
 }  // namespace
