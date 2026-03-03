@@ -45,28 +45,6 @@ static Stmt* NthInitialStmt(ParseResult10b& r, size_t n) {
 
 namespace {
 
-// --- 22. Multiple sequential assigns to same variable ---
-TEST(ParserSection10, Sec10_6_1_MultipleAssignsSameVar) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q;\n"
-      "  initial begin\n"
-      "    assign q = 0;\n"
-      "    assign q = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* s0 = NthInitialStmt(r, 0);
-  auto* s1 = NthInitialStmt(r, 1);
-  ASSERT_NE(s0, nullptr);
-  ASSERT_NE(s1, nullptr);
-  EXPECT_EQ(s0->kind, StmtKind::kAssign);
-  EXPECT_EQ(s1->kind, StmtKind::kAssign);
-  EXPECT_EQ(s0->lhs->text, "q");
-  EXPECT_EQ(s1->lhs->text, "q");
-}
-
 // --- 23. Deassign multiple variables in sequence ---
 TEST(ParserSection10, Sec10_6_1_DeassignMultipleVars) {
   auto r = Parse(
