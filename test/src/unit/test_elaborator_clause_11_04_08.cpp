@@ -135,4 +135,26 @@ TEST(SimCh9b, AlwaysCombChainedLogic) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
+// ---------------------------------------------------------------------------
+// 18. Blocking assignment with bitwise operators (&, |, ^).
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignBitwiseOps) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b;\n"
+      "  int r_and, r_or, r_xor;\n"
+      "  initial begin\n"
+      "    a = 240;\n"
+      "    b = 60;\n"
+      "    r_and = a & b;\n"
+      "    r_or  = a | b;\n"
+      "    r_xor = a ^ b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r_and", 48u}, {"r_or", 252u}, {"r_xor", 204u}});
+}
+
 }  // namespace
