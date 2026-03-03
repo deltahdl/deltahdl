@@ -46,4 +46,18 @@ TEST(ParserClause03, Cl3_14_1_FinerGlobalPrecision) {
   EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kFs), 2800000u);
 }
 
+// =============================================================================
+// LRM §3.14.1 — Time value rounding
+// =============================================================================
+// 14. Same precision as unit: delay values rounded to whole numbers.
+TEST(ParserClause03, Cl3_14_1_SamePrecisionRoundsToInteger) {
+  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kNs, 1};
+  // 2.75ns with 1ns precision rounds to 3ns = 3 ticks at ns.
+  EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kNs), 3u);
+  // 2.3ns rounds to 2ns.
+  EXPECT_EQ(RealDelayToTicks(2.3, ts, TimeUnit::kNs), 2u);
+  // 2.5ns rounds to 3ns (round half away from zero).
+  EXPECT_EQ(RealDelayToTicks(2.5, ts, TimeUnit::kNs), 3u);
+}
+
 }  // namespace

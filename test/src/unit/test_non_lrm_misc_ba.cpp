@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM §3.14.1 — Time value rounding
-// =============================================================================
-// 14. Same precision as unit: delay values rounded to whole numbers.
-TEST(ParserClause03, Cl3_14_1_SamePrecisionRoundsToInteger) {
-  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kNs, 1};
-  // 2.75ns with 1ns precision rounds to 3ns = 3 ticks at ns.
-  EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kNs), 3u);
-  // 2.3ns rounds to 2ns.
-  EXPECT_EQ(RealDelayToTicks(2.3, ts, TimeUnit::kNs), 2u);
-  // 2.5ns rounds to 3ns (round half away from zero).
-  EXPECT_EQ(RealDelayToTicks(2.5, ts, TimeUnit::kNs), 3u);
-}
-
 // 15. One order of magnitude smaller: rounds to one decimal place.
 TEST(ParserClause03, Cl3_14_1_OneOrderSmallerRoundsToOneDecimal) {
   // 1ns unit, 100ps precision → 1 decimal place in ns.
