@@ -854,4 +854,24 @@ TEST(ParserSection6, Sec6_7_1_NetCoexistsWithVarDecl) {
   EXPECT_FALSE(items[2]->data_type.is_net);
 }
 
+// §6.7.1: Wire with range and multiple names.
+TEST(ParserSection6, Sec6_7_1_WireRangeMultipleNames) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire [3:0] x, y, z;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  for (auto* item : items) {
+    EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+    ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+    EXPECT_EQ(item->data_type.packed_dim_left->int_val, 3u);
+  }
+  EXPECT_EQ(items[0]->name, "x");
+  EXPECT_EQ(items[1]->name, "y");
+  EXPECT_EQ(items[2]->name, "z");
+}
+
 }  // namespace
