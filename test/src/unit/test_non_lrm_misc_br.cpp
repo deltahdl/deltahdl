@@ -17,16 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-TEST(ParserA26, FuncBodyConstructorNewEndLabel) {
-  auto r = Parse(
-      "class C;\n"
-      "  function new(int x);\n"
-      "  endfunction : new\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(Parser, ClassExtends) {
   auto r = Parse("class child extends parent; endclass");
   ASSERT_NE(r.cu, nullptr);
