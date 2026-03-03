@@ -323,4 +323,20 @@ TEST(ParserCh512, Attribute_OnModuleInstantiation) {
               "endmodule"));
 }
 
+TEST(ParserCh512, Attribute_OnIfStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* synthesis_off *)\n"
+      "    if (a) x = 1;\n"
+      "  end\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_EQ(stmt->attrs.size(), 1u);
+  EXPECT_EQ(stmt->attrs[0].name, "synthesis_off");
+}
+
 }  // namespace

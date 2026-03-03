@@ -21,18 +21,6 @@ static ParseResult512 Parse(const std::string& src) {
   return result;
 }
 
-static Stmt* FirstInitialStmt(ParseResult512& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
 static ModuleItem* FirstItem(ParseResult512& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   auto& items = r.cu->modules[0]->items;
@@ -40,22 +28,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 }
 
 namespace {
-
-TEST(ParserCh512, Attribute_OnIfStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    (* synthesis_off *)\n"
-      "    if (a) x = 1;\n"
-      "  end\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  ASSERT_EQ(stmt->attrs.size(), 1u);
-  EXPECT_EQ(stmt->attrs[0].name, "synthesis_off");
-}
 
 TEST(ParserCh512, Attribute_OnForLoop) {
   EXPECT_TRUE(
