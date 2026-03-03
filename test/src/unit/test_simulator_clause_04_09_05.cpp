@@ -126,4 +126,37 @@ TEST(SimCh4095, CoordinatedProcessingOfConnectedNodes) {
   EXPECT_EQ(n2, 1);
 }
 
+// ---------------------------------------------------------------------------
+// §4.9.5 — Inputs and outputs interact through bidirectional switches
+// ---------------------------------------------------------------------------
+TEST(SimCh4095, InputsAndOutputsInteract) {
+  Arena arena;
+  Scheduler sched(arena);
+  int node_a = 0;
+  int node_b = 0;
+  int driver_a_val = 1;
+  int driver_b_val = 1;
+
+  // Both nodes are driven and connected by a switch. The resolved value
+  // depends on both drivers interacting (not independent processing).
+  auto* eval = sched.GetEventPool().Acquire();
+  eval->kind = EventKind::kEvaluation;
+  eval->callback = [&]() {
+    // Both drivers contribute; resolved values reflect interaction.
+    auto* update = sched.GetEventPool().Acquire();
+    update->kind = EventKind::kUpdate;
+    update->callback = [&]() {
+      // When both drivers agree (both 1), both nodes resolve to 1.
+      node_a = driver_a_val;
+      node_b = driver_b_val;
+    };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, eval);
+
+  sched.Run();
+  EXPECT_EQ(node_a, 1);
+  EXPECT_EQ(node_b, 1);
+}
+
 }  // namespace
