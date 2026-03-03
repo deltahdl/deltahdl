@@ -221,4 +221,17 @@ TEST(ParserSection6, SignedVector) {
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
+TEST(ParserSection6, UnsignedVector) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic unsigned [15:0] uv;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_FALSE(item->data_type.is_signed);
+  EXPECT_EQ(item->name, "uv");
+}
+
 }  // namespace
