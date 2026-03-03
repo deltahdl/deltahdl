@@ -135,4 +135,33 @@ TEST(SimCh9c, PartSelectLowerNibble) {
   EXPECT_EQ(q->value.ToUint64(), 0xBu);
 }
 
+// 17. Part-select extracting upper nibble.
+TEST(SimCh9c, PartSelectUpperNibble) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic en;\n"
+      "  logic [7:0] d;\n"
+      "  logic [3:0] q;\n"
+      "  initial begin\n"
+      "    en = 1;\n"
+      "    d = 8'hAB;\n"
+      "  end\n"
+      "  always_latch\n"
+      "    if (en) q = d[7:4];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.width, 4u);
+  // d = 0xAB; d[7:4] = 0xA.
+  EXPECT_EQ(q->value.ToUint64(), 0xAu);
+}
+
 }  // namespace
