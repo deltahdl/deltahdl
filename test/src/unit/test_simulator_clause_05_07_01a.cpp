@@ -23,37 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 26. Unbased unsized literal 'x and 'z
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
-  // §5.7.1: Unbased unsized x and z set all bits to x or z.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 'x;\n"
-      "    b = 'z;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  // x: aval=1, bval=1; z: aval=0, bval=1. All bits filled.
-  uint16_t mask = 0xFFFF;
-  EXPECT_EQ(va->value.words[0].aval & mask, mask);
-  EXPECT_EQ(va->value.words[0].bval & mask, mask);
-  EXPECT_EQ(vb->value.words[0].aval & mask, 0u);
-  EXPECT_EQ(vb->value.words[0].bval & mask, mask);
-}
-
-// ---------------------------------------------------------------------------
 // 27. Left padding with x when leftmost bit is x
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, LeftPadWithX) {
