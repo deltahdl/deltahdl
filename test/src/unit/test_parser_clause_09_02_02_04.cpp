@@ -386,4 +386,25 @@ TEST(ParserSection9, AlwaysFF) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
 
+// =============================================================================
+// §4.6: always_ff guarantees flip-flop semantics
+// =============================================================================
+TEST(ParserSection4, Sec4_6_AlwaysFfFlipFlop) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, d, q;\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+}
+
 }  // namespace
