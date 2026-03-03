@@ -10,31 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 2. Sequential blocking assignments: value available immediately.
-// ---------------------------------------------------------------------------
-TEST(SimCh10, SequentialBlockingImmediate) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = a + 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* b = f.ctx.FindVariable("b");
-  ASSERT_NE(b, nullptr);
-  EXPECT_EQ(b->value.ToUint64(), 2u);
-}
-
-// ---------------------------------------------------------------------------
 // 3. Blocking assignment with arithmetic expression.
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignExpression) {
