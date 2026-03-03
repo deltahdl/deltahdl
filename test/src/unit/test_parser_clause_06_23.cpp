@@ -287,4 +287,21 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefDeclKind) {
   EXPECT_EQ(items[1]->name, "b");
 }
 
+// 5. var type(expr) stores the reference expression as an identifier.
+TEST(ParserSection6, Sec6_11_1_VarTypeRefExprIdent) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  var type(x) y;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  auto* ref = items[1]->data_type.type_ref_expr;
+  ASSERT_NE(ref, nullptr);
+  EXPECT_EQ(ref->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(ref->text, "x");
+}
+
 }  // namespace

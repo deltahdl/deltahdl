@@ -54,23 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 5. var type(expr) stores the reference expression as an identifier.
-TEST(ParserSection6, Sec6_11_1_VarTypeRefExprIdent) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  var type(x) y;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 2u);
-  auto* ref = items[1]->data_type.type_ref_expr;
-  ASSERT_NE(ref, nullptr);
-  EXPECT_EQ(ref->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(ref->text, "x");
-}
-
 // 6. var type(binary_expr) stores a binary expression reference.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefBinaryExpr) {
   auto r = Parse(
