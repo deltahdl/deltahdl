@@ -103,4 +103,20 @@ TEST(ParserSection9, Sec9_3_2_EmptyForkJoin) {
   EXPECT_TRUE(stmt->fork_stmts.empty());
 }
 
+// ---------------------------------------------------------------------------
+// 20. Fork in task body
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_ForkInTaskBody) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task automatic run_parallel;\n"
+              "    fork\n"
+              "      #10 a = 1;\n"
+              "      #20 b = 2;\n"
+              "    join\n"
+              "  endtask\n"
+              "  initial run_parallel;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

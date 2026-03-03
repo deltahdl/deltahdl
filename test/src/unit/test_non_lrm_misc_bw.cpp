@@ -36,22 +36,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 20. Fork in task body
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_3_2_ForkInTaskBody) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  task automatic run_parallel;\n"
-              "    fork\n"
-              "      #10 a = 1;\n"
-              "      #20 b = 2;\n"
-              "    join\n"
-              "  endtask\n"
-              "  initial run_parallel;\n"
-              "endmodule\n"));
-}
-
-// ---------------------------------------------------------------------------
 // 21. Fork in always block
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkInAlwaysBlock) {
