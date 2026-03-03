@@ -200,4 +200,14 @@ TEST(SourceText, ClassEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(Parser, ClassWithProperty) {
+  auto r = Parse("class pkt; int data; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->members.size(), 1);
+  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kProperty);
+  EXPECT_EQ(cls->members[0]->name, "data");
+  EXPECT_EQ(cls->members[0]->data_type.kind, DataTypeKind::kInt);
+}
+
 }  // namespace
