@@ -58,4 +58,15 @@ TEST(ParserSection11, StringLiteralToVector) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
+TEST(ParserSection11, StringConcatToVector) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  bit [8*14:1] stringvar;\n"
+              "  initial begin\n"
+              "    stringvar = \"Hello world\";\n"
+              "    stringvar = {stringvar, \"!!!\"};\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

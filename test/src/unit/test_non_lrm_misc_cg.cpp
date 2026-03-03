@@ -42,17 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, StringConcatToVector) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  bit [8*14:1] stringvar;\n"
-              "  initial begin\n"
-              "    stringvar = \"Hello world\";\n"
-              "    stringvar = {stringvar, \"!!!\"};\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection11, StringCompareEquality) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
