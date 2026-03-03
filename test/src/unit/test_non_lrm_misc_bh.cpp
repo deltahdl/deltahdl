@@ -30,23 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 6.11 -- Integer data types
-// =============================================================================
-// --- 2-state integer types ---
-TEST(ParserSection6, IntegerTypeByteDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  byte b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
-  EXPECT_EQ(item->name, "b");
-}
-
 // --- Mixed types in one module ---
 TEST(ParserSection6, MixedIntegerRealStringTypes) {
   // All major type families coexisting
