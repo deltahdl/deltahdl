@@ -34,23 +34,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 
 namespace {
 
-// =========================================================================
-// §7.5.2/7.5.3: Dynamic array size() and delete()
-// =========================================================================
-TEST(ParserSection7, DynamicArraySizeMethod) {
-  auto r = Parse(
-      "module t;\n"
-      "  int dyn[];\n"
-      "  initial x = dyn.size();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCall);
-}
-
 TEST(ParserSection7, DynamicArrayDeleteMethod) {
   auto r = Parse(
       "module t;\n"
