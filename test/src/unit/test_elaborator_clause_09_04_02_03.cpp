@@ -557,4 +557,31 @@ TEST(SimCh9e, IffConditionEvaluatedAtEdgeTime) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// §9.4.2.4: iff with equality comparison (reset == 0).
+TEST(SimCh9e, IffEqualityComparison) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, reset;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    clk = 0; reset = 0; result = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk iff reset == 0)\n"
+      "    result = 66;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 66u);
+}
+
 }  // namespace
