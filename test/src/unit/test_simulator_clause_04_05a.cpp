@@ -13,16 +13,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §4.5 "if (all regions in [Active ... Post-Re-NBA] are empty)
-//        execute_region (Pre-Postponed);"
-// Pre-Postponed only fires after Active and Reactive sets are fully drained.
-// ---------------------------------------------------------------------------
-TEST(SimCh45, PrePostponedOnlyAfterActiveAndReactiveSetsEmpty) {
-  VerifyThreeRegionOrder(Region::kActive, "active", Region::kReactive,
-                         "reactive", Region::kPrePostponed, "pre_postponed");
-}
-
-// ---------------------------------------------------------------------------
 // §4.5 Outer loop: Reactive region schedules Active event -> active set
 // re-processes before Pre-Postponed can fire.
 // ---------------------------------------------------------------------------

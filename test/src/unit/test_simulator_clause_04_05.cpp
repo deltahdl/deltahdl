@@ -268,4 +268,14 @@ TEST(SimCh45, ReactiveSetReIteratesWhenReInactiveGeneratesReactive) {
   EXPECT_EQ(order[1], "reactive_from_re_inactive");
 }
 
+// ---------------------------------------------------------------------------
+// §4.5 "if (all regions in [Active ... Post-Re-NBA] are empty)
+//        execute_region (Pre-Postponed);"
+// Pre-Postponed only fires after Active and Reactive sets are fully drained.
+// ---------------------------------------------------------------------------
+TEST(SimCh45, PrePostponedOnlyAfterActiveAndReactiveSetsEmpty) {
+  VerifyThreeRegionOrder(Region::kActive, "active", Region::kReactive,
+                         "reactive", Region::kPrePostponed, "pre_postponed");
+}
+
 }  // namespace
