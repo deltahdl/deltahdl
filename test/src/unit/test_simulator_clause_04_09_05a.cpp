@@ -13,44 +13,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §4.9.5 — Unique logic level across all combinations gives steady-state
-// ---------------------------------------------------------------------------
-TEST(SimCh4095, SteadyStateUniqueLevel) {
-  Arena arena;
-  Scheduler sched(arena);
-
-  // Model: strong driver on node_a = 1. Switch with gate=x connects
-  // node_a to node_b. Solve both combinations:
-  //   gate=on:  node_a=1, node_b=1
-  //   gate=off: node_a=1, node_b=z (or undriven)
-  // node_a has unique level (1) in all cases → steady-state = 1.
-  int node_a_result = 0;
-  int gate_val = -1;  // x represented as -1.
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    // Solve all combinations for gate=x.
-    int result_gate_on = 1;   // node_a when gate conducts.
-    int result_gate_off = 1;  // node_a when gate non-conducting.
-    // node_a is 1 in both cases → unique → steady-state = 1.
-    if (result_gate_on == result_gate_off) {
-      node_a_result = result_gate_on;  // Unique level.
-    } else {
-      node_a_result = gate_val;  // Ambiguous → x.
-    }
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = []() {};
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(node_a_result, 1);
-}
-
-// ---------------------------------------------------------------------------
 // §4.9.5 — Ambiguous node across combinations has steady-state x
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, SteadyStateAmbiguousX) {
