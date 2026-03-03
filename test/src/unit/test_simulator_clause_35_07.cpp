@@ -44,4 +44,10 @@ TEST(DpiRuntime, RegisterExportAndCall) {
   EXPECT_EQ(result.AsInt(), 42);
 }
 
+TEST(DpiRuntime, CallMissingExportReturnsZero) {
+  DpiRuntime rt;
+  auto result = rt.CallExport("nonexistent", {});
+  EXPECT_EQ(result.AsInt(), 0);
+}
+
 }  // namespace
