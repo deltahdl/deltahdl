@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §7.4.6: Operations on arrays
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
