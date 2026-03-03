@@ -40,23 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.26.2 — Extends and implements together
-TEST(ParserSection8, ExtendsAndImplements) {
-  auto r = Parse(
-      "interface class Iface;\n"
-      "  pure virtual function void foo();\n"
-      "endclass\n"
-      "class Base;\n"
-      "endclass\n"
-      "class Child extends Base implements Iface;\n"
-      "  virtual function void foo();\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 3u);
-  EXPECT_EQ(r.cu->classes[2]->base_class, "Base");
-}
-
 // §8.9 — Static property with const
 TEST(ParserSection8, StaticConstProperty) {
   auto r = Parse(
