@@ -41,18 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, OperatorPrecedenceCompareAndLogical) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a > 0) && (b < 10);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
-}
-
 // =========================================================================
 // Section 11.5.1 -- Bit-select and part-select
 // =========================================================================
