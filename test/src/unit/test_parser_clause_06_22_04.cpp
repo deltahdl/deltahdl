@@ -29,4 +29,13 @@ TEST(ParserSection6, CastCompatibleEnumToInt) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
+TEST(ParserSection6, CastCompatibleIntToEnum) {
+  // §6.22.4: integral → enum requires cast (cast compatible).
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  DataType b;
+  b.kind = DataTypeKind::kEnum;
+  EXPECT_TRUE(IsCastCompatible(a, b));
+}
+
 }  // namespace
