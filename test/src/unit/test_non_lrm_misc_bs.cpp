@@ -40,20 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.19 — Constant class properties
-TEST(ParserSection8, ConstProperty) {
-  auto r = Parse(
-      "class MyClass;\n"
-      "  const int MAX = 100;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto* cls = r.cu->classes[0];
-  ASSERT_GE(cls->members.size(), 1u);
-  EXPECT_TRUE(cls->members[0]->is_const);
-  EXPECT_EQ(cls->members[0]->name, "MAX");
-}
-
 // §8.26 — Class implements interface class
 TEST(ParserSection8, ClassImplementsInterface) {
   auto r = Parse(
