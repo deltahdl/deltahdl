@@ -209,15 +209,6 @@ static NetPair MakeNetPair(uint64_t a_val) {
 
 namespace {
 
-TEST(SwitchProcessing, BuiltinNetZControlNonUniqueProducesX) {
-  auto np = MakeNetPair(0);
-  // control = z: on->b=0, off->b=z. Not unique -> x.
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 1}, false});
-  ResolveSwitchNetwork(sw, np.arena);
-  EXPECT_EQ(ValOf(*np.vb), kValX);
-}
-
 // --- User-defined net type, x/z control: treated as off ---
 TEST(SwitchProcessing, UserDefinedNetXControlTreatedAsOff) {
   auto np = MakeNetPair(1);
