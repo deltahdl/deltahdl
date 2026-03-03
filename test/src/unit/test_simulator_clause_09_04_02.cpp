@@ -202,4 +202,13 @@ TEST(TimingControl, NoEdgeZToZ) {
   EXPECT_EQ(DetectEdge(Logic4::kZ, Logic4::kZ), EdgeKind::kNone);
 }
 
+bool IsEdge(Logic4 from, Logic4 to) {
+  EdgeKind e = DetectEdge(from, to);
+  return e == EdgeKind::kPosedge || e == EdgeKind::kNegedge;
+}
+
+TEST(TimingControl, EdgeDetectedOnPosedge) {
+  EXPECT_TRUE(IsEdge(Logic4::kVal0, Logic4::kVal1));
+}
+
 }  // namespace
