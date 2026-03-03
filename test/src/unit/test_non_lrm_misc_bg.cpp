@@ -41,14 +41,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, PostfixFunctionAttribute_NoArgs) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic a;\n"
-              "  initial a = foo (* bar *) ();\n"
-              "endmodule\n"));
-}
-
 TEST(ParserCh512, NestedAttribute_Error) {
   // §5.12: Nesting of attribute instances is disallowed.
   EXPECT_FALSE(

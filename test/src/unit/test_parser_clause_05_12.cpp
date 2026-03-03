@@ -248,4 +248,12 @@ TEST(ParserCh512, PostfixFunctionAttribute) {
               "endmodule\n"));
 }
 
+TEST(ParserCh512, PostfixFunctionAttribute_NoArgs) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic a;\n"
+              "  initial a = foo (* bar *) ();\n"
+              "endmodule\n"));
+}
+
 }  // namespace
