@@ -248,4 +248,12 @@ TEST(ParserSection6, RealLiteralDecimalPoint) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, RealLiteralScientificNotation) {
+  // Scientific notation: 1.3e2 = 130.0
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1.3e2;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -30,14 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, RealLiteralScientificNotation) {
-  // Scientific notation: 1.3e2 = 130.0
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 1.3e2;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, RealLiteralNegativeExponent) {
   // Negative exponent: 1.0e-3 = 0.001
   EXPECT_TRUE(
