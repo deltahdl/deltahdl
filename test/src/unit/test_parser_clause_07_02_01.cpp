@@ -634,4 +634,24 @@ TEST(ParserSection7, Sec7_2_1_AtmCellHeader) {
   EXPECT_EQ(item->typedef_type.struct_members[6].name, "Payload");
 }
 
+// --- Packed struct with multiple members of the same type (comma-separated)
+// ---
+TEST(ParserSection7, Sec7_2_1_PackedMultiMembersSameType) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    bit [7:0] r, g, b;\n"
+      "  } rgb_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 3u);
+  EXPECT_EQ(item->typedef_type.struct_members[0].name, "r");
+  EXPECT_EQ(item->typedef_type.struct_members[1].name, "g");
+  EXPECT_EQ(item->typedef_type.struct_members[2].name, "b");
+}
+
 }  // namespace
