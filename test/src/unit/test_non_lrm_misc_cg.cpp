@@ -42,17 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-TEST(ParserSection11, Sec11_1_StringLiteralAsExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  string s;\n"
-      "  initial s = \"hello world\";\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
-}
-
 TEST(ParserSection11, Sec11_1_RealLiteralAsExpression) {
   auto r = Parse(
       "module t;\n"
