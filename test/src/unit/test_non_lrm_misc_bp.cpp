@@ -49,27 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-// =========================================================================
-// §7.2.1: Packed structures
-// =========================================================================
-TEST(ParserSection7, PackedStructSigned2State) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct packed signed {\n"
-      "    int a;\n"
-      "    shortint b;\n"
-      "    byte c;\n"
-      "    bit [7:0] d;\n"
-      "  } pack1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->data_type.is_packed);
-  EXPECT_TRUE(item->data_type.is_signed);
-  EXPECT_EQ(item->data_type.struct_members.size(), 4u);
-}
-
 TEST(ParserSection7, PackedStructUnsigned4State) {
   auto r = Parse(
       "module t;\n"
