@@ -351,4 +351,27 @@ TEST(ParserSection4, Sec4_9_4_AutoTaskWithVariousTypes) {
   EXPECT_EQ(t->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
 }
 
+// =============================================================================
+// 20. Automatic task with explicit automatic local vars
+// =============================================================================
+TEST(ParserSection4, Sec4_9_4_AutoTaskExplicitAutoLocals) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic run(input int seed);\n"
+      "    automatic int local_seed = seed;\n"
+      "    $display(local_seed);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* t = FirstFuncOrTask(r);
+  ASSERT_NE(t, nullptr);
+  EXPECT_TRUE(t->is_automatic);
+  ASSERT_GE(t->func_body_stmts.size(), 1u);
+  EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(t->func_body_stmts[0]->var_is_automatic);
+  EXPECT_EQ(t->func_body_stmts[0]->var_name, "local_seed");
+  EXPECT_NE(t->func_body_stmts[0]->var_init, nullptr);
+}
+
 }  // namespace
