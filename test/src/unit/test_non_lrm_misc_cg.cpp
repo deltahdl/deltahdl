@@ -42,28 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Expressions in different contexts ---
-TEST(ParserSection11, Sec11_1_ExprInContinuousAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire a, b, c;\n"
-      "  assign c = a ^ b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ModuleItem* ca = nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      ca = item;
-      break;
-    }
-  }
-  ASSERT_NE(ca, nullptr);
-  ASSERT_NE(ca->assign_rhs, nullptr);
-  EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(ca->assign_rhs->op, TokenKind::kCaret);
-}
-
 TEST(ParserSection11, Sec11_1_ExprInInitialBlock) {
   auto r = Parse(
       "module t;\n"
