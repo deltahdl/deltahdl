@@ -50,4 +50,20 @@ TEST(ParserSection8, ConstructorSuperNew) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
 }
 
+// §8.15 — super.new() expression
+TEST(ParserSection8, SuperNewExpression) {
+  auto r = Parse(
+      "class Base;\n"
+      "  function new(int x);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    super.new(5);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+}
+
 }  // namespace
