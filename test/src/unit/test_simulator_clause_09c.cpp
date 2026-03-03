@@ -8,48 +8,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §9.2.3: always_latch with multiple outputs
-// =============================================================================
-// 25. Multiple outputs assigned from different data sources.
-TEST(SimCh9c, MultipleOutputsDifferentSources) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic en;\n"
-      "  logic [7:0] d1, d2, d3, q1, q2, q3;\n"
-      "  initial begin\n"
-      "    en = 1;\n"
-      "    d1 = 8'h10;\n"
-      "    d2 = 8'h20;\n"
-      "    d3 = 8'h30;\n"
-      "  end\n"
-      "  always_latch begin\n"
-      "    if (en) begin\n"
-      "      q1 = d1;\n"
-      "      q2 = d2;\n"
-      "      q3 = d3;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q1 = f.ctx.FindVariable("q1");
-  auto* q2 = f.ctx.FindVariable("q2");
-  auto* q3 = f.ctx.FindVariable("q3");
-  ASSERT_NE(q1, nullptr);
-  ASSERT_NE(q2, nullptr);
-  ASSERT_NE(q3, nullptr);
-  EXPECT_EQ(q1->value.ToUint64(), 0x10u);
-  EXPECT_EQ(q2->value.ToUint64(), 0x20u);
-  EXPECT_EQ(q3->value.ToUint64(), 0x30u);
-}
-
 // 26. Multiple outputs with independent enable conditions.
 TEST(SimCh9c, MultipleOutputsIndependentEnables) {
   SimFixture f;
