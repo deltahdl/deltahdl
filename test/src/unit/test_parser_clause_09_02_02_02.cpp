@@ -783,4 +783,21 @@ TEST(ParserSection9c, AlwaysCombBeginEnd) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
+TEST(ParserSection9c, AlwaysCombWithIf) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic sel, a, b, y;\n"
+      "  always_comb\n"
+      "    if (sel) y = a;\n"
+      "    else y = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kIf);
+}
+
 }  // namespace
