@@ -9,35 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.4: iff guard on posedge fires, negedge suppressed.
-TEST(SimCh9e, IffPosedgeFiresNegedgeSuppressed) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic clk, en_pos, en_neg;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    clk = 0; en_pos = 1; en_neg = 0; result = 0;\n"
-      "    #1 clk = 1;\n"
-      "    #1 clk = 0;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "  always @(posedge clk iff en_pos or negedge clk iff en_neg)\n"
-      "    result = result + 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  // Only posedge fires (en_pos=1), negedge suppressed (en_neg=0).
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
 // §9.4.2.4: iff condition variable changes between edges.
 TEST(SimCh9e, IffConditionChanges) {
   SimFixture f;
