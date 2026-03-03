@@ -28,13 +28,6 @@ struct SvaFixture {
 
 namespace {
 
-TEST(SvaEngine, AssertoffDisablesInstance) {
-  AssertionControl ctrl;
-  ctrl.SetOff("inst1");
-  EXPECT_FALSE(ctrl.IsEnabled("inst1"));
-  EXPECT_TRUE(ctrl.IsEnabled("inst2"));
-}
-
 TEST(SvaEngine, AssertonReenablesInstance) {
   AssertionControl ctrl;
   ctrl.SetOff("inst1");

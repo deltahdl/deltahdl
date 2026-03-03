@@ -46,4 +46,11 @@ TEST(SvaEngine, AssertionControlDefaultOn) {
   EXPECT_TRUE(ctrl.IsEnabled("inst2"));
 }
 
+TEST(SvaEngine, AssertoffDisablesInstance) {
+  AssertionControl ctrl;
+  ctrl.SetOff("inst1");
+  EXPECT_FALSE(ctrl.IsEnabled("inst1"));
+  EXPECT_TRUE(ctrl.IsEnabled("inst2"));
+}
+
 }  // namespace
