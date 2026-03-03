@@ -96,4 +96,20 @@ TEST(SimCh9, AlwaysCombExplicitZeros) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// ---------------------------------------------------------------------------
+// 11. Multiple always_comb blocks all evaluate at time 0.
+// ---------------------------------------------------------------------------
+TEST(SimCh9b, MultipleAlwaysCombTime0) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  always_comb x = 8'h11;\n"
+      "  always_comb y = 8'h22;\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 0x11u}, {"y", 0x22u}});
+}
+
 }  // namespace

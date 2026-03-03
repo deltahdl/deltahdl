@@ -10,22 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 11. Multiple always_comb blocks all evaluate at time 0.
-// ---------------------------------------------------------------------------
-TEST(SimCh9b, MultipleAlwaysCombTime0) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x, y;\n"
-      "  always_comb x = 8'h11;\n"
-      "  always_comb y = 8'h22;\n"
-      "  initial #1 $finish;\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"x", 0x11u}, {"y", 0x22u}});
-}
-
-// ---------------------------------------------------------------------------
 // 12. always_comb output available in initial block after scheduler run.
 // ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombOutputAfterRun) {
