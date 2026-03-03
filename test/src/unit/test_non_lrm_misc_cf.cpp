@@ -41,17 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, OperatorPrecedenceMixedArithRhs) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a + b * c;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  ASSERT_NE(rhs->rhs, nullptr);
-  EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
-}
-
 TEST(ParserSection11, OperatorPrecedenceCompareAndLogical) {
   auto r = Parse(
       "module t;\n"

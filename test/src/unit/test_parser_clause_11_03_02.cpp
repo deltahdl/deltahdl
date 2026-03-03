@@ -234,4 +234,15 @@ TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
+TEST(ParserSection11, OperatorPrecedenceMixedArithRhs) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a + b * c;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
+}
+
 }  // namespace
