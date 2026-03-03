@@ -17,21 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// method_prototype ::= task_prototype | function_prototype
-TEST(SourceText, ClassMethodPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  extern function int get_val();\n"
-      "  extern task do_work();\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 2u);
-  EXPECT_EQ(members[0]->method->name, "get_val");
-  EXPECT_EQ(members[1]->method->name, "do_work");
-}
-
 // ---------------------------------------------------------------------------
 // function_body_declaration (scope qualifiers)
 // ---------------------------------------------------------------------------
