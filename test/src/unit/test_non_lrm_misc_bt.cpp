@@ -30,23 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.4.2 -- iff guards on event expressions
-// =============================================================================
-TEST(ParserSection9, IffGuardPosedgeEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, reset, a, b;\n"
-      "  always @(posedge clk iff reset == 0) a <= b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  // iff guard goes through always-block sensitivity path.
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-}
-
 TEST(ParserSection9, IffGuardPosedgeFields) {
   auto r = Parse(
       "module m;\n"

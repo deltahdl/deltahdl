@@ -822,4 +822,44 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevel) {
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+static ModuleItem* FirstAlwaysItem(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
+  }
+  return nullptr;
+}
+
+// =============================================================================
+// LRM section 9.4.2 -- iff guards on event expressions
+// =============================================================================
+TEST(ParserSection9, IffGuardPosedgeEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, reset, a, b;\n"
+      "  always @(posedge clk iff reset == 0) a <= b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  // iff guard goes through always-block sensitivity path.
+  ASSERT_EQ(item->sensitivity.size(), 1u);
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+}
+
 }  // namespace
