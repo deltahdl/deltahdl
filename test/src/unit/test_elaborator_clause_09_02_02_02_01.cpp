@@ -342,4 +342,30 @@ TEST(SimCh9b, AlwaysCombConcatenation) {
   EXPECT_EQ(y->value.ToUint64(), 0xA5u);
 }
 
+// ---------------------------------------------------------------------------
+// 19. always_comb re-triggers when input changes.
+// ---------------------------------------------------------------------------
+TEST(SimCh9b, AlwaysCombRetriggersOnChange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, y;\n"
+      "  always_comb y = a + 1;\n"
+      "  initial begin\n"
+      "    a = 10;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 11u);
+}
+
 }  // namespace
