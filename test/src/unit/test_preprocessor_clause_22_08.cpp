@@ -69,3 +69,17 @@ TEST(ParserSection22, DefaultNettypeModuleCount) {
   EXPECT_EQ(r.cu->modules[1]->name, "m2");
 }
 
+// =========================================================================
+// §6.10: Implicit declarations — `default_nettype directive
+// =========================================================================
+TEST(ParserSection6, DefaultNettypeWire) {
+  // §6.10: Default nettype is wire; implicit nets are wire.
+  auto r = ParseWithPreprocessor(
+      "`default_nettype wire\n"
+      "module t;\n"
+      "  assign out = 1'b0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->default_nettype, NetType::kWire);
+}
+

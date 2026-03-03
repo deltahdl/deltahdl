@@ -25,20 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.10: Implicit declarations — `default_nettype directive
-// =========================================================================
-TEST(ParserSection6, DefaultNettypeWire) {
-  // §6.10: Default nettype is wire; implicit nets are wire.
-  auto r = ParseWithPreprocessor(
-      "`default_nettype wire\n"
-      "module t;\n"
-      "  assign out = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->default_nettype, NetType::kWire);
-}
-
 TEST(ParserSection6, DefaultNettypeNone) {
   // §6.10: `default_nettype none disables implicit declarations.
   auto r = ParseWithPreprocessor(
