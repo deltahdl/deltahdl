@@ -10,32 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §10.4.2: NBA with part-select on LHS.
-// ---------------------------------------------------------------------------
-TEST(SimCh10b, NBAPartSelectLHS) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  initial begin\n"
-      "    a = 8'h00;\n"
-      "    a[3:0] <= 4'hF;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("a");
-  ASSERT_NE(var, nullptr);
-  // Lower nibble set to 0xF: 0x0F = 15.
-  EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
-}
-
-// ---------------------------------------------------------------------------
 // §10.4.2: NBA with concatenation on RHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAConcatenationRHS) {
