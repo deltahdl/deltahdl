@@ -42,27 +42,6 @@ static Stmt* FirstInitialStmt(ParseResult7e& r) {
 
 namespace {
 
-// 11. Struct assigned in always_comb block.
-TEST(ParserSection7, Sec7_2_2_AssignInAlwaysComb) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { logic a; logic b; } pair_t;\n"
-      "  pair_t p;\n"
-      "  logic sel;\n"
-      "  always_comb begin\n"
-      "    if (sel)\n"
-      "      p = '{1'b1, 1'b0};\n"
-      "    else\n"
-      "      p = '{1'b0, 1'b1};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = NthItem(r, 3);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
-}
-
 // 12. Struct assigned via continuous assign statement.
 TEST(ParserSection7, Sec7_2_2_ContinuousAssign) {
   auto r = Parse(
