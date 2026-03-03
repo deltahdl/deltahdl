@@ -404,4 +404,20 @@ TEST(ParserCh512, AttributeValue_String) {
               "endmodule"));
 }
 
+TEST(ParserCh512, Attribute_MultipleSeparateInstances) {
+  // Multiple attribute instances are merged.
+  auto r = Parse(
+      "module m;\n"
+      "  (* first *)\n"
+      "  (* second *)\n"
+      "  logic x;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_GE(item->attrs.size(), 2u);
+  EXPECT_EQ(item->attrs[0].name, "first");
+  EXPECT_EQ(item->attrs[1].name, "second");
+}
+
 }  // namespace
