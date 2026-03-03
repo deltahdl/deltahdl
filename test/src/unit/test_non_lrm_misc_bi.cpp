@@ -40,18 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-TEST(ParserSection6, ByteDefaultSigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
-  EXPECT_TRUE(item->data_type.is_signed) << "byte is signed by default";
-}
-
 TEST(ParserSection6, ShortintDefaultSigned) {
   auto r = Parse(
       "module t;\n"
