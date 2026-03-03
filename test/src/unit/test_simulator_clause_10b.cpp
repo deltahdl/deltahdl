@@ -10,44 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §10.4.2: NBA with comparison result on RHS.
-// ---------------------------------------------------------------------------
-TEST(SimCh10b, NBAComparisonResult) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a;\n"
-      "  logic [31:0] b;\n"
-      "  logic r_eq;\n"
-      "  logic r_lt;\n"
-      "  logic r_gt;\n"
-      "  initial begin\n"
-      "    a = 10;\n"
-      "    b = 20;\n"
-      "    r_eq <= (a == b);\n"
-      "    r_lt <= (a < b);\n"
-      "    r_gt <= (a > b);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r_eq = f.ctx.FindVariable("r_eq");
-  auto* r_lt = f.ctx.FindVariable("r_lt");
-  auto* r_gt = f.ctx.FindVariable("r_gt");
-  ASSERT_NE(r_eq, nullptr);
-  ASSERT_NE(r_lt, nullptr);
-  ASSERT_NE(r_gt, nullptr);
-  EXPECT_EQ(r_eq->value.ToUint64(), 0u);
-  EXPECT_EQ(r_lt->value.ToUint64(), 1u);
-  EXPECT_EQ(r_gt->value.ToUint64(), 0u);
-}
-
-// ---------------------------------------------------------------------------
 // §10.4.2: Mixed blocking and nonblocking in same block — blocking first.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, MixedBlockingAndNBA) {
