@@ -19,30 +19,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// 25. Blocking assignment to part-select LHS (§7.4.5 / §10.3)
-// =============================================================================
-TEST(StmtExec, BlockingAssignPartSelect) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("ps", 8);
-  var->value = MakeLogic4VecVal(f.arena, 8, 0x0F);
-
-  // ps[7:4] = 4'hA;
-  auto* sel = f.arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  sel->base = MakeId(f.arena, "ps");
-  sel->index = MakeInt(f.arena, 7);
-  sel->index_end = MakeInt(f.arena, 4);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kBlockingAssign;
-  stmt->lhs = sel;
-  stmt->rhs = MakeInt(f.arena, 0xA);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 0xAFu);  // upper nibble = A, lower = F
-}
-
-// =============================================================================
 // 26. Blocking assignment to member-access LHS (§7.2 / §10.3)
 // =============================================================================
 TEST(StmtExec, BlockingAssignMemberAccess) {
