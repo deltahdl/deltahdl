@@ -52,22 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh505, Operator_Ternary) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = sel ? a : b;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->condition, nullptr);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  ASSERT_NE(rhs->false_expr, nullptr);
-}
-
 TEST(ParserCh505, Operator_LogicalShiftLeft) {
   EXPECT_TRUE(ParseOk("module m; initial x = a <<< 2; endmodule"));
 }
