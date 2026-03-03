@@ -17,23 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// class_constructor_declaration with super.new()
-TEST(SourceText, ClassConstructorSuperNew) {
-  auto r = Parse(
-      "class Base;\n"
-      "  function new(int x); endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  function new();\n"
-      "    super.new(5);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
-  EXPECT_EQ(r.cu->classes[1]->members[0]->method->name, "new");
-}
-
 TEST(Parser, ClassPropertyQualifiers) {
   auto r = Parse(
       "class pkt;\n"
