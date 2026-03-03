@@ -41,18 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// §6.20.1 — block-level localparam declaration
-TEST(ParserSection6, BlockLevelLocalparam) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    localparam int LP = 10;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // §20.6 — Bare type keyword in expression context ($typename(logic))
 TEST(ParserSection6, BareTypeKeywordInExpr) {
   auto r = Parse(

@@ -968,4 +968,16 @@ TEST(ParserSection6, BlockLevelParameter) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+// §6.20.1 — block-level localparam declaration
+TEST(ParserSection6, BlockLevelLocalparam) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    localparam int LP = 10;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
