@@ -309,4 +309,27 @@ TEST(SimCh45, ReactiveRestartsActiveSetBeforePrePostponed) {
   EXPECT_EQ(order[2], "pre_postponed");
 }
 
+// ---------------------------------------------------------------------------
+// §4.5 execute_region: "while (region is nonempty) { E = any event from
+// region; remove E from the region; ... }"
+// Multiple events in a single region all execute (FIFO order).
+// ---------------------------------------------------------------------------
+TEST(SimCh45, ExecuteRegionDrainsAllEventsInFIFOOrder) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<int> order;
+
+  for (int i = 0; i < 5; ++i) {
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = [&order, i]() { order.push_back(i); };
+    sched.ScheduleEvent({0}, Region::kActive, ev);
+  }
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 5u);
+  for (int i = 0; i < 5; ++i) {
+    EXPECT_EQ(order[i], i);
+  }
+}
+
 }  // namespace

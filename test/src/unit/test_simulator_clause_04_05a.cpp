@@ -13,29 +13,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §4.5 execute_region: "while (region is nonempty) { E = any event from
-// region; remove E from the region; ... }"
-// Multiple events in a single region all execute (FIFO order).
-// ---------------------------------------------------------------------------
-TEST(SimCh45, ExecuteRegionDrainsAllEventsInFIFOOrder) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-
-  for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, i]() { order.push_back(i); };
-    sched.ScheduleEvent({0}, Region::kActive, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 5u);
-  for (int i = 0; i < 5; ++i) {
-    EXPECT_EQ(order[i], i);
-  }
-}
-
-// ---------------------------------------------------------------------------
 // §4.5 "The Iterative regions and their order are Active, Inactive, Pre-NBA,
 // NBA, Post-NBA, Pre-Observed, Observed, Post-Observed, Reactive,
 // Re-Inactive, Pre-Re-NBA, Re-NBA, Post-Re-NBA, and Pre-Postponed."
