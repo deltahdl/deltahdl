@@ -33,38 +33,7 @@ static ParseResult3140203 ParseTimescale31402(const std::string& src) {
   return result;
 }
 
-static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
-  for (auto* item : items)
-    if (item->kind == ModuleItemKind::kNestedModuleDecl)
-      return item->nested_module_decl;
-  return nullptr;
-}
-
 namespace {
-
-// 18. Nested module with own timeunit overrides inheritance.
-TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
-  auto r = ParseTimescale31402(
-      "module outer;\n"
-      "  timeunit 1us;\n"
-      "  timeprecision 1ns;\n"
-      "  module inner;\n"
-      "    timeunit 1fs;\n"
-      "    timeprecision 1fs;\n"
-      "  endmodule\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* outer = r.cu->modules[0];
-  auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
-
-  auto* inner = FindNestedModule(outer->items);
-  ASSERT_NE(inner, nullptr);
-  auto inner_resolved =
-      ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
-  // inner has own timeunit/timeprecision — these override.
-  EXPECT_EQ(inner_resolved.unit, TimeUnit::kFs);
-  EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
-}
 
 // =============================================================================
 // LRM §3.14.3 — Simulation time unit (global time precision)

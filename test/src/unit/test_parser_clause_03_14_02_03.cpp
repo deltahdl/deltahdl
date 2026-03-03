@@ -338,4 +338,28 @@ TEST(ParserClause03, Cl3_14_2_3_IndependentResolution) {
   EXPECT_EQ(resolved_b.precision, TimeUnit::kPs);
 }
 
+// 18. Nested module with own timeunit overrides inheritance.
+TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
+  auto r = ParseTimescale31402(
+      "module outer;\n"
+      "  timeunit 1us;\n"
+      "  timeprecision 1ns;\n"
+      "  module inner;\n"
+      "    timeunit 1fs;\n"
+      "    timeprecision 1fs;\n"
+      "  endmodule\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* outer = r.cu->modules[0];
+  auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
+
+  auto* inner = FindNestedModule(outer->items);
+  ASSERT_NE(inner, nullptr);
+  auto inner_resolved =
+      ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
+  // inner has own timeunit/timeprecision — these override.
+  EXPECT_EQ(inner_resolved.unit, TimeUnit::kFs);
+  EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
+}
+
 }  // namespace
