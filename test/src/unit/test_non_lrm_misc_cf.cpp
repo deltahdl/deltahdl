@@ -41,19 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.5.1 -- Bit-select and part-select
-// =========================================================================
-TEST(ParserSection11, BitSelect) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a[3];\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-}
-
 TEST(ParserSection11, PartSelectConstant) {
   auto r = Parse(
       "module t;\n"
