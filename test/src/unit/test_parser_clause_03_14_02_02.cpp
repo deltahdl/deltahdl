@@ -420,4 +420,26 @@ TEST(ParserClause03, Cl3_14_2_2_RepeatMatchingDeclaration) {
   EXPECT_EQ(r.cu->modules[0]->time_prec, TimeUnit::kPs);
 }
 
+// 60. Separate modules each define their own time scope independently.
+// §3.14.2.2: "There shall be at most one time unit and one time
+// precision for any module ... definition."
+TEST(ParserClause03, Cl3_14_2_2_SeparateModulesIndependentScope) {
+  auto r = ParseTimescale31402(
+      "module a;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  timeunit 1us;\n"
+      "  timeprecision 1ns;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->time_unit, TimeUnit::kNs);
+  EXPECT_EQ(r.cu->modules[0]->time_prec, TimeUnit::kPs);
+  EXPECT_EQ(r.cu->modules[1]->time_unit, TimeUnit::kUs);
+  EXPECT_EQ(r.cu->modules[1]->time_prec, TimeUnit::kNs);
+}
+
 }  // namespace
