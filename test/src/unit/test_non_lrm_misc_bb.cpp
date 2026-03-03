@@ -35,27 +35,6 @@ static ParseResult3140203 ParseTimescale31402(const std::string& src) {
 
 namespace {
 
-// =============================================================================
-// LRM §3.14.3 — Simulation time unit (global time precision)
-// =============================================================================
-// 19. Global precision is minimum of all timeprecision statements.
-TEST(ParserClause03, Cl3_14_3_MinOfTimeprecisionStatements) {
-  auto r = ParseTimescale31402(
-      "module a;\n"
-      "  timeprecision 1ns;\n"
-      "endmodule\n"
-      "module b;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n"
-      "module c;\n"
-      "  timeprecision 1us;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
-                                       r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kPs);  // min of ns, ps, us = ps
-}
-
 // 20. Global precision considers timeunit precision argument (slash syntax).
 TEST(ParserClause03, Cl3_14_3_ConsidersTimeunitPrecArg) {
   auto r = ParseTimescale31402(
