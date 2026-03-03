@@ -49,16 +49,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
-  // c = '{a:0, b:0.0}; -- member name and value.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct {int a; shortreal b;} ab;\n"
-              "  ab c;\n"
-              "  initial c = '{a:0, b:0.0};\n"
-              "endmodule"));
-}
-
 TEST(ParserCh511, ArrayLiteral_Nested) {
   // int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};
   EXPECT_TRUE(

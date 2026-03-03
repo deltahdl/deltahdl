@@ -472,4 +472,14 @@ TEST(ParserCh510, StructLiteral_Positional) {
               "endmodule"));
 }
 
+TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
+  // c = '{a:0, b:0.0}; -- member name and value.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {int a; shortreal b;} ab;\n"
+              "  ab c;\n"
+              "  initial c = '{a:0, b:0.0};\n"
+              "endmodule"));
+}
+
 }  // namespace
