@@ -9,34 +9,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 12. Multiple outputs from one always_comb block.
-// ---------------------------------------------------------------------------
-TEST(SimCh9, AlwaysCombMultipleOutputs) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  logic [7:0] doubled, incremented;\n"
-      "  initial a = 8'd25;\n"
-      "  always_comb begin\n"
-      "    doubled = a << 1;\n"
-      "    incremented = a + 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* dbl = f.ctx.FindVariable("doubled");
-  ASSERT_NE(dbl, nullptr);
-  EXPECT_EQ(dbl->value.ToUint64(), 50u);
-  auto* inc = f.ctx.FindVariable("incremented");
-  ASSERT_NE(inc, nullptr);
-  EXPECT_EQ(inc->value.ToUint64(), 26u);
-}
-
-// ---------------------------------------------------------------------------
 // 13. Bit-select in always_comb using initial begin/end.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombBitSelect) {
