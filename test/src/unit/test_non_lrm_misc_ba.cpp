@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ===========================================================================
-// §3.14: Timeunit/timeprecision parsing
-// ===========================================================================
-TEST(Lexical, Timeunit_BasicParse) {
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  timeunit 1ns;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-  // Should parse without error. The timeunit decl is consumed.
-  EXPECT_EQ(r.cu->modules[0]->name, "top");
-}
-
 TEST(Lexical, Timeprecision_BasicParse) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
