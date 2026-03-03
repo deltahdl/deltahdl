@@ -230,16 +230,27 @@ def test_missing_file_with_issue_exits_zero(tmp_path):
     assert result.returncode == 0
 
 
-def test_file_without_tests_deletes_and_closes(tmp_path):
-    """A file with no TEST blocks is deleted and issue is closed."""
+def test_file_without_tests_exits_zero(tmp_path):
+    """A file with no TEST blocks exits 0 when --issue is given."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
-    f = _write_test_file(tmp_path, "#include <gtest/gtest.h>\n")
+    _write_test_file(tmp_path, "#include <gtest/gtest.h>\n")
     result = _invoke(
         *_all_flags(tmp_path),
         cwd=str(tmp_path), env=env,
     )
     assert result.returncode == 0
+
+
+def test_file_without_tests_deletes_file(tmp_path):
+    """A file with no TEST blocks is deleted."""
+    fake = _install_fake_classify_test(tmp_path)
+    env = _base_env(tmp_path, fake)
+    f = _write_test_file(tmp_path, "#include <gtest/gtest.h>\n")
+    _invoke(
+        *_all_flags(tmp_path),
+        cwd=str(tmp_path), env=env,
+    )
     assert not f.exists()
 
 
