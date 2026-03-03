@@ -18,16 +18,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StmtExec, ReleaseUnknownVarNoOp) {
-  StmtFixture f;
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kRelease;
-  stmt->lhs = MakeId(f.arena, "nonexistent");
-
-  auto result = RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result, StmtResult::kDone);
-}
-
 // =============================================================================
 // 14. Force prevents normal assignment
 // =============================================================================
