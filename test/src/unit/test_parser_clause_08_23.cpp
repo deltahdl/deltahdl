@@ -115,4 +115,16 @@ TEST(ParserSection8, ClassScopeResolutionTypedef) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+TEST(ParserSection8, ClassScopeResolutionParameter) {
+  auto r = Parse(
+      "class Cfg;\n"
+      "  parameter int WIDTH = 8;\n"
+      "endclass\n"
+      "module m;\n"
+      "  logic [Cfg::WIDTH-1:0] data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace

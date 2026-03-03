@@ -40,18 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-TEST(ParserSection8, ClassScopeResolutionParameter) {
-  auto r = Parse(
-      "class Cfg;\n"
-      "  parameter int WIDTH = 8;\n"
-      "endclass\n"
-      "module m;\n"
-      "  logic [Cfg::WIDTH-1:0] data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // =============================================================================
 // §8.25 -- Parameterized classes (additional tests)
 // =============================================================================
