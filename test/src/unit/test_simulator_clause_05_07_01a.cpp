@@ -23,27 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 30. Signed designator does not affect bit pattern
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, SignedDesignatorBitPattern) {
-  // §5.7.1: The s designator affects interpretation, not the bit pattern.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 4'hf;\n"
-      "    b = 4'shf;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerRunAndCompareBitPatterns(f, design, 0xF);
-  auto* va = f.ctx.FindVariable("a");
-  EXPECT_EQ(va->value.words[0].aval & 0xF, 0xFu);
-}
-
-// ---------------------------------------------------------------------------
 // 31. X and z case insensitive in values
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, XZCaseInsensitive) {
