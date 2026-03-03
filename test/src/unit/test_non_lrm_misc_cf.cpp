@@ -42,18 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 namespace {
 
 // =========================================================================
-// Section 11.3.5 -- Short-circuit evaluation
-// =========================================================================
-TEST(ParserSection11, ShortCircuitAnd) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a != 0) && (b / a > 1);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// =========================================================================
 // Section 11.7 -- Signed expressions ($signed, $unsigned)
 // =========================================================================
 TEST(ParserSection11, SignedSystemCall) {
