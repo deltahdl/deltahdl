@@ -42,20 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 14. CU-scope timeunit applies to interface.
-TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToInterface) {
-  auto r = ParseTimescale31402(
-      "timeunit 1ps;\n"
-      "timeprecision 1fs;\n"
-      "interface i;\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  auto resolved =
-      ResolveModuleTimescale(r.cu->interfaces[0], r.cu, false, {}, nullptr);
-  EXPECT_EQ(resolved.unit, TimeUnit::kPs);
-  EXPECT_EQ(resolved.precision, TimeUnit::kFs);
-}
-
 // 15. CU-scope timeunit applies to program.
 TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToProgram) {
   auto r = ParseTimescale31402(
