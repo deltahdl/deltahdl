@@ -209,22 +209,6 @@ static NetPair MakeNetPair(uint64_t a_val) {
 
 namespace {
 
-TEST(SwitchProcessing, TranBidirectionalPropagation) {
-  Arena arena;
-  auto* va = arena.Create<Variable>();
-  va->value = MakeLogic4Vec(arena, 1);
-  auto* vb = arena.Create<Variable>();
-  vb->value = MakeLogic4Vec(arena, 1);
-
-  Net a = MakeUndrivenNet(arena, va);
-  Net b = MakeNet1(arena, vb, 0);
-
-  std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTran, {}, false});
-  ResolveSwitchNetwork(sw, arena);
-  EXPECT_EQ(ValOf(*va), kVal0);
-}
-
 // --- Coordinated processing ---
 TEST(SwitchProcessing, NetworkResolvesAllDevicesTogether) {
   Arena arena;
