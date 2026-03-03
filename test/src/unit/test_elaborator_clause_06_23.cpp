@@ -420,4 +420,31 @@ TEST(SimCh6b, TypeOpParameterTypeDefault) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
+// 17. type() with enum-typed variable preserves 32-bit enum width.
+TEST(SimCh6b, TypeOpEnumType) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  color_t c;\n"
+      "  var type(c) result;\n"
+      "  initial begin\n"
+      "    c = GREEN;\n"
+      "    result = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  // enum default base type is int (32-bit).
+  EXPECT_EQ(var->value.width, 32u);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
 }  // namespace
