@@ -25,14 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, VarRegDecl) {
-  // §6.8: "var reg r;"
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  var reg r;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, VarWithInitializer) {
   // §6.8: Variable with initializer "int i = 0;"
   auto r = ParseWithPreprocessor(

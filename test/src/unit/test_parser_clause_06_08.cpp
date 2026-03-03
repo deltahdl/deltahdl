@@ -399,4 +399,12 @@ TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
   EXPECT_EQ(items[3]->data_type.kind, DataTypeKind::kShortreal);
 }
 
+TEST(ParserSection6, VarRegDecl) {
+  // §6.8: "var reg r;"
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  var reg r;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
