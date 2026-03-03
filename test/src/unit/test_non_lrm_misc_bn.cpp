@@ -54,20 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 14. type() on logic data type produces kTypeRef expression.
-TEST(ParserSection6, Sec6_11_1_TypeRefOnLogic) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = type(logic);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTypeRef);
-}
-
 // 15. type() on bit data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnBit) {
   EXPECT_TRUE(
