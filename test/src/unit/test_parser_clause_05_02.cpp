@@ -15,4 +15,16 @@ TEST(ParserCh501, FreeFormatLayout) {
   EXPECT_TRUE(ParseOk("module t; logic a; endmodule"));
 }
 
+TEST(ParserCh501, FreeFormatMultiline) {
+  // Same construct spread over many lines.
+  EXPECT_TRUE(
+      ParseOk("module\n"
+              "  t\n"
+              ";\n"
+              "  logic\n"
+              "    a\n"
+              ";\n"
+              "endmodule\n"));
+}
+
 }  // namespace

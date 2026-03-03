@@ -52,18 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh501, FreeFormatMultiline) {
-  // Same construct spread over many lines.
-  EXPECT_TRUE(
-      ParseOk("module\n"
-              "  t\n"
-              ";\n"
-              "  logic\n"
-              "    a\n"
-              ";\n"
-              "endmodule\n"));
-}
-
 TEST(ParserCh501, AllTokenTypesPresent) {
   // §5.1 lists: white space, comments, operators, numbers, string
   // literals, identifiers, keywords. This test exercises them all.
