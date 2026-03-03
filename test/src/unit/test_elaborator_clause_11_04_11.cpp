@@ -168,4 +168,29 @@ TEST(SimCh9c, TernarySelectsSecond) {
   EXPECT_EQ(q->value.ToUint64(), 0xFEu);
 }
 
+// ---------------------------------------------------------------------------
+// 8. Blocking assignment with ternary on RHS.
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignTernary) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int sel, result;\n"
+      "  initial begin\n"
+      "    sel = 1;\n"
+      "    result = sel ? 42 : 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
 }  // namespace
