@@ -796,4 +796,20 @@ TEST(ParserSection11, Sec11_4_6_ChainedTernaryRightAssoc) {
   EXPECT_EQ(rhs->false_expr->false_expr->kind, ExprKind::kIdentifier);
 }
 
+// --- Ternary with complex condition ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithComplexCondition) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a > b) ? y : z;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->condition, nullptr);
+  EXPECT_EQ(rhs->condition->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->condition->op, TokenKind::kGt);
+}
+
 }  // namespace

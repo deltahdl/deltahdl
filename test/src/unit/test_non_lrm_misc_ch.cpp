@@ -42,22 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11g& r) {
 
 namespace {
 
-// --- Ternary with complex condition ---
-TEST(ParserSection11, Sec11_4_6_TernaryWithComplexCondition) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a > b) ? y : z;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->condition, nullptr);
-  EXPECT_EQ(rhs->condition->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->condition->op, TokenKind::kGt);
-}
-
 // --- Ternary with binary expression operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithBinaryOperands) {
   auto r = Parse(
