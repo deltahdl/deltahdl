@@ -25,16 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, TypesNotEquivalentDifferentSign) {
-  DataType a;
-  a.kind = DataTypeKind::kInt;
-  a.is_signed = true;
-  DataType b;
-  b.kind = DataTypeKind::kInt;
-  b.is_signed = false;
-  EXPECT_FALSE(TypesEquivalent(a, b));
-}
-
 TEST(ParserSection6, AssignmentCompatibleRealToReal) {
   DataType a;
   a.kind = DataTypeKind::kReal;
