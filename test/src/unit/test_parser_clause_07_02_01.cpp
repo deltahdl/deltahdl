@@ -791,4 +791,32 @@ TEST(ParserSection7, PackedStructWithTypedef) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 6u);
 }
 
+static Stmt* FirstInitialStmt(ParseResult7b& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+TEST(ParserSection7, PackedStructPartSelect) {
+  auto r = Parse(
+      "module t;\n"
+      "  struct packed {\n"
+      "    bit [7:0] a;\n"
+      "    bit [7:0] b;\n"
+      "  } s;\n"
+      "  initial x = s[15:8];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace

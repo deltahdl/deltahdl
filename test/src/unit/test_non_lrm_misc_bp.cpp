@@ -49,22 +49,6 @@ static ParseResult7c Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection7, PackedStructPartSelect) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct packed {\n"
-      "    bit [7:0] a;\n"
-      "    bit [7:0] b;\n"
-      "  } s;\n"
-      "  initial x = s[15:8];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
-}
-
 // =========================================================================
 // §7.2.2: Assigning to structures
 // =========================================================================
