@@ -245,4 +245,12 @@ TEST(ParserSection7, AssignmentPatternPositional) {
   EXPECT_EQ(item->init_expr->kind, ExprKind::kAssignmentPattern);
 }
 
+TEST(ParserCh510, AssignmentPattern_IntKey) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef int triple[1:3];\n"
+              "  triple t = '{1:1, default:0};\n"
+              "endmodule"));
+}
+
 }  // namespace

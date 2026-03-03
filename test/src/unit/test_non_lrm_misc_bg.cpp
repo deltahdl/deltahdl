@@ -49,14 +49,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-TEST(ParserCh510, AssignmentPattern_IntKey) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef int triple[1:3];\n"
-              "  triple t = '{1:1, default:0};\n"
-              "endmodule"));
-}
-
 TEST(ParserCh510, AssignmentPattern_Replication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
