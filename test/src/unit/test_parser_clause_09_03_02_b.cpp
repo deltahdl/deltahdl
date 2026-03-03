@@ -197,4 +197,19 @@ TEST(ParserSection9, Sec9_3_2_MultipleSequentialForks) {
   EXPECT_EQ(body->stmts[2]->join_kind, TokenKind::kKwJoinAny);
 }
 
+// ---------------------------------------------------------------------------
+// 24. Fork with system calls ($display, $finish)
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_ForkWithSystemCalls) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    fork\n"
+              "      $display(\"thread 1\");\n"
+              "      $display(\"thread 2\");\n"
+              "    join\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

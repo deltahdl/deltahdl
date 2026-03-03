@@ -36,21 +36,6 @@ static Stmt* FirstInitialStmt(ParseResult9e& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 24. Fork with system calls ($display, $finish)
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_3_2_ForkWithSystemCalls) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    fork\n"
-              "      $display(\"thread 1\");\n"
-              "      $display(\"thread 2\");\n"
-              "    join\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-// ---------------------------------------------------------------------------
 // 25. Fork-join with single begin-end thread
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkJoinSingleBeginEnd) {
