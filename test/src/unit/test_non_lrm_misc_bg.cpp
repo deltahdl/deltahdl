@@ -29,14 +29,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, AttributeValue_String) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  (* tool_purpose = \"synthesis\" *)\n"
-              "  logic x;\n"
-              "endmodule"));
-}
-
 TEST(ParserCh512, Attribute_MultipleSeparateInstances) {
   // Multiple attribute instances are merged.
   auto r = Parse(

@@ -396,4 +396,12 @@ TEST(ParserCh512, AttributeValue_ConstExpr) {
   EXPECT_EQ(item->attrs[0].value->kind, ExprKind::kBinary);
 }
 
+TEST(ParserCh512, AttributeValue_String) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  (* tool_purpose = \"synthesis\" *)\n"
+              "  logic x;\n"
+              "endmodule"));
+}
+
 }  // namespace
