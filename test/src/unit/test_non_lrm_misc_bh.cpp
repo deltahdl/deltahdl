@@ -24,14 +24,6 @@ static ParseResult616 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection6, StringDeclEmptyInit) {
-  // string initialized to empty string
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  string s = \"\";\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, StringParameterDecl) {
   // parameter string (LRM 6.16)
   EXPECT_TRUE(

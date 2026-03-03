@@ -331,4 +331,12 @@ TEST(ParserSection6, StringDeclWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
+TEST(ParserSection6, StringDeclEmptyInit) {
+  // string initialized to empty string
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string s = \"\";\n"
+              "endmodule\n"));
+}
+
 }  // namespace
