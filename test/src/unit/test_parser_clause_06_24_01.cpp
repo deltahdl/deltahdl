@@ -393,4 +393,15 @@ TEST(ParserSection6, StaticCastRealToInt) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, StaticCastStringType) {
+  // §6.24.1: string'(expr) cast is valid per grammar.
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    string s;\n"
+              "    s = string'(8'h41);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

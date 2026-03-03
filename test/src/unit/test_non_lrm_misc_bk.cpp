@@ -13,17 +13,6 @@ static ModuleItem* FirstItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, StaticCastStringType) {
-  // §6.24.1: string'(expr) cast is valid per grammar.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    string s;\n"
-              "    s = string'(8'h41);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // §6.24.2: Dynamic casting — $cast
 // =========================================================================
