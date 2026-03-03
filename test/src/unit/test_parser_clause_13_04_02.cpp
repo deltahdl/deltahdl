@@ -672,4 +672,26 @@ TEST(ParserSection4, Sec4_9_4_StaticFuncWithStaticLocal) {
   EXPECT_EQ(fn->func_body_stmts[0]->var_name, "seq_num");
 }
 
+// =============================================================================
+// 9. Function in program block (automatic by default)
+// =============================================================================
+TEST(ParserSection4, Sec4_9_3_FunctionInProgramBlock) {
+  auto r = Parse(
+      "program p;\n"
+      "  function int get_value();\n"
+      "    int local_v;\n"
+      "    local_v = 42;\n"
+      "    return local_v;\n"
+      "  endfunction\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_GE(r.cu->programs[0]->items.size(), 1u);
+  auto* item = r.cu->programs[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(item->name, "get_value");
+}
+
 }  // namespace
