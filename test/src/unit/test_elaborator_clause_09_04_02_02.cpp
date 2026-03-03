@@ -384,4 +384,32 @@ TEST(SimCh9d, AlwaysStarMultipleStmts) {
   LowerRunAndCheck(f, design, {{"x", 0x11u}, {"y", 0x22u}});
 }
 
+// ---------------------------------------------------------------------------
+// 14. always @* with arithmetic operators (+, -, *, /).
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarArithmetic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a, b, y;\n"
+      "  always @* y = (a + b) * 2;\n"
+      "  initial begin\n"
+      "    a = 10;\n"
+      "    b = 5;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  // (10 + 5) * 2 = 30.
+  EXPECT_EQ(y->value.ToUint64(), 30u);
+}
+
 }  // namespace
