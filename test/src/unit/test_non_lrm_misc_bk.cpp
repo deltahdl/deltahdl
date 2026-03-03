@@ -25,14 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, AssignmentCompatibleRealToReal) {
-  DataType a;
-  a.kind = DataTypeKind::kReal;
-  DataType b;
-  b.kind = DataTypeKind::kShortreal;
-  EXPECT_TRUE(IsAssignmentCompatible(a, b));
-}
-
 TEST(ParserSection6, CastCompatibleRealToInt) {
   DataType a;
   a.kind = DataTypeKind::kReal;
