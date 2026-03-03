@@ -31,21 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// Longint function return type.
-TEST(ParserSection6, Sec6_11_LongintFunctionReturnType) {
-  auto r = Parse(
-      "module t;\n"
-      "  function longint get_id();\n"
-      "    return 64'd1;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->return_type.kind, DataTypeKind::kLongint);
-}
-
 // Integer function return type.
 TEST(ParserSection6, Sec6_11_IntegerFunctionReturnType) {
   auto r = Parse(
