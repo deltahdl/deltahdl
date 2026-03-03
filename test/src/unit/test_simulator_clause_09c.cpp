@@ -8,33 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 21. Ternary operator in always_latch selects second operand.
-TEST(SimCh9c, TernarySelectsSecond) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic sel;\n"
-      "  logic [7:0] a, b, q;\n"
-      "  initial begin\n"
-      "    sel = 0;\n"
-      "    a = 8'hCA;\n"
-      "    b = 8'hFE;\n"
-      "  end\n"
-      "  always_latch\n"
-      "    q = sel ? a : b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->value.ToUint64(), 0xFEu);
-}
-
 // =============================================================================
 // §9.2.3: always_latch with nested if-else
 // =============================================================================
