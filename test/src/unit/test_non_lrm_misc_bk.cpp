@@ -25,14 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, CastCompatibleRealToInt) {
-  DataType a;
-  a.kind = DataTypeKind::kReal;
-  DataType b;
-  b.kind = DataTypeKind::kInt;
-  EXPECT_TRUE(IsCastCompatible(a, b));
-}
-
 TEST(ParserSection6, MatchingTypesSameSigningModifier) {
   // §6.22.1g: Explicitly adding signed to a type that is already signed
   // creates a matching type.

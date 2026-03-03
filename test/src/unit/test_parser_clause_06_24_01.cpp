@@ -371,4 +371,12 @@ TEST(ParserSection8, StaticCastTypeSyntax) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, CastCompatibleRealToInt) {
+  DataType a;
+  a.kind = DataTypeKind::kReal;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_TRUE(IsCastCompatible(a, b));
+}
+
 }  // namespace
