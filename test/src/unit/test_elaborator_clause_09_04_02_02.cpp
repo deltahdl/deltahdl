@@ -721,4 +721,31 @@ TEST(SimCh9d, MultipleAlwaysStarIndependent) {
   EXPECT_EQ(y->value.ToUint64(), 0xA5u);
 }
 
+// ---------------------------------------------------------------------------
+// 27. Verify correctness of combinational output set via initial block.
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarCombOutputFromInitial) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] a, b, y;\n"
+      "  always @* y = a + b;\n"
+      "  initial begin\n"
+      "    a = 16'h1234;\n"
+      "    b = 16'h4321;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 0x5555u);
+}
+
 }  // namespace
