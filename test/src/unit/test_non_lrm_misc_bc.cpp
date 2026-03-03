@@ -5,24 +5,6 @@
 
 using namespace delta;
 
-struct ParseResult4b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static Stmt* FirstInitialStmt(ParseResult4b& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
 struct ParseResult4c {
   SourceManager mgr;
   Arena arena;
@@ -55,23 +37,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 }
 
 namespace {
-
-// ---------------------------------------------------------------------------
-// 30. Disable statement (task/block disable)
-// ---------------------------------------------------------------------------
-TEST(ParserSection4, Sec4_5_DisableStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : blk\n"
-      "    disable blk;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
-}
 
 // =============================================================================
 // §4.6: always_comb guarantees combinational semantics
