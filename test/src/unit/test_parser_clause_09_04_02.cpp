@@ -583,4 +583,21 @@ TEST(Parser, EventWaitBareIdentifier) {
   EXPECT_EQ(stmt->events[0].signal->text, "ev");
 }
 
+// =============================================================================
+// LRM section 9.4.2 -- Event control (@)
+// =============================================================================
+TEST(ParserSection9, EventControlPosedgeKind) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
 }  // namespace
