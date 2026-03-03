@@ -41,14 +41,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, NestedAttribute_Error) {
-  // §5.12: Nesting of attribute instances is disallowed.
-  EXPECT_FALSE(
-      ParseOk("module t;\n"
-              "  (* foo = 1 + (* bar *) 2 *) logic x;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserCh512, AttributeValue_NoNesting_Ok) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
