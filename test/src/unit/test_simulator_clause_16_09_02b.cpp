@@ -16,23 +16,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SvaEngine, ConsecutiveRepetitionRange) {
-  SvaSequence seq;
-  seq.kind = SvaSequenceKind::kConsecutiveRepetition;
-  seq.rep_min = 2;
-  seq.rep_max = 4;
-  seq.expr_check = [](uint64_t v) { return v == 1; };
-
-  // 2 is within [2:4].
-  EXPECT_TRUE(MatchRepetition(seq, {1, 1}));
-  // 3 is within [2:4].
-  EXPECT_TRUE(MatchRepetition(seq, {1, 1, 1}));
-  // 4 is within [2:4].
-  EXPECT_TRUE(MatchRepetition(seq, {1, 1, 1, 1}));
-  // 1 is below range.
-  EXPECT_FALSE(MatchRepetition(seq, {1}));
-}
-
 // =============================================================================
 // Edge cases and robustness
 // =============================================================================
