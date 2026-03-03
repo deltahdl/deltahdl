@@ -155,4 +155,15 @@ TEST(ParserSection6, RealVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
 }
 
+TEST(ParserSection6, ShortrealVarDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  shortreal sr;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
+}
+
 }  // namespace

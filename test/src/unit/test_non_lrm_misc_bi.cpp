@@ -40,17 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-TEST(ParserSection6, ShortrealVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  shortreal sr;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
-}
-
 TEST(ParserSection6, RealtimeVarDecl) {
   auto r = Parse(
       "module t;\n"
