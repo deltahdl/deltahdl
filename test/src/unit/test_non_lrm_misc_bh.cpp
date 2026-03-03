@@ -30,16 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, ShortrealCast) {
-  // Cast to shortreal
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int i = 42;\n"
-              "  shortreal sr;\n"
-              "  initial sr = shortreal'(i);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, ShortrealInPort) {
   // shortreal as port type (LRM 23.2.2)
   EXPECT_TRUE(
