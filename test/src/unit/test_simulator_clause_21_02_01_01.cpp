@@ -29,4 +29,12 @@ TEST(SimA82, SystemTaskDisplay) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
+TEST(SysTask, FormatOctal) {
+  std::vector<Logic4Vec> vals;
+  Arena arena;
+  vals.push_back(MakeLogic4VecVal(arena, 32, 8));
+  auto out = FormatDisplay("%o", vals);
+  EXPECT_EQ(out, "00000000010");
+}
+
 }  // namespace

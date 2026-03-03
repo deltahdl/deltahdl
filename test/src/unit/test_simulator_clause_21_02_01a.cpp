@@ -1,25 +1,15 @@
-// §21.2.1: The display and write tasks
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include <cstring>
 #include <string>
 #include <vector>
-
 #include "common/arena.h"
 #include "simulator/eval.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(SysTask, FormatOctal) {
-  std::vector<Logic4Vec> vals;
-  Arena arena;
-  vals.push_back(MakeLogic4VecVal(arena, 32, 8));
-  auto out = FormatDisplay("%o", vals);
-  EXPECT_EQ(out, "00000000010");
-}
 
 TEST(SysTask, FormatReal_e) {
   std::vector<Logic4Vec> vals;
