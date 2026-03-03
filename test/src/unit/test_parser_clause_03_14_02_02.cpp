@@ -384,4 +384,20 @@ TEST(ParserClause03, Cl3_14_2_2_TimeprecisionAloneNoUnit) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
+// 58. Keywords must precede other items in the time scope.
+// §3.14.2.2: "If specified, the timeunit and timeprecision declarations
+// shall precede any other items in the current time scope."
+// This test verifies timeunit before other items parses without error.
+TEST(ParserClause03, Cl3_14_2_2_PrecedeOtherItems) {
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "  logic x;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
+}
+
 }  // namespace

@@ -42,22 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 58. Keywords must precede other items in the time scope.
-// §3.14.2.2: "If specified, the timeunit and timeprecision declarations
-// shall precede any other items in the current time scope."
-// This test verifies timeunit before other items parses without error.
-TEST(ParserClause03, Cl3_14_2_2_PrecedeOtherItems) {
-  auto r = ParseTimescale31402(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "  logic x;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
-}
-
 // 59. Repeated timeunit/timeprecision that match previous declaration.
 // §3.14.2.2: "The timeunit and timeprecision declarations can be
 // repeated as later items, but shall match the previous declaration
