@@ -36,4 +36,18 @@ TEST(ParserSection8, ConstProperty) {
   EXPECT_EQ(cls->members[0]->name, "MAX");
 }
 
+// §8.9 — Static property with const
+TEST(ParserSection8, StaticConstProperty) {
+  auto r = Parse(
+      "class Config;\n"
+      "  static const int VERSION = 3;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_GE(cls->members.size(), 1u);
+  EXPECT_TRUE(cls->members[0]->is_static);
+  EXPECT_TRUE(cls->members[0]->is_const);
+}
+
 }  // namespace
