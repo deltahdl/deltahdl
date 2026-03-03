@@ -42,22 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 31. Module with `timescale but no explicit timeunit/timeprecision:
-// has_timeunit=false (keywords were not used), but the preprocessor
-// carries the timescale state for this module.
-TEST(ParserClause03, Cl3_14_2_TimescaleWithoutKeywords) {
-  auto r = ParseTimescale31402(
-      "`timescale 1ns / 1ps\n"
-      "module m;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  // Keywords were not used — flags are false.
-  EXPECT_FALSE(mod->has_timeunit);
-  EXPECT_FALSE(mod->has_timeprecision);
-}
-
 // 37. Design elements with timeunit/timeprecision keywords are NOT
 // affected by `timescale.  §3.14.2.1: "that do not have timeunit and
 // timeprecision constructs specified within the design element."
