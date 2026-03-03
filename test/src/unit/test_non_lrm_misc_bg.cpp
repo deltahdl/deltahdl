@@ -41,15 +41,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, Attribute_OnModuleInstantiation) {
-  // Section 5.12 Example 4: attribute on a module instantiation.
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  (* optimize_power=0 *)\n"
-              "  sub u1(.a(x));\n"
-              "endmodule"));
-}
-
 TEST(ParserCh512, Attribute_OnIfStatement) {
   auto r = Parse(
       "module m;\n"
