@@ -531,4 +531,18 @@ TEST(ParserSection6, BlockVarDecl_Automatic) {
   EXPECT_TRUE(stmt->var_is_automatic);
 }
 
+TEST(ParserSection6, BlockVarDecl_Automatic_Props) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic int auto1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_FALSE(stmt->var_is_static);
+  EXPECT_EQ(stmt->var_name, "auto1");
+}
+
 }  // namespace
