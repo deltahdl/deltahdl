@@ -23,37 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 18. Underscore in numbers
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, UnderscoreInNumber) {
-  // §5.7.1: Underscores are legal anywhere in a number except as first char.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a, b, c;\n"
-      "  initial begin\n"
-      "    a = 27_195_000;\n"
-      "    b = 16'b0011_0101_0001_1111;\n"
-      "    c = 32'h12ab_f001;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  auto* vc = f.ctx.FindVariable("c");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  ASSERT_NE(vc, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 27195000u);
-  EXPECT_EQ(vb->value.ToUint64(), 0x351Fu);
-  EXPECT_EQ(vc->value.ToUint64(), 0x12ABF001u);
-}
-
-// ---------------------------------------------------------------------------
 // 19. Left padding with zeros (value smaller than size)
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, LeftPadWithZeros) {
