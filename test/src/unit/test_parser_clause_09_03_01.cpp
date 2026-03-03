@@ -893,4 +893,29 @@ TEST(ParserSection9, Sec9_3_1_NestedBeginEndTwoLevels) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
+TEST(ParserSection9, Sec9_3_1_DeeplyNestedBeginEndThreeLevels) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      begin\n"
+      "        a = 1;\n"
+      "      end\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 1u);
+  auto* mid = body->stmts[0];
+  EXPECT_EQ(mid->kind, StmtKind::kBlock);
+  ASSERT_EQ(mid->stmts.size(), 1u);
+  auto* inner = mid->stmts[0];
+  EXPECT_EQ(inner->kind, StmtKind::kBlock);
+  ASSERT_EQ(inner->stmts.size(), 1u);
+  EXPECT_EQ(inner->stmts[0]->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace
