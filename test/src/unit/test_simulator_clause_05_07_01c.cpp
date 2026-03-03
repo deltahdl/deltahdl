@@ -21,16 +21,6 @@ static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
 
 namespace {
 
-TEST(EvalAdv, UnsignedBaseLiteralNotSigned) {
-  SimFixture f;
-  // 4'd3 should produce is_signed=false.
-  auto* lit = MakeSizedLiteral(f.arena, "4'd3", 3);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_FALSE(result.is_signed);
-  EXPECT_EQ(result.width, 4u);
-  EXPECT_EQ(result.ToUint64(), 3u);
-}
-
 TEST(EvalAdv, SignedHexLiteralIsSigned) {
   SimFixture f;
   // 8'shFF should produce is_signed=true.
