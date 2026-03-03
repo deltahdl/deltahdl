@@ -52,17 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh501, Sec5_1_EmptyCuCommentsOnly) {
-  // A compilation unit containing only comments parses to an empty CU.
-  auto r = Parse(
-      "// line comment\n"
-      "/* block\n"
-      "   comment */\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
-}
-
 TEST(ParserCh501, Sec5_1_EmptyCuCompletelyEmpty) {
   // An entirely empty source file parses to an empty CU.
   auto r = Parse("");

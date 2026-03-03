@@ -146,4 +146,15 @@ TEST(LibraryText, BlockComments) {
   ASSERT_EQ(r.cu->libraries.size(), 1u);
 }
 
+TEST(ParserCh501, Sec5_1_EmptyCuCommentsOnly) {
+  // A compilation unit containing only comments parses to an empty CU.
+  auto r = Parse(
+      "// line comment\n"
+      "/* block\n"
+      "   comment */\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->modules.empty());
+  EXPECT_TRUE(r.cu->packages.empty());
+}
+
 }  // namespace
