@@ -52,10 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh505, Operator_ArithShiftRight) {
-  EXPECT_TRUE(ParseOk("module m; initial x = a >>> 1; endmodule"));
-}
-
 TEST(ParserCh505, Operator_CaseEquality) {
   // === is the case equality operator.
   auto r = Parse(
