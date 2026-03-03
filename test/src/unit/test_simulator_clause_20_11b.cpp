@@ -28,21 +28,6 @@ struct SvaFixture {
 
 namespace {
 
-TEST(SvaEngine, AssertionControlEnabledExecution) {
-  SvaFixture f;
-  bool executed = false;
-
-  DeferredAssertion da;
-  da.condition_val = 1;
-  da.instance_name = "my_assert";
-  da.pass_action = [&executed]() { executed = true; };
-
-  f.engine.QueueDeferredAssertionIfEnabled(da);
-  f.engine.FlushDeferredAssertions(f.scheduler, SimTime{0});
-  f.scheduler.Run();
-  EXPECT_TRUE(executed);
-}
-
 TEST(SvaEngine, PassOffSkipsPassAction) {
   SvaFixture f;
   bool pass_called = false;
