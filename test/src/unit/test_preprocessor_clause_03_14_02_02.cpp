@@ -69,4 +69,13 @@ TEST(Lexical, Timeunit_BasicParse) {
   EXPECT_EQ(r.cu->modules[0]->name, "top");
 }
 
+TEST(Lexical, Timeprecision_BasicParse) {
+  auto r = ParseWithPreprocessor(
+      "module top;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+}
+
 }  // namespace
