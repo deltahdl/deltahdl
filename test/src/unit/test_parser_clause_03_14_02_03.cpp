@@ -103,4 +103,25 @@ TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInheritsUnit) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
 }
 
+// 4. Rule (a): Nested interface inherits from enclosing interface.
+TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInterfaceInherits) {
+  auto r = ParseTimescale31402(
+      "interface outer_if;\n"
+      "  timeunit 1us;\n"
+      "  timeprecision 1ns;\n"
+      "  interface inner_if;\n"
+      "  endinterface\n"
+      "endinterface\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* outer = r.cu->interfaces[0];
+  auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
+
+  auto* inner = FindNestedModule(outer->items);
+  ASSERT_NE(inner, nullptr);
+  auto inner_resolved =
+      ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
+  EXPECT_EQ(inner_resolved.unit, TimeUnit::kUs);
+  EXPECT_EQ(inner_resolved.precision, TimeUnit::kNs);
+}
+
 }  // namespace
