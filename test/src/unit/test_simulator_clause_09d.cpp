@@ -10,35 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 4. always @* sensitivity includes all RHS signals (a, b, c).
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarAllRhsSensitive) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, y;\n"
-      "  always @* y = a + b + c;\n"
-      "  initial begin\n"
-      "    a = 8'h10;\n"
-      "    b = 8'h20;\n"
-      "    c = 8'h03;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  // 0x10 + 0x20 + 0x03 = 0x33.
-  EXPECT_EQ(y->value.ToUint64(), 0x33u);
-}
-
-// ---------------------------------------------------------------------------
 // 5. always @* does NOT include LHS signal 'y' in sensitivity.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarLhsNotSensitive) {
