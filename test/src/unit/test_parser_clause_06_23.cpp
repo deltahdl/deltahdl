@@ -442,4 +442,12 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnShortint) {
               "endmodule\n"));
 }
 
+// 18. type() on longint data type.
+TEST(ParserSection6, Sec6_11_1_TypeRefOnLongint) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(longint);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -54,14 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 18. type() on longint data type.
-TEST(ParserSection6, Sec6_11_1_TypeRefOnLongint) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial x = type(longint);\n"
-              "endmodule\n"));
-}
-
 // 19. type() on real data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnReal) {
   EXPECT_TRUE(
