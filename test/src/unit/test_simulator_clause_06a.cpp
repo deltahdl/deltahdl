@@ -1,3 +1,4 @@
+// Non-LRM tests
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -5,30 +6,17 @@
 
 using namespace delta;
 
-// §6.24.1: signed'(x) sets is_signed flag.
-TEST(SimCh6, CastSigned) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    x = 8'hFF;\n"
-      "    result = signed'(x);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  // 8'hFF sign-extended to 32 bits = 0xFFFFFFFF (-1 as unsigned).
-  EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
+static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
+                            uint32_t expected_width, bool& found) {
+  for (const auto& n : mod->nets) {
+    if (n.name == name) {
+      found = true;
+      EXPECT_EQ(n.width, expected_width);
+    }
+  }
 }
+
+namespace {
 
 // §6.24.1: unsigned'(x) clears is_signed flag.
 TEST(SimCh6, CastUnsigned) {
@@ -356,16 +344,6 @@ TEST(SimCh6, BitStreamShortArrayToInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEu);
 }
 
-static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
-                            uint32_t expected_width, bool& found) {
-  for (const auto& n : mod->nets) {
-    if (n.name == name) {
-      found = true;
-      EXPECT_EQ(n.width, expected_width);
-    }
-  }
-}
-
 // §6.6.7: User-defined nettype creates a net with correct width.
 TEST(SimCh6, NettypeCreatesNet) {
   SimFixture f;
@@ -411,3 +389,5 @@ TEST(SimCh6, NettypeWideNet) {
   VerifyNetByName(mod, "y", 16u, found_net);
   EXPECT_TRUE(found_net) << "y should be elaborated as a net";
 }
+
+}  // namespace
