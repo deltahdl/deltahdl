@@ -65,4 +65,15 @@ TEST(ParserCh501, Sec5_1_IdentifierAllLegalChars) {
   EXPECT_EQ(item->name, "abc_123$xyz");
 }
 
+// =========================================================================
+// Simple identifiers starting with underscore
+// =========================================================================
+TEST(ParserCh501, Sec5_1_IdentifierStartsWithUnderscore) {
+  auto r = Parse("module m; logic _start_val; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "_start_val");
+}
+
 }  // namespace
