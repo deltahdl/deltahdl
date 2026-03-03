@@ -17,4 +17,21 @@ TEST(ParserClause03, Cl3_14_TimeUnitEnumValues) {
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kFs), -15);
 }
 
+// 2. Table 3-1: ParseTimeUnitStr maps all six character strings.
+TEST(ParserClause03, Cl3_14_Table3_1_AllUnitStrings) {
+  TimeUnit u = TimeUnit::kNs;
+  EXPECT_TRUE(ParseTimeUnitStr("s", u));
+  EXPECT_EQ(u, TimeUnit::kS);
+  EXPECT_TRUE(ParseTimeUnitStr("ms", u));
+  EXPECT_EQ(u, TimeUnit::kMs);
+  EXPECT_TRUE(ParseTimeUnitStr("us", u));
+  EXPECT_EQ(u, TimeUnit::kUs);
+  EXPECT_TRUE(ParseTimeUnitStr("ns", u));
+  EXPECT_EQ(u, TimeUnit::kNs);
+  EXPECT_TRUE(ParseTimeUnitStr("ps", u));
+  EXPECT_EQ(u, TimeUnit::kPs);
+  EXPECT_TRUE(ParseTimeUnitStr("fs", u));
+  EXPECT_EQ(u, TimeUnit::kFs);
+}
+
 }  // namespace
