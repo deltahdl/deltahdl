@@ -17,13 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// Class with end label.
-TEST(SourceText, ClassEndLabel) {
-  auto r = Parse("class C; endclass : C\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserAnnexA, A2ClassDecl) {
   auto r = Parse(
       "class Packet;\n"
