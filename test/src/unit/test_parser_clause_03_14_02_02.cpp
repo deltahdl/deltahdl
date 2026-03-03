@@ -289,4 +289,20 @@ TEST(ParserClause03, Cl3_14_2_2_RemovesFileOrderDependency) {
   EXPECT_EQ(r1.cu->modules[0]->time_prec, TimeUnit::kFs);
 }
 
+// 51. At most one timeunit and one timeprecision per design element
+// defines a "time scope".
+// §3.14.2.2: "There shall be at most one time unit and one time
+// precision for any module, program, package, or interface definition."
+TEST(ParserClause03, Cl3_14_2_2_DefinesTimeScope) {
+  // One timeunit + one timeprecision: valid time scope.
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
+}
+
 }  // namespace
