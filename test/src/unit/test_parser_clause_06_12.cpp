@@ -87,4 +87,36 @@ TEST(ParserSection6, Sec6_5_RealVarDeclKind) {
   EXPECT_FALSE(item->data_type.is_net);
 }
 
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// Non-integer types (real, shortreal, realtime).
+TEST(ParserSection8, DataTypeSyntaxNonInteger) {
+  auto r = Parse(
+      "module m;\n"
+      "  real r;\n"
+      "  shortreal sr;\n"
+      "  realtime rt;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 3u);
+  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kReal);
+  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kShortreal);
+  EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kRealtime);
+}
+
 }  // namespace

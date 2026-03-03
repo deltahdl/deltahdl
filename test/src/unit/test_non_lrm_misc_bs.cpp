@@ -40,22 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// Non-integer types (real, shortreal, realtime).
-TEST(ParserSection8, DataTypeSyntaxNonInteger) {
-  auto r = Parse(
-      "module m;\n"
-      "  real r;\n"
-      "  shortreal sr;\n"
-      "  realtime rt;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 3u);
-  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kReal);
-  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kShortreal);
-  EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kRealtime);
-}
-
 // =============================================================================
 // Section 8.6 -- String data type
 // =============================================================================
