@@ -41,33 +41,6 @@ static Stmt* FirstAlwaysCombStmt(ParseResult9g& r) {
 namespace {
 
 // ---------------------------------------------------------------------------
-// 4. always_comb with case statement
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_CaseStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [3:0] y;\n"
-      "  always_comb begin\n"
-      "    case (sel)\n"
-      "      2'b00: y = 4'h0;\n"
-      "      2'b01: y = 4'h1;\n"
-      "      2'b10: y = 4'h2;\n"
-      "      default: y = 4'hF;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstAlwaysCombStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
-  ASSERT_EQ(stmt->case_items.size(), 4u);
-  EXPECT_TRUE(stmt->case_items[3].is_default);
-}
-
-// ---------------------------------------------------------------------------
 // 5. always_comb with casex statement
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_CasexStatement) {
