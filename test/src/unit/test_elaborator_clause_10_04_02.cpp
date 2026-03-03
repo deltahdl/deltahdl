@@ -664,4 +664,23 @@ TEST(SimCh10b, NBAComparisonResult) {
   EXPECT_EQ(r_gt->value.ToUint64(), 0u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: Mixed blocking and nonblocking in same block — blocking first.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, MixedBlockingAndNBA) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "    b <= a + 1;\n"
+      "    a = 10;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 6u}});
+}
+
 }  // namespace
