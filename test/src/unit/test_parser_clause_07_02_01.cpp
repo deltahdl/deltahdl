@@ -757,4 +757,18 @@ TEST(ParserSection7, PackedStructUnsigned4State) {
   EXPECT_EQ(item->data_type.struct_members.size(), 3u);
 }
 
+TEST(ParserSection7, PackedStructDefaultUnsigned) {
+  auto r = Parse(
+      "module t;\n"
+      "  struct packed {\n"
+      "    bit [3:0] x;\n"
+      "  } ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->data_type.is_packed);
+  EXPECT_FALSE(item->data_type.is_signed);
+}
+
 }  // namespace
