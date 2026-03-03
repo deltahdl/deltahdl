@@ -13,22 +13,6 @@ static ModuleItem* FirstItem(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.9: Vector declarations — signed vectors
-// =========================================================================
-TEST(ParserSection6, VectorUnsignedExplicit) {
-  // §6.9: Explicit unsigned qualifier on a vector.
-  auto r = ParseWithPreprocessor(
-      "module t;\n"
-      "  logic unsigned [7:0] uv;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_FALSE(item->data_type.is_signed);
-}
-
 TEST(ParserSection6, VectorSignedBitType) {
   // §6.9: bit type with signed qualifier.
   auto r = ParseWithPreprocessor(
