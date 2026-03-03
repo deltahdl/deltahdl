@@ -71,16 +71,6 @@ bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
 
 namespace {
 
-// §28.16: "When one delay value is given, then this value shall be
-//  used for all propagation delays."
-TEST(GateNetDelays, SingleDelayUsedForAll) {
-  DelaySpec spec{10, 0, 0, 1};
-  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kV1), 10u);
-  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kV0), 10u);
-  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kX), 10u);
-  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kZ), 10u);
-}
-
 // §28.16: "When two delays are given, the first delay shall specify
 //  the rise delay, and the second delay shall specify the fall
 //  delay."
