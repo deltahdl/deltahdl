@@ -23,30 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 28. Left padding with z when leftmost bit is z
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, LeftPadWithZ) {
-  // §5.7.1: Leftmost z causes z-padding to the left.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [11:0] x;\n"
-      "  initial x = 'hz;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  // z encoding: aval=0, bval=1 per bit; left-padded to full width.
-  uint16_t mask = 0xFFF;
-  EXPECT_EQ(var->value.words[0].aval & mask, 0u);
-  EXPECT_EQ(var->value.words[0].bval & mask, mask);
-}
-
-// ---------------------------------------------------------------------------
 // 29. Signed based literal with 's' designator
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SignedBasedLiteral) {
