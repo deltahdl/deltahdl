@@ -483,4 +483,17 @@ TEST(SourceText, TimeunitAndTimeprecisionSeparate) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
+// 11. CU-scope combined timeunit X / Y syntax.
+TEST(ParserClause03, Cl3_14_2_3_CUTimeunitSlashSyntax) {
+  auto r = ParseTimescale31402(
+      "timeunit 100ps / 10fs;\n"
+      "module m;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->has_cu_timeunit);
+  EXPECT_TRUE(r.cu->has_cu_timeprecision);
+  EXPECT_EQ(r.cu->cu_time_unit, TimeUnit::kPs);
+  EXPECT_EQ(r.cu->cu_time_prec, TimeUnit::kFs);
+}
+
 }  // namespace

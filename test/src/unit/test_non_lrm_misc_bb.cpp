@@ -42,19 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 11. CU-scope combined timeunit X / Y syntax.
-TEST(ParserClause03, Cl3_14_2_3_CUTimeunitSlashSyntax) {
-  auto r = ParseTimescale31402(
-      "timeunit 100ps / 10fs;\n"
-      "module m;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->has_cu_timeunit);
-  EXPECT_TRUE(r.cu->has_cu_timeprecision);
-  EXPECT_EQ(r.cu->cu_time_unit, TimeUnit::kPs);
-  EXPECT_EQ(r.cu->cu_time_prec, TimeUnit::kFs);
-}
-
 // 12. Same precedence rules apply for timeprecision (§3.14.2.3).
 TEST(ParserClause03, Cl3_14_2_3_SameRulesForPrecision) {
   // Module has no timeprecision, enclosing has it.
