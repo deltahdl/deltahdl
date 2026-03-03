@@ -113,4 +113,11 @@ TEST(ParserA82, ListOfArgsPositionalOnly) {
   EXPECT_TRUE(expr->arg_names.empty());
 }
 
+TEST(ParserSection11, Sec11_1_ExprAsFunctionArgument) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $display(a + b, c * d, {e, f});\n"
+              "endmodule\n"));
+}
+
 }  // namespace
