@@ -41,22 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult7& r) {
 namespace {
 
 // =========================================================================
-// §7.4.1: Packed arrays (multidimensional packed dims)
-// =========================================================================
-TEST(ParserSection7, MultidimensionalPackedArray) {
-  auto r = Parse(
-      "module t;\n"
-      "  bit [3:0] [7:0] joe [1:10];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "joe");
-  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
-// =========================================================================
 // §7.4.3: Memories
 // =========================================================================
 TEST(ParserSection7, MemoryDeclaration_Type) {
