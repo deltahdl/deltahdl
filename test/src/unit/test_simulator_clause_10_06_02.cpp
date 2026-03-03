@@ -181,4 +181,37 @@ TEST(ForceRelease, ForceNetOverridesAllDrivers) {
   EXPECT_EQ(ValOf(*var), kVal1);
 }
 
+void ReleaseNet(Net& net, Arena& arena) {
+  (void)arena;
+  if (!net.drivers.empty()) {
+    net.resolved->value = net.drivers[0];
+  } else {
+    // Set to z: aval=1, bval=1.
+    for (uint32_t i = 0; i < net.resolved->value.nwords; ++i) {
+      net.resolved->value.words[i].aval = 1;
+      net.resolved->value.words[i].bval = 1;
+    }
+  }
+}
+
+// §10.6.2: "When released, the net shall immediately be assigned the
+//  value determined by the drivers of the net."
+TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+
+  ForceNet(net, MakeLogic4VecVal(arena, 1, 1), arena);
+  EXPECT_EQ(ValOf(*var), kVal1);
+
+  ReleaseNet(net, arena);
+  // Should immediately restore to driver value (0).
+  EXPECT_EQ(ValOf(*var), kVal0);
+}
+
 }  // namespace

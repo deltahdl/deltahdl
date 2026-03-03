@@ -75,26 +75,6 @@ static TwoNets MakeTwoWireNets() {
 
 namespace {
 
-// §10.6.2: "When released, the net shall immediately be assigned the
-//  value determined by the drivers of the net."
-TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-
-  ForceNet(net, MakeLogic4VecVal(arena, 1, 1), arena);
-  EXPECT_EQ(ValOf(*var), kVal1);
-
-  ReleaseNet(net, arena);
-  // Should immediately restore to driver value (0).
-  EXPECT_EQ(ValOf(*var), kVal0);
-}
-
 // §10.6.2 example: at time 0, d=0 (a&b&c=1&0&1=0), e=0 (and gate).
 // At time 10, force d and e to a|b|c=1. At time 20, release both back
 // to driver values (0).
