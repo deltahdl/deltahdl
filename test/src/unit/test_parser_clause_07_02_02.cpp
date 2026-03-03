@@ -89,4 +89,47 @@ TEST(ParserSection7, Sec7_2_2_PackedArrayMemberAssign) {
   EXPECT_EQ(s1->lhs->kind, ExprKind::kMemberAccess);
 }
 
+struct ParseResult7e {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult7e Parse(const std::string& src) {
+  ParseResult7e result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+static ModuleItem* FirstItem(ParseResult7e& r) {
+  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
+    return nullptr;
+  return r.cu->modules[0]->items[0];
+}
+
+// --- Packed struct with member default initializer ---
+TEST(ParserSection7, Sec7_2_1_PackedMemberDefaultInit) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] cmd = 8'h00;\n"
+      "    logic [7:0] data;\n"
+      "  } msg_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->typedef_type.is_packed);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
+  EXPECT_NE(item->typedef_type.struct_members[0].init_expr, nullptr);
+  EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
+}
+
 }  // namespace

@@ -60,25 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// --- Packed struct with member default initializer ---
-TEST(ParserSection7, Sec7_2_1_PackedMemberDefaultInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] cmd = 8'h00;\n"
-      "    logic [7:0] data;\n"
-      "  } msg_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->typedef_type.is_packed);
-  ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
-  EXPECT_NE(item->typedef_type.struct_members[0].init_expr, nullptr);
-  EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
-}
-
 // --- Packed struct with multiple members of the same type (comma-separated)
 // ---
 TEST(ParserSection7, Sec7_2_1_PackedMultiMembersSameType) {
