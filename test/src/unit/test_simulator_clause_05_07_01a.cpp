@@ -23,20 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 12. Sized decimal literal constant
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, SizedDecimalLiteral) {
-  // §5.7.1: Sized decimal literal — 5-bit decimal number.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 5'd3;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 3u);
-}
-
-// ---------------------------------------------------------------------------
 // 13. Unsized hex literal (at least 32 bits)
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, UnsizedHexLiteral) {

@@ -593,4 +593,18 @@ TEST(SimCh50701, SizedOctalLiteral) {
   EXPECT_EQ(result, 07460u);
 }
 
+// ---------------------------------------------------------------------------
+// 12. Sized decimal literal constant
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, SizedDecimalLiteral) {
+  // §5.7.1: Sized decimal literal — 5-bit decimal number.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 5'd3;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 3u);
+}
+
 }  // namespace
