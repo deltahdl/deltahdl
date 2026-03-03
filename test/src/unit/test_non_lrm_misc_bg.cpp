@@ -49,13 +49,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-TEST(ParserCh511, ArrayLiteral_DefaultValue) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int arr[0:3] = '{default:0};\n"
-              "endmodule"));
-}
-
 // From test_parser_clause_05.cpp
 TEST(ParserCh512, AttributeOnModuleItem) {
   auto r = Parse(

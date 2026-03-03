@@ -291,4 +291,11 @@ TEST(ParserCh511, ArrayLiteral_Simple) {
               "endmodule"));
 }
 
+TEST(ParserCh511, ArrayLiteral_DefaultValue) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int arr[0:3] = '{default:0};\n"
+              "endmodule"));
+}
+
 }  // namespace
