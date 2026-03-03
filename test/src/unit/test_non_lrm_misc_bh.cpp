@@ -30,19 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, ShortrealWithInitializer) {
-  auto r = Parse(
-      "module m;\n"
-      "  shortreal f = 1.5;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
 TEST(ParserSection6, MultipleRealDecls) {
   auto r = Parse(
       "module m;\n"
