@@ -584,4 +584,32 @@ TEST(SimCh9e, IffEqualityComparison) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
+// §9.4.2.4: Multiple signals, only some with iff guards.
+TEST(SimCh9e, MixedIffAndNoIff) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, rst_n, en;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    clk = 0; rst_n = 1; en = 0; result = 0;\n"
+      "    #1 rst_n = 0;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk iff en or negedge rst_n)\n"
+      "    result = result + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  // posedge clk never occurs. negedge rst_n fires (no iff guard on it).
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace
