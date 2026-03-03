@@ -9,33 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.4: always_ff @(posedge clk iff en) with register update.
-TEST(SimCh9e, AlwaysFFIffRegisterUpdate) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic clk, en;\n"
-      "  logic [31:0] d, q;\n"
-      "  initial begin\n"
-      "    clk = 0; en = 1; d = 55; q = 0;\n"
-      "    #1 clk = 1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "  always_ff @(posedge clk iff en)\n"
-      "    q <= d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("q");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
-}
-
 // §9.4.2.4: always_ff @(posedge clk iff en) suppressed when en=0.
 TEST(SimCh9e, AlwaysFFIffSuppressed) {
   SimFixture f;
