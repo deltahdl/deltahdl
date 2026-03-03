@@ -451,4 +451,17 @@ TEST(ParserSection6, IntegerTypesInProcedural) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, RealWithInitializer) {
+  auto r = Parse(
+      "module m;\n"
+      "  real pi = 3.14159;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
 }  // namespace
