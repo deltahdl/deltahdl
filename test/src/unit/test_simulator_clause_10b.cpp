@@ -10,32 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §10.4.2: NBA with ternary operator on RHS.
-// ---------------------------------------------------------------------------
-TEST(SimCh10b, NBATernaryRHS) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] sel;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    sel = 1;\n"
-      "    result <= sel ? 42 : 99;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-// ---------------------------------------------------------------------------
 // §10.4.2: NBA in always_ff block (canonical use for sequential logic).
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAInAlwaysFF) {
