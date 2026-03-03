@@ -54,17 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 11. type() comparison with === (case equality).
-TEST(ParserSection6, Sec6_11_1_TypeRefCaseEq) {
-  EXPECT_TRUE(
-      ParseOk("module t #(parameter type T = int)\n"
-              "  ();\n"
-              "  initial begin\n"
-              "    if (type(T) === type(int)) $display(\"exact\");\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // 12. type() comparison with !== (case inequality).
 TEST(ParserSection6, Sec6_11_1_TypeRefCaseNeq) {
   EXPECT_TRUE(
