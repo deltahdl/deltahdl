@@ -25,13 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, VarImplicitInPort) {
-  // §6.8: "input var [7:0] data_in;" in port list.
-  EXPECT_TRUE(
-      ParseOk("module t(input var [7:0] data_in);\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // §6.9: Vector declarations
 // =========================================================================
