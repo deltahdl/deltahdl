@@ -30,13 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, RealLiteralZeroPointSomething) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 0.123;\n"
-              "endmodule\n"));
-}
-
 // --- Real conversions (LRM 6.12.1) ---
 TEST(ParserSection6, RealToIntAssignment) {
   // Implicit conversion from real to integer (rounds, not truncates)

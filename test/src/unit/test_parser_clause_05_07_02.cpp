@@ -280,4 +280,11 @@ TEST(ParserSection6, RealLiteralUnderscoresInValue) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, RealLiteralZeroPointSomething) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 0.123;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
