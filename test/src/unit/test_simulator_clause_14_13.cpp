@@ -70,4 +70,38 @@ TEST(SimA611, SampledValueUpdatesAcrossEdges) {
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0x22u);
 }
 
+// Helper fixture for clocking simulation tests.
+// Schedule posedge at a given time through the scheduler.
+// Schedule negedge at a given time through the scheduler.
+// =============================================================================
+// 5. Clocking block input sampling (S14.6)
+// =============================================================================
+TEST(ClockingSim, InputSampling) {
+  ClockingSimFixture f;
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+  auto* sig_a = f.ctx.CreateVariable("sig_a", 16);
+  sig_a->value = MakeLogic4VecVal(f.arena, 16, 0x1234);
+
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
+
+  ClockingSignal sig;
+  sig.signal_name = "sig_a";
+  sig.direction = ClockingDir::kInput;
+  block.signals.push_back(sig);
+  cmgr.Register(block);
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  SchedulePosedge(f, clk, 10);
+  f.scheduler.Run();
+
+  EXPECT_EQ(cmgr.GetSampledValue("cb", "sig_a"), 0x1234u);
+}
+
 }  // namespace
