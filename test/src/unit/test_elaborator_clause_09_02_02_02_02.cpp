@@ -228,4 +228,42 @@ TEST(SimCh9, AlwaysCombCaseDecode) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
+// =============================================================================
+// IEEE 1800 LRM section 9.2.2.2 -- always_comb compared with always @*
+//
+// Key behavioral properties of always_comb:
+//   - Executes once at time 0 automatically (initial evaluation).
+//   - Automatically infers a complete sensitivity list from signals read.
+//   - Re-triggers whenever any read signal changes.
+//   - No blocking timing controls allowed inside.
+//   - Produces combinational logic: AND, OR, XOR, if-else, case, etc.
+//
+// Contrast with always @*:
+//   - Does NOT execute at time 0; waits for the first event.
+//   - The @* is consumed by the parser; in this implementation, always @*
+//     maps to a plain always loop (no implicit suspension).
+// =============================================================================
+// ---------------------------------------------------------------------------
+// 1. always_comb with constant assignment executes at time 0.
+// ---------------------------------------------------------------------------
+TEST(SimCh9b, AlwaysCombConstAssignTime0) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] y;\n"
+      "  always_comb y = 42;\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 42u);
+}
+
 }  // namespace
