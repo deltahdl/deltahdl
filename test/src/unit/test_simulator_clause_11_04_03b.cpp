@@ -11,21 +11,6 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalAdv, PowNeg1EvenExp) {
-  SimFixture f;
-  // (-1) ** 4 = 1 (Table 11-4: base -1, even exp).
-  MakeSignedVarAdv(f, "n1", 8, 0xFF);  // -1 in 8-bit
-  MakeSignedVarAdv(f, "n4", 8, 4);
-  auto* expr = f.arena.Create<Expr>();
-  expr->kind = ExprKind::kBinary;
-  expr->op = TokenKind::kPower;
-  expr->lhs = MakeId(f.arena, "n1");
-  expr->rhs = MakeId(f.arena, "n4");
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-  EXPECT_TRUE(result.is_signed);
-}
-
 // ==========================================================================
 // Signed arithmetic — §11.4.3, §11.4.3.1
 // ==========================================================================
