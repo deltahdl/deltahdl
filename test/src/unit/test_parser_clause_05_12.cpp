@@ -219,4 +219,8 @@ TEST(ParserCh512, AttributeWithValue_Values) {
   ASSERT_NE(item->attrs[1].value, nullptr);
 }
 
+TEST(ParserCh512, TopLevel_AttributeBeforeModule) {
+  EXPECT_TRUE(ParseOk("(* optimize_power *) module m; endmodule"));
+}
+
 }  // namespace
