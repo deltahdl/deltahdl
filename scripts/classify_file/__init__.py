@@ -91,7 +91,9 @@ def ensure_unchecked(
             body = body.rstrip("\n") + "\n- [ ] " + name + "\n"
             changed = True
     if changed:
-        print(f"Resetting checkboxes for issue #{args.issue}...")
+        print(f"Resetting checkboxes for issue #{args.issue}"
+              " because a previous run already checked"
+              " some boxes...")
         update_issue_body(
             args.organization, args.repo, args.issue, body,
         )
@@ -127,7 +129,7 @@ def run_classify_test(
     total: int,
 ) -> bool:
     """Invoke classify_test for a single test. Returns True on success."""
-    print(f"Processing test {index}/{total}: {test_name}()")
+    print(f"Processing test {index}/{total}: {test_name}")
     cmd = _build_command(args, test_name)
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
@@ -135,9 +137,9 @@ def run_classify_test(
     return True
 
 
-def close_issue(args: argparse.Namespace) -> None:
+def close_issue(args: argparse.Namespace, reason: str) -> None:
     """Close the GitHub issue using gh api."""
-    print(f"Closing issue #{args.issue}...")
+    print(f"Closing issue #{args.issue} because {reason}...")
     result = subprocess.run(
         ["gh", "api",
          f"repos/{args.organization}/{args.repo}/issues/{args.issue}",
@@ -209,17 +211,18 @@ def _run(args: argparse.Namespace) -> None:
     if not filepath.is_file():
         print(f"Skipping: {filepath} not found")
         if not args.create_issue and args.issue is not None:
-            close_issue(args)
+            close_issue(args, "the source file no longer exists")
         return
     test_names = extract_test_names(filepath)
     if not test_names:
-        print(f"Deleting empty file {filepath.name}...")
+        print(f"Deleting {filepath.name} because it contains"
+              " no tests...")
         filepath.unlink()
         print(f"Deleted {filepath.name}")
         if not args.dry_run and not args.no_commit:
             commit_and_push([], [filepath], f"Delete empty {filepath.name}\n")
         if not args.create_issue and args.issue is not None:
-            close_issue(args)
+            close_issue(args, "the file has no tests")
         return
     if args.create_issue:
         args.issue = create_issue(args, test_names)
@@ -230,7 +233,7 @@ def _run(args: argparse.Namespace) -> None:
         if not run_classify_test(args, name, i, total):
             sys.exit(1)
     if not args.dry_run:
-        close_issue(args)
+        close_issue(args, "all tests have been classified")
 
 
 def main():

@@ -31,7 +31,7 @@ _parse_args = getattr(classify_test, "_parse_args")
 _ALL_FLAGS = ["prog", "--file", "f.cpp", "--output-dir", "/out",
               "--lrm", "/lrm.txt", "--test", "T",
               "--issue", "42", "--organization", "myorg",
-              "--repo", "myrepo"]
+              "--repo", "myrepo", "--max-lines", "1000"]
 
 
 def test_parse_args_issue(monkeypatch):
@@ -46,7 +46,8 @@ def test_parse_args_issue_required(monkeypatch):
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
          "--lrm", "/lrm.txt", "--test", "T",
-         "--organization", "myorg", "--repo", "myrepo"],
+         "--organization", "myorg", "--repo", "myrepo",
+         "--max-lines", "1000"],
     )
     with pytest.raises(SystemExit):
         _parse_args()
@@ -64,7 +65,8 @@ def test_parse_args_organization_required(monkeypatch):
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
          "--lrm", "/lrm.txt", "--test", "T",
-         "--issue", "42", "--repo", "myrepo"],
+         "--issue", "42", "--repo", "myrepo",
+         "--max-lines", "1000"],
     )
     with pytest.raises(SystemExit):
         _parse_args()
@@ -82,7 +84,8 @@ def test_parse_args_repo_required(monkeypatch):
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
          "--lrm", "/lrm.txt", "--test", "T",
-         "--issue", "42", "--organization", "myorg"],
+         "--issue", "42", "--organization", "myorg",
+         "--max-lines", "1000"],
     )
     with pytest.raises(SystemExit):
         _parse_args()

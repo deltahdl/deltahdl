@@ -70,7 +70,7 @@ def _stub_close(monkeypatch):
     called: list[bool] = []
     monkeypatch.setattr(
         classify_file, "close_issue",
-        lambda _a: called.append(True),
+        lambda _a, _r: called.append(True),
     )
     return called
 

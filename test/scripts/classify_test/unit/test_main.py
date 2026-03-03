@@ -38,7 +38,7 @@ def _run_args(tmp_path, **overrides):
     defaults = {
         "file": str(tmp_path / "test_input.cpp"),
         "output_dir": str(tmp_path), "dry_run": False,
-        "lrm": str(tmp_path / "lrm.txt"), "max_lines": None,
+        "lrm": str(tmp_path / "lrm.txt"), "max_lines": 1000,
         "test": "T", "issue": None, "organization": None,
         "repo": None, "no_commit": False,
     }
@@ -51,7 +51,8 @@ def _run_args(tmp_path, **overrides):
 
 _BASE_ARGV = ["prog", "--file", "f.cpp", "--output-dir", "/out",
               "--lrm", "/lrm.txt", "--test", "T",
-              "--issue", "1", "--organization", "o", "--repo", "r"]
+              "--issue", "1", "--organization", "o", "--repo", "r",
+              "--max-lines", "1000"]
 
 
 def test_parse_args_basic(monkeypatch):
@@ -73,7 +74,8 @@ def test_parse_args_lrm(monkeypatch):
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
          "--lrm", "/my/LRM.txt", "--test", "T",
-         "--issue", "1", "--organization", "o", "--repo", "r"],
+         "--issue", "1", "--organization", "o", "--repo", "r",
+         "--max-lines", "1000"],
     )
     assert _parse_args().lrm == "/my/LRM.txt"
 
@@ -84,7 +86,8 @@ def test_parse_args_test_flag(monkeypatch):
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
          "--lrm", "/lrm.txt", "--test", "Foo",
-         "--issue", "1", "--organization", "o", "--repo", "r"],
+         "--issue", "1", "--organization", "o", "--repo", "r",
+         "--max-lines", "1000"],
     )
     assert _parse_args().test == "Foo"
 
@@ -97,10 +100,14 @@ def test_parse_args_max_lines(monkeypatch):
     assert _parse_args().max_lines == 500
 
 
-def test_parse_args_max_lines_default(monkeypatch):
-    """--max-lines defaults to None."""
-    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().max_lines is None
+def test_parse_args_max_lines_required(monkeypatch):
+    """--max-lines is required."""
+    argv = [v for i, v in enumerate(_BASE_ARGV)
+            if _BASE_ARGV[max(0, i - 1)] != "--max-lines"
+            and v != "--max-lines"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        _parse_args()
 
 
 def test_parse_args_no_commit(monkeypatch):
@@ -447,6 +454,23 @@ def test_run_live_prints_cmake_update(tmp_path, monkeypatch, capsys):
     assert "Updated `CMakeLists.txt`" in capsys.readouterr().out
 
 
+def test_run_live_prints_cmake_updating(tmp_path, monkeypatch, capsys):
+    """Live run prints 'Updating' with rationale before the update."""
+    args = _setup_live_run(tmp_path, monkeypatch)
+    _run(args)
+    out = capsys.readouterr().out
+    assert "Updating `CMakeLists.txt` because" in out
+
+
+def test_run_live_delete_prints_message(tmp_path, monkeypatch, capsys):
+    """Live run prints delete message when source file is removed."""
+    args = _setup_live_run(tmp_path, monkeypatch)
+    _run(args)
+    out = capsys.readouterr().out
+    assert "Deleting test_input.cpp because all its tests" \
+           " were moved elsewhere" in out
+
+
 def test_run_live_merge_writes_test(tmp_path, monkeypatch):
     """Live run merging into existing file writes the test."""
     (tmp_path / "test_parser_clause_06_01.cpp").write_text(
@@ -461,7 +485,7 @@ def test_run_live_merge_writes_test(tmp_path, monkeypatch):
 
 
 def test_run_live_merge_prints_merge(tmp_path, monkeypatch, capsys):
-    """Live merge prints merge target filename."""
+    """Live merge prints test name, target, and rationale."""
     (tmp_path / "test_parser_clause_06_01.cpp").write_text(
         "// \u00a76.1\n\n#include <gtest/gtest.h>\n\n"
         "namespace {\n\nTEST(S, Old) {\n}\n\n}  // namespace\n",
@@ -469,7 +493,9 @@ def test_run_live_merge_prints_merge(tmp_path, monkeypatch, capsys):
     )
     args = _setup_live_run(tmp_path, monkeypatch)
     _run(args)
-    assert "Merging into" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Merging test T into" in out
+    assert "because" in out
 
 
 def _mixed_classifier(prompt, schema=None):

@@ -352,7 +352,8 @@ def _detect_prefix(test, clause, lrm_path):
             test.prefix_rationale = f"body contains '{pattern}'"
             return prefix
     print(f"Calling Claude to detect pipeline stage"
-          f" for {test.test_name}...")
+          f" for {test.test_name} because body does not"
+          " match any known pattern...")
     prompt = _PREFIX_PROMPT_TEMPLATE.format(
         lrm_path=lrm_path,
         suite=test.suite_name,
@@ -543,7 +544,8 @@ def classify_tests(tests, test_dir, lrm_path):
         topic_resp = None
         clause = clause_resp.get("clause", "")
         if clause.replace("_", "-") == "non-lrm":
-            print(f"Calling Claude to classify topic for {test.test_name}...")
+            print(f"Calling Claude to classify topic for {test.test_name}"
+                  " because clause is non-lrm...")
             topic_prompt = _build_topic_prompt(test, test_dir)
             topic_resp = _call_claude(topic_prompt, _TOPIC_SCHEMA)
         _apply_classification(test, clause_resp, topic_resp,
@@ -769,7 +771,7 @@ def _parse_args():
         help="Path to IEEE 1800-2023 LRM text file",
     )
     parser.add_argument(
-        "--max-lines", type=int, default=None,
+        "--max-lines", type=int, required=True,
         help="Maximum lines per output file; splits into _a, _b, ... suffixes",
     )
     parser.add_argument(
@@ -927,6 +929,8 @@ def _update_source(filepath, parsed, ctx):
         content = generate_file("non-lrm", "", parsed, others)
         filepath.write_text(content, encoding="utf-8")
     else:
+        print(f"Deleting {filepath.name} because all its tests"
+              " were moved elsewhere")
         filepath.unlink()
     return 0
 
@@ -954,8 +958,14 @@ def _run(args):
     )
     for dest, _, _ in to_create:
         print(f"  Target: {dest}.cpp")
-    for merge_into, _ in to_merge:
-        print(f"  Merging into {merge_into.name}")
+    for merge_into, merge_tests in to_merge:
+        for t in merge_tests:
+            print(f"  Merging test {t.test_name} into"
+                  f" {merge_into.name} because that's where"
+                  " it belongs and because adding it to that"
+                  " file would not increase the file's number"
+                  f" of lines to more than {args.max_lines}"
+                  " lines")
     if args.dry_run:
         return
     if not to_create and not to_merge and source_is_target \
@@ -972,6 +982,8 @@ def _run(args):
         "titles": titles, "stem": test_name,
         "source_is_target": source_is_target,
     })
+    print("Updating `CMakeLists.txt` because the test"
+          " moved to a new file...")
     update_cmake(
         test_name, new_names,
         keep_old=source_is_target or any(

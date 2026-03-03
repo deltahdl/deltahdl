@@ -64,7 +64,8 @@ def stub_close_issue(monkeypatch):
     """Stub classify_file.close_issue; return call log."""
     log: list = []
     monkeypatch.setattr(
-        classify_file, "close_issue", log.append,
+        classify_file, "close_issue",
+        lambda args, reason: log.append((args, reason)),
     )
     return log
 

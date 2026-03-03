@@ -14,7 +14,8 @@ _SCRIPTS_DIR = str(_REPO_ROOT / "scripts")
 # ---- Helpers ---------------------------------------------------------------
 
 
-_ISSUE_FLAGS = ("--issue", "1", "--organization", "o", "--repo", "r")
+_ISSUE_FLAGS = ("--issue", "1", "--organization", "o", "--repo", "r",
+                "--max-lines", "1000")
 
 
 def _invoke(*args, cwd=None, env=None):

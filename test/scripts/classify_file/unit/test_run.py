@@ -345,10 +345,12 @@ def test_run_classify_test_returns_false_on_failure(monkeypatch):
 
 
 def test_run_classify_test_prints_progress(monkeypatch, capsys):
-    """Prints progress line with index and name."""
+    """Prints progress line with index and name, no trailing parens."""
     stub_subprocess_success(monkeypatch)
     classify_file.run_classify_test(_make_args(), "Alpha", 3, 10)
-    assert "Processing test 3/10: Alpha" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Processing test 3/10: Alpha" in out
+    assert "Alpha()" not in out
 
 
 def test_run_classify_test_passes_test_name(monkeypatch):
@@ -420,22 +422,32 @@ def test_build_issue_body_single_test():
 def test_close_issue_calls_gh_api(monkeypatch):
     """Invokes gh api with correct repo path and PATCH method."""
     captured = stub_subprocess_success(monkeypatch)
-    classify_file.close_issue(_make_args(issue=42))
+    classify_file.close_issue(_make_args(issue=42), "test reason")
     assert "repos/testorg/testrepo/issues/42" in captured[0][2]
 
 
 def test_close_issue_prints_confirmation(monkeypatch, capsys):
     """Prints confirmation message after closing."""
     stub_subprocess_success(monkeypatch)
-    classify_file.close_issue(_make_args(issue=99))
+    classify_file.close_issue(_make_args(issue=99), "test reason")
     assert "Closed issue #99" in capsys.readouterr().out
+
+
+def test_close_issue_prints_reason(monkeypatch, capsys):
+    """Prints reason in the 'Closing' message."""
+    stub_subprocess_success(monkeypatch)
+    classify_file.close_issue(
+        _make_args(issue=99), "all tests have been classified",
+    )
+    out = capsys.readouterr().out
+    assert "because all tests have been classified" in out
 
 
 def test_close_issue_exits_on_failure(monkeypatch):
     """Exits when gh api fails."""
     stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
-        classify_file.close_issue(_make_args())
+        classify_file.close_issue(_make_args(), "test reason")
 
 
 # ---- create_issue ----------------------------------------------------------
@@ -583,12 +595,14 @@ def test_run_no_tests_with_create_issue_returns(
 
 
 def test_run_no_tests_prints_deleting(tmp_path, capsys, monkeypatch):
-    """Empty file → stdout contains 'Deleting'."""
+    """Empty file → stdout explains why file is being deleted."""
     make_test_file(tmp_path, "")
     monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
     stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path))
-    assert "Deleting" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Deleting" in out
+    assert "because it contains no tests" in out
 
 
 def test_run_no_tests_prints_deleted(tmp_path, capsys, monkeypatch):
@@ -721,6 +735,35 @@ def test_run_skips_close_on_dry_run(tmp_path, monkeypatch):
     log = stub_close_issue(monkeypatch)
     _run(_make_run_args(tmp_path, dry_run=True))
     assert len(log) == 0
+
+
+def test_run_close_reason_all_classified(tmp_path, monkeypatch, capsys):
+    """Closes with 'all tests have been classified' on success."""
+    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    stub_ensure_unchecked(monkeypatch)
+    stub_subprocess_success(monkeypatch)
+    _run(_make_run_args(tmp_path))
+    assert "because all tests have been classified" \
+           in capsys.readouterr().out
+
+
+def test_run_close_reason_no_tests(tmp_path, monkeypatch, capsys):
+    """Closes with 'the file has no tests' when file is empty."""
+    make_test_file(tmp_path, "")
+    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
+    stub_subprocess_success(monkeypatch)
+    _run(_make_run_args(tmp_path))
+    assert "because the file has no tests" in capsys.readouterr().out
+
+
+def test_run_close_reason_file_missing(tmp_path, monkeypatch, capsys):
+    """Closes with 'the source file no longer exists' when missing."""
+    stub_subprocess_success(monkeypatch)
+    _run(_make_run_args(
+        tmp_path, file=str(tmp_path / "missing.cpp"),
+    ))
+    assert "because the source file no longer exists" \
+           in capsys.readouterr().out
 
 
 def _stub_create_and_run(tmp_path, monkeypatch, **run_overrides):
