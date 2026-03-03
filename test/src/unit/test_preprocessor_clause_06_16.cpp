@@ -17,4 +17,26 @@ TEST(ParserSection6, AssignCompatibleStringLiteral) {
   EXPECT_FALSE(r.has_errors);
 }
 
+static ModuleItem* FirstItem(ParseResult& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto& items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
+// =========================================================================
+// §6.16: String data type
+// =========================================================================
+TEST(ParserSection6, StringDeclModule) {
+  // §6.16: String data type is a dynamic ordered collection of characters.
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  string name;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
+  EXPECT_EQ(item->name, "name");
+}
+
 }  // namespace
