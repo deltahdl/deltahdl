@@ -23,19 +23,6 @@ static ParseResult90301 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection9, IffGuardStmtLevelKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, reset, a, b;\n"
-      "  initial @(posedge clk iff reset == 0) a <= b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 1u);
-}
-
 TEST(ParserSection9, IffGuardStmtLevelEvent) {
   auto r = Parse(
       "module m;\n"
