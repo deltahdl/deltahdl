@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// 15. One order of magnitude smaller: rounds to one decimal place.
-TEST(ParserClause03, Cl3_14_1_OneOrderSmallerRoundsToOneDecimal) {
-  // 1ns unit, 100ps precision → 1 decimal place in ns.
-  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
-  // 2.75ns → 2.8ns = 2800ps = 2800 ticks at ps.
-  EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kPs), 2800u);
-  // 2.73ns → 2.7ns = 2700ps.
-  EXPECT_EQ(RealDelayToTicks(2.73, ts, TimeUnit::kPs), 2700u);
-}
-
 // 16. Rounding example: 1ns unit, 100ps precision, 2.75ns rounds to 2.8ns.
 TEST(ParserClause03, Cl3_14_1_LrmExample_2_75ns) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
