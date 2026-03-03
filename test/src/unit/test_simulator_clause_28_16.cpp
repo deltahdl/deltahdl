@@ -112,4 +112,12 @@ TEST(GateNetDelays, ThreeDelayToZIsD3) {
   EXPECT_EQ(ComputePropagationDelay(spec, Val4::kX, Val4::kZ), 15u);
 }
 
+TEST(GateNetDelays, ThreeDelayToXIsMinOfAll) {
+  DelaySpec spec{10, 20, 15, 3};
+  // min(10, 20, 15) = 10
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kX), 10u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kX), 10u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kX), 10u);
+}
+
 }  // namespace

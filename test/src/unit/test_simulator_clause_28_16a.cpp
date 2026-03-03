@@ -71,14 +71,6 @@ bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
 
 namespace {
 
-TEST(GateNetDelays, ThreeDelayToXIsMinOfAll) {
-  DelaySpec spec{10, 20, 15, 3};
-  // min(10, 20, 15) = 10
-  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kX), 10u);
-  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kX), 10u);
-  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kX), 10u);
-}
-
 // §28.16: Table 28-9 — x→0 = d2, x→1 = d1.
 TEST(GateNetDelays, ThreeDelayXTo0IsD2) {
   DelaySpec spec{10, 20, 15, 3};
