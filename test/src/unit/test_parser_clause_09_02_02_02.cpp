@@ -639,4 +639,24 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombCaseStatement) {
   EXPECT_GE(item->body->case_items.size(), 3u);
 }
 
+// ---------------------------------------------------------------------------
+// 17. always_comb with complex combinational logic (nested ternary).
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_2_AlwaysCombComplexLogic) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0] a, b, c, y;\n"
+      "  always_comb y = (a > b) ? (a + c) : (b - c);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(item->body->rhs, nullptr);
+  EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
+}
+
 }  // namespace
