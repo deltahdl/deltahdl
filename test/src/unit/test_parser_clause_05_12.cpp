@@ -339,4 +339,14 @@ TEST(ParserCh512, Attribute_OnIfStatement) {
   EXPECT_EQ(stmt->attrs[0].name, "synthesis_off");
 }
 
+TEST(ParserCh512, Attribute_OnForLoop) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    (* unroll *)\n"
+              "    for (int i = 0; i < 4; i++) x = i;\n"
+              "  end\n"
+              "endmodule"));
+}
+
 }  // namespace

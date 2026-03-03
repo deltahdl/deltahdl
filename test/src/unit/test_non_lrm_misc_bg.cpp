@@ -29,16 +29,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, Attribute_OnForLoop) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* unroll *)\n"
-              "    for (int i = 0; i < 4; i++) x = i;\n"
-              "  end\n"
-              "endmodule"));
-}
-
 TEST(ParserCh512, Attribute_OnAssignment) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
