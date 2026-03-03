@@ -370,4 +370,28 @@ TEST(SimCh50701, XValueInHexLiteral) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
+// ---------------------------------------------------------------------------
+// 22. Z value in hex literal
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, ZValueInHexLiteral) {
+  // §5.7.1: z sets 4 bits to high-impedance in hex base.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  initial x = 16'hz;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // z encoding: aval=0, bval=1 per bit; left-padded to full width.
+  uint16_t mask = 0xFFFF;
+  EXPECT_EQ(var->value.words[0].aval & mask, 0u);
+  EXPECT_EQ(var->value.words[0].bval & mask, mask);
+}
+
 }  // namespace
