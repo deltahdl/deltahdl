@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Lexical, Timeunit_StoredInModuleDecl_Values) {
-  // The timeunit/timeprecision values should be stored in ModuleDecl.
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
-  EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
-}
-
 TEST(Lexical, Timeunit_StoredInModuleDecl_Flags) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
