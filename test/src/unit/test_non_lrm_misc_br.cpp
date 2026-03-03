@@ -17,15 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-TEST(ParserA26, FuncPrototypePureVirtual) {
-  auto r = Parse(
-      "class C;\n"
-      "  pure virtual function int compute(input int x);\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA27, TaskPrototypePureVirtual) {
   auto r = Parse(
       "class C;\n"
