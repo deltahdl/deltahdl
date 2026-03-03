@@ -305,4 +305,13 @@ TEST(SwitchProcessing, TranBidirectionalPropagation) {
   EXPECT_EQ(ValOf(*va), kVal0);
 }
 
+// --- tranif1 / tranif0 control semantics ---
+TEST(SwitchProcessing, Tranif1ConductsWhenControlHigh) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
+}
+
 }  // namespace
