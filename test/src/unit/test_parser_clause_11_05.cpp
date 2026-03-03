@@ -56,4 +56,16 @@ TEST(ParserSection11, Sec11_1_IdentifierAsExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kIdentifier);
 }
 
+// --- Call expressions ---
+TEST(ParserSection11, Sec11_1_SystemFunctionCallExpression) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = $clog2(256);\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(rhs->callee, "$clog2");
+}
+
 }  // namespace

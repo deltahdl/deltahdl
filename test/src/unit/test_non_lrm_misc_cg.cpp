@@ -42,18 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Call expressions ---
-TEST(ParserSection11, Sec11_1_SystemFunctionCallExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = $clog2(256);\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
-  EXPECT_EQ(rhs->callee, "$clog2");
-}
-
 TEST(ParserSection11, Sec11_1_FunctionCallExpression) {
   auto r = Parse(
       "module t;\n"
