@@ -27,4 +27,15 @@ TEST(ParserCh501, FreeFormatMultiline) {
               "endmodule\n"));
 }
 
+TEST(ParserCh501, AllTokenTypesPresent) {
+  // §5.1 lists: white space, comments, operators, numbers, string
+  // literals, identifiers, keywords. This test exercises them all.
+  EXPECT_TRUE(
+      ParseOk("module t; // one-line comment\n"
+              "  /* block comment */\n"
+              "  logic [7:0] data = 8'hAB;\n"
+              "  initial $display(\"hello\");\n"
+              "endmodule\n"));
+}
+
 }  // namespace
