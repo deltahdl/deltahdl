@@ -139,4 +139,37 @@ TEST(SimCh9b, AlwaysCombMultiBitAdd) {
   EXPECT_EQ(y->value.ToUint64(), 0x5555u);
 }
 
+// ---------------------------------------------------------------------------
+// 21. always_comb with begin-end block and multiple outputs.
+// ---------------------------------------------------------------------------
+TEST(SimCh9b, AlwaysCombBlockMultipleOutputs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, sum, diff;\n"
+      "  always_comb begin\n"
+      "    sum = a + b;\n"
+      "    diff = a - b;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 8'h20;\n"
+      "    b = 8'h05;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* sum = f.ctx.FindVariable("sum");
+  auto* diff = f.ctx.FindVariable("diff");
+  ASSERT_NE(sum, nullptr);
+  ASSERT_NE(diff, nullptr);
+  EXPECT_EQ(sum->value.ToUint64(), 0x25u);
+  EXPECT_EQ(diff->value.ToUint64(), 0x1Bu);
+}
+
 }  // namespace
