@@ -77,4 +77,18 @@ TEST(ParserSection8, ClassExtendsBase) {
   EXPECT_TRUE(r.cu->classes[0]->base_class.empty());
 }
 
+TEST(ParserSection8, ClassExtendsDerived) {
+  auto r = Parse(
+      "class Base;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  int y;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  EXPECT_EQ(r.cu->classes[1]->name, "Derived");
+  EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
+}
+
 }  // namespace
