@@ -54,14 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 21. type() with packed array dimension: type(logic [15:0]).
-TEST(ParserSection6, Sec6_11_1_TypeRefPackedArray) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial x = type(logic [15:0]);\n"
-              "endmodule\n"));
-}
-
 // 22. var type(expr) with ternary expression.
 TEST(ParserSection6, Sec6_11_1_VarTypeRefTernary) {
   auto r = Parse(

@@ -466,4 +466,12 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnString) {
               "endmodule\n"));
 }
 
+// 21. type() with packed array dimension: type(logic [15:0]).
+TEST(ParserSection6, Sec6_11_1_TypeRefPackedArray) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(logic [15:0]);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
