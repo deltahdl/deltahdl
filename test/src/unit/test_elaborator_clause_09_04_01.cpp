@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §9.4.1: Delay control
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -9,14 +9,15 @@ using namespace delta;
 
 namespace {
 
-TEST(Lowerer, DelayZero) {
+TEST(Lowerer, DelayBasic) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial begin\n"
-      "    #0;\n"
-      "    x = 99;\n"
+      "    x = 1;\n"
+      "    #10;\n"
+      "    x = 2;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -28,7 +29,7 @@ TEST(Lowerer, DelayZero) {
 
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
 }  // namespace
