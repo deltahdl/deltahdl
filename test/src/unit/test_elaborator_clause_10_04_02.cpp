@@ -353,4 +353,44 @@ TEST(SimCh10b, NBAInInitialBlock) {
   EXPECT_EQ(var->value.ToUint64(), 123u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA with if-else control flow.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBAWithIfElse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  logic cond;\n"
+      "  initial begin\n"
+      "    cond = 0;\n"
+      "    if (cond)\n"
+      "      a <= 100;\n"
+      "    else\n"
+      "      a <= 200;\n"
+      "    cond = 1;\n"
+      "    if (cond)\n"
+      "      b <= 300;\n"
+      "    else\n"
+      "      b <= 400;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  // cond==0 → else branch for a.
+  EXPECT_EQ(a->value.ToUint64(), 200u);
+  // cond==1 → if branch for b.
+  EXPECT_EQ(b->value.ToUint64(), 300u);
+}
+
 }  // namespace
