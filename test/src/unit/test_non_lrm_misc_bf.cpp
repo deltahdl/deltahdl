@@ -53,18 +53,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 namespace {
 
 // =========================================================================
-// Tab characters as whitespace
-// =========================================================================
-TEST(ParserCh501, Sec5_1_TabCharactersAsWhitespace) {
-  // Tabs used throughout instead of spaces.
-  EXPECT_TRUE(
-      ParseOk("module\tm;\n"
-              "\tlogic\ta;\n"
-              "\tassign\ta\t=\t1'b1;\n"
-              "endmodule\n"));
-}
-
-// =========================================================================
 // Carriage return + line feed
 // =========================================================================
 TEST(ParserCh501, Sec5_1_CarriageReturnLineFeed) {

@@ -177,4 +177,16 @@ TEST(ParserCh501, Sec5_1_StatementSpanningManyLines) {
   EXPECT_EQ(assign_item->kind, ModuleItemKind::kContAssign);
 }
 
+// =========================================================================
+// Tab characters as whitespace
+// =========================================================================
+TEST(ParserCh501, Sec5_1_TabCharactersAsWhitespace) {
+  // Tabs used throughout instead of spaces.
+  EXPECT_TRUE(
+      ParseOk("module\tm;\n"
+              "\tlogic\ta;\n"
+              "\tassign\ta\t=\t1'b1;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
