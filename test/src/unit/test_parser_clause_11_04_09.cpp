@@ -257,4 +257,15 @@ TEST(ParserSection11, ReductionXor) {
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
 }
 
+TEST(ParserSection11, ReductionNand) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = ~&a;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kTildeAmp);
+}
+
 }  // namespace
