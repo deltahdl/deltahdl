@@ -75,4 +75,37 @@ TEST(SimCh10b, SimpleNBA) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
+// ---------------------------------------------------------------------------
+// §10.4.2: NBA does NOT take effect immediately — uses NBA region scheduling.
+// The RHS is sampled in the Active region but the LHS update is deferred.
+// ---------------------------------------------------------------------------
+TEST(SimCh10b, NBADeferredUpdate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial begin\n"
+      "    a = 10;\n"
+      "    a <= 20;\n"
+      "    b = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  // b captures a's value before the NBA takes effect.
+  EXPECT_EQ(b->value.ToUint64(), 10u);
+  // a is updated in the NBA region.
+  EXPECT_EQ(a->value.ToUint64(), 20u);
+}
+
 }  // namespace
