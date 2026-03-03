@@ -42,24 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 49. LRM Example E: timeunit with optional second argument.
-// §3.14.2.2:
-//   module E (...);
-//     timeunit 100ps / 10fs;
-TEST(ParserClause03, Cl3_14_2_2_LrmExampleE) {
-  auto r = ParseTimescale31402(
-      "module E;\n"
-      "  timeunit 100ps / 10fs;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  EXPECT_TRUE(mod->has_timeunit);
-  EXPECT_TRUE(mod->has_timeprecision);
-  EXPECT_EQ(mod->time_unit, TimeUnit::kPs);
-  EXPECT_EQ(mod->time_prec, TimeUnit::kFs);
-}
-
 // 50. Keywords remove file order dependency: the same module always has
 // the same time unit regardless of compilation order.
 // §3.14.2.2: "Defining the timeunit and timeprecision constructs within
