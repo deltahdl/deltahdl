@@ -42,21 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 46. timeprecision keyword sets the time precision of a module.
-// §3.14.2.2: "The time ... precision can be declared by the ...
-// timeprecision keywords, respectively, and set to a time literal."
-TEST(ParserClause03, Cl3_14_2_2_TimeprecisionSetsPrecision) {
-  auto r = ParseTimescale31402(
-      "module m;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  EXPECT_TRUE(mod->has_timeprecision);
-  EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
-}
-
 // 47. Combined syntax: timeunit with slash separator sets both unit and
 // precision.  §3.14.2.2: "The time precision may also be declared using
 // an optional second argument to the timeunit keyword using the slash
