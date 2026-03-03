@@ -44,4 +44,18 @@ TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
   ASSERT_EQ(r2->liblist.size(), 2u);
 }
 
+// 15. Config declarations at top level (part of CU).
+TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
+  auto r = ParseWithPreprocessor(
+      "module lib_mod; endmodule\n"
+      "config my_cfg;\n"
+      "  design lib_mod;\n"
+      "  default liblist;\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "my_cfg");
+}
+
 }  // namespace

@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// 15. Config declarations at top level (part of CU).
-TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
-  auto r = ParseWithPreprocessor(
-      "module lib_mod; endmodule\n"
-      "config my_cfg;\n"
-      "  design lib_mod;\n"
-      "  default liblist;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-  EXPECT_EQ(r.cu->configs[0]->name, "my_cfg");
-}
-
 // 1. TimeUnit enum: six values with correct power-of-10 exponents
 // (s=0, ms=-3, us=-6, ns=-9, ps=-12, fs=-15).
 TEST(ParserClause03, Cl3_14_TimeUnitEnumValues) {
