@@ -31,27 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 6.11 -- Integer types as port declarations
-// =============================================================================
-// 30. Integer types as module port declarations.
-TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
-  auto r = Parse(
-      "module m(input int a, output byte b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto& ports = r.cu->modules[0]->ports;
-  ASSERT_EQ(ports.size(), 2u);
-  EXPECT_EQ(ports[0].direction, Direction::kInput);
-  EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kInt);
-  EXPECT_EQ(ports[0].name, "a");
-  EXPECT_EQ(ports[1].direction, Direction::kOutput);
-  EXPECT_EQ(ports[1].data_type.kind, DataTypeKind::kByte);
-  EXPECT_EQ(ports[1].name, "b");
-}
-
 // 30b. More integer types as ports: longint and shortint.
 TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
   auto r = Parse(

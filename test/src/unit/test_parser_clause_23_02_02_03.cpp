@@ -150,4 +150,43 @@ TEST(ParserSection23, AnsiPortsWithDefaultType) {
   EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
 }
 
+struct ParseResult6h {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+  bool has_errors = false;
+};
+
+static ParseResult6h Parse(const std::string& src) {
+  ParseResult6h result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
+// =============================================================================
+// LRM section 6.11 -- Integer types as port declarations
+// =============================================================================
+// 30. Integer types as module port declarations.
+TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
+  auto r = Parse(
+      "module m(input int a, output byte b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  EXPECT_EQ(ports[0].direction, Direction::kInput);
+  EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(ports[0].name, "a");
+  EXPECT_EQ(ports[1].direction, Direction::kOutput);
+  EXPECT_EQ(ports[1].data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(ports[1].name, "b");
+}
+
 }  // namespace
