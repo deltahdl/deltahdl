@@ -25,18 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, MatchingTypesSameSigningModifier) {
-  // §6.22.1g: Explicitly adding signed to a type that is already signed
-  // creates a matching type.
-  DataType a;
-  a.kind = DataTypeKind::kByte;
-  a.is_signed = true;
-  DataType b;
-  b.kind = DataTypeKind::kByte;
-  b.is_signed = true;
-  EXPECT_TRUE(TypesMatch(a, b));
-}
-
 TEST(ParserSection6, VarRegDecl) {
   // §6.8: "var reg r;"
   EXPECT_TRUE(

@@ -18,4 +18,16 @@ TEST(ParserSection6, TypeCompatibilityAnonymousStruct) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
+TEST(ParserSection6, MatchingTypesSameSigningModifier) {
+  // §6.22.1g: Explicitly adding signed to a type that is already signed
+  // creates a matching type.
+  DataType a;
+  a.kind = DataTypeKind::kByte;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kByte;
+  b.is_signed = true;
+  EXPECT_TRUE(TypesMatch(a, b));
+}
+
 }  // namespace
