@@ -87,4 +87,15 @@ TEST(ParserA26, FuncBodyClassScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserA26, FuncBodyOutOfBlockConstructor) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern function new();\n"
+      "endclass\n"
+      "function C::new();\n"
+      "endfunction\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
