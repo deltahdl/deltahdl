@@ -231,4 +231,12 @@ TEST(ParserCh512, Expr_AttributeOnOperator) {
               "endmodule"));
 }
 
+TEST(ParserCh512, Expr_AttributeOnTernary) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic a, b, c, d;\n"
+              "  assign a = b ? (* no_glitch *) c : d;\n"
+              "endmodule"));
+}
+
 }  // namespace

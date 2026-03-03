@@ -41,14 +41,6 @@ static ModuleItem* FirstItem(ParseResult512& r) {
 
 namespace {
 
-TEST(ParserCh512, Expr_AttributeOnTernary) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic a, b, c, d;\n"
-              "  assign a = b ? (* no_glitch *) c : d;\n"
-              "endmodule"));
-}
-
 TEST(ParserCh512, PostfixFunctionAttribute) {
   // §5.12 Example 7: a = add (* mode = "cla" *) (b, c);
   EXPECT_TRUE(
