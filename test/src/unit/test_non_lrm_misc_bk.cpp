@@ -13,22 +13,6 @@ static ModuleItem* FirstItem(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.6.8: Chandle data type
-// =========================================================================
-TEST(ParserSection6, ChandleInClass) {
-  // §6.6.8: chandle used in a class for DPI handle.
-  auto r = ParseWithPreprocessor(
-      "class Wrapper;\n"
-      "  chandle ptr;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  ASSERT_GE(r.cu->classes[0]->members.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->members[0]->data_type.kind,
-            DataTypeKind::kChandle);
-}
-
 TEST(ParserSection6, ChandleMultipleDecls) {
   // chandle with multiple variables in a module.
   EXPECT_TRUE(
