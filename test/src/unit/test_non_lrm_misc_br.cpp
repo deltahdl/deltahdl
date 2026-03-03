@@ -17,12 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-TEST(Parser, VirtualClass) {
-  auto r = Parse("virtual class base; endclass");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.cu->classes[0]->is_virtual);
-}
-
 // class_method ::= pure virtual { class_item_qualifier } method_prototype ;
 //                | extern { method_qualifier } method_prototype ;
 TEST(SourceText, ClassPureVirtualAndExtern) {

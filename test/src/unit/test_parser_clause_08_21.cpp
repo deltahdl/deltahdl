@@ -32,4 +32,10 @@ TEST(ParserSection8, PureVirtualFunction) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
+TEST(Parser, VirtualClass) {
+  auto r = Parse("virtual class base; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->classes[0]->is_virtual);
+}
+
 }  // namespace
