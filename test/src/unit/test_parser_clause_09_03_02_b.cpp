@@ -119,4 +119,28 @@ TEST(ParserSection9, Sec9_3_2_ForkInTaskBody) {
               "endmodule\n"));
 }
 
+// ---------------------------------------------------------------------------
+// 21. Fork in always block
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_3_2_ForkInAlwaysBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) begin\n"
+      "    fork\n"
+      "      #1 a = 1;\n"
+      "      #2 b = 2;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kFork);
+  EXPECT_EQ(item->body->stmts[0]->join_kind, TokenKind::kKwJoinNone);
+}
+
 }  // namespace
