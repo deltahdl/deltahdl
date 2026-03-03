@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §20.3.2: $stime
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -9,11 +9,11 @@ using namespace delta;
 
 namespace {
 
-TEST(SysTask, RealtimeReturns64Bit) {
+TEST(SysTask, StimeReturns32Bit) {
   SysTaskFixture f;
-  auto* expr = MkSysCall(f.arena, "$realtime", {});
+  auto* expr = MkSysCall(f.arena, "$stime", {});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 64u);
+  EXPECT_EQ(result.width, 32u);
 }
 
 }  // namespace
