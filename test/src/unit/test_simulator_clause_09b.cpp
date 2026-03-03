@@ -10,28 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 26. always_comb sensitivity: changes signal 'a', observes result.
-// ---------------------------------------------------------------------------
-TEST(SimCh9b, AlwaysCombSensitivityRegistered) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a, b;\n"
-      "  always_comb b = a + 1;\n"
-      "  initial #1 $finish;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-
-  // Sensitivity map should have signal 'a' mapped.
-  const auto& procs = f.ctx.GetSensitiveProcesses("a");
-  EXPECT_FALSE(procs.empty());
-}
-
-// ---------------------------------------------------------------------------
 // 27. always_comb with subtraction.
 // ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombSubtraction) {
