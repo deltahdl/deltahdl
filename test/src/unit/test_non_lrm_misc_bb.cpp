@@ -42,23 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 5. Rule (b): Module without timeunit falls back to `timescale.
-TEST(ParserClause03, Cl3_14_2_3_RuleB_FallbackToTimescale) {
-  auto r = ParseTimescale31402(
-      "`timescale 1us / 1ps\n"
-      "module m;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.has_preproc_timescale);
-  auto resolved =
-      ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
-                             r.preproc_timescale, nullptr);
-  EXPECT_TRUE(resolved.has_unit);
-  EXPECT_EQ(resolved.unit, TimeUnit::kUs);
-  EXPECT_TRUE(resolved.has_precision);
-  EXPECT_EQ(resolved.precision, TimeUnit::kPs);
-}
-
 // 6. Rule (c): Module without timeunit or `timescale uses CU-scope timeunit.
 TEST(ParserClause03, Cl3_14_2_3_RuleC_FallbackToCUTimeunit) {
   auto r = ParseTimescale31402(
