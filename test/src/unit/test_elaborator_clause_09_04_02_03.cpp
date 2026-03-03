@@ -1,0 +1,39 @@
+// §9.4.2.3: Conditional event controls
+
+#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
+
+using namespace delta;
+
+namespace {
+
+// §9.4.2.4: posedge clk iff enable=1 fires the event, body executes.
+TEST(SimCh9e, PosedgeIffEnableTrue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, enable;\n"
+      "  logic [31:0] count;\n"
+      "  initial begin\n"
+      "    clk = 0; enable = 1; count = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk iff enable)\n"
+      "    count = count + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("count");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+}  // namespace
