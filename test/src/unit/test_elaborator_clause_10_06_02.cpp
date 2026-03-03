@@ -58,4 +58,11 @@ TEST(ForceRelease, LegalTargetConcatenation) {
   EXPECT_TRUE(ValidateForceTarget(info));
 }
 
+// --- Illegal LHS targets ---
+// §10.6.2:
+TEST(ForceRelease, IllegalBitSelectVariable) {
+  ForceInfo info{ForceTarget::kBitSelectVariable};
+  EXPECT_FALSE(ValidateForceTarget(info));
+}
+
 }  // namespace

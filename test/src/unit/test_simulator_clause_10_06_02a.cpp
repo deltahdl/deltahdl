@@ -108,13 +108,6 @@ static TwoNets MakeTwoWireNets() {
 
 namespace {
 
-// --- Illegal LHS targets ---
-// §10.6.2:
-TEST(ForceRelease, IllegalBitSelectVariable) {
-  ForceInfo info{ForceTarget::kBitSelectVariable};
-  EXPECT_FALSE(ValidateForceTarget(info));
-}
-
 TEST(ForceRelease, IllegalPartSelectVariable) {
   ForceInfo info{ForceTarget::kPartSelectVariable};
   EXPECT_FALSE(ValidateForceTarget(info));
