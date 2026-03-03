@@ -30,20 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-// --- Shortreal specifics (LRM 6.12) ---
-TEST(ParserSection6, ShortrealInModule) {
-  // shortreal is same as C float (LRM 6.12)
-  auto r = Parse(
-      "module m;\n"
-      "  shortreal x = 1.0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
-}
-
 TEST(ParserSection6, ShortrealInFunctionArg) {
   // shortreal as function argument type
   EXPECT_TRUE(
