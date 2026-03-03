@@ -106,4 +106,33 @@ TEST(SimCh9b, AlwaysCombNand) {
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xF0u);
 }
 
+// ---------------------------------------------------------------------------
+// 30. always_comb with chained combinational logic: a XOR b, then OR c.
+// ---------------------------------------------------------------------------
+TEST(SimCh9b, AlwaysCombChainedLogic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c, y;\n"
+      "  always_comb y = (a ^ b) | c;\n"
+      "  initial begin\n"
+      "    a = 8'hA0;\n"
+      "    b = 8'h50;\n"
+      "    c = 8'h0F;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  // (0xA0 ^ 0x50) | 0x0F = 0xF0 | 0x0F = 0xFF.
+  EXPECT_EQ(y->value.ToUint64(), 0xFFu);
+}
+
 }  // namespace
