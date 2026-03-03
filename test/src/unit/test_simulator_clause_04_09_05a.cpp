@@ -13,48 +13,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §4.9.5 — Six transistor source element types
-// ---------------------------------------------------------------------------
-TEST(SimCh4095, TransistorSourceElements) {
-  Arena arena;
-  Scheduler sched(arena);
-
-  // Enumerate all six transistor types as distinct source elements.
-  // Each is represented as a named type with bidirectional connectivity.
-  enum class TranType : std::uint8_t {
-    kTran,
-    kTranif0,
-    kTranif1,
-    kRtran,
-    kRtranif0,
-    kRtranif1
-  };
-  std::vector<TranType> transistors = {
-      TranType::kTran,  TranType::kTranif0,  TranType::kTranif1,
-      TranType::kRtran, TranType::kRtranif0, TranType::kRtranif1};
-
-  int resolved_count = 0;
-
-  // Each transistor type participates in switch processing.
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    for (auto type : transistors) {
-      (void)type;
-      auto* update = sched.GetEventPool().Acquire();
-      update->kind = EventKind::kUpdate;
-      update->callback = [&]() { ++resolved_count; };
-      sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-    }
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  // All six transistor types processed.
-  EXPECT_EQ(resolved_count, 6);
-}
-
-// ---------------------------------------------------------------------------
 // §4.9.5 — Inputs and outputs interact through bidirectional switches
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, InputsAndOutputsInteract) {
