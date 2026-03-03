@@ -607,4 +607,18 @@ TEST(SimCh50701, SizedDecimalLiteral) {
   EXPECT_EQ(result, 3u);
 }
 
+// ---------------------------------------------------------------------------
+// 13. Unsized hex literal (at least 32 bits)
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, UnsizedHexLiteral) {
+  // §5.7.1: Unsized hex literal (at least 32 bits).
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 'h837FF;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x837FFu);
+}
+
 }  // namespace

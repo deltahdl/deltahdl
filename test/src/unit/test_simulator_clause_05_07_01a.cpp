@@ -23,20 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 13. Unsized hex literal (at least 32 bits)
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, UnsizedHexLiteral) {
-  // §5.7.1: Unsized hex literal (at least 32 bits).
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 'h837FF;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 0x837FFu);
-}
-
-// ---------------------------------------------------------------------------
 // 14. Unsized octal literal
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, UnsizedOctalLiteral) {
