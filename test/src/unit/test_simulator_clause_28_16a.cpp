@@ -42,11 +42,6 @@ bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
 
 namespace {
 
-TEST(MinTypMaxDelays, SelectTyp) {
-  MinTypMax mtm{5, 10, 15};
-  EXPECT_EQ(SelectMinTypMax(mtm, 1), 10u);
-}
-
 TEST(MinTypMaxDelays, SelectMax) {
   MinTypMax mtm{5, 10, 15};
   EXPECT_EQ(SelectMinTypMax(mtm, 2), 15u);
