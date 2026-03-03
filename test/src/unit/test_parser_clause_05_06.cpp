@@ -125,4 +125,12 @@ TEST(ParserCh501, Sec5_1_NumberFollowedByIdentifier) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
+TEST(ParserCh506, Ident_SimpleWithUnderscore) {
+  auto r = Parse("module m; logic _bus3; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "_bus3");
+}
+
 }  // namespace

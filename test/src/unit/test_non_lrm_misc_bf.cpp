@@ -5,21 +5,6 @@
 using namespace delta;
 
 // =========================================================================
-// Section 5.6: Identifiers, keywords, and system names
-// =========================================================================
-struct ParseResult506 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ModuleItem* FirstItem(ParseResult506& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
-// =========================================================================
 // Section 5.6.3: System tasks and system functions
 // =========================================================================
 struct ParseResult50603 {
@@ -51,14 +36,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 }
 
 namespace {
-
-TEST(ParserCh506, Ident_SimpleWithUnderscore) {
-  auto r = Parse("module m; logic _bus3; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "_bus3");
-}
 
 TEST(ParserCh506, Ident_SimpleWithDollarSign) {
   EXPECT_TRUE(ParseOk("module m; logic n$657; endmodule"));
