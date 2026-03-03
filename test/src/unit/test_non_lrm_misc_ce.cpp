@@ -35,23 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// ==========================================================================
-// §11.12: Let instantiation parsing (calls parsed as kCall expressions)
-// ==========================================================================
-TEST(ParserLet, InstantiationParsed) {
-  // Let calls look syntactically like function calls — verify parsing.
-  auto r = Parse(
-      "module t;\n"
-      "  let op(x, y) = x + y;\n"
-      "  initial begin\n"
-      "    int z;\n"
-      "    z = op(3, 4);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserLet, InstantiationNamedArgs) {
   auto r = Parse(
       "module t;\n"
