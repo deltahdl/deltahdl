@@ -31,25 +31,6 @@ static ModuleItem* FirstItem(ParseResult6h& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 6.5 -- Nets and variables
-// =============================================================================
-// 1. Wire net declaration produces kNetDecl with is_net=true.
-TEST(ParserSection6, Sec6_5_WireNetDeclKind) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire w;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kWire);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "w");
-}
-
 // 2. Logic variable declaration produces kVarDecl with is_net=false.
 TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
   auto r = Parse(
