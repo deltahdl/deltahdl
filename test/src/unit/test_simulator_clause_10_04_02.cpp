@@ -26,4 +26,29 @@ TEST(SimA85, VarLvalueNonblocking) {
   EXPECT_EQ(var->value.ToUint64(), 0x99u);
 }
 
+// =============================================================================
+// 27. Nonblocking assignment to bit-select LHS (§10.4.2)
+// =============================================================================
+TEST(StmtExec, NonblockingAssignBitSelect) {
+  StmtFixture f;
+  auto* var = f.ctx.CreateVariable("nb", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0);
+
+  // nb[5] <= 1;
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "nb");
+  sel->index = MakeInt(f.arena, 5);
+
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kNonblockingAssign;
+  stmt->lhs = sel;
+  stmt->rhs = MakeInt(f.arena, 1);
+
+  RunStmt(stmt, f.ctx, f.arena);
+  // NBA is deferred -- drain the scheduler to apply it.
+  f.scheduler.Run();
+  EXPECT_EQ(var->value.ToUint64(), 0x20u);  // bit 5 set
+}
+
 }  // namespace
