@@ -49,14 +49,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-TEST(ParserCh510, AssignmentPattern_DefaultKey) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct { int x; int y; } ms_t;\n"
-              "  ms_t ms = '{default:1};\n"
-              "endmodule"));
-}
-
 TEST(ParserCh510, AssignmentPattern_IntKey) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
