@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -445,18 +446,43 @@ def _call_claude(prompt, schema=None):
            "--allowedTools", "Read"]
     if schema:
         cmd.extend(["--json-schema", schema])
-    result = subprocess.run(
-        cmd,
-        input=prompt,
-        capture_output=True,
-        text=True,
-        env=env,
-        check=False,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Claude CLI failed (RC={result.returncode}):"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
+    delays = [5, 10]
+    for attempt in range(len(delays) + 1):  # pragma: no branch
+        try:
+            result = subprocess.run(
+                cmd,
+                input=prompt,
+                capture_output=True,
+                text=True,
+                env=env,
+                check=False,
+                timeout=600,
+            )
+        except subprocess.TimeoutExpired:
+            if attempt < len(delays):
+                print(f"WARNING: Claude CLI timed out (attempt"
+                      f" {attempt + 1}/{len(delays) + 1}),"
+                      f" retrying in {delays[attempt]}s...",
+                      file=sys.stderr)
+                time.sleep(delays[attempt])
+                continue
+            print("ERROR: Claude CLI timed out after"
+                  f" {len(delays) + 1} attempts", file=sys.stderr)
+            sys.exit(1)
+        if result.returncode != 0:
+            if attempt < len(delays):
+                print(f"WARNING: Claude CLI failed"
+                      f" (RC={result.returncode}, attempt"
+                      f" {attempt + 1}/{len(delays) + 1}),"
+                      f" retrying in {delays[attempt]}s...",
+                      file=sys.stderr)
+                time.sleep(delays[attempt])
+                continue
+            print(f"ERROR: Claude CLI failed (RC={result.returncode})"
+                  f" after {len(delays) + 1} attempts:"
+                  f"\n{result.stderr}", file=sys.stderr)
+            sys.exit(1)
+        break
     raw = result.stdout.strip()
     # --output-format json wraps Claude's text in an envelope
     # with keys like "result", "session_id", etc.

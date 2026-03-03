@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -383,6 +384,74 @@ def test_call_claude_no_json_schema_by_default(monkeypatch):
     """CLI command omits --json-schema when no schema is provided."""
     cmd = _capture_claude_cmd(monkeypatch)
     assert "--json-schema" not in cmd
+
+
+def test_call_claude_timeout_retries_then_succeeds(monkeypatch):
+    """Retries on timeout and returns result on subsequent success."""
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    mock_ok = MagicMock()
+    mock_ok.returncode = 0
+    mock_ok.stdout = '{"clause": "6.1", "rationale": "r"}'
+    mock_ok.stderr = ""
+    calls = []
+
+    def run_side_effect(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise subprocess.TimeoutExpired(args[0], kwargs.get("timeout"))
+        return mock_ok
+
+    monkeypatch.setattr(subprocess, "run", run_side_effect)
+    assert _call_claude("prompt") == {"clause": "6.1", "rationale": "r"}
+
+
+def test_call_claude_timeout_exhausted(monkeypatch):
+    """Exits after all retry attempts are exhausted by timeouts."""
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+
+    def run_timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], kwargs.get("timeout"))
+
+    monkeypatch.setattr(subprocess, "run", run_timeout)
+    with pytest.raises(SystemExit):
+        _call_claude("prompt")
+
+
+def test_call_claude_failure_retries_then_succeeds(monkeypatch):
+    """Retries on non-zero exit code and returns result on success."""
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    mock_fail = MagicMock()
+    mock_fail.returncode = 1
+    mock_fail.stdout = ""
+    mock_fail.stderr = "error"
+    mock_ok = MagicMock()
+    mock_ok.returncode = 0
+    mock_ok.stdout = '{"clause": "6.1", "rationale": "r"}'
+    mock_ok.stderr = ""
+    calls = []
+
+    def run_side_effect(*_args, **_kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            return mock_fail
+        return mock_ok
+
+    monkeypatch.setattr(subprocess, "run", run_side_effect)
+    assert _call_claude("prompt") == {"clause": "6.1", "rationale": "r"}
+
+
+def test_call_claude_failure_exhausted(monkeypatch):
+    """Exits after all retry attempts are exhausted by failures."""
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    mock_fail = MagicMock()
+    mock_fail.returncode = 1
+    mock_fail.stdout = ""
+    mock_fail.stderr = "error"
+    monkeypatch.setattr(
+        subprocess, "run", lambda *_a, **_kw: mock_fail,
+    )
+    with pytest.raises(SystemExit):
+        _call_claude("prompt")
 
 
 # ---- _apply_classification -------------------------------------------------
