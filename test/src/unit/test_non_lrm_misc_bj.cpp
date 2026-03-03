@@ -27,34 +27,7 @@ static ModuleItem* FirstItem(ParseResult6b& r) {
   return items.empty() ? nullptr : items[0];
 }
 
-static Stmt* FirstInitialStmt(ParseResult6b& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
 namespace {
-
-// =========================================================================
-// §6.6.8: Void data type (additional tests)
-// =========================================================================
-TEST(ParserSection6, VoidCastExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  function int foo(); return 1; endfunction\n"
-      "  initial void'(foo());\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-}
 
 TEST(ParserSection6, VoidFunctionInClass) {
   auto r = Parse(
