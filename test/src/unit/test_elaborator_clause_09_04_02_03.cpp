@@ -225,4 +225,32 @@ TEST(SimCh9e, IffComparisonZeroSuppresses) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// §9.4.2.4: iff with bitwise-AND condition.
+TEST(SimCh9e, IffBitwiseAndCondition) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] mask, enable;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    clk = 0; mask = 8'hFF; enable = 8'h01; result = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always @(posedge clk iff (mask & enable))\n"
+      "    result = 99;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
 }  // namespace
