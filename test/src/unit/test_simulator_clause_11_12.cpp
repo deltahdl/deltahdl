@@ -90,4 +90,19 @@ TEST(EvalAdv, LetNoRecursive) {
   EXPECT_TRUE(result.nwords > 0);
 }
 
+TEST(EvalAdv, LetDeclarativeScope) {
+  SimFixture f;
+  // let get_k() = K;
+  // K is set in the outer scope before let registration.
+  MakeVar(f, "K", 32, 42);
+  auto* body = MakeId(f.arena, "K");
+  auto* decl = MakeLetDecl(f.arena, "get_k", body);
+  f.ctx.RegisterLetDecl("get_k", decl);
+
+  // get_k() should access K=42 from declaration scope.
+  auto* call = MakeCall(f.arena, "get_k", {});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}
+
 }  // namespace
