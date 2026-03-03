@@ -288,7 +288,7 @@ def _build_section_list(
     sections: list[str] = []
 
     # Top-level clause or annex letter
-    top: str = h.get("letter") or h.get("clause_number")  # type: ignore[assignment]
+    top: str = h["letter"] if h["is_annex"] else h["clause_number"]
     if top != clause:
         sections.append(top)
 
