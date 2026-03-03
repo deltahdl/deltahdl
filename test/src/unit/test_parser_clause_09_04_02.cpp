@@ -547,4 +547,25 @@ TEST(ParserSection15, WaitForEventPosedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
+TEST(ParserSection9, Sec9_3_1_BlockWithEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge clk);\n"
+      "    a = 1;\n"
+      "    @(posedge clk);\n"
+      "    b = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 4u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kEventControl);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kEventControl);
+  EXPECT_EQ(body->stmts[3]->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace
