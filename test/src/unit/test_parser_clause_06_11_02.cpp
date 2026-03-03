@@ -414,4 +414,19 @@ TEST(ParserSection6, Sec6_11_LongintFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kLongint);
 }
 
+// Integer function return type.
+TEST(ParserSection6, Sec6_11_IntegerFunctionReturnType) {
+  auto r = Parse(
+      "module t;\n"
+      "  function integer get_count();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kInteger);
+}
+
 }  // namespace
