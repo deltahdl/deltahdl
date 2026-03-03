@@ -22,19 +22,6 @@ static ParseResult8b Parse(const std::string& src) {
 
 namespace {
 
-// Static cast with type apostrophe syntax: type'(expr).
-TEST(ParserSection8, StaticCastTypeSyntax) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    int a;\n"
-              "    real r;\n"
-              "    r = 3.14;\n"
-              "    a = int'(r);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // Section 8.18 -- User-defined types (typedef)
 // =============================================================================

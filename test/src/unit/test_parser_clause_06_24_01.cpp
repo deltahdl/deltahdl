@@ -358,4 +358,17 @@ TEST(ParserSection11, Sec11_1_CastExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
+// Static cast with type apostrophe syntax: type'(expr).
+TEST(ParserSection8, StaticCastTypeSyntax) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    int a;\n"
+              "    real r;\n"
+              "    r = 3.14;\n"
+              "    a = int'(r);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
