@@ -41,14 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, TypesMatchDifferent) {
-  DataType a;
-  a.kind = DataTypeKind::kInt;
-  DataType b;
-  b.kind = DataTypeKind::kReal;
-  EXPECT_FALSE(TypesMatch(a, b));
-}
-
 TEST(ParserSection6, TypesMatchSignedness) {
   // Same kind but different signedness should not match.
   DataType a;

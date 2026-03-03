@@ -81,4 +81,12 @@ TEST(ParserSection6, TypesMatchBuiltin) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
+TEST(ParserSection6, TypesMatchDifferent) {
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  DataType b;
+  b.kind = DataTypeKind::kReal;
+  EXPECT_FALSE(TypesMatch(a, b));
+}
+
 }  // namespace
