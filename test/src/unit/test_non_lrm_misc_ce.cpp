@@ -35,15 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-TEST(ParserSection11, CompoundAssignStarEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a *= 2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserSection11, CompoundAssignSlashEq) {
   auto r = Parse(
       "module t;\n"

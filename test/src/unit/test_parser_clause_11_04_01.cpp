@@ -606,4 +606,13 @@ TEST(ParserSection11, CompoundAssignMinusEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
+TEST(ParserSection11, CompoundAssignStarEq) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial a *= 2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
