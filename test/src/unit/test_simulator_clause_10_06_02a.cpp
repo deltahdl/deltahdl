@@ -86,22 +86,6 @@ static TwoNets MakeTwoWireNets() {
 
 namespace {
 
-// §10.6.2: "When released, then if the variable is not driven by a
-//  continuous assignment ... the variable shall not immediately change
-//  value and shall maintain its current value."
-TEST(ForceRelease, ReleaseUndrivenVariableHoldsValue) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 1, 0);
-
-  ForceVariable(*var, MakeLogic4VecVal(arena, 1, 1));
-  EXPECT_EQ(ValOf(*var), kVal1);
-
-  ReleaseVariable(*var, false, nullptr, arena);
-  // Value should remain at forced value (1) since no continuous driver.
-  EXPECT_EQ(ValOf(*var), kVal1);
-}
-
 // §10.6.2: "Releasing a variable that is driven by a continuous
 //  assignment ... shall reestablish that assignment."
 TEST(ForceRelease, ReleaseContinuouslyDrivenVariableReestablishes) {

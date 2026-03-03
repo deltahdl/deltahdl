@@ -115,4 +115,29 @@ TEST(ForceRelease, ForceVariableOverridesValue) {
   EXPECT_EQ(ValOf(*var), kVal0);
 }
 
+void ReleaseVariable(Variable& var, bool has_continuous_driver,
+                     const Logic4Vec* continuous_value, Arena& arena) {
+  (void)arena;
+  if (has_continuous_driver && continuous_value) {
+    var.value = *continuous_value;
+  }
+  // Otherwise keep current value.
+}
+
+// §10.6.2: "When released, then if the variable is not driven by a
+//  continuous assignment ... the variable shall not immediately change
+//  value and shall maintain its current value."
+TEST(ForceRelease, ReleaseUndrivenVariableHoldsValue) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4VecVal(arena, 1, 0);
+
+  ForceVariable(*var, MakeLogic4VecVal(arena, 1, 1));
+  EXPECT_EQ(ValOf(*var), kVal1);
+
+  ReleaseVariable(*var, false, nullptr, arena);
+  // Value should remain at forced value (1) since no continuous driver.
+  EXPECT_EQ(ValOf(*var), kVal1);
+}
+
 }  // namespace
