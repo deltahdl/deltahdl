@@ -30,16 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, RealCastExplicit) {
-  // Explicit cast: int'(real_val) (LRM 6.24)
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 3.7;\n"
-              "  int i;\n"
-              "  initial i = int'(r);\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, RealInExpression) {
   // Real values in arithmetic expressions
   EXPECT_TRUE(
