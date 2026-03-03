@@ -292,4 +292,34 @@ TEST(ParserA604, StmtItemDisableStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
 }
 
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(Parser, DisableStatement) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    disable blk;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
 }  // namespace

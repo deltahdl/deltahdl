@@ -30,20 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(Parser, DisableStatement) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    disable blk;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
 // =============================================================================
 // LRM section 9.2.1 -- Initial and final blocks
 // =============================================================================
