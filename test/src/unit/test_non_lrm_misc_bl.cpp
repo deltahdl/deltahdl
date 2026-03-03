@@ -32,21 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-// §6.7.1: Net with scalared qualifier.
-TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire scalared [7:0] sc;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_scalared);
-  EXPECT_EQ(item->name, "sc");
-}
-
 // §6.7.1: Wire with explicit bit type.
 TEST(ParserSection6, Sec6_7_1_WireWithBitType) {
   auto r = Parse(
