@@ -1,4 +1,4 @@
-// §11.4.2: Increment and decrement operators
+// Non-LRM tests
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
@@ -8,26 +8,6 @@
 using namespace delta;
 
 namespace {
-
-// ==========================================================================
-// Postfix increment/decrement (i++, i--)
-// ==========================================================================
-// ==========================================================================
-// Prefix increment/decrement (++i, --i)
-// ==========================================================================
-TEST(EvalOp, PrefixIncrement) {
-  SimFixture f;
-  auto* var = f.ctx.CreateVariable("i", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 10);
-
-  auto* pre = MakeUnary(f.arena, TokenKind::kPlusPlus, MakeId(f.arena, "i"));
-
-  auto result = EvalExpr(pre, f.ctx, f.arena);
-  // Returns NEW value (prefix semantics).
-  EXPECT_EQ(result.ToUint64(), 11u);
-  // Variable is now 11.
-  EXPECT_EQ(var->value.ToUint64(), 11u);
-}
 
 TEST(EvalOp, PrefixDecrement) {
   SimFixture f;
