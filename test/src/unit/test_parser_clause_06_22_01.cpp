@@ -130,4 +130,13 @@ TEST(ParserSection6, MatchingTypesBuiltinTypedef) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
+TEST(ParserSection6, MatchingTypesAnonymousStruct) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct packed {int A; int B;} AB1, AB2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
+}
+
 }  // namespace
