@@ -49,4 +49,13 @@ TEST(ParserSection6, AssignCompatibleEnumToLogic) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
+TEST(ParserSection6, AssignmentCompatibleIntegral) {
+  // §6.22.3: All integral types are assignment compatible.
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  DataType b;
+  b.kind = DataTypeKind::kLogic;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
 }  // namespace
