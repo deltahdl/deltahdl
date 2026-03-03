@@ -95,4 +95,13 @@ TEST(ParserSection7, QueueBounded) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
+TEST(ParserSection7c, QueueWithMaxSize) {
+  auto r = Parse(
+      "module m;\n"
+      "  int q[$:255];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
