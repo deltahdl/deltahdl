@@ -224,4 +224,17 @@ TEST(ParserSection8, StringTypeModuleLevel) {
   EXPECT_EQ(item->name, "name");
 }
 
+// String variable with initializer.
+TEST(ParserSection8, StringTypeWithInit) {
+  auto r = Parse(
+      "module m;\n"
+      "  string greeting = \"hello\";\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
 }  // namespace
