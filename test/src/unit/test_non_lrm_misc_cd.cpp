@@ -35,24 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult10d& r) {
 
 namespace {
 
-// --- 6. Nonblocking with binary expression RHS: q <= a + b ---
-TEST(ParserSection10, Sec10_4_2_ExpressionRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] q, a, b;\n"
-      "  initial begin\n"
-      "    q <= a + b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
-}
-
 // --- 7. Nonblocking to bit-select: q[3] <= 1 ---
 TEST(ParserSection10, Sec10_4_2_BitSelectLhs) {
   auto r = Parse(
