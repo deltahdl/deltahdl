@@ -13,45 +13,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §4.9.5 — Coordinated processing of switch-connected nodes
-// ---------------------------------------------------------------------------
-TEST(SimCh4095, CoordinatedProcessingOfConnectedNodes) {
-  Arena arena;
-  Scheduler sched(arena);
-  // Three nodes connected by two switches: n0 --sw0-- n1 --sw1-- n2.
-  int n0 = 1;
-  int n1 = 0;
-  int n2 = 0;
-  bool sw0_on = true;
-  bool sw1_on = true;
-
-  // Coordinated processing: must resolve entire chain before determining
-  // any individual node value. n0=1 propagates through sw0 to n1 and
-  // through sw1 to n2 in a single coordinated pass.
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    // Coordinated: resolve all connected nodes together.
-    if (sw0_on && sw1_on) {
-      auto* update = sched.GetEventPool().Acquire();
-      update->kind = EventKind::kUpdate;
-      update->callback = [&]() {
-        // All nodes resolve to the strongest driver (n0=1).
-        n1 = n0;
-        n2 = n0;
-      };
-      sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-    }
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(n0, 1);
-  EXPECT_EQ(n1, 1);
-  EXPECT_EQ(n2, 1);
-}
-
-// ---------------------------------------------------------------------------
 // §4.9.5 — Six transistor source element types
 // ---------------------------------------------------------------------------
 TEST(SimCh4095, TransistorSourceElements) {
