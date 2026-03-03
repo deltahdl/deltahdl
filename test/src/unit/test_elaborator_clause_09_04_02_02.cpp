@@ -588,4 +588,37 @@ TEST(SimCh9d, AlwaysStarLocalVar) {
   EXPECT_EQ(y->value.ToUint64(), 0x33u);
 }
 
+// ---------------------------------------------------------------------------
+// 21. always @* with begin-end block and sequential assignments.
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarBeginEnd) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, x, y;\n"
+      "  always @* begin\n"
+      "    x = a + 1;\n"
+      "    y = b + 2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 8'h05;\n"
+      "    b = 8'h03;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* x = f.ctx.FindVariable("x");
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(x, nullptr);
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 0x06u);
+  EXPECT_EQ(y->value.ToUint64(), 0x05u);
+}
+
 }  // namespace
