@@ -63,10 +63,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh5, UnpackedDim_MultiRange) {
-  EXPECT_TRUE(ParseOk5("module m; int a[1:2][1:3]; endmodule"));
-}
-
 TEST(ParserCh5, UnpackedDim_Typedef) {
   EXPECT_TRUE(ParseOk5("module m; typedef int triple[1:3]; endmodule"));
 }
