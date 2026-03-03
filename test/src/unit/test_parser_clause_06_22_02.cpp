@@ -39,4 +39,18 @@ TEST(ParserSection6, NotEquivalentDiffWidth) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
+TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
+  // §6.22.2c: same width+signing+state-ness → equivalent.
+  // byte (8-bit, 2-state) and shortint differ in width → not equivalent.
+  // int and integer: same 32-bit width, but int is 2-state, integer is
+  // 4-state → not equivalent.
+  DataType a;
+  a.kind = DataTypeKind::kByte;
+  DataType b;
+  b.kind = DataTypeKind::kByte;
+  b.is_signed = true;  // byte defaults to signed, make both agree.
+  a.is_signed = true;
+  EXPECT_TRUE(TypesEquivalent(a, b));  // Same kind → match → equivalent.
+}
+
 }  // namespace

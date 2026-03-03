@@ -41,20 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
-  // §6.22.2c: same width+signing+state-ness → equivalent.
-  // byte (8-bit, 2-state) and shortint differ in width → not equivalent.
-  // int and integer: same 32-bit width, but int is 2-state, integer is
-  // 4-state → not equivalent.
-  DataType a;
-  a.kind = DataTypeKind::kByte;
-  DataType b;
-  b.kind = DataTypeKind::kByte;
-  b.is_signed = true;  // byte defaults to signed, make both agree.
-  a.is_signed = true;
-  EXPECT_TRUE(TypesEquivalent(a, b));  // Same kind → match → equivalent.
-}
-
 TEST(ParserSection6, TypesNotEquivalentDifferentState) {
   // §6.22.2c: bit (2-state) and logic (4-state) are NOT equivalent.
   DataType a;
