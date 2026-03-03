@@ -147,4 +147,16 @@ TEST(ParserSection6, ConstVarDecl) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
+TEST(ParserSection6, ConstVarDecl_NameAndInit) {
+  auto r = Parse(
+      "module t;\n"
+      "  const logic [7:0] MAX = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "MAX");
+  ASSERT_NE(item->init_expr, nullptr);
+}
+
 }  // namespace

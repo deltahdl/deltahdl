@@ -40,18 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-TEST(ParserSection6, ConstVarDecl_NameAndInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  const logic [7:0] MAX = 8'hFF;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "MAX");
-  ASSERT_NE(item->init_expr, nullptr);
-}
-
 TEST(ParserSection6, ConstIntDecl) {
   auto r = Parse(
       "module t;\n"
