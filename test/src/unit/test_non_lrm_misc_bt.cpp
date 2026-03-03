@@ -30,23 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.4.2.2 -- @* and @(*) implicit event list
-// =============================================================================
-TEST(ParserSection9, StarEventBareAlways) {
-  // always @* consumes the @* at the always-block level; body is the stmt.
-  auto r = Parse(
-      "module m;\n"
-      "  always @* a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(ParserSection9, StarEventParenAlways) {
   // always @(*) consumes the @(*) at the always-block level.
   auto r = Parse(
