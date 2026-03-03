@@ -28,4 +28,15 @@ TEST(ParserSection6, TypesEquivalentDiffSignedness) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
+TEST(ParserSection6, NotEquivalentDiffWidth) {
+  // §6.22.2: byte (8-bit) and shortint (16-bit) are NOT equivalent.
+  DataType a;
+  a.kind = DataTypeKind::kByte;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kShortint;
+  b.is_signed = true;
+  EXPECT_FALSE(TypesEquivalent(a, b));
+}
+
 }  // namespace
