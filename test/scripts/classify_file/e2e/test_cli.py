@@ -230,16 +230,17 @@ def test_missing_file_with_issue_exits_zero(tmp_path):
     assert result.returncode == 0
 
 
-def test_file_without_tests_reports_error(tmp_path):
-    """A file with no TEST blocks prints an error."""
+def test_file_without_tests_deletes_and_closes(tmp_path):
+    """A file with no TEST blocks is deleted and issue is closed."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
-    _write_test_file(tmp_path, "#include <gtest/gtest.h>\n")
+    f = _write_test_file(tmp_path, "#include <gtest/gtest.h>\n")
     result = _invoke(
         *_all_flags(tmp_path),
         cwd=str(tmp_path), env=env,
     )
-    assert "No TEST blocks" in result.stdout
+    assert result.returncode == 0
+    assert not f.exists()
 
 
 # ---- Successful batch run --------------------------------------------------
