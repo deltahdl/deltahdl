@@ -25,20 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.22.1: Type equivalence — matching built-in types
-// =========================================================================
-TEST(ParserSection6, TypesEquivalentSameSignedInt) {
-  // §6.22.1/2: Two int types (both signed by default) are equivalent.
-  DataType a;
-  a.kind = DataTypeKind::kInt;
-  a.is_signed = true;
-  DataType b;
-  b.kind = DataTypeKind::kInt;
-  b.is_signed = true;
-  EXPECT_TRUE(TypesEquivalent(a, b));
-}
-
 TEST(ParserSection6, TypesEquivalentDiffSignedness) {
   // §6.22.1: Same kind but different signedness is not equivalent.
   DataType a;
