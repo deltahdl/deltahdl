@@ -113,4 +113,8 @@ TEST(TimingControl, PositiveDelayPassesThrough) {
   EXPECT_EQ(EvaluateDelay(10, false, false), 10u);
 }
 
+TEST(TimingControl, ZeroDelayIsZero) {
+  EXPECT_EQ(EvaluateDelay(0, false, false), 0u);
+}
+
 }  // namespace
