@@ -426,4 +426,38 @@ TEST(ParserSection9, Sec9_3_1_BlockWithDelayControl) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDelay);
 }
 
+struct ParseResult90301 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult90301 Parse(const std::string& src) {
+  ParseResult90301 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// =============================================================================
+// LRM section 9.4.1 -- Delay control (#)
+// =============================================================================
+TEST(ParserSection9, DelayControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10 a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
 }  // namespace
