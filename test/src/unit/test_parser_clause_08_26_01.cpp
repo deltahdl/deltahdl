@@ -28,4 +28,13 @@ TEST(SourceText, InterfaceClassItems) {
   EXPECT_EQ(members[3]->kind, ClassMemberKind::kProperty);
 }
 
+// interface_class_declaration: interface class.
+TEST(SourceText, InterfaceClassDecl) {
+  auto r = Parse("interface class IC; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "IC");
+}
+
 }  // namespace
