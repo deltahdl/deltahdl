@@ -593,4 +593,13 @@ TEST(SwitchProcessing, BuiltinNetZControlNonUniqueProducesX) {
   EXPECT_EQ(ValOf(*np.vb), kValX);
 }
 
+// --- User-defined net type, x/z control: treated as off ---
+TEST(SwitchProcessing, UserDefinedNetXControlTreatedAsOff) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 1}, true});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
+}
+
 }  // namespace
