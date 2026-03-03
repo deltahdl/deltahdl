@@ -66,4 +66,20 @@ TEST(ParserSection8, SuperNewExpression) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
 }
 
+// §8.17 — Chaining constructors with super.new() and default
+TEST(ParserSection8, ConstructorChainingDefault) {
+  auto r = Parse(
+      "class Base;\n"
+      "  function new(int x = 0);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Child extends Base;\n"
+      "  function new();\n"
+      "    super.new(5);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+}
+
 }  // namespace
