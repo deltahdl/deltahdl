@@ -678,4 +678,24 @@ TEST(ParserSection6, Sec6_7_1_TriWithRange) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
+// =============================================================================
+// LRM section 6.7.1 -- Net declarations with built-in net types
+// =============================================================================
+// 1. wire logic [7:0] w; — explicit data type after net keyword, no errors.
+TEST(ParserSection6, Sec6_7_1_WireExplicitLogicNoErrors) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire logic [7:0] w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_EQ(item->name, "w");
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
+}
+
 }  // namespace
