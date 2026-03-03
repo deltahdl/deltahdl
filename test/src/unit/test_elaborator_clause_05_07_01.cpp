@@ -576,4 +576,23 @@ TEST(SimCh50701, SignedDesignatorBitPattern) {
   EXPECT_EQ(va->value.words[0].aval & 0xF, 0xFu);
 }
 
+// ---------------------------------------------------------------------------
+// 31. X and z case insensitive in values
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, XZCaseInsensitive) {
+  // §5.7.1: x and z are case insensitive in number values.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 4'bx01x;\n"
+      "    b = 4'bX01X;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerRunAndCompareBitPatterns(f, design, 0xF);
+}
+
 }  // namespace

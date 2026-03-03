@@ -7,39 +7,7 @@
 
 using namespace delta;
 
-static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
-                                          uint32_t mask) {
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.words[0].aval & mask, vb->value.words[0].aval & mask);
-  EXPECT_EQ(va->value.words[0].bval & mask, vb->value.words[0].bval & mask);
-}
-
 namespace {
-
-// ---------------------------------------------------------------------------
-// 31. X and z case insensitive in values
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, XZCaseInsensitive) {
-  // §5.7.1: x and z are case insensitive in number values.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 4'bx01x;\n"
-      "    b = 4'bX01X;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerRunAndCompareBitPatterns(f, design, 0xF);
-}
 
 // ---------------------------------------------------------------------------
 // 32. X in octal literal (sets 3 bits)
