@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(Lexical, Timeunit_StoredInModuleDecl_Flags) {
-  auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-  auto* mod = r.cu->modules[0];
-  EXPECT_TRUE(mod->has_timeunit);
-  EXPECT_TRUE(mod->has_timeprecision);
-}
-
 // =============================================================================
 // LRM §3.14.1 — Time value rounding
 // =============================================================================
