@@ -71,4 +71,9 @@ TEST(ParserSection6, TypeParamDefaultLogicVector) {
               "endmodule\n"));
 }
 
+// Step 1d: type parameter in module header (fixes 6.20.3)
+TEST(ParserSection6, TypeParamPort) {
+  EXPECT_TRUE(ParseOk6("module top #(type T = real); endmodule\n"));
+}
+
 }  // namespace

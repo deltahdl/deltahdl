@@ -41,11 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// Step 1d: type parameter in module header (fixes 6.20.3)
-TEST(ParserSection6, TypeParamPort) {
-  EXPECT_TRUE(ParseOk6("module top #(type T = real); endmodule\n"));
-}
-
 // Step 1d: localparam type declaration (fixes 6.23-localparam_type_decl)
 TEST(ParserSection6, LocalparamTypeDecl) {
   EXPECT_TRUE(
