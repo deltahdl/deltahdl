@@ -292,4 +292,19 @@ TEST(ParserSection7, UnpackedStructTypedefDecl) {
   EXPECT_FALSE(item->typedef_type.is_packed);
 }
 
+static bool ParseOk5(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  auto fid = mgr.AddFile("<test>", src);
+  DiagEngine diag(mgr);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
+TEST(ParserCh5, StructMembers_Single) {
+  EXPECT_TRUE(ParseOk5("module m; struct { int X; } s; endmodule"));
+}
+
 }  // namespace

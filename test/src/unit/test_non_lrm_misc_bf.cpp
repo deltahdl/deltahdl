@@ -63,10 +63,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh5, StructMembers_Single) {
-  EXPECT_TRUE(ParseOk5("module m; struct { int X; } s; endmodule"));
-}
-
 // --- Null module items ---
 TEST(ParserCh5, ModuleBody_NullItem) {
   EXPECT_TRUE(ParseOk5("module m; ; endmodule"));
