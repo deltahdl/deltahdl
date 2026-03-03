@@ -159,4 +159,16 @@ TEST(ParserSection6, ConstVarDecl_NameAndInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
+TEST(ParserSection6, ConstIntDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  const int LIMIT = 100;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_TRUE(item->data_type.is_const);
+}
+
 }  // namespace
