@@ -868,4 +868,22 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithConcatenationOperands) {
   EXPECT_EQ(rhs->false_expr->elements.size(), 2u);
 }
 
+// --- Ternary with replication operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithReplication) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel ? {4{a}} : {4{b}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kReplicate);
+  ASSERT_NE(rhs->true_expr->repeat_count, nullptr);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kReplicate);
+}
+
 }  // namespace
