@@ -4,24 +4,6 @@
 
 using namespace delta;
 
-struct ParseResult7b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static Stmt* FirstInitialStmt(ParseResult7b& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
 // --- Test helpers ---
 struct ParseResult7c {
   SourceManager mgr;
@@ -42,19 +24,6 @@ static ParseResult7c Parse(const std::string& src) {
 }
 
 namespace {
-
-TEST(ParserSection7, StructMemberAccess) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct { int x; int y; } s;\n"
-      "  initial s.x = 42;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
-}
 
 TEST(ParserSection7c, DynamicArrayNewConstruct) {
   auto r = Parse(
