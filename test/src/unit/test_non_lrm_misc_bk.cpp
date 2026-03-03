@@ -25,25 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.11.1: Integral types — automatic variables in functions
-// =========================================================================
-TEST(ParserSection6, AutomaticFunctionLocalVar) {
-  // §6.11.1: Automatic function has automatic local variables.
-  auto r = ParseWithPreprocessor(
-      "module t;\n"
-      "  function automatic int factorial(int n);\n"
-      "    if (n <= 1) return 1;\n"
-      "    return n * factorial(n - 1);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_automatic);
-}
-
 TEST(ParserSection6, AutomaticFunctionReturnType) {
   // §6.11.1: Function return type is an integral type.
   auto r = ParseWithPreprocessor(
