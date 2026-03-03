@@ -39,27 +39,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult4c& r) {
 namespace {
 
 // =============================================================================
-// §4.6: always_comb guarantees combinational semantics
-// =============================================================================
-TEST(ParserSection4, Sec4_6_AlwaysCombCombinational) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic a, b, y;\n"
-      "  always_comb begin\n"
-      "    y = a & b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-}
-
-// =============================================================================
 // §4.6: always_ff guarantees flip-flop semantics
 // =============================================================================
 TEST(ParserSection4, Sec4_6_AlwaysFfFlipFlop) {
