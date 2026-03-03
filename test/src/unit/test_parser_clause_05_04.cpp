@@ -157,4 +157,14 @@ TEST(ParserCh501, Sec5_1_EmptyCuCommentsOnly) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
+TEST(ParserCh503, BlockCommentSpanningLines) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  /* this comment\n"
+              "     spans multiple\n"
+              "     lines */\n"
+              "  logic a;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

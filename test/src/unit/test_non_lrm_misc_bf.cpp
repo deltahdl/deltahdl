@@ -52,16 +52,6 @@ static Stmt* FirstInitialStmt(ParseResult50603& r) {
 
 namespace {
 
-TEST(ParserCh503, BlockCommentSpanningLines) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  /* this comment\n"
-              "     spans multiple\n"
-              "     lines */\n"
-              "  logic a;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserCh503, OneLineCommentEndsAtNewline) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
