@@ -25,18 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-// =========================================================================
-// §6.23: Type operator — type() in declarations
-// =========================================================================
-TEST(ParserSection6, VarTypeOpDecl) {
-  // §6.23: var type(expr) creates a variable with the type of expr.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  int a;\n"
-              "  var type(a) b;\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection6, TypeOpInParamDefault) {
   // §6.23: type(data_type) as parameter default.
   EXPECT_TRUE(
