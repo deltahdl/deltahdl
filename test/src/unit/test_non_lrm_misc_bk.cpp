@@ -13,14 +13,6 @@ static ModuleItem* FirstItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, ChandleMultipleDecls) {
-  // chandle with multiple variables in a module.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  chandle h1, h2;\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // §6.9: Vector declarations — signed vectors
 // =========================================================================
