@@ -214,4 +214,41 @@ TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
   EXPECT_EQ(ValOf(*var), kVal0);
 }
 
+// --- Normative example (§10.6.2) ---
+struct TwoNets {
+  Arena arena;
+  Variable* vd = nullptr;
+  Variable* ve = nullptr;
+  Net net_d;
+  Net net_e;
+};
+
+static TwoNets MakeTwoWireNets() {
+  TwoNets tn;
+  tn.vd = tn.arena.Create<Variable>();
+  tn.vd->value = MakeLogic4Vec(tn.arena, 1);
+  tn.ve = tn.arena.Create<Variable>();
+  tn.ve->value = MakeLogic4Vec(tn.arena, 1);
+  tn.net_d.type = NetType::kWire;
+  tn.net_d.resolved = tn.vd;
+  tn.net_d.drivers.push_back(MakeLogic4VecVal(tn.arena, 1, 0));
+  tn.net_e.type = NetType::kWire;
+  tn.net_e.resolved = tn.ve;
+  tn.net_e.drivers.push_back(MakeLogic4VecVal(tn.arena, 1, 0));
+  return tn;
+}
+
+// §10.6.2 example: at time 0, d=0 (a&b&c=1&0&1=0), e=0 (and gate).
+// At time 10, force d and e to a|b|c=1. At time 20, release both back
+// to driver values (0).
+TEST(ForceRelease, NormativeExampleForceAndRelease_InitialState) {
+  auto tn = MakeTwoWireNets();
+
+  // Time 0: d=0, e=0.
+  ReleaseNet(tn.net_d, tn.arena);
+  ReleaseNet(tn.net_e, tn.arena);
+  EXPECT_EQ(ValOf(*tn.vd), kVal0);
+  EXPECT_EQ(ValOf(*tn.ve), kVal0);
+}
+
 }  // namespace
