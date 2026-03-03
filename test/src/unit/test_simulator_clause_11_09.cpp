@@ -103,4 +103,19 @@ TEST(EvalAdv, TaggedExprVoidMember) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
+// =============================================================================
+// Helper fixture
+// =============================================================================
+// =============================================================================
+// §11.9 Tagged union — tag tracking
+// =============================================================================
+TEST(TaggedUnion, SetAndGetTag) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("u", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  f.ctx.SetVariableTag("u", "field_a");
+  EXPECT_EQ(f.ctx.GetVariableTag("u"), "field_a");
+}
+
 }  // namespace
