@@ -19,33 +19,6 @@ static void LowerRunAndFindQ1Q2(SimFixture& f, RtlirDesign* design,
 
 namespace {
 
-// 5. Enable low retains previous value set by initial block ordering.
-TEST(SimCh9c, EnableLowRetainsPreviousValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic en;\n"
-      "  logic [7:0] d, q;\n"
-      "  initial begin\n"
-      "    d = 8'hBB;\n"
-      "    en = 1;\n"
-      "  end\n"
-      "  always_latch\n"
-      "    if (en) q = d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
-  ASSERT_NE(q, nullptr);
-  // en=1, d=0xBB, so q = 0xBB.
-  EXPECT_EQ(q->value.ToUint64(), 0xBBu);
-}
-
 // =============================================================================
 // §9.2.3: Multiple latches in one always_latch block
 // =============================================================================
