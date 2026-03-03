@@ -489,6 +489,15 @@ def test_run_file_not_found(tmp_path):
     assert _run(args) is None
 
 
+def test_run_missing_file_prints_not_found(tmp_path, capsys):
+    """Missing file prints 'not found' message to stdout."""
+    _run(_make_run_args(
+        tmp_path, file=str(tmp_path / "missing.cpp"),
+        create_issue=True, issue=None,
+    ))
+    assert "not found" in capsys.readouterr().out
+
+
 def test_run_missing_file_with_issue_closes_issue(
     tmp_path, monkeypatch,
 ):

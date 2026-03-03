@@ -206,6 +206,7 @@ def _run(args: argparse.Namespace) -> None:
     """Execute the batch classification."""
     filepath = Path(args.file)
     if not filepath.exists():
+        print(f"Skipping: {filepath} not found")
         if not args.create_issue and args.issue is not None:
             close_issue(args)
         return

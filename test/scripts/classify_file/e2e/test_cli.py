@@ -220,6 +220,16 @@ def test_nonexistent_file_exits_zero(tmp_path):
     assert result.returncode == 0
 
 
+def test_nonexistent_file_prints_not_found(tmp_path):
+    """Missing file with --create-issue prints 'not found'."""
+    fake = _install_fake_classify_test(tmp_path)
+    env = _base_env(tmp_path, fake)
+    flags = _all_flags_create(tmp_path)
+    flags[flags.index("--file") + 1] = str(tmp_path / "missing.cpp")
+    result = _invoke(*flags, cwd=str(tmp_path), env=env)
+    assert "not found" in result.stdout
+
+
 def test_missing_file_with_issue_exits_zero(tmp_path):
     """Missing file with --issue closes issue and exits 0."""
     fake = _install_fake_classify_test(tmp_path)
