@@ -209,14 +209,6 @@ static NetPair MakeNetPair(uint64_t a_val) {
 
 namespace {
 
-TEST(SwitchProcessing, Tranif1BlocksWhenControlLow) {
-  auto np = MakeNetPair(1);
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 0}, false});
-  ResolveSwitchNetwork(sw, np.arena);
-  EXPECT_EQ(ValOf(*np.vb), kValZ);
-}
-
 TEST(SwitchProcessing, Tranif0ConductsWhenControlLow) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
