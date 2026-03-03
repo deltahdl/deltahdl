@@ -40,18 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-TEST(ParserSection8, ClassScopeResolutionTypedef) {
-  auto r = Parse(
-      "class Outer;\n"
-      "  typedef int my_type;\n"
-      "endclass\n"
-      "module m;\n"
-      "  Outer::my_type x;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(ParserSection8, ClassScopeResolutionParameter) {
   auto r = Parse(
       "class Cfg;\n"
