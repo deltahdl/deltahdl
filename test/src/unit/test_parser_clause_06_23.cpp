@@ -418,4 +418,12 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnLogic) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTypeRef);
 }
 
+// 15. type() on bit data type.
+TEST(ParserSection6, Sec6_11_1_TypeRefOnBit) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(bit);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

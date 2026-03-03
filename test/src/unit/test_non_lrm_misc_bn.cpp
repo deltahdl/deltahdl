@@ -54,14 +54,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 15. type() on bit data type.
-TEST(ParserSection6, Sec6_11_1_TypeRefOnBit) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial x = type(bit);\n"
-              "endmodule\n"));
-}
-
 // 16. type() on byte data type.
 TEST(ParserSection6, Sec6_11_1_TypeRefOnByte) {
   EXPECT_TRUE(
