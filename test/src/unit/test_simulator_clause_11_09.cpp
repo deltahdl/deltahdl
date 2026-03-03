@@ -72,4 +72,21 @@ TEST(EvalAdv, TaggedUnionNoTagSetAccessesNormally) {
   EXPECT_EQ(result_x.ToUint64(), 0xFFu);
 }
 
+// ==========================================================================
+// §11.9: Tagged union expressions
+// ==========================================================================
+TEST(EvalAdv, TaggedExprWithValue) {
+  SimFixture f;
+  // tagged Valid 42 → evaluates to 42.
+  auto* tagged = f.arena.Create<Expr>();
+  tagged->kind = ExprKind::kTagged;
+  auto* member = f.arena.Create<Expr>();
+  member->kind = ExprKind::kIdentifier;
+  member->text = "Valid";
+  tagged->rhs = member;
+  tagged->lhs = MakeInt(f.arena, 42);
+  auto result = EvalExpr(tagged, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}
+
 }  // namespace
