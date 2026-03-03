@@ -187,4 +187,17 @@ TEST(EvalAdv, InsideDollarLowerBound) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+TEST(EvalAdv, InsideDollarUpperBound) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("du", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 200);
+  auto* inside = f.arena.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->lhs = MakeId(f.arena, "du");
+  inside->elements.push_back(
+      MakeRange(f.arena, MakeInt(f.arena, 100), MakeDollar(f.arena)));
+  auto result = EvalExpr(inside, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
