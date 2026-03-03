@@ -711,4 +711,28 @@ TEST(ParserSection9, Sec9_2_2_SimpleBlockingAssign) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
+// ---------------------------------------------------------------------------
+// 2. always_comb with begin-end block containing multiple assignments
+// ---------------------------------------------------------------------------
+TEST(ParserSection9, Sec9_2_2_BeginEndBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, x, y;\n"
+      "  always_comb begin\n"
+      "    x = a & b;\n"
+      "    y = a | b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysComb(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_EQ(item->body->stmts.size(), 2u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace
