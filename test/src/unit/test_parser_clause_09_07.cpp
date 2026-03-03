@@ -89,4 +89,16 @@ TEST(ParserAnnexG, AnnexGProcessDecl) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+TEST(ParserSection9c, ProcessStatusCheck) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    process p;\n"
+              "    p = process::self();\n"
+              "    if (p.status() != process::FINISHED)\n"
+              "      $display(\"still running\");\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

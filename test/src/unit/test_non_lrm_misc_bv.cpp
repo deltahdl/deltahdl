@@ -39,18 +39,6 @@ static Stmt* FirstInitialStmt(ParseResult9d& r) {
 
 namespace {
 
-TEST(ParserSection9c, ProcessStatusCheck) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    process p;\n"
-              "    p = process::self();\n"
-              "    if (p.status() != process::FINISHED)\n"
-              "      $display(\"still running\");\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // =============================================================================
 // LRM section 9.3.1 -- Variable declarations inside sequential blocks.
 // =============================================================================
