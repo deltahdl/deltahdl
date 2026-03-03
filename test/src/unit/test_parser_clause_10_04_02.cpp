@@ -892,4 +892,23 @@ TEST(ParserSection10, Sec10_4_2_BitSelectLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
+// --- 8. Nonblocking to part-select: q[7:4] <= 4'hF ---
+TEST(ParserSection10, Sec10_4_2_PartSelectLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] q;\n"
+      "  initial begin\n"
+      "    q[7:4] <= 4'hF;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
