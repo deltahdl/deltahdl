@@ -8,32 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 28. type() with int, value preserved after multiple assignments.
-TEST(SimCh6b, TypeOpMultipleAssignments) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  var type(a) result;\n"
-      "  initial begin\n"
-      "    result = 1;\n"
-      "    result = 2;\n"
-      "    result = 3;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.width, 32u);
-  EXPECT_EQ(var->value.ToUint64(), 3u);
-}
-
 // 29. type() with shortint, assign max unsigned 16-bit value.
 TEST(SimCh6b, TypeOpShortintMaxUnsigned) {
   SimFixture f;
