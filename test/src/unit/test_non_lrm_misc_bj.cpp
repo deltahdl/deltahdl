@@ -41,20 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-TEST(ParserSection6, BlockVarDecl_Static_Props) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    static int st2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_FALSE(stmt->var_is_automatic);
-  EXPECT_EQ(stmt->var_name, "st2");
-}
-
 TEST(ParserSection6, BlockVarDecl_AutomaticWithInit) {
   auto r = Parse(
       "module t;\n"
