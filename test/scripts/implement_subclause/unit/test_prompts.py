@@ -32,8 +32,10 @@ _TITLES = {
 def _check_common_structure(prompt, subclause, issue):
     """Return list of missing common structure elements."""
     missing = []
-    if "failing test" not in prompt:
-        missing.append("TDD (failing test)")
+    if "failing unit test" not in prompt:
+        missing.append("TDD (failing unit test)")
+    if "test-driven development" not in prompt:
+        missing.append("explicit TDD")
     if "pipeline stages" not in prompt:
         missing.append("'pipeline stages'")
     if f"Issue #{issue}" not in prompt:

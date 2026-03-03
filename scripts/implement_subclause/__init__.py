@@ -333,8 +333,9 @@ def format_prompt(
         lines.append(supplementary.rstrip("\n"))
 
     lines.append(
-        "For each requirement in the LRM section,"
-        " write a failing test, then implement."
+        "Use strict test-driven development:"
+        " for each requirement in the LRM section,"
+        " write a failing unit test, then implement."
         " Cover all affected pipeline stages."
         " Include error conditions and edge cases.",
     )
