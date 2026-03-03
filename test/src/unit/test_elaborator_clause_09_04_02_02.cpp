@@ -333,4 +333,33 @@ TEST(SimCh9d, AlwaysStarFunctionCall) {
   EXPECT_EQ(y->value.ToUint64(), 0x13u);
 }
 
+// ---------------------------------------------------------------------------
+// 12. always @* with nested expressions -- all leaf signals are sensitive.
+// ---------------------------------------------------------------------------
+TEST(SimCh9d, AlwaysStarNestedExpr) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c, y;\n"
+      "  always @* y = (a & b) | c;\n"
+      "  initial begin\n"
+      "    a = 8'hFF;\n"
+      "    b = 8'h0F;\n"
+      "    c = 8'hF0;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  // (0xFF & 0x0F) | 0xF0 = 0x0F | 0xF0 = 0xFF.
+  EXPECT_EQ(y->value.ToUint64(), 0xFFu);
+}
+
 }  // namespace
