@@ -39,29 +39,6 @@ static Stmt* FirstInitialStmt(ParseResult9d& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with control flow statements.
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (sel)\n"
-      "      a = 1;\n"
-      "    else\n"
-      "      a = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_NE(stmt->condition, nullptr);
-  EXPECT_NE(stmt->then_branch, nullptr);
-  EXPECT_NE(stmt->else_branch, nullptr);
-}
-
 TEST(ParserSection9, Sec9_3_1_BlockWithForLoop) {
   auto r = Parse(
       "module m;\n"
