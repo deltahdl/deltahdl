@@ -139,4 +139,16 @@ TEST(EvalAdv, SignedGtNeg) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+TEST(EvalAdv, UnsignedLtUnchanged) {
+  SimFixture f;
+  auto* a = MakeVar(f, "ua", 8, 0xFF);
+  (void)a;
+  auto* b = MakeVar(f, "ub", 8, 0x01);
+  (void)b;
+  auto* expr = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "ua"),
+                          MakeId(f.arena, "ub"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
 }  // namespace
