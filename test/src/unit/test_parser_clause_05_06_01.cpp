@@ -44,4 +44,10 @@ TEST(ParserCh50601, EscapedIdent_Basic) {
   EXPECT_TRUE(ParseOk("module m; wire \\busa+index ; endmodule"));
 }
 
+TEST(ParserCh50601, EscapedIdent_Keyword) {
+  // An escaped keyword is treated as a user-defined identifier, not as a
+  // keyword. \net is a valid user-defined wire name.
+  EXPECT_TRUE(ParseOk("module m; wire \\net ; endmodule"));
+}
+
 }  // namespace
