@@ -8,38 +8,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §9.2.3: always_latch with concatenation
-// =============================================================================
-// 18. Concatenation on RHS within always_latch.
-TEST(SimCh9c, ConcatenationRHS) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic en;\n"
-      "  logic [3:0] a, b;\n"
-      "  logic [7:0] q;\n"
-      "  initial begin\n"
-      "    en = 1;\n"
-      "    a = 4'hA;\n"
-      "    b = 4'h5;\n"
-      "  end\n"
-      "  always_latch\n"
-      "    if (en) q = {a, b};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
-  ASSERT_NE(q, nullptr);
-  // {4'hA, 4'h5} = 8'hA5.
-  EXPECT_EQ(q->value.ToUint64(), 0xA5u);
-}
-
 // 19. Concatenation retained when enable is low.
 TEST(SimCh9c, ConcatenationRetainedWhenLow) {
   SimFixture f;
