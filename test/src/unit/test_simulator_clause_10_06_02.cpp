@@ -267,4 +267,27 @@ TEST(ForceRelease, NormativeExampleForceAndRelease_ForceAndRelease) {
   EXPECT_EQ(ValOf(*tn.ve), kVal0);
 }
 
+// Helper to create a blocking assignment statement: lhs = rhs_val.
+// Driver coroutine that co_awaits an ExecTask and stores its result.
+// Helper to run ExecStmt synchronously (for non-suspending statements).
+// Creates a wrapper coroutine, resumes it, and returns the result.
+// =============================================================================
+// 1. Force / Release (StmtKind::kForce, kRelease)
+// =============================================================================
+TEST(StmtExec, ForceOverridesValue) {
+  StmtFixture f;
+  auto* var = f.ctx.CreateVariable("x", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 10);
+
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kForce;
+  stmt->lhs = MakeId(f.arena, "x");
+  stmt->rhs = MakeInt(f.arena, 99);
+
+  RunStmt(stmt, f.ctx, f.arena);
+  EXPECT_TRUE(var->is_forced);
+  EXPECT_EQ(var->forced_value.ToUint64(), 99u);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
 }  // namespace
