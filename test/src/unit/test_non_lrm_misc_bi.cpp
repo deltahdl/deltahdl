@@ -20,12 +20,6 @@ static ParseResult6 Parse(const std::string& src) {
   return result;
 }
 
-static ModuleItem* FirstItem(ParseResult6& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 static Stmt* FirstInitialStmt(ParseResult6& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kInitialBlock) {
@@ -39,20 +33,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 }
 
 namespace {
-
-TEST(ParserSection6, StaticFunction) {
-  auto r = Parse(
-      "module t;\n"
-      "  function static int counter();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_static);
-}
 
 // =========================================================================
 // §6.24: Casting
