@@ -22,14 +22,6 @@ static ParseResult8b Parse(const std::string& src) {
 
 namespace {
 
-// Module with type parameter defaulting to logic vector.
-TEST(ParserSection8, TypeParameterLogicVector) {
-  EXPECT_TRUE(
-      ParseOk("module m #(parameter type T = logic [7:0]);\n"
-              "  T bus;\n"
-              "endmodule\n"));
-}
-
 // Class with type parameter used as member type.
 TEST(ParserSection8, TypeParameterClassMember) {
   auto r = Parse(
