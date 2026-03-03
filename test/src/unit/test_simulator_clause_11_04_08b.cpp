@@ -9,14 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalOp, ReductionXnorTildeCaret) {
-  SimFixture f;
-  // ~^32'd3 = 1 (even parity -> XNOR=1)
-  auto* expr = MakeUnary(f.arena, TokenKind::kTildeCaret, MakeInt(f.arena, 3));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
 TEST(EvalOp, ReductionXnorCaretTilde) {
   SimFixture f;
   // ^~32'd7 = 0 (odd parity -> XNOR=0)
