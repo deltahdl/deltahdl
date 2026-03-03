@@ -42,18 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Unary operators ---
-TEST(ParserSection11, Sec11_1_UnaryBitwiseNot) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = ~b;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
-  EXPECT_EQ(rhs->op, TokenKind::kTilde);
-}
-
 TEST(ParserSection11, Sec11_1_UnaryLogicalNot) {
   auto r = Parse(
       "module t;\n"

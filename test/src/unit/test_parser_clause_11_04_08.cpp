@@ -179,4 +179,16 @@ TEST(ParserA86, UnaryBitwiseNot) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
+// --- Unary operators ---
+TEST(ParserSection11, Sec11_1_UnaryBitwiseNot) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = ~b;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kTilde);
+}
+
 }  // namespace
