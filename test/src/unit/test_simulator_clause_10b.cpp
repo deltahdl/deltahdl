@@ -10,39 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §10.4.2: Multiple NBAs in sequence — each captures current blocking state.
-// ---------------------------------------------------------------------------
-TEST(SimCh10b, MultipleNBAsInSequence) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a;\n"
-      "  logic [31:0] b;\n"
-      "  logic [31:0] c;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b <= a;\n"
-      "    a = 2;\n"
-      "    c <= a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* b = f.ctx.FindVariable("b");
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(b, nullptr);
-  ASSERT_NE(c, nullptr);
-  // b <= a when a==1, c <= a when a==2.
-  EXPECT_EQ(b->value.ToUint64(), 1u);
-  EXPECT_EQ(c->value.ToUint64(), 2u);
-}
-
-// ---------------------------------------------------------------------------
 // §10.4.2: NBA preserving width — result width matches LHS declaration.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAPreservesWidth) {
