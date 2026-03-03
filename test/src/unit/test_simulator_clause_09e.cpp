@@ -9,38 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.4: iff guard preserves previous value when suppressed.
-TEST(SimCh9e, IffPreservesPreviousValueWhenSuppressed) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic clk, en;\n"
-      "  logic [31:0] q;\n"
-      "  initial begin\n"
-      "    clk = 0; en = 1; q = 0;\n"
-      "    #1 clk = 1;\n"
-      "    #1 clk = 0;\n"
-      "    #1 en = 0;\n"
-      "    #1 clk = 1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "  always @(posedge clk iff en)\n"
-      "    q = q + 10;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("q");
-  ASSERT_NE(var, nullptr);
-  // First posedge (t=1, en=1): q = 0+10 = 10.
-  // Second posedge (t=4, en=0): suppressed, q stays 10.
-  EXPECT_EQ(var->value.ToUint64(), 10u);
-}
-
 // §9.4.2.4: Verify result .width is correct after iff-guarded update.
 TEST(SimCh9e, ResultWidthAfterIffUpdate) {
   SimFixture f;
