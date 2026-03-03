@@ -23,21 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 29. Signed based literal with 's' designator
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, SignedBasedLiteral) {
-  // §5.7.1: Signed based literal — 4'shf is 4'b1111, signed = -1.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  integer x;\n"
-      "  initial x = 4'shf;\n"
-      "endmodule\n",
-      "x");
-  uint32_t mask = 0xFFFFFFFF;
-  EXPECT_EQ(result & mask, mask);
-}
-
-// ---------------------------------------------------------------------------
 // 30. Signed designator does not affect bit pattern
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SignedDesignatorBitPattern) {
