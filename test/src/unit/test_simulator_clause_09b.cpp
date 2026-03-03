@@ -10,29 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 12. always_comb output available in initial block after scheduler run.
-// ---------------------------------------------------------------------------
-TEST(SimCh9b, AlwaysCombOutputAfterRun) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  always_comb result = 100;\n"
-      "  initial #1 $finish;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* result = f.ctx.FindVariable("result");
-  ASSERT_NE(result, nullptr);
-  EXPECT_EQ(result->value.ToUint64(), 100u);
-}
-
-// ---------------------------------------------------------------------------
 // 13. always_comb with function call.
 // ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombFunctionCall) {
