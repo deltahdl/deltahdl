@@ -39,32 +39,6 @@ static Stmt* FirstInitialStmt(ParseResult9d& r) {
 
 namespace {
 
-// =============================================================================
-// LRM section 9.3.1 -- Nested begin-end blocks.
-// =============================================================================
-TEST(ParserSection9, Sec9_3_1_NestedBeginEndTwoLevels) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 0;\n"
-      "    begin\n"
-      "      b = 1;\n"
-      "      c = 2;\n"
-      "    end\n"
-      "    d = 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->stmts[1]->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(ParserSection9, Sec9_3_1_DeeplyNestedBeginEndThreeLevels) {
   auto r = Parse(
       "module m;\n"
