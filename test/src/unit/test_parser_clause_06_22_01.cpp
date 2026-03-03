@@ -160,4 +160,14 @@ TEST(ParserSection6, MatchingTypesSignedBitVector) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
+TEST(ParserSection6, MatchingTypesArrayTypedef) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef byte MEM_BYTES [256];\n"
+      "  MEM_BYTES mem;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
 }  // namespace

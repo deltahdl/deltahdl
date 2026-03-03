@@ -5,33 +5,7 @@
 
 using namespace delta;
 
-struct ParseResult6b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6b Parse(const std::string& src) {
-  ParseResult6b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 namespace {
-
-TEST(ParserSection6, MatchingTypesArrayTypedef) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef byte MEM_BYTES [256];\n"
-      "  MEM_BYTES mem;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-}
 
 // =========================================================================
 // §6.22: Type compatibility — additional tests
