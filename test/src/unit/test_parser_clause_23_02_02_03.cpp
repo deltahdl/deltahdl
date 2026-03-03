@@ -241,4 +241,13 @@ TEST(ParserSection6, VarImplicitInPort) {
               "endmodule\n"));
 }
 
+TEST(ParserSection6, ShortrealInPort) {
+  // shortreal as port type (LRM 23.2.2)
+  EXPECT_TRUE(
+      ParseOk("module m (input var shortreal in_val,\n"
+              "          output var shortreal out_val);\n"
+              "  assign out_val = in_val;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
