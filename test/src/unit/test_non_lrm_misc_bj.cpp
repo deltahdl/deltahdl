@@ -23,13 +23,6 @@ static ParseResult6b Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection6, ModuleLifetimeAutomatic) {
-  auto r = Parse("module automatic t; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "t");
-}
-
 // =========================================================================
 // §6.22.1 -- Matching types
 // =========================================================================

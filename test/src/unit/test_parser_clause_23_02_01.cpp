@@ -140,4 +140,27 @@ TEST(ParserSection23, ModuleDefinitionEmpty) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
+struct ParseResult6b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6b Parse(const std::string& src) {
+  ParseResult6b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(ParserSection6, ModuleLifetimeAutomatic) {
+  auto r = Parse("module automatic t; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "t");
+}
+
 }  // namespace
