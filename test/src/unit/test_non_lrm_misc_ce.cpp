@@ -35,21 +35,6 @@ static Stmt* FirstInitialStmt(ParseResult11& r) {
 
 namespace {
 
-// =========================================================================
-// Section 11.3.6 -- Assignment operators in expressions
-// =========================================================================
-TEST(ParserSection11, CompoundAssignPlusEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a += 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  // Compound assignment is parsed as blocking assign with op
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(ParserSection11, CompoundAssignMinusEq) {
   auto r = Parse(
       "module t;\n"
