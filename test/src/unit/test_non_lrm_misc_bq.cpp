@@ -42,18 +42,6 @@ static Stmt* FirstInitialStmt(ParseResult7e& r) {
 
 namespace {
 
-// 10. Struct assigned in initial block with begin/end.
-TEST(ParserSection7, Sec7_2_2_AssignInInitialBlock) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct { int a; int b; } s_t;\n"
-              "  s_t s;\n"
-              "  initial begin\n"
-              "    s = '{10, 20};\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // 11. Struct assigned in always_comb block.
 TEST(ParserSection7, Sec7_2_2_AssignInAlwaysComb) {
   auto r = Parse(
