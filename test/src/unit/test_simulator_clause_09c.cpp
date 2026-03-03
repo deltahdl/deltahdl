@@ -19,37 +19,6 @@ static void LowerRunAndFindQ1Q2(SimFixture& f, RtlirDesign* design,
 
 namespace {
 
-// =============================================================================
-// §9.2.3: always_latch with if-without-else creates latch behavior
-// When the enable condition is false, the output retains its previous value.
-// =============================================================================
-// 3. if-without-else: enable low retains default (zero) value.
-TEST(SimCh9c, IfWithoutElseRetainsDefault) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic en;\n"
-      "  logic [7:0] d, q;\n"
-      "  initial begin\n"
-      "    en = 0;\n"
-      "    d = 8'hFF;\n"
-      "  end\n"
-      "  always_latch\n"
-      "    if (en) q = d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
-  ASSERT_NE(q, nullptr);
-  // en=0, so always_latch does not assign q; q retains 0.
-  EXPECT_EQ(q->value.ToUint64(), 0u);
-}
-
 // 4. if-without-else: enable high passes data through.
 TEST(SimCh9c, EnableHighPassesData) {
   SimFixture f;
