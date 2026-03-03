@@ -46,4 +46,22 @@ TEST(Lexical, ContAssign_WithParenDelay) {
   EXPECT_TRUE(found);
 }
 
+// =============================================================================
+// LRM section 10.3.3 -- Continuous assignment delays
+// =============================================================================
+TEST(ParserSection10, ContinuousAssignDelay) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign #10 a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      EXPECT_NE(item->assign_delay, nullptr);
+    }
+  }
+}
+
 }  // namespace
