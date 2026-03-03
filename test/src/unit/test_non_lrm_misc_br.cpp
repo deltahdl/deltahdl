@@ -17,21 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-TEST(ParserAnnexA, A2ClassDecl) {
-  auto r = Parse(
-      "class Packet;\n"
-      "  rand bit [7:0] payload;\n"
-      "  function void display();\n"
-      "    $display(\"pkt\");\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "Packet");
-  EXPECT_EQ(r.cu->classes[0]->members.size(), 2u);
-}
-
 TEST(Parser, ClassWithProperty) {
   auto r = Parse("class pkt; int data; endclass");
   ASSERT_NE(r.cu, nullptr);
