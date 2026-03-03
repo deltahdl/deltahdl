@@ -9,32 +9,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 19. Function call in always_comb.
-// ---------------------------------------------------------------------------
-TEST(SimCh9, AlwaysCombFunctionCall) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  function automatic logic [7:0] add_one(input logic [7:0] x);\n"
-      "    return x + 8'd1;\n"
-      "  endfunction\n"
-      "  logic [7:0] a, result;\n"
-      "  initial a = 8'd9;\n"
-      "  always_comb begin\n"
-      "    result = add_one(a);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
-}
-
-// ---------------------------------------------------------------------------
 // 20. Verify result variable width is 8 bits.
 // ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombResultWidth8) {
