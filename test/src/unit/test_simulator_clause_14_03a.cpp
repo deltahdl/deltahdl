@@ -14,15 +14,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// 16. Negedge clock event
-// =============================================================================
-TEST(ClockingSim, NegedgeClockEvent) {
-  ClockingSimFixture f;
-  ClockingManager cmgr;
-  TestNegedgeSampling(f, cmgr);
-}
-
-// =============================================================================
 // 17. Inout direction signal
 // =============================================================================
 TEST(ClockingSim, InoutSignalDirection) {

@@ -122,4 +122,13 @@ TEST(ClockingSim, DeclareWithClockEvent) {
   EXPECT_EQ(found->clock_edge, Edge::kPosedge);
 }
 
+// =============================================================================
+// 16. Negedge clock event
+// =============================================================================
+TEST(ClockingSim, NegedgeClockEvent) {
+  ClockingSimFixture f;
+  ClockingManager cmgr;
+  TestNegedgeSampling(f, cmgr);
+}
+
 }  // namespace
