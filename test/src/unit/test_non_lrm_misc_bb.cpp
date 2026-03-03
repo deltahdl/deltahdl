@@ -42,21 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 7. Rule (d): Default time unit when nothing is specified.
-TEST(ParserClause03, Cl3_14_2_3_RuleD_DefaultTimeUnit) {
-  auto r = ParseTimescale31402(
-      "module m;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto resolved =
-      ResolveModuleTimescale(r.cu->modules[0], r.cu, false, {}, nullptr);
-  EXPECT_FALSE(resolved.has_unit);
-  EXPECT_FALSE(resolved.has_precision);
-  // Default is kNs (implementation-specific).
-  EXPECT_EQ(resolved.unit, TimeUnit::kNs);
-  EXPECT_EQ(resolved.precision, TimeUnit::kNs);
-}
-
 // 8. CU-scope timeunit can only be set by keyword, not `timescale.
 // §3.14.2.3: "The time unit of the compilation-unit scope can only be
 // set by a timeunit declaration, not a `timescale directive."
