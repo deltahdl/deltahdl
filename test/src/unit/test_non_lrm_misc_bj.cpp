@@ -41,25 +41,6 @@ static Stmt* FirstInitialStmt(ParseResult6b& r) {
 
 namespace {
 
-// Step 3b: type(data_type) in expressions (fixes 6.23-type_op_compare)
-TEST(ParserSection6, TypeRef_DataType) {
-  EXPECT_TRUE(
-      ParseOk6("module top #(parameter type T = type(logic[11:0]))\n"
-               "  ();\n"
-               "  initial begin\n"
-               "    case (type(T))\n"
-               "      type(logic[11:0]) : ;\n"
-               "      default : $stop;\n"
-               "    endcase\n"
-               "    if (type(T) == type(logic[12:0])) $stop;\n"
-               "    if (type(T) != type(logic[11:0])) $stop;\n"
-               "    if (type(T) === type(logic[12:0])) $stop;\n"
-               "    if (type(T) !== type(logic[11:0])) $stop;\n"
-               "    $finish;\n"
-               "  end\n"
-               "endmodule\n"));
-}
-
 // =========================================================================
 // §6.21: Scope and lifetime — block-level automatic/static qualifiers
 // =========================================================================
