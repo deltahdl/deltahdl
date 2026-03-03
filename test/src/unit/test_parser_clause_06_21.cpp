@@ -588,4 +588,13 @@ TEST(ParserSection6, BlockVarDecl_AutomaticWithInit) {
   ASSERT_NE(stmt->var_init, nullptr);
 }
 
+TEST(ParserSection6, BlockVarDecl_StaticVar) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  initial begin\n"
+               "    static var logic x;\n"
+               "  end\n"
+               "endmodule\n"));
+}
+
 }  // namespace
