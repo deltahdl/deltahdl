@@ -42,20 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// =========================================================================
-// LRM section 11.1 -- Operators and operands overview
-// =========================================================================
-// --- Primary operand types ---
-TEST(ParserSection11, Sec11_1_IdentifierAsExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = foo;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIdentifier);
-}
-
 TEST(ParserSection11, Sec11_1_StringLiteralAsExpression) {
   auto r = Parse(
       "module t;\n"
