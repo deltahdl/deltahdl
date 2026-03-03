@@ -132,4 +132,37 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberDefaultInit) {
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
+static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        if (item->body->stmts.size() > n) return item->body->stmts[n];
+      }
+      if (n == 0) return item->body;
+    }
+  }
+  return nullptr;
+}
+
+// 5. Struct variable assigned from another struct variable.
+TEST(ParserSection7, Sec7_2_2_AssignFromStructVar) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct { int x; int y; } point_t;\n"
+      "  point_t a, b;\n"
+      "  initial begin\n"
+      "    a = '{1, 2};\n"
+      "    b = a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = NthInitialStmt(r, 1);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(stmt->rhs->text, "a");
+}
+
 }  // namespace

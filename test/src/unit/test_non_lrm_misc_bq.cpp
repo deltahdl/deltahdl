@@ -60,27 +60,6 @@ static Stmt* NthInitialStmt(ParseResult7e& r, size_t n) {
 
 namespace {
 
-// 5. Struct variable assigned from another struct variable.
-TEST(ParserSection7, Sec7_2_2_AssignFromStructVar) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { int x; int y; } point_t;\n"
-      "  point_t a, b;\n"
-      "  initial begin\n"
-      "    a = '{1, 2};\n"
-      "    b = a;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = NthInitialStmt(r, 1);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(stmt->rhs->text, "a");
-}
-
 // 6. Struct member assigned individually (s.a = 1).
 TEST(ParserSection7, Sec7_2_2_MemberAssignment) {
   auto r = Parse(
