@@ -30,4 +30,11 @@ TEST(SysTask, AssertKillDoesNotCrash) {
   EXPECT_EQ(result.width, 1u);
 }
 
+TEST(SysTask, AssertControlDoesNotCrash) {
+  SysTaskFixture f;
+  auto* expr = MkSysCall(f.arena, "$assertcontrol", {MkInt(f.arena, 3)});
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+}
+
 }  // namespace
