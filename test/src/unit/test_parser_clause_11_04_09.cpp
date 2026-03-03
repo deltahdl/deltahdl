@@ -128,4 +128,18 @@ TEST(ParserA86, UnaryReductionXnorAlt) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
+// =========================================================================
+// Section 11.4.3.1 -- Unary reduction operators
+// =========================================================================
+TEST(ParserSection11, ReductionXnorCaretTilde) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = ^~a;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
+}
+
 }  // namespace
