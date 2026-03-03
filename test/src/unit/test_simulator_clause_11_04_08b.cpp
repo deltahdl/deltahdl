@@ -1,4 +1,4 @@
-// §11.4.8: Bitwise operators
+// Non-LRM tests
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
@@ -8,18 +8,6 @@
 using namespace delta;
 
 namespace {
-
-// ==========================================================================
-// Reduction operators (unary &, |, ^, ~&, ~|, ~^, ^~)
-// ==========================================================================
-TEST(EvalOp, ReductionAndAllOnes) {
-  SimFixture f;
-  // &32'hFFFFFFFF = 1 (all 32 bits are 1)
-  auto* expr =
-      MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 0xFFFFFFFF));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
 
 TEST(EvalOp, ReductionAndNotAllOnes) {
   SimFixture f;

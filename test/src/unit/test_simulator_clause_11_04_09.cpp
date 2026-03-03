@@ -249,4 +249,16 @@ TEST(SimA86, UnaryReductionXnorAlt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// ==========================================================================
+// Reduction operators (unary &, |, ^, ~&, ~|, ~^, ^~)
+// ==========================================================================
+TEST(EvalOp, ReductionAndAllOnes) {
+  SimFixture f;
+  // &32'hFFFFFFFF = 1 (all 32 bits are 1)
+  auto* expr =
+      MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 0xFFFFFFFF));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
