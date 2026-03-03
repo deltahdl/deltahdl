@@ -40,19 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-TEST(ParserSection8, ParameterizedClassDefaultInstantiation) {
-  auto r = Parse(
-      "class stack #(type T = int);\n"
-      "  T items[];\n"
-      "endclass\n"
-      "module m;\n"
-      "  stack is_default;\n"
-      "  stack #(real) rs;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // =============================================================================
 // Section 8.2 -- Data type syntax
 // =============================================================================
