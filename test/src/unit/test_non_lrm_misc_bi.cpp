@@ -40,21 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult6& r) {
 
 namespace {
 
-// =========================================================================
-// §6.20: Constants
-// =========================================================================
-TEST(ParserSection6, ConstVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  const logic [7:0] MAX = 8'hFF;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_TRUE(item->data_type.is_const);
-}
-
 TEST(ParserSection6, ConstVarDecl_NameAndInit) {
   auto r = Parse(
       "module t;\n"
