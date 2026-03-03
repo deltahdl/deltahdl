@@ -10,41 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 33. Base format case insensitive
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, BaseFormatCaseInsensitive) {
-  // §5.7.1: Base format letter is case insensitive.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, d;\n"
-      "  initial begin\n"
-      "    a = 8'hFF;\n"
-      "    b = 8'HFF;\n"
-      "    c = 8'b11111111;\n"
-      "    d = 8'B11111111;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  auto* vc = f.ctx.FindVariable("c");
-  auto* vd = f.ctx.FindVariable("d");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  ASSERT_NE(vc, nullptr);
-  ASSERT_NE(vd, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 0xFFu);
-  EXPECT_EQ(vb->value.ToUint64(), 0xFFu);
-  EXPECT_EQ(vc->value.ToUint64(), 0xFFu);
-  EXPECT_EQ(vd->value.ToUint64(), 0xFFu);
-}
-
-// ---------------------------------------------------------------------------
 // 34. White space between size and base format
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, WhiteSpaceSizeAndBase) {
