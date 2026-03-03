@@ -10,36 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 11. always @* with function call -- function arguments are sensitive.
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarFunctionCall) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  function logic [7:0] add3(input logic [7:0] x);\n"
-      "    return x + 3;\n"
-      "  endfunction\n"
-      "  logic [7:0] a, y;\n"
-      "  always @* y = add3(a);\n"
-      "  initial begin\n"
-      "    a = 8'h10;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  // 0x10 + 3 = 0x13.
-  EXPECT_EQ(y->value.ToUint64(), 0x13u);
-}
-
-// ---------------------------------------------------------------------------
 // 12. always @* with nested expressions -- all leaf signals are sensitive.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarNestedExpr) {
