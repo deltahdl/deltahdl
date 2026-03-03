@@ -6,9 +6,9 @@ import pytest
 
 from implement_subclause import (
     build_hierarchy,
-    build_overview_lines,
     build_supplementary_lines,
     check_supplementary_args,
+    find_context_subclauses,
     format_prompt,
     invoke_claude,
     load_lrm_titles,
@@ -128,7 +128,6 @@ class TestBuildHierarchyNumeric:
         assert build_hierarchy("6.24.1") == {
             "is_annex": False,
             "clause_number": "6",
-            "principle": "6.1",
             "ancestors": ["6.24"],
             "subclause": "6.24.1",
         }
@@ -138,7 +137,6 @@ class TestBuildHierarchyNumeric:
         assert build_hierarchy("4.4.3.1") == {
             "is_annex": False,
             "clause_number": "4",
-            "principle": "4.1",
             "ancestors": ["4.4", "4.4.3"],
             "subclause": "4.4.3.1",
         }
@@ -148,7 +146,6 @@ class TestBuildHierarchyNumeric:
         assert build_hierarchy("4.4.3.1.2") == {
             "is_annex": False,
             "clause_number": "4",
-            "principle": "4.1",
             "ancestors": ["4.4", "4.4.3", "4.4.3.1"],
             "subclause": "4.4.3.1.2",
         }
@@ -173,7 +170,6 @@ class TestBuildHierarchyAnnex:
             "is_annex": True,
             "collection": "Annex A",
             "letter": "A",
-            "principles": "A.8",
             "ancestors": [],
             "subclause": "A.8",
         }
@@ -184,8 +180,7 @@ class TestBuildHierarchyAnnex:
             "is_annex": True,
             "collection": "Annex A",
             "letter": "A",
-            "principles": "A.8",
-            "ancestors": [],
+            "ancestors": ["A.8"],
             "subclause": "A.8.1",
         }
 
@@ -195,8 +190,7 @@ class TestBuildHierarchyAnnex:
             "is_annex": True,
             "collection": "Annex A",
             "letter": "A",
-            "principles": "A.7",
-            "ancestors": ["A.7.5"],
+            "ancestors": ["A.7", "A.7.5"],
             "subclause": "A.7.5.3",
         }
 
@@ -206,8 +200,7 @@ class TestBuildHierarchyAnnex:
             "is_annex": True,
             "collection": "Annex A",
             "letter": "A",
-            "principles": "A.7",
-            "ancestors": ["A.7.5", "A.7.5.3"],
+            "ancestors": ["A.7", "A.7.5", "A.7.5.3"],
             "subclause": "A.7.5.3.1",
         }
 
@@ -381,27 +374,50 @@ def test_format_prompt_includes_supplementary():
     assert "Table 4-1" in result
 
 
-def test_build_overview_lines_single():
-    """Single overview generates one line."""
-    result = build_overview_lines(["4.1"], "~/LRM.txt")
-    assert result == "- Thoroughly understand 4.1 per LRM in ~/LRM.txt"
+# ---- find_context_subclauses ----------------------------------------------
 
 
-def test_build_overview_lines_multiple_includes_first():
-    """First overview appears when multiple are provided."""
-    result = build_overview_lines(["4.1", "4.4"], "~/LRM.txt")
-    assert "Thoroughly understand 4.1 per LRM" in result
+def test_find_context_general():
+    """Finds sibling titled 'General'."""
+    titles = {"4.1": "General", "4.2": "Foo"}
+    assert find_context_subclauses("4.3", titles) == ["4.1"]
 
 
-def test_build_overview_lines_multiple_includes_second():
-    """Second overview appears when multiple are provided."""
-    result = build_overview_lines(["4.1", "4.4"], "~/LRM.txt")
-    assert "Thoroughly understand 4.4 per LRM" in result
+def test_find_context_overview():
+    """Finds siblings titled 'General' and 'Overview'."""
+    titles = {"4.1": "General", "4.2": "Overview", "4.3": "Foo"}
+    assert find_context_subclauses("4.3", titles) == ["4.1", "4.2"]
 
 
-def test_build_overview_lines_empty():
-    """Empty list returns empty string."""
-    assert build_overview_lines([], "~/LRM.txt") == ""
+def test_find_context_none():
+    """Returns empty list when no General/Overview siblings exist."""
+    titles = {"4.1": "Foo", "4.2": "Bar"}
+    assert not find_context_subclauses("4.1", titles)
+
+
+def test_find_context_excludes_self():
+    """Does not include the target subclause itself."""
+    titles = {"4.1": "General"}
+    assert not find_context_subclauses("4.1", titles)
+
+
+def test_find_context_intermediate():
+    """Finds General at an intermediate ancestry level."""
+    titles = {
+        "4.1": "General",
+        "4.4": "Foo",
+        "4.4.1": "General",
+        "4.4.3": "Bar",
+    }
+    assert find_context_subclauses("4.4.3", titles) == [
+        "4.1", "4.4.1",
+    ]
+
+
+def test_find_context_depth_1():
+    """Depth-1 clause has no siblings to scan."""
+    titles = {"4.1": "General", "4.2": "Overview"}
+    assert not find_context_subclauses("4", titles)
 
 
 # ---- invoke_claude --------------------------------------------------------

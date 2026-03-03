@@ -110,38 +110,6 @@ def test_parse_args_accepts_annex_clause(tmp_path):
     assert (args.subclause, args.issue) == ("B", 44)
 
 
-def test_parse_args_overviews_default(tmp_path):
-    """--overviews defaults to empty list."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    args = parse_args([
-        "--lrm", str(lrm), "--subclause", "4.1", "--issue", "8",
-    ])
-    assert args.overviews == []
-
-
-def test_parse_args_overviews_single(tmp_path):
-    """--overviews with a single value is parsed into a one-element list."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    args = parse_args([
-        "--lrm", str(lrm), "--subclause", "4.1", "--issue", "8",
-        "--overviews", "4.1",
-    ])
-    assert args.overviews == ["4.1"]
-
-
-def test_parse_args_overviews_multiple(tmp_path):
-    """--overviews with comma-separated values is parsed into a list."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    args = parse_args([
-        "--lrm", str(lrm), "--subclause", "4.4.3.1", "--issue", "6",
-        "--overviews", "4.1,4.4",
-    ])
-    assert args.overviews == ["4.1", "4.4"]
-
-
 # ---- main ------------------------------------------------------------------
 
 
@@ -153,20 +121,6 @@ def test_main_dispatches_depth_1(_mock_check, mock_run, tmp_path):
     lrm.write_text("")
     main(["--lrm", str(lrm), "--subclause", "4", "--issue", "6", "--model", "opus"])
     assert mock_run.call_args[1]["model"] == "opus"
-
-
-@patch("implement_subclause.run_prompt")
-@patch("implement_subclause.check_supplementary_args")
-def test_main_passes_overviews(_mock_check, mock_run, tmp_path):
-    """main() includes overview lines in the supplementary string."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    main([
-        "--lrm", str(lrm), "--subclause", "4.1", "--issue", "8",
-        "--overviews", "4.1,4.4",
-    ])
-    supp = mock_run.call_args[0][0].keywords["supplementary"]
-    assert "Thoroughly understand 4.1" in supp
 
 
 @patch("implement_subclause.run_prompt")

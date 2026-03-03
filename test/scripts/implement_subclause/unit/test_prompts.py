@@ -17,10 +17,12 @@ _TITLES = {
     "3": "Design and verification building blocks",
     "4": "Scheduling semantics",
     "4.1": "General",
+    "4.2": "Overview",
     "4.4": "Stratified event scheduler",
     "4.4.3": "The PLI callback control points",
     "4.4.3.1": "Preponed PLI region",
     "6": "Data types",
+    "6.1": "General",
     "6.24": "String data type",
     "6.24.1": "String operators",
     "A": "(normative) Formal syntax",
@@ -104,13 +106,15 @@ class TestPromptVW:
         prompt = build_v_w("4.1", _TITLES, "~/LRM.txt", issue=6)
         assert not _check_common_structure(prompt, "4.1", 6)
 
-    def test_overviews_via_supplementary(self):
-        """Overview lines passed via supplementary appear in the prompt."""
-        prompt = build_v_w(
-            "4.1", _TITLES, "~/LRM.txt", issue=6,
-            supplementary="- Thoroughly understand 4.1 per LRM\n",
-        )
-        assert "Thoroughly understand 4.1 per LRM" in prompt
+    def test_numeric_includes_auto_detected_general(self):
+        """Auto-detected 'General' sibling appears in the prompt."""
+        prompt = build_v_w("4.4", _TITLES, "~/LRM.txt", issue=6)
+        assert "Thoroughly understand 4.1" in prompt
+
+    def test_numeric_includes_auto_detected_overview(self):
+        """Auto-detected 'Overview' sibling appears in the prompt."""
+        prompt = build_v_w("4.4", _TITLES, "~/LRM.txt", issue=6)
+        assert "Thoroughly understand 4.2" in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +126,7 @@ class TestPromptVWX:
     """Tests for depth-3 prompt generation."""
 
     def test_numeric_walks_hierarchy(self):
-        """Numeric prompt includes clause, principle, ancestor, subclause."""
+        """Numeric prompt includes clause, context, ancestor, subclause."""
         prompt = build_v_w_x("6.24.1", _TITLES, "~/LRM.txt", issue=8)
         assert all(
             s in prompt
@@ -130,7 +134,7 @@ class TestPromptVWX:
         )
 
     def test_annex_walks_hierarchy(self):
-        """Annex prompt includes collection, principles, subclause."""
+        """Annex prompt includes collection, ancestors, subclause."""
         prompt = build_v_w_x("A.8.1", _TITLES, "~/LRM.txt", issue=44)
         assert all(
             s in prompt for s in ["Annex A", "A.8", "A.8.1"]
@@ -164,7 +168,7 @@ class TestPromptVWXY:
     """Tests for depth-4 prompt generation."""
 
     def test_numeric_walks_full_hierarchy(self):
-        """Numeric prompt includes clause, principle, ancestors, subclause."""
+        """Numeric prompt includes clause, context, ancestors, subclause."""
         prompt = build_v_w_x_y("4.4.3.1", _TITLES, "~/LRM.txt", issue=6)
         assert all(
             s in prompt
@@ -172,7 +176,7 @@ class TestPromptVWXY:
         )
 
     def test_annex_walks_full_hierarchy(self):
-        """Annex prompt includes collection, principles, ancestors, subclause."""
+        """Annex prompt includes collection, ancestors, subclause."""
         prompt = build_v_w_x_y("A.7.5.3", _TITLES, "~/LRM.txt", issue=44)
         assert all(
             s in prompt
@@ -183,11 +187,11 @@ class TestPromptVWXY:
         """'Understand' steps appear in top-down order."""
         prompt = build_v_w_x_y("4.4.3.1", _TITLES, "~/LRM.txt", issue=6)
         i_clause = prompt.index("Clause 4")
-        i_principle = prompt.index("4.1")
+        i_context = prompt.index("4.1")
         i_parent = prompt.index("4.4")
         i_ref = prompt.index("4.4.3")
         i_sub = prompt.index("4.4.3.1")
-        assert i_clause < i_principle < i_parent < i_ref < i_sub
+        assert i_clause < i_context < i_parent < i_ref < i_sub
 
     def test_has_common_structure(self):
         """Prompt has TDD, 'not just parsing', issue, subclause."""

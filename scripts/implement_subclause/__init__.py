@@ -95,8 +95,8 @@ def build_hierarchy(clause: str) -> dict:
 
     Returns a dict with keys:
     - is_annex, subclause (always present)
-    - Numeric: clause_number, principle (depth >= 3), ancestors
-    - Annex: collection, letter, principles (depth >= 2), ancestors
+    - Numeric: clause_number, ancestors
+    - Annex: collection, letter, ancestors
     """
     parts = clause.split(".")
     is_annex = parts[0][0].isalpha() and parts[0][0].isupper()
@@ -108,22 +108,12 @@ def build_hierarchy(clause: str) -> dict:
         letter = parts[0]
         result["collection"] = f"Annex {letter}"
         result["letter"] = letter
-        if depth >= 2:
-            result["principles"] = f"{letter}.{parts[1]}"
-        # Ancestors: intermediate levels between principles (V.W) and
-        # subclause. For depth 3 (A.8.1), no ancestors. For depth 4
-        # (A.7.5.3), ancestors = [A.7.5].
         ancestors = []
-        for k in range(3, depth):
+        for k in range(2, depth):
             ancestors.append(".".join(parts[:k]))
         result["ancestors"] = ancestors
     else:
         result["clause_number"] = parts[0]
-        if depth >= 3:
-            result["principle"] = f"{parts[0]}.1"
-        # Ancestors: intermediate levels between principle (V.1) and
-        # subclause. For depth 3 (6.24.1), ancestors = [6.24]. For
-        # depth 4 (4.4.3.1), ancestors = [4.4, 4.4.3].
         ancestors = []
         for k in range(2, depth):
             ancestors.append(".".join(parts[:k]))
@@ -145,6 +135,34 @@ def build_top_level_line(h: dict, titles: dict[str, str], lrm: str) -> str:
         f"- Thoroughly understand that Clause {h['clause_number']}"
         f" is about '{title}' per LRM in {lrm}"
     )
+
+
+def find_context_subclauses(
+    clause: str, titles: dict[str, str],
+) -> list[str]:
+    """Find subclauses titled 'General' or 'Overview' at each ancestry level.
+
+    Scans sibling subclauses at each level between the top-level clause
+    and the target, returning those titled exactly 'General' or 'Overview'.
+    Excludes the target itself.
+    """
+    parts = clause.split(".")
+    context: list[str] = []
+
+    for level in range(1, len(parts)):
+        prefix = ".".join(parts[:level]) + "."
+        target_depth = level + 1
+        for key, title in sorted(titles.items()):
+            if (
+                key.startswith(prefix)
+                and key.count(".") == prefix.count(".")
+                and len(key.split(".")) == target_depth
+                and title in ("General", "Overview")
+                and key != clause
+            ):
+                context.append(key)
+
+    return context
 
 
 # ---------------------------------------------------------------------------
@@ -273,18 +291,6 @@ def build_supplementary_lines(
 # Prompt formatting
 # ---------------------------------------------------------------------------
 
-def build_overview_lines(overviews: list[str], lrm: str) -> str:
-    """Build prompt lines for overview subclauses."""
-    if not overviews:
-        return ""
-    lines: list[str] = []
-    for ov in overviews:
-        lines.append(
-            f"- Thoroughly understand {ov} per LRM in {lrm}"
-        )
-    return "\n".join(lines)
-
-
 def format_prompt(
     hierarchy: str,
     subclause: str,
@@ -367,22 +373,44 @@ def run_prompt(
 # Prompt builders (depth 1-5)
 # ---------------------------------------------------------------------------
 
+def _build_context_lines(
+    clause: str, titles: dict, lrm: str, ancestors: list,
+) -> list[str]:
+    """Build 'Thoroughly understand' lines for auto-detected context."""
+    ancestor_set = set(ancestors)
+    lines: list[str] = []
+    for ctx in find_context_subclauses(clause, titles):
+        if ctx not in ancestor_set:
+            lines.append(
+                f"- Thoroughly understand {ctx}"
+                f" per LRM in {lrm}",
+            )
+    return lines
+
+
 def _build_hierarchy_steps(h: dict, titles: dict, lrm: str) -> str:
-    """Build the 'Thoroughly understand' hierarchy lines for depth 4+."""
+    """Build the 'Thoroughly understand' hierarchy lines for depth 3+."""
     lines = [build_top_level_line(h, titles, lrm)]
 
-    root = h["principles"] if h["is_annex"] else h["principle"]
-    lines.append(
-        f"- Thoroughly understand {root}"
-        f" per LRM in {lrm}",
+    lines.extend(
+        _build_context_lines(
+            h["subclause"], titles, lrm, h["ancestors"],
+        ),
     )
-    parent = root
+
+    parent = None
     for ancestor in h["ancestors"]:
-        lines.append(
-            f"- Thoroughly understand {ancestor}"
-            f" and how it fits within {parent}"
-            f" per LRM in {lrm}",
-        )
+        if parent is None:
+            lines.append(
+                f"- Thoroughly understand {ancestor}"
+                f" per LRM in {lrm}",
+            )
+        else:
+            lines.append(
+                f"- Thoroughly understand {ancestor}"
+                f" and how it fits within {parent}"
+                f" per LRM in {lrm}",
+            )
         parent = ancestor
     lines.append(
         f"- Thoroughly understand {h['subclause']}"
@@ -403,8 +431,11 @@ def build_prompt_v(
 ) -> str:
     """Build the implementation prompt for a depth-1 clause."""
     h = build_hierarchy(clause)
-    top = build_top_level_line(h, titles, lrm)
-    hierarchy = f"{top}\n"
+    lines = [build_top_level_line(h, titles, lrm)]
+    lines.extend(
+        _build_context_lines(clause, titles, lrm, []),
+    )
+    hierarchy = "\n".join(lines) + "\n"
     return format_prompt(
         hierarchy, h["subclause"], lrm,
         issue=issue, supplementary=supplementary,
@@ -421,12 +452,15 @@ def build_prompt_v_w(
 ) -> str:
     """Build the implementation prompt for a depth-2 clause."""
     h = build_hierarchy(clause)
-    top = build_top_level_line(h, titles, lrm)
-    hierarchy = (
-        f"{top}\n"
-        f"- Thoroughly understand {h['subclause']}"
-        f" per LRM in {lrm}\n"
+    lines = [build_top_level_line(h, titles, lrm)]
+    lines.extend(
+        _build_context_lines(clause, titles, lrm, []),
     )
+    lines.append(
+        f"- Thoroughly understand {h['subclause']}"
+        f" per LRM in {lrm}",
+    )
+    hierarchy = "\n".join(lines) + "\n"
     return format_prompt(
         hierarchy, h["subclause"], lrm,
         issue=issue, supplementary=supplementary,
@@ -443,27 +477,7 @@ def build_prompt_v_w_x(
 ) -> str:
     """Build the implementation prompt for a depth-3 clause."""
     h = build_hierarchy(clause)
-    top = build_top_level_line(h, titles, lrm)
-
-    if h["is_annex"]:
-        hierarchy = (
-            f"{top}\n"
-            f"- Thoroughly understand {h['principles']}"
-            f" per LRM in {lrm}\n"
-            f"- Thoroughly understand {h['subclause']}"
-            f" and how it fits within {h['principles']}"
-            f" per LRM in {lrm}\n"
-        )
-    else:
-        hierarchy = (
-            f"{top}\n"
-            f"- Thoroughly understand {h['principle']}"
-            f" per LRM in {lrm}\n"
-            f"- Thoroughly understand {h['subclause']}"
-            f" and how it fits within {h['ancestors'][0]}"
-            f" per LRM in {lrm}\n"
-        )
-
+    hierarchy = _build_hierarchy_steps(h, titles, lrm)
     return format_prompt(
         hierarchy, h["subclause"], lrm,
         issue=issue, supplementary=supplementary,
@@ -564,12 +578,6 @@ def parse_args(argv=None):
         default="",
         help="Comma-separated shorthand labels (e.g. 4-1,16-5) to skip.",
     )
-    parser.add_argument(
-        "--overviews",
-        type=str,
-        default="",
-        help="Comma-separated subclauses that provide context for the target.",
-    )
     args = parser.parse_args(argv)
 
     if not args.lrm.is_file():
@@ -593,10 +601,6 @@ def parse_args(argv=None):
     args.ignore_figures = (
         [s.strip() for s in args.ignore_figures.split(",") if s.strip()]
         if args.ignore_figures else []
-    )
-    args.overviews = (
-        [s.strip() for s in args.overviews.split(",") if s.strip()]
-        if args.overviews else []
     )
 
     return args
@@ -625,12 +629,6 @@ def main(argv=None):
         ignore_figures=args.ignore_figures,
     )
 
-    overviews = build_overview_lines(
-        args.overviews, str(args.lrm),
-    )
-    if overviews:
-        overviews += "\n"
-
     supplementary = build_supplementary_lines(
         figures=args.figures, tables=args.tables,
     )
@@ -642,9 +640,8 @@ def main(argv=None):
         )
         supplementary += "\n"
 
-    combined = overviews + supplementary
     bound_handler = functools.partial(
-        handler, supplementary=combined,
+        handler, supplementary=supplementary,
     )
     run_prompt(
         bound_handler, args.lrm, args.subclause,
