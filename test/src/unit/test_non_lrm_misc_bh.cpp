@@ -30,17 +30,6 @@ static ModuleItem* FirstItem(ParseResult616& r) {
 
 namespace {
 
-TEST(ParserSection6, StringInProcedural) {
-  // String declared inside procedural block
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    string s = \"test\";\n"
-              "    $display(s);\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 // --- interface_class_type ---
 // ps_class_identifier [parameter_value_assignment]
 // (grammatically same as single class_type)

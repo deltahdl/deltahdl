@@ -265,4 +265,15 @@ TEST(ParserSection8, StringTypeBlockLevel) {
   EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
 }
 
+TEST(ParserSection6, StringInProcedural) {
+  // String declared inside procedural block
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    string s = \"test\";\n"
+              "    $display(s);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
