@@ -300,4 +300,21 @@ TEST(ParserSection8, DataTypeSyntaxIntegerAtom) {
   EXPECT_EQ(items[4]->data_type.kind, DataTypeKind::kInteger);
 }
 
+// 30. Reg used in always block (procedural context).
+TEST(ParserSection6, Sec6_5_RegInAlwaysBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  reg clk;\n"
+      "  always #5 clk = ~clk;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kReg);
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kAlwaysBlock);
+  ASSERT_NE(items[1]->body, nullptr);
+}
+
 }  // namespace
