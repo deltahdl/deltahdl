@@ -210,24 +210,23 @@ def test_missing_file_flag_reported(tmp_path):
 # ---- Input validation errors -----------------------------------------------
 
 
-def test_nonexistent_file_exits_zero(tmp_path):
-    """Missing file with --create-issue exits 0."""
+def _invoke_missing_file_create(tmp_path):
+    """Invoke classify_file with --create-issue pointing at a missing file."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
     flags = _all_flags_create(tmp_path)
     flags[flags.index("--file") + 1] = str(tmp_path / "missing.cpp")
-    result = _invoke(*flags, cwd=str(tmp_path), env=env)
-    assert result.returncode == 0
+    return _invoke(*flags, cwd=str(tmp_path), env=env)
+
+
+def test_nonexistent_file_exits_zero(tmp_path):
+    """Missing file with --create-issue exits 0."""
+    assert _invoke_missing_file_create(tmp_path).returncode == 0
 
 
 def test_nonexistent_file_prints_not_found(tmp_path):
     """Missing file with --create-issue prints 'not found'."""
-    fake = _install_fake_classify_test(tmp_path)
-    env = _base_env(tmp_path, fake)
-    flags = _all_flags_create(tmp_path)
-    flags[flags.index("--file") + 1] = str(tmp_path / "missing.cpp")
-    result = _invoke(*flags, cwd=str(tmp_path), env=env)
-    assert "not found" in result.stdout
+    assert "not found" in _invoke_missing_file_create(tmp_path).stdout
 
 
 def test_missing_file_with_issue_exits_zero(tmp_path):
