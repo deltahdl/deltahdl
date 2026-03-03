@@ -59,4 +59,16 @@ TEST(SimA86, BinaryWildcardNeq) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// ==========================================================================
+// Wildcard equality (==?, !=?)
+// ==========================================================================
+TEST(EvalOp, WildcardEqMatch) {
+  SimFixture f;
+  // 5 ==? 5 = 1 (no X/Z bits, exact match)
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
+                          MakeInt(f.arena, 5), MakeInt(f.arena, 5));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
 }  // namespace
