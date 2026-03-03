@@ -650,4 +650,19 @@ TEST(ParserLet, InstantiationParsed) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserLet, InstantiationNamedArgs) {
+  auto r = Parse(
+      "module t;\n"
+      "  let valid_arb(request, valid, override) = "
+      "|(request & valid) || override;\n"
+      "  initial begin\n"
+      "    logic result;\n"
+      "    result = valid_arb(.request(2'b11), .valid(2'b10),"
+      " .override(1'b0));\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
