@@ -248,4 +248,14 @@ TEST(ParserSection11, BitSelect) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
+TEST(ParserSection11, PartSelectConstant) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a[7:0];\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+}
+
 }  // namespace

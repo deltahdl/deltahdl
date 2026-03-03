@@ -41,16 +41,6 @@ static Expr* FirstAssignRhs(ParseResult11d& r) {
 
 namespace {
 
-TEST(ParserSection11, PartSelectConstant) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a[7:0];\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-}
-
 // =========================================================================
 // Section 11.3.5 -- Short-circuit evaluation
 // =========================================================================
