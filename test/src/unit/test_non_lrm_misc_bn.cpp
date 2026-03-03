@@ -30,14 +30,6 @@ static ModuleItem* FirstItem(ParseResult6j& r) {
 
 namespace {
 
-// 27. type() on shortreal data type.
-TEST(ParserSection6, Sec6_11_1_TypeRefOnShortreal) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial x = type(shortreal);\n"
-              "endmodule\n"));
-}
-
 // 28. type() in parameter type default with type(int).
 TEST(ParserSection6, Sec6_11_1_ParamTypeDefaultInt) {
   auto r = Parse(

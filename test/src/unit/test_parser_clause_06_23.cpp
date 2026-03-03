@@ -569,4 +569,12 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefConcat) {
   EXPECT_EQ(ref->kind, ExprKind::kConcatenation);
 }
 
+// 27. type() on shortreal data type.
+TEST(ParserSection6, Sec6_11_1_TypeRefOnShortreal) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial x = type(shortreal);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
