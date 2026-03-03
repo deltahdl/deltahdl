@@ -40,21 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.26 — Class implements interface class
-TEST(ParserSection8, ClassImplementsInterface) {
-  auto r = Parse(
-      "interface class PutIf;\n"
-      "  pure virtual function void put(int a);\n"
-      "endclass\n"
-      "class Fifo implements PutIf;\n"
-      "  virtual function void put(int a);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_EQ(r.cu->classes[1]->name, "Fifo");
-}
-
 // §8.26 — Interface class extends multiple interfaces
 TEST(ParserSection8, InterfaceClassExtendsMultiple) {
   auto r = Parse(

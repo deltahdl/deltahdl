@@ -32,4 +32,35 @@ TEST(ParserSection8, ClassImplementsMultipleInterfaces) {
               "endclass\n"));
 }
 
+struct ParseResult8b {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult8b Parse(const std::string& src) {
+  ParseResult8b result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+// §8.26 — Class implements interface class
+TEST(ParserSection8, ClassImplementsInterface) {
+  auto r = Parse(
+      "interface class PutIf;\n"
+      "  pure virtual function void put(int a);\n"
+      "endclass\n"
+      "class Fifo implements PutIf;\n"
+      "  virtual function void put(int a);\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  EXPECT_EQ(r.cu->classes[1]->name, "Fifo");
+}
+
 }  // namespace
