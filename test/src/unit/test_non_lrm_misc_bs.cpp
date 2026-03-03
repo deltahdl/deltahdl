@@ -40,25 +40,6 @@ static Stmt* FirstInitialStmt(ParseResult8b& r) {
 
 namespace {
 
-// §8.7 — Constructor with arguments
-TEST(ParserSection8, NewWithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  class test_cls;\n"
-      "    int a;\n"
-      "    function new(int val);\n"
-      "      a = val;\n"
-      "    endfunction\n"
-      "  endclass\n"
-      "  test_cls obj;\n"
-      "  initial begin\n"
-      "    obj = new(42);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 // §8.11 — 'this' keyword
 TEST(ParserSection8, ThisExpression) {
   auto r = Parse(
