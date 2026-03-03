@@ -204,4 +204,17 @@ TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
 }
 
+TEST(ParserSection11, Sec11_1_ExprInInitialBlock) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a | b) & c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kAmp);
+}
+
 }  // namespace
