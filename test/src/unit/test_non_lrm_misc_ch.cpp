@@ -49,16 +49,6 @@ static ModuleItem* FirstContAssign(ParseResult11g& r) {
 
 namespace {
 
-// --- Indexed part-select with parameter width ---
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectParamWidth) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  parameter W = 8;\n"
-              "  logic [31:0] vec;\n"
-              "  initial x = vec[0 +: W];\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // LRM section 11.4.6 -- Conditional operator (ternary ? :)
 // =========================================================================

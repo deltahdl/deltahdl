@@ -61,4 +61,14 @@ TEST(ParserSection11, Sec11_4_1_BitSelectsInConcatenation) {
   }
 }
 
+// --- Indexed part-select with parameter width ---
+TEST(ParserSection11, Sec11_4_1_IndexedPartSelectParamWidth) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  parameter W = 8;\n"
+              "  logic [31:0] vec;\n"
+              "  initial x = vec[0 +: W];\n"
+              "endmodule\n"));
+}
+
 }  // namespace
