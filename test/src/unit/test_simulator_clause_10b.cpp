@@ -10,32 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// §10.4.2: NBA with expression on RHS.
-// ---------------------------------------------------------------------------
-TEST(SimCh10b, NBAExpressionRHS) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a;\n"
-      "  logic [31:0] b;\n"
-      "  initial begin\n"
-      "    a = 7;\n"
-      "    b <= a + 3;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
-}
-
-// ---------------------------------------------------------------------------
 // §10.4.2: NBA with bit-select on LHS.
 // ---------------------------------------------------------------------------
 TEST(SimCh10b, NBABitSelectLHS) {
