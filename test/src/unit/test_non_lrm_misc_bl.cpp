@@ -32,15 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-TEST(ParserSection6, CastCompatibleEnumToInt) {
-  // §6.22.4: enum and int are cast compatible.
-  DataType a;
-  a.kind = DataTypeKind::kEnum;
-  DataType b;
-  b.kind = DataTypeKind::kInt;
-  EXPECT_TRUE(IsCastCompatible(a, b));
-}
-
 // §6.6.7: Nettype used with resolution function and net declaration.
 TEST(ParserSection6, Sec6_6_7_NettypeWithResolveAndNetDecl) {
   EXPECT_TRUE(

@@ -20,4 +20,13 @@ TEST(ParserSection6, CastCompatibleRealToIntType) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
+TEST(ParserSection6, CastCompatibleEnumToInt) {
+  // §6.22.4: enum and int are cast compatible.
+  DataType a;
+  a.kind = DataTypeKind::kEnum;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_TRUE(IsCastCompatible(a, b));
+}
+
 }  // namespace
