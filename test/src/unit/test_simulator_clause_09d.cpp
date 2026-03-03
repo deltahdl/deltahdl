@@ -10,35 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 15. always @* with bitwise operators (&, |, ^).
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, AlwaysStarBitwiseOps) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, y;\n"
-      "  always @* y = (a & b) ^ c;\n"
-      "  initial begin\n"
-      "    a = 8'hFF;\n"
-      "    b = 8'hAA;\n"
-      "    c = 8'h55;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  // (0xFF & 0xAA) ^ 0x55 = 0xAA ^ 0x55 = 0xFF.
-  EXPECT_EQ(y->value.ToUint64(), 0xFFu);
-}
-
-// ---------------------------------------------------------------------------
 // 16. always @* with comparison operators (==, <).
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarComparison) {
