@@ -445,4 +445,12 @@ TEST(ParserCh510, AssignmentPatternDefault) {
   VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
 }
 
+TEST(ParserCh510, AssignmentPattern_TypeKey) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct { int x; int y; } ms_t;\n"
+              "  ms_t ms = '{int:0, int:1};\n"
+              "endmodule"));
+}
+
 }  // namespace
