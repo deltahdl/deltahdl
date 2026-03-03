@@ -179,4 +179,35 @@ TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
   EXPECT_EQ(notv->value.ToUint64(), 0u);
 }
 
+// ---------------------------------------------------------------------------
+// 21. Blocking assignment with logical operators (&&, ||).
+// ---------------------------------------------------------------------------
+TEST(SimCh10, BlockingAssignLogicalOps) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b;\n"
+      "  int r_and, r_or;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = 0;\n"
+      "    r_and = a && b;\n"
+      "    r_or  = a || b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* r_and = f.ctx.FindVariable("r_and");
+  auto* r_or = f.ctx.FindVariable("r_or");
+  ASSERT_NE(r_and, nullptr);
+  ASSERT_NE(r_or, nullptr);
+  EXPECT_EQ(r_and->value.ToUint64(), 0u);  // 1 && 0 = 0
+  EXPECT_EQ(r_or->value.ToUint64(), 1u);   // 1 || 0 = 1
+}
+
 }  // namespace
