@@ -473,4 +473,17 @@ TEST(ParserSection6, Sec6_11_StaticLifetimeInt) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// 21. Automatic lifetime qualifier with integer type.
+TEST(ParserSection6, Sec6_11_AutomaticLifetimeInt) {
+  auto r = Parse(
+      "module t;\n"
+      "  function static int get_temp();\n"
+      "    automatic int temp = 42;\n"
+      "    return temp;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
