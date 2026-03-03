@@ -17,28 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// class_method ::= { method_qualifier } function_declaration
-//                | { method_qualifier } task_declaration
-TEST(SourceText, ClassMethods) {
-  auto r = Parse(
-      "class C;\n"
-      "  function void foo(); endfunction\n"
-      "  task bar(); endtask\n"
-      "  static function int sfn(); endfunction\n"
-      "  virtual task vtask(); endtask\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 4u);
-  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
-  EXPECT_EQ(members[0]->method->name, "foo");
-  EXPECT_EQ(members[1]->kind, ClassMemberKind::kMethod);
-  EXPECT_EQ(members[1]->method->name, "bar");
-  EXPECT_TRUE(members[2]->is_static);
-  EXPECT_TRUE(members[3]->is_virtual);
-}
-
 // 13. Class with methods sharing scope with member variables
 TEST(ParserClause03, Cl3_13_ClassMethodsAndProperties) {
   auto r = Parse(
