@@ -472,4 +472,9 @@ TEST(ParserSection6, ValueSet_IntegerIs4State) {
   EXPECT_TRUE(Is4stateType(DataTypeKind::kInteger));
 }
 
+TEST(ParserSection6, ValueSet_IntIs2State) {
+  // §6.3: int is a 2-state type.
+  EXPECT_FALSE(Is4stateType(DataTypeKind::kInt));
+}
+
 }  // namespace

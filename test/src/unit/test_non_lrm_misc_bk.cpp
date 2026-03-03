@@ -13,11 +13,6 @@ static ModuleItem* FirstItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, ValueSet_IntIs2State) {
-  // §6.3: int is a 2-state type.
-  EXPECT_FALSE(Is4stateType(DataTypeKind::kInt));
-}
-
 // =========================================================================
 // §6.6.8: Chandle data type
 // =========================================================================
