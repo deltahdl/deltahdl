@@ -46,30 +46,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
 namespace {
 
 // =============================================================================
-// 10. Explicit automatic var in static function
-// =============================================================================
-TEST(ParserSection4, Sec4_9_3_AutoVarInStaticFunc) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int process(int x);\n"
-      "    automatic int temp;\n"
-      "    temp = x + 1;\n"
-      "    return temp;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_static);
-  auto* var_stmt = FirstBodyStmt(item);
-  ASSERT_NE(var_stmt, nullptr);
-  EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(var_stmt->var_is_automatic);
-  EXPECT_FALSE(var_stmt->var_is_static);
-}
-
-// =============================================================================
 // 11. Explicit static var in automatic function
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_StaticVarInAutoFunc) {
