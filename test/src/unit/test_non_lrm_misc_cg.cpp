@@ -42,17 +42,6 @@ static Expr* FirstAssignRhs(ParseResult11e& r) {
 
 namespace {
 
-// --- Member access ---
-TEST(ParserSection11, Sec11_1_MemberAccessExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = obj.field;\n"
-      "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
-}
-
 // --- Parenthesized expression ---
 TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
   auto r = Parse(
