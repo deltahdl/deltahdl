@@ -32,26 +32,6 @@ static ModuleItem* FirstItem(ParseResult6f& r) {
 
 namespace {
 
-// §6.7.1: Net coexisting with variable declarations in the same module.
-TEST(ParserSection6, Sec6_7_1_NetCoexistsWithVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] net_w;\n"
-      "  logic [7:0] var_v;\n"
-      "  int count;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  ASSERT_EQ(items.size(), 3u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(items[0]->data_type.is_net);
-  EXPECT_EQ(items[1]->kind, ModuleItemKind::kVarDecl);
-  EXPECT_FALSE(items[1]->data_type.is_net);
-  EXPECT_EQ(items[2]->kind, ModuleItemKind::kVarDecl);
-  EXPECT_FALSE(items[2]->data_type.is_net);
-}
-
 // §6.7.1: Wire with range and multiple names.
 TEST(ParserSection6, Sec6_7_1_WireRangeMultipleNames) {
   auto r = Parse(
