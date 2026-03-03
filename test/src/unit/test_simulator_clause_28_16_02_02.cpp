@@ -45,4 +45,9 @@ TEST(TriregChargeDecay, OneDelayHasNoChargeDecay) {
   EXPECT_FALSE(ValidateTriregChargeDecaySpec(spec));
 }
 
+TEST(TriregChargeDecay, TwoDelaysHasNoChargeDecay) {
+  DelaySpec spec{10, 20, 0, 2};
+  EXPECT_FALSE(ValidateTriregChargeDecaySpec(spec));
+}
+
 }  // namespace
