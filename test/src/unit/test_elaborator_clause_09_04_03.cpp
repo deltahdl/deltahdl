@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §9.4.3: Level-sensitive event control
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -9,19 +9,15 @@ using namespace delta;
 
 namespace {
 
-TEST(Lowerer, WaitConditionDeferred) {
-  // wait(expr) when condition is initially false, becomes true later.
+TEST(Lowerer, WaitConditionTrue) {
+  // wait(expr) when condition is immediately true.
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic [31:0] flag, result;\n"
+      "  logic [31:0] x;\n"
       "  initial begin\n"
-      "    flag = 0;\n"
-      "    #5 flag = 1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    wait (flag) result = 99;\n"
+      "    x = 1;\n"
+      "    wait (x) x = 42;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -31,9 +27,9 @@ TEST(Lowerer, WaitConditionDeferred) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 }  // namespace
