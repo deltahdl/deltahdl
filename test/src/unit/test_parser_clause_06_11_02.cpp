@@ -317,4 +317,24 @@ TEST(ParserSection6, Sec6_5_RegInAlwaysBlock) {
   ASSERT_NE(items[1]->body, nullptr);
 }
 
+// =============================================================================
+// LRM section 6.11.2 -- reg and logic equivalence
+// =============================================================================
+// 22. reg and logic both parse to their respective DataTypeKind.
+TEST(ParserSection6, Sec6_11_2_RegAndLogicDistinctKinds) {
+  auto r = Parse(
+      "module t;\n"
+      "  reg r;\n"
+      "  logic l;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 2u);
+  EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kReg);
+  EXPECT_EQ(items[0]->name, "r");
+  EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(items[1]->name, "l");
+}
+
 }  // namespace
