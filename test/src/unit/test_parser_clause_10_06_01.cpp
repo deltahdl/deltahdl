@@ -696,4 +696,22 @@ TEST(ParserSection10, DeassignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
+// --- 21. Assign with system function RHS ---
+TEST(ParserSection10, Sec10_6_1_AssignSystemFuncRhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [31:0] q;\n"
+      "  initial begin\n"
+      "    assign q = $random;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
+}
+
 }  // namespace
