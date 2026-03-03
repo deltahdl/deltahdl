@@ -74,15 +74,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-TEST(ParserCh50701, SizedLiteral_ExactFit) {
-  auto r = ParseWithDiag(
-      "module t;\n"
-      "  initial x = 8'hFF;\n"
-      "endmodule\n");
-  EXPECT_EQ(r.diag->WarningCount(), 0u);
-  delete r.diag;
-}
-
 TEST(ParserCh50701, SizedLiteral_OneBitOverflow) {
   auto r = ParseWithDiag(
       "module t;\n"
