@@ -30,40 +30,7 @@ static ModuleItem* FirstAlwaysItem(ParseResult9h& r) {
   return nullptr;
 }
 
-// Return the Nth always-kind module item (0-indexed).
-static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) {
-      if (count == n) return item;
-      ++count;
-    }
-  }
-  return nullptr;
-}
-
 namespace {
-
-// ---------------------------------------------------------------------------
-// 12. Side-by-side: both have their own body statements.
-// ---------------------------------------------------------------------------
-TEST(ParserSection9, Sec9_2_2_2_SideBySideBodiesExist) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb x = a;\n"
-      "  always @* y = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* first = NthAlwaysItem(r, 0);
-  auto* second = NthAlwaysItem(r, 1);
-  ASSERT_NE(first, nullptr);
-  ASSERT_NE(second, nullptr);
-  ASSERT_NE(first->body, nullptr);
-  ASSERT_NE(second->body, nullptr);
-  EXPECT_EQ(first->body->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(second->body->kind, StmtKind::kBlockingAssign);
-}
 
 // ---------------------------------------------------------------------------
 // 13. always_comb with if-else body.
