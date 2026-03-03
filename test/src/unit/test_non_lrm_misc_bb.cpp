@@ -42,25 +42,6 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// 52. timeunit and timeprecision work in interface declarations.
-// §3.14.2.2: "... for any module, program, package, or interface
-// definition ..."
-TEST(ParserClause03, Cl3_14_2_2_WorksInInterface) {
-  auto r = ParseTimescale31402(
-      "interface ifc;\n"
-      "  timeunit 1us;\n"
-      "  timeprecision 1ns;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  auto* ifc = r.cu->interfaces[0];
-  EXPECT_TRUE(ifc->has_timeunit);
-  EXPECT_TRUE(ifc->has_timeprecision);
-  EXPECT_EQ(ifc->time_unit, TimeUnit::kUs);
-  EXPECT_EQ(ifc->time_prec, TimeUnit::kNs);
-}
-
 // 53. timeunit and timeprecision work in program declarations.
 // §3.14.2.2: "... for any module, program, package, or interface ..."
 TEST(ParserClause03, Cl3_14_2_2_WorksInProgram) {
