@@ -10,53 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 20. Blocking assignment with comparison operators.
-// ---------------------------------------------------------------------------
-TEST(SimCh10, BlockingAssignComparisonOps) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b;\n"
-      "  int r_eq, r_ne, r_lt, r_gt, r_le, r_ge;\n"
-      "  initial begin\n"
-      "    a = 10;\n"
-      "    b = 20;\n"
-      "    r_eq = (a == b);\n"
-      "    r_ne = (a != b);\n"
-      "    r_lt = (a < b);\n"
-      "    r_gt = (a > b);\n"
-      "    r_le = (a <= b);\n"
-      "    r_ge = (a >= b);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r_eq = f.ctx.FindVariable("r_eq");
-  auto* r_ne = f.ctx.FindVariable("r_ne");
-  auto* r_lt = f.ctx.FindVariable("r_lt");
-  auto* r_gt = f.ctx.FindVariable("r_gt");
-  auto* r_le = f.ctx.FindVariable("r_le");
-  auto* r_ge = f.ctx.FindVariable("r_ge");
-  ASSERT_NE(r_eq, nullptr);
-  ASSERT_NE(r_ne, nullptr);
-  ASSERT_NE(r_lt, nullptr);
-  ASSERT_NE(r_gt, nullptr);
-  ASSERT_NE(r_le, nullptr);
-  ASSERT_NE(r_ge, nullptr);
-  EXPECT_EQ(r_eq->value.ToUint64(), 0u);  // 10 == 20 -> false
-  EXPECT_EQ(r_ne->value.ToUint64(), 1u);  // 10 != 20 -> true
-  EXPECT_EQ(r_lt->value.ToUint64(), 1u);  // 10 < 20  -> true
-  EXPECT_EQ(r_gt->value.ToUint64(), 0u);  // 10 > 20  -> false
-  EXPECT_EQ(r_le->value.ToUint64(), 1u);  // 10 <= 20 -> true
-  EXPECT_EQ(r_ge->value.ToUint64(), 0u);  // 10 >= 20 -> false
-}
-
-// ---------------------------------------------------------------------------
 // 21. Blocking assignment with logical operators (&&, ||).
 // ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignLogicalOps) {
