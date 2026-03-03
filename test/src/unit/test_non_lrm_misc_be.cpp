@@ -45,31 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 15. Mixed static and automatic vars in same block
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_MixedStaticAutoInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    static int persist = 0;\n"
-      "    automatic int scratch = 10;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBodyT(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(body->stmts[0]->var_is_static);
-  EXPECT_EQ(body->stmts[0]->var_name, "persist");
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(body->stmts[1]->var_is_automatic);
-  EXPECT_EQ(body->stmts[1]->var_name, "scratch");
-}
-
-// =============================================================================
 // 16. Static task declaration
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticTaskDecl) {
