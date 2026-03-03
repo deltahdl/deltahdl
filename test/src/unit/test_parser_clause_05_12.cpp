@@ -304,4 +304,14 @@ TEST(ParserCh512, Attribute_OnCaseStatement) {
   EXPECT_EQ(stmt->attrs[1].name, "parallel_case");
 }
 
+TEST(ParserCh512, Attribute_MultipleInstances) {
+  // Multiple separate attribute instances before the same item.
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  (* full_case=1 *)\n"
+              "  (* parallel_case=1 *)\n"
+              "  logic x;\n"
+              "endmodule"));
+}
+
 }  // namespace
