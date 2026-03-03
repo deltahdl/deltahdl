@@ -87,4 +87,42 @@ TEST(ParserCh501, Sec5_1_IdentifierStartsWithLetter) {
   EXPECT_EQ(item->name, "Data0");
 }
 
+static Stmt* FirstInitialStmt(ParseResult50603& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock) {
+      if (item->body && item->body->kind == StmtKind::kBlock) {
+        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
+      }
+      return item->body;
+    }
+  }
+  return nullptr;
+}
+
+// =========================================================================
+// Number followed by identifier (separate tokens)
+// =========================================================================
+TEST(ParserCh501, Sec5_1_NumberFollowedByIdentifier) {
+  // "42" and "abc" are separate tokens even without whitespace between the
+  // numeric literal and an identifier in expression context.
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 42 + abc;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+  // LHS should be integer literal 42.
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->lhs->int_val, 42u);
+  // RHS should be identifier abc.
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
+}
+
 }  // namespace
