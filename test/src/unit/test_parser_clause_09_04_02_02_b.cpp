@@ -251,4 +251,20 @@ TEST(ParserSection9, StarEventParenAlways) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
+TEST(ParserSection9, StarEventBareStmt) {
+  // @* at the statement level produces an kEventControl stmt.
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @* a = b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  EXPECT_TRUE(stmt->is_star_event);
+  EXPECT_TRUE(stmt->events.empty());
+}
+
 }  // namespace
