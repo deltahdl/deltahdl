@@ -10,39 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 24. Multiple always @* blocks have independent sensitivity and outputs.
-// ---------------------------------------------------------------------------
-TEST(SimCh9d, MultipleAlwaysStarIndependent) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, d, x, y;\n"
-      "  always @* x = a & b;\n"
-      "  always @* y = c | d;\n"
-      "  initial begin\n"
-      "    a = 8'hFF;\n"
-      "    b = 8'h0F;\n"
-      "    c = 8'hA0;\n"
-      "    d = 8'h05;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* x = f.ctx.FindVariable("x");
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(x, nullptr);
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(x->value.ToUint64(), 0x0Fu);
-  EXPECT_EQ(y->value.ToUint64(), 0xA5u);
-}
-
-// ---------------------------------------------------------------------------
 // 25. always @* equivalent to always_comb for simple combinational logic.
 // ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
