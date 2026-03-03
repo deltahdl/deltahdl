@@ -966,4 +966,21 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownOnLhs) {
   ASSERT_NE(lhs->index_end, nullptr);
 }
 
+// --- Select on function return value ---
+TEST(ParserSection11, Sec11_4_1_SelectOnFuncReturnValue) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = get_data()[7:0];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->base, nullptr);
+  EXPECT_EQ(rhs->base->kind, ExprKind::kCall);
+  ASSERT_NE(rhs->index, nullptr);
+  ASSERT_NE(rhs->index_end, nullptr);
+}
+
 }  // namespace
