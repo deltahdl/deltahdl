@@ -849,4 +849,23 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithFuncCallOperands) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kCall);
 }
 
+// --- Ternary with concatenation operands ---
+TEST(ParserSection11, Sec11_4_6_TernaryWithConcatenationOperands) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel ? {a, b} : {c, d};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(rhs->true_expr->elements.size(), 2u);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(rhs->false_expr->elements.size(), 2u);
+}
+
 }  // namespace
