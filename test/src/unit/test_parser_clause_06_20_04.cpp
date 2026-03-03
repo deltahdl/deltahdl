@@ -98,4 +98,12 @@ TEST(ParserA28, LocalparamInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "X");
 }
 
+TEST(ParserSection6, LocalparamConstant) {
+  // §6.20: localparam cannot be overridden.
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  localparam int DEPTH = 16;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

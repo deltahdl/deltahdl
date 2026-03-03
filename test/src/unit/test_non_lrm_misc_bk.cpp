@@ -25,14 +25,6 @@ static Stmt* FirstInitialStmt(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection6, LocalparamConstant) {
-  // §6.20: localparam cannot be overridden.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  localparam int DEPTH = 16;\n"
-              "endmodule\n"));
-}
-
 // =========================================================================
 // §6.20.3: Local parameters (localparam) and type parameters
 // =========================================================================
