@@ -150,6 +150,11 @@ class TestPromptVWX:
         prompt = build_v_w_x("A.8.1", _TITLES, "~/LRM.txt", issue=44)
         assert not _check_common_structure(prompt, "A.8.1", 44)
 
+    def test_context_skips_ancestor_duplicate(self):
+        """Context subclause already in ancestors is not duplicated."""
+        prompt = build_v_w_x("6.1.1", _TITLES, "~/LRM.txt", issue=8)
+        assert prompt.count("Thoroughly understand 6.1 per") == 1
+
     def test_supplementary_lines_included(self):
         """Supplementary lines appear in the prompt."""
         prompt = build_v_w_x(
