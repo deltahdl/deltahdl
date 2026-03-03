@@ -276,4 +276,12 @@ TEST(ParserCh510, StructLiteral_NestedBraces) {
               "endmodule"));
 }
 
+TEST(ParserCh511, ArrayLiteral_Nested) {
+  // int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
+              "endmodule"));
+}
+
 }  // namespace

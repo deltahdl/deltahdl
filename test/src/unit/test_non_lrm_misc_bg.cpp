@@ -49,14 +49,6 @@ static void VerifyAttrNames(const ModuleItem* item,
 
 namespace {
 
-TEST(ParserCh511, ArrayLiteral_Nested) {
-  // int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
-              "endmodule"));
-}
-
 TEST(ParserCh511, ArrayLiteral_Simple) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
