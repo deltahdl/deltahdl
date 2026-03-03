@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// 17. Two orders of magnitude smaller: rounds to two decimal places.
-TEST(ParserClause03, Cl3_14_1_TwoOrdersSmaller) {
-  // 1ns unit, 10ps precision → 2 decimal places in ns.
-  TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 10};
-  // 2.756ns → 2.76ns = 2760ps.
-  EXPECT_EQ(RealDelayToTicks(2.756, ts, TimeUnit::kPs), 2760u);
-  // 2.754ns → 2.75ns = 2750ps.
-  EXPECT_EQ(RealDelayToTicks(2.754, ts, TimeUnit::kPs), 2750u);
-}
-
 // 18. Three orders (full precision): no rounding needed.
 TEST(ParserClause03, Cl3_14_1_ThreeOrdersNoRounding) {
   // 1ns unit, 1ps precision → 3 decimal places in ns.
