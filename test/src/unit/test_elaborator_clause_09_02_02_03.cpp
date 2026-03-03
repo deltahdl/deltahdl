@@ -36,4 +36,25 @@ TEST(SimCh9c, ExecutesAtTimeZero) {
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
+// 2. always_latch with unconditional assignment sets output at time 0.
+TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  always_latch\n"
+      "    q = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 0xABu);
+}
+
 }  // namespace

@@ -19,27 +19,6 @@ static void LowerRunAndFindQ1Q2(SimFixture& f, RtlirDesign* design,
 
 namespace {
 
-// 2. always_latch with unconditional assignment sets output at time 0.
-TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] q;\n"
-      "  always_latch\n"
-      "    q = 8'hAB;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
-  ASSERT_NE(q, nullptr);
-  EXPECT_EQ(q->value.ToUint64(), 0xABu);
-}
-
 // =============================================================================
 // §9.2.3: always_latch with if-without-else creates latch behavior
 // When the enable condition is false, the output retains its previous value.
