@@ -310,4 +310,15 @@ TEST(SourceText, ClassNestedInterfaceClass) {
   EXPECT_TRUE(members[0]->nested_class->is_interface);
 }
 
+// =============================================================================
+// §8 Class declarations — parsing
+// =============================================================================
+TEST(ParserSection8, EmptyClassDecl) {
+  auto r = Parse("class Packet; endclass");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "Packet");
+  EXPECT_TRUE(r.cu->classes[0]->members.empty());
+}
+
 }  // namespace

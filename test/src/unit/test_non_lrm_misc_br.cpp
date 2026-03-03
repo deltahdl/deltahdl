@@ -17,17 +17,6 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
 
 namespace {
 
-// =============================================================================
-// §8 Class declarations — parsing
-// =============================================================================
-TEST(ParserSection8, EmptyClassDecl) {
-  auto r = Parse("class Packet; endclass");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "Packet");
-  EXPECT_TRUE(r.cu->classes[0]->members.empty());
-}
-
 TEST(ParserSection8, ClassWithProperties) {
   auto r = Parse(
       "class Packet;\n"
