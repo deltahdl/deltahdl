@@ -22,18 +22,6 @@ static ParseResult6 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection6, BitStreamCastStreaming) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    byte a;\n"
-      "    int b;\n"
-      "    b = int'({<< byte {a}});\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 // =========================================================================
 // §6.15: Class
 // =========================================================================

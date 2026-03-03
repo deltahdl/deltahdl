@@ -155,4 +155,32 @@ TEST(ParserSection11, Sec11_1_StreamingConcatLeftShift) {
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
 
+struct ParseResult6 {
+  SourceManager mgr;
+  Arena arena;
+  CompilationUnit* cu = nullptr;
+};
+
+static ParseResult6 Parse(const std::string& src) {
+  ParseResult6 result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.Parse();
+  return result;
+}
+
+TEST(ParserSection6, BitStreamCastStreaming) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    byte a;\n"
+      "    int b;\n"
+      "    b = int'({<< byte {a}});\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+}
+
 }  // namespace
