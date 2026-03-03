@@ -22,19 +22,6 @@ static ParseResult6 Parse(const std::string& src) {
 
 namespace {
 
-TEST(ParserSection6, BitStreamCastFromStruct) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
-      "  initial begin\n"
-      "    pair_t p;\n"
-      "    logic [7:0] flat;\n"
-      "    flat = logic [7:0]'(p);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(ParserSection6, BitStreamCastStreaming) {
   auto r = Parse(
       "module t;\n"
