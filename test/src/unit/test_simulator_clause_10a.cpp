@@ -1,3 +1,4 @@
+// Non-LRM tests
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -6,29 +7,7 @@
 
 using namespace delta;
 
-// ---------------------------------------------------------------------------
-// 1. Simple blocking assignment: a = 5; check a == 5.
-// ---------------------------------------------------------------------------
-TEST(SimCh10, SimpleBlockingAssign) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a;\n"
-      "  initial begin\n"
-      "    a = 5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("a");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 5u);
-}
+namespace {
 
 // ---------------------------------------------------------------------------
 // 2. Sequential blocking assignments: value available immediately.
@@ -833,3 +812,5 @@ TEST(SimCh10, BlockingAssignUnaryPlus) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
+
+}  // namespace
