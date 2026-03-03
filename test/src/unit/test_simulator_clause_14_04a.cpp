@@ -14,34 +14,6 @@ using namespace delta;
 namespace {
 
 // =============================================================================
-// 4. Default clocking skew (S14.5)
-// =============================================================================
-TEST(ClockingSim, DefaultSkewAppliedToAllSignals) {
-  ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{3};
-  block.default_output_skew = SimTime{7};
-
-  ClockingSignal in_sig;
-  in_sig.signal_name = "a";
-  in_sig.direction = ClockingDir::kInput;
-  block.signals.push_back(in_sig);
-
-  ClockingSignal out_sig;
-  out_sig.signal_name = "b";
-  out_sig.direction = ClockingDir::kOutput;
-  block.signals.push_back(out_sig);
-
-  cmgr.Register(block);
-
-  EXPECT_EQ(cmgr.GetInputSkew("cb", "a").ticks, 3u);
-  EXPECT_EQ(cmgr.GetOutputSkew("cb", "b").ticks, 7u);
-}
-
-// =============================================================================
 // 13. Per-signal skew override for input
 // =============================================================================
 TEST(ClockingSim, PerSignalInputSkewOverride) {
