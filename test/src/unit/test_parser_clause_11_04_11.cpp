@@ -774,4 +774,26 @@ TEST(ParserSection11, Sec11_4_6_NestedTernaryWithParens) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIdentifier);
 }
 
+// --- Chained ternary without parens (right-associative) ---
+TEST(ParserSection11, Sec11_4_6_ChainedTernaryRightAssoc) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel1 ? a : sel2 ? b : c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kIdentifier);
+  // Right-associative: false_expr is itself a ternary.
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr->true_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->true_expr->kind, ExprKind::kIdentifier);
+  ASSERT_NE(rhs->false_expr->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->false_expr->kind, ExprKind::kIdentifier);
+}
+
 }  // namespace
