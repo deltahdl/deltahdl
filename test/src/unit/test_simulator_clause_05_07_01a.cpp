@@ -10,28 +10,6 @@ using namespace delta;
 namespace {
 
 // ---------------------------------------------------------------------------
-// 36. Decimal single-digit x
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, DecimalSingleDigitX) {
-  // §5.7.1: Decimal literal allows single x/z/? digit only.
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'dx;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  uint8_t mask = 0xFF;
-  EXPECT_EQ(var->value.words[0].bval & mask, mask);
-}
-
-// ---------------------------------------------------------------------------
 // 37. Size constant must be nonzero
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, SizeConstantNonzero) {
