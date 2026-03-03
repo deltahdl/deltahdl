@@ -251,4 +251,20 @@ TEST(ForceRelease, NormativeExampleForceAndRelease_InitialState) {
   EXPECT_EQ(ValOf(*tn.ve), kVal0);
 }
 
+TEST(ForceRelease, NormativeExampleForceAndRelease_ForceAndRelease) {
+  auto tn = MakeTwoWireNets();
+
+  // Time 10: force both to a|b|c = 1.
+  ForceNet(tn.net_d, MakeLogic4VecVal(tn.arena, 1, 1), tn.arena);
+  ForceNet(tn.net_e, MakeLogic4VecVal(tn.arena, 1, 1), tn.arena);
+  EXPECT_EQ(ValOf(*tn.vd), kVal1);
+  EXPECT_EQ(ValOf(*tn.ve), kVal1);
+
+  // Time 20: release both — should revert to driver value 0.
+  ReleaseNet(tn.net_d, tn.arena);
+  ReleaseNet(tn.net_e, tn.arena);
+  EXPECT_EQ(ValOf(*tn.vd), kVal0);
+  EXPECT_EQ(ValOf(*tn.ve), kVal0);
+}
+
 }  // namespace
