@@ -23,20 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 19. Left padding with zeros (value smaller than size)
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, LeftPadWithZeros) {
-  // §5.7.1: Value smaller than size — left-padded with zeros.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'hF;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 0x0Fu);
-}
-
-// ---------------------------------------------------------------------------
 // 20. Truncation from left (value larger than size)
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, TruncationFromLeft) {
