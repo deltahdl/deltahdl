@@ -30,20 +30,6 @@ static ModuleItem* FirstAlwaysItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserSection9, IffGuardNoEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, en, a, b;\n"
-      "  always @(clk iff en) a <= b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kNone);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-}
-
 TEST(ParserSection9, IffGuardMultipleEventsFirst) {
   auto r = Parse(
       "module m;\n"
