@@ -116,4 +116,27 @@ TEST(ClockingSim, OutputSkewDrivesAfterClockEdge) {
   EXPECT_EQ(data_out->value.ToUint64(), 0x55u);
 }
 
+// =============================================================================
+// 13. Per-signal skew override for input
+// =============================================================================
+TEST(ClockingSim, PerSignalInputSkewOverride) {
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{5};
+  block.default_output_skew = SimTime{0};
+
+  ClockingSignal sig;
+  sig.signal_name = "fast_in";
+  sig.direction = ClockingDir::kInput;
+  sig.skew = SimTime{1};
+  block.signals.push_back(sig);
+  cmgr.Register(block);
+
+  EXPECT_EQ(cmgr.GetInputSkew("cb", "fast_in").ticks, 1u);
+  EXPECT_EQ(cmgr.GetInputSkew("cb", "other").ticks, 5u);
+}
+
 }  // namespace
