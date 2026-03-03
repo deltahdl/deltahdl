@@ -301,4 +301,19 @@ TEST(StmtExec, ForceNullLhsNoOp) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
+TEST(StmtExec, ReleaseClearsForce) {
+  StmtFixture f;
+  auto* var = f.ctx.CreateVariable("y", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 0);
+  var->is_forced = true;
+  var->forced_value = MakeLogic4VecVal(f.arena, 32, 42);
+
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kRelease;
+  stmt->lhs = MakeId(f.arena, "y");
+
+  RunStmt(stmt, f.ctx, f.arena);
+  EXPECT_FALSE(var->is_forced);
+}
+
 }  // namespace
