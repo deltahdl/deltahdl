@@ -664,4 +664,18 @@ TEST(SimCh50701, NegativeTwosComplement) {
   EXPECT_EQ(result, 255u);
 }
 
+// ---------------------------------------------------------------------------
+// 20. Truncation from left (value larger than size)
+// ---------------------------------------------------------------------------
+TEST(SimCh50701, TruncationFromLeft) {
+  // §5.7.1: Value larger than size — truncated from the left.
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 4'b11001;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x09u);
+}
+
 }  // namespace

@@ -23,20 +23,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 namespace {
 
 // ---------------------------------------------------------------------------
-// 20. Truncation from left (value larger than size)
-// ---------------------------------------------------------------------------
-TEST(SimCh50701, TruncationFromLeft) {
-  // §5.7.1: Value larger than size — truncated from the left.
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 4'b11001;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 0x09u);
-}
-
-// ---------------------------------------------------------------------------
 // 21. X value in hex literal
 // ---------------------------------------------------------------------------
 TEST(SimCh50701, XValueInHexLiteral) {
