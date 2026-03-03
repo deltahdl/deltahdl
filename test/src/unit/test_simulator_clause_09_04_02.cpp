@@ -110,4 +110,36 @@ TEST(SimA605, MultipleTimingControls) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
 }
 
+enum class Logic4 : uint8_t {
+  kVal0 = 0,
+  kVal1 = 1,
+  kX = 2,
+  kZ = 3,
+};
+
+enum class EdgeKind : uint8_t {
+  kNone,
+  kPosedge,
+  kNegedge,
+};
+
+EdgeKind DetectEdge(Logic4 from, Logic4 to) {
+  if (from == to) return EdgeKind::kNone;
+  if (from == Logic4::kVal0 &&
+      (to == Logic4::kVal1 || to == Logic4::kX || to == Logic4::kZ))
+    return EdgeKind::kPosedge;
+  if ((from == Logic4::kX || from == Logic4::kZ) && to == Logic4::kVal1)
+    return EdgeKind::kPosedge;
+  if (from == Logic4::kVal1 &&
+      (to == Logic4::kVal0 || to == Logic4::kX || to == Logic4::kZ))
+    return EdgeKind::kNegedge;
+  if ((from == Logic4::kX || from == Logic4::kZ) && to == Logic4::kVal0)
+    return EdgeKind::kNegedge;
+  return EdgeKind::kNone;
+}
+
+TEST(TimingControl, Posedge0To1) {
+  EXPECT_EQ(DetectEdge(Logic4::kVal0, Logic4::kVal1), EdgeKind::kPosedge);
+}
+
 }  // namespace

@@ -1,7 +1,6 @@
-// §9.4.2: Event control
+// Non-LRM tests
 
 #include <gtest/gtest.h>
-
 #include <cstdint>
 
 enum class Logic4 : uint8_t {
@@ -38,10 +37,6 @@ bool IsEdge(Logic4 from, Logic4 to) {
 }
 
 namespace {
-
-TEST(TimingControl, Posedge0To1) {
-  EXPECT_EQ(DetectEdge(Logic4::kVal0, Logic4::kVal1), EdgeKind::kPosedge);
-}
 
 TEST(TimingControl, Posedge0ToX) {
   EXPECT_EQ(DetectEdge(Logic4::kVal0, Logic4::kX), EdgeKind::kPosedge);
