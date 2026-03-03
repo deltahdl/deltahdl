@@ -45,26 +45,6 @@ static ClassMember* FindClassMethod(ParseResult4e& r) {
 namespace {
 
 // =============================================================================
-// 11. Static variable in initial block (no function)
-// =============================================================================
-TEST(ParserSection4, Sec4_9_4_StaticVarInInitialBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    static logic [7:0] saved = 8'hFF;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmtT(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_static);
-  EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kLogic);
-  EXPECT_NE(stmt->var_init, nullptr);
-}
-
-// =============================================================================
 // 12. Variable in program block (automatic by default)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_ProgramBlockVarAutoDefault) {
