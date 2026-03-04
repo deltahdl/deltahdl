@@ -39,6 +39,9 @@ struct ParseResult31402 {
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
+  TimeScale preproc_timescale;
+  bool has_preproc_timescale = false;
+  TimeUnit preproc_global_precision = TimeUnit::kS;
 };
 
 inline ParseResult31402 ParseTimescale31402(const std::string& src) {
@@ -46,7 +49,10 @@ inline ParseResult31402 ParseTimescale31402(const std::string& src) {
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.PreprocessTimescale(fid);
+  auto pp = preproc.Preprocess(fid);
+  result.preproc_timescale = preproc.CurrentTimescale();
+  result.has_preproc_timescale = preproc.HasTimescale();
+  result.preproc_global_precision = preproc.GlobalPrecision();
   auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
   Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, result.arena, diag);

@@ -17,17 +17,6 @@ TEST(ParserA23, ListOfInterfaceIdentifiersMultiple) {
   EXPECT_EQ(r.cu->modules[0]->ports[2].name, "c");
 }
 
-// Verify a 2-port module has expected names and directions.
-static void VerifyTwoPortModule(ParseResult& r, const char* n0, Direction d0,
-                                const char* n1, Direction d1) {
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 2);
-  EXPECT_EQ(mod->ports[0].name, n0);
-  EXPECT_EQ(mod->ports[0].direction, d0);
-  EXPECT_EQ(mod->ports[1].name, n1);
-  EXPECT_EQ(mod->ports[1].direction, d1);
-}
 // --- Non-ANSI port declarations (LRM §23.2.2.1) ---
 TEST(ParserSection23, NonAnsiPortsBasic) {
   auto r = Parse(

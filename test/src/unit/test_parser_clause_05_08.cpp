@@ -1,6 +1,7 @@
 // §5.8: Time literals
 
 #include "fixture_parser.h"
+#include "fixture_preprocessor_timescale.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -110,24 +111,6 @@ TEST(ParserA84, TimeLiteralFixedPoint) {
   auto r = Parse("module m; initial #1.5ns; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-// Helper: preprocess and parse, returning CU + preprocessor state.
-static ParseResult ParseTimescale31402(const std::string& src) {
-  ParseResult result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.PreprocessTimescale(fid);
-  result.preproc_timescale = preproc.CurrentTimescale();
-  result.has_preproc_timescale = preproc.HasTimescale();
-  result.preproc_global_precision = preproc.GlobalPrecision();
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
 }
 
 // 54. All six time units are accepted as time literals for timeunit.

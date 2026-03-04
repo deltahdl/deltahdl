@@ -6,24 +6,6 @@
 
 using namespace delta;
 
-// Helper: preprocess and parse, returning CU + preprocessor state.
-static ParseResult ParseTimescale31402(const std::string& src) {
-  ParseResult result;
-  DiagEngine diag(result.mgr);
-  auto fid = result.mgr.AddFile("<test>", src);
-  Preprocessor preproc(result.mgr, diag, {});
-  auto pp = preproc.PreprocessTimescale(fid);
-  result.preproc_timescale = preproc.CurrentTimescale();
-  result.has_preproc_timescale = preproc.HasTimescale();
-  result.preproc_global_precision = preproc.GlobalPrecision();
-  auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 namespace {
 
 // =============================================================================
