@@ -29,12 +29,6 @@ TEST(ParserClause03, Cl3_14_2_1_GlobalPrecisionTracking) {
   EXPECT_EQ(r.global_precision, TimeUnit::kPs);
 }
 
-static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
-                                    Preprocessor& pp) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  return pp.Preprocess(fid);
-}
-
 // =============================================================================
 // LRM §3.14.2 — Specifying time units and precision
 // =============================================================================

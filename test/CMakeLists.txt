@@ -15,26 +15,6 @@ function(add_unit_test name)
     gtest_discover_tests(${name})
 endfunction()
 
-# add_unit_test(test_elaborator_clause_10_11)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_06h)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_07d)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_07e)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_09d)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_09g)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_09i)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_09j)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_09k)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_10d)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_11f)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_11g)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_13b)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_16c)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_parser_clause_29_08)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_simulator_clause_09c)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_simulator_clause_09d)  # disabled: always @* infinite loop (§9.4.2.2)
-# add_unit_test(test_simulator_clause_09e)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_simulator_clause_10b)  # disabled: failing tests in workflow 22294976044
-# add_unit_test(test_simulator_clause_11)  # disabled: failing tests in workflow 22294976044
 add_unit_test(test_elaborator_annex_a_04_01_03)
 add_unit_test(test_elaborator_annex_a_07_03)
 add_unit_test(test_elaborator_annex_a_07_05_01)
