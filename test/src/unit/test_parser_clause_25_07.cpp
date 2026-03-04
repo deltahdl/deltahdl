@@ -1,6 +1,7 @@
 // §25.7: Tasks and functions in interfaces
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

@@ -71,6 +71,11 @@ TEST(ParserSection25, ModportImportWithDirectionFirst) {
   EXPECT_FALSE(mp->ports[0].is_import);
 }
 
+struct ModportPortExpected {
+  Direction dir;
+  const char* name;
+};
+
 static void VerifyModportPorts(const std::vector<ModportPort>& ports,
                                const ModportPortExpected expected[],
                                size_t count) {

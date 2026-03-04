@@ -1,6 +1,7 @@
 // §30.4.4.3: Edge-sensitive state-dependent paths
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

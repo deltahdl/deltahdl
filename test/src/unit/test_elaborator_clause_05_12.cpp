@@ -183,7 +183,7 @@ TEST(ElabA91, DefaultValueBitOne) {
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   EXPECT_EQ(mod->variables[0].attrs[0].name, "full_case");
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(*mod->variables[0].attrs[0].resolved_value, 1);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 1);
 }
 
 // =========================================================================
@@ -205,7 +205,7 @@ TEST(ElabA91, AttributeValueFromExpression) {
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   EXPECT_EQ(mod->variables[0].attrs[0].name, "depth");
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(*mod->variables[0].attrs[0].resolved_value, 8);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 8);
 }
 
 TEST(ElabA91, AttributeValueConstExpr) {
@@ -222,7 +222,7 @@ TEST(ElabA91, AttributeValueConstExpr) {
   ASSERT_FALSE(mod->variables.empty());
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(*mod->variables[0].attrs[0].resolved_value, 8);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 8);
 }
 
 TEST(ElabA91, AttributeValueString) {
@@ -267,7 +267,7 @@ TEST(ElabA91, DuplicateAttrLastWins) {
     if (a.name == "depth") {
       ++depth_count;
       ASSERT_NE(a.resolved_value, std::nullopt);
-      EXPECT_EQ(*a.resolved_value, 8);
+      EXPECT_EQ(a.resolved_value.value(), 8);
     }
   }
   EXPECT_EQ(depth_count, 1);
@@ -304,7 +304,7 @@ TEST(ElabA91, DuplicateAttrAcrossInstances) {
     if (a.name == "depth") {
       ++depth_count;
       ASSERT_NE(a.resolved_value, std::nullopt);
-      EXPECT_EQ(*a.resolved_value, 16);
+      EXPECT_EQ(a.resolved_value.value(), 16);
     }
   }
   EXPECT_EQ(depth_count, 1);
@@ -594,7 +594,7 @@ TEST(ElabA91, AttrValueZero) {
   ASSERT_FALSE(mod->variables.empty());
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(*mod->variables[0].attrs[0].resolved_value, 0);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 0);
 }
 
 TEST(ElabA91, AttrValueLargeInt) {
@@ -611,7 +611,7 @@ TEST(ElabA91, AttrValueLargeInt) {
   ASSERT_FALSE(mod->variables.empty());
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(*mod->variables[0].attrs[0].resolved_value, 255);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 255);
 }
 
 // =========================================================================

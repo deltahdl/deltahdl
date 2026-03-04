@@ -21,7 +21,7 @@ TEST(ParserSection14, InputSamplingBasic) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
   EXPECT_EQ(item->clocking_signals[0].name, "v");
@@ -37,7 +37,7 @@ TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
   EXPECT_EQ(sig.direction, Direction::kInput);
