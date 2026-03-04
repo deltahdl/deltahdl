@@ -59,4 +59,16 @@ TEST(SysTask, FormatReal_f) {
   EXPECT_NE(out.find("2.5"), std::string::npos);
 }
 
+// =============================================================================
+// Helper fixture
+// =============================================================================
+// =============================================================================
+// Phase 3: §21.2.1 FormatArg specifiers
+// =============================================================================
+TEST(FormatArg, DecimalUnsigned) {
+  Arena arena;
+  auto val = MakeLogic4VecVal(arena, 8, 42);
+  EXPECT_EQ(FormatArg(val, 'd'), "42");
+}
+
 }  // namespace
