@@ -55,42 +55,60 @@ jobs:
           ${{ github.workspace }}/test/lib/lrm
           ${{ github.workspace }}/test/lib/github
           ${{ github.workspace }}/test/scripts/implement_subclause
-      - name: Run pylint on source
+      - name: Run pylint on lib source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
           lib/lrm/ lib/github/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run pylint on source
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pylint
           scripts/implement_subclause/
+          --fail-on=C,R,W --fail-under=10.0
+      - name: Run pylint on lib tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pylint --recursive=y
+          test/lib/lrm/ test/lib/github/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts:test/scripts/implement_subclause/unit
           python3 -m pylint --recursive=y
-          test/lib/lrm/ test/lib/github/
           test/scripts/implement_subclause/
           --fail-on=C,R,W --fail-under=10.0
-      - name: Run mypy on source
+      - name: Run mypy on lib source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy
           lib/lrm/ lib/github/
+      - name: Run mypy on source
+        run: >-
+          PYTHONPATH=.:scripts python3 -m mypy
           scripts/implement_subclause/
+      - name: Run mypy on lib tests
+        run: >-
+          MYPYPATH=.:scripts python3 -m mypy
+          test/lib/lrm/ test/lib/github/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts:test/scripts/implement_subclause/unit
           python3 -m mypy --explicit-package-bases
-          test/lib/lrm/ test/lib/github/
           test/scripts/implement_subclause/
+      - name: Detect copy-paste in lib source
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console lib/lrm/ lib/github/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console
-          lib/lrm/ lib/github/
-          scripts/implement_subclause/
+          --reporters console scripts/implement_subclause/
+      - name: Detect copy-paste in lib tests
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console test/lib/lrm/ test/lib/github/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console
-          test/lib/lrm/ test/lib/github/
-          test/scripts/implement_subclause/
+          --reporters console test/scripts/implement_subclause/
       # DO NOT lower coverage thresholds. Uncovered code is untested code —
       # lowering it hides bugs and lets regressions slip through silently.
       - name: Run lib/github unit tests with 100% coverage gate
