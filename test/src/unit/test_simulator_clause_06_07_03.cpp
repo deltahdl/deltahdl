@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 
+#include "helpers_switch_network.h"
 #include "model_net_declaration.h"
 
 using namespace delta;

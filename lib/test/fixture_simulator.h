@@ -11,6 +11,7 @@ struct SimFixture {
   Scheduler scheduler{arena};
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag};
+  bool has_errors = false;
 };
 
 struct SimFixtureSeeded {
@@ -27,13 +28,15 @@ using SysTaskMathFixture = SimFixture;
 using FuncFixture = SimFixture;
 using ExprFixture = SimFixture;
 using SyncFixture = SimFixtureSeeded;
-using SvaFixture = SimFixture;
+
 using SampledLetFixture = SimFixture;
 using CompiledSimFixture = SimFixture;
 using DpiSimFixture = SimFixture;
 using AssertionSimFixture = SimFixture;
 using StmtFixture = SimFixtureSeeded;
 using ClockingSimFixture = SimFixtureSeeded;
+using MtSimFixture = SimFixture;
+using SimA604Fixture = SimFixture;
 
 inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
@@ -41,7 +44,9 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixture& f) {
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
+  f.has_errors = f.diag.HasErrors();
+  return design;
 }
 
 inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixtureSeeded& f) {

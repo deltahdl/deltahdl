@@ -18,11 +18,6 @@ TEST(ParserAnnexA, A2ContinuousAssignWithDelay) {
   }
 }
 
-bool ParseOk(const std::string& src) {
-  auto r = Parse(src);
-  return r.cu && !r.has_errors;
-}
-
 // --- delay3 on continuous assignments ---
 // delay3: single value on continuous assign.
 TEST(ParserA223, Delay3AssignSingleValue) {
@@ -139,7 +134,8 @@ TEST(ParserSection11, MinTypMaxInContAssign) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
+static ModuleItem* FindItemByKindFromResult(ParseResult& r,
+                                            ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return item;
   }
@@ -147,7 +143,7 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 }
 
 static ModuleItem* FindContAssign(ParseResult& r) {
-  return FindItemByKind(r, ModuleItemKind::kContAssign);
+  return FindItemByKindFromResult(r, ModuleItemKind::kContAssign);
 }
 // ---------------------------------------------------------------------------
 // 26. Assign with delay (assign #5 y = a & b)

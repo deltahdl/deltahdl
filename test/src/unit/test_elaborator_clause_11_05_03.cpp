@@ -5,8 +5,10 @@
 #include <unordered_set>
 
 #include "builders_ast.h"
+#include "builders_sensitivity.h"
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/sensitivity.h"
 #include "parser/ast.h"
 
 using namespace delta;

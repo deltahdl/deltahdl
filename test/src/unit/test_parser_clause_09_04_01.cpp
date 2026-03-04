@@ -5,11 +5,6 @@
 
 using namespace delta;
 
-bool ParseOk(const std::string& src) {
-  auto r = Parse(src);
-  return r.cu && !r.has_errors;
-}
-
 namespace {
 
 // Statement delay: #delay_value in procedural context.
@@ -127,7 +122,8 @@ TEST(ParserSection9, DelayControlReal) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
+static ModuleItem* FindItemByKindFromResult(ParseResult& r,
+                                            ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return item;
   }
@@ -135,7 +131,7 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 }
 
 static ModuleItem* FindInitialBlock(ParseResult& r) {
-  return FindItemByKind(r, ModuleItemKind::kInitialBlock);
+  return FindItemByKindFromResult(r, ModuleItemKind::kInitialBlock);
 }
 
 // ---------------------------------------------------------------------------

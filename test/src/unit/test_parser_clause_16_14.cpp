@@ -5,14 +5,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-static size_t CountItemsByKind(const std::vector<ModuleItem*>& items,
-                               ModuleItemKind kind) {
-  size_t count = 0;
-  for (auto* item : items) {
-    if (item->kind == kind) ++count;
-  }
-  return count;
-}
 
 using VerifyParseTest = ProgramTestParse;
 

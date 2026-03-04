@@ -34,7 +34,8 @@ inline void ScheduleLabeled(Scheduler& sched, uint64_t time, Region region,
 }
 
 // Verify that two regions execute in the given order.
-inline void VerifyTwoRegionOrder(RegionLabel first, RegionLabel second) {
+inline void VerifyTwoRegionOrder(const RegionLabel& first,
+                                 const RegionLabel& second) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -47,8 +48,8 @@ inline void VerifyTwoRegionOrder(RegionLabel first, RegionLabel second) {
 }
 
 // Verify that three regions execute in the given order.
-inline void VerifyThreeRegionOrder(RegionLabel r1, RegionLabel r2,
-                                   RegionLabel r3) {
+inline void VerifyThreeRegionOrder(const RegionLabel& r1, const RegionLabel& r2,
+                                   const RegionLabel& r3) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -63,8 +64,9 @@ inline void VerifyThreeRegionOrder(RegionLabel r1, RegionLabel r2,
 }
 
 // Verify that four regions execute in the given order.
-inline void VerifyFourRegionOrder(RegionLabel r1, RegionLabel r2,
-                                  RegionLabel r3, RegionLabel r4) {
+inline void VerifyFourRegionOrder(const RegionLabel& r1, const RegionLabel& r2,
+                                  const RegionLabel& r3,
+                                  const RegionLabel& r4) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -111,8 +113,9 @@ inline void VerifyIterationChain(Region main_region,
 }
 
 // Verify region restart: initial runs, trigger schedules into target.
-inline void VerifyRegionRestart(RegionLabel initial, RegionLabel trigger,
-                                RegionLabel target) {
+inline void VerifyRegionRestart(const RegionLabel& initial,
+                                const RegionLabel& trigger,
+                                const RegionLabel& target) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;

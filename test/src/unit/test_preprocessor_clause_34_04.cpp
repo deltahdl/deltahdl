@@ -2,10 +2,24 @@
 
 #include <gtest/gtest.h>
 
-#include "fixture_preprocessor.h"
-#include "fixture_program.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
+
+struct ProtectedTest : ::testing::Test {
+ protected:
+  std::string Preprocess(const std::string& src) {
+    auto fid = mgr_.AddFile("<test>", src);
+    Preprocessor pp(mgr_, diag_, config_);
+    return pp.Preprocess(fid);
+  }
+
+  SourceManager mgr_;
+  DiagEngine diag_{mgr_};
+  PreprocConfig config_;
+};
 
 namespace {
 

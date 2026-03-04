@@ -87,11 +87,6 @@ TEST(ParserA222, DriveStrengthOnWand) {
   EXPECT_EQ(item->drive_strength1, 3u);  // pull1
 }
 
-bool ParseOk(const std::string& src) {
-  auto r = Parse(src);
-  return r.cu && !r.has_errors;
-}
-
 // delay_value: ps_identifier — parameter/specparam identifier as delay.
 TEST(ParserA223, DelayValuePsIdentifier) {
   auto r = Parse(

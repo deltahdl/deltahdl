@@ -5,13 +5,6 @@
 
 using namespace delta;
 
-static bool HasItemOfKind(const std::vector<ModuleItem*>& items,
-                          ModuleItemKind kind) {
-  for (const auto* item : items)
-    if (item->kind == kind) return true;
-  return false;
-}
-
 namespace {
 
 // §3.5: "an interface can also contain processes (i.e., initial or always

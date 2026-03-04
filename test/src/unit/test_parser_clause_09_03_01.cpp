@@ -45,14 +45,6 @@ TEST(ParserA28, DataDeclBasicInBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(body->stmts[0]->var_name, "x");
 }
-// Helpers to extract items from the first module.
-static ModuleItem* FindItem(const std::vector<ModuleItem*>& items,
-                            ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
 TEST(ParserA602, InitialConstruct_BeginEnd) {
   auto r = Parse(
       "module m;\n"

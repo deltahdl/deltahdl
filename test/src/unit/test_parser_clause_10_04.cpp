@@ -29,12 +29,6 @@ TEST(ParserA602, MixedAssignments_BlockingAndNonblocking) {
   EXPECT_EQ(stmts[3]->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmts[3]->delay, nullptr);
 }
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
 
 static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKind(r, ModuleItemKind::kInitialBlock);

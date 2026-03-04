@@ -6,6 +6,7 @@
 #include "common/types.h"
 #include "fixture_lexer.h"
 #include "fixture_parser.h"
+#include "fixture_simulator.h"
 #include "simulator/adv_sim.h"
 #include "simulator/compiled_sim.h"
 #include "simulator/mt_sim.h"
@@ -14,6 +15,8 @@
 #include "simulator/sim_context.h"
 
 using namespace delta;
+
+SimCoroutine MakeTestCoroutine() { co_return; }
 
 namespace {
 

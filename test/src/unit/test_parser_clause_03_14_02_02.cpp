@@ -4,13 +4,14 @@
 #include "fixture_preprocessor_timescale.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "parser/time_resolve.h"
 
 using namespace delta;
 namespace {
 
 // 28. Single module with timeunit slash — precision arg is used.
 TEST(ParserClause03, Cl3_14_3_SingleModuleTimeunitSlash) {
-  auto r = Parse(
+  auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 1us / 1ps;\n"
       "endmodule\n");

@@ -5,11 +5,6 @@
 
 using namespace delta;
 
-bool ParseOk(const std::string& src) {
-  auto r = Parse(src);
-  return r.cu && !r.has_errors;
-}
-
 namespace {
 
 // Intra-assignment delay: var = #delay expr.

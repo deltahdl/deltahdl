@@ -3,7 +3,7 @@
 // --- Local types for net type strengths (§28.15) ---
 #include <gtest/gtest.h>
 
-#include "model_strength.h"
+#include "model_net_default.h"
 
 namespace {
 

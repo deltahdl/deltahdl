@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_elaborator.h"
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 
 using namespace delta;

@@ -6,14 +6,6 @@
 
 using namespace delta;
 
-static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
-                                  ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
 namespace {
 
 TEST(ParserA210, ConcurrentAssertionItem_CoverProperty) {
@@ -242,13 +234,6 @@ TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
   )"));
 }
 
-static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
 // cover_property_statement
 TEST(ParserA610, CoverPropertyModule) {
   auto r = Parse(
@@ -257,7 +242,7 @@ TEST(ParserA610, CoverPropertyModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
+  auto* item = FindItemByKind(r, ModuleItemKind::kCoverProperty);
   ASSERT_NE(item, nullptr);
 }
 
@@ -269,7 +254,7 @@ TEST(ParserA610, CoverSequenceModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverSequence);
+  auto* item = FindItemByKind(r, ModuleItemKind::kCoverSequence);
   ASSERT_NE(item, nullptr);
 }
 
@@ -281,7 +266,7 @@ TEST(ParserA610, CoverPropertyPassAction) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kCoverProperty);
+  auto* item = FindItemByKind(r, ModuleItemKind::kCoverProperty);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->assert_pass_stmt, nullptr);
 }

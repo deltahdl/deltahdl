@@ -4,7 +4,9 @@
 
 #include "common/types.h"
 #include "fixture_preprocessor.h"
+#include "fixture_preprocessor_timescale.h"
 #include "helpers_parser_verify.h"
+#include "parser/time_resolve.h"
 
 using namespace delta;
 
@@ -27,7 +29,7 @@ TEST(Preprocessor, Timescale_GlobalPrecision) {
 }
 // 29. Multiple `timescale — preprocessor tracks min; function uses it.
 TEST(ParserClause03, Cl3_14_3_MultipleTimescaleDirectives) {
-  auto r = Parse(
+  auto r = ParseTimescale31402(
       "`timescale 1ns / 1ns\n"
       "module a; endmodule\n"
       "`timescale 1us / 1ps\n"
@@ -41,7 +43,7 @@ TEST(ParserClause03, Cl3_14_3_MultipleTimescaleDirectives) {
 
 // 30. Earlier `timescale with finer precision than later — global min is used.
 TEST(ParserClause03, Cl3_14_3_EarlierTimescaleFinerPrecision) {
-  auto r = Parse(
+  auto r = ParseTimescale31402(
       "`timescale 1ns / 1fs\n"
       "module a; endmodule\n"
       "`timescale 1us / 1ps\n"

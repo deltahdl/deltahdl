@@ -309,6 +309,7 @@ TEST(LexerAnnexB, LookupKeywordReturnsCorrectTokenKind) {
     auto result = LookupKeyword(kTableB1[i].text);
     ASSERT_TRUE(result.has_value())
         << kTableB1[i].text << " not in keyword table";
+    if (!result.has_value()) continue;  // NOLINT: ASSERT_TRUE above exits
     EXPECT_EQ(*result, kTableB1[i].expected)
         << kTableB1[i].text << " LookupKeyword returned wrong TokenKind";
   }

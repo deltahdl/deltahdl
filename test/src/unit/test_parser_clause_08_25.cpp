@@ -99,8 +99,9 @@ TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   auto* cls = FindClassDeclItem(r.cu->modules[0]->items);
   ASSERT_NE(cls, nullptr);
-  ASSERT_EQ(cls->params.size(), 1u);
-  EXPECT_EQ(cls->params[0].first, "a");
+  ASSERT_NE(cls->class_decl, nullptr);
+  ASSERT_EQ(cls->class_decl->params.size(), 1u);
+  EXPECT_EQ(cls->class_decl->params[0].first, "a");
 }
 
 // --- Test helpers ---

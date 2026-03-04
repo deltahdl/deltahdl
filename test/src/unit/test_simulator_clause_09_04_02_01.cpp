@@ -1,5 +1,7 @@
 // §9.4.2.1: Event OR operator
 
+#include <gtest/gtest.h>
+
 #include "helpers_sensitivity.h"
 
 namespace {

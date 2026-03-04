@@ -1,21 +1,14 @@
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 
 #include "model_val4.h"
+#include "parser/ast.h"
 
-// --- Local types for logic gate evaluation (§28.4, §28.5) ---
+using delta::GateKind;
 
-enum class GateKind : uint8_t {
-  kAnd,
-  kNand,
-  kOr,
-  kNor,
-  kXor,
-  kXnor,
-  kBuf,
-  kNot
-};
+// --- Logic gate evaluation helpers (§28.4, §28.5) ---
 
 inline Val4 InvertVal4(Val4 v);
 inline Val4 NormalizeInput(Val4 v);
@@ -24,6 +17,7 @@ inline Val4 EvalOr(Val4 a, Val4 b);
 inline Val4 EvalXor(Val4 a, Val4 b);
 inline Val4 EvalNInputGate(GateKind kind, Val4 a, Val4 b);
 inline Val4 EvalNOutputGate(GateKind kind, Val4 input);
+inline void CheckInversion(GateKind base, GateKind inverted);
 inline uint64_t ComputeGateDelay(uint64_t d_rise, uint64_t d_fall, Val4 from,
                                  Val4 to);
 
@@ -88,6 +82,19 @@ inline Val4 EvalNOutputGate(GateKind kind, Val4 input) {
       return InvertVal4(ni);
     default:
       return Val4::kX;
+  }
+}
+
+inline void CheckInversion(GateKind base, GateKind inverted) {
+  Val4 vals[] = {Val4::kV0, Val4::kV1, Val4::kX, Val4::kZ};
+  for (auto a : vals) {
+    for (auto b : vals) {
+      Val4 base_result = EvalNInputGate(base, a, b);
+      Val4 inv_result = EvalNInputGate(inverted, a, b);
+      (void)base_result;
+      (void)inv_result;
+      assert(inv_result == InvertVal4(base_result));
+    }
   }
 }
 

@@ -5,14 +5,6 @@
 #include "simulator/udp_eval.h"
 
 using namespace delta;
-// Helpers to extract items from the first module.
-static ModuleItem* FindItem(const std::vector<ModuleItem*>& items,
-                            ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
 namespace {
 
 TEST(ParserA602, InitialConstruct_NullStmt) {

@@ -4,12 +4,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-SpecifyItem* GetSolePathItem(ParseResult& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty()) return nullptr;
-  return spec->specify_items[0];
-}
 
 namespace {
 

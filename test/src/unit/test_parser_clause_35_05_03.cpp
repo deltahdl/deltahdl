@@ -10,12 +10,7 @@ using namespace delta;
 using DpiParseTest = ProgramTestParse;
 
 using ApiParseTest = ProgramTestParse;
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
+
 namespace {
 
 TEST(ParserSection38, DpiImportForVpiAccess) {

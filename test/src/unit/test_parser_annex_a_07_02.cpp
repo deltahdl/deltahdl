@@ -27,12 +27,6 @@ TEST(ParserA702, PolarityWithEdgeFullPath) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   EXPECT_NE(si->path.data_source, nullptr);
 }
-SpecifyItem* GetSolePathItem(ParseResult& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty()) return nullptr;
-  return spec->specify_items[0];
-}
 
 // =============================================================================
 // A.7.2 full_path_description — polarity_operator

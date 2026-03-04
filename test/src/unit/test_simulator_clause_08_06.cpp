@@ -14,14 +14,6 @@ using namespace delta;
 // Test fixture — provides arena, scheduler, sim context, and helpers to
 // build class types and objects at the AST/runtime level.
 // =============================================================================
-// AST helper: make an identifier expression.
-static Expr* MkId(Arena& a, std::string_view name) {
-  auto* e = a.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
 // AST helper: make a binary expression.
 static Expr* MkBin(Arena& a, TokenKind op, Expr* l, Expr* r) {
   auto* e = a.Create<Expr>();

@@ -4,11 +4,6 @@
 
 using namespace delta;
 
-bool ParseOk(const std::string& src) {
-  auto r = Parse(src);
-  return r.cu && !r.has_errors;
-}
-
 namespace {
 
 // delay3: mintypmax on gate — #(1:2:3) with min:typ:max expression.

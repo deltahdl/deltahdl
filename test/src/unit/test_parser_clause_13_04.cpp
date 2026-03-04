@@ -347,17 +347,6 @@ TEST(ParserA28, BlockItemInFunction) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kFunctionDecl &&
-        item->kind != ModuleItemKind::kTaskDecl) {
-      continue;
-    }
-    if (item->name == name) return item;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // LRM section 13.4 -- Array parameters on function args
 // =============================================================================

@@ -34,6 +34,11 @@ inline PreprocTimescaleResult PreprocessTimescale(const std::string& src) {
   return result;
 }
 
+// Alias for tests that use "Preprocess" as a 1-arg call.
+inline PreprocTimescaleResult Preprocess(const std::string& src) {
+  return PreprocessTimescale(src);
+}
+
 struct ParseResult31402 {
   SourceManager mgr;
   Arena arena;

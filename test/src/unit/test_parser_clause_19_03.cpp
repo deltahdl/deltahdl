@@ -6,14 +6,6 @@
 
 using namespace delta;
 
-static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
-                                  ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
 namespace {
 
 // =============================================================================

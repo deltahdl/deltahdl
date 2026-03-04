@@ -74,7 +74,7 @@ TEST(ParserSection26, ModuleImportSpecific) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   const auto* imp =
-      FindItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
   ASSERT_NE(imp, nullptr);
   EXPECT_EQ(imp->import_item.package_name, "p");
   EXPECT_EQ(imp->import_item.item_name, "X");
@@ -139,7 +139,7 @@ TEST(ParserSection26, ImportWildcardField) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   const auto* imp =
-      FindItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
   ASSERT_NE(imp, nullptr);
   EXPECT_EQ(imp->import_item.package_name, "p");
   EXPECT_TRUE(imp->import_item.is_wildcard);
@@ -174,7 +174,7 @@ TEST(ParserSection26, ImportSpecificNotWildcard) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   const auto* imp =
-      FindItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl);
   ASSERT_NE(imp, nullptr);
   EXPECT_FALSE(imp->import_item.is_wildcard);
   EXPECT_EQ(imp->import_item.item_name, "X");

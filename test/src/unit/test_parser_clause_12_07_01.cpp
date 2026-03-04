@@ -565,6 +565,13 @@ static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   return nullptr;
 }
 
+static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
+  for (auto* stmt : item->func_body_stmts) {
+    if (stmt->kind == kind) return stmt;
+  }
+  return nullptr;
+}
+
 // =============================================================================
 // 22. For-loop init var in static function
 // =============================================================================
@@ -610,13 +617,6 @@ TEST(ParserSection4, Sec4_9_4_ForLoopInitInAutoFunc) {
   auto* for_stmt = FindStmtByKind(fn, StmtKind::kFor);
   ASSERT_NE(for_stmt, nullptr);
   EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
-}
-// Returns the first module item from the first module.
-static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
-  for (auto* stmt : item->func_body_stmts) {
-    if (stmt->kind == kind) return stmt;
-  }
-  return nullptr;
 }
 
 // =============================================================================

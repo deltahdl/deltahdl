@@ -4,6 +4,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "fixture_parser.h"
 #include "fixture_preprocessor.h"
 #include "fixture_preprocessor_timescale.h"
 #include "lexer/lexer.h"
@@ -31,7 +32,7 @@ TEST(ParserClause03, Cl3_14_2_1_GlobalPrecisionTracking) {
 static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
                                     Preprocessor& pp) {
   auto fid = f.mgr.AddFile("<test>", src);
-  return pp.PreprocessTimescale(fid);
+  return pp.Preprocess(fid);
 }
 
 // =============================================================================

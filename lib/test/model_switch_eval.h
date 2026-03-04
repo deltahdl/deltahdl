@@ -2,8 +2,9 @@
 
 #include <cstdint>
 
+#include "model_val4.h"
+
 // --- Local types for MOS/pass switches (§28.7, §28.8, §28.9) ---
-enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
 
 enum class Val4Ext : uint8_t {
   kV0 = 0,

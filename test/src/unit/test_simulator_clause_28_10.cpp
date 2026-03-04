@@ -3,7 +3,7 @@
 // --- Local types for pullup/pulldown sources (§28.10) ---
 #include <gtest/gtest.h>
 
-#include "model_strength.h"
+#include "model_pull_source.h"
 
 namespace {
 

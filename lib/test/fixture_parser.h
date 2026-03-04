@@ -42,6 +42,17 @@ inline bool ParseOk(const std::string& src) {
   return !diag.HasErrors();
 }
 
+inline ParseResult ParseLibrary(const std::string& src) {
+  ParseResult result;
+  auto fid = result.mgr.AddFile("<test>", src);
+  DiagEngine diag(result.mgr);
+  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, result.arena, diag);
+  result.cu = parser.ParseLibraryText();
+  result.has_errors = diag.HasErrors();
+  return result;
+}
+
 inline ParseResult ParseWithPreprocessor(const std::string& src) {
   ParseResult result;
   DiagEngine diag(result.mgr);

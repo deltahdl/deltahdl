@@ -31,3 +31,5 @@ inline double ToDouble(const Logic4Vec& v) {
   std::memcpy(&d, &bits, sizeof(double));
   return d;
 }
+
+inline double ToDouble(const Variable* var) { return ToDouble(var->value); }

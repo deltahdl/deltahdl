@@ -3,13 +3,14 @@
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
 #include "helpers_parser_verify.h"
+#include "parser/time_resolve.h"
 
 using namespace delta;
 namespace {
 
 // 21. Global precision considers `timescale precision.
 TEST(ParserClause03, Cl3_14_3_ConsidersTimescalePrec) {
-  auto r = Parse(
+  auto r = ParseTimescale31402(
       "`timescale 1ns / 1ps\n"
       "module a;\n"
       "  timeprecision 1ns;\n"
@@ -23,7 +24,7 @@ TEST(ParserClause03, Cl3_14_3_ConsidersTimescalePrec) {
 // 22. Global precision across all three sources: timeprecision, timeunit
 //     precision arg, and `timescale.
 TEST(ParserClause03, Cl3_14_3_MinAcrossAllThreeSources) {
-  auto r = Parse(
+  auto r = ParseTimescale31402(
       "`timescale 1us / 1ns\n"
       "module a;\n"
       "  timeunit 1ms / 1us;\n"
@@ -39,7 +40,7 @@ TEST(ParserClause03, Cl3_14_3_MinAcrossAllThreeSources) {
 
 // 23. With no time declarations, default is implementation-specific (kNs).
 TEST(ParserClause03, Cl3_14_3_DefaultWhenNoneSpecified) {
-  auto r = Parse(
+  auto r = ParseTimescale31402(
       "module a;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
@@ -50,7 +51,7 @@ TEST(ParserClause03, Cl3_14_3_DefaultWhenNoneSpecified) {
 
 // 24. Step time unit equals global time precision.
 TEST(ParserClause03, Cl3_14_3_StepEqualsGlobalPrecision) {
-  auto r = Parse(
+  auto r = ParseTimescale31402(
       "module a;\n"
       "  timeprecision 1fs;\n"
       "endmodule\n"
@@ -66,7 +67,7 @@ TEST(ParserClause03, Cl3_14_3_StepEqualsGlobalPrecision) {
 
 // 25. CU-scope timeprecision is included in global computation.
 TEST(ParserClause03, Cl3_14_3_CUScopeTimeprecisionIncluded) {
-  auto r = Parse(
+  auto r = ParseTimescale31402(
       "timeprecision 1fs;\n"
       "module a;\n"
       "  timeprecision 1ns;\n"
@@ -79,7 +80,7 @@ TEST(ParserClause03, Cl3_14_3_CUScopeTimeprecisionIncluded) {
 
 // 26. Interfaces and programs also contribute to global precision.
 TEST(ParserClause03, Cl3_14_3_InterfacesAndProgramsContribute) {
-  auto r = Parse(
+  auto r = ParseTimescale31402(
       "interface i;\n"
       "  timeprecision 1ps;\n"
       "endinterface\n"

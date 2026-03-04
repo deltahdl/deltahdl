@@ -14,14 +14,6 @@ using namespace delta;
 // Test fixture — provides arena, scheduler, sim context, and helpers to
 // build class types and objects at the AST/runtime level.
 // =============================================================================
-// AST helper: make an identifier expression.
-static Expr* MkId(Arena& a, std::string_view name) {
-  auto* e = a.Create<Expr>();
-  e->kind = ExprKind::kIdentifier;
-  e->text = name;
-  return e;
-}
-
 // Build a simple ClassTypeInfo and register it with the context.
 
 // Allocate a ClassObject of the given type, returning (handle_id, object*).

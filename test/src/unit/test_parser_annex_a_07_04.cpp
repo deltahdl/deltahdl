@@ -1,6 +1,7 @@
 // Annex A.7.4: Specify path delays
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

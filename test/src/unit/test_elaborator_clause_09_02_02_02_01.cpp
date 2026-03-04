@@ -2,6 +2,7 @@
 
 #include <unordered_set>
 
+#include "builders_sensitivity.h"
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"

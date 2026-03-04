@@ -382,12 +382,6 @@ TEST(ParserSection10, Sec10_4_2_MixedBlockingNonblocking) {
   EXPECT_TRUE(found_nonblocking);
   EXPECT_TRUE(found_blocking);
 }
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
 
 static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKind(r, ModuleItemKind::kInitialBlock);

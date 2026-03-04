@@ -3,7 +3,9 @@
 #include <gtest/gtest.h>
 
 #include "common/types.h"
+#include "fixture_parser.h"
 #include "fixture_preprocessor.h"
+#include "fixture_preprocessor_timescale.h"
 
 using namespace delta;
 

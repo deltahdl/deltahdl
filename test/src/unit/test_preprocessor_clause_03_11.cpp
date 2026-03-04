@@ -1,15 +1,9 @@
 // §3.11: Overview of hierarchy
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
-
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
 
 namespace {
 

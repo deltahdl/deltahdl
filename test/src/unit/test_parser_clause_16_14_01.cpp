@@ -6,14 +6,6 @@
 
 using namespace delta;
 
-static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
-                                  ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
 namespace {
 
 // =============================================================================
@@ -245,13 +237,6 @@ TEST(ParserSection39, AssertPropertyStatement) {
   EXPECT_TRUE(found_assert);
 }
 
-static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // A.6.10 — concurrent_assertion_statement (module-level)
 // =============================================================================
@@ -263,7 +248,7 @@ TEST(ParserA610, AssertPropertyModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
 }
 
@@ -278,7 +263,7 @@ TEST(ParserA610, AssertPropertyActionBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->assert_pass_stmt, nullptr);
   ASSERT_NE(item->assert_fail_stmt, nullptr);

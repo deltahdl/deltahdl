@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <vector>
 
 #include "common/arena.h"
 #include "simulator/net.h"
@@ -98,4 +100,24 @@ inline void InitializeTriregNet(Net& net, LocalChargeStrength str,
     net.resolved->value.words[i].aval = 0;
     net.resolved->value.words[i].bval = 1;
   }
+}
+
+// --- User-defined nettype support (§6.7.3) ---
+struct UserNettype {
+  std::function<Logic4Vec(Arena&, const std::vector<Logic4Vec>&)> resolution;
+};
+
+inline void ActivateResolutionAtTimeZero(Net& net, UserNettype& nt,
+                                         Arena& arena) {
+  if (nt.resolution) {
+    std::vector<Logic4Vec> drivers(net.drivers.begin(), net.drivers.end());
+    Logic4Vec result = nt.resolution(arena, drivers);
+    net.resolved->value = result;
+  }
+}
+
+inline void SetUserNettypeInitialValue(Net& /*net*/, UserNettype& /*nt*/,
+                                       Arena& /*arena*/) {
+  // Default for logic is x (aval=1, bval=1).
+  // The net's resolved value is already initialized to x by MakeLogic4Vec.
 }

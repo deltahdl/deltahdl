@@ -4,6 +4,7 @@
 
 #include "helpers_switch_network.h"
 #include "model_switch_eval.h"
+#include "simulator/scheduler.h"
 
 namespace {
 

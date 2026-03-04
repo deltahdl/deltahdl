@@ -140,7 +140,8 @@ TEST(ParserSection10, ContinuousAssignMultipleTargets) {
   }
   EXPECT_GE(count, 1);
 }
-static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
+static ModuleItem* FindItemByKindFromResult(ParseResult& r,
+                                            ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return item;
   }
@@ -148,7 +149,7 @@ static ModuleItem* FindItemByKind(ParseResult& r, ModuleItemKind kind) {
 }
 
 static ModuleItem* FindContAssign(ParseResult& r) {
-  return FindItemByKind(r, ModuleItemKind::kContAssign);
+  return FindItemByKindFromResult(r, ModuleItemKind::kContAssign);
 }
 // ---------------------------------------------------------------------------
 // 3. Continuous assignment with assign (Active region)

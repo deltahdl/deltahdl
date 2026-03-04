@@ -118,17 +118,6 @@ TEST(ParserA27, TfItemDeclMixed) {
   EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
-static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kFunctionDecl &&
-        item->kind != ModuleItemKind::kTaskDecl) {
-      continue;
-    }
-    if (item->name == name) return item;
-  }
-  return nullptr;
-}
-
 TEST(ParserSection13, MultipleDimsOnFuncArg) {
   auto r = Parse(
       "module m;\n"

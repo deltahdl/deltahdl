@@ -462,13 +462,6 @@ struct LetParseResult {
   bool has_errors = false;
 };
 
-// Helper: find the first kLetDecl item in the first module.
-static ModuleItem* FirstLetDecl(LetParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kLetDecl) return item;
-  }
-  return nullptr;
-}
 // ==========================================================================
 // §11.12: Let declaration parsing
 // ==========================================================================
