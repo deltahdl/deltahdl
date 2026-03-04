@@ -7,8 +7,8 @@
 using namespace delta;
 
 struct ConfigTest : ::testing::Test {
-protected:
-  CompilationUnit *Parse(const std::string &src) {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -32,7 +32,7 @@ namespace {
 // §33.4.2 Config with nested config references
 // =============================================================================
 TEST_F(ConfigTest, NestedConfigReference) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config bot;
       design lib1.bot;
       default liblist lib1 lib2;
@@ -47,11 +47,11 @@ TEST_F(ConfigTest, NestedConfigReference) {
   EXPECT_EQ(unit->configs[1]->name, "top");
 
   ASSERT_EQ(unit->configs[1]->rules.size(), 1u);
-  auto *rule = unit->configs[1]->rules[0];
+  auto* rule = unit->configs[1]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(rule->use_lib, "lib1");
   EXPECT_EQ(rule->use_cell, "bot");
   EXPECT_TRUE(rule->use_config);
 }
 
-} // namespace
+}  // namespace

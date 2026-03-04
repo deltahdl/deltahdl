@@ -9,14 +9,15 @@ namespace {
 
 TEST(ParserSection6, ShortrealInit) {
   // §6.12: shortreal is a 32-bit IEEE float.
-  auto r = ParseWithPreprocessor("module t;\n"
-                                 "  shortreal sr = 1.5;\n"
-                                 "endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  shortreal sr = 1.5;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-} // namespace
+}  // namespace

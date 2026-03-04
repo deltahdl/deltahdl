@@ -12,12 +12,13 @@ namespace {
 // LRM section 6.20 -- Type operator
 // =============================================================================
 TEST(ParserSection6, TypeExprInCast) {
-  auto r = ParseWithPreprocessor("module m;\n"
-                                 "  initial begin\n"
-                                 "    int x;\n"
-                                 "    x = int'(3.14);\n"
-                                 "  end\n"
-                                 "endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "    x = int'(3.14);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -26,16 +27,17 @@ TEST(ParserSection6, TypeExprInCast) {
 // =========================================================================
 TEST(ParserSection6, CastUnsigned) {
   // §6.24: unsigned'(expr) changes signedness.
-  auto r = ParseWithPreprocessor("module t;\n"
-                                 "  initial x = unsigned'(y);\n"
-                                 "endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  initial x = unsigned'(y);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
   EXPECT_EQ(rhs->text, "unsigned");
 }
 
-} // namespace
+}  // namespace

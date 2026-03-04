@@ -10,16 +10,17 @@ namespace {
 // §7.9: Associative array methods
 // =========================================================================
 TEST(ParserSection7, AssocArrayNumMethod) {
-  auto r = Parse("module t;\n"
-                 "  int aa[string];\n"
-                 "  initial x = aa.num();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  initial x = aa.num();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-} // namespace
+}  // namespace

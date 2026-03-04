@@ -15,7 +15,7 @@ namespace {
 // §40 Coverage control system functions
 // =============================================================================
 TEST_F(ApiParseTest, CoverageControlSystemCall) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       initial $coverage_control(1, 2, 3);
     endmodule
@@ -37,4 +37,4 @@ TEST(ParserSection40, CoverageControlInAlwaysBlock) {
   )"));
 }
 
-} // namespace
+}  // namespace

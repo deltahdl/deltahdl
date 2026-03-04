@@ -9,13 +9,14 @@ namespace {
 
 // system_timing_check ::= $fullskew_timing_check
 TEST(ParserA705, SystemTimingCheckFullskew) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *tc = GetSoleTimingCheck(r);
+  auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
 }
@@ -25,13 +26,14 @@ TEST(ParserA705, SystemTimingCheckFullskew) {
 // =============================================================================
 // $fullskew with two limits, event_based_flag and remain_active_flag
 TEST(ParserA70501, FullskewWithFlags) {
-  auto r = Parse("module m;\n"
-                 "specify\n"
-                 "  $fullskew(posedge clk1, negedge clk2, 4, 6, ntfr, 1, 0);\n"
-                 "endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $fullskew(posedge clk1, negedge clk2, 4, 6, ntfr, 1, 0);\n"
+      "endspecify\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *tc = GetSoleTimingCheck(r);
+  auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
   ASSERT_GE(tc->limits.size(), 2u);
@@ -42,18 +44,19 @@ TEST(ParserA70501, FullskewWithFlags) {
 using ConfigParseTest = ProgramTestParse;
 
 TEST_F(SpecifyTest, FullskewTimingCheck) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
-                   "endspecify\n"
-                   "endmodule\n");
-  auto *spec = FirstSpecifyBlock(cu);
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
+      "endspecify\n"
+      "endmodule\n");
+  auto* spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
-  auto &tc = spec->specify_items[0]->timing_check;
+  auto& tc = spec->specify_items[0]->timing_check;
   EXPECT_EQ(tc.check_kind, TimingCheckKind::kFullskew);
   EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(tc.data_edge, SpecifyEdge::kNegedge);
   ASSERT_GE(tc.limits.size(), 2u);
 }
 
-} // namespace
+}  // namespace

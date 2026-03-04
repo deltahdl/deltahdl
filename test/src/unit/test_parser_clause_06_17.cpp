@@ -8,11 +8,12 @@ namespace {
 
 // --- Named event tests ---
 TEST(Parser, EventDeclaration) {
-  auto r = Parse("module t;\n"
-                 "  event ev;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  event ev;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
   EXPECT_EQ(item->name, "ev");
@@ -27,12 +28,13 @@ TEST(ParserA221, DataTypeEvent) {
 }
 // 24. Event variable declaration.
 TEST(ParserSection6, Sec6_5_EventVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  event done;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  event done;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
@@ -43,13 +45,14 @@ TEST(ParserSection6, Sec6_5_EventVarDecl) {
 // §6.17: Event data type
 // =========================================================================
 TEST(ParserSection6, EventVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  event e;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  event e;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
 }
 
-} // namespace
+}  // namespace

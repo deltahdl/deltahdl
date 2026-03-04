@@ -7,35 +7,38 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection18, RandomizeWithMultipleConstraints) {
-  auto r = Parse("class SimpleSum;\n"
-                 "  rand bit [7:0] x, y, z;\n"
-                 "  constraint c { z == x + y; }\n"
-                 "  function void test();\n"
-                 "    this.randomize() with { x < y; x > 10; y < 200; };\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class SimpleSum;\n"
+      "  rand bit [7:0] x, y, z;\n"
+      "  constraint c { z == x + y; }\n"
+      "  function void test();\n"
+      "    this.randomize() with { x < y; x > 10; y < 200; };\n"
+      "  endfunction\n"
+      "endclass\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
 TEST(ParserSection18, RandomizeWithRestrictedIdList) {
-  auto r = Parse("class C;\n"
-                 "  rand integer x;\n"
-                 "endclass\n"
-                 "function int F(int y);\n"
-                 "  C obj;\n"
-                 "  F = obj.randomize() with (x) { x < y; };\n"
-                 "endfunction\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand integer x;\n"
+      "endclass\n"
+      "function int F(int y);\n"
+      "  C obj;\n"
+      "  F = obj.randomize() with (x) { x < y; };\n"
+      "endfunction\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
 TEST(ParserA82, RandomizeCallWithConstraintBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin obj.randomize() with { x < 10; }; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj.randomize() with { x < 10; }; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -44,27 +47,29 @@ using CheckerParseTest = ProgramTestParse;
 
 // --- Inline randomize with constraint block (§18.7) ---
 TEST(ParserSection18, RandomizeWithInlineConstraint) {
-  auto r = Parse("class C;\n"
-                 "  rand int x;\n"
-                 "  function void test();\n"
-                 "    this.randomize() with { x > 0; x < 100; };\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  function void test();\n"
+      "    this.randomize() with { x > 0; x < 100; };\n"
+      "  endfunction\n"
+      "endclass\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
 TEST(ParserSection18, RandomizeWithIdListAndConstraint) {
-  auto r = Parse("class C;\n"
-                 "  rand int x, y;\n"
-                 "  function void test();\n"
-                 "    this.randomize() with (x) { x > 0; x < y; };\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x, y;\n"
+      "  function void test();\n"
+      "    this.randomize() with (x) { x > 0; x < y; };\n"
+      "  endfunction\n"
+      "endclass\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-} // namespace
+}  // namespace

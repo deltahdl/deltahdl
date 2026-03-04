@@ -10,7 +10,7 @@ using VerifyParseTest = ProgramTestParse;
 namespace {
 
 TEST_F(VerifyParseTest, CheckerWithAssumeProperty) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker observer_model(bit valid, reset);
       default clocking @$global_clock; endclocking
       rand bit flag;
@@ -24,4 +24,4 @@ TEST_F(VerifyParseTest, CheckerWithAssumeProperty) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-} // namespace
+}  // namespace

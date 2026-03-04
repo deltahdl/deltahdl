@@ -15,14 +15,15 @@ TEST(ParserSection15, SemaphoreVarDecl) {
   // semaphore is not a keyword — it's a built-in class type in the std
   // package. It parses as a named-type variable declaration via the
   // identifier-based path in ParseImplicitTypeOrInst.
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    smTx = new(1);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    smTx = new(1);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   // Just verify the module parsed without errors.
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-} // namespace
+}  // namespace

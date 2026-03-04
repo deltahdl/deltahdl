@@ -11,7 +11,7 @@ using CheckerParseTest = ProgramTestParse;
 namespace {
 
 TEST_F(CheckerParseTest, CheckerWithBitVector) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker bv_check;
       logic [7:0] counter;
     endchecker
@@ -22,7 +22,7 @@ TEST_F(CheckerParseTest, CheckerWithBitVector) {
 using VerifyParseTest = ProgramTestParse;
 
 TEST_F(VerifyParseTest, CheckerWithRandVariable) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker observer_model(bit valid, reset);
       default clocking @$global_clock; endclocking
       rand bit flag;
@@ -34,7 +34,7 @@ TEST_F(VerifyParseTest, CheckerWithRandVariable) {
 }
 
 TEST_F(VerifyParseTest, CheckerWithRandConstVariable) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker reason_about_one_bit(bit [63:0] data1, bit [63:0] data2,
                                   event clock);
       rand const bit [5:0] idx;
@@ -46,4 +46,4 @@ TEST_F(VerifyParseTest, CheckerWithRandConstVariable) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-} // namespace
+}  // namespace

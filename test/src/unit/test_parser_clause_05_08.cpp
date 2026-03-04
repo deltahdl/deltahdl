@@ -9,11 +9,12 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh508, TimeLiteral_IntegerNs) {
-  auto r = Parse("module m;\n"
-                 "  initial #40ns;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  initial #40ns;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
@@ -79,14 +80,15 @@ TEST(ParserA84, TimeLiteralS) {
 
 // Time literal variants in delay: fs, ps, ns, us, ms, s.
 TEST(ParserA223, DelayValueAllTimeLiterals) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  wire #1fs w1;\n"
-                      "  wire #2ps w2;\n"
-                      "  wire #3ns w3;\n"
-                      "  wire #4us w4;\n"
-                      "  wire #5ms w5;\n"
-                      "  wire #6s w6;\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire #1fs w1;\n"
+              "  wire #2ps w2;\n"
+              "  wire #3ns w3;\n"
+              "  wire #4us w4;\n"
+              "  wire #5ms w5;\n"
+              "  wire #6s w6;\n"
+              "endmodule"));
 }
 
 // § time_literal — unsigned_number time_unit (ps)
@@ -111,7 +113,7 @@ TEST(ParserA84, TimeLiteralFixedPoint) {
 }
 
 // Helper: preprocess and parse, returning CU + preprocessor state.
-static ParseResult ParseTimescale31402(const std::string &src) {
+static ParseResult ParseTimescale31402(const std::string& src) {
   ParseResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -157,4 +159,4 @@ TEST(ParserClause03, Cl3_14_2_2_AllSixUnitsAccepted) {
             TimeUnit::kFs);
 }
 
-} // namespace
+}  // namespace

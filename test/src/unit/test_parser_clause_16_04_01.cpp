@@ -12,14 +12,15 @@ namespace {
 // §16.4.1 Deferred assertion reporting
 // =============================================================================
 TEST(ParserSection16, DeferredAssertHash0PassAndFail) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    assert #0 (data_ok)\n"
-                 "      $display(\"pass\"); else $error(\"fail\");\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    assert #0 (data_ok)\n"
+      "      $display(\"pass\"); else $error(\"fail\");\n"
+      "  end\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_TRUE(stmt->is_deferred);
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
@@ -28,13 +29,13 @@ TEST(ParserSection16, DeferredAssertHash0PassAndFail) {
 
 // assert #0 ( expression ) pass else fail ;
 TEST(ParserA610, DeferredAssertHash0ActionBlock) {
-  auto r =
-      Parse("module m;\n"
-            "  initial assert #0 (1) $display(\"p\"); else $display(\"f\");\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert #0 (1) $display(\"p\"); else $display(\"f\");\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -42,4 +43,4 @@ TEST(ParserA610, DeferredAssertHash0ActionBlock) {
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-} // namespace
+}  // namespace

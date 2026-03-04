@@ -20,12 +20,13 @@ TEST(ParserA213, NetDeclScalared) {
 }
 // 6. wire vectored logic [7:0] v; — vectored with explicit type.
 TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
-  auto r = Parse("module t;\n"
-                 "  wire vectored logic [7:0] v;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire vectored logic [7:0] v;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(item->data_type.is_net);
@@ -35,12 +36,13 @@ TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
 
 // 7. wire scalared logic [7:0] s; — scalared with explicit type.
 TEST(ParserSection6, Sec6_7_1_ScalaredWithExplicitType) {
-  auto r = Parse("module t;\n"
-                 "  wire scalared logic [7:0] s;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire scalared logic [7:0] s;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(item->data_type.is_net);
@@ -49,12 +51,13 @@ TEST(ParserSection6, Sec6_7_1_ScalaredWithExplicitType) {
 }
 // §6.7.1: Net with vectored qualifier.
 TEST(ParserSection6, Sec6_7_1_WireVectoredQualifier) {
-  auto r = Parse("module t;\n"
-                 "  wire vectored [7:0] v;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire vectored [7:0] v;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(item->data_type.is_vectored);
@@ -63,16 +66,17 @@ TEST(ParserSection6, Sec6_7_1_WireVectoredQualifier) {
 
 // §6.7.1: Net with scalared qualifier.
 TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
-  auto r = Parse("module t;\n"
-                 "  wire scalared [7:0] sc;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire scalared [7:0] sc;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(item->data_type.is_scalared);
   EXPECT_EQ(item->name, "sc");
 }
 
-} // namespace
+}  // namespace

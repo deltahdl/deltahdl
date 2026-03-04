@@ -19,20 +19,21 @@ TEST(SourceText, DescriptionPackageItem) {
 // A.1.2 comprehensive: all description types in one source text.
 // =============================================================================
 TEST(SourceText, AllDescriptionTypes) {
-  auto r = Parse("package pkg; endpackage\n"
-                 "module m; endmodule\n"
-                 "interface ifc; endinterface\n"
-                 "program prg; endprogram\n"
-                 "class C; endclass\n"
-                 "checker chk; endchecker\n"
-                 "primitive my_udp(output y, input a);\n"
-                 "  table 0 : 0 ; 1 : 1 ; endtable\n"
-                 "endprimitive\n"
-                 "config cfg;\n"
-                 "  design work.m;\n"
-                 "  default liblist work;\n"
-                 "endconfig\n"
-                 "bind m chk chk_i(.a(s));\n");
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; endmodule\n"
+      "interface ifc; endinterface\n"
+      "program prg; endprogram\n"
+      "class C; endclass\n"
+      "checker chk; endchecker\n"
+      "primitive my_udp(output y, input a);\n"
+      "  table 0 : 0 ; 1 : 1 ; endtable\n"
+      "endprimitive\n"
+      "config cfg;\n"
+      "  design work.m;\n"
+      "  default liblist work;\n"
+      "endconfig\n"
+      "bind m chk chk_i(.a(s));\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->packages.size(), 1u);
@@ -47,9 +48,10 @@ TEST(SourceText, AllDescriptionTypes) {
 }
 
 TEST(ParserAnnexA, A1ProgramDecl) {
-  auto r = Parse("program test_prog(input logic clk);\n"
-                 "  initial $display(\"Hello\");\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program test_prog(input logic clk);\n"
+      "  initial $display(\"Hello\");\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -57,9 +59,10 @@ TEST(ParserAnnexA, A1ProgramDecl) {
 }
 
 TEST(ParserAnnexA, A1CompilationUnitMultipleItems) {
-  auto r = Parse("package p; endpackage\n"
-                 "module m; endmodule\n"
-                 "interface i; endinterface\n");
+  auto r = Parse(
+      "package p; endpackage\n"
+      "module m; endmodule\n"
+      "interface i; endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->packages.size(), 1u);
@@ -69,14 +72,15 @@ TEST(ParserAnnexA, A1CompilationUnitMultipleItems) {
 
 // --- udp_declaration: coexistence with modules ---
 TEST(ParserAnnexA051, UdpWithModule) {
-  auto r = Parse("primitive inv(output out, input in);\n"
-                 "  table\n"
-                 "    0 : 1;\n"
-                 "    1 : 0;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module top;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
@@ -89,8 +93,8 @@ using SpecifyParseTest = ProgramTestParse;
 // Parser test fixture
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
-protected:
-  CompilationUnit *Parse(const std::string &src) {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -98,10 +102,9 @@ protected:
   }
 
   // Helper: get first specify block from first module.
-  ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
-    for (auto *item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock)
-        return item;
+  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
+    for (auto* item : cu->modules[0]->items) {
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
     }
     return nullptr;
   }
@@ -114,14 +117,15 @@ protected:
   std::unique_ptr<Parser> parser_;
 };
 TEST(ParserSection29, UdpCoexistsWithModule) {
-  auto r = Parse("primitive inv(output out, input in);\n"
-                 "  table\n"
-                 "    0 : 1;\n"
-                 "    1 : 0;\n"
-                 "  endtable\n"
-                 "endprimitive\n"
-                 "module top;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);
@@ -129,7 +133,7 @@ TEST(ParserSection29, UdpCoexistsWithModule) {
 using ConfigParseTest = ProgramTestParse;
 
 TEST_F(ConfigParseTest, ConfigCoexistsWithModule) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
     endmodule
     config cfg;
@@ -142,7 +146,7 @@ TEST_F(ConfigParseTest, ConfigCoexistsWithModule) {
 }
 
 TEST_F(ConfigParseTest, MultipleConfigs) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg1;
       design lib.top1;
     endconfig
@@ -156,8 +160,9 @@ TEST_F(ConfigParseTest, MultipleConfigs) {
 }
 
 TEST(Parser, InterfaceAndModule) {
-  auto r = Parse("interface bus; endinterface\n"
-                 "module top; endmodule\n");
+  auto r = Parse(
+      "interface bus; endinterface\n"
+      "module top; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->interfaces.size(), 1);
   EXPECT_EQ(r.cu->modules.size(), 1);
@@ -191,12 +196,13 @@ TEST(SourceText, InterfaceEndLabel) {
 }
 
 TEST(ParserAnnexA, A2ClassDecl) {
-  auto r = Parse("class Packet;\n"
-                 "  rand bit [7:0] payload;\n"
-                 "  function void display();\n"
-                 "    $display(\"pkt\");\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class Packet;\n"
+      "  rand bit [7:0] payload;\n"
+      "  function void display();\n"
+      "    $display(\"pkt\");\n"
+      "  endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
@@ -214,4 +220,4 @@ TEST(ParserCh501, Sec5_1_EmptyCuCompletelyEmpty) {
   EXPECT_TRUE(r.cu->modules.empty());
 }
 
-} // namespace
+}  // namespace

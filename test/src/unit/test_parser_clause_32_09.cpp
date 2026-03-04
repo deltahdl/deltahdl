@@ -15,7 +15,7 @@ namespace {
 // §41 Data read API / General system functions
 // =============================================================================
 TEST_F(ApiParseTest, SdfAnnotateSystemCall) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       initial $sdf_annotate("timing.sdf");
     endmodule
@@ -23,4 +23,4 @@ TEST_F(ApiParseTest, SdfAnnotateSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-} // namespace
+}  // namespace

@@ -11,24 +11,26 @@ namespace {
 // §7.12.1: Array locator methods
 // =========================================================================
 TEST(ParserSection7, ArrayFindWithClause) {
-  auto r = Parse("module t;\n"
-                 "  int d[] = '{1,2,3,4,5};\n"
-                 "  initial qi = d.find with (item > 3);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int d[] = '{1,2,3,4,5};\n"
+      "  initial qi = d.find with (item > 3);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
 }
 
 TEST(ParserSection7, ArrayFindIndexMethod) {
-  auto r = Parse("module t;\n"
-                 "  int arr[8];\n"
-                 "  initial qi = arr.find_index with (item == 0);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[8];\n"
+      "  initial qi = arr.find_index with (item == 0);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
 }
@@ -37,13 +39,14 @@ TEST(ParserSection7, ArrayFindIndexMethod) {
 // §7.12.1: Array locator method 'unique' (keyword as method name)
 // =========================================================================
 TEST(ParserSection7, ArrayLocatorUnique) {
-  auto r = Parse("module t;\n"
-                 "  int s[] = '{10, 10, 3, 20, 20, 10};\n"
-                 "  int qi[$];\n"
-                 "  initial qi = s.unique;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int s[] = '{10, 10, 3, 20, 20, 10};\n"
+      "  int qi[$];\n"
+      "  initial qi = s.unique;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
@@ -53,37 +56,40 @@ TEST(ParserSection7, ArrayLocatorUnique) {
 // §7.12: Array manipulation methods (additional tests)
 // =========================================================================
 TEST(ParserSection7, ArrayLocatorFindWithClause) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{1, 2, 3, 4, 5};\n"
-                 "  int found[$];\n"
-                 "  initial found = arr.find with (item > 3);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3, 4, 5};\n"
+      "  int found[$];\n"
+      "  initial found = arr.find with (item > 3);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
 TEST(ParserSection7, ArrayLocatorFindIndex) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{10, 20, 30};\n"
-                 "  int idx[$];\n"
-                 "  initial idx = arr.find_index with (item == 20);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{10, 20, 30};\n"
+      "  int idx[$];\n"
+      "  initial idx = arr.find_index with (item == 20);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
 }
 TEST(ParserSection7, ArrayMethodMin) {
-  auto r = Parse("module t;\n"
-                 "  initial y = arr.min;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial y = arr.min;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   // min without parens is a member access
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
@@ -93,12 +99,13 @@ TEST(ParserSection7, ArrayMethodMin) {
 // A.6.9 — array_method_name keywords (unique, and, or, xor)
 // =============================================================================
 TEST(ParserA609, ArrayMethodUnique) {
-  auto r = Parse("module m;\n"
-                 "  initial begin arr.unique(); end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin arr.unique(); end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *expr = FirstInitialExpr(r);
+  auto* expr = FirstInitialExpr(r);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
@@ -107,22 +114,24 @@ TEST(ParserA609, ArrayMethodUnique) {
 // A.6.9 — array_manipulation_call with 'with' clause
 // =============================================================================
 TEST(ParserA609, ArrayMethodWithClause) {
-  auto r = Parse("module m;\n"
-                 "  int arr[4];\n"
-                 "  int result[$];\n"
-                 "  initial begin result = arr.find with (item > 5); end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  int arr[4];\n"
+      "  int result[$];\n"
+      "  initial begin result = arr.find with (item > 5); end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 // array_manipulation_call with 'with' clause
 TEST(ParserA82, ArrayManipCallWithClause) {
-  auto r = Parse("module m;\n"
-                 "  int arr[4];\n"
-                 "  int result[$];\n"
-                 "  initial begin result = arr.find with (item > 5); end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  int arr[4];\n"
+      "  int result[$];\n"
+      "  initial begin result = arr.find with (item > 5); end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -132,37 +141,40 @@ TEST(ParserA82, ArrayManipCallWithClause) {
 // =============================================================================
 // § array_method_name ::= method_identifier | unique | and | or | xor
 TEST(ParserA82, ArrayMethodNameUnique) {
-  auto r = Parse("module m;\n"
-                 "  initial begin x = arr.unique(); end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = arr.unique(); end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection7, ArrayMethodMax) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{5, 1, 3};\n"
-                 "  int res[$];\n"
-                 "  initial res = arr.max;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{5, 1, 3};\n"
+      "  int res[$];\n"
+      "  initial res = arr.max;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
 TEST(ParserSection7, ArrayMethodUniqueIndex) {
-  auto r = Parse("module t;\n"
-                 "  int arr[] = '{1, 2, 1, 3};\n"
-                 "  int idx[$];\n"
-                 "  initial idx = arr.unique_index;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 1, 3};\n"
+      "  int idx[$];\n"
+      "  initial idx = arr.unique_index;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-} // namespace
+}  // namespace

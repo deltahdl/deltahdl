@@ -8,37 +8,40 @@ using namespace delta;
 namespace {
 
 TEST(ParserAnnexA, A2FunctionDeclAutomaticParse) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int add(int a, int b);\n"
-                 "    return a + b;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->name, "add");
 }
 
 TEST(ParserAnnexA, A2FunctionDeclAutomaticProps) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int add(int a, int b);\n"
-                 "    return a + b;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->is_automatic);
   EXPECT_EQ(item->func_args.size(), 2u);
 }
 
 TEST(ParserA213, LifetimeInFunction) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int calc; return 0; endfunction\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int calc; return 0; endfunction\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->is_automatic);
 }
 
@@ -48,31 +51,34 @@ TEST(ParserA213, LifetimeInFunction) {
 //     function_body_declaration
 // ---------------------------------------------------------------------------
 TEST(ParserA26, FuncLifetimeAutomatic) {
-  auto r = Parse("module m;\n  function automatic int foo();\n"
-                 "    return 1;\n  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n  function automatic int foo();\n"
+      "    return 1;\n  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->is_automatic);
   EXPECT_FALSE(item->is_static);
 }
 
 TEST(ParserA26, FuncLifetimeStatic) {
-  auto r = Parse("module m;\n  function static int foo();\n"
-                 "    return 1;\n  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n  function static int foo();\n"
+      "    return 1;\n  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_FALSE(item->is_automatic);
   EXPECT_TRUE(item->is_static);
 }
 
 TEST(ParserA26, FuncLifetimeDefault) {
-  auto r = Parse("module m;\n  function int foo();\n"
-                 "    return 1;\n  endfunction\nendmodule\n");
+  auto r = Parse(
+      "module m;\n  function int foo();\n"
+      "    return 1;\n  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_FALSE(item->is_automatic);
   EXPECT_FALSE(item->is_static);
 }
@@ -80,19 +86,20 @@ TEST(ParserA26, FuncLifetimeDefault) {
 // 18. Recursive automatic function with base case (Fibonacci)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_RecursiveAutoFuncFibonacci) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int fibonacci(int n);\n"
-                 "    if (n == 0)\n"
-                 "      return 0;\n"
-                 "    else if (n == 1)\n"
-                 "      return 1;\n"
-                 "    else\n"
-                 "      return fibonacci(n - 1) + fibonacci(n - 2);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int fibonacci(int n);\n"
+      "    if (n == 0)\n"
+      "      return 0;\n"
+      "    else if (n == 1)\n"
+      "      return 1;\n"
+      "    else\n"
+      "      return fibonacci(n - 1) + fibonacci(n - 2);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   EXPECT_EQ(item->name, "fibonacci");
@@ -105,11 +112,12 @@ TEST(ParserSection4, Sec4_9_3_RecursiveAutoFuncFibonacci) {
 // 20. Automatic function in class context
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoFuncInClass) {
-  EXPECT_TRUE(ParseOk("class my_class;\n"
-                      "  function automatic int get_id();\n"
-                      "    return 42;\n"
-                      "  endfunction\n"
-                      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class my_class;\n"
+              "  function automatic int get_id();\n"
+              "    return 42;\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // =========================================================================
@@ -119,14 +127,15 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncInClass) {
 // 28. Function without explicit lifetime (default — static in module)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_FuncNoExplicitLifetime) {
-  auto r = Parse("module m;\n"
-                 "  function int adder(int a, int b);\n"
-                 "    return a + b;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int adder(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *fn = FirstFuncOrTask(r);
+  auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
   // No explicit lifetime — both flags should be false.
@@ -139,19 +148,20 @@ TEST(ParserSection4, Sec4_9_4_FuncNoExplicitLifetime) {
 // 22. Mixed static and automatic functions in same module
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_MixedStaticAutoFuncsInModule) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int auto_fn(int x);\n"
-                 "    return x + 1;\n"
-                 "  endfunction\n"
-                 "  function static int static_fn(int x);\n"
-                 "    return x - 1;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int auto_fn(int x);\n"
+      "    return x + 1;\n"
+      "  endfunction\n"
+      "  function static int static_fn(int x);\n"
+      "    return x - 1;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto *auto_fn = r.cu->modules[0]->items[0];
-  auto *static_fn = r.cu->modules[0]->items[1];
+  auto* auto_fn = r.cu->modules[0]->items[0];
+  auto* static_fn = r.cu->modules[0]->items[1];
   EXPECT_TRUE(auto_fn->is_automatic);
   EXPECT_FALSE(auto_fn->is_static);
   EXPECT_TRUE(static_fn->is_static);
@@ -162,14 +172,15 @@ TEST(ParserSection4, Sec4_9_3_MixedStaticAutoFuncsInModule) {
 // 25. Function without explicit lifetime (implicit static in module)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_FuncNoLifetimeQualifier) {
-  auto r = Parse("module m;\n"
-                 "  function int plain_fn(int x);\n"
-                 "    return x;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function int plain_fn(int x);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_FALSE(item->is_automatic);
@@ -180,14 +191,15 @@ TEST(ParserSection4, Sec4_9_3_FuncNoLifetimeQualifier) {
 // 28. Automatic function returning logic with packed dimensions
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoFuncReturningLogic) {
-  auto r = Parse("module m;\n"
-                 "  function automatic logic [7:0] get_byte(int idx);\n"
-                 "    return idx;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic logic [7:0] get_byte(int idx);\n"
+      "    return idx;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kLogic);
@@ -196,10 +208,9 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncReturningLogic) {
 }
 
 // Returns the first function or task declaration from the first module.
-static ModuleItem *FirstFuncOrTask(ParseResult &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
-  for (auto *item : r.cu->modules[0]->items) {
+static ModuleItem* FirstFuncOrTask(ParseResult& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl)
       return item;
@@ -211,16 +222,17 @@ static ModuleItem *FirstFuncOrTask(ParseResult &r) {
 // 1. Static function — variables are static by default
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticFunctionDecl) {
-  auto r = Parse("module m;\n"
-                 "  function static int count();\n"
-                 "    int c;\n"
-                 "    c = c + 1;\n"
-                 "    return c;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function static int count();\n"
+      "    int c;\n"
+      "    c = c + 1;\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *fn = FirstFuncOrTask(r);
+  auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(fn->is_static);
@@ -232,15 +244,16 @@ TEST(ParserSection4, Sec4_9_4_StaticFunctionDecl) {
 // 2. Automatic function — variables are automatic by default
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutomaticFunctionDecl) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int factorial(int n);\n"
-                 "    if (n <= 1) return 1;\n"
-                 "    return n * factorial(n - 1);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int factorial(int n);\n"
+      "    if (n <= 1) return 1;\n"
+      "    return n * factorial(n - 1);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *fn = FirstFuncOrTask(r);
+  auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(fn->is_automatic);
@@ -252,16 +265,17 @@ TEST(ParserSection4, Sec4_9_4_AutomaticFunctionDecl) {
 // 3. Explicit static variable in automatic function
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_ExplicitStaticInAutoFunc) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int call_count();\n"
-                 "    static int cnt = 0;\n"
-                 "    cnt = cnt + 1;\n"
-                 "    return cnt;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int call_count();\n"
+      "    static int cnt = 0;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *fn = FirstFuncOrTask(r);
+  auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   EXPECT_TRUE(fn->is_automatic);
   ASSERT_GE(fn->func_body_stmts.size(), 1u);
@@ -275,15 +289,16 @@ TEST(ParserSection4, Sec4_9_4_ExplicitStaticInAutoFunc) {
 // 4. Explicit automatic variable in static function
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_ExplicitAutoInStaticFunc) {
-  auto r = Parse("module m;\n"
-                 "  function static int compute(int x);\n"
-                 "    automatic int tmp = x * 2;\n"
-                 "    return tmp;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function static int compute(int x);\n"
+      "    automatic int tmp = x * 2;\n"
+      "    return tmp;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *fn = FirstFuncOrTask(r);
+  auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   EXPECT_TRUE(fn->is_static);
   ASSERT_GE(fn->func_body_stmts.size(), 1u);
@@ -296,19 +311,20 @@ TEST(ParserSection4, Sec4_9_4_ExplicitAutoInStaticFunc) {
 // §4.6: Static vs automatic function lifetime
 // =============================================================================
 TEST(ParserSection4, Sec4_6_StaticVsAutomaticFunctionLifetime) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int auto_fn();\n"
-                 "    return 1;\n"
-                 "  endfunction\n"
-                 "  function static int static_fn();\n"
-                 "    return 2;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int auto_fn();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  function static int static_fn();\n"
+      "    return 2;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto *auto_fn = r.cu->modules[0]->items[0];
-  auto *static_fn = r.cu->modules[0]->items[1];
+  auto* auto_fn = r.cu->modules[0]->items[0];
+  auto* static_fn = r.cu->modules[0]->items[1];
   EXPECT_EQ(auto_fn->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(auto_fn->is_automatic);
   EXPECT_FALSE(auto_fn->is_static);
@@ -322,14 +338,15 @@ TEST(ParserSection4, Sec4_6_StaticVsAutomaticFunctionLifetime) {
 // 1. Automatic function declaration parses (function automatic ...)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticFunctionDecl) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int add(int a, int b);\n"
-                 "    return a + b;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -342,19 +359,20 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFunctionDecl) {
 // 5. Static variable with initializer in function
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticVarWithInitInFunc) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int get_id();\n"
-                 "    static int next_id = 100;\n"
-                 "    next_id = next_id + 1;\n"
-                 "    return next_id;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int get_id();\n"
+      "    static int next_id = 100;\n"
+      "    next_id = next_id + 1;\n"
+      "    return next_id;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *fn = FirstFuncOrTask(r);
+  auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  auto *var_stmt = fn->func_body_stmts[0];
+  auto* var_stmt = fn->func_body_stmts[0];
   EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(var_stmt->var_is_static);
   EXPECT_EQ(var_stmt->var_name, "next_id");
@@ -365,14 +383,15 @@ TEST(ParserSection4, Sec4_9_4_StaticVarWithInitInFunc) {
 // 2. Static function declaration parses (function static ...)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_StaticFunctionDecl) {
-  auto r = Parse("module m;\n"
-                 "  function static int counter();\n"
-                 "    return 0;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function static int counter();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_static);
@@ -384,18 +403,19 @@ TEST(ParserSection4, Sec4_9_3_StaticFunctionDecl) {
 // 6. Automatic variable with initializer in function
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoVarWithInitInFunc) {
-  auto r = Parse("module m;\n"
-                 "  function static int compute(int a, int b);\n"
-                 "    automatic int result = a + b;\n"
-                 "    return result;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function static int compute(int a, int b);\n"
+      "    automatic int result = a + b;\n"
+      "    return result;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *fn = FirstFuncOrTask(r);
+  auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  auto *var_stmt = fn->func_body_stmts[0];
+  auto* var_stmt = fn->func_body_stmts[0];
   EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(var_stmt->var_is_automatic);
   EXPECT_EQ(var_stmt->var_name, "result");
@@ -406,18 +426,19 @@ TEST(ParserSection4, Sec4_9_4_AutoVarWithInitInFunc) {
 // 5. Automatic function with local variable declarations
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithLocalVars) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int compute(int x);\n"
-                 "    int temp;\n"
-                 "    int result;\n"
-                 "    temp = x * 2;\n"
-                 "    result = temp + 1;\n"
-                 "    return result;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int compute(int x);\n"
+      "    int temp;\n"
+      "    int result;\n"
+      "    temp = x * 2;\n"
+      "    result = temp + 1;\n"
+      "    return result;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -430,17 +451,18 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithLocalVars) {
 // 6. Automatic function with recursive call (factorial)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncRecursiveCall) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int factorial(int n);\n"
-                 "    if (n <= 1)\n"
-                 "      return 1;\n"
-                 "    else\n"
-                 "      return n * factorial(n - 1);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int factorial(int n);\n"
+      "    if (n <= 1)\n"
+      "      return 1;\n"
+      "    else\n"
+      "      return n * factorial(n - 1);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -451,9 +473,8 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncRecursiveCall) {
 }
 
 // Returns the first function/task body statement from a ModuleItem.
-static Stmt *FirstBodyStmt(ModuleItem *item) {
-  if (!item || item->func_body_stmts.empty())
-    return nullptr;
+static Stmt* FirstBodyStmt(ModuleItem* item) {
+  if (!item || item->func_body_stmts.empty()) return nullptr;
   return item->func_body_stmts[0];
 }
 
@@ -461,19 +482,20 @@ static Stmt *FirstBodyStmt(ModuleItem *item) {
 // 7. Static function with static local variable
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_StaticFuncWithStaticLocalVar) {
-  auto r = Parse("module m;\n"
-                 "  function static int call_count();\n"
-                 "    static int cnt = 0;\n"
-                 "    cnt = cnt + 1;\n"
-                 "    return cnt;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function static int call_count();\n"
+      "    static int cnt = 0;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_static);
-  auto *var_stmt = FirstBodyStmt(item);
+  auto* var_stmt = FirstBodyStmt(item);
   ASSERT_NE(var_stmt, nullptr);
   EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(var_stmt->var_is_static);
@@ -485,14 +507,15 @@ TEST(ParserSection4, Sec4_9_3_StaticFuncWithStaticLocalVar) {
 // 8. Automatic function in automatic module
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncInAutoModule) {
-  auto r = Parse("module automatic m;\n"
-                 "  function int add(int a, int b);\n"
-                 "    return a + b;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module automatic m;\n"
+      "  function int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->name, "add");
@@ -502,14 +525,13 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncInAutoModule) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-static ModuleItem *FindFunc(ParseResult &r, std::string_view name) {
-  for (auto *item : r.cu->modules[0]->items) {
+static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kFunctionDecl &&
         item->kind != ModuleItemKind::kTaskDecl) {
       continue;
     }
-    if (item->name == name)
-      return item;
+    if (item->name == name) return item;
   }
   return nullptr;
 }
@@ -518,26 +540,28 @@ static ModuleItem *FindFunc(ParseResult &r, std::string_view name) {
 // LRM section 13.3.1 -- Static and automatic tasks/functions
 // =============================================================================
 TEST(ParserSection13, AutomaticFunction) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int fact(int n);\n"
-                 "    if (n <= 1) return 1;\n"
-                 "    return n * fact(n - 1);\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int fact(int n);\n"
+      "    if (n <= 1) return 1;\n"
+      "    return n * fact(n - 1);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *fn = FindFunc(r, "fact");
+  auto* fn = FindFunc(r, "fact");
   ASSERT_NE(fn, nullptr);
   EXPECT_TRUE(fn->is_automatic);
   EXPECT_FALSE(fn->is_static);
 }
 TEST(ParserSection6, StaticFunction) {
-  auto r = Parse("module t;\n"
-                 "  function static int counter();\n"
-                 "    return 0;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  function static int counter();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_static);
@@ -547,16 +571,17 @@ TEST(ParserSection6, StaticFunction) {
 // 19. Static function with static local and return
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticFuncWithStaticLocal) {
-  auto r = Parse("module m;\n"
-                 "  function static int get_seq();\n"
-                 "    int seq_num;\n"
-                 "    seq_num = seq_num + 1;\n"
-                 "    return seq_num;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function static int get_seq();\n"
+      "    int seq_num;\n"
+      "    seq_num = seq_num + 1;\n"
+      "    return seq_num;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *fn = FirstFuncOrTask(r);
+  auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   EXPECT_TRUE(fn->is_static);
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
@@ -569,19 +594,20 @@ TEST(ParserSection4, Sec4_9_4_StaticFuncWithStaticLocal) {
 // 9. Function in program block (automatic by default)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_FunctionInProgramBlock) {
-  auto r = Parse("program p;\n"
-                 "  function int get_value();\n"
-                 "    int local_v;\n"
-                 "    local_v = 42;\n"
-                 "    return local_v;\n"
-                 "  endfunction\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program p;\n"
+      "  function int get_value();\n"
+      "    int local_v;\n"
+      "    local_v = 42;\n"
+      "    return local_v;\n"
+      "  endfunction\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
   EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
   ASSERT_GE(r.cu->programs[0]->items.size(), 1u);
-  auto *item = r.cu->programs[0]->items[0];
+  auto* item = r.cu->programs[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->name, "get_value");
 }
@@ -590,20 +616,21 @@ TEST(ParserSection4, Sec4_9_3_FunctionInProgramBlock) {
 // 14. Automatic function with multiple local vars of different types
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoFuncMultiTypedLocalVars) {
-  auto r = Parse("module m;\n"
-                 "  function automatic int mixed_locals(int x);\n"
-                 "    int a;\n"
-                 "    logic [7:0] b;\n"
-                 "    real c;\n"
-                 "    a = x;\n"
-                 "    b = x;\n"
-                 "    c = x;\n"
-                 "    return a;\n"
-                 "  endfunction\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int mixed_locals(int x);\n"
+      "    int a;\n"
+      "    logic [7:0] b;\n"
+      "    real c;\n"
+      "    a = x;\n"
+      "    b = x;\n"
+      "    c = x;\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_automatic);
   ASSERT_GE(item->func_body_stmts.size(), 3u);
@@ -615,4 +642,4 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncMultiTypedLocalVars) {
   EXPECT_EQ(item->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
 }
 
-} // namespace
+}  // namespace

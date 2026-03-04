@@ -8,9 +8,10 @@ namespace {
 
 // 28. Single module with timeunit slash — precision arg is used.
 TEST(ParserClause03, Cl3_14_3_SingleModuleTimeunitSlash) {
-  auto r = Parse("module m;\n"
-                 "  timeunit 1us / 1ps;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1us / 1ps;\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
                                        r.preproc_global_precision);
@@ -18,27 +19,30 @@ TEST(ParserClause03, Cl3_14_3_SingleModuleTimeunitSlash) {
 }
 // --- timeunit / timeprecision (LRM section 3.14) ---
 TEST(ParserSection23, TimeunitDecl) {
-  auto r = Parse("module m;\n"
-                 "  timeunit 1ns;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->modules[0]->name, "m");
   // timeunit is consumed; no items generated (just parsed and skipped).
 }
 
 TEST(ParserSection23, TimeprecisionDecl) {
-  auto r = Parse("module m;\n"
-                 "  timeprecision 1ps;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
 TEST(ParserSection23, TimeunitAndTimeprecision) {
-  auto r = Parse("module m;\n"
-                 "  timeunit 1ns;\n"
-                 "  timeprecision 100ps;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 100ps;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
@@ -47,10 +51,11 @@ using ProgramParseTest = ProgramTestParse;
 
 // non_port_program_item ::= timeunits_declaration
 TEST(SourceText, ProgramTimeunitsDecl) {
-  auto r = Parse("program prg;\n"
-                 "  timeunit 1ns;\n"
-                 "  timeprecision 1ps;\n"
-                 "endprogram\n");
+  auto r = Parse(
+      "program prg;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
@@ -58,7 +63,7 @@ TEST(SourceText, ProgramTimeunitsDecl) {
 }
 
 // Helper: preprocess and parse, returning CU + preprocessor state.
-static ParseResult ParseTimescale31402(const std::string &src) {
+static ParseResult ParseTimescale31402(const std::string& src) {
   ParseResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -77,13 +82,14 @@ static ParseResult ParseTimescale31402(const std::string &src) {
 
 // 25. Way 2: timeunit and timeprecision keywords specify time unit and
 TEST(ParserClause03, Cl3_14_2_KeywordsSetUnitAndPrecision) {
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeunit 1ns;\n"
-                               "  timeprecision 1ps;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
   EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
@@ -92,12 +98,13 @@ TEST(ParserClause03, Cl3_14_2_KeywordsSetUnitAndPrecision) {
 
 // 26. Way 2 alternate: timeunit with slash separator combines both.
 TEST(ParserClause03, Cl3_14_2_TimeunitSlashCombinesBoth) {
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeunit 1ns / 1ps;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns / 1ps;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
   EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
@@ -127,12 +134,13 @@ TEST(ParserClause03, Cl3_14_2_TimeunitAllSixUnits) {
 // §3.14.2.2: "The time unit ... can be declared by the timeunit ...
 // keywords, respectively, and set to a time literal."
 TEST(ParserClause03, Cl3_14_2_2_TimeunitSetsUnit) {
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeunit 1ns;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
 }
@@ -141,12 +149,13 @@ TEST(ParserClause03, Cl3_14_2_2_TimeunitSetsUnit) {
 // §3.14.2.2: "The time ... precision can be declared by the ...
 // timeprecision keywords, respectively, and set to a time literal."
 TEST(ParserClause03, Cl3_14_2_2_TimeprecisionSetsPrecision) {
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeprecision 1ps;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeprecision);
   EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
 }
@@ -156,12 +165,13 @@ TEST(ParserClause03, Cl3_14_2_2_TimeprecisionSetsPrecision) {
 // an optional second argument to the timeunit keyword using the slash
 // separator."
 TEST(ParserClause03, Cl3_14_2_2_TimeunitSlashSetsBoth) {
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeunit 100ps / 10fs;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 100ps / 10fs;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
   EXPECT_EQ(mod->time_unit, TimeUnit::kPs);
@@ -174,13 +184,14 @@ TEST(ParserClause03, Cl3_14_2_2_TimeunitSlashSetsBoth) {
 //     timeunit 100ps;
 //     timeprecision 10fs;
 TEST(ParserClause03, Cl3_14_2_2_LrmExampleD) {
-  auto r = ParseTimescale31402("module D;\n"
-                               "  timeunit 100ps;\n"
-                               "  timeprecision 10fs;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module D;\n"
+      "  timeunit 100ps;\n"
+      "  timeprecision 10fs;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
   EXPECT_EQ(mod->time_unit, TimeUnit::kPs);
@@ -192,12 +203,13 @@ TEST(ParserClause03, Cl3_14_2_2_LrmExampleD) {
 //   module E (...);
 //     timeunit 100ps / 10fs;
 TEST(ParserClause03, Cl3_14_2_2_LrmExampleE) {
-  auto r = ParseTimescale31402("module E;\n"
-                               "  timeunit 100ps / 10fs;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module E;\n"
+      "  timeunit 100ps / 10fs;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
   EXPECT_EQ(mod->time_unit, TimeUnit::kPs);
@@ -211,16 +223,18 @@ TEST(ParserClause03, Cl3_14_2_2_LrmExampleE) {
 // compiler directives."
 TEST(ParserClause03, Cl3_14_2_2_RemovesFileOrderDependency) {
   // With different preceding timescales, keywords always win.
-  auto r1 = ParseTimescale31402("`timescale 1us / 1ns\n"
-                                "module m;\n"
-                                "  timeunit 1ps;\n"
-                                "  timeprecision 1fs;\n"
-                                "endmodule\n");
-  auto r2 = ParseTimescale31402("`timescale 1ms / 1us\n"
-                                "module m;\n"
-                                "  timeunit 1ps;\n"
-                                "  timeprecision 1fs;\n"
-                                "endmodule\n");
+  auto r1 = ParseTimescale31402(
+      "`timescale 1us / 1ns\n"
+      "module m;\n"
+      "  timeunit 1ps;\n"
+      "  timeprecision 1fs;\n"
+      "endmodule\n");
+  auto r2 = ParseTimescale31402(
+      "`timescale 1ms / 1us\n"
+      "module m;\n"
+      "  timeunit 1ps;\n"
+      "  timeprecision 1fs;\n"
+      "endmodule\n");
   EXPECT_EQ(r1.cu->modules[0]->time_unit, r2.cu->modules[0]->time_unit);
   EXPECT_EQ(r1.cu->modules[0]->time_prec, r2.cu->modules[0]->time_prec);
   EXPECT_EQ(r1.cu->modules[0]->time_unit, TimeUnit::kPs);
@@ -233,10 +247,11 @@ TEST(ParserClause03, Cl3_14_2_2_RemovesFileOrderDependency) {
 // precision for any module, program, package, or interface definition."
 TEST(ParserClause03, Cl3_14_2_2_DefinesTimeScope) {
   // One timeunit + one timeprecision: valid time scope.
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeunit 1ns;\n"
-                               "  timeprecision 1ps;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
@@ -246,14 +261,15 @@ TEST(ParserClause03, Cl3_14_2_2_DefinesTimeScope) {
 // §3.14.2.2: "... for any module, program, package, or interface
 // definition ..."
 TEST(ParserClause03, Cl3_14_2_2_WorksInInterface) {
-  auto r = ParseTimescale31402("interface ifc;\n"
-                               "  timeunit 1us;\n"
-                               "  timeprecision 1ns;\n"
-                               "endinterface\n");
+  auto r = ParseTimescale31402(
+      "interface ifc;\n"
+      "  timeunit 1us;\n"
+      "  timeprecision 1ns;\n"
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  auto *ifc = r.cu->interfaces[0];
+  auto* ifc = r.cu->interfaces[0];
   EXPECT_TRUE(ifc->has_timeunit);
   EXPECT_TRUE(ifc->has_timeprecision);
   EXPECT_EQ(ifc->time_unit, TimeUnit::kUs);
@@ -263,14 +279,15 @@ TEST(ParserClause03, Cl3_14_2_2_WorksInInterface) {
 // 53. timeunit and timeprecision work in program declarations.
 // §3.14.2.2: "... for any module, program, package, or interface ..."
 TEST(ParserClause03, Cl3_14_2_2_WorksInProgram) {
-  auto r = ParseTimescale31402("program p;\n"
-                               "  timeunit 10ns;\n"
-                               "  timeprecision 100ps;\n"
-                               "endprogram\n");
+  auto r = ParseTimescale31402(
+      "program p;\n"
+      "  timeunit 10ns;\n"
+      "  timeprecision 100ps;\n"
+      "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
-  auto *prog = r.cu->programs[0];
+  auto* prog = r.cu->programs[0];
   EXPECT_TRUE(prog->has_timeunit);
   EXPECT_TRUE(prog->has_timeprecision);
   EXPECT_EQ(prog->time_unit, TimeUnit::kNs);
@@ -298,9 +315,10 @@ TEST(ParserClause03, Cl3_14_2_2_AllThreeMagnitudes) {
 // 56. timeunit keyword alone: only has_timeunit is set, not
 // has_timeprecision.
 TEST(ParserClause03, Cl3_14_2_2_TimeunitAloneNoPrec) {
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeunit 1ns;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
   EXPECT_FALSE(r.cu->modules[0]->has_timeprecision);
@@ -309,9 +327,10 @@ TEST(ParserClause03, Cl3_14_2_2_TimeunitAloneNoPrec) {
 // 57. timeprecision keyword alone: only has_timeprecision is set, not
 // has_timeunit.
 TEST(ParserClause03, Cl3_14_2_2_TimeprecisionAloneNoUnit) {
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeprecision 1ps;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_FALSE(r.cu->modules[0]->has_timeunit);
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
@@ -322,11 +341,12 @@ TEST(ParserClause03, Cl3_14_2_2_TimeprecisionAloneNoUnit) {
 // shall precede any other items in the current time scope."
 // This test verifies timeunit before other items parses without error.
 TEST(ParserClause03, Cl3_14_2_2_PrecedeOtherItems) {
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeunit 1ns;\n"
-                               "  timeprecision 1ps;\n"
-                               "  logic x;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "  logic x;\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
@@ -337,13 +357,14 @@ TEST(ParserClause03, Cl3_14_2_2_PrecedeOtherItems) {
 // repeated as later items, but shall match the previous declaration
 // within the current time scope."
 TEST(ParserClause03, Cl3_14_2_2_RepeatMatchingDeclaration) {
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeunit 1ns;\n"
-                               "  timeprecision 1ps;\n"
-                               "  logic x;\n"
-                               "  timeunit 1ns;\n"
-                               "  timeprecision 1ps;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "  logic x;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
@@ -355,14 +376,15 @@ TEST(ParserClause03, Cl3_14_2_2_RepeatMatchingDeclaration) {
 // §3.14.2.2: "There shall be at most one time unit and one time
 // precision for any module ... definition."
 TEST(ParserClause03, Cl3_14_2_2_SeparateModulesIndependentScope) {
-  auto r = ParseTimescale31402("module a;\n"
-                               "  timeunit 1ns;\n"
-                               "  timeprecision 1ps;\n"
-                               "endmodule\n"
-                               "module b;\n"
-                               "  timeunit 1us;\n"
-                               "  timeprecision 1ns;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module a;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  timeunit 1us;\n"
+      "  timeprecision 1ns;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 2u);
@@ -402,10 +424,11 @@ TEST(SourceText, TimeunitWithSlash) {
 
 // Form 4: both timeunit and timeprecision separately.
 TEST(SourceText, TimeunitAndTimeprecisionSeparate) {
-  auto r = ParseTimescale31402("module m;\n"
-                               "  timeunit 1ns;\n"
-                               "  timeprecision 1ps;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
@@ -414,9 +437,10 @@ TEST(SourceText, TimeunitAndTimeprecisionSeparate) {
 
 // 11. CU-scope combined timeunit X / Y syntax.
 TEST(ParserClause03, Cl3_14_2_3_CUTimeunitSlashSyntax) {
-  auto r = ParseTimescale31402("timeunit 100ps / 10fs;\n"
-                               "module m;\n"
-                               "endmodule\n");
+  auto r = ParseTimescale31402(
+      "timeunit 100ps / 10fs;\n"
+      "module m;\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->has_cu_timeunit);
   EXPECT_TRUE(r.cu->has_cu_timeprecision);
@@ -424,4 +448,4 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitSlashSyntax) {
   EXPECT_EQ(r.cu->cu_time_prec, TimeUnit::kFs);
 }
 
-} // namespace
+}  // namespace

@@ -10,17 +10,18 @@ namespace {
 
 // §15.4.1: mailbox method calls (put, get) after new().
 TEST(ParserSection15, MailboxNewThenPutGet) {
-  auto r = Parse("module m;\n"
-                 "  mailbox #(int) mbx;\n"
-                 "  initial begin\n"
-                 "    mbx = new();\n"
-                 "    mbx.put(42);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  mailbox #(int) mbx;\n"
+      "  initial begin\n"
+      "    mbx = new();\n"
+      "    mbx.put(42);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
 }
 
-} // namespace
+}  // namespace

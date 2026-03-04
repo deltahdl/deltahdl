@@ -7,14 +7,15 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection7, AssocArrayDeleteMethod) {
-  auto r = Parse("module t;\n"
-                 "  int aa[string];\n"
-                 "  initial aa.delete(\"key\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  initial aa.delete(\"key\");\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-} // namespace
+}  // namespace

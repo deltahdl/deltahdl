@@ -5,7 +5,7 @@
 
 using namespace delta;
 
-bool ParseOk(const std::string &src) {
+bool ParseOk(const std::string& src) {
   auto r = Parse(src);
   return r.cu && !r.has_errors;
 }
@@ -17,12 +17,13 @@ namespace {
 // =============================================================================
 // Verify the signal field of the event expression.
 TEST(ParserSection9, Sec9_4_5_RepeatEventSignalField) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, a, b;\n"
-                 "  initial a = repeat(2) @(posedge clk) b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  initial a = repeat(2) @(posedge clk) b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->events.size(), 1u);
   ASSERT_NE(stmt->events[0].signal, nullptr);
@@ -34,25 +35,27 @@ TEST(ParserSection9, Sec9_4_5_RepeatEventSignalField) {
 // =============================================================================
 // Validate ParseOk for a complete repeat event control scenario.
 TEST(ParserSection9, Sec9_4_5_ParseOkRepeatEvent) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  reg clk, a, b;\n"
-                      "  initial begin\n"
-                      "    a = repeat(10) @(posedge clk) b;\n"
-                      "    a <= repeat(5) @(negedge clk) b;\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  reg clk, a, b;\n"
+              "  initial begin\n"
+              "    a = repeat(10) @(posedge clk) b;\n"
+              "    a <= repeat(5) @(negedge clk) b;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 // =============================================================================
 // LRM section 9.4.5 -- Intra-assignment delay no events field set
 // =============================================================================
 // Intra-assignment delay should not set the events field.
 TEST(ParserSection9, Sec9_4_5_IntraDelayNoEventsField) {
-  auto r = Parse("module m;\n"
-                 "  reg a, b;\n"
-                 "  initial a = #10 b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, b;\n"
+      "  initial a = #10 b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->delay, nullptr);
   EXPECT_TRUE(stmt->events.empty());
@@ -66,14 +69,15 @@ TEST(ParserSection9, Sec9_4_5_IntraDelayNoEventsField) {
 // ---------------------------------------------------------------------------
 // §9.4.5: intra-assignment delay in blocking assignment
 TEST(ParserA605, IntraAssignDelayBlocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a = #5 b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = #5 b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   EXPECT_NE(stmt->delay, nullptr);
@@ -82,14 +86,15 @@ TEST(ParserA605, IntraAssignDelayBlocking) {
 
 // §9.4.5: intra-assignment event in blocking assignment
 TEST(ParserA605, IntraAssignEventBlocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a = @(posedge clk) b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   EXPECT_FALSE(stmt->events.empty());
@@ -98,14 +103,15 @@ TEST(ParserA605, IntraAssignEventBlocking) {
 
 // §9.4.5: repeat event control in blocking assignment
 TEST(ParserA605, IntraAssignRepeatEventBlocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a = repeat(3) @(posedge clk) b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = repeat(3) @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   EXPECT_NE(stmt->repeat_event_count, nullptr);
@@ -114,14 +120,15 @@ TEST(ParserA605, IntraAssignRepeatEventBlocking) {
 
 // §9.4.5: intra-assignment delay in nonblocking assignment
 TEST(ParserA605, IntraAssignDelayNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a <= #5 b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= #5 b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmt->delay, nullptr);
@@ -129,14 +136,15 @@ TEST(ParserA605, IntraAssignDelayNonblocking) {
 
 // §9.4.5: intra-assignment event in nonblocking assignment
 TEST(ParserA605, IntraAssignEventNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a <= @(posedge clk) b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   EXPECT_FALSE(stmt->events.empty());
@@ -144,36 +152,39 @@ TEST(ParserA605, IntraAssignEventNonblocking) {
 
 // §9.4.5: repeat event control in nonblocking assignment
 TEST(ParserA605, IntraAssignRepeatEventNonblocking) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    a <= repeat(5) @(posedge clk) data;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a <= repeat(5) @(posedge clk) data;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmt->repeat_event_count, nullptr);
   EXPECT_FALSE(stmt->events.empty());
 }
 TEST(ParserSection9b, NonblockingAssignWithDelay) {
-  auto r = Parse("module m;\n"
-                 "  initial q <= #5 d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial q <= #5 d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmt->delay, nullptr);
 }
 
 TEST(ParserSection9b, NonblockingAssignWithEventControl) {
-  auto r = Parse("module m;\n"
-                 "  initial a <= @(posedge clk) b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial a <= @(posedge clk) b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
@@ -181,16 +192,17 @@ TEST(ParserSection9b, NonblockingAssignWithEventControl) {
 // LRM section 9.4.5 -- repeat event control
 // =============================================================================
 TEST(ParserSection9, RepeatEventControl) {
-  auto r = Parse("module m;\n"
-                 "  reg clk, a, b;\n"
-                 "  initial a = repeat(3) @(posedge clk) b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  initial a = repeat(3) @(posedge clk) b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   EXPECT_NE(stmt->repeat_event_count, nullptr);
   EXPECT_FALSE(stmt->events.empty());
 }
 
-} // namespace
+}  // namespace

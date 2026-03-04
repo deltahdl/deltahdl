@@ -10,7 +10,7 @@ using VerifyParseTest = ProgramTestParse;
 namespace {
 
 TEST_F(VerifyParseTest, CheckerContextInferenceImplicit) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker check_ctx(logic sig,
         event clock = $inferred_clock);
     endchecker
@@ -30,38 +30,40 @@ TEST_F(VerifyParseTest, CheckerContextInferenceImplicit) {
 // §16.14.7 -- Inferred clocking and disable functions
 // =============================================================================
 TEST(ParserSection16, InferredClockInProperty) {
-  auto r = Parse("module m;\n"
-                 "  default clocking @(posedge clk); endclocking\n"
-                 "  property p_inferred(clk_ev = $inferred_clock);\n"
-                 "    @clk_ev a |-> b;\n"
-                 "  endproperty\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking @(posedge clk); endclocking\n"
+      "  property p_inferred(clk_ev = $inferred_clock);\n"
+      "    @clk_ev a |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection16, InferredDisableInProperty) {
-  auto r = Parse("module m;\n"
-                 "  default disable iff rst;\n"
-                 "  property p_dis(rst_cond = $inferred_disable);\n"
-                 "    disable iff (rst_cond) a |-> b;\n"
-                 "  endproperty\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  default disable iff rst;\n"
+      "  property p_dis(rst_cond = $inferred_disable);\n"
+      "    disable iff (rst_cond) a |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection16, InferredClockAndDisableTogether) {
-  auto r =
-      Parse("module m;\n"
-            "  default clocking @(negedge clk); endclocking\n"
-            "  default disable iff rst;\n"
-            "  property p_both(c = $inferred_clock, d = $inferred_disable);\n"
-            "    @c disable iff (d) req |-> ack;\n"
-            "  endproperty\n"
-            "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking @(negedge clk); endclocking\n"
+      "  default disable iff rst;\n"
+      "  property p_both(c = $inferred_clock, d = $inferred_disable);\n"
+      "    @c disable iff (d) req |-> ack;\n"
+      "  endproperty\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-} // namespace
+}  // namespace

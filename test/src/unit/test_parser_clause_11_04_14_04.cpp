@@ -23,10 +23,11 @@ TEST(ParserSection11, StreamingWithPartSelect) {
 }
 
 TEST(ParserSection11, StreamingWithSimpleIndex) {
-  auto r = Parse("module t;\n"
-                 "  int arr[4], out[4];\n"
-                 "  initial {<< int {out with [3]}} = arr;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4], out[4];\n"
+      "  initial {<< int {out with [3]}} = arr;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -36,7 +37,7 @@ TEST(ParserA81, StreamExpressionWithArrayRange) {
   auto r = Parse("module m; initial x = {<< {a with [3]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
@@ -62,4 +63,4 @@ TEST(ParserA81, StreamExprWithMinusRange) {
   EXPECT_FALSE(r.has_errors);
 }
 
-} // namespace
+}  // namespace

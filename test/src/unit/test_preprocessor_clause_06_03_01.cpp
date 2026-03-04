@@ -12,14 +12,15 @@ namespace {
 // =========================================================================
 TEST(ParserSection6, ValueSet_4StateLogicDecl) {
   // §6.3: logic is the basic 4-state data type.
-  auto r = ParseWithPreprocessor("module t;\n"
-                                 "  logic [3:0] val;\n"
-                                 "endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  logic [3:0] val;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_TRUE(Is4stateType(DataTypeKind::kLogic));
 }
 
-} // namespace
+}  // namespace

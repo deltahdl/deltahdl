@@ -5,11 +5,10 @@
 
 using namespace delta;
 
-static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
+static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
                                   ModuleItemKind kind) {
-  for (auto *item : items) {
-    if (item->kind == kind)
-      return item;
+  for (auto* item : items) {
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -23,11 +22,12 @@ namespace {
 //   | checker_instantiation
 // =============================================================================
 TEST(ParserA210, ConcurrentAssertionItem_AssertProperty) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a |-> b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a |-> b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->loc.IsValid());
@@ -38,12 +38,13 @@ TEST(ParserA210, ConcurrentAssertionItem_AssertProperty) {
 // assert_property_statement ::= assert property ( property_spec ) action_block
 // =============================================================================
 TEST(ParserA210, AssertProperty_WithActionBlock) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a |-> b)\n"
-                 "    $display(\"pass\"); else $display(\"fail\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a |-> b)\n"
+      "    $display(\"pass\"); else $display(\"fail\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->assert_pass_stmt, nullptr);
@@ -51,11 +52,12 @@ TEST(ParserA210, AssertProperty_WithActionBlock) {
 }
 
 TEST(ParserA210, AssertProperty_PassOnly) {
-  auto r = Parse("module m;\n"
-                 "  assert property (a) $display(\"ok\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a) $display(\"ok\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->assert_pass_stmt, nullptr);
@@ -63,11 +65,12 @@ TEST(ParserA210, AssertProperty_PassOnly) {
 }
 
 TEST(ParserA210, AssertProperty_FailOnly) {
-  auto r = Parse("module m;\n"
-                 "  assert property (a |-> b) else $error(\"fail\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a |-> b) else $error(\"fail\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->assert_pass_stmt, nullptr);
@@ -80,12 +83,13 @@ using VerifyParseTest = ProgramTestParse;
 // =============================================================================
 // Assert property with a simple property expression (no clock, no implication).
 TEST(ParserSection16, Sec16_5_1_AssertPropertySimple) {
-  auto r = Parse("module m;\n"
-                 "  assert property (a && b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a && b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
-  auto *ap =
+  auto* ap =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(ap, nullptr);
   EXPECT_NE(ap->assert_expr, nullptr);
@@ -96,13 +100,14 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertySimple) {
 // §16.5 Concurrent assertions — assert property (module-level)
 // =============================================================================
 TEST(ParserSection16, AssertPropertyModuleLevel) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a |-> b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a |-> b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAssertProperty) {
       found = true;
       EXPECT_NE(item->assert_expr, nullptr);
@@ -112,12 +117,13 @@ TEST(ParserSection16, AssertPropertyModuleLevel) {
 }
 
 TEST(ParserSection16, AssertPropertyWithElse) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) req |-> ack)\n"
-                 "    $display(\"ok\"); else $error(\"fail\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req |-> ack)\n"
+      "    $display(\"ok\"); else $error(\"fail\");\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *ap =
+  auto* ap =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(ap, nullptr);
   EXPECT_NE(ap->assert_pass_stmt, nullptr);
@@ -126,12 +132,13 @@ TEST(ParserSection16, AssertPropertyWithElse) {
 
 // Assert property with a posedge-clocked property.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyClockedPosedge) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
-  auto *ap =
+  auto* ap =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(ap, nullptr);
   EXPECT_NE(ap->assert_expr, nullptr);
@@ -139,13 +146,14 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyClockedPosedge) {
 
 // Assert property with both pass and fail action blocks.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyPassAndFailActions) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) req |-> ack)\n"
-                 "    $display(\"pass\"); else $error(\"fail\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) req |-> ack)\n"
+      "    $display(\"pass\"); else $error(\"fail\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
-  auto *ap =
+  auto* ap =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(ap, nullptr);
   EXPECT_NE(ap->assert_pass_stmt, nullptr);
@@ -154,13 +162,14 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyPassAndFailActions) {
 
 // Assert property with only a pass action (no else).
 TEST(ParserSection16, Sec16_5_1_AssertPropertyPassOnly) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) valid)\n"
-                 "    $display(\"passed\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) valid)\n"
+      "    $display(\"passed\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
-  auto *ap =
+  auto* ap =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(ap, nullptr);
   EXPECT_NE(ap->assert_pass_stmt, nullptr);
@@ -169,13 +178,14 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyPassOnly) {
 
 // Assert property with only an else (fail) action.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyFailOnly) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a |-> b)\n"
-                 "    else $error(\"failed\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a |-> b)\n"
+      "    else $error(\"failed\");\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
-  auto *ap =
+  auto* ap =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(ap, nullptr);
   EXPECT_EQ(ap->assert_pass_stmt, nullptr);
@@ -186,20 +196,22 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyFailOnly) {
 // §16.5 Concurrent assertions overview — clocked property
 // =============================================================================
 TEST(ParserSection16, ConcurrentAssertWithClock) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *ap =
+  auto* ap =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty);
   ASSERT_NE(ap, nullptr);
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
 TEST(ParserSection16, ConcurrentAssertNegedgeClock) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(negedge clk) a |-> b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(negedge clk) a |-> b);\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
 }
@@ -224,7 +236,7 @@ TEST(ParserSection39, AssertPropertyStatement) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   // Find the assert property item
   bool found_assert = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAssertProperty) {
       found_assert = true;
     }
@@ -232,10 +244,9 @@ TEST(ParserSection39, AssertPropertyStatement) {
   EXPECT_TRUE(found_assert);
 }
 
-static ModuleItem *FirstModuleItemOfKind(ParseResult &r, ModuleItemKind kind) {
-  for (auto *item : r.cu->modules[0]->items) {
-    if (item->kind == kind)
-      return item;
+static ModuleItem* FirstModuleItemOfKind(ParseResult& r, ModuleItemKind kind) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == kind) return item;
   }
   return nullptr;
 }
@@ -245,12 +256,13 @@ static ModuleItem *FirstModuleItemOfKind(ParseResult &r, ModuleItemKind kind) {
 // =============================================================================
 // assert_property_statement
 TEST(ParserA610, AssertPropertyModule) {
-  auto r = Parse("module m;\n"
-                 "  assert property (a |-> b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a |-> b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
 }
 
@@ -265,7 +277,7 @@ TEST(ParserA610, AssertPropertyActionBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
+  auto* item = FirstModuleItemOfKind(r, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->assert_pass_stmt, nullptr);
   ASSERT_NE(item->assert_fail_stmt, nullptr);
@@ -273,16 +285,17 @@ TEST(ParserA610, AssertPropertyActionBlock) {
 
 // --- F.19: Assert with action blocks (pass/fail) ---
 TEST(ParserAnnexF, AnnexFAssertActionBlocks) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) a |-> b)\n"
-                 "    $display(\"PASS\");\n"
-                 "  else\n"
-                 "    $error(\"FAIL\");\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) a |-> b)\n"
+      "    $display(\"PASS\");\n"
+      "  else\n"
+      "    $error(\"FAIL\");\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   bool found = false;
-  for (auto *item : r.cu->modules[0]->items) {
+  for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAssertProperty) {
       found = true;
       EXPECT_NE(item->assert_expr, nullptr);
@@ -291,4 +304,4 @@ TEST(ParserAnnexF, AnnexFAssertActionBlocks) {
   EXPECT_TRUE(found);
 }
 
-} // namespace
+}  // namespace

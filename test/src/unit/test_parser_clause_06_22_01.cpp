@@ -10,9 +10,10 @@ namespace {
 
 TEST(ParserSection6, TypeCompatibilityAnonymousStruct) {
   // §6.22.1c: Anonymous struct matches itself within same declaration.
-  auto r = Parse("module m;\n"
-                 "  struct packed { int A; int B; } AB1, AB2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  struct packed { int A; int B; } AB1, AB2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   // AB1 and AB2 should both be declared
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
@@ -103,47 +104,52 @@ TEST(ParserSection6, TypesMatchSignedness) {
 // §6.22.1 -- Matching types
 // =========================================================================
 TEST(ParserSection6, MatchingTypesBuiltinTypedef) {
-  auto r = Parse("module m;\n"
-                 "  typedef bit node;\n"
-                 "  node n1;\n"
-                 "  bit n2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  typedef bit node;\n"
+      "  node n1;\n"
+      "  bit n2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
 TEST(ParserSection6, MatchingTypesAnonymousStruct) {
-  auto r = Parse("module m;\n"
-                 "  struct packed {int A; int B;} AB1, AB2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  struct packed {int A; int B;} AB1, AB2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
 }
 
 TEST(ParserSection6, MatchingTypesNamedTypedefStruct) {
-  auto r = Parse("module m;\n"
-                 "  typedef struct packed {int A; int B;} AB_t;\n"
-                 "  AB_t x1;\n"
-                 "  AB_t x2;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed {int A; int B;} AB_t;\n"
+      "  AB_t x1;\n"
+      "  AB_t x2;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
 TEST(ParserSection6, MatchingTypesSignedBitVector) {
-  auto r = Parse("module m;\n"
-                 "  typedef bit signed [7:0] BYTE;\n"
-                 "  BYTE b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  typedef bit signed [7:0] BYTE;\n"
+      "  BYTE b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
 TEST(ParserSection6, MatchingTypesArrayTypedef) {
-  auto r = Parse("module m;\n"
-                 "  typedef byte MEM_BYTES [256];\n"
-                 "  MEM_BYTES mem;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  typedef byte MEM_BYTES [256];\n"
+      "  MEM_BYTES mem;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
@@ -173,4 +179,4 @@ TEST(ParserSection6, TypesMatchNamedDifferent) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
-} // namespace
+}  // namespace

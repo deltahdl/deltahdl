@@ -9,14 +9,15 @@ namespace {
 
 TEST(ParserSection6, VectorSignedBitType) {
   // §6.9: bit type with signed qualifier.
-  auto r = ParseWithPreprocessor("module t;\n"
-                                 "  bit signed [15:0] sb;\n"
-                                 "endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  bit signed [15:0] sb;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
-} // namespace
+}  // namespace

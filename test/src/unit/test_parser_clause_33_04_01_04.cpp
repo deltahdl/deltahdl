@@ -15,7 +15,7 @@ namespace {
 // §36.9.1 Config library (cell clause)
 // =============================================================================
 TEST_F(ApiParseTest, ConfigCellClauseLiblist) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg1;
       design lib1.top;
       default liblist lib1;
@@ -24,7 +24,7 @@ TEST_F(ApiParseTest, ConfigCellClauseLiblist) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto *cell_rule = unit->configs[0]->rules[1];
+  auto* cell_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(cell_rule->kind, ConfigRuleKind::kCell);
   EXPECT_EQ(cell_rule->cell_name, "adder");
   ASSERT_EQ(cell_rule->liblist.size(), 1u);
@@ -32,7 +32,7 @@ TEST_F(ApiParseTest, ConfigCellClauseLiblist) {
 }
 
 TEST_F(ApiParseTest, ConfigCellClauseWithLib) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg1;
       design lib1.top;
       default liblist lib1;
@@ -41,7 +41,7 @@ TEST_F(ApiParseTest, ConfigCellClauseWithLib) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto *cell_rule = unit->configs[0]->rules[1];
+  auto* cell_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(cell_rule->kind, ConfigRuleKind::kCell);
   EXPECT_EQ(cell_rule->cell_lib, "gateLib");
   EXPECT_EQ(cell_rule->cell_name, "adder");
@@ -50,8 +50,8 @@ TEST_F(ApiParseTest, ConfigCellClauseWithLib) {
 }
 
 struct ConfigTest : ::testing::Test {
-protected:
-  CompilationUnit *Parse(const std::string &src) {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -69,13 +69,14 @@ protected:
 };
 // cell_clause: unqualified cell identifier (no library prefix)
 TEST(SourceText, ConfigCellUnqualified) {
-  auto r = Parse("config cfg13;\n"
-                 "  design top;\n"
-                 "  cell mux4 use better_mux;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config cfg13;\n"
+      "  design top;\n"
+      "  cell mux4 use better_mux;\n"
+      "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rule = r.cu->configs[0]->rules[0];
+  auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kCell);
   EXPECT_EQ(rule->cell_lib, "");
   EXPECT_EQ(rule->cell_name, "mux4");
@@ -84,7 +85,7 @@ TEST(SourceText, ConfigCellUnqualified) {
 using ConfigParseTest = ProgramTestParse;
 
 TEST_F(ConfigParseTest, ConfigWithCellClause) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg;
       design lib.top;
       cell top use lib.other;
@@ -94,4 +95,4 @@ TEST_F(ConfigParseTest, ConfigWithCellClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-} // namespace
+}  // namespace

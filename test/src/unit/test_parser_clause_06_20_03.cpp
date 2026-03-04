@@ -32,24 +32,27 @@ TEST(ParserA24, TypeAssignmentComplexType) {
 // =============================================================================
 // Module with type parameter.
 TEST(ParserSection8, TypeParameterModule) {
-  EXPECT_TRUE(ParseOk("module m #(parameter type T = int);\n"
-                      "  T data;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter type T = int);\n"
+              "  T data;\n"
+              "endmodule\n"));
 }
 
 // Module with type parameter defaulting to logic vector.
 TEST(ParserSection8, TypeParameterLogicVector) {
-  EXPECT_TRUE(ParseOk("module m #(parameter type T = logic [7:0]);\n"
-                      "  T bus;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter type T = logic [7:0]);\n"
+              "  T bus;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection6, TypeParamDefaultLogicVector) {
   // §6.20.3: Type parameter with a vector default.
-  EXPECT_TRUE(ParseOk("module m #(parameter type DATA_T = logic [15:0])\n"
-                      "  ();\n"
-                      "  DATA_T data;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter type DATA_T = logic [15:0])\n"
+              "  ();\n"
+              "  DATA_T data;\n"
+              "endmodule\n"));
 }
 
 // Step 1d: type parameter in module header (fixes 6.20.3)
@@ -59,10 +62,11 @@ TEST(ParserSection6, TypeParamPort) {
 
 // Step 1d: localparam type declaration (fixes 6.23-localparam_type_decl)
 TEST(ParserSection6, LocalparamTypeDecl) {
-  EXPECT_TRUE(ParseOk6("module t;\n"
-                       "  localparam type testtype = logic;\n"
-                       "  testtype x;\n"
-                       "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  localparam type testtype = logic;\n"
+               "  testtype x;\n"
+               "endmodule\n"));
 }
 
 // =========================================================================
@@ -85,4 +89,4 @@ TEST(ParserSection6, TypeParameterDefaultShortint) {
                "endmodule\n"));
 }
 
-} // namespace
+}  // namespace

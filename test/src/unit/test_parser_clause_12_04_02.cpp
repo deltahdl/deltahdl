@@ -10,16 +10,17 @@ namespace {
 // §4.6: unique if statement
 // =============================================================================
 TEST(ParserSection4, Sec4_6_UniqueIf) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique if (a) x = 1;\n"
-                 "    else if (b) x = 2;\n"
-                 "    else x = 3;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
@@ -29,15 +30,16 @@ TEST(ParserSection4, Sec4_6_UniqueIf) {
 // §4.6: unique0 if statement
 // =============================================================================
 TEST(ParserSection4, Sec4_6_Unique0If) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique0 if (a) x = 1;\n"
-                 "    else if (b) x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
@@ -47,31 +49,33 @@ TEST(ParserSection4, Sec4_6_Unique0If) {
 // §4.6: priority if statement
 // =============================================================================
 TEST(ParserSection4, Sec4_6_PriorityIf) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    priority if (a) x = 1;\n"
-                 "    else if (b) x = 2;\n"
-                 "    else x = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 // unique0 if with else-if chain (no violation when none match).
 TEST(ParserSection12, Unique0IfChainElseIf) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    unique0 if (a == 0) x = 0;\n"
-                 "    else if (a == 1) x = 1;\n"
-                 "    else if (a == 2) x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    unique0 if (a == 0) x = 0;\n"
+      "    else if (a == 1) x = 1;\n"
+      "    else if (a == 2) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
@@ -82,15 +86,16 @@ TEST(ParserSection12, Unique0IfChainElseIf) {
 // ---------------------------------------------------------------------------
 // §12.4.2: unique if
 TEST(ParserA606, UniqueIf) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique if (a == 0) x = 1;\n"
-                 "    else if (a == 1) x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
@@ -98,15 +103,16 @@ TEST(ParserA606, UniqueIf) {
 
 // priority if with a final else (covers all cases, LRM says no violation).
 TEST(ParserSection12, PriorityIfWithElse) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    priority if (a[2:1] == 0) x = 0;\n"
-                 "    else if (a[2] == 0) x = 1;\n"
-                 "    else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    priority if (a[2:1] == 0) x = 0;\n"
+      "    else if (a[2] == 0) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
@@ -117,15 +123,16 @@ TEST(ParserSection12, PriorityIfWithElse) {
 
 // §12.4.2: unique0 if
 TEST(ParserA606, Unique0If) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique0 if (a == 0) x = 1;\n"
-                 "    else if (a == 1) x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
@@ -133,16 +140,17 @@ TEST(ParserA606, Unique0If) {
 
 // §12.4.2: priority if
 TEST(ParserA606, PriorityIf) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    priority if (a == 0) x = 1;\n"
-                 "    else if (a == 1) x = 2;\n"
-                 "    else x = 3;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
@@ -150,17 +158,18 @@ TEST(ParserA606, PriorityIf) {
 
 // §12.4.2: unique if with else-if chain and final else
 TEST(ParserA606, UniqueIfElseIfElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    unique if (a == 0) x = 1;\n"
-                 "    else if (a == 1) x = 2;\n"
-                 "    else if (a == 2) x = 3;\n"
-                 "    else x = 4;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "    else if (a == 2) x = 3;\n"
+      "    else x = 4;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
@@ -173,23 +182,24 @@ TEST(ParserA606, UniqueIfElseIfElse) {
 // 29. always_comb with unique if
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_UniqueIf) {
-  auto r = Parse("module m;\n"
-                 "  logic [1:0] sel;\n"
-                 "  logic [3:0] out;\n"
-                 "  always_comb begin\n"
-                 "    unique if (sel == 2'b00)\n"
-                 "      out = 4'd0;\n"
-                 "    else if (sel == 2'b01)\n"
-                 "      out = 4'd1;\n"
-                 "    else if (sel == 2'b10)\n"
-                 "      out = 4'd2;\n"
-                 "    else\n"
-                 "      out = 4'd3;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic [3:0] out;\n"
+      "  always_comb begin\n"
+      "    unique if (sel == 2'b00)\n"
+      "      out = 4'd0;\n"
+      "    else if (sel == 2'b01)\n"
+      "      out = 4'd1;\n"
+      "    else if (sel == 2'b10)\n"
+      "      out = 4'd2;\n"
+      "    else\n"
+      "      out = 4'd3;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstAlwaysCombStmt(r);
+  auto* stmt = FirstAlwaysCombStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
@@ -197,4 +207,4 @@ TEST(ParserSection9, Sec9_2_2_UniqueIf) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-} // namespace
+}  // namespace

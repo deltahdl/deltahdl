@@ -6,12 +6,10 @@
 using namespace delta;
 
 // Return all statements from the first initial block's begin/end.
-static std::vector<Stmt *> AllInitialStmts(ParseResult &r) {
-  auto *item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body)
-    return {};
-  if (item->body->kind == StmtKind::kBlock)
-    return item->body->stmts;
+static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  if (!item || !item->body) return {};
+  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
   return {item->body};
 }
 
@@ -19,38 +17,41 @@ namespace {
 
 TEST(ParserA602, BlockingAssignment_ClassNew) {
   // class_new: obj = new;
-  auto r = Parse("module m;\n"
-                 "  initial begin obj = new; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj = new; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 TEST(ParserA602, BlockingAssignment_ClassNewWithArgs) {
   // class_new with arguments: obj = new(arg1, arg2)
-  auto r = Parse("module m;\n"
-                 "  initial begin obj = new(1, 2); end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj = new(1, 2); end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 // §8.7 — Constructor (function new)
 TEST(ParserSection8, ClassConstructor) {
-  auto r = Parse("class Packet;\n"
-                 "  int data;\n"
-                 "  function new();\n"
-                 "    data = 0;\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class Packet;\n"
+      "  int data;\n"
+      "  function new();\n"
+      "    data = 0;\n"
+      "  endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *m = FindMethodMember(r.cu->classes[0]);
+  auto* m = FindMethodMember(r.cu->classes[0]);
   ASSERT_NE(m, nullptr);
   ASSERT_NE(m->method, nullptr);
   EXPECT_EQ(m->method->name, "new");
@@ -58,102 +59,110 @@ TEST(ParserSection8, ClassConstructor) {
 
 // §8.7 — Constructor with parameters
 TEST(ParserSection8, ClassConstructorWithParams) {
-  auto r = Parse("class Packet;\n"
-                 "  int data;\n"
-                 "  function new(int val);\n"
-                 "    data = val;\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class Packet;\n"
+      "  int data;\n"
+      "  function new(int val);\n"
+      "    data = val;\n"
+      "  endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
 // §8.4 — Class instantiation with 'new' expression
 TEST(ParserSection8, NewExpression) {
-  auto r = Parse("module m;\n"
-                 "  class test_cls;\n"
-                 "    int a;\n"
-                 "  endclass\n"
-                 "  test_cls obj;\n"
-                 "  initial begin\n"
-                 "    obj = new;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  class test_cls;\n"
+      "    int a;\n"
+      "  endclass\n"
+      "  test_cls obj;\n"
+      "  initial begin\n"
+      "    obj = new;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
 // §8.7 — Constructor with arguments
 TEST(ParserSection8, NewWithArgs) {
-  auto r = Parse("module m;\n"
-                 "  class test_cls;\n"
-                 "    int a;\n"
-                 "    function new(int val);\n"
-                 "      a = val;\n"
-                 "    endfunction\n"
-                 "  endclass\n"
-                 "  test_cls obj;\n"
-                 "  initial begin\n"
-                 "    obj = new(42);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  class test_cls;\n"
+      "    int a;\n"
+      "    function new(int val);\n"
+      "      a = val;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  test_cls obj;\n"
+      "  initial begin\n"
+      "    obj = new(42);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
 // class_method ::= { method_qualifier } class_constructor_declaration
 TEST(SourceText, ClassConstructorDecl) {
-  auto r = Parse("class C;\n"
-                 "  function new(int val);\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int val);\n"
+      "  endfunction\n"
+      "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto &members = r.cu->classes[0]->members;
+  auto& members = r.cu->classes[0]->members;
   ASSERT_EQ(members.size(), 1u);
   EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
   EXPECT_EQ(members[0]->method->name, "new");
 }
 
 TEST(ParserA24, ClassNewWithArgs) {
-  auto r = Parse("class C;\n"
-                 "  function new(int a, int b);\n"
-                 "  endfunction\n"
-                 "endclass\n"
-                 "module m;\n"
-                 "  C c = new(1, 2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int a, int b);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c = new(1, 2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA26, FuncBodyConstructorNew) {
-  auto r = Parse("class C;\n"
-                 "  function new();\n"
-                 "  endfunction\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA26, FuncBodyConstructorNewEndLabel) {
-  auto r = Parse("class C;\n"
-                 "  function new(int x);\n"
-                 "  endfunction : new\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int x);\n"
+      "  endfunction : new\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserSection8, ClassWithInitializer) {
-  auto r = Parse("class WithInit;\n"
-                 "  int x = 42;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class WithInit;\n"
+      "  int x = 42;\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   ASSERT_GE(cls->members.size(), 1u);
   EXPECT_NE(cls->members[0]->init_expr, nullptr);
 }
 
-} // namespace
+}  // namespace

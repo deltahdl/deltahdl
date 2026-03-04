@@ -8,26 +8,28 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection21, MonitorOnOff) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial begin\n"
-                      "    $monitoron;\n"
-                      "    $monitoroff;\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    $monitoron;\n"
+              "    $monitoroff;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 // ---------------------------------------------------------------------------
 // 9. $monitor system call
 // ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_MonitorSystemCall) {
-  auto r = Parse("module m;\n"
-                 "  reg a;\n"
-                 "  initial begin\n"
-                 "    $monitor(\"a=%b\", a);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg a;\n"
+      "  initial begin\n"
+      "    $monitor(\"a=%b\", a);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
   ASSERT_NE(stmt->expr, nullptr);
@@ -36,19 +38,21 @@ TEST(ParserSection4, Sec4_5_MonitorSystemCall) {
 }
 
 TEST(ParserSection21, MonitorBasicCall) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial $monitor(\"a=%b b=%b\", a, b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $monitor(\"a=%b b=%b\", a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection21, MonitorbHexOctal) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  initial begin\n"
-                      "    $monitorb(a);\n"
-                      "    $monitorh(a);\n"
-                      "    $monitoro(a);\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial begin\n"
+              "    $monitorb(a);\n"
+              "    $monitorh(a);\n"
+              "    $monitoro(a);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
-} // namespace
+}  // namespace

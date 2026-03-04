@@ -7,15 +7,16 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection12, NestedIfElse) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a)\n"
-                 "      if (b) x = 1;\n"
-                 "      else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a)\n"
+      "      if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   // Else associates with the inner if
@@ -26,19 +27,20 @@ TEST(ParserSection12, NestedIfElse) {
 }
 
 TEST(ParserSection12, IfWithBlockBody) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a) begin\n"
-                 "      x = 1;\n"
-                 "      y = 2;\n"
-                 "    end else begin\n"
-                 "      x = 3;\n"
-                 "      y = 4;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      x = 1;\n"
+      "      y = 2;\n"
+      "    end else begin\n"
+      "      x = 3;\n"
+      "      y = 4;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   ASSERT_NE(stmt->then_branch, nullptr);
@@ -58,12 +60,13 @@ TEST(ParserSection12, IfWithBlockBody) {
 // ---------------------------------------------------------------------------
 // §12.4: basic if statement — true branch only, no else
 TEST(ParserA606, IfOnly) {
-  auto r = Parse("module m;\n"
-                 "  initial begin if (a) x = 1; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) x = 1; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->condition, nullptr);
@@ -73,12 +76,13 @@ TEST(ParserA606, IfOnly) {
 
 // §12.4: if-else statement
 TEST(ParserA606, IfElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin if (a) x = 1; else x = 0; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) x = 1; else x = 0; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->condition, nullptr);
@@ -92,13 +96,14 @@ TEST(ParserA606, IfElse) {
 // =============================================================================
 // Basic if without else -- verifies condition/branch pointers.
 TEST(ParserSection12, IfNoElseConditionAndBranches) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->condition, nullptr);
@@ -108,12 +113,13 @@ TEST(ParserSection12, IfNoElseConditionAndBranches) {
 
 // §12.4: if with null statement_or_null (semicolon) for then branch
 TEST(ParserA606, IfNullThen) {
-  auto r = Parse("module m;\n"
-                 "  initial begin if (a) ; else x = 0; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) ; else x = 0; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   ASSERT_NE(stmt->then_branch, nullptr);
@@ -123,14 +129,15 @@ TEST(ParserA606, IfNullThen) {
 
 // If-else with both branches.
 TEST(ParserSection12, IfWithElse) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a) x = 1;\n"
-                 "    else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->then_branch, nullptr);
@@ -139,12 +146,13 @@ TEST(ParserSection12, IfWithElse) {
 
 // §12.4: if with null else branch
 TEST(ParserA606, IfNullElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin if (a) x = 1; else ; end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin if (a) x = 1; else ; end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   ASSERT_NE(stmt->else_branch, nullptr);
@@ -153,20 +161,21 @@ TEST(ParserA606, IfNullElse) {
 
 // §12.4: if with begin-end block in both branches
 TEST(ParserA606, IfElseWithBlocks) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (cond) begin\n"
-                 "      x = 1;\n"
-                 "      y = 2;\n"
-                 "    end else begin\n"
-                 "      x = 3;\n"
-                 "      y = 4;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (cond) begin\n"
+      "      x = 1;\n"
+      "      y = 2;\n"
+      "    end else begin\n"
+      "      x = 3;\n"
+      "      y = 4;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   ASSERT_NE(stmt->then_branch, nullptr);
@@ -177,16 +186,17 @@ TEST(ParserA606, IfElseWithBlocks) {
 
 // If with begin-end block body (then-only).
 TEST(ParserSection12, IfBlockBodyThenOnly) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a) begin\n"
-                 "      x = 1;\n"
-                 "      y = 2;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      x = 1;\n"
+      "      y = 2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   ASSERT_NE(stmt->then_branch, nullptr);
@@ -195,16 +205,17 @@ TEST(ParserSection12, IfBlockBodyThenOnly) {
 
 // §12.4: dangling else associates with closest if
 TEST(ParserA606, DanglingElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (a)\n"
-                 "      if (b) x = 1;\n"
-                 "      else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a)\n"
+      "      if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   // outer if has no else — the else belongs to the inner if
@@ -217,17 +228,18 @@ TEST(ParserA606, DanglingElse) {
 
 // §12.4: forced else association with begin-end
 TEST(ParserA606, ForcedElseWithBeginEnd) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (a) begin\n"
-                 "      if (b) x = 1;\n"
-                 "    end\n"
-                 "    else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      if (b) x = 1;\n"
+      "    end\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   // outer if now has else (because begin-end blocks inner if)
@@ -240,14 +252,15 @@ TEST(ParserA606, ForcedElseWithBeginEnd) {
 
 // Plain if (no qualifier) has kNone qualifier.
 TEST(ParserSection12, PlainIfHasNoQualifier) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a) x = 1;\n"
-                 "    else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
@@ -258,19 +271,20 @@ TEST(ParserSection12, PlainIfHasNoQualifier) {
 // ---------------------------------------------------------------------------
 // §12.4: nested if inside begin-end
 TEST(ParserA606, NestedIfInBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (a) begin\n"
-                 "      if (b) x = 1;\n"
-                 "      else x = 2;\n"
-                 "    end else begin\n"
-                 "      if (c) x = 3;\n"
-                 "    end\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a) begin\n"
+      "      if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "    end else begin\n"
+      "      if (c) x = 3;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   // both branches are blocks
@@ -280,14 +294,15 @@ TEST(ParserA606, NestedIfInBlock) {
 
 // §12.4: complex condition expression
 TEST(ParserA606, ComplexCondExpression) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if ((a > 0) && (b < 10) || c) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if ((a > 0) && (b < 10) || c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->condition, nullptr);
@@ -295,35 +310,37 @@ TEST(ParserA606, ComplexCondExpression) {
 
 // §12.4: if condition with function call
 TEST(ParserA606, IfCondFunctionCall) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if ($unsigned(a) > 0) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if ($unsigned(a) > 0) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
 // --- 28. Blocking assignment in nested if-else with expressions ---
 TEST(ParserSection10, Sec10_4_1_NestedIfElseWithExpressions) {
-  auto r = Parse("module m;\n"
-                 "  reg [7:0] out, a, b;\n"
-                 "  reg sel1, sel2;\n"
-                 "  initial begin\n"
-                 "    if (sel1)\n"
-                 "      if (sel2)\n"
-                 "        out = a + b;\n"
-                 "      else\n"
-                 "        out = a - b;\n"
-                 "    else\n"
-                 "      out = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] out, a, b;\n"
+      "  reg sel1, sel2;\n"
+      "  initial begin\n"
+      "    if (sel1)\n"
+      "      if (sel2)\n"
+      "        out = a + b;\n"
+      "      else\n"
+      "        out = a - b;\n"
+      "    else\n"
+      "      out = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   ASSERT_NE(stmt->then_branch, nullptr);
@@ -338,14 +355,15 @@ TEST(ParserSection10, Sec10_4_1_NestedIfElseWithExpressions) {
 
 // §12.4: conditional_statement (if-else)
 TEST(ParserA604, StmtItemConditionalStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (x) a = 1; else a = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (x) a = 1; else a = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
@@ -354,14 +372,15 @@ TEST(ParserA604, StmtItemConditionalStatement) {
 // LRM section 12.4 -- Conditional if-else statement
 // =============================================================================
 TEST(ParserSection12, BasicIfElse) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a) x = 1;\n"
-                 "    else x = 2;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else x = 2;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->condition, nullptr);
@@ -370,13 +389,14 @@ TEST(ParserSection12, BasicIfElse) {
 }
 
 TEST(ParserSection12, IfWithoutElse) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    if (a) x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->then_branch, nullptr);
@@ -386,18 +406,19 @@ TEST(ParserSection12, IfWithoutElse) {
 // 3. always_comb with if-else statement
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_IfElse) {
-  auto r = Parse("module m;\n"
-                 "  logic sel, a, b, y;\n"
-                 "  always_comb begin\n"
-                 "    if (sel)\n"
-                 "      y = a;\n"
-                 "    else\n"
-                 "      y = b;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  logic sel, a, b, y;\n"
+      "  always_comb begin\n"
+      "    if (sel)\n"
+      "      y = a;\n"
+      "    else\n"
+      "      y = b;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstAlwaysCombStmt(r);
+  auto* stmt = FirstAlwaysCombStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->condition, nullptr);
@@ -408,17 +429,18 @@ TEST(ParserSection9, Sec9_2_2_IfElse) {
 // LRM section 9.3.1 -- Blocks with control flow statements.
 // =============================================================================
 TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    if (sel)\n"
-                 "      a = 1;\n"
-                 "    else\n"
-                 "      a = 0;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (sel)\n"
+      "      a = 1;\n"
+      "    else\n"
+      "      a = 0;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->condition, nullptr);
@@ -426,4 +448,4 @@ TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-} // namespace
+}  // namespace

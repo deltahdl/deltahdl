@@ -9,10 +9,11 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, AssignCompatibleStringLiteral) {
-  auto r = ParseWithPreprocessor("module m;\n"
-                                 "  string s;\n"
-                                 "  initial s = \"hello\";\n"
-                                 "endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  string s;\n"
+      "  initial s = \"hello\";\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -21,11 +22,12 @@ TEST(ParserSection6, AssignCompatibleStringLiteral) {
 // =========================================================================
 TEST(ParserSection6, StringDeclModule) {
   // §6.16: String data type is a dynamic ordered collection of characters.
-  auto r = ParseWithPreprocessor("module t;\n"
-                                 "  string name;\n"
-                                 "endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  string name;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
   EXPECT_EQ(item->name, "name");
@@ -33,14 +35,15 @@ TEST(ParserSection6, StringDeclModule) {
 
 TEST(ParserSection6, StringDeclWithInit) {
   // §6.16: String variable with initializer.
-  auto r = ParseWithPreprocessor("module t;\n"
-                                 "  string msg = \"hello\";\n"
-                                 "endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  string msg = \"hello\";\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-} // namespace
+}  // namespace

@@ -12,7 +12,7 @@ using ApiParseTest = ProgramTestParse;
 namespace {
 
 TEST_F(ApiParseTest, ReadmembSystemCall) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       logic [7:0] mem [0:255];
       initial $readmemb("data.bin", mem);
@@ -21,4 +21,4 @@ TEST_F(ApiParseTest, ReadmembSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-} // namespace
+}  // namespace

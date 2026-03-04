@@ -13,24 +13,26 @@ namespace {
 TEST(ParserSection6, NetsCantBeProcAssigned) {
   // Nets are driven by continuous assignments, variables by procedural.
   // This test verifies both constructs parse correctly.
-  auto r = Parse("module t;\n"
-                 "  wire a;\n"
-                 "  assign a = 1'b1;\n"
-                 "  logic b;\n"
-                 "  initial b = 1'b0;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire a;\n"
+      "  assign a = 1'b1;\n"
+      "  logic b;\n"
+      "  initial b = 1'b0;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_GE(r.cu->modules[0]->items.size(), 4u);
 }
 // 13. Variable driven by initial block (procedural assignment).
 TEST(ParserSection6, Sec6_5_VarDrivenByInitialBlock) {
-  auto r = Parse("module t;\n"
-                 "  logic q;\n"
-                 "  initial q = 1'b1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic q;\n"
+      "  initial q = 1'b1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &items = r.cu->modules[0]->items;
+  auto& items = r.cu->modules[0]->items;
   ASSERT_GE(items.size(), 2u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(items[1]->kind, ModuleItemKind::kInitialBlock);
@@ -39,16 +41,17 @@ TEST(ParserSection6, Sec6_5_VarDrivenByInitialBlock) {
 
 // 26. Mixed net and variable declarations coexist in same module.
 TEST(ParserSection6, Sec6_5_MixedNetAndVarDecls) {
-  auto r = Parse("module t;\n"
-                 "  wire [7:0] net_a;\n"
-                 "  logic [7:0] var_b;\n"
-                 "  tri net_c;\n"
-                 "  int var_d;\n"
-                 "  reg var_e;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire [7:0] net_a;\n"
+      "  logic [7:0] var_b;\n"
+      "  tri net_c;\n"
+      "  int var_d;\n"
+      "  reg var_e;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &items = r.cu->modules[0]->items;
+  auto& items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 5u);
   // Nets
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
@@ -65,12 +68,13 @@ TEST(ParserSection6, Sec6_5_MixedNetAndVarDecls) {
 }
 // 2. Logic variable declaration produces kVarDecl with is_net=false.
 TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
-  auto r = Parse("module t;\n"
-                 "  logic v;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic v;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
@@ -78,4 +82,4 @@ TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
   EXPECT_EQ(item->name, "v");
 }
 
-} // namespace
+}  // namespace

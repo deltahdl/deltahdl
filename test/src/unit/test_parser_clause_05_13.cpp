@@ -10,13 +10,14 @@ namespace {
 
 TEST(ParserCh513, BuiltInMethodCall_ChainedAccess) {
   // Chained member access: obj.arr.size() parses as a call.
-  auto r = Parse("module t;\n"
-                 "  initial x = obj.arr.size();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = obj.arr.size();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
@@ -24,10 +25,11 @@ TEST(ParserCh513, BuiltInMethodCall_ChainedAccess) {
 // From test_parser_clause_05b.cpp
 TEST(ParserCh513, BuiltInMethod_NoParens) {
   // When a method has no arguments the parentheses are optional.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  int q[$];\n"
-                      "  initial x = q.size;\n"
-                      "endmodule"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q[$];\n"
+              "  initial x = q.size;\n"
+              "endmodule"));
 }
 
-} // namespace
+}  // namespace

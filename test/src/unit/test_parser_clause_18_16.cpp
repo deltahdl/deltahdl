@@ -13,18 +13,19 @@ namespace {
 // ---------------------------------------------------------------------------
 // §18.16: randcase statement
 TEST(ParserA607, RandcaseParse) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    randcase\n"
-                 "      50: x = 1;\n"
-                 "      30: x = 2;\n"
-                 "      20: x = 3;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      50: x = 1;\n"
+      "      30: x = 2;\n"
+      "      20: x = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
   EXPECT_EQ(stmt->randcase_items.size(), 3u);
@@ -32,17 +33,18 @@ TEST(ParserA607, RandcaseParse) {
 
 // §18.16: randcase with block bodies
 TEST(ParserA607, RandcaseWithBlocks) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    randcase\n"
-                 "      50: begin x = 1; y = 2; end\n"
-                 "      50: begin x = 3; y = 4; end\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      50: begin x = 1; y = 2; end\n"
+      "      50: begin x = 3; y = 4; end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
   EXPECT_EQ(stmt->randcase_items.size(), 2u);
@@ -50,17 +52,18 @@ TEST(ParserA607, RandcaseWithBlocks) {
 
 // §18.16: randcase_statement
 TEST(ParserA604, StmtItemRandcaseStatement) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    randcase\n"
-                 "      1: a = 1;\n"
-                 "      1: a = 2;\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1: a = 1;\n"
+      "      1: a = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
 }
@@ -69,15 +72,16 @@ using CheckerParseTest = ProgramTestParse;
 
 // --- Randcase statement (§18.16) ---
 TEST(ParserSection18, RandcaseStmt) {
-  auto r = Parse("module top;\n"
-                 "  initial begin\n"
-                 "    randcase\n"
-                 "      1 : $display(\"one\");\n"
-                 "      2 : $display(\"two\");\n"
-                 "      3 : $display(\"three\");\n"
-                 "    endcase\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module top;\n"
+      "  initial begin\n"
+      "    randcase\n"
+      "      1 : $display(\"one\");\n"
+      "      2 : $display(\"two\");\n"
+      "      3 : $display(\"three\");\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
@@ -88,7 +92,7 @@ using VerifyParseTest = ProgramTestParse;
 // §18 Constrained random — randcase
 // =============================================================================
 TEST_F(VerifyParseTest, RandcaseInModule) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       initial begin
         randcase
@@ -99,12 +103,12 @@ TEST_F(VerifyParseTest, RandcaseInModule) {
     endmodule
   )");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto &items = unit->modules[0]->items;
+  auto& items = unit->modules[0]->items;
   ASSERT_FALSE(items.empty());
 }
 
 TEST_F(VerifyParseTest, RandcaseSingleBranch) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       initial begin
         randcase
@@ -116,4 +120,4 @@ TEST_F(VerifyParseTest, RandcaseSingleBranch) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-} // namespace
+}  // namespace

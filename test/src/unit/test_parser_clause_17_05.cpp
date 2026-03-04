@@ -14,7 +14,7 @@ namespace {
 // §17.5 Checker procedures (always, initial)
 // =============================================================================
 TEST_F(CheckerParseTest, CheckerWithAlwaysBlock) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker always_check(input logic clk, input logic a);
       always @(posedge clk)
         assert(a);
@@ -26,7 +26,7 @@ TEST_F(CheckerParseTest, CheckerWithAlwaysBlock) {
 }
 
 TEST_F(CheckerParseTest, CheckerWithInitialBlock) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker init_check;
       initial begin
         $display("checker started");
@@ -43,7 +43,7 @@ using VerifyParseTest = ProgramTestParse;
 // §17.5 Checker procedures
 // =============================================================================
 TEST_F(VerifyParseTest, CheckerWithInitialProcedure) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker init_check(input logic clk, input logic rst);
       logic flag;
       initial begin
@@ -57,7 +57,7 @@ TEST_F(VerifyParseTest, CheckerWithInitialProcedure) {
 }
 
 TEST_F(VerifyParseTest, CheckerWithAlwaysComb) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker comb_check(logic a, b);
       logic v;
       always_comb begin
@@ -74,7 +74,7 @@ TEST_F(VerifyParseTest, CheckerWithAlwaysComb) {
 }
 
 TEST_F(VerifyParseTest, CheckerWithFinalProcedure) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker final_check;
       logic count;
       final begin
@@ -87,4 +87,4 @@ TEST_F(VerifyParseTest, CheckerWithFinalProcedure) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-} // namespace
+}  // namespace

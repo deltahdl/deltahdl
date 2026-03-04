@@ -12,17 +12,18 @@ namespace {
 // =========================================================================
 TEST(ParserSection6, AutomaticFunctionLocalVar) {
   // §6.11.1: Automatic function has automatic local variables.
-  auto r = ParseWithPreprocessor("module t;\n"
-                                 "  function automatic int factorial(int n);\n"
-                                 "    if (n <= 1) return 1;\n"
-                                 "    return n * factorial(n - 1);\n"
-                                 "  endfunction\n"
-                                 "endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  function automatic int factorial(int n);\n"
+      "    if (n <= 1) return 1;\n"
+      "    return n * factorial(n - 1);\n"
+      "  endfunction\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_automatic);
 }
 
-} // namespace
+}  // namespace

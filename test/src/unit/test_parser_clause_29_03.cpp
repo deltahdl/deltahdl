@@ -10,13 +10,14 @@ namespace {
 
 // --- udp_declaration: extern followed by full definition ---
 TEST(ParserAnnexA051, ExternThenDefinition) {
-  auto r = Parse("extern primitive inv(output out, input in);\n"
-                 "primitive inv(output out, input in);\n"
-                 "  table\n"
-                 "    0 : 1;\n"
-                 "    1 : 0;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "extern primitive inv(output out, input in);\n"
+      "primitive inv(output out, input in);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 2u);
@@ -28,61 +29,60 @@ TEST(ParserAnnexA051, ExternThenDefinition) {
 
 // --- udp_declaration: wildcard port with sequential ---
 TEST(ParserAnnexA051, WildcardPortSequential) {
-  auto r = Parse("primitive dff(.*);\n"
-                 "  output reg q;\n"
-                 "  input d;\n"
-                 "  input clk;\n"
-                 "  table\n"
-                 "    0 r : ? : 0;\n"
-                 "    1 r : ? : 1;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive dff(.*);\n"
+      "  output reg q;\n"
+      "  input d;\n"
+      "  input clk;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto *udp = r.cu->udps[0];
+  auto* udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "dff");
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_EQ(udp->output_name, "q");
   ASSERT_EQ(udp->input_names.size(), 2u);
 }
 
-static std::vector<ModuleItem *>
-FindUdpInsts(const std::vector<ModuleItem *> &items) {
-  std::vector<ModuleItem *> insts;
-  for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kUdpInst)
-      insts.push_back(item);
+static std::vector<ModuleItem*> FindUdpInsts(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> insts;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
   }
   return insts;
 }
 
-static std::vector<ModuleItem *>
-FindContAssigns(const std::vector<ModuleItem *> &items) {
-  std::vector<ModuleItem *> result;
-  for (auto *item : items) {
-    if (item->kind == ModuleItemKind::kContAssign)
-      result.push_back(item);
+static std::vector<ModuleItem*> FindContAssigns(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
   }
   return result;
 }
 
-static std::vector<ModuleItem *>
-FindItems(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
-  std::vector<ModuleItem *> result;
-  for (auto *item : items) {
-    if (item->kind == kind)
-      result.push_back(item);
+static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
+                                          ModuleItemKind kind) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == kind) result.push_back(item);
   }
   return result;
 }
 
 // --- Extern UDP declaration used for instantiation ---
 TEST(ParserA504, UdpInst_ExternUdp) {
-  auto r = Parse("extern primitive my_udp(output y, input a, input b);\n"
-                 "module m;\n"
-                 "  my_udp u1(out, in1, in2);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "extern primitive my_udp(output y, input a, input b);\n"
+      "module m;\n"
+      "  my_udp u1(out, in1, in2);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
@@ -96,8 +96,8 @@ using SpecifyParseTest = ProgramTestParse;
 // Parser test fixture
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
-protected:
-  CompilationUnit *Parse(const std::string &src) {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -105,10 +105,9 @@ protected:
   }
 
   // Helper: get first specify block from first module.
-  ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
-    for (auto *item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock)
-        return item;
+  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
+    for (auto* item : cu->modules[0]->items) {
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
     }
     return nullptr;
   }
@@ -122,16 +121,17 @@ protected:
 };
 // description: udp_declaration
 TEST(SourceText, DescriptionUdp) {
-  auto r = Parse("primitive my_udp(output y, input a, input b);\n"
-                 "  table\n"
-                 "    0 0 : 0 ;\n"
-                 "    1 1 : 1 ;\n"
-                 "  endtable\n"
-                 "endprimitive\n");
+  auto r = Parse(
+      "primitive my_udp(output y, input a, input b);\n"
+      "  table\n"
+      "    0 0 : 0 ;\n"
+      "    1 1 : 1 ;\n"
+      "  endtable\n"
+      "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
   EXPECT_EQ(r.cu->udps[0]->name, "my_udp");
 }
 
-} // namespace
+}  // namespace

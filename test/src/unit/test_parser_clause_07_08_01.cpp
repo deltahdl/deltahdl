@@ -16,7 +16,7 @@ TEST(ParserA25, AssocDimWildcard) {
   auto r = Parse("module m; int aa [*]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
   ASSERT_NE(item->unpacked_dims[0], nullptr);
   EXPECT_EQ(item->unpacked_dims[0]->text, "*");
@@ -25,11 +25,12 @@ TEST(ParserA25, AssocDimWildcard) {
 // §7.8: Associative arrays
 // =========================================================================
 TEST(ParserSection7, AssocArrayWildcard) {
-  auto r = Parse("module t;\n"
-                 "  integer aa[*];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  integer aa[*];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "aa");
   EXPECT_FALSE(item->unpacked_dims.empty());
@@ -39,13 +40,14 @@ TEST(ParserSection7, AssocArrayWildcard) {
 // §7.8: Associative arrays
 // =========================================================================
 TEST(ParserSection7, AssociativeArrayWildcardIndex) {
-  auto r = Parse("module t;\n"
-                 "  int aa[*];\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int aa[*];\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "aa");
 }
 
-} // namespace
+}  // namespace

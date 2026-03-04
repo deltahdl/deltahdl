@@ -11,12 +11,13 @@ namespace {
 // =============================================================================
 // 1. Packed dimensions on logic type.
 TEST(ParserSection6, Sec6_11_LogicPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  logic [7:0] data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -28,12 +29,13 @@ TEST(ParserSection6, Sec6_11_LogicPackedDims) {
 
 // 1b. Packed dimensions on bit type.
 TEST(ParserSection6, Sec6_11_BitPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  bit [31:0] word;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  bit [31:0] word;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -44,12 +46,13 @@ TEST(ParserSection6, Sec6_11_BitPackedDims) {
 
 // 1c. Packed dimensions on reg type.
 TEST(ParserSection6, Sec6_11_RegPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  reg [3:0] nibble;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  reg [3:0] nibble;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -59,12 +62,13 @@ TEST(ParserSection6, Sec6_11_RegPackedDims) {
 }
 // 7. Logic with packed dimensions [15:0].
 TEST(ParserSection6, Sec6_5_LogicPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  logic [15:0] addr;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [15:0] addr;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_FALSE(item->data_type.is_net);
@@ -77,11 +81,12 @@ TEST(ParserSection6, Sec6_5_LogicPackedDims) {
 // §6.8: Variable declarations
 // =========================================================================
 TEST(ParserSection6, LogicVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  logic [15:0] data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic [15:0] data;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_EQ(item->name, "data");
@@ -89,13 +94,14 @@ TEST(ParserSection6, LogicVarDecl) {
 
 // 29. Net and variable with same-width packed vectors.
 TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
-  auto r = Parse("module t;\n"
-                 "  wire [31:0] net_data;\n"
-                 "  logic [31:0] var_data;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wire [31:0] net_data;\n"
+      "  logic [31:0] var_data;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &items = r.cu->modules[0]->items;
+  auto& items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 2u);
   // Wire net
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
@@ -111,12 +117,13 @@ TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
 
 // 23. reg with packed dimensions.
 TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
-  auto r = Parse("module t;\n"
-                 "  reg [15:0] wide_reg;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  reg [15:0] wide_reg;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -130,26 +137,28 @@ TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
 // §6.9: Vector declarations
 // =========================================================================
 TEST(ParserSection6, SignedVector) {
-  auto r = Parse("module t;\n"
-                 "  logic signed [7:0] sv;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic signed [7:0] sv;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
 TEST(ParserSection6, UnsignedVector) {
-  auto r = Parse("module t;\n"
-                 "  logic unsigned [15:0] uv;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic unsigned [15:0] uv;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_FALSE(item->data_type.is_signed);
   EXPECT_EQ(item->name, "uv");
 }
 
-} // namespace
+}  // namespace

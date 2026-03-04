@@ -8,13 +8,14 @@ using namespace delta;
 namespace {
 
 TEST(Parser, DoWhileStatement) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    do x = x + 1; while (x < 10);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    do x = x + 1; while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
   EXPECT_NE(stmt->body, nullptr);
@@ -22,15 +23,16 @@ TEST(Parser, DoWhileStatement) {
 }
 // Do-while with complex condition.
 TEST(ParserSection12, DoWhileComplexCondition) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    do begin\n"
-                 "      x = x + 1;\n"
-                 "    end while (x < 10 && !done);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    do begin\n"
+      "      x = x + 1;\n"
+      "    end while (x < 10 && !done);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
   EXPECT_NE(stmt->condition, nullptr);
@@ -40,12 +42,13 @@ TEST(ParserSection12, DoWhileComplexCondition) {
 
 // --- do statement_or_null while ( expression ) ; ---
 TEST(ParserA608, DoWhileLoop) {
-  auto r = Parse("module m;\n"
-                 "  initial begin do x = x - 1; while (x > 0); end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin do x = x - 1; while (x > 0); end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
   EXPECT_NE(stmt->condition, nullptr);
@@ -53,44 +56,47 @@ TEST(ParserA608, DoWhileLoop) {
 }
 
 TEST(ParserA608, DoWhileNullStmt) {
-  auto r = Parse("module m;\n"
-                 "  initial begin do ; while (x > 0); end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin do ; while (x > 0); end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
 }
 
 TEST(ParserA608, DoWhileBlockBody) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    do begin x = x + 1; end while (x < 10);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    do begin x = x + 1; end while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
 TEST(ParserSection12, DoWhileLoopWithBlock) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    do begin\n"
-                 "      x = x + 1;\n"
-                 "    end while (x < 10);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    do begin\n"
+      "      x = x + 1;\n"
+      "    end while (x < 10);\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
   EXPECT_NE(stmt->body, nullptr);
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-} // namespace
+}  // namespace

@@ -7,8 +7,8 @@
 using namespace delta;
 
 struct ConfigTest : ::testing::Test {
-protected:
-  CompilationUnit *Parse(const std::string &src) {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -30,13 +30,14 @@ namespace {
 
 // config_rule_statement: inst_clause use_clause
 TEST(SourceText, ConfigRuleInstUse) {
-  auto r = Parse("config cfg7;\n"
-                 "  design top;\n"
-                 "  instance top.u1 use work.alt_cell;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config cfg7;\n"
+      "  design top;\n"
+      "  instance top.u1 use work.alt_cell;\n"
+      "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rule = r.cu->configs[0]->rules[0];
+  auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(rule->inst_path, "top.u1");
   EXPECT_EQ(rule->use_lib, "work");
@@ -45,13 +46,14 @@ TEST(SourceText, ConfigRuleInstUse) {
 
 // use_clause: use with named_parameter_assignment
 TEST(SourceText, ConfigUseNamedParams) {
-  auto r = Parse("config cfg10;\n"
-                 "  design top;\n"
-                 "  instance top.u1 use #(.WIDTH(16), .DEPTH(4));\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config cfg10;\n"
+      "  design top;\n"
+      "  instance top.u1 use #(.WIDTH(16), .DEPTH(4));\n"
+      "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rule = r.cu->configs[0]->rules[0];
+  auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
   ASSERT_EQ(rule->use_params.size(), 2u);
   EXPECT_EQ(rule->use_params[0].first, "WIDTH");
@@ -60,13 +62,14 @@ TEST(SourceText, ConfigUseNamedParams) {
 
 // use_clause: use [lib.] cell named_parameter_assignment (combined form)
 TEST(SourceText, ConfigUseCellAndParams) {
-  auto r = Parse("config cfg11;\n"
-                 "  design top;\n"
-                 "  cell adder use work.fast_add #(.W(32)) :config;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config cfg11;\n"
+      "  design top;\n"
+      "  cell adder use work.fast_add #(.W(32)) :config;\n"
+      "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rule = r.cu->configs[0]->rules[0];
+  auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->use_lib, "work");
   EXPECT_EQ(rule->use_cell, "fast_add");
   ASSERT_EQ(rule->use_params.size(), 1u);
@@ -76,7 +79,7 @@ TEST(SourceText, ConfigUseCellAndParams) {
 
 using ApiParseTest = ProgramTestParse;
 TEST_F(ApiParseTest, ConfigInstanceClauseUse) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg1;
       design lib1.top;
       default liblist lib1;
@@ -85,7 +88,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUse) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto *inst_rule = unit->configs[0]->rules[1];
+  auto* inst_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(inst_rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(inst_rule->inst_path, "top.u1");
   EXPECT_EQ(inst_rule->use_lib, "lib2");
@@ -93,7 +96,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUse) {
 }
 
 TEST_F(ApiParseTest, ConfigInstanceClauseUseConfig) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg1;
       design lib1.top;
       default liblist lib1;
@@ -102,7 +105,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUseConfig) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto *inst_rule = unit->configs[0]->rules[1];
+  auto* inst_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(inst_rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(inst_rule->use_cell, "bot");
   EXPECT_TRUE(inst_rule->use_config);
@@ -112,7 +115,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUseConfig) {
 // §33.4.1.3/6 Instance clause with use binding
 // =============================================================================
 TEST_F(ConfigTest, InstanceUseClause) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg;
       design lib1.top;
       instance top.u1 use lib2.adder;
@@ -120,7 +123,7 @@ TEST_F(ConfigTest, InstanceUseClause) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_EQ(unit->configs[0]->rules.size(), 1u);
-  auto *rule = unit->configs[0]->rules[0];
+  auto* rule = unit->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(rule->inst_path, "top.u1");
   EXPECT_EQ(rule->use_lib, "lib2");
@@ -129,7 +132,7 @@ TEST_F(ConfigTest, InstanceUseClause) {
 }
 
 TEST_F(ConfigTest, CellClauseWithLibUse) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg;
       design lib.top;
       cell mylib.adder use otherlib.fast_adder;
@@ -137,7 +140,7 @@ TEST_F(ConfigTest, CellClauseWithLibUse) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_EQ(unit->configs[0]->rules.size(), 1u);
-  auto *rule = unit->configs[0]->rules[0];
+  auto* rule = unit->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kCell);
   EXPECT_EQ(rule->cell_lib, "mylib");
   EXPECT_EQ(rule->cell_name, "adder");
@@ -159,4 +162,4 @@ TEST(ParserSection34, ConfigWithUseClause) {
   ASSERT_GE(r.cu->configs[0]->rules.size(), 1u);
 }
 
-} // namespace
+}  // namespace

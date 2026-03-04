@@ -8,14 +8,15 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection7, QueuePushFront) {
-  auto r = Parse("module t;\n"
-                 "  int q[$];\n"
-                 "  initial q.push_front(99);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial q.push_front(99);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-} // namespace
+}  // namespace

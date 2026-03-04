@@ -13,47 +13,51 @@ namespace {
 // dpi_import_export: export variants
 // ---------------------------------------------------------------------------
 TEST(ParserA26, DpiExportFunction) {
-  auto r = Parse("module m;\n"
-                 "  function void sv_func(); endfunction\n"
-                 "  export \"DPI-C\" function sv_func;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[1];
+  auto* item = r.cu->modules[0]->items[1];
   EXPECT_EQ(item->kind, ModuleItemKind::kDpiExport);
   EXPECT_EQ(item->name, "sv_func");
   EXPECT_FALSE(item->dpi_is_task);
 }
 
 TEST(ParserA26, DpiExportWithCIdentifier) {
-  auto r = Parse("module m;\n"
-                 "  function void sv_func(); endfunction\n"
-                 "  export \"DPI-C\" c_name = function sv_func;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI-C\" c_name = function sv_func;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[1];
+  auto* item = r.cu->modules[0]->items[1];
   EXPECT_EQ(item->kind, ModuleItemKind::kDpiExport);
   EXPECT_EQ(item->dpi_c_name, "c_name");
   EXPECT_EQ(item->name, "sv_func");
 }
 
 TEST(ParserA26, DpiExportDpiLegacy) {
-  auto r = Parse("module m;\n"
-                 "  function void sv_func(); endfunction\n"
-                 "  export \"DPI\" function sv_func;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI\" function sv_func;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kDpiExport);
 }
 
 TEST_F(AnnexHParseTest, AnnexHDpiExportFunction) {
-  auto *unit = Parse("module m;\n"
-                     "  export \"DPI-C\" function sv_func;\n"
-                     "endmodule\n");
+  auto* unit = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto &items = unit->modules[0]->items;
+  auto& items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
   EXPECT_EQ(items[0]->name, "sv_func");
@@ -64,13 +68,13 @@ using DpiParseTest = ProgramTestParse;
 
 using ApiParseTest = ProgramTestParse;
 TEST_F(DpiParseTest, ExportWithCName) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       export "DPI-C" c_func = function sv_func;
     endmodule
   )");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto &items = unit->modules[0]->items;
+  auto& items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
   EXPECT_EQ(items[0]->dpi_c_name, "c_func");
@@ -81,11 +85,12 @@ TEST_F(DpiParseTest, ExportWithCName) {
 // Annex H - DPI export with C name alias
 // =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiExportWithCName) {
-  auto *unit = Parse("module m;\n"
-                     "  export \"DPI-C\" my_c_func = function sv_compute;\n"
-                     "endmodule\n");
+  auto* unit = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" my_c_func = function sv_compute;\n"
+      "endmodule\n");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto &items = unit->modules[0]->items;
+  auto& items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
   EXPECT_EQ(items[0]->dpi_c_name, "my_c_func");
@@ -107,7 +112,7 @@ TEST(ParserSection38, DpiExportFunctionForCalltf) {
   )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &items = r.cu->modules[0]->items;
+  auto& items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
   EXPECT_EQ(items[0]->name, "calltf_routine");
@@ -123,15 +128,15 @@ TEST(ParserSection38, DpiExportWithCNameForSystf) {
   )");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &items = r.cu->modules[0]->items;
+  auto& items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->dpi_c_name, "my_c_calltf");
   EXPECT_EQ(items[0]->name, "sv_calltf");
 }
 
 struct ConfigTest : ::testing::Test {
-protected:
-  CompilationUnit *Parse(const std::string &src) {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -151,17 +156,17 @@ protected:
 // §35.3 DPI-C export declarations
 // =============================================================================
 TEST_F(DpiParseTest, ExportFunction) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       export "DPI-C" function my_func;
     endmodule
   )");
   ASSERT_EQ(unit->modules.size(), 1u);
-  auto &items = unit->modules[0]->items;
+  auto& items = unit->modules[0]->items;
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kDpiExport);
   EXPECT_EQ(items[0]->name, "my_func");
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-} // namespace
+}  // namespace

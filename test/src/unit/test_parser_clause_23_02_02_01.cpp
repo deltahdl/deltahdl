@@ -18,10 +18,10 @@ TEST(ParserA23, ListOfInterfaceIdentifiersMultiple) {
 }
 
 // Verify a 2-port module has expected names and directions.
-static void VerifyTwoPortModule(ParseResult &r, const char *n0, Direction d0,
-                                const char *n1, Direction d1) {
+static void VerifyTwoPortModule(ParseResult& r, const char* n0, Direction d0,
+                                const char* n1, Direction d1) {
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 2);
   EXPECT_EQ(mod->ports[0].name, n0);
   EXPECT_EQ(mod->ports[0].direction, d0);
@@ -30,21 +30,23 @@ static void VerifyTwoPortModule(ParseResult &r, const char *n0, Direction d0,
 }
 // --- Non-ANSI port declarations (LRM §23.2.2.1) ---
 TEST(ParserSection23, NonAnsiPortsBasic) {
-  auto r = Parse("module m(a, b);\n"
-                 "  input a;\n"
-                 "  output b;\n"
-                 "  assign b = a;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(a, b);\n"
+      "  input a;\n"
+      "  output b;\n"
+      "  assign b = a;\n"
+      "endmodule\n");
   VerifyTwoPortModule(r, "a", Direction::kInput, "b", Direction::kOutput);
 }
 
 TEST(ParserSection23, NonAnsiPortsWithTypesPortA) {
-  auto r = Parse("module m(a, b);\n"
-                 "  input [7:0] a;\n"
-                 "  output reg b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(a, b);\n"
+      "  input [7:0] a;\n"
+      "  output reg b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 2);
   EXPECT_EQ(mod->ports[0].name, "a");
   EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
@@ -52,12 +54,13 @@ TEST(ParserSection23, NonAnsiPortsWithTypesPortA) {
 }
 
 TEST(ParserSection23, NonAnsiPortsWithTypesPortB) {
-  auto r = Parse("module m(a, b);\n"
-                 "  input [7:0] a;\n"
-                 "  output reg b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(a, b);\n"
+      "  input [7:0] a;\n"
+      "  output reg b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 2);
   EXPECT_EQ(mod->ports[1].name, "b");
   EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
@@ -65,16 +68,17 @@ TEST(ParserSection23, NonAnsiPortsWithTypesPortB) {
 }
 
 TEST(ParserSection23, NonAnsiPortsMixed) {
-  auto r = Parse("module m(a, b, c, d);\n"
-                 "  input a, b;\n"
-                 "  output [3:0] c;\n"
-                 "  inout d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(a, b, c, d);\n"
+      "  input a, b;\n"
+      "  output [3:0] c;\n"
+      "  inout d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 4);
   struct Expected {
-    const char *name;
+    const char* name;
     Direction dir;
   };
   Expected expected[] = {
@@ -94,11 +98,12 @@ using ProgramParseTest = ProgramTestParse;
 
 TEST(ParserSection23, Sec23_2_2_NonAnsiPortDeclarations) {
   // Non-ANSI style: port list + separate direction declarations
-  auto r = Parse("module m (a, b, y);\n"
-                 "  input a, b;\n"
-                 "  output y;\n"
-                 "  assign y = a & b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m (a, b, y);\n"
+      "  input a, b;\n"
+      "  output y;\n"
+      "  assign y = a & b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
@@ -113,11 +118,12 @@ TEST(ParserSection23, Sec23_2_2_NonAnsiPortDeclarations) {
 // LRM section 23.2.2.1: Non-ANSI port declarations
 // =========================================================================
 TEST(ParserSection23, NonAnsiInoutPort) {
-  auto r = Parse("module m(bus);\n"
-                 "  inout [7:0] bus;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(bus);\n"
+      "  inout [7:0] bus;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 1);
   EXPECT_EQ(mod->ports[0].name, "bus");
   EXPECT_EQ(mod->ports[0].direction, Direction::kInout);
@@ -125,15 +131,16 @@ TEST(ParserSection23, NonAnsiInoutPort) {
 }
 
 TEST(ParserSection23, NonAnsiMultiplePortsSameDir) {
-  auto r = Parse("module m(x, y, z);\n"
-                 "  output x, y, z;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(x, y, z);\n"
+      "  output x, y, z;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 3);
   for (size_t i = 0; i < 3; ++i) {
     EXPECT_EQ(mod->ports[i].direction, Direction::kOutput);
   }
 }
 
-} // namespace
+}  // namespace

@@ -8,12 +8,13 @@ namespace {
 
 // 22. Uwire net declaration.
 TEST(ParserSection6, Sec6_5_UwireDecl) {
-  auto r = Parse("module t;\n"
-                 "  uwire single;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  uwire single;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kUwire);
@@ -22,12 +23,13 @@ TEST(ParserSection6, Sec6_5_UwireDecl) {
 }
 // §6.7.1: Uwire net declaration.
 TEST(ParserSection6, Sec6_7_1_UwireDecl) {
-  auto r = Parse("module t;\n"
-                 "  uwire uw;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  uwire uw;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kUwire);
@@ -35,4 +37,4 @@ TEST(ParserSection6, Sec6_7_1_UwireDecl) {
   EXPECT_EQ(item->name, "uw");
 }
 
-} // namespace
+}  // namespace

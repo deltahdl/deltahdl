@@ -13,7 +13,7 @@ namespace {
 // §17.4 Context inference
 // =============================================================================
 TEST_F(VerifyParseTest, CheckerContextInferenceDefaults) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker check_in_context(logic test_sig,
         event clock = $inferred_clock,
         logic reset = $inferred_disable);
@@ -29,7 +29,7 @@ TEST_F(VerifyParseTest, CheckerContextInferenceDefaults) {
 }
 
 TEST_F(VerifyParseTest, CheckerContextInferenceInstantiation) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     checker check_in_context(logic test_sig,
         event clock = $inferred_clock,
         logic reset = $inferred_disable);
@@ -46,4 +46,4 @@ TEST_F(VerifyParseTest, CheckerContextInferenceInstantiation) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-} // namespace
+}  // namespace

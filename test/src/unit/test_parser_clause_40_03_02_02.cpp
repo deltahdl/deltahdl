@@ -12,7 +12,7 @@ using ApiParseTest = ProgramTestParse;
 namespace {
 
 TEST_F(ApiParseTest, CoverageGetMaxSystemCall) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       initial begin
         int x;
@@ -23,4 +23,4 @@ TEST_F(ApiParseTest, CoverageGetMaxSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-} // namespace
+}  // namespace

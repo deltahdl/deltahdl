@@ -10,44 +10,48 @@ namespace {
 // Section 11.1 -- Overview: general expression parsing
 // =========================================================================
 TEST(ParserSection11, NestedParenthesizedExpression) {
-  auto r = Parse("module t;\n"
-                 "  initial x = ((a + b) * (c - d));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = ((a + b) * (c - d));\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
 
 TEST(ParserSection11, ChainedAdditiveLeftAssoc) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a + b - c + d;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a + b - c + d;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 TEST(Parser, ExpressionPrecedence) {
-  auto r = Parse("module expr;\n"
-                 "  logic a;\n"
-                 "  assign a = 1 + 2 * 3;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module expr;\n"
+      "  logic a;\n"
+      "  assign a = 1 + 2 * 3;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
 }
 TEST(ParserSection11, ImplicationRightAssocParses) {
   // a -> b -> c should be parsed as a -> (b -> c)
-  auto r = Parse("module t;\n"
-                 "  logic a, b, c, d;\n"
-                 "  initial d = a -> b -> c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  logic a, b, c, d;\n"
+      "  initial d = a -> b -> c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
@@ -57,7 +61,7 @@ TEST(ParserA83, ExprPrecedenceChain) {
   auto r = Parse("module m; initial x = a + b * c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstInitialRHS(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
@@ -75,7 +79,7 @@ TEST(ParserA83, ChainedBinaryOps) {
   auto r = Parse("module m; initial x = a | b & c ^ d; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstInitialRHS(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
 }
@@ -85,7 +89,7 @@ TEST(ParserA83, ParenthesizedExpr) {
   auto r = Parse("module m; initial x = (a + b) * c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstInitialRHS(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
@@ -96,10 +100,11 @@ TEST(ParserA83, ParenthesizedExpr) {
 
 // --- Parenthesized expression ---
 TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
-  auto r = Parse("module t;\n"
-                 "  initial x = (a + b) * c;\n"
-                 "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a + b) * c;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
@@ -109,12 +114,13 @@ TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
 }
 
 TEST(ParserSection11, Sec11_1_ExprInInitialBlock) {
-  auto r = Parse("module t;\n"
-                 "  initial x = (a | b) & c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a | b) & c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
@@ -124,12 +130,13 @@ TEST(ParserSection11, Sec11_1_ExprInInitialBlock) {
 // Section 11.3.2 -- Operator precedence (complex expression)
 // =========================================================================
 TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a + b * c;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a + b * c;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   // * has higher precedence than +, so top-level is +
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
@@ -137,24 +144,26 @@ TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
 }
 
 TEST(ParserSection11, OperatorPrecedenceMixedArithRhs) {
-  auto r = Parse("module t;\n"
-                 "  initial x = a + b * c;\n"
-                 "endmodule\n");
-  auto *rhs = FirstAssignRhs(r);
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a + b * c;\n"
+      "endmodule\n");
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   ASSERT_NE(rhs->rhs, nullptr);
   EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
 }
 
 TEST(ParserSection11, OperatorPrecedenceCompareAndLogical) {
-  auto r = Parse("module t;\n"
-                 "  initial x = (a > 0) && (b < 10);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a > 0) && (b < 10);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-} // namespace
+}  // namespace

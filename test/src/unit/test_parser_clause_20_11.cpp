@@ -15,7 +15,7 @@ namespace {
 // §39 Assertion control system functions
 // =============================================================================
 TEST_F(ApiParseTest, AssertOnSystemCall) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       initial $assertOn;
     endmodule
@@ -24,7 +24,7 @@ TEST_F(ApiParseTest, AssertOnSystemCall) {
 }
 
 TEST_F(ApiParseTest, AssertOffSystemCall) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       initial $assertOff;
     endmodule
@@ -33,7 +33,7 @@ TEST_F(ApiParseTest, AssertOffSystemCall) {
 }
 
 TEST_F(ApiParseTest, AssertKillSystemCall) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     module m;
       initial $assertKill;
     endmodule
@@ -161,4 +161,4 @@ TEST(ParserSection39, AssertionControlSequence) {
   )"));
 }
 
-} // namespace
+}  // namespace

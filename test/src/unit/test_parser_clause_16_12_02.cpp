@@ -12,23 +12,26 @@ namespace {
 // =============================================================================
 // property_expr ::= sequence_expr
 TEST(ParserA210, PropertyExpr_SequenceExpr) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) a ##1 b);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) a ##1 b);\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= strong ( sequence_expr )
 TEST(ParserA210, PropertyExpr_Strong) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) strong(a ##1 b));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) strong(a ##1 b));\n"
+              "endmodule\n"));
 }
 
 // property_expr ::= weak ( sequence_expr )
 TEST(ParserA210, PropertyExpr_Weak) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) weak(a ##1 b));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) weak(a ##1 b));\n"
+              "endmodule\n"));
 }
 
 using VerifyParseTest = ProgramTestParse;
@@ -46,9 +49,10 @@ TEST(ParserSection16, Sec16_5_1_StrongSequence) {
 
 // Assert property with weak sequence.
 TEST(ParserSection16, Sec16_5_1_WeakSequence) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  assert property (@(posedge clk) weak(a ##1 b));\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  assert property (@(posedge clk) weak(a ##1 b));\n"
+              "endmodule\n"));
 }
 
 // --- Test helpers ---
@@ -59,19 +63,21 @@ TEST(ParserSection16, Sec16_5_1_WeakSequence) {
 // §16.14.2 Sequence property — strong/weak
 // =============================================================================
 TEST(ParserSection16, StrongSequenceProperty) {
-  auto r = Parse("module m;\n"
-                 "  cover property (@(posedge clk) strong(a ##1 b ##1 c));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) strong(a ##1 b ##1 c));\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
 }
 
 TEST(ParserSection16, WeakSequenceProperty) {
-  auto r = Parse("module m;\n"
-                 "  assert property (@(posedge clk) weak(a ##1 b));\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) weak(a ##1 b));\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
 }
 
-} // namespace
+}  // namespace

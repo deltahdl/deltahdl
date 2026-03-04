@@ -15,10 +15,11 @@ namespace {
 // =========================================================================
 TEST(ParserCh501, Sec5_1_CommentDoesNotProduceTokens) {
   // A module containing only comments and no actual items parses cleanly.
-  auto r = Parse("module m;\n"
-                 "  // line comment\n"
-                 "  /* block comment */\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  // line comment\n"
+      "  /* block comment */\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
@@ -45,10 +46,11 @@ TEST(ParserCh501, Sec5_1_BlockCommentBetweenTokens) {
 // =========================================================================
 TEST(ParserCh501, Sec5_1_BlockCommentInsideExpression) {
   // Block comment between operands in a continuous assignment expression.
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  logic a, b, c;\n"
-                      "  assign a = b /* comment */ + c;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic a, b, c;\n"
+              "  assign a = b /* comment */ + c;\n"
+              "endmodule\n"));
 }
 
 // =========================================================================
@@ -56,10 +58,11 @@ TEST(ParserCh501, Sec5_1_BlockCommentInsideExpression) {
 // =========================================================================
 TEST(ParserCh501, Sec5_1_NestedBlockCommentStartInsideLineComment) {
   // A /* inside a // comment is not treated as the start of a block comment.
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  // this /* is not special\n"
-                      "  logic a;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  // this /* is not special\n"
+              "  logic a;\n"
+              "endmodule\n"));
 }
 
 // =========================================================================
@@ -70,22 +73,23 @@ TEST(ParserCh501, Sec5_1_NestedBlockCommentStartInsideLineComment) {
 // =========================================================================
 TEST(ParserCh501, Sec5_1_AdjacentLineComments) {
   // Multiple consecutive line comments behave as whitespace.
-  auto r = Parse("module m;\n"
-                 "  // first comment\n"
-                 "  // second comment\n"
-                 "  // third comment\n"
-                 "  logic a;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  // first comment\n"
+      "  // second comment\n"
+      "  // third comment\n"
+      "  logic a;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "a");
 }
 
 struct ConfigTest : ::testing::Test {
-protected:
-  CompilationUnit *Parse(const std::string &src) {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -106,9 +110,10 @@ using DpiParseTest = ProgramTestParse;
 
 // Block comments.
 TEST(LibraryText, BlockComments) {
-  auto r = ParseLibrary("/* Multi-line\n"
-                        "   comment */\n"
-                        "library lib1 /proj/*.v;\n");
+  auto r = ParseLibrary(
+      "/* Multi-line\n"
+      "   comment */\n"
+      "library lib1 /proj/*.v;\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->libraries.size(), 1u);
@@ -116,28 +121,31 @@ TEST(LibraryText, BlockComments) {
 
 TEST(ParserCh501, Sec5_1_EmptyCuCommentsOnly) {
   // A compilation unit containing only comments parses to an empty CU.
-  auto r = Parse("// line comment\n"
-                 "/* block\n"
-                 "   comment */\n");
+  auto r = Parse(
+      "// line comment\n"
+      "/* block\n"
+      "   comment */\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->modules.empty());
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
 TEST(ParserCh503, BlockCommentSpanningLines) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  /* this comment\n"
-                      "     spans multiple\n"
-                      "     lines */\n"
-                      "  logic a;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  /* this comment\n"
+              "     spans multiple\n"
+              "     lines */\n"
+              "  logic a;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserCh503, OneLineCommentEndsAtNewline) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  logic a; // comment\n"
-                      "  logic b;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic a; // comment\n"
+              "  logic b;\n"
+              "endmodule\n"));
 }
 
-} // namespace
+}  // namespace

@@ -15,14 +15,15 @@ TEST(SourceText, CheckerEndLabel) {
 }
 // §9.3.4: Named sequential block
 TEST(ParserA603, SeqBlockNamed) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : my_block\n"
-                 "    a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "my_block");
@@ -30,14 +31,15 @@ TEST(ParserA603, SeqBlockNamed) {
 
 // §9.3.4: Named sequential block with matching end label
 TEST(ParserA603, SeqBlockNamedWithEndLabel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : blockB\n"
-                 "    a = 1;\n"
-                 "  end : blockB\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : blockB\n"
+      "    a = 1;\n"
+      "  end : blockB\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "blockB");
@@ -45,16 +47,17 @@ TEST(ParserA603, SeqBlockNamedWithEndLabel) {
 
 // §9.3.4: Named fork block
 TEST(ParserA603, ForkNamed) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : my_fork\n"
-                 "      #10 a = 1;\n"
-                 "    join\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : my_fork\n"
+      "      #10 a = 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->label, "my_fork");
@@ -62,32 +65,34 @@ TEST(ParserA603, ForkNamed) {
 
 // §9.3.4: Named fork block with matching end label
 TEST(ParserA603, ForkNamedWithEndLabel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : my_fork\n"
-                 "      #10 a = 1;\n"
-                 "    join : my_fork\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : my_fork\n"
+      "      #10 a = 1;\n"
+      "    join : my_fork\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->label, "my_fork");
 }
 
 // §9.3.4: Named fork with join_any and end label
 TEST(ParserA603, ForkNamedJoinAnyWithEndLabel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : f1\n"
-                 "      #10 a = 1;\n"
-                 "    join_any : f1\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : f1\n"
+      "      #10 a = 1;\n"
+      "    join_any : f1\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
   EXPECT_EQ(stmt->label, "f1");
@@ -95,30 +100,32 @@ TEST(ParserA603, ForkNamedJoinAnyWithEndLabel) {
 
 // §9.3.4: Named fork with join_none and end label
 TEST(ParserA603, ForkNamedJoinNoneWithEndLabel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : f2\n"
-                 "      #10 a = 1;\n"
-                 "    join_none : f2\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : f2\n"
+      "      #10 a = 1;\n"
+      "    join_none : f2\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
   EXPECT_EQ(stmt->label, "f2");
 }
 TEST(ParserSection9c, SequentialBlockNamedWithDecls) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : my_block\n"
-                 "    integer count;\n"
-                 "    count = 0;\n"
-                 "  end : my_block\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    integer count;\n"
+      "    count = 0;\n"
+      "  end : my_block\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *body = r.cu->modules[0]->items[0]->body;
+  auto* body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "my_block");
@@ -127,15 +134,16 @@ TEST(ParserSection9c, SequentialBlockNamedWithDecls) {
 // §4.6: Named begin-end block for deterministic scoping
 // =============================================================================
 TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : seq_blk\n"
-                 "    x = 1;\n"
-                 "    y = 2;\n"
-                 "  end : seq_blk\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : seq_blk\n"
+      "    x = 1;\n"
+      "    y = 2;\n"
+      "  end : seq_blk\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "seq_blk");
@@ -144,14 +152,15 @@ TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
 // LRM section 9.3.1 -- Sequential blocks (additional tests)
 // =============================================================================
 TEST(ParserSection9, SequentialBlockNamedBeginEnd) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : my_seq\n"
-                 "    a = 1;\n"
-                 "    b = 2;\n"
-                 "  end : my_seq\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_seq\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  end : my_seq\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   EXPECT_EQ(item->body->label, "my_seq");
@@ -159,18 +168,19 @@ TEST(ParserSection9, SequentialBlockNamedBeginEnd) {
 }
 // 3. Named begin-end block creating a subscope
 TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : my_block\n"
-                 "    int x;\n"
-                 "    x = 1;\n"
-                 "  end : my_block\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    int x;\n"
+      "    x = 1;\n"
+      "  end : my_block\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_GE(mod->items.size(), 1u);
-  auto *item = mod->items[0];
+  auto* item = mod->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kInitialBlock);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->label, "my_block");
@@ -178,17 +188,18 @@ TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
 
 // 4. Nested named begin-end blocks
 TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : outer\n"
-                 "    begin : inner\n"
-                 "      int y;\n"
-                 "      y = 42;\n"
-                 "    end : inner\n"
-                 "  end : outer\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : outer\n"
+      "    begin : inner\n"
+      "      int y;\n"
+      "      y = 42;\n"
+      "    end : inner\n"
+      "  end : outer\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->label, "outer");
   ASSERT_GE(item->body->stmts.size(), 1u);
@@ -199,13 +210,14 @@ TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
 // LRM section 12.6 -- Named blocks / block labels
 // =============================================================================
 TEST(ParserSection12, NamedBeginEnd) {
-  auto r = Parse("module t;\n"
-                 "  initial begin : my_block\n"
-                 "    x = 1;\n"
-                 "  end : my_block\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : my_block\n"
+      "    x = 1;\n"
+      "  end : my_block\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "my_block");
@@ -213,15 +225,16 @@ TEST(ParserSection12, NamedBeginEnd) {
 
 // 25. begin-end with no name (anonymous block)
 TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    int x;\n"
-                 "    x = 5;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x;\n"
+      "    x = 5;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   // Anonymous blocks have an empty label.
@@ -229,13 +242,14 @@ TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
 }
 
 TEST(ParserSection12, NamedBeginEndNoEndLabel) {
-  auto r = Parse("module t;\n"
-                 "  initial begin : blk\n"
-                 "    x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : blk\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "blk");
@@ -243,21 +257,22 @@ TEST(ParserSection12, NamedBeginEndNoEndLabel) {
 
 // 26. Multiple named blocks at same level
 TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    begin : block_a\n"
-                 "      int x;\n"
-                 "      x = 1;\n"
-                 "    end : block_a\n"
-                 "    begin : block_b\n"
-                 "      int y;\n"
-                 "      y = 2;\n"
-                 "    end : block_b\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin : block_a\n"
+      "      int x;\n"
+      "      x = 1;\n"
+      "    end : block_a\n"
+      "    begin : block_b\n"
+      "      int y;\n"
+      "      y = 2;\n"
+      "    end : block_b\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *body = r.cu->modules[0]->items[0]->body;
+  auto* body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 2u);
   EXPECT_EQ(body->stmts[0]->label, "block_a");
@@ -267,17 +282,18 @@ TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
 // 5. Named fork-join with matching end labels
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_NamedForkJoinMatchingLabels) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : thread_group\n"
-                 "      #10 a = 1;\n"
-                 "      #20 b = 2;\n"
-                 "    join : thread_group\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : thread_group\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 2;\n"
+      "    join : thread_group\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->label, "thread_group");
@@ -285,13 +301,14 @@ TEST(ParserSection9, Sec9_3_2_NamedForkJoinMatchingLabels) {
 }
 
 TEST(ParserSection12, NamedForkJoin) {
-  auto r = Parse("module t;\n"
-                 "  initial fork : my_fork\n"
-                 "    x = 1;\n"
-                 "  join : my_fork\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial fork : my_fork\n"
+      "    x = 1;\n"
+      "  join : my_fork\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kFork);
   EXPECT_EQ(body->label, "my_fork");
@@ -302,16 +319,17 @@ TEST(ParserSection12, NamedForkJoin) {
 // Nested blocks with names, and automatic variable lifetime in blocks.
 // =============================================================================
 TEST(ParserSection9c, NestedNamedSequentialBlocks) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : outer\n"
-                 "    begin : inner\n"
-                 "      a = 1;\n"
-                 "    end : inner\n"
-                 "  end : outer\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : outer\n"
+      "    begin : inner\n"
+      "      a = 1;\n"
+      "    end : inner\n"
+      "  end : outer\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *body = r.cu->modules[0]->items[0]->body;
+  auto* body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->label, "outer");
   ASSERT_GE(body->stmts.size(), 1u);
@@ -320,13 +338,14 @@ TEST(ParserSection9c, NestedNamedSequentialBlocks) {
 }
 
 TEST(ParserSection12, NamedForkJoinAny) {
-  auto r = Parse("module t;\n"
-                 "  initial fork : par_blk\n"
-                 "    x = 1;\n"
-                 "  join_any : par_blk\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial fork : par_blk\n"
+      "    x = 1;\n"
+      "  join_any : par_blk\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kFork);
   EXPECT_EQ(body->label, "par_blk");
@@ -343,16 +362,17 @@ TEST(ParserSection23, EndLabelInterface) {
 // 7. Named fork-join_none
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_NamedForkJoinNone) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : bg_threads\n"
-                 "      #100 a = 1;\n"
-                 "    join_none : bg_threads\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : bg_threads\n"
+      "      #100 a = 1;\n"
+      "    join_none : bg_threads\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->label, "bg_threads");
@@ -360,13 +380,14 @@ TEST(ParserSection9, Sec9_3_2_NamedForkJoinNone) {
 }
 
 TEST(ParserSection12, UnlabeledBlockHasEmptyLabel) {
-  auto r = Parse("module t;\n"
-                 "  initial begin\n"
-                 "    x = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_TRUE(body->label.empty());
@@ -381,32 +402,34 @@ TEST(ParserSection23, EndLabelProgram) {
 
 // 24. Named fork-join blocks
 TEST(ParserClause03, Cl3_13_NamedForkJoinBlock) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : my_fork\n"
-                 "      $display(\"a\");\n"
-                 "      $display(\"b\");\n"
-                 "    join : my_fork\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : my_fork\n"
+      "      $display(\"a\");\n"
+      "      $display(\"b\");\n"
+      "    join : my_fork\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->body, nullptr);
   ASSERT_GE(item->body->stmts.size(), 1u);
-  auto *fork_stmt = item->body->stmts[0];
+  auto* fork_stmt = item->body->stmts[0];
   EXPECT_EQ(fork_stmt->kind, StmtKind::kFork);
   EXPECT_EQ(fork_stmt->label, "my_fork");
 }
 TEST(ParserSection9, Sec9_3_1_NamedBeginEndMatchingLabel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : seq_block\n"
-                 "    a = 1;\n"
-                 "  end : seq_block\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : seq_block\n"
+      "    a = 1;\n"
+      "  end : seq_block\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *body = FirstInitialBody(r);
+  auto* body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "seq_block");
@@ -415,45 +438,48 @@ TEST(ParserSection9, Sec9_3_1_NamedBeginEndMatchingLabel) {
 
 // Named block with declarations
 TEST(ParserA28, NamedBlockWithDecls) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : my_block\n"
-                 "    parameter int N = 4;\n"
-                 "    int i;\n"
-                 "    for (i = 0; i < N; i++) begin\n"
-                 "    end\n"
-                 "  end : my_block\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    parameter int N = 4;\n"
+      "    int i;\n"
+      "    for (i = 0; i < N; i++) begin\n"
+      "    end\n"
+      "  end : my_block\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *body = r.cu->modules[0]->items[0]->body;
+  auto* body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->label, "my_block");
 }
 
 TEST(ParserSection9, Sec9_3_1_NamedBeginEndNoEndLabel) {
-  auto r = Parse("module m;\n"
-                 "  initial begin : blk_no_end\n"
-                 "    a = 1;\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : blk_no_end\n"
+      "    a = 1;\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *body = FirstInitialBody(r);
+  auto* body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "blk_no_end");
 }
 
 TEST(ParserSection12, NestedNamedBlocks) {
-  auto r = Parse("module t;\n"
-                 "  initial begin : outer\n"
-                 "    begin : inner\n"
-                 "      x = 1;\n"
-                 "    end : inner\n"
-                 "  end : outer\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin : outer\n"
+      "    begin : inner\n"
+      "      x = 1;\n"
+      "    end : inner\n"
+      "  end : outer\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *body = InitialBody(r);
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->label, "outer");
   ASSERT_GE(body->stmts.size(), 1u);
@@ -463,20 +489,21 @@ TEST(ParserSection12, NestedNamedBlocks) {
 // LRM section 9.3.2 -- Parallel blocks (additional tests)
 // =============================================================================
 TEST(ParserSection9, ParallelBlockNamedForkJoin) {
-  auto r = Parse("module m;\n"
-                 "  initial begin\n"
-                 "    fork : par_blk\n"
-                 "      #10 a = 1;\n"
-                 "      #20 b = 2;\n"
-                 "    join : par_blk\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : par_blk\n"
+      "      #10 a = 1;\n"
+      "      #20 b = 2;\n"
+      "    join : par_blk\n"
+      "  end\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->label, "par_blk");
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
 }
 
-} // namespace
+}  // namespace

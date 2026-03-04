@@ -7,8 +7,8 @@
 using namespace delta;
 
 struct ConfigTest : ::testing::Test {
-protected:
-  CompilationUnit *Parse(const std::string &src) {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -32,7 +32,7 @@ namespace {
 // §33.4.3 Config with parameter override
 // =============================================================================
 TEST_F(ConfigTest, UseClauseWithParams) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg;
       design lib.top;
       instance top.u1 use lib.adder #(.WIDTH(16), .DEPTH(4));
@@ -40,7 +40,7 @@ TEST_F(ConfigTest, UseClauseWithParams) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_EQ(unit->configs[0]->rules.size(), 1u);
-  auto *rule = unit->configs[0]->rules[0];
+  auto* rule = unit->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(rule->use_lib, "lib");
   EXPECT_EQ(rule->use_cell, "adder");
@@ -50,7 +50,7 @@ TEST_F(ConfigTest, UseClauseWithParams) {
 }
 
 TEST_F(ConfigTest, LocalparamInConfig) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg;
       localparam W = 32;
       design lib.top;
@@ -58,10 +58,10 @@ TEST_F(ConfigTest, LocalparamInConfig) {
     endconfig
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
-  auto *cfg = unit->configs[0];
+  auto* cfg = unit->configs[0];
   ASSERT_EQ(cfg->local_params.size(), 1u);
   EXPECT_EQ(cfg->local_params[0].first, "W");
   EXPECT_NE(cfg->local_params[0].second, nullptr);
 }
 
-} // namespace
+}  // namespace

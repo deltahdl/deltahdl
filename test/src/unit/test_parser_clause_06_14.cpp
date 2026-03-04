@@ -16,12 +16,13 @@ TEST(ParserA221, DataTypeChandle) {
 }
 // 25. Chandle variable declaration.
 TEST(ParserSection6, Sec6_5_ChandleVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  chandle handle;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  chandle handle;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kChandle);
@@ -34,7 +35,7 @@ TEST(ParserA84, ConstantPrimaryNull) {
   auto r = Parse("module m; initial x = null; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstInitialRHS(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kIdentifier);
   EXPECT_EQ(rhs->text, "null");
@@ -42,22 +43,24 @@ TEST(ParserA84, ConstantPrimaryNull) {
 
 TEST(ParserSection6, ChandleMultipleDecls) {
   // chandle with multiple variables in a module.
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  chandle h1, h2;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  chandle h1, h2;\n"
+              "endmodule\n"));
 }
 // =========================================================================
 // §6.14: Chandle data type
 // =========================================================================
 TEST(ParserSection6, ChandleVarDecl) {
-  auto r = Parse("module t;\n"
-                 "  chandle ch;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  chandle ch;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kChandle);
   EXPECT_EQ(item->name, "ch");
 }
 
-} // namespace
+}  // namespace

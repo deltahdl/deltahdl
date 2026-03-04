@@ -11,7 +11,7 @@ TEST(ParserA212, InoutImplicitType) {
   auto r = Parse("module m(inout a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &port = r.cu->modules[0]->ports[0];
+  auto& port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kInout);
 }
 
@@ -36,17 +36,18 @@ TEST(ParserA212, RefUnpackedDim) {
   auto r = Parse("module m(ref int arr [4]); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &port = r.cu->modules[0]->ports[0];
+  auto& port = r.cu->modules[0]->ports[0];
   EXPECT_EQ(port.direction, Direction::kRef);
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
 // 27. Net as input port.
 TEST(ParserSection6, Sec6_5_NetAsInputPort) {
-  auto r = Parse("module t(input wire [7:0] data_in);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t(input wire [7:0] data_in);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &ports = r.cu->modules[0]->ports;
+  auto& ports = r.cu->modules[0]->ports;
   ASSERT_EQ(ports.size(), 1u);
   EXPECT_EQ(ports[0].direction, Direction::kInput);
   EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kWire);
@@ -58,11 +59,12 @@ TEST(ParserSection6, Sec6_5_NetAsInputPort) {
 
 // 28. Variable as output port.
 TEST(ParserSection6, Sec6_5_VarAsOutputPort) {
-  auto r = Parse("module t(output logic [15:0] result);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t(output logic [15:0] result);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &ports = r.cu->modules[0]->ports;
+  auto& ports = r.cu->modules[0]->ports;
   ASSERT_EQ(ports.size(), 1u);
   EXPECT_EQ(ports[0].direction, Direction::kOutput);
   EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kLogic);
@@ -75,7 +77,7 @@ TEST(ParserSection6, ParsePortDecl_ImplicitType) {
   auto r = Parse("module m(input [3:0] a, output [7:0] b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
-  auto &ports = r.cu->modules[0]->ports;
+  auto& ports = r.cu->modules[0]->ports;
   std::string expected_names[] = {"a", "b"};
   ASSERT_EQ(ports.size(), std::size(expected_names));
   for (size_t i = 0; i < std::size(expected_names); ++i) {
@@ -84,10 +86,11 @@ TEST(ParserSection6, ParsePortDecl_ImplicitType) {
   }
 }
 TEST(ParserSection23, AnsiPortsWithDefaultType) {
-  auto r = Parse("module m(input a, output b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 2u);
   EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
   EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
@@ -97,12 +100,13 @@ TEST(ParserSection23, AnsiPortsWithDefaultType) {
 // =============================================================================
 // 30. Integer types as module port declarations.
 TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
-  auto r = Parse("module m(input int a, output byte b);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input int a, output byte b);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto &ports = r.cu->modules[0]->ports;
+  auto& ports = r.cu->modules[0]->ports;
   ASSERT_EQ(ports.size(), 2u);
   EXPECT_EQ(ports[0].direction, Direction::kInput);
   EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kInt);
@@ -114,11 +118,12 @@ TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
 
 // 30b. More integer types as ports: longint and shortint.
 TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
-  auto r = Parse("module m(input longint addr, output shortint result);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input longint addr, output shortint result);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &ports = r.cu->modules[0]->ports;
+  auto& ports = r.cu->modules[0]->ports;
   ASSERT_EQ(ports.size(), 2u);
   EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kLongint);
   EXPECT_EQ(ports[0].name, "addr");
@@ -128,11 +133,12 @@ TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
 
 // 30c. Integer type port with packed dimensions.
 TEST(ParserSection6, Sec6_11_LogicPackedDimsAsPort) {
-  auto r = Parse("module m(input logic [7:0] data, output logic [15:0] addr);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input logic [7:0] data, output logic [15:0] addr);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &ports = r.cu->modules[0]->ports;
+  auto& ports = r.cu->modules[0]->ports;
   ASSERT_EQ(ports.size(), 2u);
   EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kLogic);
   ASSERT_NE(ports[0].data_type.packed_dim_left, nullptr);
@@ -144,11 +150,12 @@ TEST(ParserSection6, Sec6_11_LogicPackedDimsAsPort) {
 
 // integer (4-state) as port declaration.
 TEST(ParserSection6, Sec6_11_IntegerAsPort) {
-  auto r = Parse("module m(input integer idx);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input integer idx);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto &ports = r.cu->modules[0]->ports;
+  auto& ports = r.cu->modules[0]->ports;
   ASSERT_EQ(ports.size(), 1u);
   EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kInteger);
   EXPECT_EQ(ports[0].direction, Direction::kInput);
@@ -156,16 +163,18 @@ TEST(ParserSection6, Sec6_11_IntegerAsPort) {
 
 TEST(ParserSection6, VarImplicitInPort) {
   // §6.8: "input var [7:0] data_in;" in port list.
-  EXPECT_TRUE(ParseOk("module t(input var [7:0] data_in);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t(input var [7:0] data_in);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserSection6, ShortrealInPort) {
   // shortreal as port type (LRM 23.2.2)
-  EXPECT_TRUE(ParseOk("module m (input var shortreal in_val,\n"
-                      "          output var shortreal out_val);\n"
-                      "  assign out_val = in_val;\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (input var shortreal in_val,\n"
+              "          output var shortreal out_val);\n"
+              "  assign out_val = in_val;\n"
+              "endmodule\n"));
 }
 
-} // namespace
+}  // namespace

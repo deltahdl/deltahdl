@@ -14,12 +14,13 @@ namespace {
 // §14.13: input sampled at clocking event (basic pattern from LRM).
 // Validates: clocking cb @(negedge clk); input v; endclocking
 TEST(ParserSection14, InputSamplingBasic) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(negedge clk);\n"
-                 "    input v;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
-  ModuleItem *item = nullptr;
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(negedge clk);\n"
+      "    input v;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
@@ -29,15 +30,16 @@ TEST(ParserSection14, InputSamplingBasic) {
 
 // §14.13: input with explicit #0 skew (samples in the Observed region).
 TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
-  auto r = Parse("module m;\n"
-                 "  clocking cb @(posedge clk);\n"
-                 "    input #0 data;\n"
-                 "  endclocking\n"
-                 "endmodule\n");
-  ModuleItem *item = nullptr;
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #0 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
-  auto &sig = item->clocking_signals[0];
+  auto& sig = item->clocking_signals[0];
   EXPECT_EQ(sig.direction, Direction::kInput);
   ASSERT_NE(sig.skew_delay, nullptr);
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
@@ -45,12 +47,13 @@ TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
 
 // Access clocking block signal via dot notation (cb.v) in always block.
 TEST(ParserSection19, ClockingBlockEvent_DotAccess) {
-  EXPECT_TRUE(ParseOk("module t;\n"
-                      "  clocking cb @(negedge clk);\n"
-                      "    input v;\n"
-                      "  endclocking\n"
-                      "  always @(cb) $display(cb.v);\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(negedge clk);\n"
+              "    input v;\n"
+              "  endclocking\n"
+              "  always @(cb) $display(cb.v);\n"
+              "endmodule\n"));
 }
 
-} // namespace
+}  // namespace

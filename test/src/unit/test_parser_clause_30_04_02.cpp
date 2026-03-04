@@ -18,30 +18,32 @@ TEST(ParserAnnexA, A7SpecifyParallelPath) {
   ASSERT_GE(r.cu->modules[0]->items[0]->specify_items.size(), 1u);
 }
 TEST(ParserA701, SpecifyBlockSingleItem) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
 }
 using ConfigParseTest = ProgramTestParse;
 
 TEST(ParserSection28, Sec28_12_MultiplePathsInSpecifyBlock) {
-  auto r = Parse("module m(input a, b, output x, y);\n"
-                 "  specify\n"
-                 "    (a => x) = 5;\n"
-                 "    (b => y) = 7;\n"
-                 "    (a => y) = 9;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, b, output x, y);\n"
+      "  specify\n"
+      "    (a => x) = 5;\n"
+      "    (b => y) = 7;\n"
+      "    (a => y) = 9;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 3u);
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
@@ -57,14 +59,15 @@ TEST(ParserSection28, Sec28_12_MultiplePathsInSpecifyBlock) {
 // =============================================================================
 // Input terminal with bit-select
 TEST(ParserA703, InputTerminalBitSelect) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a[3] => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a[3] => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *si = GetSolePathItem(r);
+  auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   ASSERT_EQ(si->path.src_ports.size(), 1u);
   EXPECT_EQ(si->path.src_ports[0].name, "a");
@@ -74,14 +77,15 @@ TEST(ParserA703, InputTerminalBitSelect) {
 }
 
 TEST(ParserA701, SpecifyItemPathDecl) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
@@ -89,14 +93,15 @@ TEST(ParserA701, SpecifyItemPathDecl) {
 
 // Output terminal with part-select range
 TEST(ParserA703, OutputTerminalPartSelect) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a => b[7:0]) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b[7:0]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *si = GetSolePathItem(r);
+  auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
   EXPECT_EQ(si->path.dst_ports[0].name, "b");
@@ -105,12 +110,10 @@ TEST(ParserA703, OutputTerminalPartSelect) {
   EXPECT_NE(si->path.dst_ports[0].range_right, nullptr);
 }
 
-SpecifyItem *GetSolePathItem(ParseResult &r) {
-  if (!r.cu || r.cu->modules.empty())
-    return nullptr;
-  auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  if (!spec || spec->specify_items.empty())
-    return nullptr;
+SpecifyItem* GetSolePathItem(ParseResult& r) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  if (!spec || spec->specify_items.empty()) return nullptr;
   return spec->specify_items[0];
 }
 
@@ -119,14 +122,15 @@ SpecifyItem *GetSolePathItem(ParseResult &r) {
 // =============================================================================
 // path_declaration ::= simple_path_declaration ;
 TEST(ParserA702, PathDeclSimpleParallel) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *si = GetSolePathItem(r);
+  auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
@@ -137,14 +141,15 @@ TEST(ParserA702, PathDeclSimpleParallel) {
 
 // path_declaration ::= simple_path_declaration ; (full connection)
 TEST(ParserA702, PathDeclSimpleFull) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a, b *> c) = 10;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b *> c) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *si = GetSolePathItem(r);
+  auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   ASSERT_EQ(si->path.src_ports.size(), 2u);
@@ -153,14 +158,15 @@ TEST(ParserA702, PathDeclSimpleFull) {
 
 // Both input and output with range expressions
 TEST(ParserA703, BothInputOutputWithRanges) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a[3:0] => b[7:4]) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a[3:0] => b[7:4]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *si = GetSolePathItem(r);
+  auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.src_ports[0].name, "a");
   EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
@@ -170,14 +176,15 @@ TEST(ParserA703, BothInputOutputWithRanges) {
 
 // Output identifier — interface_identifier.port_identifier
 TEST(ParserA703, OutputIdentifierDotted) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a => intf.sig) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => intf.sig) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *si = GetSolePathItem(r);
+  auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
   EXPECT_EQ(si->path.dst_ports[0].interface_name, "intf");
@@ -188,14 +195,15 @@ TEST(ParserA703, OutputIdentifierDotted) {
 // A.7.2 simple_path_declaration — parallel_path_description = path_delay_value
 // =============================================================================
 TEST(ParserA702, SimplePathParallelSingleDelay) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a => b) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *si = GetSolePathItem(r);
+  auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
   ASSERT_EQ(si->path.src_ports.size(), 1u);
@@ -207,14 +215,15 @@ TEST(ParserA702, SimplePathParallelSingleDelay) {
 
 // simple_path_declaration — full_path_description = path_delay_value
 TEST(ParserA702, SimplePathFullMultiplePorts) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a, b, c *> x, y) = 12;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b, c *> x, y) = 12;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *si = GetSolePathItem(r);
+  auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
 }
@@ -224,14 +233,15 @@ TEST(ParserA702, SimplePathFullMultiplePorts) {
 // =============================================================================
 // Multiple input terminals with mixed forms in full path
 TEST(ParserA703, MixedInputTerminalsFullPath) {
-  auto r = Parse("module m;\n"
-                 "  specify\n"
-                 "    (a, b[3], c[7:0] *> d) = 5;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b[3], c[7:0] *> d) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *si = GetSolePathItem(r);
+  auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   ASSERT_EQ(si->path.src_ports.size(), 3u);
   EXPECT_EQ(si->path.src_ports[0].name, "a");
@@ -247,11 +257,12 @@ TEST(ParserA703, MixedInputTerminalsFullPath) {
 // =============================================================================
 // § module_path_expression used in specify block path conditions
 TEST(ParserA83, ModulePathExprInSpecify) {
-  auto r = Parse("module m(input a, output y);\n"
-                 "  specify\n"
-                 "    (a => y) = 1;\n"
-                 "  endspecify\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  specify\n"
+      "    (a => y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -262,8 +273,8 @@ using SpecifyParseTest = ProgramTestParse;
 // Parser test fixture
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
-protected:
-  CompilationUnit *Parse(const std::string &src) {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -271,10 +282,9 @@ protected:
   }
 
   // Helper: get first specify block from first module.
-  ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
-    for (auto *item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock)
-        return item;
+  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
+    for (auto* item : cu->modules[0]->items) {
+      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
     }
     return nullptr;
   }
@@ -289,23 +299,25 @@ protected:
 
 // §3.3 Specify blocks
 TEST(ParserClause03, Cl3_3_SpecifyBlock) {
-  EXPECT_TRUE(ParseOk("module m (input a, output y);\n"
-                      "  assign y = a;\n"
-                      "  specify\n"
-                      "    (a => y) = 1.5;\n"
-                      "  endspecify\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m (input a, output y);\n"
+              "  assign y = a;\n"
+              "  specify\n"
+              "    (a => y) = 1.5;\n"
+              "  endspecify\n"
+              "endmodule\n"));
 }
 TEST(ParserSection28, Sec28_12_MultipleSourceDestPorts) {
-  auto sp = ParseSpecifySingle("module m(input a, b, c, output x, y);\n"
-                               "  specify\n"
-                               "    (a, b, c *> x, y) = 12;\n"
-                               "  endspecify\n"
-                               "endmodule\n");
+  auto sp = ParseSpecifySingle(
+      "module m(input a, b, c, output x, y);\n"
+      "  specify\n"
+      "    (a, b, c *> x, y) = 12;\n"
+      "  endspecify\n"
+      "endmodule\n");
   ASSERT_NE(sp.pr.cu, nullptr);
   EXPECT_FALSE(sp.pr.has_errors);
   ASSERT_NE(sp.sole_item, nullptr);
-  auto *si = sp.sole_item;
+  auto* si = sp.sole_item;
   EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
   VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
 }
@@ -314,16 +326,17 @@ TEST(ParserSection28, Sec28_12_MultipleSourceDestPorts) {
 // §30.3 Path delay declarations
 // =============================================================================
 TEST_F(SpecifyTest, ParallelPathDelay) {
-  auto *cu = Parse("module m;\n"
-                   "specify\n"
-                   "  (a => b) = 5;\n"
-                   "endspecify\n"
-                   "endmodule\n");
+  auto* cu = Parse(
+      "module m;\n"
+      "specify\n"
+      "  (a => b) = 5;\n"
+      "endspecify\n"
+      "endmodule\n");
   ASSERT_EQ(cu->modules.size(), 1u);
-  auto *spec = FirstSpecifyBlock(cu);
+  auto* spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
-  auto *item = spec->specify_items[0];
+  auto* item = spec->specify_items[0];
   EXPECT_EQ(item->kind, SpecifyItemKind::kPathDecl);
   EXPECT_EQ(item->path.path_kind, SpecifyPathKind::kParallel);
   ASSERT_EQ(item->path.src_ports.size(), 1u);
@@ -333,4 +346,4 @@ TEST_F(SpecifyTest, ParallelPathDelay) {
   ASSERT_EQ(item->path.delays.size(), 1u);
 }
 
-} // namespace
+}  // namespace

@@ -8,11 +8,12 @@ using namespace delta;
 namespace {
 
 TEST(ParserA212, LetIdentifier_Underscore) {
-  auto r = Parse("module m;\n"
-                 "  let _my_let_123 = 0;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  let _my_let_123 = 0;\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto *item =
+  auto* item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "_my_let_123");
@@ -31,7 +32,7 @@ TEST(ParserCh501, Sec5_1_IdentifierAllLegalChars) {
   // An identifier may contain letters, digits, underscore, and dollar sign.
   auto r = Parse("module m; logic abc_123$xyz; endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "abc_123$xyz");
 }
@@ -42,7 +43,7 @@ TEST(ParserCh501, Sec5_1_IdentifierAllLegalChars) {
 TEST(ParserCh501, Sec5_1_IdentifierStartsWithUnderscore) {
   auto r = Parse("module m; logic _start_val; endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "_start_val");
 }
@@ -53,7 +54,7 @@ TEST(ParserCh501, Sec5_1_IdentifierStartsWithUnderscore) {
 TEST(ParserCh501, Sec5_1_IdentifierStartsWithLetter) {
   auto r = Parse("module m; logic Data0; endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "Data0");
 }
@@ -63,13 +64,14 @@ TEST(ParserCh501, Sec5_1_IdentifierStartsWithLetter) {
 TEST(ParserCh501, Sec5_1_NumberFollowedByIdentifier) {
   // "42" and "abc" are separate tokens even without whitespace between the
   // numeric literal and an identifier in expression context.
-  auto r = Parse("module m;\n"
-                 "  initial x = 42 + abc;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 42 + abc;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  auto *rhs = stmt->rhs;
+  auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
@@ -85,7 +87,7 @@ TEST(ParserCh501, Sec5_1_NumberFollowedByIdentifier) {
 TEST(ParserCh506, Ident_SimpleWithUnderscore) {
   auto r = Parse("module m; logic _bus3; endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "_bus3");
 }
@@ -96,14 +98,15 @@ TEST(ParserCh506, Ident_SimpleWithDollarSign) {
 
 TEST(ParserCh506, Ident_CaseSensitive) {
   // Identifiers are case sensitive: X and x are different.
-  auto r = Parse("module m;\n"
-                 "  logic X;\n"
-                 "  logic x;\n"
-                 "endmodule");
+  auto r = Parse(
+      "module m;\n"
+      "  logic X;\n"
+      "  logic x;\n"
+      "endmodule");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "X");
   EXPECT_EQ(r.cu->modules[0]->items[1]->name, "x");
 }
 
-} // namespace
+}  // namespace

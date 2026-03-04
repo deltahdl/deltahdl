@@ -8,8 +8,9 @@ namespace {
 
 // §8.15 — Extends with scoped class name
 TEST(ParserSection8, ExtendsScopedName) {
-  auto r = Parse("class Child extends pkg::Base;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class Child extends pkg::Base;\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 
@@ -19,7 +20,7 @@ TEST(ParserSection8, ExtendsScopedName) {
 TEST(Parser, ClassExtends) {
   auto r = Parse("class child extends parent; endclass");
   ASSERT_NE(r.cu, nullptr);
-  auto *cls = r.cu->classes[0];
+  auto* cls = r.cu->classes[0];
   EXPECT_EQ(cls->name, "child");
   EXPECT_EQ(cls->base_class, "parent");
 }
@@ -47,12 +48,13 @@ TEST(SourceText, ClassWithFinal) {
 }
 
 TEST(ParserSection8, ClassExtendsBase) {
-  auto r = Parse("class Base;\n"
-                 "  int x;\n"
-                 "endclass\n"
-                 "class Derived extends Base;\n"
-                 "  int y;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class Base;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  int y;\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 2u);
   EXPECT_EQ(r.cu->classes[0]->name, "Base");
@@ -60,16 +62,17 @@ TEST(ParserSection8, ClassExtendsBase) {
 }
 
 TEST(ParserSection8, ClassExtendsDerived) {
-  auto r = Parse("class Base;\n"
-                 "  int x;\n"
-                 "endclass\n"
-                 "class Derived extends Base;\n"
-                 "  int y;\n"
-                 "endclass\n");
+  auto r = Parse(
+      "class Base;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  int y;\n"
+      "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 2u);
   EXPECT_EQ(r.cu->classes[1]->name, "Derived");
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
-} // namespace
+}  // namespace

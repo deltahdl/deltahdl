@@ -29,24 +29,26 @@ TEST(ParserA210, ExpectPropertyStatement) {
 }
 
 TEST(ParserA210, ExpectPropertyStatement_NoActions) {
-  EXPECT_TRUE(ParseOk("module m;\n"
-                      "  initial begin\n"
-                      "    expect (req |-> ack);\n"
-                      "  end\n"
-                      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    expect (req |-> ack);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // --- Test helpers ---
 TEST(ParserSection16, ExpectStatement) {
-  auto r = Parse("module top();\n"
-                 "  logic clk, a, b;\n"
-                 "  initial begin\n"
-                 "    expect (@(posedge clk) a ##1 b);\n"
-                 "  end\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module top();\n"
+      "  logic clk, a, b;\n"
+      "  initial begin\n"
+      "    expect (@(posedge clk) a ##1 b);\n"
+      "  end\n"
+      "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-} // namespace
+}  // namespace

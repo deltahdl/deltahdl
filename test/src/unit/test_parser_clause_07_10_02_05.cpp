@@ -8,15 +8,16 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection7, QueuePopBack) {
-  auto r = Parse("module t;\n"
-                 "  int q[$] = '{1, 2, 3};\n"
-                 "  initial y = q.pop_back();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$] = '{1, 2, 3};\n"
+      "  initial y = q.pop_back();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-} // namespace
+}  // namespace

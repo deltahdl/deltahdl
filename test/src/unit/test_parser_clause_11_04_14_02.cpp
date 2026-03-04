@@ -7,12 +7,13 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection11, StreamingLeft) {
-  auto r = Parse("module t;\n"
-                 "  initial x = {<< {a, b, c}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {<< {a, b, c}};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rhs = FirstAssignRhs(r);
+  auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
@@ -23,7 +24,7 @@ TEST(ParserA81, StreamingWithTypeSliceSize) {
   auto r = Parse("module m; initial x = {<< byte {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
   ASSERT_NE(stmt->rhs->lhs, nullptr);
@@ -33,7 +34,7 @@ TEST(ParserA81, StreamingWithIntSliceSize) {
   auto r = Parse("module m; initial x = {<< int {a, b}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
   ASSERT_NE(stmt->rhs->lhs, nullptr);
@@ -43,7 +44,7 @@ TEST(ParserA81, StreamingWithExprSliceSize) {
   auto r = Parse("module m; initial x = {<< 4 {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
   ASSERT_NE(stmt->rhs->lhs, nullptr);
@@ -51,12 +52,13 @@ TEST(ParserA81, StreamingWithExprSliceSize) {
 
 // § variable_lvalue — streaming_concatenation with slice_size
 TEST(ParserA85, VarLvalueStreamingConcatSliceSize) {
-  auto r = Parse("module m; logic [31:0] a, b;\n"
-                 "  initial {>> 8 {a}} = b;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module m; logic [31:0] a, b;\n"
+      "  initial {>> 8 {a}} = b;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
@@ -64,13 +66,14 @@ TEST(ParserA85, VarLvalueStreamingConcatSliceSize) {
 
 // --- Streaming operator with type-sized slice (§11.4.14) ---
 TEST(ParserSection11, StreamingWithTypedSlice) {
-  auto r = Parse("module t;\n"
-                 "  byte a;\n"
-                 "  int b;\n"
-                 "  initial b = {<< byte {a}};\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  byte a;\n"
+      "  int b;\n"
+      "  initial b = {<< byte {a}};\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-} // namespace
+}  // namespace

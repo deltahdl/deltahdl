@@ -9,12 +9,13 @@ namespace {
 
 // §6.7.1: Wand net declaration.
 TEST(ParserSection6, Sec6_7_1_WandDecl) {
-  auto r = Parse("module t;\n"
-                 "  wand w;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wand w;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kWand);
@@ -24,12 +25,13 @@ TEST(ParserSection6, Sec6_7_1_WandDecl) {
 
 // §6.7.1: Wor net declaration.
 TEST(ParserSection6, Sec6_7_1_WorDecl) {
-  auto r = Parse("module t;\n"
-                 "  wor w;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  wor w;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kWor);
@@ -39,12 +41,13 @@ TEST(ParserSection6, Sec6_7_1_WorDecl) {
 
 // §6.7.1: Triand net declaration.
 TEST(ParserSection6, Sec6_7_1_TriandDecl) {
-  auto r = Parse("module t;\n"
-                 "  triand ta;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  triand ta;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTriand);
@@ -53,16 +56,17 @@ TEST(ParserSection6, Sec6_7_1_TriandDecl) {
 
 // §6.7.1: Trior net declaration.
 TEST(ParserSection6, Sec6_7_1_TriorDecl) {
-  auto r = Parse("module t;\n"
-                 "  trior to1;\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  trior to1;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrior);
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-} // namespace
+}  // namespace

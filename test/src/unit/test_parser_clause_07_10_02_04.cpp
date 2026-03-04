@@ -7,15 +7,16 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection7, QueuePopFront) {
-  auto r = Parse("module t;\n"
-                 "  int q[$];\n"
-                 "  initial x = q.pop_front();\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "module t;\n"
+      "  int q[$];\n"
+      "  initial x = q.pop_front();\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *stmt = FirstInitialStmt(r);
+  auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-} // namespace
+}  // namespace

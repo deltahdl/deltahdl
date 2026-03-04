@@ -7,7 +7,7 @@
 using namespace delta;
 
 // Helper: preprocess and parse, returning CU + preprocessor state.
-static ParseResult ParseTimescale31402(const std::string &src) {
+static ParseResult ParseTimescale31402(const std::string& src) {
   ParseResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
@@ -33,14 +33,15 @@ TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
   auto pp = PreprocessTimescale("`timescale 1ns / 1ps\n");
   EXPECT_FALSE(pp.has_errors);
   // Way 2: keywords inside a module.
-  auto pr = ParseTimescale31402("module m;\n"
-                                "  timeunit 1ns;\n"
-                                "  timeprecision 1ps;\n"
-                                "endmodule\n");
+  auto pr = ParseTimescale31402(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
   EXPECT_FALSE(pr.has_errors);
   // Both specify the same unit and precision.
   EXPECT_EQ(pp.timescale.unit, pr.cu->modules[0]->time_unit);
   EXPECT_EQ(pp.timescale.precision, pr.cu->modules[0]->time_prec);
 }
 
-} // namespace
+}  // namespace

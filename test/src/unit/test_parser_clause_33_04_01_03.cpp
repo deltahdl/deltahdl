@@ -7,8 +7,8 @@
 using namespace delta;
 
 struct ConfigTest : ::testing::Test {
-protected:
-  CompilationUnit *Parse(const std::string &src) {
+ protected:
+  CompilationUnit* Parse(const std::string& src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -30,13 +30,14 @@ namespace {
 
 // config_rule_statement: inst_clause liblist_clause with hierarchical inst_name
 TEST(SourceText, ConfigRuleInstLiblist) {
-  auto r = Parse("config cfg6;\n"
-                 "  design top;\n"
-                 "  instance top.u1.u2 liblist mylib;\n"
-                 "endconfig\n");
+  auto r = Parse(
+      "config cfg6;\n"
+      "  design top;\n"
+      "  instance top.u1.u2 liblist mylib;\n"
+      "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto *rule = r.cu->configs[0]->rules[0];
+  auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(rule->inst_path, "top.u1.u2");
   ASSERT_EQ(rule->liblist.size(), 1u);
@@ -48,7 +49,7 @@ using ApiParseTest = ProgramTestParse;
 // §36.9.2 Config instance clause
 // =============================================================================
 TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg1;
       design rtlLib.top;
       default liblist rtlLib;
@@ -57,7 +58,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto *inst_rule = unit->configs[0]->rules[1];
+  auto* inst_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(inst_rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(inst_rule->inst_path, "top.a2");
   ASSERT_EQ(inst_rule->liblist.size(), 1u);
@@ -75,13 +76,13 @@ TEST(ParserSection34, ConfigWithInstanceAndLiblist) {
   )");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->configs.size(), 1u);
-  auto *cfg = r.cu->configs[0];
+  auto* cfg = r.cu->configs[0];
   ASSERT_GE(cfg->rules.size(), 2u);
 }
 using ConfigParseTest = ProgramTestParse;
 
 TEST_F(ConfigParseTest, ConfigWithInstanceClause) {
-  auto *unit = Parse(R"(
+  auto* unit = Parse(R"(
     config cfg;
       design lib.top;
       instance top.u1 liblist lib2;
@@ -91,4 +92,4 @@ TEST_F(ConfigParseTest, ConfigWithInstanceClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-} // namespace
+}  // namespace

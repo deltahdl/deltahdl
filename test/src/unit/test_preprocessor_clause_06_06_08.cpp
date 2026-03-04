@@ -12,14 +12,15 @@ namespace {
 // =========================================================================
 TEST(ParserSection6, InterconnectDeclFlag) {
   // §6.6.8: interconnect declares a typeless generic net.
-  auto r = ParseWithPreprocessor("module t;\n"
-                                 "  interconnect ibus;\n"
-                                 "endmodule\n");
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  interconnect ibus;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto *item = FirstItem(r);
+  auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->data_type.is_interconnect);
   EXPECT_EQ(item->name, "ibus");
 }
 
-} // namespace
+}  // namespace

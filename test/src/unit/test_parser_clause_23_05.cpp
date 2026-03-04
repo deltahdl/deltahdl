@@ -11,17 +11,17 @@ TEST(ParserSection23, ExternModuleHeader) {
   auto r = Parse("extern module foo(input logic a, output logic b);\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->name, "foo");
   EXPECT_TRUE(mod->is_extern);
   EXPECT_TRUE(mod->items.empty());
 }
 
 // Verify a 2-port module has expected names and directions.
-static void VerifyTwoPortModule(ParseResult &r, const char *n0, Direction d0,
-                                const char *n1, Direction d1) {
+static void VerifyTwoPortModule(ParseResult& r, const char* n0, Direction d0,
+                                const char* n1, Direction d1) {
   ASSERT_NE(r.cu, nullptr);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   ASSERT_EQ(mod->ports.size(), 2);
   EXPECT_EQ(mod->ports[0].name, n0);
   EXPECT_EQ(mod->ports[0].direction, d0);
@@ -35,12 +35,13 @@ TEST(ParserSection23, ExternModulePorts) {
 }
 
 TEST(ParserSection23, ExternModuleNoBody) {
-  auto r = Parse("extern module bar(input logic x);\n"
-                 "module baz; endmodule\n");
+  auto r = Parse(
+      "extern module bar(input logic x);\n"
+      "module baz; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 2);
   struct Expected {
-    const char *name;
+    const char* name;
     bool is_extern;
   };
   Expected expected[] = {{"bar", true}, {"baz", false}};
@@ -59,18 +60,19 @@ TEST(ParserSection23, ExternModuleNonAnsiPorts) {
   auto r = Parse("extern module m (a, b, c);\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->name, "m");
   EXPECT_TRUE(mod->is_extern);
   EXPECT_TRUE(mod->items.empty());
 }
 
 TEST(ParserSection23, ExternModuleWithParams) {
-  auto r = Parse("extern module a #(parameter size = 8)\n"
-                 "  (input [size:0] x, output logic y);\n");
+  auto r = Parse(
+      "extern module a #(parameter size = 8)\n"
+      "  (input [size:0] x, output logic y);\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  auto *mod = r.cu->modules[0];
+  auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->name, "a");
   EXPECT_TRUE(mod->is_extern);
   ASSERT_EQ(mod->params.size(), 1);
@@ -79,9 +81,10 @@ TEST(ParserSection23, ExternModuleWithParams) {
 }
 
 TEST(ParserSection23, ExternModuleFollowedByDefinition) {
-  auto r = Parse("extern module ext (input a, output b);\n"
-                 "module other (input x);\n"
-                 "endmodule\n");
+  auto r = Parse(
+      "extern module ext (input a, output b);\n"
+      "module other (input x);\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 2);
   EXPECT_EQ(r.cu->modules[0]->name, "ext");
@@ -90,4 +93,4 @@ TEST(ParserSection23, ExternModuleFollowedByDefinition) {
   EXPECT_FALSE(r.cu->modules[1]->is_extern);
 }
 
-} // namespace
+}  // namespace
