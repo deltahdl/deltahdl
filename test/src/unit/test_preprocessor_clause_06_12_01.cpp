@@ -1,7 +1,7 @@
 // §6.12.1: Conversion
 
-#include "fixture_parser.h"
 #include "elaborator/type_eval.h"
+#include "fixture_parser.h"
 
 using namespace delta;
 

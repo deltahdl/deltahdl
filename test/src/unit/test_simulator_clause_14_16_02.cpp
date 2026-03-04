@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string_view>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"

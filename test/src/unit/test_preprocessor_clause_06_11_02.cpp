@@ -1,7 +1,7 @@
 // §6.11.2: 2-state (two-value) and 4-state (four-value) data types
 
-#include "fixture_parser.h"
 #include "elaborator/type_eval.h"
+#include "fixture_parser.h"
 
 using namespace delta;
 

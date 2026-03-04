@@ -30,4 +30,3 @@ TEST(LexerCh5, SourceLocations) {
     EXPECT_EQ(tokens[c.idx].loc.column, c.column) << "token " << c.idx;
   }
 }
-

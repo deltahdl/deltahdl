@@ -1,6 +1,7 @@
 // §11.9: Tagged union expressions and member access
 
 #include <cstring>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"

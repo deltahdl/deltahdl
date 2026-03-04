@@ -1,9 +1,11 @@
 // §35.5.4: Import declarations
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
+
 #include "simulator/dpi_runtime.h"
 
 using namespace delta;

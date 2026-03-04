@@ -1,7 +1,9 @@
 // §10.6.2: The force and release procedural statements
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
+
 #include "common/arena.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"

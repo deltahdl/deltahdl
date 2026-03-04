@@ -1,8 +1,10 @@
 // §7.5.1: New[ ]
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/adv_sim.h"

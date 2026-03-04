@@ -101,4 +101,3 @@ TEST(ParserSection6, DefaultNettypeNone) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
 }
-

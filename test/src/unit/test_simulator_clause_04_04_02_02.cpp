@@ -185,4 +185,3 @@ TEST(Scheduler, ScheduleAndRunSingleEvent) {
   sched.Run();
   EXPECT_TRUE(executed);
 }
-

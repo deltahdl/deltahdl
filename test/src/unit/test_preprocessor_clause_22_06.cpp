@@ -191,4 +191,3 @@ TEST(ParserSection22, IfndefSelectsElseBranch) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "reached");
 }
-

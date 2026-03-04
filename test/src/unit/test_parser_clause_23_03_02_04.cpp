@@ -1,4 +1,5 @@
-// §23.3.2.4: Connecting module instances using wildcard named port connections ( .*)
+// §23.3.2.4: Connecting module instances using wildcard named port connections
+// ( .*)
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"

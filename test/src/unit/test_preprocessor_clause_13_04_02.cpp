@@ -1,7 +1,7 @@
 // §13.4.2: Static and automatic functions
 
-#include "fixture_parser.h"
 #include "elaborator/type_eval.h"
+#include "fixture_parser.h"
 
 using namespace delta;
 

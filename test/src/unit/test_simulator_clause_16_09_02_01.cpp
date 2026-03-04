@@ -1,9 +1,11 @@
 // §16.9.2.1: Repetition, concatenation, and empty matches
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string_view>
 #include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

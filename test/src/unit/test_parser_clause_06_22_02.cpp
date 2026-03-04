@@ -1,7 +1,7 @@
 // §6.22.2: Equivalent types
 
-#include "fixture_parser.h"
 #include "elaborator/type_eval.h"
+#include "fixture_parser.h"
 
 using namespace delta;
 

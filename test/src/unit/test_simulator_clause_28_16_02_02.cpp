@@ -1,6 +1,7 @@
 // §28.16.2.2: Delay specification for charge decay time
 
 #include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <initializer_list>

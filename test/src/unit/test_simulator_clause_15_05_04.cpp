@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string_view>
+
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"

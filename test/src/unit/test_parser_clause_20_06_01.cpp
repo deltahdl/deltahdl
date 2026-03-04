@@ -1,7 +1,7 @@
 // §20.6.1: Type name function
 
-#include "fixture_parser.h"
 #include "elaborator/type_eval.h"
+#include "fixture_parser.h"
 
 using namespace delta;
 

@@ -1,4 +1,5 @@
-// §23.3.2.3: Connecting module instance using implicit named port connections (.name)
+// §23.3.2.3: Connecting module instance using implicit named port connections
+// (.name)
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"

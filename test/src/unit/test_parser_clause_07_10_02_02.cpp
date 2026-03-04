@@ -1,4 +1,5 @@
-// §7.10.2.2: and 7.10.2.3) at the back (i.e., right side) of the queue as necessary to produce the new
+// §7.10.2.2: and 7.10.2.3) at the back (i.e., right side) of the queue as
+// necessary to produce the new
 
 #include "fixture_parser.h"
 

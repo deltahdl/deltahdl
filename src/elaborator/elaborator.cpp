@@ -76,9 +76,9 @@ static std::vector<ResolvedAttribute> ResolveAttributes(
     auto it = std::find_if(result.begin(), result.end(),
                            [&](const auto& e) { return e.name == ra.name; });
     if (it != result.end()) {
-      diag.Warning(attr.loc,
-                   std::format("duplicate attribute '{}'; last value used",
-                               attr.name));
+      diag.Warning(
+          attr.loc,
+          std::format("duplicate attribute '{}'; last value used", attr.name));
       *it = ra;
     } else {
       result.push_back(ra);

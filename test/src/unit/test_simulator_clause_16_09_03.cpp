@@ -1,7 +1,9 @@
 // §16.9.3: Sampled value functions
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

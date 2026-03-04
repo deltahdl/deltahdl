@@ -1,9 +1,11 @@
 // §21.2.1.7: String format
 
 #include <gtest/gtest.h>
+
 #include <cstring>
 #include <string>
 #include <vector>
+
 #include "common/arena.h"
 #include "simulator/eval.h"
 

@@ -1,8 +1,10 @@
 // §7.8.7: Allocating associative array elements
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/adv_sim.h"

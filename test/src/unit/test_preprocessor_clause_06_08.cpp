@@ -1,7 +1,8 @@
-// §6.8: on variable initialization). This is roughly equivalent to a C automatic variable.
+// §6.8: on variable initialization). This is roughly equivalent to a C
+// automatic variable.
 
-#include "fixture_parser.h"
 #include "elaborator/type_eval.h"
+#include "fixture_parser.h"
 
 using namespace delta;
 

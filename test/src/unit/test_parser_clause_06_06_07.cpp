@@ -1,7 +1,7 @@
 // §6.6.7: User-defined nettypes
 
-#include "fixture_parser.h"
 #include "elaborator/type_eval.h"
+#include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;

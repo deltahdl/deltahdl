@@ -112,8 +112,8 @@ inline Stmt* InitialBody(T& r) {
 }
 
 // Find the first module item of a given kind.
-inline ModuleItem* FindItemByKind(
-    const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
+inline ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
+                                  ModuleItemKind kind) {
   for (auto* item : items) {
     if (item->kind == kind) return item;
   }
@@ -121,8 +121,8 @@ inline ModuleItem* FindItemByKind(
 }
 
 // Count module items of a given kind.
-inline size_t CountItemsByKind(
-    const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
+inline size_t CountItemsByKind(const std::vector<ModuleItem*>& items,
+                               ModuleItemKind kind) {
   size_t count = 0;
   for (auto* item : items) {
     if (item->kind == kind) ++count;
@@ -131,8 +131,8 @@ inline size_t CountItemsByKind(
 }
 
 // Check if any module item of a given kind exists.
-inline bool HasItemOfKind(
-    const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
+inline bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+                          ModuleItemKind kind) {
   return FindItemByKind(items, kind) != nullptr;
 }
 

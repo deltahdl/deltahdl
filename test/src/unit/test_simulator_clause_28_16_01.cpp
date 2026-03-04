@@ -1,6 +1,7 @@
 // §28.16.1: min:typ:max delays
 
 #include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <initializer_list>

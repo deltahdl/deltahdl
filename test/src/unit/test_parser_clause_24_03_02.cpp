@@ -1,4 +1,5 @@
-// §24.3.2: Operation of program port connections in the absence of clocking blocks
+// §24.3.2: Operation of program port connections in the absence of clocking
+// blocks
 
 #include "fixture_parser.h"
 #include "fixture_program.h"

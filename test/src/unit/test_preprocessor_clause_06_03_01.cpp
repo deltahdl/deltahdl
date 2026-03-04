@@ -1,7 +1,7 @@
 // §6.3.1: Logic values
 
-#include "fixture_parser.h"
 #include "elaborator/type_eval.h"
+#include "fixture_parser.h"
 
 using namespace delta;
 

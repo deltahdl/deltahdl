@@ -94,4 +94,3 @@ TEST(SimCh50701, SizeConstantNonzero) {
       "x");
   EXPECT_EQ(result, 1u);
 }
-

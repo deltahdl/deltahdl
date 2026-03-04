@@ -1,9 +1,11 @@
 // §20.10: Severity system tasks
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string_view>
 #include <vector>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

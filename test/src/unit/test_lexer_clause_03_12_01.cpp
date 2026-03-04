@@ -4,10 +4,10 @@
 
 #include <string>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
-#include "common/arena.h"
 
 using namespace delta;
 

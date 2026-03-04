@@ -1,6 +1,7 @@
 // §28.16: Gate and net delays
 
 #include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <initializer_list>

@@ -1,9 +1,11 @@
 // §4.9.5: Switch (transistor) processing
 
 #include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/scheduler.h"

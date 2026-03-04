@@ -258,4 +258,3 @@ TEST(ParserAnnexA, A2ParamDecl) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kParamDecl);
 }
-
