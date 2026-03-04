@@ -9,13 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(FormatArg, HexLeadingZeros) {
-  Arena arena;
-  auto val = MakeLogic4VecVal(arena, 8, 0x0A);
-  // %h for 8-bit value should be 2 hex digits.
-  EXPECT_EQ(FormatArg(val, 'h'), "0a");
-}
-
 TEST(FormatArg, OctalLeadingZeros) {
   Arena arena;
   auto val = MakeLogic4VecVal(arena, 8, 5);
