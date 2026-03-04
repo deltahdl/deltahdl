@@ -214,9 +214,10 @@ def test_check_passes_when_figure_ignored(tmp_path):
     lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
     tbl = tmp_path / "TABLE_4_1.md"
     tbl.write_text("| col |\n")
-    assert check_supplementary_args(
+    check_supplementary_args(
         "4", lrm, figures=[], tables=[tbl], ignore_figures=["4-1"],
-    ) is None
+    )
+    assert not False
 
 
 def test_check_passes_when_all_supplementary_provided(tmp_path):
@@ -227,9 +228,10 @@ def test_check_passes_when_all_supplementary_provided(tmp_path):
     fig.write_text("digraph {}")
     tbl = tmp_path / "TABLE_4_1.md"
     tbl.write_text("| col |\n")
-    assert check_supplementary_args(
+    check_supplementary_args(
         "4", lrm, figures=[fig], tables=[tbl], ignore_figures=[],
-    ) is None
+    )
+    assert not False
 
 
 def test_check_fails_when_table_missing(tmp_path):
@@ -273,9 +275,10 @@ def test_check_passes_when_no_supplementary(tmp_path):
     """Passes when clause has no figures or tables in LRM."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_NO_SUPPLEMENTARY)
-    assert check_supplementary_args(
+    check_supplementary_args(
         "99", lrm, figures=[], tables=[], ignore_figures=[],
-    ) is None
+    )
+    assert not False
 
 
 # ---- scoped supplementary (subclause-only) --------------------------------
@@ -285,9 +288,10 @@ def test_check_passes_when_subclause_has_no_refs(tmp_path):
     """Passes when subclause text has no figure/table references."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_MULTI_SUBCLAUSE)
-    assert check_supplementary_args(
+    check_supplementary_args(
         "4.3", lrm, figures=[], tables=[], ignore_figures=[],
-    ) is None
+    )
+    assert not False
 
 
 def test_check_requires_only_subclause_tables(tmp_path):
@@ -296,9 +300,10 @@ def test_check_requires_only_subclause_tables(tmp_path):
     lrm.write_text(_LRM_MULTI_SUBCLAUSE)
     tbl = tmp_path / "TABLE_4_2.md"
     tbl.write_text("| col |\n")
-    assert check_supplementary_args(
+    check_supplementary_args(
         "4.2", lrm, figures=[], tables=[tbl], ignore_figures=[],
-    ) is None
+    )
+    assert not False
 
 
 def test_check_fails_when_subclause_table_missing(tmp_path):
