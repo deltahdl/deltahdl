@@ -49,7 +49,7 @@ TEST(ParserSection11, UnaryPlusOperator) {
       "module t;\n"
       "  initial x = +a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
@@ -63,7 +63,7 @@ TEST(ParserSection11, RealLiteralAddition) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kRealLiteral);
@@ -75,7 +75,7 @@ TEST(ParserSection11, RealMultiplication) {
       "  real r;\n"
       "  initial r = 3.14 * 2.0;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
@@ -88,7 +88,7 @@ TEST(ParserSection11, ArithmeticAdd) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
@@ -99,7 +99,7 @@ TEST(ParserSection11, ArithmeticSub) {
       "module t;\n"
       "  initial x = a - b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
@@ -109,7 +109,7 @@ TEST(ParserSection11, ArithmeticMul) {
       "module t;\n"
       "  initial x = a * b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
@@ -119,7 +119,7 @@ TEST(ParserSection11, ArithmeticMod) {
       "module t;\n"
       "  initial x = a % b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPercent);
 }
@@ -129,7 +129,7 @@ TEST(ParserSection11, ArithmeticPower) {
       "module t;\n"
       "  initial x = a ** b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPower);
 }
@@ -139,7 +139,7 @@ TEST(ParserSection11, UnaryNegation) {
       "module t;\n"
       "  initial x = -a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
@@ -210,7 +210,7 @@ TEST(ParserSection11, Sec11_1_BinaryPowerOperator) {
       "module t;\n"
       "  initial x = base ** exp;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPower);
@@ -225,7 +225,7 @@ TEST(ParserSection11, ArithmeticDiv) {
       "module t;\n"
       "  initial x = a / b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
 }

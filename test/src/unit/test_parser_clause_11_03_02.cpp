@@ -11,7 +11,7 @@ TEST(ParserSection11, NestedParenthesizedExpression) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
@@ -24,7 +24,7 @@ TEST(ParserSection11, ChainedAdditiveLeftAssoc) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
@@ -46,7 +46,7 @@ TEST(ParserSection11, ImplicationRightAssocParses) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
@@ -93,7 +93,7 @@ TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
       "module t;\n"
       "  initial x = (a + b) * c;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
@@ -109,7 +109,7 @@ TEST(ParserSection11, Sec11_1_ExprInInitialBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
@@ -122,7 +122,7 @@ TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
 
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
@@ -134,7 +134,7 @@ TEST(ParserSection11, OperatorPrecedenceMixedArithRhs) {
       "module t;\n"
       "  initial x = a + b * c;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   ASSERT_NE(rhs->rhs, nullptr);
   EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
@@ -147,7 +147,7 @@ TEST(ParserSection11, OperatorPrecedenceCompareAndLogical) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }

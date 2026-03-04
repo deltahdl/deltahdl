@@ -26,7 +26,7 @@ TEST(ParserSection11, StreamingRight) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
 }
@@ -38,7 +38,7 @@ TEST(ParserSection11, StreamingWithSliceSize) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   EXPECT_NE(rhs->lhs, nullptr);
@@ -69,7 +69,7 @@ TEST(ParserSection11, Sec11_1_StreamingConcatLeftShift) {
       "module t;\n"
       "  initial x = {<< {a, b}};\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);

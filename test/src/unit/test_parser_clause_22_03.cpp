@@ -6,14 +6,14 @@ namespace {
 
 TEST(ParserSection22, ResetallDirective) {
   EXPECT_TRUE(
-      ParseOk("`resetall\n"
+      ParseWithPreprocessorOk("`resetall\n"
               "module t;\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, ResetallBeforeMultipleModules) {
   EXPECT_TRUE(
-      ParseOk("`resetall\n"
+      ParseWithPreprocessorOk("`resetall\n"
               "module m1;\n"
               "endmodule\n"
               "module m2;\n"

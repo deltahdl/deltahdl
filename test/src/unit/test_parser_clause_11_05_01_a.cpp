@@ -12,7 +12,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectConstantIndex) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->base, nullptr);
@@ -32,7 +32,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectVariableIndex) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->index, nullptr);
@@ -48,7 +48,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectExpressionIndex) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->index, nullptr);
@@ -83,7 +83,7 @@ TEST(ParserSection11, Sec11_4_1_ConstPartSelectDescending) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->base, nullptr);
@@ -102,7 +102,7 @@ TEST(ParserSection11, Sec11_4_1_ConstPartSelectAscending) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->index, nullptr);
@@ -119,7 +119,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectUpVariableBase) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   EXPECT_TRUE(rhs->is_part_select_plus);
@@ -138,7 +138,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownVariableBase) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   EXPECT_TRUE(rhs->is_part_select_minus);
@@ -371,7 +371,7 @@ TEST(ParserSection11, Sec11_4_1_PartSelectAfterBitSelect) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->index, nullptr);
@@ -409,7 +409,7 @@ TEST(ParserSection11, Sec11_4_1_SelectOnMemberAccess) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->base, nullptr);
@@ -429,7 +429,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInAlwaysComb) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysCombItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(item->body->rhs, nullptr);
@@ -454,7 +454,7 @@ TEST(ParserSection11, Sec11_4_1_PartSelectWithSysFuncIndex) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->index, nullptr);
@@ -470,7 +470,7 @@ TEST(ParserSection11, Sec11_4_1_MultiplePartSelectsInExpr) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
@@ -490,7 +490,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectComplexBase) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   EXPECT_TRUE(rhs->is_part_select_plus);
@@ -504,7 +504,7 @@ TEST(ParserSection11, BitSelectWithExprIndex) {
       "module t;\n"
       "  initial x = a[i + 1];\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->index, nullptr);
@@ -588,7 +588,7 @@ TEST(ParserSection11, PartSelectHasIndexEnd) {
       "module t;\n"
       "  initial x = a[15:8];\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   EXPECT_NE(rhs->index, nullptr);
@@ -691,7 +691,7 @@ TEST(ParserSection11, Sec11_4_1_SelectOnFuncReturnValue) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->base, nullptr);

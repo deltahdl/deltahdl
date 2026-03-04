@@ -53,6 +53,20 @@ inline ParseResult ParseLibrary(const std::string& src) {
   return result;
 }
 
+inline bool ParseWithPreprocessorOk(const std::string& src) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", src);
+  Preprocessor preproc(mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return !diag.HasErrors();
+}
+
 inline ParseResult ParseWithPreprocessor(const std::string& src) {
   ParseResult result;
   DiagEngine diag(result.mgr);

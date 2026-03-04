@@ -25,7 +25,7 @@ TEST(ParserSection11, XnorBinaryOperator) {
       "module t;\n"
       "  initial x = a ^~ b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
@@ -106,7 +106,7 @@ TEST(ParserSection11, Sec11_1_UnaryBitwiseNot) {
       "module t;\n"
       "  initial x = ~b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
@@ -117,7 +117,7 @@ TEST(ParserSection11, Sec11_1_BinaryXnorTildeCaret) {
       "module t;\n"
       "  initial x = a ~^ b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
@@ -149,7 +149,7 @@ TEST(ParserSection11, BitwiseAnd) {
       "module t;\n"
       "  initial x = a & b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
@@ -159,7 +159,7 @@ TEST(ParserSection11, BitwiseOr) {
       "module t;\n"
       "  initial x = a | b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
 }
@@ -169,7 +169,7 @@ TEST(ParserSection11, BitwiseXor) {
       "module t;\n"
       "  initial x = a ^ b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
 }
@@ -179,7 +179,7 @@ TEST(ParserSection11, BitwiseNot) {
       "module t;\n"
       "  initial x = ~a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTilde);

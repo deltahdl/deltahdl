@@ -28,7 +28,7 @@ TEST(ParserSection11, ReplicationCountAndElements) {
       "module t;\n"
       "  initial x = {4{a}};\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
   ASSERT_NE(rhs->repeat_count, nullptr);
@@ -43,7 +43,7 @@ TEST(ParserSection11, ReplicationNestedInConcat) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(rhs->elements.size(), 2u);
@@ -55,7 +55,7 @@ TEST(ParserSection11, ReplicationMultipleElements) {
       "module t;\n"
       "  initial x = {2{a, b, c}};\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
   EXPECT_EQ(rhs->elements.size(), 3u);
@@ -159,7 +159,7 @@ TEST(ParserSection11, Sec11_1_ReplicateRepeatCountAndElements) {
       "module t;\n"
       "  initial x = {3{a, b}};\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
   ASSERT_NE(rhs->repeat_count, nullptr);
@@ -171,7 +171,7 @@ TEST(ParserSection11, ReplicationOperator) {
       "module t;\n"
       "  initial x = {4{a}};\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
 }

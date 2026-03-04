@@ -490,7 +490,7 @@ TEST(ParserA28, NestedBlocksWithDecls) {
 }
 static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return item;
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
   }
   return nullptr;
 }

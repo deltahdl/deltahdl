@@ -35,7 +35,7 @@ TEST(ParserSection11, ConditionalTernary) {
       "module t;\n"
       "  initial x = (a > b) ? a : b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }

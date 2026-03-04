@@ -31,7 +31,7 @@ TEST(ParserSection11, ConcatWithPartSelects) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(rhs->elements.size(), 4u);
@@ -87,7 +87,7 @@ TEST(ParserSection11, ConcatSingleElement) {
       "module t;\n"
       "  initial x = {a};\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(rhs->elements.size(), 1u);
@@ -100,7 +100,7 @@ TEST(ParserSection11, Sec11_4_1_SelectOnConcatenation) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->base, nullptr);
@@ -225,7 +225,7 @@ TEST(ParserSection11, Sec11_1_ConcatenationElements) {
       "module t;\n"
       "  initial x = {a, b, 1'b0};\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(rhs->elements.size(), 3u);
@@ -238,7 +238,7 @@ TEST(ParserSection11, ConcatenationBasic) {
       "module t;\n"
       "  initial x = {a, b, c};\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(rhs->elements.size(), 3u);

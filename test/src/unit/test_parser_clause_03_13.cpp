@@ -59,7 +59,7 @@ TEST(ParserClause03, Cl3_13_ForkJoinBlockSubscope) {
 
 TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
 
-  auto r = Parse(
+  auto r = ParseWithPreprocessor(
       "`define WIDTH 8\n"
       "`define DEPTH 16\n"
       "module m;\n"
@@ -71,7 +71,7 @@ TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 
   EXPECT_TRUE(
-      ParseOk("`define data 42\n"
+      ParseWithPreprocessorOk("`define data 42\n"
               "module m; logic [7:0] data; endmodule\n"));
 }
 

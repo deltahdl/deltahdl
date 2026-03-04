@@ -7,7 +7,7 @@ namespace {
 
 TEST(ParserSection22, FileAndLineInErrorMessage) {
   EXPECT_TRUE(
-      ParseOk("module t;\n"
+      ParseWithPreprocessorOk("module t;\n"
               "  initial $display(\"Error at %s, line %d.\",\n"
               "    `__FILE__, `__LINE__);\n"
               "endmodule\n"));
@@ -15,7 +15,7 @@ TEST(ParserSection22, FileAndLineInErrorMessage) {
 
 TEST(ParserSection22, LineDirectiveInAssignment) {
   EXPECT_TRUE(
-      ParseOk("module t;\n"
+      ParseWithPreprocessorOk("module t;\n"
               "  integer line_num;\n"
               "  initial line_num = `__LINE__;\n"
               "endmodule\n"));
@@ -23,21 +23,21 @@ TEST(ParserSection22, LineDirectiveInAssignment) {
 
 TEST(ParserSection22, FileDirectiveInStringConcat) {
   EXPECT_TRUE(
-      ParseOk("module t;\n"
+      ParseWithPreprocessorOk("module t;\n"
               "  initial $display(\"source: %s:%0d\", `__FILE__, `__LINE__);\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, FileDirectiveInDisplay) {
   EXPECT_TRUE(
-      ParseOk("module t;\n"
+      ParseWithPreprocessorOk("module t;\n"
               "  initial $display(\"File: %s\", `__FILE__);\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, LineDirectiveInDisplay) {
   EXPECT_TRUE(
-      ParseOk("module t;\n"
+      ParseWithPreprocessorOk("module t;\n"
               "  initial $display(\"Line: %0d\", `__LINE__);\n"
               "endmodule\n"));
 }

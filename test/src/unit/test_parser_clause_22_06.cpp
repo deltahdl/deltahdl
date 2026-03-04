@@ -6,7 +6,7 @@ namespace {
 
 TEST(ParserSection22, IfdefDefined) {
   EXPECT_TRUE(
-      ParseOk("`define FEATURE_A\n"
+      ParseWithPreprocessorOk("`define FEATURE_A\n"
               "`ifdef FEATURE_A\n"
               "module t;\n"
               "endmodule\n"
@@ -15,7 +15,7 @@ TEST(ParserSection22, IfdefDefined) {
 
 TEST(ParserSection22, IfdefWithElse) {
   EXPECT_TRUE(
-      ParseOk("`ifdef UNDEFINED_MACRO\n"
+      ParseWithPreprocessorOk("`ifdef UNDEFINED_MACRO\n"
               "module alt;\n"
               "endmodule\n"
               "`else\n"
@@ -26,7 +26,7 @@ TEST(ParserSection22, IfdefWithElse) {
 
 TEST(ParserSection22, IfndefUndefined) {
   EXPECT_TRUE(
-      ParseOk("`ifndef GUARD\n"
+      ParseWithPreprocessorOk("`ifndef GUARD\n"
               "`define GUARD\n"
               "module t;\n"
               "endmodule\n"
@@ -35,7 +35,7 @@ TEST(ParserSection22, IfndefUndefined) {
 
 TEST(ParserSection22, IfdefElsifChain) {
   EXPECT_TRUE(
-      ParseOk("`define OPT_B\n"
+      ParseWithPreprocessorOk("`define OPT_B\n"
               "`ifdef OPT_A\n"
               "module ma;\n"
               "endmodule\n"
@@ -50,7 +50,7 @@ TEST(ParserSection22, IfdefElsifChain) {
 
 TEST(ParserSection22, NestedIfdef) {
   EXPECT_TRUE(
-      ParseOk("`define OUTER\n"
+      ParseWithPreprocessorOk("`define OUTER\n"
               "`define INNER\n"
               "`ifdef OUTER\n"
               "`ifdef INNER\n"

@@ -9,7 +9,7 @@ TEST(ParserSection11, StreamingRightDetails) {
       "module t;\n"
       "  initial x = {>> {a, b, c}};\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
   EXPECT_EQ(rhs->elements.size(), 3u);

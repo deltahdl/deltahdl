@@ -18,7 +18,7 @@ TEST(ParserSection11, Sec11_1_MemberAccessExpression) {
       "module t;\n"
       "  initial x = obj.field;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }

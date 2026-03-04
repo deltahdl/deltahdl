@@ -52,7 +52,7 @@ TEST(ParserSection11, RelationalLt) {
       "module t;\n"
       "  initial x = (a < b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kLt);
 }
@@ -62,7 +62,7 @@ TEST(ParserSection11, RelationalGt) {
       "module t;\n"
       "  initial x = (a > b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGt);
 }
@@ -72,7 +72,7 @@ TEST(ParserSection11, RelationalLtEq) {
       "module t;\n"
       "  initial x = (a <= b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kLtEq);
 }
@@ -82,7 +82,7 @@ TEST(ParserSection11, RelationalGtEq) {
       "module t;\n"
       "  initial x = (a >= b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGtEq);
 }

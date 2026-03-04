@@ -9,14 +9,14 @@ namespace {
 
 TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
 
-  auto r1 = Parse(
+  auto r1 = ParseWithPreprocessor(
       "`define FOO 1\n"
       "module m1;\n"
       "  localparam X = `FOO;\n"
       "endmodule\n");
   EXPECT_FALSE(r1.has_errors);
 
-  auto r2 = Parse(
+  auto r2 = ParseWithPreprocessor(
       "module m2;\n"
       "  localparam Y = `FOO;\n"
       "endmodule\n");

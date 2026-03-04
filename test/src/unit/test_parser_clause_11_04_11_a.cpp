@@ -56,7 +56,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithSystemCall) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -73,7 +73,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithUnaryOperands) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -91,7 +91,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryAsFunctionArgument) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
   EXPECT_EQ(rhs->callee, "func");
@@ -119,7 +119,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithCast) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -188,7 +188,7 @@ TEST(ParserSection11, Sec11_4_6_VerifyExprKindTernary) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
@@ -200,7 +200,7 @@ TEST(ParserSection11, Sec11_4_6_VerifyTernaryFields) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   VerifyTernaryFieldsAllIdentifier(rhs);
 }
 
@@ -230,7 +230,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryInAlwaysComb) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysCombItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(item->body->rhs, nullptr);
@@ -270,7 +270,7 @@ TEST(ParserSection11, Sec11_4_6_MultipleTernariesInExpr) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
@@ -305,7 +305,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithStringLiterals) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -322,7 +322,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithRealLiterals) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -338,7 +338,7 @@ TEST(ParserSection11, Sec11_4_6_DeeplyNestedTernary) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 
@@ -404,7 +404,7 @@ TEST(ParserSection11, TernaryFieldAccess) {
       "module t;\n"
       "  initial x = sel ? a : b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->condition, nullptr);
@@ -417,7 +417,7 @@ TEST(ParserSection11, NestedTernaryRightAssoc) {
       "module t;\n"
       "  initial x = a ? b : c ? d : e;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->false_expr, nullptr);
@@ -477,7 +477,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectInTernaryCondition) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->condition, nullptr);
@@ -492,7 +492,7 @@ TEST(ParserSection11, Sec11_4_6_SimpleTernary) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   VerifyTernaryFieldsAllIdentifier(rhs);
 }
 
@@ -557,7 +557,7 @@ TEST(ParserSection11, Sec11_4_6_NestedTernaryWithParens) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -573,7 +573,7 @@ TEST(ParserSection11, Sec11_4_6_ChainedTernaryRightAssoc) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -594,7 +594,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithComplexCondition) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->condition, nullptr);
@@ -609,7 +609,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithBinaryOperands) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -627,7 +627,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithFuncCallOperands) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -644,7 +644,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithConcatenationOperands) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -662,7 +662,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithReplication) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -680,7 +680,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithBitSelectOperands) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -712,7 +712,7 @@ TEST(ParserSection11, Sec11_1_TernaryConditionalFields) {
       "module t;\n"
       "  initial x = en ? val_a : val_b;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   VerifyTernaryFieldsAllIdentifier(rhs);
 }
 

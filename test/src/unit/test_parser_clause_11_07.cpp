@@ -11,7 +11,7 @@ TEST(ParserSection11, SignedSystemCall) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
   EXPECT_EQ(rhs->callee, "$signed");
@@ -24,7 +24,7 @@ TEST(ParserSection11, UnsignedSystemCall) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
   EXPECT_EQ(rhs->callee, "$unsigned");

@@ -255,7 +255,13 @@ inline ModuleItem* FirstModuleInst(T& r) {
 // Find the first always_comb item.
 template <typename T>
 inline ModuleItem* FirstAlwaysCombItem(T& r) {
-  return FirstItem(r, ModuleItemKind::kAlwaysCombBlock);
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock &&
+        item->always_kind == AlwaysKind::kAlwaysComb)
+      return item;
+  }
+  return nullptr;
 }
 
 // Find a return statement in a function/task body.
@@ -571,7 +577,8 @@ inline ModuleItem* NthAlwaysComb(T& r, size_t n) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   size_t count = 0;
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysCombBlock) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock &&
+        item->always_kind == AlwaysKind::kAlwaysComb) {
       if (count == n) return item;
       ++count;
     }
@@ -695,7 +702,12 @@ template <typename T>
 inline Stmt* FindReturnStmt(T& r) {
   auto* func = FirstFunctionDecl(r);
   if (!func) return nullptr;
-  return FindReturnStmt(func->body);
+  auto* ret = FindReturnStmt(func->body);
+  if (ret) return ret;
+  for (auto* s : func->func_body_stmts) {
+    if (s->kind == StmtKind::kReturn) return s;
+  }
+  return nullptr;
 }
 
 template <typename T>

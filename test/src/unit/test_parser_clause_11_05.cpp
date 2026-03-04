@@ -9,7 +9,7 @@ TEST(ParserSection11, Sec11_1_IdentifierAsExpression) {
       "module t;\n"
       "  initial x = foo;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kIdentifier);
 }
@@ -19,7 +19,7 @@ TEST(ParserSection11, Sec11_1_SystemFunctionCallExpression) {
       "module t;\n"
       "  initial x = $clog2(256);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
   EXPECT_EQ(rhs->callee, "$clog2");
@@ -30,7 +30,7 @@ TEST(ParserSection11, Sec11_1_FunctionCallExpression) {
       "module t;\n"
       "  initial x = my_func(a, b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
   EXPECT_EQ(rhs->callee, "my_func");

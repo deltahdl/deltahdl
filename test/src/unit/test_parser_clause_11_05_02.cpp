@@ -39,7 +39,7 @@ TEST(ParserSection11, Sec11_4_1_NestedBitSelects) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   EXPECT_EQ(rhs->index_end, nullptr);
@@ -52,7 +52,7 @@ TEST(ParserSection11, BitSelectChained) {
       "module t;\n"
       "  initial x = mem[i][j];\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->base, nullptr);

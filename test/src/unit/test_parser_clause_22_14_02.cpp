@@ -7,7 +7,7 @@ namespace {
 
 TEST(ParserSection22, BeginKeywords1364_1995) {
   EXPECT_TRUE(
-      ParseOk("`begin_keywords \"1364-1995\"\n"
+      ParseWithPreprocessorOk("`begin_keywords \"1364-1995\"\n"
               "module t;\n"
               "endmodule\n"
               "`end_keywords\n"));

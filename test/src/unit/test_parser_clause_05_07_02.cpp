@@ -155,7 +155,7 @@ TEST(ParserSection11, Sec11_1_RealLiteralAsExpression) {
       "  real r;\n"
       "  initial r = 3.14;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }

@@ -52,7 +52,7 @@ TEST(ParserSection11, EqualityInComplexExpr) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
@@ -64,7 +64,7 @@ TEST(ParserSection11, CaseEqualityInAssign) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
@@ -74,7 +74,7 @@ TEST(ParserSection11, EqualityEq) {
       "module t;\n"
       "  initial x = (a == b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
@@ -84,7 +84,7 @@ TEST(ParserSection11, EqualityNeq) {
       "module t;\n"
       "  initial x = (a != b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kBangEq);
 }
@@ -94,7 +94,7 @@ TEST(ParserSection11, CaseEqualityEq) {
       "module t;\n"
       "  initial x = (a === b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
 }
@@ -104,7 +104,7 @@ TEST(ParserSection11, CaseEqualityNeq) {
       "module t;\n"
       "  initial x = (a !== b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kBangEqEq);
 }

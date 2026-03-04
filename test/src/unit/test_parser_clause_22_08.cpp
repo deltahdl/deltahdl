@@ -6,70 +6,70 @@ namespace {
 
 TEST(ParserSection22, DefaultNettypeTri) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype tri\n"
+      ParseWithPreprocessorOk("`default_nettype tri\n"
               "module t;\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, DefaultNettypeWand) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype wand\n"
+      ParseWithPreprocessorOk("`default_nettype wand\n"
               "module t;\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, DefaultNettypeWor) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype wor\n"
+      ParseWithPreprocessorOk("`default_nettype wor\n"
               "module t;\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, DefaultNettypeTri0) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype tri0\n"
+      ParseWithPreprocessorOk("`default_nettype tri0\n"
               "module t;\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, DefaultNettypeTri1) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype tri1\n"
+      ParseWithPreprocessorOk("`default_nettype tri1\n"
               "module t;\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, DefaultNettypeTriand) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype triand\n"
+      ParseWithPreprocessorOk("`default_nettype triand\n"
               "module t;\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, DefaultNettypeTrior) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype trior\n"
+      ParseWithPreprocessorOk("`default_nettype trior\n"
               "module t;\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, DefaultNettypeTrireg) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype trireg\n"
+      ParseWithPreprocessorOk("`default_nettype trireg\n"
               "module t;\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, DefaultNettypeUwire) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype uwire\n"
+      ParseWithPreprocessorOk("`default_nettype uwire\n"
               "module t;\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection22, DefaultNettypeBeforeAndAfterModule) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype none\n"
+      ParseWithPreprocessorOk("`default_nettype none\n"
               "module t;\n"
               "endmodule\n"
               "`default_nettype wire\n"));
@@ -77,7 +77,7 @@ TEST(ParserSection22, DefaultNettypeBeforeAndAfterModule) {
 
 TEST(ParserSection22, MultipleDefaultNettypeDirectives) {
   EXPECT_TRUE(
-      ParseOk("`default_nettype wire\n"
+      ParseWithPreprocessorOk("`default_nettype wire\n"
               "module m1;\n"
               "endmodule\n"
               "`default_nettype none\n"

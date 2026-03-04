@@ -6,7 +6,7 @@ namespace {
 
 TEST(ParserSection22, CelldefineEndcelldefine) {
   EXPECT_TRUE(
-      ParseOk("`celldefine\n"
+      ParseWithPreprocessorOk("`celldefine\n"
               "module inv(output y, input a);\n"
               "  assign y = ~a;\n"
               "endmodule\n"

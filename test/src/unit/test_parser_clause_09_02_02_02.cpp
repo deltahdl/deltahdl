@@ -79,7 +79,7 @@ TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   EXPECT_EQ(item->body->stmts.size(), 2u);
@@ -171,8 +171,8 @@ TEST(ParserSection9, Sec9_2_2_MultipleAlwaysCombBlocks) {
   auto* second = NthAlwaysComb(r, 1);
   ASSERT_NE(first, nullptr);
   ASSERT_NE(second, nullptr);
-  EXPECT_EQ(first->kind, ModuleItemKind::kAlwaysCombBlock);
-  EXPECT_EQ(second->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(first->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(second->kind, ModuleItemKind::kAlwaysBlock);
   ASSERT_NE(first->body, nullptr);
   ASSERT_NE(second->body, nullptr);
 }
@@ -206,7 +206,7 @@ TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysComb) {
   auto& items = r.cu->modules[0]->items;
   bool found_comb = false;
   for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kAlwaysCombBlock) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) {
       found_comb = true;
       ASSERT_NE(item->body, nullptr);
     }
@@ -409,7 +409,7 @@ TEST(ParserSection9, Sec9_2_2_SimpleBlockingAssign) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysComb(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
@@ -428,7 +428,7 @@ TEST(ParserSection9, Sec9_2_2_BeginEndBlock) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysComb(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   ASSERT_EQ(item->body->stmts.size(), 2u);
@@ -526,7 +526,7 @@ TEST(ParserSection7, Sec7_2_2_AssignInAlwaysComb) {
   EXPECT_FALSE(r.has_errors);
   auto* item = NthItem(r, 3);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
 }
 
 TEST(ParserSection4, Sec4_6_AlwaysCombCombinational) {

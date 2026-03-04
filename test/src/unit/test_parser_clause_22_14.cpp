@@ -7,7 +7,7 @@ namespace {
 
 TEST(ParserSection22, BeginKeywords1800_2023) {
   EXPECT_TRUE(
-      ParseOk("`begin_keywords \"1800-2023\"\n"
+      ParseWithPreprocessorOk("`begin_keywords \"1800-2023\"\n"
               "module t;\n"
               "endmodule\n"
               "`end_keywords\n"));
@@ -15,7 +15,7 @@ TEST(ParserSection22, BeginKeywords1800_2023) {
 
 TEST(ParserSection22, BeginKeywords1800_2005) {
   EXPECT_TRUE(
-      ParseOk("`begin_keywords \"1800-2005\"\n"
+      ParseWithPreprocessorOk("`begin_keywords \"1800-2005\"\n"
               "module t;\n"
               "endmodule\n"
               "`end_keywords\n"));
@@ -23,7 +23,7 @@ TEST(ParserSection22, BeginKeywords1800_2005) {
 
 TEST(ParserSection22, BeginKeywordsMultipleModules) {
   EXPECT_TRUE(
-      ParseOk("`begin_keywords \"1800-2012\"\n"
+      ParseWithPreprocessorOk("`begin_keywords \"1800-2012\"\n"
               "module m1;\n"
               "endmodule\n"
               "module m2;\n"

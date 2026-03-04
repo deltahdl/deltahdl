@@ -12,7 +12,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectsInConcatenation) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(rhs->elements.size(), 4u);
@@ -39,7 +39,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithPartSelectOperands) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
@@ -59,7 +59,7 @@ TEST(ParserSection11, IndexedPartSelectVariableBase) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   EXPECT_TRUE(rhs->is_part_select_plus);
@@ -70,7 +70,7 @@ TEST(ParserSection11, Sec11_1_BitSelectIndex) {
       "module t;\n"
       "  initial x = data[7];\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->base, nullptr);
@@ -85,7 +85,7 @@ TEST(ParserSection11, Sec11_1_PartSelectIndexAndEnd) {
       "module t;\n"
       "  initial x = data[15:0];\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->index, nullptr);
@@ -99,7 +99,7 @@ TEST(ParserSection11, Sec11_1_IndexedPartSelectPlusFlag) {
       "module t;\n"
       "  initial x = vec[i +: 4];\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   EXPECT_TRUE(rhs->is_part_select_plus);
@@ -113,7 +113,7 @@ TEST(ParserSection11, Sec11_1_IndexedPartSelectMinusFlag) {
       "module t;\n"
       "  initial x = vec[j -: 8];\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   EXPECT_TRUE(rhs->is_part_select_minus);
@@ -125,7 +125,7 @@ TEST(ParserSection11, BitSelect) {
       "module t;\n"
       "  initial x = a[3];\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
@@ -135,7 +135,7 @@ TEST(ParserSection11, PartSelectConstant) {
       "module t;\n"
       "  initial x = a[7:0];\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }

@@ -30,7 +30,7 @@ TEST(ParserSection11, WildcardEq) {
       "module t;\n"
       "  initial x = (a ==? b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kEqEqQuestion);
 }
@@ -40,7 +40,7 @@ TEST(ParserSection11, WildcardNeq) {
       "module t;\n"
       "  initial x = (a !=? b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
 }

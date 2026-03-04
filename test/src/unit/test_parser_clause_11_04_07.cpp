@@ -53,7 +53,7 @@ TEST(ParserSection11, ImplicationParsed) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
@@ -67,7 +67,7 @@ TEST(ParserSection11, EquivalenceParsed) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
@@ -90,7 +90,7 @@ TEST(ParserSection11, ImplicationRightAssocStructure) {
       "  logic a, b, c, d;\n"
       "  initial d = a -> b -> c;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
 
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
@@ -122,7 +122,7 @@ TEST(ParserSection11, Sec11_1_UnaryLogicalNot) {
       "module t;\n"
       "  initial x = !flag;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kBang);
@@ -133,7 +133,7 @@ TEST(ParserSection11, LogicalAnd) {
       "module t;\n"
       "  initial x = (a && b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
@@ -143,7 +143,7 @@ TEST(ParserSection11, LogicalOr) {
       "module t;\n"
       "  initial x = (a || b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
 }
@@ -153,7 +153,7 @@ TEST(ParserSection11, LogicalNot) {
       "module t;\n"
       "  initial x = !a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kBang);

@@ -7,7 +7,7 @@ namespace {
 
 TEST(ParserSection22, BeginKeywords1364_2001_noconfig) {
   EXPECT_TRUE(
-      ParseOk("`begin_keywords \"1364-2001-noconfig\"\n"
+      ParseWithPreprocessorOk("`begin_keywords \"1364-2001-noconfig\"\n"
               "module t;\n"
               "endmodule\n"
               "`end_keywords\n"));

@@ -6,7 +6,7 @@ namespace {
 
 TEST(ParserSection22, UndefineallDirective) {
   EXPECT_TRUE(
-      ParseOk("`define A 1\n"
+      ParseWithPreprocessorOk("`define A 1\n"
               "`define B 2\n"
               "`undefineall\n"
               "module t;\n"

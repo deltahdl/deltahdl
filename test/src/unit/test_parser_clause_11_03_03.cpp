@@ -9,7 +9,7 @@ TEST(ParserSection11, LiteralAsExpression) {
       "module t;\n"
       "  initial x = 42;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }

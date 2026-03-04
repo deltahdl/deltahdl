@@ -558,7 +558,7 @@ TEST(ParserSection10, Sec10_4_2_AlwaysFFNonblocking) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
   auto* stmt = FirstAlwaysStmt(r);
   ASSERT_NE(stmt, nullptr);
@@ -588,7 +588,7 @@ TEST(ParserSection10, Sec10_4_2_RegisterFilePattern) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   ASSERT_GE(item->body->stmts.size(), 1u);

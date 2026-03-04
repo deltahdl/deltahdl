@@ -32,7 +32,7 @@ TEST(ParserSection9, Sec9_2_3_ThreeAlwaysLatchBlocks) {
   EXPECT_FALSE(r.has_errors);
   int count = 0;
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) {
       ++count;
       EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
       EXPECT_TRUE(item->sensitivity.empty());
@@ -44,7 +44,7 @@ TEST(ParserSection9, Sec9_2_3_ThreeAlwaysLatchBlocks) {
 }
 static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return item;
+    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
   }
   return nullptr;
 }
@@ -61,7 +61,7 @@ TEST(ParserSection9, Sec9_2_3_SimpleIfElseLatch) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysLatchItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysLatchBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kIf);
@@ -81,7 +81,7 @@ TEST(ParserSection9, Sec9_2_3_BeginEndBlock) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysLatchItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysLatchBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   ASSERT_GE(item->body->stmts.size(), 1u);
@@ -286,7 +286,7 @@ TEST(ParserSection9, Sec9_2_3_ModuleItemKindIsAlwaysLatchBlock) {
   EXPECT_FALSE(r.has_errors);
   bool found = false;
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) {
       found = true;
       EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
     }
@@ -311,7 +311,7 @@ TEST(ParserSection9, Sec9_2_3_NoSensitivityList) {
 static ModuleItem* NthAlwaysLatchItem(ParseResult& r, size_t n) {
   size_t count = 0;
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) {
       if (count == n) return item;
       ++count;
     }
@@ -334,8 +334,8 @@ TEST(ParserSection9, Sec9_2_3_MultipleAlwaysLatchBlocks) {
   auto* second = NthAlwaysLatchItem(r, 1);
   ASSERT_NE(first, nullptr);
   ASSERT_NE(second, nullptr);
-  EXPECT_EQ(first->kind, ModuleItemKind::kAlwaysLatchBlock);
-  EXPECT_EQ(second->kind, ModuleItemKind::kAlwaysLatchBlock);
+  EXPECT_EQ(first->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(second->kind, ModuleItemKind::kAlwaysBlock);
 }
 
 TEST(ParserSection9, Sec9_2_3_BodyVerificationIfCondition) {

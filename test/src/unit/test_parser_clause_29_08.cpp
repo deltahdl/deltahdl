@@ -1,8 +1,5 @@
 #include "fixture_parser.h"
-#include "fixture_program.h"
-#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
-#include "simulator/udp_eval.h"
 
 using namespace delta;
 namespace {
@@ -260,19 +257,6 @@ TEST(ParserA504, UdpInst_WithAttributes) {
   EXPECT_FALSE(insts[0]->attrs.empty());
 }
 
-static bool FindModuleInst(const std::vector<ModuleItem*>& items,
-                           std::string_view module_name,
-                           std::string_view expected_inst_name) {
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kModuleInst &&
-        item->inst_module == module_name) {
-      EXPECT_EQ(item->inst_name, expected_inst_name);
-      return true;
-    }
-  }
-  return false;
-}
-
 TEST(ParserSection29, UdpInstance) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -288,7 +272,10 @@ TEST(ParserSection29, UdpInstance) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);
-  EXPECT_TRUE(FindModuleInst(r.cu->modules[0]->items, "inv", "u1"));
+  auto insts = FindUdpInsts(r.cu->modules[0]->items);
+  ASSERT_EQ(insts.size(), 1u);
+  EXPECT_EQ(insts[0]->inst_module, "inv");
+  EXPECT_EQ(insts[0]->gate_inst_name, "u1");
 }
 
 }

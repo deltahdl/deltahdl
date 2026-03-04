@@ -9,7 +9,7 @@ TEST(ParserSection11, ReductionOnParenthesizedExpr) {
       "module t;\n"
       "  initial x = &(a ^ b);\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
@@ -90,7 +90,7 @@ TEST(ParserSection11, ReductionXnorCaretTilde) {
       "module t;\n"
       "  initial x = ^~a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
@@ -101,7 +101,7 @@ TEST(ParserSection11, Sec11_1_UnaryReductionNand) {
       "module t;\n"
       "  initial x = ~&data;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTildeAmp);
@@ -112,7 +112,7 @@ TEST(ParserSection11, Sec11_1_UnaryReductionNor) {
       "module t;\n"
       "  initial x = ~|data;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTildePipe);
@@ -123,7 +123,7 @@ TEST(ParserSection11, Sec11_1_UnaryReductionXnorTildeCaret) {
       "module t;\n"
       "  initial x = ~^data;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
@@ -134,7 +134,7 @@ TEST(ParserSection11, Sec11_1_UnaryReductionXnorCaretTilde) {
       "module t;\n"
       "  initial x = ^~data;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
@@ -145,7 +145,7 @@ TEST(ParserSection11, ReductionAnd) {
       "module t;\n"
       "  initial x = &a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
@@ -156,7 +156,7 @@ TEST(ParserSection11, ReductionOr) {
       "module t;\n"
       "  initial x = |a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
@@ -167,7 +167,7 @@ TEST(ParserSection11, ReductionXor) {
       "module t;\n"
       "  initial x = ^a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
@@ -178,7 +178,7 @@ TEST(ParserSection11, ReductionNand) {
       "module t;\n"
       "  initial x = ~&a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTildeAmp);
@@ -189,7 +189,7 @@ TEST(ParserSection11, ReductionNor) {
       "module t;\n"
       "  initial x = ~|a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTildePipe);
@@ -200,7 +200,7 @@ TEST(ParserSection11, ReductionXnor) {
       "module t;\n"
       "  initial x = ~^a;\n"
       "endmodule\n");
-  auto* rhs = FirstAssignRhs(r);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);

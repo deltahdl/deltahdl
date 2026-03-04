@@ -21,7 +21,7 @@ TEST(ParserClause03, Cl3_14_TimeunitsAndTimescale) {
       ParseOk("program p; timeunit 10us; timeprecision 100ns; endprogram\n"));
   EXPECT_TRUE(ParseOk("interface ifc; timeunit 1ns; endinterface\n"));
 
-  EXPECT_TRUE(ParseOk("`timescale 1ns/1ps\nmodule m; endmodule\n"));
+  EXPECT_TRUE(ParseWithPreprocessorOk("`timescale 1ns/1ps\nmodule m; endmodule\n"));
 
   EXPECT_TRUE(ParseOk("module m; initial #10ns $display(\"d\"); endmodule\n"));
   EXPECT_TRUE(ParseOk("module m; initial #2.1ns $display(\"d\"); endmodule\n"));

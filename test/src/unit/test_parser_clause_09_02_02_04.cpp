@@ -57,7 +57,7 @@ TEST(ParserSection9, Sec9_3_1_BlockInAlwaysFFWithSensitivity) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   ASSERT_GE(item->sensitivity.size(), 2u);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
@@ -98,7 +98,7 @@ TEST(ParserSection10, Sec10_4_2_AlwaysFFResetPattern) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
   ASSERT_GE(item->sensitivity.size(), 2u);
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
@@ -144,7 +144,7 @@ TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysFF) {
   auto& items = r.cu->modules[0]->items;
   bool found_ff = false;
   for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kAlwaysFFBlock) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock) {
       found_ff = true;
       ASSERT_NE(item->body, nullptr);
     }
