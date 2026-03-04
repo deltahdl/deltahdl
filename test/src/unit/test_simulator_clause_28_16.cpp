@@ -6,18 +6,15 @@
 #include <cstdint>
 #include <initializer_list>
 
-// --- Local types for gate/net delays (§28.16) ---
-enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
+#include "helpers_mintymax.h"
 
+// --- Local types for gate/net delays (§28.16) ---
 struct DelaySpec {
   uint64_t d1 = 0;    // rise
   uint64_t d2 = 0;    // fall
   uint64_t d3 = 0;    // turn-off (z) or charge decay for trireg
   uint8_t count = 0;  // 0, 1, 2, or 3
 };
-
-enum class ChargeDecayState : uint8_t { kIdle, kDecaying, kDone };
-
 uint64_t ComputePropagationDelay(const DelaySpec& spec, Val4 from, Val4 to) {
   if (spec.count == 0) return 0;
   if (spec.count == 1) return spec.d1;

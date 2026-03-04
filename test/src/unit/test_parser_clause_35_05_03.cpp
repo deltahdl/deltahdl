@@ -1,5 +1,6 @@
 // §35.5.3: Context tasks and functions
 
+#include "fixture_config.h"
 #include "fixture_program.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -47,25 +48,6 @@ TEST(ParserSection38, DpiImportContextCallbackWithArgs) {
   EXPECT_TRUE(items[0]->dpi_is_context);
   EXPECT_EQ(items[0]->name, "register_cb_wrapper");
 }
-
-struct ConfigTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
-    source_ = src;
-    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
-    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
-    return parser_->Parse();
-  }
-
-  bool HasErrors() const { return diag_.HasErrors(); }
-
-  SourceManager mgr_;
-  Arena arena_;
-  DiagEngine diag_{mgr_};
-  std::string source_;
-  std::unique_ptr<Lexer> lexer_;
-  std::unique_ptr<Parser> parser_;
-};
 TEST_F(DpiParseTest, ImportContextFunction) {
   auto* unit = Parse(R"(
     module m;

@@ -4,15 +4,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-
-// Return all statements from the first initial block's begin/end.
-static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body) return {};
-  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
-  return {item->body};
-}
-
 namespace {
 
 TEST(ParserA602, BlockingAssignment_ClassNew) {

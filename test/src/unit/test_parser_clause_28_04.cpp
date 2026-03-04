@@ -1,6 +1,7 @@
 // §28.4: and, nand, nor, or, xor, and xnor gates
 
 #include "fixture_parser.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -266,34 +267,6 @@ TEST(ParserA304, NInputGatetype_Xnor) {
 }
 
 using SpecifyParseTest = ProgramTestParse;
-
-// =============================================================================
-// Parser test fixture
-// =============================================================================
-struct SpecifyTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
-    source_ = src;
-    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
-    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
-    return parser_->Parse();
-  }
-
-  // Helper: get first specify block from first module.
-  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
-    for (auto* item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
-    }
-    return nullptr;
-  }
-
-  SourceManager mgr_;
-  Arena arena_;
-  DiagEngine diag_{mgr_};
-  std::string source_;
-  std::unique_ptr<Lexer> lexer_;
-  std::unique_ptr<Parser> parser_;
-};
 // delay2: two values on n_input gate (rise, fall).
 TEST(ParserA223, Delay2NInputGateTwoValues) {
   auto r = Parse(

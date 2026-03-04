@@ -19,7 +19,7 @@ TEST(ParserA611, ClockingDeclAssignWithHierExpr) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "enable");
@@ -38,32 +38,13 @@ TEST(ParserA611, ClockingDeclAssignMultipleMixed) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 3u);
   EXPECT_EQ(item->clocking_signals[0].hier_expr, nullptr);
   EXPECT_NE(item->clocking_signals[1].hier_expr, nullptr);
   EXPECT_EQ(item->clocking_signals[2].hier_expr, nullptr);
 }
-static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
-}
-
-// Validates parse result and retrieves a clocking block via output param.
-// Must be called through ASSERT_NO_FATAL_FAILURE.
-static void GetClockingBlock(ParseResult& r, ModuleItem*& out, size_t idx = 0) {
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  out = FindClockingBlock(r, idx);
-  ASSERT_NE(out, nullptr);
-}
-
 // Hierarchical expression assignment to a clocking signal.
 TEST(ParserSection19, ClockingBlock_HierarchicalExpr) {
   auto r = Parse(
@@ -73,23 +54,11 @@ TEST(ParserSection19, ClockingBlock_HierarchicalExpr) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "enable");
   ASSERT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
-
-// --- Test helpers ---
-static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // §14.5 — Hierarchical expression assignment
 // =============================================================================
@@ -101,7 +70,7 @@ TEST(ParserSection14, HierarchicalExpression) {
       "  endclocking\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "enable");

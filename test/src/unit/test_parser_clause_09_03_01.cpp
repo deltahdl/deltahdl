@@ -45,25 +45,6 @@ TEST(ParserA28, DataDeclBasicInBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(body->stmts[0]->var_name, "x");
 }
-
-static std::vector<ModuleItem*> FindUdpInsts(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> insts;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
-  }
-  return insts;
-}
-
-static std::vector<ModuleItem*> FindContAssigns(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
-  }
-  return result;
-}
-
 // Helpers to extract items from the first module.
 static ModuleItem* FindItem(const std::vector<ModuleItem*>& items,
                             ModuleItemKind kind) {
@@ -72,16 +53,6 @@ static ModuleItem* FindItem(const std::vector<ModuleItem*>& items,
   }
   return nullptr;
 }
-
-static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
-                                          ModuleItemKind kind) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == kind) result.push_back(item);
-  }
-  return result;
-}
-
 TEST(ParserA602, InitialConstruct_BeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -98,15 +69,6 @@ TEST(ParserA602, InitialConstruct_BeginEnd) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
-
-// Return all statements from the first initial block's begin/end.
-static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body) return {};
-  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
-  return {item->body};
-}
-
 TEST(ParserA602, AlwaysConstruct_WithBeginEnd) {
   auto r = Parse(
       "module m;\n"

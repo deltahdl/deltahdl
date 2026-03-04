@@ -38,15 +38,6 @@ TEST(ParserA24, DynamicArrayDeclWithNew) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// Return all statements from the first initial block's begin/end.
-static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body) return {};
-  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
-  return {item->body};
-}
-
 TEST(ParserA602, BlockingAssignment_DynamicArrayNew) {
   // nonrange_variable_lvalue = dynamic_array_new
   auto r = Parse(

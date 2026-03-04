@@ -4,6 +4,7 @@
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_mintymax.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
 
@@ -49,31 +50,6 @@ TEST(EvalOpXZ, MinTypMaxMax) {
   auto result = EvalExpr(mtm, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 30u);
 }
-
-// --- Local types for gate/net delays (§28.16) ---
-enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
-
-struct MinTypMax {
-  uint64_t min_val = 0;
-  uint64_t typ_val = 0;
-  uint64_t max_val = 0;
-};
-
-enum class ChargeDecayState : uint8_t { kIdle, kDecaying, kDone };
-
-uint64_t SelectMinTypMax(const MinTypMax& mtm, uint8_t selector) {
-  switch (selector) {
-    case 0:
-      return mtm.min_val;
-    case 1:
-      return mtm.typ_val;
-    case 2:
-      return mtm.max_val;
-    default:
-      return mtm.typ_val;
-  }
-}
-
 TEST(MinTypMaxDelays, SelectTyp) {
   MinTypMax mtm{5, 10, 15};
   EXPECT_EQ(SelectMinTypMax(mtm, 1), 10u);

@@ -1,19 +1,10 @@
 // §28.5: buf and not gates
 
+#include "fixture_elaborator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-
-static RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
-}
-
 namespace {
 
 TEST(ParserSection28, ElaborateBufGate) {

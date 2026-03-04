@@ -4,15 +4,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-
-// Return all statements from the first initial block's begin/end.
-static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body) return {};
-  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
-  return {item->body};
-}
-
 namespace {
 
 // =============================================================================
@@ -78,37 +69,6 @@ TEST(ParserSection10, Sec10_6_1_AssignInTaskBody) {
               "  endtask\n"
               "endmodule\n"));
 }
-
-// Helper: extract 4 initial statements and verify non-null.
-struct FourStmts {
-  Stmt* s0;
-  Stmt* s1;
-  Stmt* s2;
-  Stmt* s3;
-};
-
-static FourStmts Get4InitialStmts(auto& r) {
-  FourStmts fs;
-  fs.s0 = NthInitialStmt(r, 0);
-  fs.s1 = NthInitialStmt(r, 1);
-  fs.s2 = NthInitialStmt(r, 2);
-  fs.s3 = NthInitialStmt(r, 3);
-  EXPECT_NE(fs.s0, nullptr);
-  EXPECT_NE(fs.s1, nullptr);
-  EXPECT_NE(fs.s2, nullptr);
-  EXPECT_NE(fs.s3, nullptr);
-  return fs;
-}
-static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
-}
-
 // --- 29. Assign/deassign interleaved with nonblocking assigns ---
 TEST(ParserSection10, Sec10_6_1_InterleavedWithNonblocking) {
   auto r = Parse(
@@ -430,17 +390,6 @@ TEST(ParserSection10, Sec10_6_1_AssignInAlwaysWithEvent) {
   ASSERT_NE(always_item, nullptr);
   ASSERT_NE(always_item->body, nullptr);
 }
-
-static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
-}
-
 // --- 12. Multiple assigns to different vars in same block ---
 TEST(ParserSection10, Sec10_6_1_MultipleAssignsDifferentVars) {
   auto r = Parse(

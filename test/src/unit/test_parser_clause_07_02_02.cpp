@@ -84,19 +84,6 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberDefaultInit) {
   EXPECT_NE(item->typedef_type.struct_members[0].init_expr, nullptr);
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
-
-static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        if (item->body->stmts.size() > n) return item->body->stmts[n];
-      }
-      if (n == 0) return item->body;
-    }
-  }
-  return nullptr;
-}
-
 // 5. Struct variable assigned from another struct variable.
 TEST(ParserSection7, Sec7_2_2_AssignFromStructVar) {
   auto r = Parse(

@@ -71,34 +71,6 @@ TEST(ParserA223, Delay2ParenSingleValue) {
   ASSERT_NE(item->assign_delay, nullptr);
   EXPECT_EQ(item->assign_delay->int_val, 5u);
 }
-
-static std::vector<ModuleItem*> FindUdpInsts(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> insts;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
-  }
-  return insts;
-}
-
-static std::vector<ModuleItem*> FindContAssigns(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
-  }
-  return result;
-}
-
-static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
-                                          ModuleItemKind kind) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == kind) result.push_back(item);
-  }
-  return result;
-}
-
 TEST(ParserA601, ContinuousAssign_DelaySingle) {
   auto r = Parse(
       "module m;\n"

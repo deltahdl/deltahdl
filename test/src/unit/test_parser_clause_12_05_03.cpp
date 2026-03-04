@@ -160,20 +160,6 @@ TEST(ParserSection12, PriorityCasex) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
-// Helper: verify always @* case statement pattern.
-static Stmt* GetAlwaysStarCaseStmt(ParseResult& r) {
-  EXPECT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  EXPECT_NE(item, nullptr);
-  if (!item) return nullptr;
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  auto* case_stmt = item->body->stmts[0];
-  EXPECT_EQ(case_stmt->kind, StmtKind::kCase);
-  return case_stmt;
-}
 // @* with unique case
 TEST(ParserSection9, Sec9_4_2_3_AtStarUniqueCase) {
   auto r = Parse(

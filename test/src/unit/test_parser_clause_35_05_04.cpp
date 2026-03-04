@@ -2,6 +2,7 @@
 
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_config.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -363,25 +364,6 @@ TEST(ParserSection38, DpiImportPureFunctionForSizetf) {
   EXPECT_TRUE(items[0]->dpi_is_pure);
   EXPECT_FALSE(items[0]->dpi_is_context);
 }
-
-struct ConfigTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
-    source_ = src;
-    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
-    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
-    return parser_->Parse();
-  }
-
-  bool HasErrors() const { return diag_.HasErrors(); }
-
-  SourceManager mgr_;
-  Arena arena_;
-  DiagEngine diag_{mgr_};
-  std::string source_;
-  std::unique_ptr<Lexer> lexer_;
-  std::unique_ptr<Parser> parser_;
-};
 // =============================================================================
 // §35.3 DPI-C import declarations
 // =============================================================================

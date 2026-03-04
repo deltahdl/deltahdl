@@ -4,15 +4,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-
-// Return all statements from the first initial block's begin/end.
-static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body) return {};
-  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
-  return {item->body};
-}
-
 namespace {
 
 TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityStar) {
@@ -91,19 +82,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelInitial) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   EXPECT_TRUE(stmt->is_star_event);
   EXPECT_TRUE(stmt->events.empty());
-}
-
-// Helper for blocks 11: verify always block has var decl body.
-static void VerifyAlwaysVarDecl(ParseResult& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 3u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(item->body->stmts[0]->var_name, "temp");
 }
 // ---------------------------------------------------------------------------
 // 20. always @* with variable declarations in begin-end block.
@@ -234,21 +212,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarCaseBody) {
   EXPECT_EQ(item->body->kind, StmtKind::kCase);
   EXPECT_EQ(item->body->case_items.size(), 3u);
 }
-
-// Helper for block 12: verify always block has 3 blocking assigns.
-static void VerifyAlwaysMultiAssigns(ParseResult& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_EQ(item->body->stmts.size(), 3u);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
-  }
-}
-
 // ---------------------------------------------------------------------------
 // 24. always @* with multiple assignment statements.
 // ---------------------------------------------------------------------------
@@ -359,19 +322,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenInInitialBlock) {
   EXPECT_TRUE(stmt->is_star_event);
   EXPECT_TRUE(stmt->events.empty());
 }
-
-// Helper for block 24: verify always block has nested if-else.
-static void VerifyAlwaysNestedIfElse(ParseResult& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
-}
-
 // ---------------------------------------------------------------------------
 // 28. always @* with nested if-else inside begin-end.
 // ---------------------------------------------------------------------------
@@ -555,22 +505,6 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarBlocks) {
   ASSERT_NE(item0->body, nullptr);
   ASSERT_NE(item1->body, nullptr);
 }
-
-// Helper: verify always @* case statement pattern.
-static Stmt* GetAlwaysStarCaseStmt(ParseResult& r) {
-  EXPECT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  EXPECT_NE(item, nullptr);
-  if (!item) return nullptr;
-  EXPECT_TRUE(item->sensitivity.empty());
-  ASSERT_NE(item->body, nullptr);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  auto* case_stmt = item->body->stmts[0];
-  EXPECT_EQ(case_stmt->kind, StmtKind::kCase);
-  return case_stmt;
-}
-
 // @* with case inside body
 TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
   auto r = Parse(
@@ -723,17 +657,6 @@ TEST(ParserSection4, Sec4_5_StarEventControl) {
   EXPECT_TRUE(stmt->is_star_event);
   EXPECT_TRUE(stmt->events.empty());
 }
-
-static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
-}
-
 // Multiple @* event controls in sequence inside initial block
 TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarInInitial) {
   auto r = Parse(

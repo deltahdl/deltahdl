@@ -1,8 +1,6 @@
 // §28.15.1: tri0 and tri1 net strengths
 
 // --- Local types for net type strengths (§28.15) ---
-enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
-
 #include <gtest/gtest.h>
 
 #include "model_strength.h"

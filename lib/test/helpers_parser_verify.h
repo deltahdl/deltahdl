@@ -348,3 +348,116 @@ inline SpecifyParseResult ParseSpecifySingle(const std::string& src) {
   }
   return result;
 }
+
+// Collect all items of a given kind.
+inline std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
+                                          ModuleItemKind kind) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == kind) result.push_back(item);
+  }
+  return result;
+}
+
+// Find all UDP instantiations.
+inline std::vector<ModuleItem*> FindUdpInsts(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> insts;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
+  }
+  return insts;
+}
+
+// Find all continuous assignments.
+inline std::vector<ModuleItem*> FindContAssigns(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<ModuleItem*> result;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
+  }
+  return result;
+}
+
+// Find the Nth clocking block in the first module.
+template <typename T>
+inline ModuleItem* FindClockingBlockByIndex(T& r, size_t idx = 0) {
+  if (!r.cu || r.cu->modules.empty()) return nullptr;
+  size_t count = 0;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kClockingBlock) continue;
+    if (count == idx) return item;
+    ++count;
+  }
+  return nullptr;
+}
+
+// Validates parse result and retrieves a clocking block via output param.
+template <typename T>
+inline void GetClockingBlockChecked(T& r, ModuleItem*& out, size_t idx = 0) {
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->modules.empty());
+  out = FindClockingBlockByIndex(r, idx);
+  ASSERT_NE(out, nullptr);
+}
+
+// Verify always block has var decl as first statement.
+inline void VerifyAlwaysVarDecl(ParseResult& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 3u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(item->body->stmts[0]->var_name, "temp");
+}
+
+// Verify always block first statement is nested if-else.
+inline void VerifyAlwaysNestedIfElse(ParseResult& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 1u);
+  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
+}
+
+// Return all statements from the first initial block.
+template <typename T>
+inline std::vector<Stmt*> AllInitialStmts(T& r) {
+  if (!r.cu || r.cu->modules.empty()) return {};
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    if (!item->body) return {};
+    if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
+    return {item->body};
+  }
+  return {};
+}
+
+// A group of four statements from an initial block.
+struct FourStmts {
+  Stmt* s0 = nullptr;
+  Stmt* s1 = nullptr;
+  Stmt* s2 = nullptr;
+  Stmt* s3 = nullptr;
+};
+
+// Get the first 4 statements from the first initial block.
+template <typename T>
+inline FourStmts Get4InitialStmts(T& r) {
+  FourStmts fs;
+  fs.s0 = NthInitialStmt(r, 0);
+  fs.s1 = NthInitialStmt(r, 1);
+  fs.s2 = NthInitialStmt(r, 2);
+  fs.s3 = NthInitialStmt(r, 3);
+  EXPECT_NE(fs.s0, nullptr);
+  EXPECT_NE(fs.s1, nullptr);
+  EXPECT_NE(fs.s2, nullptr);
+  EXPECT_NE(fs.s3, nullptr);
+  return fs;
+}

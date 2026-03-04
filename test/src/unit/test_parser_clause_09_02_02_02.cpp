@@ -5,25 +5,6 @@
 #include "simulator/udp_eval.h"
 
 using namespace delta;
-
-static std::vector<ModuleItem*> FindUdpInsts(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> insts;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
-  }
-  return insts;
-}
-
-static std::vector<ModuleItem*> FindContAssigns(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
-  }
-  return result;
-}
-
 // Helpers to extract items from the first module.
 static ModuleItem* FindItem(const std::vector<ModuleItem*>& items,
                             ModuleItemKind kind) {
@@ -32,16 +13,6 @@ static ModuleItem* FindItem(const std::vector<ModuleItem*>& items,
   }
   return nullptr;
 }
-
-static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
-                                          ModuleItemKind kind) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == kind) result.push_back(item);
-  }
-  return result;
-}
-
 namespace {
 
 TEST(ParserA602, AlwaysConstruct_AlwaysComb) {
@@ -130,20 +101,6 @@ TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
-
-// Helper for block 12: verify always block has 3 blocking assigns.
-static void VerifyAlwaysMultiAssigns(ParseResult& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_EQ(item->body->stmts.size(), 3u);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
-  }
-}
 // ---------------------------------------------------------------------------
 // 23. always_comb with multiple assignment statements.
 // ---------------------------------------------------------------------------
@@ -183,19 +140,6 @@ TEST(ParserSection9, Sec9_2_2_MultipleAssignments) {
     EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
   }
 }
-
-// Helper for block 24: verify always block has nested if-else.
-static void VerifyAlwaysNestedIfElse(ParseResult& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
-}
-
 // ---------------------------------------------------------------------------
 // 27. always_comb with nested if-else inside begin-end.
 // ---------------------------------------------------------------------------

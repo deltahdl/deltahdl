@@ -1,8 +1,6 @@
 // §28.10: pullup and pulldown sources
 
 // --- Local types for pullup/pulldown sources (§28.10) ---
-enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
-
 #include <gtest/gtest.h>
 
 #include "model_strength.h"

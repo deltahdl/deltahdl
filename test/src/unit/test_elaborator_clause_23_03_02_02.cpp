@@ -77,18 +77,6 @@ TEST(Elaboration, PortBinding_PortMismatch) {
   EXPECT_EQ(mod->children[0].port_bindings.size(), 1);
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
-
-RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
-                       std::string_view top = "") {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto name = top.empty() ? cu->modules.back()->name : top;
-  return elab.Elaborate(name);
-}
-
 // --- Elaborator resolves interface instantiation with port bindings ---
 TEST(ParserAnnexA0412, ElaborationInterfaceInstPortBindings) {
   ElabFixture f;

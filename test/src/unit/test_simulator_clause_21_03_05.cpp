@@ -75,21 +75,6 @@ TEST(SysTask, RewindResetsPosition) {
   EvalExpr(close_expr, f.ctx, f.arena);
   std::remove(tmp.c_str());
 }
-
-static Expr* MakeStrLit(Arena& arena, std::string_view text) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kStringLiteral;
-  // Store with surrounding quotes, matching parser convention.
-  auto len = text.size() + 2;
-  char* buf = static_cast<char*>(arena.Allocate(len + 1, 1));
-  buf[0] = '"';
-  for (size_t i = 0; i < text.size(); ++i) buf[i + 1] = text[i];
-  buf[len - 1] = '"';
-  buf[len] = '\0';
-  e->text = std::string_view(buf, len);
-  return e;
-}
-
 // ============================================================================
 // §21.3 — $rewind(fd)
 // ============================================================================
@@ -100,9 +85,9 @@ TEST(Section21, Rewind) {
     std::ofstream ofs(tmp_path);
     ofs << "ABCD";
   }
-  auto* open_expr = MakeSysCall(
-      f.arena, "$fopen",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeStrLit(f.arena, "r")});
+  auto* open_expr =
+      MakeSysCall(f.arena, "$fopen",
+                  {MkStr(f.arena, tmp_path.c_str()), MkStr(f.arena, "r")});
   auto fd_val = EvalExpr(open_expr, f.ctx, f.arena);
   uint64_t fd = fd_val.ToUint64();
   ASSERT_NE(fd, 0u);

@@ -34,16 +34,6 @@ TEST(ParserSection4, Sec4_6_ProgramWithClockingBlock) {
               "  end\n"
               "endprogram\n"));
 }
-static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // LRM section 19.5.2 -- Clocking block scope
 // =============================================================================
@@ -61,7 +51,7 @@ TEST(ParserSection19, ClockingBlockScope_AmongOtherItems) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "cb");
   ASSERT_GE(r.cu->modules[0]->items.size(), 4u);

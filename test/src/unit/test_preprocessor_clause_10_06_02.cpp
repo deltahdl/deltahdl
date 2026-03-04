@@ -1,6 +1,7 @@
 // §10.6.2: The force and release procedural statements
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -68,17 +69,6 @@ TEST(ParserSection10, ReleaseLhs) {
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "w");
 }
-
-static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
-}
-
 TEST(ParserSection10, ForceThenRelease) {
   auto r = ParseWithPreprocessor(
       "module m;\n"

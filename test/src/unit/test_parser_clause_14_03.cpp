@@ -19,7 +19,7 @@ TEST(ParserA611, ClockingDirectionOutput) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kOutput);
@@ -38,7 +38,7 @@ TEST(ParserSection14, OverviewMixedDirectionSignals) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 3u);
 
   struct Expected {
@@ -70,7 +70,7 @@ TEST(ParserA611, ClockingDirectionInout) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
@@ -86,7 +86,7 @@ TEST(ParserSection14, OverviewNegedgeClockEvent) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_event.size(), 1u);
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
 }
@@ -103,7 +103,7 @@ TEST(ParserA611, ListOfClockingDeclAssignSingle) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "data");
@@ -121,7 +121,7 @@ TEST(ParserSection19, FullExample_BusClockingBlock) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   EXPECT_EQ(item->name, "bus");
   // Note: default skew is parsed but not stored in the AST.
   ASSERT_EQ(item->clocking_signals.size(), 5u);
@@ -152,7 +152,7 @@ TEST(ParserA611, ListOfClockingDeclAssignMultiple) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 3u);
   EXPECT_EQ(item->clocking_signals[0].name, "a");
@@ -172,7 +172,7 @@ TEST(ParserA611, ClockingDeclAssignBare) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "data");
@@ -188,7 +188,7 @@ TEST(ParserSection14, InputSamplingInoutSignal) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
   EXPECT_EQ(item->clocking_signals[0].name, "data");
@@ -203,7 +203,7 @@ TEST(ParserSection14, InputSamplingMultipleSignals) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 3u);
   for (size_t i = 0; i < 3; ++i) {
     EXPECT_EQ(item->clocking_signals[i].direction, Direction::kInput)
@@ -211,25 +211,6 @@ TEST(ParserSection14, InputSamplingMultipleSignals) {
     ASSERT_NE(item->clocking_signals[i].skew_delay, nullptr) << "signal " << i;
   }
 }
-static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
-}
-
-// Validates parse result and retrieves a clocking block via output param.
-// Must be called through ASSERT_NO_FATAL_FAILURE.
-static void GetClockingBlock(ParseResult& r, ModuleItem*& out, size_t idx = 0) {
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  out = FindClockingBlock(r, idx);
-  ASSERT_NE(out, nullptr);
-}
-
 // =============================================================================
 // LRM section 19.4 -- Clocking blocks
 // =============================================================================
@@ -243,7 +224,7 @@ TEST(ParserSection19, ClockingBlock_BasicDecl) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   EXPECT_EQ(item->name, "cb");
   EXPECT_FALSE(item->is_default_clocking);
   EXPECT_FALSE(item->is_global_clocking);
@@ -271,7 +252,7 @@ TEST(ParserA611, MultipleDirectionGroups) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 4u);
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
@@ -289,7 +270,7 @@ TEST(ParserSection19, ClockingBlock_NegedgeEvent) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_event.size(), 1u);
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
 }
@@ -303,7 +284,7 @@ TEST(ParserSection19, ClockingBlock_BareIdentifierEvent) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_event.size(), 1u);
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
 }
@@ -319,7 +300,7 @@ TEST(ParserSection19, ClockingBlock_AllDirections) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
 
   VerifyClockingSignalDirections(item, {
                                            {Direction::kInput, "data_in"},
@@ -337,7 +318,7 @@ TEST(ParserSection19, ClockingBlock_MultipleSignalsSameDirection) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
 
   const char* const kNames[] = {"data", "ready", "enable"};
   ASSERT_EQ(item->clocking_signals.size(), std::size(kNames));
@@ -363,7 +344,7 @@ TEST(ParserA611, ClockingItemPropertyDecl) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 }
@@ -381,21 +362,10 @@ TEST(ParserA611, ClockingItemLetDecl) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 }
-
-static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // A.6.11 clocking_declaration — plain clocking block
 // =============================================================================
@@ -408,7 +378,7 @@ TEST(ParserA611, ClockingDeclPlain) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
   EXPECT_EQ(item->name, "cb");
@@ -428,7 +398,7 @@ TEST(ParserA611, ClockingDeclEndLabel) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "cb");
 }
@@ -445,7 +415,7 @@ TEST(ParserA611, ClockingEventBareIdentifier) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_event.size(), 1u);
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
@@ -463,7 +433,7 @@ TEST(ParserA611, ClockingEventParenExpr) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_event.size(), 1u);
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
@@ -482,7 +452,7 @@ TEST(ParserA611, ClockingItemDefaultSkewInput) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_GE(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "data");
@@ -501,7 +471,7 @@ TEST(ParserA611, ClockingItemDefaultSkewOutput) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_GE(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "ack");
@@ -520,7 +490,7 @@ TEST(ParserA611, ClockingItemDefaultSkewInputOutput) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_GE(item->clocking_signals.size(), 1u);
 }
@@ -537,7 +507,7 @@ TEST(ParserA611, ClockingDirectionInput) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
@@ -558,8 +528,8 @@ TEST(ParserSection19, ClockingBlockScope_MultipleBlocks) {
       "  endclocking\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* cb1 = FindClockingBlock(r, 0);
-  auto* cb2 = FindClockingBlock(r, 1);
+  auto* cb1 = FindClockingBlockByIndex(r, 0);
+  auto* cb2 = FindClockingBlockByIndex(r, 1);
   ASSERT_NE(cb1, nullptr);
   ASSERT_NE(cb2, nullptr);
   EXPECT_EQ(cb1->name, "cd1");
@@ -580,7 +550,7 @@ TEST(ParserSection19, DefaultSkew_InputOutputTimeUnits) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   // Note: default skew is parsed but not stored in the AST.
   ASSERT_GE(item->clocking_signals.size(), 3u);
 }
@@ -670,27 +640,6 @@ TEST(ParserSection19, ClockingBlock_EndLabel) {
               "  endclocking : cb\n"
               "endmodule\n"));
 }
-
-// --- Test helpers ---
-static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
-}
-
-// Validates parse result and retrieves a clocking block via output param.
-// Must be called through ASSERT_NO_FATAL_FAILURE.
-static void GetClockingBlock(ParseResult& r, ModuleItem*& out, size_t idx = 0) {
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  out = FindClockingBlock(r, idx);
-  ASSERT_NE(out, nullptr);
-}
-
 // =============================================================================
 // §14.3 — Basic clocking block declaration
 // =============================================================================
@@ -702,7 +651,7 @@ TEST(ParserSection14, BasicClockingBlock) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   EXPECT_EQ(r.cu->modules.size(), 1u);
   ASSERT_EQ(item->clocking_event.size(), 1u);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
@@ -737,7 +686,7 @@ TEST(ParserSection14, DefaultClocking) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   EXPECT_TRUE(item->is_default_clocking);
   EXPECT_FALSE(item->is_global_clocking);
   EXPECT_EQ(item->name, "cb");
@@ -772,7 +721,7 @@ TEST(ParserSection14, SignalDirections) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
 
   VerifyClockingSignalDirections(item, {
                                            {Direction::kInput, "data_in"},
@@ -792,7 +741,7 @@ TEST(ParserSection14, OutputSkewEdge) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
   EXPECT_EQ(sig.direction, Direction::kOutput);
@@ -811,7 +760,7 @@ TEST(ParserSection14, MultipleSignalsSameDirection) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
 
   const char* const kExpectedNames[] = {"data", "ready", "enable"};
   ASSERT_EQ(item->clocking_signals.size(), std::size(kExpectedNames));
@@ -839,7 +788,7 @@ TEST(ParserSection14, ClockingBlockAmongOtherItems) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "cb");
   // Also check the other items parsed.
@@ -857,7 +806,7 @@ TEST(ParserSection14, UnnamedDefaultClocking) {
       "  endclocking\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->is_default_clocking);
   EXPECT_TRUE(item->name.empty());
@@ -877,8 +826,8 @@ TEST(ParserSection14, MultipleClockingBlocks) {
       "  endclocking\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* cb1 = FindClockingBlock(r, 0);
-  auto* cb2 = FindClockingBlock(r, 1);
+  auto* cb1 = FindClockingBlockByIndex(r, 0);
+  auto* cb2 = FindClockingBlockByIndex(r, 1);
   ASSERT_NE(cb1, nullptr);
   ASSERT_NE(cb2, nullptr);
   EXPECT_EQ(cb1->name, "cd1");
@@ -898,7 +847,7 @@ TEST(ParserSection14, OverviewMinimalClockingBlock) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
   EXPECT_EQ(item->name, "bus");
   ASSERT_EQ(item->clocking_event.size(), 1u);

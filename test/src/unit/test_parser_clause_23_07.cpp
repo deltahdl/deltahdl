@@ -24,18 +24,6 @@ TEST(ParserSection11, Sec11_1_MemberAccessExpression) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
-static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        if (item->body->stmts.size() > n) return item->body->stmts[n];
-      }
-      if (n == 0) return item->body;
-    }
-  }
-  return nullptr;
-}
-
 // 6. Struct member assigned individually (s.a = 1).
 TEST(ParserSection7, Sec7_2_2_MemberAssignment) {
   auto r = Parse(

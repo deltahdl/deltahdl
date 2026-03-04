@@ -12,19 +12,22 @@ struct ElabFixture {
   bool has_errors = false;
 };
 
-inline RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f) {
+inline RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f,
+                                 std::string_view top = "") {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
+  auto name = top.empty() ? cu->modules.back()->name : top;
+  auto* design = elab.Elaborate(name);
   f.has_errors = f.diag.HasErrors();
   return design;
 }
 
-inline RtlirDesign* Elaborate(const std::string& src, ElabFixture& f) {
-  return ElaborateSrc(src, f);
+inline RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
+                              std::string_view top = "") {
+  return ElaborateSrc(src, f, top);
 }
 
 inline bool ElabOk(const std::string& src) {

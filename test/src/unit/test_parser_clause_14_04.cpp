@@ -34,7 +34,7 @@ TEST(ParserA611, ClockingDirectionInputOutput) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
@@ -55,7 +55,7 @@ TEST(ParserSection14, OverviewInputOutputSkews) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 2u);
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
   ASSERT_NE(item->clocking_signals[0].skew_delay, nullptr);
@@ -95,7 +95,7 @@ TEST(ParserSection14, ClockingBlockEventOutputNegedgeSkew) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 2u);
   auto& out_sig = item->clocking_signals[1];
   EXPECT_EQ(out_sig.direction, Direction::kOutput);
@@ -116,7 +116,7 @@ TEST(ParserA611, ClockingSkewEdgeOnly) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
@@ -136,7 +136,7 @@ TEST(ParserA611, ClockingSkewDelayOnly) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
@@ -157,7 +157,7 @@ TEST(ParserA611, ClockingSkewEdgeAndDelay) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
@@ -177,7 +177,7 @@ TEST(ParserA611, ClockingSkew1step) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
@@ -194,7 +194,7 @@ TEST(ParserSection14, InputSamplingNonzeroSkew) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
   EXPECT_EQ(sig.direction, Direction::kInput);
@@ -215,7 +215,7 @@ TEST(ParserA611, InputWithSkewNoOutput) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlock(r);
+  auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
@@ -223,25 +223,6 @@ TEST(ParserA611, InputWithSkewNoOutput) {
   EXPECT_EQ(sig.skew_edge, Edge::kPosedge);
   ASSERT_NE(sig.skew_delay, nullptr);
 }
-static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
-}
-
-// Validates parse result and retrieves a clocking block via output param.
-// Must be called through ASSERT_NO_FATAL_FAILURE.
-static void GetClockingBlock(ParseResult& r, ModuleItem*& out, size_t idx = 0) {
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  out = FindClockingBlock(r, idx);
-  ASSERT_NE(out, nullptr);
-}
-
 // =============================================================================
 // LRM section 19.6.1 -- Input and output skews
 // =============================================================================
@@ -254,7 +235,7 @@ TEST(ParserSection19, InputOutputSkew_InputNumeric) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
   EXPECT_EQ(sig.direction, Direction::kInput);
@@ -272,7 +253,7 @@ TEST(ParserSection19, InputOutputSkew_OutputEdge) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
   EXPECT_EQ(sig.direction, Direction::kOutput);
@@ -289,7 +270,7 @@ TEST(ParserSection19, InputOutputSkew_CombinedInputOutput) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
   EXPECT_EQ(sig.direction, Direction::kInout);
@@ -349,27 +330,6 @@ TEST(ParserSection19, InputOutputSkew_MixedUnitSuffix) {
               "  endclocking\n"
               "endmodule\n"));
 }
-
-// --- Test helpers ---
-static ModuleItem* FindClockingBlock(ParseResult& r, size_t idx = 0) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kClockingBlock) continue;
-    if (count == idx) return item;
-    ++count;
-  }
-  return nullptr;
-}
-
-// Validates parse result and retrieves a clocking block via output param.
-// Must be called through ASSERT_NO_FATAL_FAILURE.
-static void GetClockingBlock(ParseResult& r, ModuleItem*& out, size_t idx = 0) {
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  out = FindClockingBlock(r, idx);
-  ASSERT_NE(out, nullptr);
-}
-
 // =============================================================================
 // §14.3 — Input skew with delay
 // =============================================================================
@@ -381,7 +341,7 @@ TEST(ParserSection14, InputSkewDelay) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
   ASSERT_NE(sig.skew_delay, nullptr);
@@ -410,7 +370,7 @@ TEST(ParserSection14, CombinedInputOutputSkew) {
       "  endclocking\n"
       "endmodule\n");
   ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlock(r, item));
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   auto& sig = item->clocking_signals[0];
   EXPECT_EQ(sig.direction, Direction::kInout);

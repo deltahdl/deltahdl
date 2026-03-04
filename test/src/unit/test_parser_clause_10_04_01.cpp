@@ -4,15 +4,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-
-// Return all statements from the first initial block's begin/end.
-static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body) return {};
-  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
-  return {item->body};
-}
-
 namespace {
 
 // =============================================================================
@@ -254,17 +245,6 @@ TEST(ParserSection10, Sec10_4_1_Concatenation) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
-
-static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
-}
-
 // --- 10. Blocking assignment in begin-end block ---
 TEST(ParserSection10, Sec10_4_1_InBeginEndBlock) {
   auto r = Parse(
@@ -397,28 +377,6 @@ TEST(ParserSection10, Sec10_4_1_SystemCallRhs) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
-
-// Helper: extract 4 initial statements and verify non-null.
-struct FourStmts {
-  Stmt* s0;
-  Stmt* s1;
-  Stmt* s2;
-  Stmt* s3;
-};
-
-static FourStmts Get4InitialStmts(auto& r) {
-  FourStmts fs;
-  fs.s0 = NthInitialStmt(r, 0);
-  fs.s1 = NthInitialStmt(r, 1);
-  fs.s2 = NthInitialStmt(r, 2);
-  fs.s3 = NthInitialStmt(r, 3);
-  EXPECT_NE(fs.s0, nullptr);
-  EXPECT_NE(fs.s1, nullptr);
-  EXPECT_NE(fs.s2, nullptr);
-  EXPECT_NE(fs.s3, nullptr);
-  return fs;
-}
-
 // --- 16. Multiple sequential blocking assignments ---
 TEST(ParserSection10, Sec10_4_1_MultipleSequential) {
   auto r = Parse(

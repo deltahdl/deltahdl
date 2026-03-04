@@ -1,25 +1,11 @@
 // §21.5: Writing memory array data to a file
 
 #include "builders_ast.h"
+#include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-
-static Expr* MakeStrLit(Arena& arena, std::string_view text) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kStringLiteral;
-  // Store with surrounding quotes, matching parser convention.
-  auto len = text.size() + 2;
-  char* buf = static_cast<char*>(arena.Allocate(len + 1, 1));
-  buf[0] = '"';
-  for (size_t i = 0; i < text.size(); ++i) buf[i + 1] = text[i];
-  buf[len - 1] = '"';
-  buf[len] = '\0';
-  e->text = std::string_view(buf, len);
-  return e;
-}
-
 namespace {
 
 // ============================================================================
@@ -32,9 +18,9 @@ TEST(Section21, WritememhBasic) {
   auto* var = f.ctx.CreateVariable("wmem", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0xFF);
 
-  auto* expr = MakeSysCall(
-      f.arena, "$writememh",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeId(f.arena, "wmem")});
+  auto* expr =
+      MakeSysCall(f.arena, "$writememh",
+                  {MkStr(f.arena, tmp_path.c_str()), MakeId(f.arena, "wmem")});
   EvalExpr(expr, f.ctx, f.arena);
 
   std::ifstream ifs(tmp_path);
@@ -54,9 +40,9 @@ TEST(Section21, WritemembBasic) {
   auto* var = f.ctx.CreateVariable("wbmem", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0b10101010);
 
-  auto* expr = MakeSysCall(
-      f.arena, "$writememb",
-      {MakeStrLit(f.arena, tmp_path.c_str()), MakeId(f.arena, "wbmem")});
+  auto* expr =
+      MakeSysCall(f.arena, "$writememb",
+                  {MkStr(f.arena, tmp_path.c_str()), MakeId(f.arena, "wbmem")});
   EvalExpr(expr, f.ctx, f.arena);
 
   std::ifstream ifs(tmp_path);

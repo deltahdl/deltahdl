@@ -1,6 +1,7 @@
 // §29.3: UDP definition
 
 #include "fixture_parser.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
 
@@ -48,34 +49,6 @@ TEST(ParserAnnexA051, WildcardPortSequential) {
   EXPECT_EQ(udp->output_name, "q");
   ASSERT_EQ(udp->input_names.size(), 2u);
 }
-
-static std::vector<ModuleItem*> FindUdpInsts(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> insts;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
-  }
-  return insts;
-}
-
-static std::vector<ModuleItem*> FindContAssigns(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
-  }
-  return result;
-}
-
-static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
-                                          ModuleItemKind kind) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == kind) result.push_back(item);
-  }
-  return result;
-}
-
 // --- Extern UDP declaration used for instantiation ---
 TEST(ParserA504, UdpInst_ExternUdp) {
   auto r = Parse(
@@ -91,34 +64,6 @@ TEST(ParserA504, UdpInst_ExternUdp) {
 }
 
 using SpecifyParseTest = ProgramTestParse;
-
-// =============================================================================
-// Parser test fixture
-// =============================================================================
-struct SpecifyTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
-    source_ = src;
-    lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
-    parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
-    return parser_->Parse();
-  }
-
-  // Helper: get first specify block from first module.
-  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
-    for (auto* item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
-    }
-    return nullptr;
-  }
-
-  SourceManager mgr_;
-  Arena arena_;
-  DiagEngine diag_{mgr_};
-  std::string source_;
-  std::unique_ptr<Lexer> lexer_;
-  std::unique_ptr<Parser> parser_;
-};
 // description: udp_declaration
 TEST(SourceText, DescriptionUdp) {
   auto r = Parse(

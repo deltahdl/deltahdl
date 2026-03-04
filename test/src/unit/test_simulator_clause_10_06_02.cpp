@@ -1,6 +1,8 @@
 // §10.6.2: The force and release procedural statements
 
 #include "fixture_simulator.h"
+#include "helpers_force_target.h"
+#include "helpers_switch_network.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -25,45 +27,6 @@ TEST(SimA85, VarLvalueForce) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
-
-// --- Local types for force/release (§10.6.2) ---
-enum class ForceTarget : uint8_t {
-  kSingularVariable,
-  kNet,
-  kConstBitSelectNet,
-  kConstPartSelectNet,
-  kConcatenation,
-  kBitSelectVariable,
-  kPartSelectVariable,
-  kUserDefinedNettypePartSelect,
-};
-
-struct ForceInfo {
-  ForceTarget target;
-  bool has_mixed_assignments = false;
-};
-
-bool ValidateForceTarget(const ForceInfo& info) {
-  if (info.has_mixed_assignments) return false;
-  switch (info.target) {
-    case ForceTarget::kSingularVariable:
-    case ForceTarget::kNet:
-    case ForceTarget::kConstBitSelectNet:
-    case ForceTarget::kConstPartSelectNet:
-    case ForceTarget::kConcatenation:
-      return true;
-    case ForceTarget::kBitSelectVariable:
-    case ForceTarget::kPartSelectVariable:
-    case ForceTarget::kUserDefinedNettypePartSelect:
-      return false;
-  }
-  return false;
-}
-
-static constexpr uint8_t kVal0 = 0;
-
-static constexpr uint8_t kVal1 = 1;
-
 // =============================================================
 // §10.6.2: The force and release procedural statements
 // =============================================================
@@ -93,14 +56,6 @@ TEST(ForceRelease, IllegalUserDefinedNettypePartSelect) {
 }
 
 void ForceVariable(Variable& var, const Logic4Vec& value) { var.value = value; }
-
-// --- Helpers ---
-static uint8_t ValOf(const Variable& v) {
-  uint8_t a = v.value.words[0].aval & 1;
-  uint8_t b = v.value.words[0].bval & 1;
-  return static_cast<uint8_t>((b << 1) | a);
-}
-
 // --- Force on variable ---
 // §10.6.2: "A force statement to a variable shall override a procedural
 //  assignment, continuous assignment or an assign procedural continuous

@@ -1,6 +1,7 @@
 // Annex A.5.3: UDP body
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -283,34 +284,6 @@ TEST(ParserAnnexA053, NextState_X) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->udps[0]->table[0].output, 'x');
 }
-
-static std::vector<ModuleItem*> FindUdpInsts(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> insts;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
-  }
-  return insts;
-}
-
-static std::vector<ModuleItem*> FindContAssigns(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
-  }
-  return result;
-}
-
-static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
-                                          ModuleItemKind kind) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == kind) result.push_back(item);
-  }
-  return result;
-}
-
 // ---------------------------------------------------------------------------
 // Production 14: output_symbol ::= 0 | 1 | x | X
 // ---------------------------------------------------------------------------

@@ -20,15 +20,6 @@ TEST(ParserA223, IntraAssignmentDelay) {
               "  initial r = #5 1'b1;\n"
               "endmodule"));
 }
-
-// Return all statements from the first initial block's begin/end.
-static std::vector<Stmt*> AllInitialStmts(ParseResult& r) {
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  if (!item || !item->body) return {};
-  if (item->body->kind == StmtKind::kBlock) return item->body->stmts;
-  return {item->body};
-}
-
 TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
   // §10.4.2: blocking with intra-assignment event
   auto r = Parse(
@@ -576,17 +567,6 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignNegedgeEvent) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
   ASSERT_NE(stmt->rhs, nullptr);
 }
-
-static Stmt* NthInitialStmt(ParseResult& r, size_t n) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      if (n < item->body->stmts.size()) return item->body->stmts[n];
-    }
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // LRM section 9.4.5 -- Multiple intra-assignment statements in sequence
 // =============================================================================
