@@ -20,4 +20,11 @@ TEST(SysTask, FormatString_s) {
   EXPECT_EQ(out, "Hi");
 }
 
+TEST(FormatArg, StringFromAscii) {
+  Arena arena;
+  // 'A' = 0x41 = 65
+  auto val = MakeLogic4VecVal(arena, 8, 65);
+  EXPECT_EQ(FormatValueAsString(val), "A");
+}
+
 }  // namespace
