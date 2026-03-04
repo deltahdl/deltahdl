@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -102,7 +101,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Install tools
         run: |
           sudo apt-get update
@@ -153,7 +151,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Install tools
         run: |
           sudo apt-get update
@@ -203,7 +200,6 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-
       - name: Install tools
         run: brew install ccache
       - name: Restore ccache
@@ -241,7 +237,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Install tools
         run: |
           sudo apt-get update
@@ -292,7 +287,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Install tools
         run: |
           sudo apt-get update
@@ -342,7 +336,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Install tools
         run: |
           sudo apt-get update
@@ -441,7 +434,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Install tools
         run: |
           sudo apt-get update
@@ -500,7 +492,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Install tools
         run: |
           sudo apt-get update
@@ -561,7 +552,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -579,7 +569,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -601,7 +590,6 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -619,7 +607,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -635,7 +622,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -651,7 +637,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -677,7 +662,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -701,7 +685,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -729,7 +712,6 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -753,7 +735,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -775,7 +756,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -797,7 +777,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Restore sv-tests cache
         uses: actions/cache/restore@v4
         with:
@@ -960,6 +939,12 @@ jobs:
       # DO NOT disable these steps. Inline suppression comments (NOLINT,
       # clang-format off, etc.) hide problems instead of fixing them and
       # make the codebase progressively harder to maintain.
+      - name: Assert no linter config files
+        run: >-
+          assert-no-linter-config-files
+          --linters pylint,mypy,yamllint
+          --verbose
+          ${{ github.workspace }}
       - name: Assert no inline directives
         run: >-
           assert-no-inline-directives
@@ -969,12 +954,6 @@ jobs:
           scripts/run_sv_tests/ test/lib/run_tests_common/
           test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
           ${{ github.workspace }}/**/*
-      - name: Assert no linter config files
-        run: >-
-          assert-no-linter-config-files
-          --linters pylint,mypy,yamllint
-          --verbose
-          ${{ github.workspace }}
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Assert one assert per pytest
         run: >-
@@ -1143,7 +1122,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -1170,7 +1148,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -1200,7 +1177,6 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -1220,7 +1196,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -1244,7 +1219,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build shard 0
         uses: actions/download-artifact@v4
         with:
@@ -1271,7 +1245,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - name: Download build shard 0
         uses: actions/download-artifact@v4
         with:
