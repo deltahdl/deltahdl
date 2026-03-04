@@ -2,12 +2,13 @@
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 struct ConfigTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -23,23 +24,6 @@ struct ConfigTest : ::testing::Test {
   std::unique_ptr<Lexer> lexer_;
   std::unique_ptr<Parser> parser_;
 };
-
-struct ParseResult34 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult34 Parse(const std::string& src) {
-  ParseResult34 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 using DpiParseTest = ProgramTestParse;
 
 namespace {
@@ -48,7 +32,7 @@ namespace {
 // §33.4.1.3 Instance clause with liblist
 // =============================================================================
 TEST_F(ConfigTest, InstanceLiblist) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design rtlLib.top;
       default liblist rtlLib;
@@ -56,14 +40,14 @@ TEST_F(ConfigTest, InstanceLiblist) {
     endconfig
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
-  auto* cfg = unit->configs[0];
+  auto *cfg = unit->configs[0];
   ASSERT_EQ(cfg->rules.size(), 2u);
 
-  auto* r0 = cfg->rules[0];
+  auto *r0 = cfg->rules[0];
   EXPECT_EQ(r0->kind, ConfigRuleKind::kDefault);
   EXPECT_EQ(r0->liblist[0], "rtlLib");
 
-  auto* r1 = cfg->rules[1];
+  auto *r1 = cfg->rules[1];
   EXPECT_EQ(r1->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(r1->inst_path, "top.a2");
   ASSERT_EQ(r1->liblist.size(), 1u);
@@ -74,7 +58,7 @@ TEST_F(ConfigTest, InstanceLiblist) {
 // §33.4.1.4/5 Cell clause for library binding
 // =============================================================================
 TEST_F(ConfigTest, CellClauseLiblist) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
       cell adder liblist lib2 lib3;
@@ -82,7 +66,7 @@ TEST_F(ConfigTest, CellClauseLiblist) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_EQ(unit->configs[0]->rules.size(), 1u);
-  auto* rule = unit->configs[0]->rules[0];
+  auto *rule = unit->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kCell);
   EXPECT_TRUE(rule->cell_lib.empty());
   EXPECT_EQ(rule->cell_name, "adder");
@@ -120,10 +104,10 @@ TEST(ParserSection34, ConfigWithMultipleLibraries) {
   )");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->configs.size(), 1u);
-  auto* cfg = r.cu->configs[0];
+  auto *cfg = r.cu->configs[0];
   EXPECT_EQ(cfg->name, "design_cfg");
   // Should have design cells
   ASSERT_GE(cfg->design_cells.size(), 1u);
 }
 
-}  // namespace
+} // namespace

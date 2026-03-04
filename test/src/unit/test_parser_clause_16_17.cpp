@@ -1,6 +1,7 @@
 // §16.17: Expect statement
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -28,44 +29,24 @@ TEST(ParserA210, ExpectPropertyStatement) {
 }
 
 TEST(ParserA210, ExpectPropertyStatement_NoActions) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    expect (req |-> ack);\n"
-              "  end\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  initial begin\n"
+                      "    expect (req |-> ack);\n"
+                      "  end\n"
+                      "endmodule\n"));
 }
 
 // --- Test helpers ---
-struct ParseResult16b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult16b Parse(const std::string& src) {
-  ParseResult16b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 TEST(ParserSection16, ExpectStatement) {
-  auto r = Parse(
-      "module top();\n"
-      "  logic clk, a, b;\n"
-      "  initial begin\n"
-      "    expect (@(posedge clk) a ##1 b);\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module top();\n"
+                 "  logic clk, a, b;\n"
+                 "  initial begin\n"
+                 "    expect (@(posedge clk) a ##1 b);\n"
+                 "  end\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+} // namespace

@@ -12,8 +12,8 @@ using SpecifyParseTest = ProgramTestParse;
 // Parser test fixture
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -21,9 +21,10 @@ struct SpecifyTest : ::testing::Test {
   }
 
   // Helper: get first specify block from first module.
-  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
-    for (auto* item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+  ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
+    for (auto *item : cu->modules[0]->items) {
+      if (item->kind == ModuleItemKind::kSpecifyBlock)
+        return item;
     }
     return nullptr;
   }
@@ -35,51 +36,24 @@ struct SpecifyTest : ::testing::Test {
   std::unique_ptr<Lexer> lexer_;
   std::unique_ptr<Parser> parser_;
 };
-
-struct ParseResult30 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult30 Parse(const std::string& src) {
-  ParseResult30 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
-  }
-  return nullptr;
-}
-
 namespace {
 
 TEST(ParserSection28, SpecifyBlockSimplePath) {
-  auto r = Parse(
-      "module m(input a, output b);\n"
-      "  specify\n"
-      "    (a => b) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m(input a, output b);\n"
+                 "  specify\n"
+                 "    (a => b) = 10;\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_GE(spec->specify_items.size(), 1u);
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
   EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kParallel);
 }
 
-static bool HasFullPathDecl(ModuleItem* spec_block) {
-  for (auto* si : spec_block->specify_items) {
+static bool HasFullPathDecl(ModuleItem *spec_block) {
+  for (auto *si : spec_block->specify_items) {
     if (si->kind == SpecifyItemKind::kPathDecl &&
         si->path.path_kind == SpecifyPathKind::kFull) {
       return true;
@@ -89,29 +63,27 @@ static bool HasFullPathDecl(ModuleItem* spec_block) {
 }
 
 TEST(ParserSection28, SpecifyBlockFullPath) {
-  auto r = Parse(
-      "module m(input a, b, output c);\n"
-      "  specify\n"
-      "    (a, b *> c) = (5, 10);\n"
-      "  endspecify\n"
-      "endmodule\n");
+  auto r = Parse("module m(input a, b, output c);\n"
+                 "  specify\n"
+                 "    (a, b *> c) = (5, 10);\n"
+                 "  endspecify\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   EXPECT_TRUE(HasFullPathDecl(spec));
 }
 
 TEST_F(SpecifyTest, FullPathDelay) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  (a *> b) = 10;\n"
-      "endspecify\n"
-      "endmodule\n");
-  auto* spec = FirstSpecifyBlock(cu);
+  auto *cu = Parse("module m;\n"
+                   "specify\n"
+                   "  (a *> b) = 10;\n"
+                   "endspecify\n"
+                   "endmodule\n");
+  auto *spec = FirstSpecifyBlock(cu);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
   EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kFull);
 }
 
-}  // namespace
+} // namespace

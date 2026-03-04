@@ -2,22 +2,13 @@
 
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 // Helper: preprocess and parse, returning CU + preprocessor state.
-struct ParseResult3140203 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-  TimeScale preproc_timescale;
-  bool has_preproc_timescale = false;
-  TimeUnit preproc_global_precision = TimeUnit::kNs;
-};
-
-static ParseResult3140203 ParseTimescale31402(const std::string& src) {
-  ParseResult3140203 result;
+static ParseResult ParseTimescale31402(const std::string &src) {
+  ParseResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -39,13 +30,12 @@ namespace {
 // has_timeunit=false (keywords were not used), but the preprocessor
 // carries the timescale state for this module.
 TEST(ParserClause03, Cl3_14_2_TimescaleWithoutKeywords) {
-  auto r = ParseTimescale31402(
-      "`timescale 1ns / 1ps\n"
-      "module m;\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("`timescale 1ns / 1ps\n"
+                               "module m;\n"
+                               "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   // Keywords were not used — flags are false.
   EXPECT_FALSE(mod->has_timeunit);
   EXPECT_FALSE(mod->has_timeprecision);
@@ -55,15 +45,14 @@ TEST(ParserClause03, Cl3_14_2_TimescaleWithoutKeywords) {
 // affected by `timescale.  §3.14.2.1: "that do not have timeunit and
 // timeprecision constructs specified within the design element."
 TEST(ParserClause03, Cl3_14_2_1_KeywordsOverrideTimescale) {
-  auto r = ParseTimescale31402(
-      "`timescale 1ns / 1ps\n"
-      "module m;\n"
-      "  timeunit 1us;\n"
-      "  timeprecision 1ns;\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("`timescale 1ns / 1ps\n"
+                               "module m;\n"
+                               "  timeunit 1us;\n"
+                               "  timeprecision 1ns;\n"
+                               "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   // Module has explicit keywords — they take priority over `timescale.
   EXPECT_TRUE(mod->has_timeunit);
   EXPECT_TRUE(mod->has_timeprecision);
@@ -84,4 +73,4 @@ TEST(ParserClause03, Cl3_14_TimeScaleTwoComponents) {
   EXPECT_NE(static_cast<int8_t>(ts.unit), static_cast<int8_t>(ts.precision));
 }
 
-}  // namespace
+} // namespace

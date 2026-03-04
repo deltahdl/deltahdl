@@ -2,22 +2,13 @@
 
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 // Helper: preprocess and parse, returning CU + preprocessor state.
-struct ParseResult3140203 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-  TimeScale preproc_timescale;
-  bool has_preproc_timescale = false;
-  TimeUnit preproc_global_precision = TimeUnit::kNs;
-};
-
-static ParseResult3140203 ParseTimescale31402(const std::string& src) {
-  ParseResult3140203 result;
+static ParseResult ParseTimescale31402(const std::string &src) {
+  ParseResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -42,15 +33,14 @@ TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
   auto pp = PreprocessTimescale("`timescale 1ns / 1ps\n");
   EXPECT_FALSE(pp.has_errors);
   // Way 2: keywords inside a module.
-  auto pr = ParseTimescale31402(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
+  auto pr = ParseTimescale31402("module m;\n"
+                                "  timeunit 1ns;\n"
+                                "  timeprecision 1ps;\n"
+                                "endmodule\n");
   EXPECT_FALSE(pr.has_errors);
   // Both specify the same unit and precision.
   EXPECT_EQ(pp.timescale.unit, pr.cu->modules[0]->time_unit);
   EXPECT_EQ(pp.timescale.precision, pr.cu->modules[0]->time_prec);
 }
 
-}  // namespace
+} // namespace

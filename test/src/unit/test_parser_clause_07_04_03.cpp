@@ -3,6 +3,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -15,44 +16,18 @@ TEST(ParserA25, PackedAndUnpackedDims) {
   auto r = Parse("module m; logic [7:0] mem [0:255]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
-
-struct ParseResult6h {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6h Parse(const std::string& src) {
-  ParseResult6h result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6h& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
-}
-
 // 3b. Unpacked dimensions on logic with packed dims (memory array).
 TEST(ParserSection6, Sec6_11_LogicPackedAndUnpackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] mem[256];\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic [7:0] mem[256];\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -62,13 +37,12 @@ TEST(ParserSection6, Sec6_11_LogicPackedAndUnpackedDims) {
 
 // 4. Combined packed + unpacked dims with range notation.
 TEST(ParserSection6, Sec6_11_PackedAndUnpackedWithRange) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] mem [0:3];\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic [7:0] mem [0:3];\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -76,82 +50,26 @@ TEST(ParserSection6, Sec6_11_PackedAndUnpackedWithRange) {
   EXPECT_FALSE(item->unpacked_dims.empty());
   EXPECT_EQ(item->name, "mem");
 }
-
-struct ParseResult7b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ModuleItem* FirstItem(ParseResult7b& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // --- Test helpers ---
-struct ParseResult7c {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult7c Parse(const std::string& src) {
-  ParseResult7c result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 TEST(ParserSection7, PackedArrayWithUnpacked) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] mem [0:255];\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic [7:0] mem [0:255];\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "mem");
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
-
-struct ParseResult7 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult7 Parse(const std::string& src) {
-  ParseResult7 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult7& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // =========================================================================
 // §7.4.3: Memories
 // =========================================================================
 TEST(ParserSection7, MemoryDeclaration_Type) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] mema [0:255];\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic [7:0] mema [0:255];\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "mema");
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
@@ -159,52 +77,27 @@ TEST(ParserSection7, MemoryDeclaration_Type) {
 }
 
 TEST(ParserSection7, MemoryDeclaration_Dim) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] mema [0:255];\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic [7:0] mema [0:255];\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
-  auto* dim = item->unpacked_dims[0];
+  auto *dim = item->unpacked_dims[0];
   ASSERT_NE(dim, nullptr);
   EXPECT_EQ(dim->kind, ExprKind::kBinary);
   EXPECT_EQ(dim->op, TokenKind::kColon);
 }
-
-struct ParseResult6 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6 Parse(const std::string& src) {
-  ParseResult6 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 TEST(ParserSection6, VectorWithMultipleDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] mem [0:255];\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic [7:0] mem [0:255];\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_EQ(item->name, "mem");
 }
 
-}  // namespace
+} // namespace

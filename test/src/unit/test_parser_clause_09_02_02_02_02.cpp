@@ -4,45 +4,25 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-
-struct ParseResult9i {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult9i Parse(const std::string& src) {
-  ParseResult9i result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 namespace {
 
 // ---------------------------------------------------------------------------
 // 29. Both always_comb and always @(*) in the same module with blocks.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_BothFormsWithBlocksInModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] a, b, c, x, y;\n"
-      "  always_comb begin\n"
-      "    x = a + b;\n"
-      "  end\n"
-      "  always @(*) begin\n"
-      "    y = b + c;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  logic [7:0] a, b, c, x, y;\n"
+                 "  always_comb begin\n"
+                 "    x = a + b;\n"
+                 "  end\n"
+                 "  always @(*) begin\n"
+                 "    y = b + c;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* comb = NthAlwaysItem(r, 0);
-  auto* star = NthAlwaysItem(r, 1);
+  auto *comb = NthAlwaysItem(r, 0);
+  auto *star = NthAlwaysItem(r, 1);
   ASSERT_NE(comb, nullptr);
   ASSERT_NE(star, nullptr);
   EXPECT_EQ(comb->always_kind, AlwaysKind::kAlwaysComb);
@@ -58,80 +38,53 @@ TEST(ParserSection9, Sec9_2_2_2_BothFormsWithBlocksInModule) {
 //     case, if-else, and variable declarations, verifying all parse OK.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_FullComboModuleParseOk) {
-  EXPECT_TRUE(
-      ParseOk("module combo_module;\n"
-              "  logic [3:0] sel, a, b, c, d;\n"
-              "  logic [3:0] out1, out2, out3;\n"
-              "  always_comb begin\n"
-              "    int tmp;\n"
-              "    tmp = a + b;\n"
-              "    case (sel)\n"
-              "      4'b0001: out1 = a;\n"
-              "      4'b0010: out1 = b;\n"
-              "      default: out1 = 0;\n"
-              "    endcase\n"
-              "  end\n"
-              "  always @* begin\n"
-              "    int tmp2;\n"
-              "    tmp2 = c - d;\n"
-              "    if (sel[0])\n"
-              "      out2 = c;\n"
-              "    else\n"
-              "      out2 = d;\n"
-              "  end\n"
-              "  always @(*) begin\n"
-              "    out3 = a ^ b ^ c ^ d;\n"
-              "  end\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module combo_module;\n"
+                      "  logic [3:0] sel, a, b, c, d;\n"
+                      "  logic [3:0] out1, out2, out3;\n"
+                      "  always_comb begin\n"
+                      "    int tmp;\n"
+                      "    tmp = a + b;\n"
+                      "    case (sel)\n"
+                      "      4'b0001: out1 = a;\n"
+                      "      4'b0010: out1 = b;\n"
+                      "      default: out1 = 0;\n"
+                      "    endcase\n"
+                      "  end\n"
+                      "  always @* begin\n"
+                      "    int tmp2;\n"
+                      "    tmp2 = c - d;\n"
+                      "    if (sel[0])\n"
+                      "      out2 = c;\n"
+                      "    else\n"
+                      "      out2 = d;\n"
+                      "  end\n"
+                      "  always @(*) begin\n"
+                      "    out3 = a ^ b ^ c ^ d;\n"
+                      "  end\n"
+                      "endmodule\n"));
 }
-
-struct ParseResult9h {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult9h Parse(const std::string& src) {
-  ParseResult9h result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // Return the first always-kind module item (any always variant).
-static ModuleItem* FirstAlwaysItem(ParseResult9h& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) return item;
-  }
-  return nullptr;
-}
-
 // ---------------------------------------------------------------------------
 // 2. always @* parses with AlwaysKind::kAlways.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarAlwaysKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @* a = b & c;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  always @* a = b & c;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
+  auto *item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
 }
 
 // Return the Nth always-kind module item (0-indexed).
-static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
+static ModuleItem *NthAlwaysItem(ParseResult &r, size_t n) {
   size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock) {
-      if (count == n) return item;
+      if (count == n)
+        return item;
       ++count;
     }
   }
@@ -142,15 +95,14 @@ static ModuleItem* NthAlwaysItem(ParseResult9h& r, size_t n) {
 // 11. Side-by-side always_comb and always @* in the same module.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_SideBySideBothForms) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb x = a & b;\n"
-      "  always @* y = c | d;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  always_comb x = a & b;\n"
+                 "  always @* y = c | d;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* first = NthAlwaysItem(r, 0);
-  auto* second = NthAlwaysItem(r, 1);
+  auto *first = NthAlwaysItem(r, 0);
+  auto *second = NthAlwaysItem(r, 1);
   ASSERT_NE(first, nullptr);
   ASSERT_NE(second, nullptr);
   EXPECT_EQ(first->always_kind, AlwaysKind::kAlwaysComb);
@@ -161,15 +113,14 @@ TEST(ParserSection9, Sec9_2_2_2_SideBySideBothForms) {
 // 12. Side-by-side: both have their own body statements.
 // ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_SideBySideBodiesExist) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb x = a;\n"
-      "  always @* y = b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  always_comb x = a;\n"
+                 "  always @* y = b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* first = NthAlwaysItem(r, 0);
-  auto* second = NthAlwaysItem(r, 1);
+  auto *first = NthAlwaysItem(r, 0);
+  auto *second = NthAlwaysItem(r, 1);
   ASSERT_NE(first, nullptr);
   ASSERT_NE(second, nullptr);
   ASSERT_NE(first->body, nullptr);
@@ -178,4 +129,4 @@ TEST(ParserSection9, Sec9_2_2_2_SideBySideBodiesExist) {
   EXPECT_EQ(second->body->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+} // namespace

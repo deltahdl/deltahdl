@@ -1,6 +1,7 @@
 // §6.11.3: Signed and unsigned integer types
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -11,7 +12,7 @@ TEST(ParserA221, DataTypeIntegerAtom) {
   auto r = Parse("module m; int unsigned x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_FALSE(item->data_type.is_signed);
 }
@@ -29,45 +30,19 @@ TEST(ParserA221, DataTypeIntegerVector) {
   auto r = Parse("module m; logic signed [7:0] a; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_TRUE(item->data_type.is_signed);
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
-
-struct ParseResult6h {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6h Parse(const std::string& src) {
-  ParseResult6h result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6h& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
-}
-
 // 5. Signed with packed dims: logic signed [15:0].
 TEST(ParserSection6, Sec6_11_LogicSignedWithPackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic signed [15:0] sv;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic signed [15:0] sv;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_TRUE(item->data_type.is_signed);
@@ -79,13 +54,12 @@ TEST(ParserSection6, Sec6_11_LogicSignedWithPackedDims) {
 
 // 5b. Unsigned with packed dims: bit unsigned [7:0].
 TEST(ParserSection6, Sec6_11_BitUnsignedWithPackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  bit unsigned [7:0] uv;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  bit unsigned [7:0] uv;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
   EXPECT_FALSE(item->data_type.is_signed);
@@ -95,13 +69,12 @@ TEST(ParserSection6, Sec6_11_BitUnsignedWithPackedDims) {
 
 // 6. byte signed explicitly (redundant but valid).
 TEST(ParserSection6, Sec6_11_ByteSignedExplicit) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte signed bs;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  byte signed bs;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
   EXPECT_TRUE(item->data_type.is_signed);
@@ -110,13 +83,12 @@ TEST(ParserSection6, Sec6_11_ByteSignedExplicit) {
 
 // 7. byte unsigned override.
 TEST(ParserSection6, Sec6_11_ByteUnsignedOverride) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte unsigned bu;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  byte unsigned bu;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
   EXPECT_FALSE(item->data_type.is_signed);
@@ -125,13 +97,12 @@ TEST(ParserSection6, Sec6_11_ByteUnsignedOverride) {
 
 // 8. shortint unsigned override.
 TEST(ParserSection6, Sec6_11_ShortintUnsignedOverride) {
-  auto r = Parse(
-      "module t;\n"
-      "  shortint unsigned su;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  shortint unsigned su;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortint);
   EXPECT_FALSE(item->data_type.is_signed);
@@ -140,13 +111,12 @@ TEST(ParserSection6, Sec6_11_ShortintUnsignedOverride) {
 
 // 9. longint unsigned override.
 TEST(ParserSection6, Sec6_11_LongintUnsignedOverride) {
-  auto r = Parse(
-      "module t;\n"
-      "  longint unsigned lu;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  longint unsigned lu;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
   EXPECT_FALSE(item->data_type.is_signed);
@@ -155,13 +125,12 @@ TEST(ParserSection6, Sec6_11_LongintUnsignedOverride) {
 
 // 10. integer unsigned override.
 TEST(ParserSection6, Sec6_11_IntegerUnsignedOverride) {
-  auto r = Parse(
-      "module t;\n"
-      "  integer unsigned iu;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  integer unsigned iu;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInteger);
   EXPECT_FALSE(item->data_type.is_signed);
@@ -170,13 +139,12 @@ TEST(ParserSection6, Sec6_11_IntegerUnsignedOverride) {
 
 // 11. time signed override.
 TEST(ParserSection6, Sec6_11_TimeSignedOverride) {
-  auto r = Parse(
-      "module t;\n"
-      "  time signed ts;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  time signed ts;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
   EXPECT_TRUE(item->data_type.is_signed);
@@ -185,53 +153,26 @@ TEST(ParserSection6, Sec6_11_TimeSignedOverride) {
 
 // 12. bit signed override.
 TEST(ParserSection6, Sec6_11_BitSignedOverride) {
-  auto r = Parse(
-      "module t;\n"
-      "  bit signed bs;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  bit signed bs;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
   EXPECT_TRUE(item->data_type.is_signed);
   EXPECT_EQ(item->name, "bs");
 }
-
-struct ParseResult616 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult616 Parse(const std::string& src) {
-  ParseResult616 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult616& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // --- Signed and unsigned qualifiers (LRM 6.11.3) ---
 TEST(ParserSection6, IntUnsignedDecl) {
   // int unsigned -- explicit unsigned override (LRM 6.11.3)
-  auto r = Parse(
-      "module m;\n"
-      "  int unsigned ui;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  int unsigned ui;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_FALSE(item->data_type.is_signed);
@@ -240,13 +181,12 @@ TEST(ParserSection6, IntUnsignedDecl) {
 
 TEST(ParserSection6, IntSignedDecl) {
   // int signed -- explicit signed (default for int)
-  auto r = Parse(
-      "module m;\n"
-      "  int signed si;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  int signed si;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_TRUE(item->data_type.is_signed);
@@ -254,26 +194,24 @@ TEST(ParserSection6, IntSignedDecl) {
 
 TEST(ParserSection6, LogicSignedDecl) {
   // logic signed -- unsigned by default, override to signed
-  auto r = Parse(
-      "module m;\n"
-      "  logic signed [7:0] sv;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  logic signed [7:0] sv;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
 TEST(ParserSection6, RegUnsignedDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg unsigned [3:0] ru;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg unsigned [3:0] ru;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   EXPECT_FALSE(item->data_type.is_signed);
@@ -283,14 +221,13 @@ using CheckerParseTest = ProgramTestParse;
 
 // --- int unsigned return type and variable decl (§18.13) ---
 TEST(ParserSection18, IntUnsignedFunctionReturnType) {
-  auto r = Parse(
-      "class C;\n"
-      "  function int unsigned get_val();\n"
-      "    int unsigned x;\n"
-      "    x = 42;\n"
-      "    return x;\n"
-      "  endfunction\n"
-      "endclass\n");
+  auto r = Parse("class C;\n"
+                 "  function int unsigned get_val();\n"
+                 "    int unsigned x;\n"
+                 "    x = 42;\n"
+                 "    return x;\n"
+                 "  endfunction\n"
+                 "endclass\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
@@ -299,13 +236,12 @@ TEST(ParserSection18, IntUnsignedFunctionReturnType) {
 
 // 24. reg with signed qualifier.
 TEST(ParserSection6, Sec6_11_2_RegSignedQualifier) {
-  auto r = Parse(
-      "module t;\n"
-      "  reg signed [7:0] sr;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  reg signed [7:0] sr;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   EXPECT_TRUE(item->data_type.is_signed);
@@ -318,30 +254,29 @@ TEST(ParserSection6, Sec6_11_2_RegSignedQualifier) {
 // =============================================================================
 // 29. All integer types with explicit signed/unsigned qualifiers.
 TEST(ParserSection6, Sec6_11_AllTypesExplicitSignedness) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte signed bs;\n"
-      "  byte unsigned bu;\n"
-      "  shortint signed ss;\n"
-      "  shortint unsigned su;\n"
-      "  int signed is_;\n"
-      "  int unsigned iu;\n"
-      "  longint signed ls;\n"
-      "  longint unsigned lu;\n"
-      "  integer signed igs;\n"
-      "  integer unsigned igu;\n"
-      "  time signed ts;\n"
-      "  time unsigned tu;\n"
-      "  logic signed lgs;\n"
-      "  logic unsigned lgu;\n"
-      "  bit signed bts;\n"
-      "  bit unsigned btu;\n"
-      "  reg signed rs;\n"
-      "  reg unsigned ru;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  byte signed bs;\n"
+                 "  byte unsigned bu;\n"
+                 "  shortint signed ss;\n"
+                 "  shortint unsigned su;\n"
+                 "  int signed is_;\n"
+                 "  int unsigned iu;\n"
+                 "  longint signed ls;\n"
+                 "  longint unsigned lu;\n"
+                 "  integer signed igs;\n"
+                 "  integer unsigned igu;\n"
+                 "  time signed ts;\n"
+                 "  time unsigned tu;\n"
+                 "  logic signed lgs;\n"
+                 "  logic unsigned lgu;\n"
+                 "  bit signed bts;\n"
+                 "  bit unsigned btu;\n"
+                 "  reg signed rs;\n"
+                 "  reg unsigned ru;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 18u);
   // byte signed / byte unsigned
   EXPECT_TRUE(items[0]->data_type.is_signed);
@@ -374,162 +309,128 @@ TEST(ParserSection6, Sec6_11_AllTypesExplicitSignedness) {
 
 // reg unsigned override.
 TEST(ParserSection6, Sec6_11_2_RegUnsignedExplicit) {
-  auto r = Parse(
-      "module t;\n"
-      "  reg unsigned [7:0] ru;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  reg unsigned [7:0] ru;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   EXPECT_FALSE(item->data_type.is_signed);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
 }
-
-struct ParseResult6 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6 Parse(const std::string& src) {
-  ParseResult6 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // =========================================================================
 // §6.11.3: Default signedness per Table 6-8
 // =========================================================================
 TEST(ParserSection6, IntDefaultSigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  int x;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  int x;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_TRUE(item->data_type.is_signed) << "int is signed by default";
 }
 
 TEST(ParserSection6, IntExplicitUnsigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  int unsigned x;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  int unsigned x;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_FALSE(item->data_type.is_signed) << "int unsigned is unsigned";
 }
 
 TEST(ParserSection6, ByteDefaultSigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte b;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  byte b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
   EXPECT_TRUE(item->data_type.is_signed) << "byte is signed by default";
 }
 
 TEST(ParserSection6, ShortintDefaultSigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  shortint s;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  shortint s;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortint);
   EXPECT_TRUE(item->data_type.is_signed) << "shortint is signed by default";
 }
 
 TEST(ParserSection6, LongintDefaultSigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  longint l;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  longint l;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
   EXPECT_TRUE(item->data_type.is_signed) << "longint is signed by default";
 }
 
 TEST(ParserSection6, IntegerDefaultSigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  integer i;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  integer i;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInteger);
   EXPECT_TRUE(item->data_type.is_signed) << "integer is signed by default";
 }
 
 TEST(ParserSection6, TimeDefaultUnsigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  time t;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  time t;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
   EXPECT_FALSE(item->data_type.is_signed) << "time is unsigned by default";
 }
 
 TEST(ParserSection6, LogicDefaultUnsigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic l;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic l;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_FALSE(item->data_type.is_signed) << "logic is unsigned by default";
 }
 
 TEST(ParserSection6, BitDefaultUnsigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  bit b;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  bit b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
   EXPECT_FALSE(item->data_type.is_signed) << "bit is unsigned by default";
 }
 
 TEST(ParserSection6, RegDefaultUnsigned) {
-  auto r = Parse(
-      "module t;\n"
-      "  reg r;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  reg r;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   EXPECT_FALSE(item->data_type.is_signed) << "reg is unsigned by default";
 }
 
-}  // namespace
+} // namespace

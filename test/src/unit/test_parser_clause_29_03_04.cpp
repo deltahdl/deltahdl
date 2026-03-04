@@ -1,6 +1,7 @@
 // §29.3.4: UDP state table
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -9,16 +10,15 @@ namespace {
 
 // --- Unmatched inputs produce x ---
 TEST(ParserAnnexA051, SimUnmatchedInputsX) {
-  auto r = Parse(
-      "primitive partial(output out, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive partial(output out, input a, input b);\n"
+                 "  table\n"
+                 "    0 0 : 0;\n"
+                 "    1 1 : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
 
   UdpEvalState state(*udp);
   EXPECT_EQ(state.Evaluate({'0', '1'}), 'x');
@@ -31,17 +31,16 @@ TEST(ParserAnnexA051, SimUnmatchedInputsX) {
 // ---------------------------------------------------------------------------
 // Sequential body without initial statement
 TEST(ParserAnnexA053, SeqBody_WithoutInitial) {
-  auto r = Parse(
-      "primitive latch_noinit(output reg q, input d, en);\n"
-      "  table\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive latch_noinit(output reg q, input d, en);\n"
+                 "  table\n"
+                 "    0 1 : ? : 0;\n"
+                 "    1 1 : ? : 1;\n"
+                 "    ? 0 : ? : -;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_FALSE(udp->has_initial);
   EXPECT_EQ(udp->table.size(), 3);
@@ -53,17 +52,16 @@ TEST(ParserAnnexA053, SeqBody_WithoutInitial) {
 // ---------------------------------------------------------------------------
 // Verify the three-field structure of a sequential entry
 TEST(ParserAnnexA053, SeqEntry_ThreeFields) {
-  auto r = Parse(
-      "primitive srff(output reg q, input s, r);\n"
-      "  table\n"
-      "    1 0 : 0 : 1;\n"
-      "    0 1 : 1 : 0;\n"
-      "    0 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive srff(output reg q, input s, r);\n"
+                 "  table\n"
+                 "    1 0 : 0 : 1;\n"
+                 "    0 1 : 1 : 0;\n"
+                 "    0 0 : ? : -;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 3);
   // Row 0: inputs [1,0], current_state '0', next_state '1'
   EXPECT_EQ(udp->table[0].inputs[0], '1');
@@ -95,15 +93,14 @@ TEST(ParserAnnexA053, SeqEntry_ThreeFields) {
 // ---------------------------------------------------------------------------
 // Single level symbol input list
 TEST(ParserAnnexA053, LevelInputList_Single) {
-  auto r = Parse(
-      "primitive inv(output y, input a);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive inv(output y, input a);\n"
+                 "  table\n"
+                 "    0 : 1;\n"
+                 "    1 : 0;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->table[0].inputs.size(), 1);
   EXPECT_EQ(udp->table[0].inputs[0], '0');
 }
@@ -114,14 +111,13 @@ TEST(ParserAnnexA053, LevelInputList_Single) {
 // ---------------------------------------------------------------------------
 // Edge indicator with leading level symbol
 TEST(ParserAnnexA053, EdgeInputList_LeadingLevel) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive dff(output reg q, input d, clk);\n"
+                 "  table\n"
+                 "    0 r : ? : 0;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   // d='0' (level), clk='r' (edge)
   ASSERT_EQ(udp->table[0].inputs.size(), 2);
   EXPECT_EQ(udp->table[0].inputs[0], '0');
@@ -134,8 +130,8 @@ using SpecifyParseTest = ProgramTestParse;
 // Parser test fixture
 // =============================================================================
 struct SpecifyTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -143,9 +139,10 @@ struct SpecifyTest : ::testing::Test {
   }
 
   // Helper: get first specify block from first module.
-  ModuleItem* FirstSpecifyBlock(CompilationUnit* cu) {
-    for (auto* item : cu->modules[0]->items) {
-      if (item->kind == ModuleItemKind::kSpecifyBlock) return item;
+  ModuleItem *FirstSpecifyBlock(CompilationUnit *cu) {
+    for (auto *item : cu->modules[0]->items) {
+      if (item->kind == ModuleItemKind::kSpecifyBlock)
+        return item;
     }
     return nullptr;
   }
@@ -157,37 +154,17 @@ struct SpecifyTest : ::testing::Test {
   std::unique_ptr<Lexer> lexer_;
   std::unique_ptr<Parser> parser_;
 };
-
-struct ParseResult30 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult30 Parse(const std::string& src) {
-  ParseResult30 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 TEST(ParserSection29, SequentialCurrentStateField) {
-  auto r = Parse(
-      "primitive srff(output reg q, input s, r);\n"
-      "  table\n"
-      "    1 0 : 0 : 1;\n"
-      "    1 0 : 1 : 1;\n"
-      "    0 1 : ? : 0;\n"
-      "    0 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive srff(output reg q, input s, r);\n"
+                 "  table\n"
+                 "    1 0 : 0 : 1;\n"
+                 "    1 0 : 1 : 1;\n"
+                 "    0 1 : ? : 0;\n"
+                 "    0 0 : ? : -;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
   ASSERT_EQ(udp->table.size(), 4);
   // First row: current state '0', output '1'
@@ -204,8 +181,8 @@ TEST(ParserSection29, SequentialCurrentStateField) {
   EXPECT_EQ(udp->table[3].output, '-');
 }
 
-static void VerifyUdpRowInputs(const UdpTableRow& row,
-                               const std::string& expected) {
+static void VerifyUdpRowInputs(const UdpTableRow &row,
+                               const std::string &expected) {
   ASSERT_EQ(row.inputs.size(), expected.size());
   for (size_t j = 0; j < expected.size(); ++j) {
     EXPECT_EQ(row.inputs[j], expected[j]);
@@ -218,7 +195,7 @@ struct SeqUdpRow {
   char output;
 };
 
-static void VerifySeqUdpTable(const UdpDecl* udp, const SeqUdpRow expected[],
+static void VerifySeqUdpTable(const UdpDecl *udp, const SeqUdpRow expected[],
                               size_t count) {
   ASSERT_EQ(udp->table.size(), count);
   for (size_t i = 0; i < count; ++i) {
@@ -229,16 +206,15 @@ static void VerifySeqUdpTable(const UdpDecl* udp, const SeqUdpRow expected[],
 }
 
 TEST(ParserSection29, SequentialUdp) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
+  auto r = Parse("primitive dff(output reg q, input d, clk);\n"
+                 "  table\n"
+                 "    0 r : ? : 0;\n"
+                 "    1 r : ? : 1;\n"
+                 "  endtable\n"
+                 "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
-  auto* udp = r.cu->udps[0];
+  auto *udp = r.cu->udps[0];
   EXPECT_EQ(udp->name, "dff");
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_EQ(udp->output_name, "q");
@@ -246,4 +222,4 @@ TEST(ParserSection29, SequentialUdp) {
   VerifySeqUdpTable(udp, expected, std::size(expected));
 }
 
-}  // namespace
+} // namespace

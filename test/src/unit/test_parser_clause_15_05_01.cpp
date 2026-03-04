@@ -15,15 +15,14 @@ namespace {
 // ---------------------------------------------------------------------------
 // §15.5.1: blocking event trigger
 TEST(ParserA605, EventTriggerBlocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    -> ev;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    -> ev;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
   EXPECT_NE(stmt->expr, nullptr);
@@ -31,72 +30,42 @@ TEST(ParserA605, EventTriggerBlocking) {
 
 // §15.5.1: nonblocking event trigger
 TEST(ParserA605, EventTriggerNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    ->> ev;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    ->> ev;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
   EXPECT_NE(stmt->expr, nullptr);
 }
 
 // --- Test helpers ---
-struct ParseResult15 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult15 Parse(const std::string& src) {
-  ParseResult15 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult15& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // §15.5.1 — Nonblocking event trigger (->>)
 // =============================================================================
 TEST(ParserSection15, NonblockingEventTrigger) {
-  auto r = Parse(
-      "module m;\n"
-      "  event e;\n"
-      "  initial begin\n"
-      "    ->> e;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  event e;\n"
+                 "  initial begin\n"
+                 "    ->> e;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
 
 TEST(ParserSection15, NonblockingEventTriggerHierarchical) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial ->> top.e;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial ->> top.e;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
@@ -105,45 +74,42 @@ TEST(ParserSection15, NonblockingEventTriggerHierarchical) {
 // §15.5.1 — Event trigger and wait (existing support, comprehensive test)
 // =============================================================================
 TEST(ParserSection15, EventTriggerAndWait) {
-  auto r = Parse(
-      "module m;\n"
-      "  event e;\n"
-      "  initial begin\n"
-      "    -> e;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  event e;\n"
+                 "  initial begin\n"
+                 "    -> e;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
 
 // §15.5.1: event_trigger (->)
 TEST(ParserA604, StmtItemEventTrigger) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    -> my_event;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    -> my_event;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
 
 // §15.5.1: nonblocking event trigger (->>)
 TEST(ParserA604, StmtItemNonblockingEventTrigger) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    ->> my_event;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    ->> my_event;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
@@ -152,17 +118,16 @@ TEST(ParserA604, StmtItemNonblockingEventTrigger) {
 // LRM section 12.9 -- Event trigger (->)
 // =============================================================================
 TEST(ParserSection12, EventTrigger) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    -> done_event;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  initial begin\n"
+                 "    -> done_event;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-}  // namespace
+} // namespace

@@ -4,31 +4,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-
-struct ParseResult6h {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6h Parse(const std::string& src) {
-  ParseResult6h result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6h& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
-}
-
 namespace {
 
 // =============================================================================
@@ -36,13 +11,12 @@ namespace {
 // =============================================================================
 // 1. Packed dimensions on logic type.
 TEST(ParserSection6, Sec6_11_LogicPackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] data;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic [7:0] data;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -54,13 +28,12 @@ TEST(ParserSection6, Sec6_11_LogicPackedDims) {
 
 // 1b. Packed dimensions on bit type.
 TEST(ParserSection6, Sec6_11_BitPackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  bit [31:0] word;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  bit [31:0] word;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -71,13 +44,12 @@ TEST(ParserSection6, Sec6_11_BitPackedDims) {
 
 // 1c. Packed dimensions on reg type.
 TEST(ParserSection6, Sec6_11_RegPackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  reg [3:0] nibble;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  reg [3:0] nibble;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -85,40 +57,14 @@ TEST(ParserSection6, Sec6_11_RegPackedDims) {
   ASSERT_NE(item->data_type.packed_dim_right, nullptr);
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
-
-struct ParseResult6j {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6j Parse(const std::string& src) {
-  ParseResult6j result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6j& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // 7. Logic with packed dimensions [15:0].
 TEST(ParserSection6, Sec6_5_LogicPackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [15:0] addr;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic [15:0] addr;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_FALSE(item->data_type.is_net);
@@ -127,39 +73,15 @@ TEST(ParserSection6, Sec6_5_LogicPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 15u);
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
-
-struct ParseResult6 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6 Parse(const std::string& src) {
-  ParseResult6 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // =========================================================================
 // §6.8: Variable declarations
 // =========================================================================
 TEST(ParserSection6, LogicVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [15:0] data;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic [15:0] data;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_EQ(item->name, "data");
@@ -167,14 +89,13 @@ TEST(ParserSection6, LogicVarDecl) {
 
 // 29. Net and variable with same-width packed vectors.
 TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [31:0] net_data;\n"
-      "  logic [31:0] var_data;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire [31:0] net_data;\n"
+                 "  logic [31:0] var_data;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 2u);
   // Wire net
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
@@ -190,13 +111,12 @@ TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
 
 // 23. reg with packed dimensions.
 TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  reg [15:0] wide_reg;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  reg [15:0] wide_reg;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
@@ -210,28 +130,26 @@ TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
 // §6.9: Vector declarations
 // =========================================================================
 TEST(ParserSection6, SignedVector) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic signed [7:0] sv;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic signed [7:0] sv;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
 TEST(ParserSection6, UnsignedVector) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic unsigned [15:0] uv;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic unsigned [15:0] uv;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
   EXPECT_FALSE(item->data_type.is_signed);
   EXPECT_EQ(item->name, "uv");
 }
 
-}  // namespace
+} // namespace

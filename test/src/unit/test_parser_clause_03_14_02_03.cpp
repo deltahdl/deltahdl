@@ -2,22 +2,13 @@
 
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 // Helper: preprocess and parse, returning CU + preprocessor state.
-struct ParseResult3140203 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-  TimeScale preproc_timescale;
-  bool has_preproc_timescale = false;
-  TimeUnit preproc_global_precision = TimeUnit::kNs;
-};
-
-static ParseResult3140203 ParseTimescale31402(const std::string& src) {
-  ParseResult3140203 result;
+static ParseResult ParseTimescale31402(const std::string &src) {
+  ParseResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -40,11 +31,10 @@ namespace {
 // =============================================================================
 // 1. Module with explicit timeunit — highest priority, no fallback needed.
 TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeunitTakesPriority) {
-  auto r = ParseTimescale31402(
-      "`timescale 1us / 1ns\n"
-      "module m;\n"
-      "  timeunit 1ps;\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("`timescale 1us / 1ns\n"
+                               "module m;\n"
+                               "  timeunit 1ps;\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto resolved =
       ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
@@ -55,11 +45,10 @@ TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeunitTakesPriority) {
 
 // 2. Module with explicit timeprecision — highest priority.
 TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeprecisionTakesPriority) {
-  auto r = ParseTimescale31402(
-      "`timescale 1us / 1ns\n"
-      "module m;\n"
-      "  timeprecision 1fs;\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("`timescale 1us / 1ns\n"
+                               "module m;\n"
+                               "  timeprecision 1fs;\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto resolved =
       ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
@@ -68,8 +57,8 @@ TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeprecisionTakesPriority) {
   EXPECT_EQ(resolved.precision, TimeUnit::kFs);
 }
 
-static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
-  for (auto* item : items)
+static ModuleDecl *FindNestedModule(const std::vector<ModuleItem *> &items) {
+  for (auto *item : items)
     if (item->kind == ModuleItemKind::kNestedModuleDecl)
       return item->nested_module_decl;
   return nullptr;
@@ -77,21 +66,20 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
 
 // 3. Rule (a): Nested module inherits time unit from enclosing module.
 TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInheritsUnit) {
-  auto r = ParseTimescale31402(
-      "module outer;\n"
-      "  timeunit 1ps;\n"
-      "  timeprecision 1fs;\n"
-      "  module inner;\n"
-      "  endmodule\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("module outer;\n"
+                               "  timeunit 1ps;\n"
+                               "  timeprecision 1fs;\n"
+                               "  module inner;\n"
+                               "  endmodule\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* outer = r.cu->modules[0];
+  auto *outer = r.cu->modules[0];
   auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
   EXPECT_TRUE(outer_resolved.has_unit);
   EXPECT_EQ(outer_resolved.unit, TimeUnit::kPs);
 
   // Find the nested module.
-  auto* inner = FindNestedModule(outer->items);
+  auto *inner = FindNestedModule(outer->items);
   ASSERT_NE(inner, nullptr);
   EXPECT_FALSE(inner->has_timeunit);
 
@@ -105,18 +93,17 @@ TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInheritsUnit) {
 
 // 4. Rule (a): Nested interface inherits from enclosing interface.
 TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInterfaceInherits) {
-  auto r = ParseTimescale31402(
-      "interface outer_if;\n"
-      "  timeunit 1us;\n"
-      "  timeprecision 1ns;\n"
-      "  interface inner_if;\n"
-      "  endinterface\n"
-      "endinterface\n");
+  auto r = ParseTimescale31402("interface outer_if;\n"
+                               "  timeunit 1us;\n"
+                               "  timeprecision 1ns;\n"
+                               "  interface inner_if;\n"
+                               "  endinterface\n"
+                               "endinterface\n");
   EXPECT_FALSE(r.has_errors);
-  auto* outer = r.cu->interfaces[0];
+  auto *outer = r.cu->interfaces[0];
   auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
 
-  auto* inner = FindNestedModule(outer->items);
+  auto *inner = FindNestedModule(outer->items);
   ASSERT_NE(inner, nullptr);
   auto inner_resolved =
       ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
@@ -126,10 +113,9 @@ TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInterfaceInherits) {
 
 // 5. Rule (b): Module without timeunit falls back to `timescale.
 TEST(ParserClause03, Cl3_14_2_3_RuleB_FallbackToTimescale) {
-  auto r = ParseTimescale31402(
-      "`timescale 1us / 1ps\n"
-      "module m;\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("`timescale 1us / 1ps\n"
+                               "module m;\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.has_preproc_timescale);
   auto resolved =
@@ -143,11 +129,10 @@ TEST(ParserClause03, Cl3_14_2_3_RuleB_FallbackToTimescale) {
 
 // 6. Rule (c): Module without timeunit or `timescale uses CU-scope timeunit.
 TEST(ParserClause03, Cl3_14_2_3_RuleC_FallbackToCUTimeunit) {
-  auto r = ParseTimescale31402(
-      "timeunit 1ps;\n"
-      "timeprecision 1fs;\n"
-      "module m;\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("timeunit 1ps;\n"
+                               "timeprecision 1fs;\n"
+                               "module m;\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->has_cu_timeunit);
   EXPECT_EQ(r.cu->cu_time_unit, TimeUnit::kPs);
@@ -164,9 +149,8 @@ TEST(ParserClause03, Cl3_14_2_3_RuleC_FallbackToCUTimeunit) {
 
 // 7. Rule (d): Default time unit when nothing is specified.
 TEST(ParserClause03, Cl3_14_2_3_RuleD_DefaultTimeUnit) {
-  auto r = ParseTimescale31402(
-      "module m;\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("module m;\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto resolved =
       ResolveModuleTimescale(r.cu->modules[0], r.cu, false, {}, nullptr);
@@ -181,10 +165,9 @@ TEST(ParserClause03, Cl3_14_2_3_RuleD_DefaultTimeUnit) {
 // §3.14.2.3: "The time unit of the compilation-unit scope can only be
 // set by a timeunit declaration, not a `timescale directive."
 TEST(ParserClause03, Cl3_14_2_3_CUTimeunitOnlyByKeyword) {
-  auto r = ParseTimescale31402(
-      "`timescale 1us / 1ps\n"
-      "module m;\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("`timescale 1us / 1ps\n"
+                               "module m;\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   // `timescale does NOT set CU-scope timeunit.
   EXPECT_FALSE(r.cu->has_cu_timeunit);
@@ -194,26 +177,25 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitOnlyByKeyword) {
 // 9. Precedence: explicit timeunit > enclosing > `timescale > CU > default.
 // Module has timeunit, enclosing has different, `timescale is different.
 TEST(ParserClause03, Cl3_14_2_3_FullPrecedenceChain) {
-  auto r = ParseTimescale31402(
-      "`timescale 1ms / 1us\n"
-      "timeunit 1ns;\n"
-      "timeprecision 1ps;\n"
-      "module outer;\n"
-      "  timeunit 1us;\n"
-      "  timeprecision 1ns;\n"
-      "  module inner;\n"
-      "    timeunit 1fs;\n"
-      "  endmodule\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("`timescale 1ms / 1us\n"
+                               "timeunit 1ns;\n"
+                               "timeprecision 1ps;\n"
+                               "module outer;\n"
+                               "  timeunit 1us;\n"
+                               "  timeprecision 1ns;\n"
+                               "  module inner;\n"
+                               "    timeunit 1fs;\n"
+                               "  endmodule\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* outer = r.cu->modules[0];
+  auto *outer = r.cu->modules[0];
   auto outer_resolved = ResolveModuleTimescale(
       outer, r.cu, r.has_preproc_timescale, r.preproc_timescale, nullptr);
   // outer has explicit timeunit 1us.
   EXPECT_EQ(outer_resolved.unit, TimeUnit::kUs);
   EXPECT_EQ(outer_resolved.precision, TimeUnit::kNs);
 
-  auto* inner = FindNestedModule(outer->items);
+  auto *inner = FindNestedModule(outer->items);
   ASSERT_NE(inner, nullptr);
   auto inner_resolved =
       ResolveModuleTimescale(inner, r.cu, r.has_preproc_timescale,
@@ -226,11 +208,10 @@ TEST(ParserClause03, Cl3_14_2_3_FullPrecedenceChain) {
 
 // 10. Rule (b) takes precedence over rule (c).
 TEST(ParserClause03, Cl3_14_2_3_TimescaleBeforeCUTimeunit) {
-  auto r = ParseTimescale31402(
-      "timeunit 1fs;\n"
-      "`timescale 1us / 1ps\n"
-      "module m;\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("timeunit 1fs;\n"
+                               "`timescale 1us / 1ps\n"
+                               "module m;\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto resolved =
       ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
@@ -243,19 +224,18 @@ TEST(ParserClause03, Cl3_14_2_3_TimescaleBeforeCUTimeunit) {
 // 12. Same precedence rules apply for timeprecision (§3.14.2.3).
 TEST(ParserClause03, Cl3_14_2_3_SameRulesForPrecision) {
   // Module has no timeprecision, enclosing has it.
-  auto r = ParseTimescale31402(
-      "module outer;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "  module inner;\n"
-      "    timeunit 1ns;\n"
-      "  endmodule\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("module outer;\n"
+                               "  timeunit 1ns;\n"
+                               "  timeprecision 1ps;\n"
+                               "  module inner;\n"
+                               "    timeunit 1ns;\n"
+                               "  endmodule\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* outer = r.cu->modules[0];
+  auto *outer = r.cu->modules[0];
   auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
 
-  auto* inner = FindNestedModule(outer->items);
+  auto *inner = FindNestedModule(outer->items);
   ASSERT_NE(inner, nullptr);
   auto inner_resolved =
       ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
@@ -275,11 +255,10 @@ TEST(ParserClause03, Cl3_14_2_3_DefaultIsImplementationSpecific) {
 
 // 14. CU-scope timeunit applies to interface.
 TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToInterface) {
-  auto r = ParseTimescale31402(
-      "timeunit 1ps;\n"
-      "timeprecision 1fs;\n"
-      "interface i;\n"
-      "endinterface\n");
+  auto r = ParseTimescale31402("timeunit 1ps;\n"
+                               "timeprecision 1fs;\n"
+                               "interface i;\n"
+                               "endinterface\n");
   EXPECT_FALSE(r.has_errors);
   auto resolved =
       ResolveModuleTimescale(r.cu->interfaces[0], r.cu, false, {}, nullptr);
@@ -289,11 +268,10 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToInterface) {
 
 // 15. CU-scope timeunit applies to program.
 TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToProgram) {
-  auto r = ParseTimescale31402(
-      "timeunit 1us;\n"
-      "timeprecision 1ns;\n"
-      "program p;\n"
-      "endprogram\n");
+  auto r = ParseTimescale31402("timeunit 1us;\n"
+                               "timeprecision 1ns;\n"
+                               "program p;\n"
+                               "endprogram\n");
   EXPECT_FALSE(r.has_errors);
   auto resolved =
       ResolveModuleTimescale(r.cu->programs[0], r.cu, false, {}, nullptr);
@@ -305,9 +283,8 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToProgram) {
 // Only modules and interfaces can inherit via nesting.
 TEST(ParserClause03, Cl3_14_2_3_ProgramsCannotBeNested) {
   // A standalone program without timeunit uses CU scope or default.
-  auto r = ParseTimescale31402(
-      "program p;\n"
-      "endprogram\n");
+  auto r = ParseTimescale31402("program p;\n"
+                               "endprogram\n");
   EXPECT_FALSE(r.has_errors);
   auto resolved =
       ResolveModuleTimescale(r.cu->programs[0], r.cu, false, {}, nullptr);
@@ -317,13 +294,12 @@ TEST(ParserClause03, Cl3_14_2_3_ProgramsCannotBeNested) {
 
 // 17. Multiple modules — each independently resolves time.
 TEST(ParserClause03, Cl3_14_2_3_IndependentResolution) {
-  auto r = ParseTimescale31402(
-      "`timescale 1us / 1ps\n"
-      "module a;\n"
-      "  timeunit 1ns;\n"
-      "endmodule\n"
-      "module b;\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("`timescale 1us / 1ps\n"
+                               "module a;\n"
+                               "  timeunit 1ns;\n"
+                               "endmodule\n"
+                               "module b;\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto resolved_a =
       ResolveModuleTimescale(r.cu->modules[0], r.cu, r.has_preproc_timescale,
@@ -340,20 +316,19 @@ TEST(ParserClause03, Cl3_14_2_3_IndependentResolution) {
 
 // 18. Nested module with own timeunit overrides inheritance.
 TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
-  auto r = ParseTimescale31402(
-      "module outer;\n"
-      "  timeunit 1us;\n"
-      "  timeprecision 1ns;\n"
-      "  module inner;\n"
-      "    timeunit 1fs;\n"
-      "    timeprecision 1fs;\n"
-      "  endmodule\n"
-      "endmodule\n");
+  auto r = ParseTimescale31402("module outer;\n"
+                               "  timeunit 1us;\n"
+                               "  timeprecision 1ns;\n"
+                               "  module inner;\n"
+                               "    timeunit 1fs;\n"
+                               "    timeprecision 1fs;\n"
+                               "  endmodule\n"
+                               "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* outer = r.cu->modules[0];
+  auto *outer = r.cu->modules[0];
   auto outer_resolved = ResolveModuleTimescale(outer, r.cu, false, {}, nullptr);
 
-  auto* inner = FindNestedModule(outer->items);
+  auto *inner = FindNestedModule(outer->items);
   ASSERT_NE(inner, nullptr);
   auto inner_resolved =
       ResolveModuleTimescale(inner, r.cu, false, {}, &outer_resolved);
@@ -362,4 +337,4 @@ TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
 }
 
-}  // namespace
+} // namespace

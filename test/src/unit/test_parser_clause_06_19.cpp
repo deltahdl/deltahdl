@@ -1,6 +1,7 @@
 // §6.19: Enumerations
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -13,7 +14,7 @@ TEST(ParserA221, EnumBaseAtomType) {
   auto r = Parse("module m; enum int {A, B} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
 }
 
@@ -25,34 +26,16 @@ TEST(ParserA221, EnumNameBasic) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.enum_members.size(), 3u);
 }
-
-struct ParseResult90301 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult90301 Parse(const std::string& src) {
-  ParseResult90301 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 // =============================================================================
 // Section 8.25 -- Enums
 // =============================================================================
 // Anonymous enum variable declaration with member inspection.
 TEST(ParserSection8, EnumAnonymousDeclMembers) {
-  auto r = Parse(
-      "module m;\n"
-      "  enum {IDLE, RUNNING, DONE} state;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  enum {IDLE, RUNNING, DONE} state;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
   EXPECT_EQ(item->name, "state");
@@ -64,36 +47,17 @@ TEST(ParserSection8, EnumAnonymousDeclMembers) {
 
 // Enum with explicit base type and value assignments.
 TEST(ParserSection8, EnumExplicitBaseTypeValues) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  enum bit [3:0] {BRONZE = 4'h3, SILVER, GOLD = 4'h5}"
-              " medal;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  enum bit [3:0] {BRONZE = 4'h3, SILVER, GOLD = 4'h5}"
+                      " medal;\n"
+                      "endmodule\n"));
 }
-
-struct ParseResult6 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6 Parse(const std::string& src) {
-  ParseResult6 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 TEST(Parser, InlineEnumVar) {
-  auto r = Parse(
-      "module t;\n"
-      "  enum { X, Y } my_var;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  enum { X, Y } my_var;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "my_var");
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
@@ -105,7 +69,7 @@ TEST(ParserA221, DataTypeEnum) {
   auto r = Parse("module m; enum logic [1:0] {A, B, C} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
 }
 
@@ -118,13 +82,12 @@ TEST(ParserA221, EnumBaseVectorWithDim) {
 
 TEST(ParserA221, EnumBaseTypeIdentifier) {
   // enum type_identifier { ... }
-  auto r = Parse(
-      "module m;\n"
-      "  typedef logic [3:0] nibble_t;\n"
-      "  enum nibble_t {A, B} x;\n"
-      "endmodule");
+  auto r = Parse("module m;\n"
+                 "  typedef logic [3:0] nibble_t;\n"
+                 "  enum nibble_t {A, B} x;\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+} // namespace

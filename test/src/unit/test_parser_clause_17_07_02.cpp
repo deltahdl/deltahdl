@@ -2,33 +2,15 @@
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
-
-struct ParseResult16c {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult16c Parse(const std::string& src) {
-  ParseResult16c result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
 TEST_F(VerifyParseTest, CheckerWithAssumeProperty) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker observer_model(bit valid, reset);
       default clocking @$global_clock; endclocking
       rand bit flag;
@@ -42,4 +24,4 @@ TEST_F(VerifyParseTest, CheckerWithAssumeProperty) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+} // namespace

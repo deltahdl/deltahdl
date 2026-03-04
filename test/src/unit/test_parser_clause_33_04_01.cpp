@@ -2,12 +2,13 @@
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 struct ConfigTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -23,23 +24,6 @@ struct ConfigTest : ::testing::Test {
   std::unique_ptr<Lexer> lexer_;
   std::unique_ptr<Parser> parser_;
 };
-
-struct ParseResult34 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult34 Parse(const std::string& src) {
-  ParseResult34 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 using DpiParseTest = ProgramTestParse;
 
 namespace {
@@ -49,15 +33,14 @@ namespace {
 // =============================================================================
 // config_declaration: config name; design statement; endconfig
 TEST(SourceText, ConfigDeclBasic) {
-  auto r = Parse(
-      "config cfg1;\n"
-      "  design work.top;\n"
-      "  default liblist work;\n"
-      "endconfig\n");
+  auto r = Parse("config cfg1;\n"
+                 "  design work.top;\n"
+                 "  default liblist work;\n"
+                 "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
-  auto* c = r.cu->configs[0];
+  auto *c = r.cu->configs[0];
   EXPECT_EQ(c->name, "cfg1");
   ASSERT_EQ(c->design_cells.size(), 1u);
   EXPECT_EQ(c->design_cells[0].first, "work");
@@ -68,16 +51,15 @@ TEST(SourceText, ConfigDeclBasic) {
 
 // config_declaration with local_parameter_declaration
 TEST(SourceText, ConfigDeclLocalParams) {
-  auto r = Parse(
-      "config cfg3;\n"
-      "  localparam WIDTH = 8;\n"
-      "  localparam DEPTH = 4;\n"
-      "  design work.top;\n"
-      "  default liblist work;\n"
-      "endconfig\n");
+  auto r = Parse("config cfg3;\n"
+                 "  localparam WIDTH = 8;\n"
+                 "  localparam DEPTH = 4;\n"
+                 "  design work.top;\n"
+                 "  default liblist work;\n"
+                 "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* c = r.cu->configs[0];
+  auto *c = r.cu->configs[0];
   ASSERT_EQ(c->local_params.size(), 2u);
   EXPECT_EQ(c->local_params[0].first, "WIDTH");
   EXPECT_EQ(c->local_params[1].first, "DEPTH");
@@ -85,14 +67,13 @@ TEST(SourceText, ConfigDeclLocalParams) {
 
 // config_rule_statement: default_clause liblist_clause
 TEST(SourceText, ConfigRuleDefaultLiblist) {
-  auto r = Parse(
-      "config cfg5;\n"
-      "  design top;\n"
-      "  default liblist lib1 lib2 lib3;\n"
-      "endconfig\n");
+  auto r = Parse("config cfg5;\n"
+                 "  design top;\n"
+                 "  default liblist lib1 lib2 lib3;\n"
+                 "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rule = r.cu->configs[0]->rules[0];
+  auto *rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kDefault);
   ASSERT_EQ(rule->liblist.size(), 3u);
   EXPECT_EQ(rule->liblist[0], "lib1");
@@ -102,14 +83,13 @@ TEST(SourceText, ConfigRuleDefaultLiblist) {
 
 // config_rule_statement: cell_clause liblist_clause
 TEST(SourceText, ConfigRuleCellLiblist) {
-  auto r = Parse(
-      "config cfg8;\n"
-      "  design top;\n"
-      "  cell mylib.mycell liblist lib_a lib_b;\n"
-      "endconfig\n");
+  auto r = Parse("config cfg8;\n"
+                 "  design top;\n"
+                 "  cell mylib.mycell liblist lib_a lib_b;\n"
+                 "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rule = r.cu->configs[0]->rules[0];
+  auto *rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kCell);
   EXPECT_EQ(rule->cell_lib, "mylib");
   EXPECT_EQ(rule->cell_name, "mycell");
@@ -119,28 +99,11 @@ TEST(SourceText, ConfigRuleCellLiblist) {
 }
 
 using ApiParseTest = ProgramTestParse;
-
-struct ParseResult40 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult40 Parse(const std::string& src) {
-  ParseResult40 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 // =============================================================================
 // §36.3 Configuration rules (config ... endconfig)
 // =============================================================================
 TEST_F(ApiParseTest, BasicConfigDecl) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg1;
       design rtlLib.top;
       default liblist rtlLib;
@@ -155,14 +118,13 @@ TEST_F(ApiParseTest, BasicConfigDecl) {
 
 // config_rule_statement: cell_clause use_clause with :config suffix
 TEST(SourceText, ConfigRuleCellUseConfig) {
-  auto r = Parse(
-      "config cfg9;\n"
-      "  design top;\n"
-      "  cell flip_flop use work.ff_impl :config;\n"
-      "endconfig\n");
+  auto r = Parse("config cfg9;\n"
+                 "  design top;\n"
+                 "  cell flip_flop use work.ff_impl :config;\n"
+                 "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rule = r.cu->configs[0]->rules[0];
+  auto *rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kCell);
   EXPECT_EQ(rule->cell_name, "flip_flop");
   EXPECT_EQ(rule->use_lib, "work");
@@ -172,16 +134,15 @@ TEST(SourceText, ConfigRuleCellUseConfig) {
 
 // Comprehensive: multiple rules of different kinds in one config
 TEST(SourceText, ConfigMultipleRules) {
-  auto r = Parse(
-      "config cfg12;\n"
-      "  design work.top;\n"
-      "  default liblist work rtl;\n"
-      "  instance top.dut use gate.dut_impl;\n"
-      "  cell lib.ram liblist sram_lib;\n"
-      "endconfig\n");
+  auto r = Parse("config cfg12;\n"
+                 "  design work.top;\n"
+                 "  default liblist work rtl;\n"
+                 "  instance top.dut use gate.dut_impl;\n"
+                 "  cell lib.ram liblist sram_lib;\n"
+                 "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* c = r.cu->configs[0];
+  auto *c = r.cu->configs[0];
   ASSERT_EQ(c->rules.size(), 3u);
   EXPECT_EQ(c->rules[0]->kind, ConfigRuleKind::kDefault);
   EXPECT_EQ(c->rules[1]->kind, ConfigRuleKind::kInstance);
@@ -190,11 +151,10 @@ TEST(SourceText, ConfigMultipleRules) {
 
 // description: config_declaration
 TEST(SourceText, DescriptionConfig) {
-  auto r = Parse(
-      "config cfg;\n"
-      "  design work.top;\n"
-      "  default liblist work;\n"
-      "endconfig\n");
+  auto r = Parse("config cfg;\n"
+                 "  design work.top;\n"
+                 "  default liblist work;\n"
+                 "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
@@ -203,10 +163,9 @@ TEST(SourceText, DescriptionConfig) {
 
 // config_declaration with endconfig label
 TEST(SourceText, ConfigDeclEndLabel) {
-  auto r = Parse(
-      "config cfg2;\n"
-      "  design top;\n"
-      "endconfig : cfg2\n");
+  auto r = Parse("config cfg2;\n"
+                 "  design top;\n"
+                 "endconfig : cfg2\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
@@ -218,14 +177,14 @@ TEST(SourceText, ConfigDeclEndLabel) {
 // =============================================================================
 TEST_F(ConfigTest, LibraryMappingConfig) {
   // Config with library-qualified design cells
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design rtlLib.top;
       default liblist rtlLib;
     endconfig
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
-  auto* cfg = unit->configs[0];
+  auto *cfg = unit->configs[0];
   ASSERT_EQ(cfg->design_cells.size(), 1u);
   EXPECT_EQ(cfg->design_cells[0].first, "rtlLib");
   EXPECT_EQ(cfg->design_cells[0].second, "top");
@@ -237,7 +196,7 @@ TEST_F(ConfigTest, LibraryMappingConfig) {
 // Multiple rules in single config
 // =============================================================================
 TEST_F(ConfigTest, MultipleRulesInConfig) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
       default liblist rtlLib;
@@ -246,7 +205,7 @@ TEST_F(ConfigTest, MultipleRulesInConfig) {
     endconfig
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
-  auto* cfg = unit->configs[0];
+  auto *cfg = unit->configs[0];
   ASSERT_EQ(cfg->rules.size(), 3u);
   EXPECT_EQ(cfg->rules[0]->kind, ConfigRuleKind::kDefault);
   EXPECT_EQ(cfg->rules[1]->kind, ConfigRuleKind::kInstance);
@@ -257,7 +216,7 @@ TEST_F(ConfigTest, MultipleRulesInConfig) {
 // Endconfig with label
 // =============================================================================
 TEST_F(ConfigTest, EndconfigWithLabel) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config my_config;
       design lib.top;
     endconfig : my_config
@@ -266,32 +225,13 @@ TEST_F(ConfigTest, EndconfigWithLabel) {
   EXPECT_EQ(unit->configs[0]->name, "my_config");
   EXPECT_FALSE(HasErrors());
 }
-
-struct ParseResult31 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult31 Parse(const std::string& src) {
-  ParseResult31 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 using ConfigParseTest = ProgramTestParse;
 
 // =============================================================================
 // §33 Configuration declarations
 // =============================================================================
 TEST_F(ConfigParseTest, BasicConfig) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
     endconfig
@@ -301,7 +241,7 @@ TEST_F(ConfigParseTest, BasicConfig) {
 }
 
 TEST_F(ConfigParseTest, ConfigWithEndLabel) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
     endconfig : cfg
@@ -310,4 +250,4 @@ TEST_F(ConfigParseTest, ConfigWithEndLabel) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}  // namespace
+} // namespace

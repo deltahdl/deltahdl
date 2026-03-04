@@ -1,21 +1,21 @@
 // §13.3.1: Static and automatic tasks
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
 
 TEST(ParserAnnexA, A2TaskDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic drive(input logic [7:0] val);\n"
-      "    data = val;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic drive(input logic [7:0] val);\n"
+                 "    data = val;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_EQ(item->name, "drive");
 }
@@ -28,77 +28,54 @@ TEST(ParserAnnexA, A2TaskDecl) {
 //   task [ dynamic_override_specifiers ] [ lifetime ] task_body_declaration
 // ---------------------------------------------------------------------------
 TEST(ParserA27, TaskLifetimeAutomatic) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic my_task();\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_automatic);
   EXPECT_FALSE(item->is_static);
 }
 
 TEST(ParserA27, TaskLifetimeStatic) {
-  auto r = Parse(
-      "module m;\n"
-      "  task static my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task static my_task();\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_FALSE(item->is_automatic);
   EXPECT_TRUE(item->is_static);
 }
 
 TEST(ParserA27, TaskLifetimeDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task my_task();\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_FALSE(item->is_automatic);
   EXPECT_FALSE(item->is_static);
 }
-
-struct ParseResult4e {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult4e Parse(const std::string& src) {
-  ParseResult4e result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // =============================================================================
 // 19. Automatic task with delay control
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic delayed_write(input int val);\n"
-      "    #10;\n"
-      "    $display(\"val=%0d\", val);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic delayed_write(input int val);\n"
+                 "    #10;\n"
+                 "    $display(\"val=%0d\", val);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -110,16 +87,15 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
 // 24. Automatic task with event control
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoTaskWithEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic wait_clk(input logic clk);\n"
-      "    @(posedge clk);\n"
-      "    $display(\"clock edge\");\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic wait_clk(input logic clk);\n"
+                 "    @(posedge clk);\n"
+                 "    $display(\"clock edge\");\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -133,59 +109,32 @@ TEST(ParserSection4, Sec4_9_3_AutoTaskWithEventControl) {
 // 26. Task without explicit lifetime (implicit static in module)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_TaskNoLifetimeQualifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  task plain_task();\n"
-      "    $display(\"hello\");\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task plain_task();\n"
+                 "    $display(\"hello\");\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_FALSE(item->is_automatic);
   EXPECT_FALSE(item->is_static);
 }
-
-struct ParseResult4d {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult4d Parse(const std::string& src) {
-  ParseResult4d result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // Returns the first module item from the first module.
-static ModuleItem* FirstItem(ParseResult4d& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
-}
-
 // =============================================================================
 // 3. Automatic task declaration
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticTaskDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic do_work(input int n);\n"
-      "    $display(\"work %0d\", n);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic do_work(input int n);\n"
+                 "    $display(\"work %0d\", n);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_automatic);
@@ -197,15 +146,14 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskDecl) {
 // 4. Static task declaration
 // =============================================================================
 TEST(ParserSection4, Sec4_9_3_StaticTaskDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task static wait_cycles(input int n);\n"
-      "    repeat (n) #1;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task static wait_cycles(input int n);\n"
+                 "    repeat (n) #1;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_static);
@@ -213,85 +161,61 @@ TEST(ParserSection4, Sec4_9_3_StaticTaskDecl) {
   EXPECT_EQ(item->name, "wait_cycles");
 }
 
-static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
-  for (auto* item : r.cu->modules[0]->items) {
+static ModuleItem *FindFunc(ParseResult &r, std::string_view name) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kFunctionDecl &&
         item->kind != ModuleItemKind::kTaskDecl) {
       continue;
     }
-    if (item->name == name) return item;
+    if (item->name == name)
+      return item;
   }
   return nullptr;
 }
 
 TEST(ParserSection13, StaticTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  task static do_stuff();\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task static do_stuff();\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "do_stuff");
+  auto *tk = FindFunc(r, "do_stuff");
   ASSERT_NE(tk, nullptr);
   EXPECT_TRUE(tk->is_static);
   EXPECT_FALSE(tk->is_automatic);
 }
-
-struct ParseResult6b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6b Parse(const std::string& src) {
-  ParseResult6b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6b& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // =========================================================================
 // §6.21: Scope and lifetime (additional tests)
 // =========================================================================
 TEST(ParserSection6, AutomaticTaskDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  task automatic my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  task automatic my_task();\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_automatic);
 }
 
 TEST(ParserSection6, StaticTaskDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  task static my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  task static my_task();\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_static);
 }
 
 // Returns the first function or task declaration from the first module.
-static ModuleItem* FirstFuncOrTask(ParseResult4e& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
+static ModuleItem *FirstFuncOrTask(ParseResult &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl)
       return item;
@@ -303,15 +227,14 @@ static ModuleItem* FirstFuncOrTask(ParseResult4e& r) {
 // 16. Static task declaration
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticTaskDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task static log_event(input int code);\n"
-      "    $display(\"event: %0d\", code);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task static log_event(input int code);\n"
+                 "    $display(\"event: %0d\", code);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* t = FirstFuncOrTask(r);
+  auto *t = FirstFuncOrTask(r);
   ASSERT_NE(t, nullptr);
   EXPECT_EQ(t->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(t->is_static);
@@ -323,20 +246,19 @@ TEST(ParserSection4, Sec4_9_4_StaticTaskDecl) {
 // 17. Automatic task with automatic local vars (different types)
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoTaskWithVariousTypes) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic process();\n"
-      "    int i_val;\n"
-      "    logic [3:0] l_val;\n"
-      "    real r_val;\n"
-      "    i_val = 1;\n"
-      "    l_val = 4'hA;\n"
-      "    r_val = 3.14;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic process();\n"
+                 "    int i_val;\n"
+                 "    logic [3:0] l_val;\n"
+                 "    real r_val;\n"
+                 "    i_val = 1;\n"
+                 "    l_val = 4'hA;\n"
+                 "    r_val = 3.14;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* t = FirstFuncOrTask(r);
+  auto *t = FirstFuncOrTask(r);
   ASSERT_NE(t, nullptr);
   EXPECT_EQ(t->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(t->is_automatic);
@@ -355,16 +277,15 @@ TEST(ParserSection4, Sec4_9_4_AutoTaskWithVariousTypes) {
 // 20. Automatic task with explicit automatic local vars
 // =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoTaskExplicitAutoLocals) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic run(input int seed);\n"
-      "    automatic int local_seed = seed;\n"
-      "    $display(local_seed);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task automatic run(input int seed);\n"
+                 "    automatic int local_seed = seed;\n"
+                 "    $display(local_seed);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* t = FirstFuncOrTask(r);
+  auto *t = FirstFuncOrTask(r);
   ASSERT_NE(t, nullptr);
   EXPECT_TRUE(t->is_automatic);
   ASSERT_GE(t->func_body_stmts.size(), 1u);
@@ -374,4 +295,4 @@ TEST(ParserSection4, Sec4_9_4_AutoTaskExplicitAutoLocals) {
   EXPECT_NE(t->func_body_stmts[0]->var_init, nullptr);
 }
 
-}  // namespace
+} // namespace

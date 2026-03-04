@@ -2,12 +2,13 @@
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 struct ConfigTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -23,23 +24,6 @@ struct ConfigTest : ::testing::Test {
   std::unique_ptr<Lexer> lexer_;
   std::unique_ptr<Parser> parser_;
 };
-
-struct ParseResult34 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult34 Parse(const std::string& src) {
-  ParseResult34 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 using DpiParseTest = ProgramTestParse;
 
 namespace {
@@ -48,16 +32,16 @@ namespace {
 // §33.4.1.2 Default clause (liblist)
 // =============================================================================
 TEST_F(ConfigTest, DefaultLiblist) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
       default liblist lib1 lib2;
     endconfig
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
-  auto* cfg = unit->configs[0];
+  auto *cfg = unit->configs[0];
   ASSERT_EQ(cfg->rules.size(), 1u);
-  auto* rule = cfg->rules[0];
+  auto *rule = cfg->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kDefault);
   ASSERT_EQ(rule->liblist.size(), 2u);
   EXPECT_EQ(rule->liblist[0], "lib1");
@@ -65,7 +49,7 @@ TEST_F(ConfigTest, DefaultLiblist) {
 }
 
 TEST_F(ConfigTest, DefaultLiblistSingleLib) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
       default liblist mylib;
@@ -73,7 +57,7 @@ TEST_F(ConfigTest, DefaultLiblistSingleLib) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_EQ(unit->configs[0]->rules.size(), 1u);
-  auto* rule = unit->configs[0]->rules[0];
+  auto *rule = unit->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kDefault);
   ASSERT_EQ(rule->liblist.size(), 1u);
   EXPECT_EQ(rule->liblist[0], "mylib");
@@ -99,29 +83,10 @@ TEST(ParserSection34, ConfigCoexistsWithModuleAndProtected) {
   EXPECT_EQ(r.cu->modules[0]->name, "protected_ip");
   EXPECT_EQ(r.cu->configs[0]->name, "ip_cfg");
 }
-
-struct ParseResult31 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult31 Parse(const std::string& src) {
-  ParseResult31 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 using ConfigParseTest = ProgramTestParse;
 
 TEST_F(ConfigParseTest, ConfigWithDefaultClause) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
       default liblist lib1 lib2;
@@ -131,4 +96,4 @@ TEST_F(ConfigParseTest, ConfigWithDefaultClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}  // namespace
+} // namespace

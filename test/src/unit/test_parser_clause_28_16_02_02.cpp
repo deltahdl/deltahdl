@@ -4,42 +4,16 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-
-struct ParseResult6h {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6h Parse(const std::string& src) {
-  ParseResult6h result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6h& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
-}
-
 namespace {
 
 // §6.7.1: Trireg with charge strength and delay combined.
 TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithDelay) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (small) #(5, 10, 15) cap;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  trireg (small) #(5, 10, 15) cap;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
   EXPECT_EQ(item->data_type.charge_strength, 1);
@@ -50,35 +24,11 @@ TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithDelay) {
   ASSERT_NE(item->net_delay_decay, nullptr);
   EXPECT_EQ(item->net_delay_decay->int_val, 15u);
 }
-
-struct ParseResult6b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6b Parse(const std::string& src) {
-  ParseResult6b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6b& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 TEST(ParserSection6, TriregThreeDelay_Strength) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (large) #(10, 20, 50) cap1;\n"
-      "endmodule\n");
-  auto* item = FirstItem(r);
+  auto r = Parse("module t;\n"
+                 "  trireg (large) #(10, 20, 50) cap1;\n"
+                 "endmodule\n");
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.charge_strength, 4);
   ASSERT_NE(item->net_delay, nullptr);
@@ -86,11 +36,10 @@ TEST(ParserSection6, TriregThreeDelay_Strength) {
 }
 
 TEST(ParserSection6, TriregThreeDelay_FallAndDecay) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (large) #(10, 20, 50) cap1;\n"
-      "endmodule\n");
-  auto* item = FirstItem(r);
+  auto r = Parse("module t;\n"
+                 "  trireg (large) #(10, 20, 50) cap1;\n"
+                 "endmodule\n");
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->net_delay_fall, nullptr);
   EXPECT_EQ(item->net_delay_fall->int_val, 20u);
@@ -98,4 +47,4 @@ TEST(ParserSection6, TriregThreeDelay_FallAndDecay) {
   EXPECT_EQ(item->net_delay_decay->int_val, 50u);
 }
 
-}  // namespace
+} // namespace

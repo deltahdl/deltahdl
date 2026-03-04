@@ -3,20 +3,22 @@
 #include <gtest/gtest.h>
 
 #include <initializer_list>
+#include <string>
 #include <utility>
 #include <vector>
 
+#include "fixture_parser.h"
 #include "parser/ast.h"
 
 using namespace delta;
 
 // Verify clocking signal directions and names.
 inline void VerifyClockingSignalDirections(
-    ModuleItem* item,
-    std::initializer_list<std::pair<Direction, const char*>> expected) {
+    ModuleItem *item,
+    std::initializer_list<std::pair<Direction, const char *>> expected) {
   ASSERT_EQ(item->clocking_signals.size(), expected.size());
   size_t i = 0;
-  for (auto& [dir, name] : expected) {
+  for (auto &[dir, name] : expected) {
     EXPECT_EQ(item->clocking_signals[i].direction, dir) << "signal " << i;
     EXPECT_EQ(item->clocking_signals[i].name, name) << "signal " << i;
     ++i;
@@ -24,26 +26,26 @@ inline void VerifyClockingSignalDirections(
 }
 
 // Verify full-path src_ports and dst_ports by name.
-inline void VerifyFullPathPorts(SpecifyItem* si,
-                                std::initializer_list<const char*> src,
-                                std::initializer_list<const char*> dst) {
+inline void VerifyFullPathPorts(SpecifyItem *si,
+                                std::initializer_list<const char *> src,
+                                std::initializer_list<const char *> dst) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
   ASSERT_EQ(si->path.src_ports.size(), src.size());
   size_t i = 0;
-  for (auto* name : src) {
+  for (auto *name : src) {
     EXPECT_EQ(si->path.src_ports[i].name, name) << "src port " << i;
     ++i;
   }
   ASSERT_EQ(si->path.dst_ports.size(), dst.size());
   i = 0;
-  for (auto* name : dst) {
+  for (auto *name : dst) {
     EXPECT_EQ(si->path.dst_ports[i].name, name) << "dst port " << i;
     ++i;
   }
 }
 
 // Verify ternary expression: condition, true_expr, false_expr all kIdentifier.
-inline void VerifyTernaryFieldsAllIdentifier(Expr* expr) {
+inline void VerifyTernaryFieldsAllIdentifier(Expr *expr) {
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kTernary);
   ASSERT_NE(expr->condition, nullptr);
@@ -55,7 +57,7 @@ inline void VerifyTernaryFieldsAllIdentifier(Expr* expr) {
 }
 
 // Verify func_args directions.
-inline void VerifyFuncArgDirections(ModuleItem* item,
+inline void VerifyFuncArgDirections(ModuleItem *item,
                                     std::initializer_list<Direction> expected) {
   ASSERT_EQ(item->func_args.size(), expected.size());
   size_t i = 0;
@@ -66,22 +68,23 @@ inline void VerifyFuncArgDirections(ModuleItem* item,
 }
 
 // Verify forever-loop body has jump statement of given kind.
-inline void VerifyForeverLoopJump(Stmt* body, StmtKind expected) {
+inline void VerifyForeverLoopJump(Stmt *body, StmtKind expected) {
   ASSERT_NE(body, nullptr);
-  auto* forever_stmt = body->stmts[0];
+  auto *forever_stmt = body->stmts[0];
   ASSERT_NE(forever_stmt, nullptr);
   EXPECT_EQ(forever_stmt->kind, StmtKind::kForever);
-  auto* loop_body = forever_stmt->body;
+  auto *loop_body = forever_stmt->body;
   ASSERT_NE(loop_body, nullptr);
   EXPECT_EQ(loop_body->stmts[0]->kind, expected);
 }
 
 // Template AST navigation: first statement inside the first initial block.
-template <typename T>
-inline Stmt* FirstInitialStmtT(T& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+template <typename T> inline Stmt *FirstInitialStmtT(T &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock)
+      continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
     }
@@ -91,56 +94,55 @@ inline Stmt* FirstInitialStmtT(T& r) {
 }
 
 // Non-template wrappers for common ParseResult types.
-template <typename T>
-inline Stmt* FirstInitialStmt(T& r) {
+template <typename T> inline Stmt *FirstInitialStmt(T &r) {
   return FirstInitialStmtT(r);
 }
 
 // Template AST navigation: body of the first initial block.
-template <typename T>
-inline Stmt* InitialBodyT(T& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
+template <typename T> inline Stmt *InitialBodyT(T &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock)
+      return item->body;
   }
   return nullptr;
 }
 
-template <typename T>
-inline Stmt* InitialBody(T& r) {
-  return InitialBodyT(r);
-}
+template <typename T> inline Stmt *InitialBody(T &r) { return InitialBodyT(r); }
 
 // Find the first module item of a given kind.
-inline ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
+inline ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
                                   ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
+  for (auto *item : items) {
+    if (item->kind == kind)
+      return item;
   }
   return nullptr;
 }
 
 // Count module items of a given kind.
-inline size_t CountItemsByKind(const std::vector<ModuleItem*>& items,
+inline size_t CountItemsByKind(const std::vector<ModuleItem *> &items,
                                ModuleItemKind kind) {
   size_t count = 0;
-  for (auto* item : items) {
-    if (item->kind == kind) ++count;
+  for (auto *item : items) {
+    if (item->kind == kind)
+      ++count;
   }
   return count;
 }
 
 // Check if any module item of a given kind exists.
-inline bool HasItemOfKind(const std::vector<ModuleItem*>& items,
+inline bool HasItemOfKind(const std::vector<ModuleItem *> &items,
                           ModuleItemKind kind) {
   return FindItemByKind(items, kind) != nullptr;
 }
 
 // Find the first always block's body item.
-template <typename T>
-inline ModuleItem* FirstAlwaysItem(T& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
+template <typename T> inline ModuleItem *FirstAlwaysItem(T &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock ||
         item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysFFBlock ||
@@ -152,16 +154,24 @@ inline ModuleItem* FirstAlwaysItem(T& r) {
 }
 
 // Get the first item of a given kind from a module.
-template <typename T>
-inline ModuleItem* FirstItem(T& r, ModuleItemKind kind) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
+template <typename T> inline ModuleItem *FirstItem(T &r, ModuleItemKind kind) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
   return FindItemByKind(r.cu->modules[0]->items, kind);
 }
 
+// Get the very first module item (regardless of kind).
+template <typename T> inline ModuleItem *FirstItem(T &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  auto &items = r.cu->modules[0]->items;
+  return items.empty() ? nullptr : items[0];
+}
+
 // Find first gate instantiation of a given kind.
-inline ModuleItem* FindGateByKind(const std::vector<ModuleItem*>& items,
+inline ModuleItem *FindGateByKind(const std::vector<ModuleItem *> &items,
                                   GateKind kind) {
-  for (auto* item : items) {
+  for (auto *item : items) {
     if (item->kind == ModuleItemKind::kGateInst && item->gate_kind == kind)
       return item;
   }
@@ -169,27 +179,28 @@ inline ModuleItem* FindGateByKind(const std::vector<ModuleItem*>& items,
 }
 
 // Collect all gate instantiations.
-inline std::vector<ModuleItem*> FindAllGates(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> gates;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kGateInst) gates.push_back(item);
+inline std::vector<ModuleItem *>
+FindAllGates(const std::vector<ModuleItem *> &items) {
+  std::vector<ModuleItem *> gates;
+  for (auto *item : items) {
+    if (item->kind == ModuleItemKind::kGateInst)
+      gates.push_back(item);
   }
   return gates;
 }
 
 // Find the first specify block in a module.
-template <typename T>
-inline ModuleItem* FindSpecifyBlock(T& r) {
+template <typename T> inline ModuleItem *FindSpecifyBlock(T &r) {
   return FirstItem(r, ModuleItemKind::kSpecifyBlock);
 }
 
 // Get the Nth statement from the first initial block.
-template <typename T>
-inline Stmt* NthInitialStmt(T& r, size_t n) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+template <typename T> inline Stmt *NthInitialStmt(T &r, size_t n) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kInitialBlock)
+      continue;
     if (item->body && item->body->kind == StmtKind::kBlock) {
       return n < item->body->stmts.size() ? item->body->stmts[n] : nullptr;
     }
@@ -199,76 +210,75 @@ inline Stmt* NthInitialStmt(T& r, size_t n) {
 }
 
 // Get the RHS expression from the first initial block's first assignment.
-template <typename T>
-inline Expr* FirstInitialRHS(T& r) {
-  auto* stmt = FirstInitialStmt(r);
+template <typename T> inline Expr *FirstInitialRHS(T &r) {
+  auto *stmt = FirstInitialStmt(r);
   return stmt ? stmt->rhs : nullptr;
 }
 
 // Get the expression from the first initial block's first statement.
-template <typename T>
-inline Expr* FirstInitialExpr(T& r) {
-  auto* stmt = FirstInitialStmt(r);
+template <typename T> inline Expr *FirstInitialExpr(T &r) {
+  auto *stmt = FirstInitialStmt(r);
   return stmt ? stmt->expr : nullptr;
 }
 
 // Get the RHS of the first continuous assignment.
-template <typename T>
-inline Expr* FirstAssignRhs(T& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) return item->rhs;
+template <typename T> inline Expr *FirstAssignRhs(T &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kContAssign)
+      return item->rhs;
   }
   return nullptr;
 }
 
 // Find the first function declaration.
-template <typename T>
-inline ModuleItem* FirstFunctionDecl(T& r) {
+template <typename T> inline ModuleItem *FirstFunctionDecl(T &r) {
   return FirstItem(r, ModuleItemKind::kFunctionDecl);
 }
 
 // Find the first module instance.
-template <typename T>
-inline ModuleItem* FirstModuleInst(T& r) {
+template <typename T> inline ModuleItem *FirstModuleInst(T &r) {
   return FirstItem(r, ModuleItemKind::kModuleInst);
 }
 
 // Find the first always_comb item.
-template <typename T>
-inline ModuleItem* FirstAlwaysCombItem(T& r) {
+template <typename T> inline ModuleItem *FirstAlwaysCombItem(T &r) {
   return FirstItem(r, ModuleItemKind::kAlwaysCombBlock);
 }
 
 // Find a return statement in a function/task body.
-inline Stmt* FindReturnStmt(Stmt* body) {
-  if (!body) return nullptr;
-  if (body->kind == StmtKind::kReturn) return body;
-  for (auto* s : body->stmts) {
-    if (s->kind == StmtKind::kReturn) return s;
+inline Stmt *FindReturnStmt(Stmt *body) {
+  if (!body)
+    return nullptr;
+  if (body->kind == StmtKind::kReturn)
+    return body;
+  for (auto *s : body->stmts) {
+    if (s->kind == StmtKind::kReturn)
+      return s;
   }
   return nullptr;
 }
 
 // Find the first generate-if item.
-template <typename T>
-inline ModuleItem* FirstGenerateIf(T& r) {
+template <typename T> inline ModuleItem *FirstGenerateIf(T &r) {
   return FirstItem(r, ModuleItemKind::kGenerateIf);
 }
 
 // Find an item by name.
-inline ModuleItem* FindItemByName(const std::vector<ModuleItem*>& items,
+inline ModuleItem *FindItemByName(const std::vector<ModuleItem *> &items,
                                   std::string_view name) {
-  for (auto* item : items) {
-    if (item->name == name) return item;
+  for (auto *item : items) {
+    if (item->name == name)
+      return item;
   }
   return nullptr;
 }
 
 // Find a function declaration by name.
-inline ModuleItem* FindFunc(const std::vector<ModuleItem*>& items,
+inline ModuleItem *FindFunc(const std::vector<ModuleItem *> &items,
                             std::string_view name) {
-  for (auto* item : items) {
+  for (auto *item : items) {
     if (item->kind == ModuleItemKind::kFunctionDecl && item->name == name)
       return item;
   }
@@ -276,9 +286,9 @@ inline ModuleItem* FindFunc(const std::vector<ModuleItem*>& items,
 }
 
 // Find a clocking block by name.
-inline ModuleItem* FindClockingBlock(const std::vector<ModuleItem*>& items,
+inline ModuleItem *FindClockingBlock(const std::vector<ModuleItem *> &items,
                                      std::string_view name) {
-  for (auto* item : items) {
+  for (auto *item : items) {
     if (item->kind == ModuleItemKind::kClockingBlock && item->name == name)
       return item;
   }
@@ -286,14 +296,58 @@ inline ModuleItem* FindClockingBlock(const std::vector<ModuleItem*>& items,
 }
 
 // Get the first clocking block.
-template <typename T>
-inline ModuleItem* GetClockingBlock(T& r) {
+template <typename T> inline ModuleItem *GetClockingBlock(T &r) {
   return FirstItem(r, ModuleItemKind::kClockingBlock);
 }
 
 // Find a clocking block from a parse result.
 template <typename T>
-inline ModuleItem* FindClockingBlock(T& r, std::string_view name) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
+inline ModuleItem *FindClockingBlock(T &r, std::string_view name) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
   return FindClockingBlock(r.cu->modules[0]->items, name);
+}
+
+// Find the specify block from a vector of module items.
+inline ModuleItem *FindSpecifyBlock(const std::vector<ModuleItem *> &items) {
+  return FindItemByKind(items, ModuleItemKind::kSpecifyBlock);
+}
+
+// Get the sole specify item from a specify block.
+inline SpecifyItem *GetSoleSpecifyItem(ModuleItem *spec_block) {
+  EXPECT_EQ(spec_block->specify_items.size(), 1u);
+  if (spec_block->specify_items.empty())
+    return nullptr;
+  return spec_block->specify_items[0];
+}
+
+// Get the sole timing check declaration from a parse result.
+template <typename T> inline TimingCheckDecl *GetSoleTimingCheck(T &r) {
+  if (!r.cu || r.cu->modules.empty())
+    return nullptr;
+  auto *spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  if (!spec || spec->specify_items.empty())
+    return nullptr;
+  if (spec->specify_items[0]->kind != SpecifyItemKind::kTimingCheck)
+    return nullptr;
+  return &spec->specify_items[0]->timing_check;
+}
+
+// Result of parsing a module with a single specify item.
+struct SpecifyParseResult {
+  ParseResult pr;
+  ModuleItem *spec_block = nullptr;
+  SpecifyItem *sole_item = nullptr;
+};
+
+inline SpecifyParseResult ParseSpecifySingle(const std::string &src) {
+  SpecifyParseResult result;
+  result.pr = Parse(src);
+  if (result.pr.cu == nullptr)
+    return result;
+  result.spec_block = FindSpecifyBlock(result.pr.cu->modules[0]->items);
+  if (result.spec_block != nullptr) {
+    result.sole_item = GetSoleSpecifyItem(result.spec_block);
+  }
+  return result;
 }

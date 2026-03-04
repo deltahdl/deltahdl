@@ -6,34 +6,17 @@
 using namespace delta;
 
 // --- Test helpers ---
-struct ParseResult14 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult14 Parse(const std::string& src) {
-  ParseResult14 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 namespace {
 
 // Task with inout port direction.
 TEST(ParserSection13, TaskWithInoutPort) {
-  auto r = Parse(
-      "module m;\n"
-      "  task transform(inout logic [7:0] data);\n"
-      "    data = data ^ 8'hFF;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task transform(inout logic [7:0] data);\n"
+                 "    data = data ^ 8'hFF;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "transform");
+  auto *tk = FindFunc(r, "transform");
   ASSERT_NE(tk, nullptr);
   ASSERT_EQ(tk->func_args.size(), 1u);
   EXPECT_EQ(tk->func_args[0].direction, Direction::kInout);
@@ -41,28 +24,26 @@ TEST(ParserSection13, TaskWithInoutPort) {
 
 // Task with no ports.
 TEST(ParserSection13, TaskWithNoPorts) {
-  auto r = Parse(
-      "module m;\n"
-      "  task idle();\n"
-      "    #10;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task idle();\n"
+                 "    #10;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "idle");
+  auto *tk = FindFunc(r, "idle");
   ASSERT_NE(tk, nullptr);
   EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(tk->func_args.empty());
 }
 
 TEST(ParserA27, TfPortItemVarWithDirection) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task(input var int x);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task my_task(input var int x);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
   EXPECT_EQ(item->func_args[0].name, "x");
@@ -72,58 +53,38 @@ TEST(ParserA27, TfPortItemVarWithDirection) {
 // tf_port_item clarification 28: name omitted in prototype
 // ---------------------------------------------------------------------------
 TEST(ParserA27, TfPortItemNoNameInPrototype) {
-  auto r = Parse(
-      "module m;\n"
-      "  extern task my_task(input int, output int);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  extern task my_task(input int, output int);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 2u);
 }
 
 // block_item_declaration in task body (§13.3)
 TEST(ParserA28, BlockItemInTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task();\n"
-      "    int x;\n"
-      "    x = 5;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task my_task();\n"
+                 "    int x;\n"
+                 "    x = 5;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   ASSERT_GE(item->func_body_stmts.size(), 1u);
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
 }
-
-struct ParseResult12b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult12b Parse(const std::string& src) {
-  ParseResult12b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 TEST(Parser, TaskDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  task my_task(input int x);\n"
-      "    $display(\"%d\", x);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  task my_task(input int x);\n"
+                 "    $display(\"%d\", x);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   ASSERT_EQ(mod->items.size(), 1);
   EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kTaskDecl);
   EXPECT_EQ(mod->items[0]->name, "my_task");
@@ -134,58 +95,56 @@ TEST(Parser, TaskDecl) {
 // tf_item_declaration: block_item_declaration and tf_port_declaration mixed
 // ---------------------------------------------------------------------------
 TEST(ParserA27, TfItemDeclMixed) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task;\n"
-      "    input int a;\n"
-      "    output int b;\n"
-      "    int temp;\n"
-      "    temp = a + 1;\n"
-      "    b = temp;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task my_task;\n"
+                 "    input int a;\n"
+                 "    output int b;\n"
+                 "    int temp;\n"
+                 "    temp = a + 1;\n"
+                 "    b = temp;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 2u);
   EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
-static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
-  for (auto* item : r.cu->modules[0]->items) {
+static ModuleItem *FindFunc(ParseResult &r, std::string_view name) {
+  for (auto *item : r.cu->modules[0]->items) {
     if (item->kind != ModuleItemKind::kFunctionDecl &&
         item->kind != ModuleItemKind::kTaskDecl) {
       continue;
     }
-    if (item->name == name) return item;
+    if (item->name == name)
+      return item;
   }
   return nullptr;
 }
 
 TEST(ParserSection13, MultipleDimsOnFuncArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  task bar(logic mem[16][8]);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task bar(logic mem[16][8]);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "bar");
+  auto *tk = FindFunc(r, "bar");
   ASSERT_NE(tk, nullptr);
   ASSERT_EQ(tk->func_args.size(), 1u);
   EXPECT_EQ(tk->func_args[0].unpacked_dims.size(), 2u);
 }
 
 TEST(ParserSection13, OldStyleTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  task mytask;\n"
-      "    input a;\n"
-      "    output b;\n"
-      "    b = a;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task mytask;\n"
+                 "    input a;\n"
+                 "    output b;\n"
+                 "    b = a;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "mytask");
+  auto *tk = FindFunc(r, "mytask");
   ASSERT_NE(tk, nullptr);
   ASSERT_EQ(tk->func_args.size(), 2u);
   EXPECT_EQ(tk->func_args[0].direction, Direction::kInput);
@@ -196,17 +155,16 @@ TEST(ParserSection13, OldStyleTask) {
 // LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
 // =============================================================================
 TEST(ParserSection13, OldStyleTaskMultipleInputs) {
-  auto r = Parse(
-      "module m;\n"
-      "  task add;\n"
-      "    input a;\n"
-      "    input b;\n"
-      "    output c;\n"
-      "    c = a + b;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task add;\n"
+                 "    input a;\n"
+                 "    input b;\n"
+                 "    output c;\n"
+                 "    c = a + b;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "add");
+  auto *tk = FindFunc(r, "add");
   ASSERT_NE(tk, nullptr);
   ASSERT_EQ(tk->func_args.size(), 3u);
   const Direction kExpected[] = {Direction::kInput, Direction::kInput,
@@ -218,14 +176,13 @@ TEST(ParserSection13, OldStyleTaskMultipleInputs) {
 
 // Task with end label matching the task name (LRM section 13.3).
 TEST(ParserSection13, TaskEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  task do_work(int x);\n"
-      "    $display(\"%d\", x);\n"
-      "  endtask : do_work\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task do_work(int x);\n"
+                 "    $display(\"%d\", x);\n"
+                 "  endtask : do_work\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "do_work");
+  auto *tk = FindFunc(r, "do_work");
   ASSERT_NE(tk, nullptr);
   EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
 }
@@ -235,14 +192,13 @@ TEST(ParserSection13, TaskEndLabel) {
 // =============================================================================
 // Task with timing control in body (tasks may have time-controlling stmts).
 TEST(ParserSection13, TaskWithTimingControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  task wait_clk(input int n);\n"
-      "    repeat (n) @(posedge clk);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task wait_clk(input int n);\n"
+                 "    repeat (n) @(posedge clk);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* tk = FindFunc(r, "wait_clk");
+  auto *tk = FindFunc(r, "wait_clk");
   ASSERT_NE(tk, nullptr);
   EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
   ASSERT_EQ(tk->func_args.size(), 1u);
@@ -250,16 +206,15 @@ TEST(ParserSection13, TaskWithTimingControl) {
 }
 
 TEST(ParserA23, ListOfTfVariableIdentifiersTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  task report;\n"
-      "    input int addr, data;\n"
-      "    output int status;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task report;\n"
+                 "    input int addr, data;\n"
+                 "    output int status;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_EQ(item->func_args.size(), 3u);
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
@@ -271,23 +226,22 @@ TEST(ParserA23, ListOfTfVariableIdentifiersTask) {
 // task_body_declaration (new-style ports)
 // ---------------------------------------------------------------------------
 TEST(ParserA27, TaskBodyNewStyleEmptyPorts) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task my_task();\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->func_args.empty());
 }
 
 // Helper: verify first item has 2 func_args: a(input), b.
-static void VerifyTwoArgTask(ParseResult12b& r) {
+static void VerifyTwoArgTask(ParseResult &r) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 2u);
   EXPECT_EQ(item->func_args[0].name, "a");
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
@@ -295,20 +249,19 @@ static void VerifyTwoArgTask(ParseResult12b& r) {
 }
 
 TEST(ParserA27, TaskBodyNewStyleWithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task(input int a, input int b);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task my_task(input int a, input int b);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   VerifyTwoArgTask(r);
 }
 
 TEST(ParserA27, TaskBodyNewStyleMultipleDirections) {
-  auto r = Parse(
-      "module m;\n"
-      "  task xfer(input int a, output int b, inout int c, ref int d);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r =
+      Parse("module m;\n"
+            "  task xfer(input int a, output int b, inout int c, ref int d);\n"
+            "  endtask\n"
+            "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   VerifyFuncArgDirections(r.cu->modules[0]->items[0],
@@ -317,11 +270,10 @@ TEST(ParserA27, TaskBodyNewStyleMultipleDirections) {
 }
 
 TEST(ParserA27, TaskBodyNewStyleStickyDirection) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task(input int a, int b, int c);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task my_task(input int a, int b, int c);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   VerifyFuncArgDirections(
@@ -330,11 +282,10 @@ TEST(ParserA27, TaskBodyNewStyleStickyDirection) {
 }
 
 TEST(ParserA27, TaskBodyWithEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task();\n"
-      "  endtask : my_task\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task my_task();\n"
+                 "  endtask : my_task\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "my_task");
@@ -344,66 +295,40 @@ TEST(ParserA27, TaskBodyWithEndLabel) {
 // task_body_declaration (old-style ports — tf_item_declaration)
 // ---------------------------------------------------------------------------
 TEST(ParserA27, TaskBodyOldStylePorts) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task;\n"
-      "    input int a;\n"
-      "    input int b;\n"
-      "    $display(\"a=%0d b=%0d\", a, b);\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task my_task;\n"
+                 "    input int a;\n"
+                 "    input int b;\n"
+                 "    $display(\"a=%0d b=%0d\", a, b);\n"
+                 "  endtask\n"
+                 "endmodule\n");
   VerifyTwoArgTask(r);
 }
 
 TEST(ParserA27, TaskBodyOldStyleOutputPort) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task;\n"
-      "    input int a;\n"
-      "    output int b;\n"
-      "    b = a * 2;\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  task my_task;\n"
+                 "    input int a;\n"
+                 "    output int b;\n"
+                 "    b = a * 2;\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 2u);
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
-
-struct ParseResult6b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6b Parse(const std::string& src) {
-  ParseResult6b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6b& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 TEST(ParserSection6, VoidTaskReturnType) {
   // Tasks implicitly return void; verify parse is correct.
-  auto r = Parse(
-      "module t;\n"
-      "  task do_nothing();\n"
-      "  endtask\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  task do_nothing();\n"
+                 "  endtask\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
 }
 
-}  // namespace
+} // namespace

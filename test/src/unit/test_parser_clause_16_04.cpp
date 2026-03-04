@@ -6,36 +6,17 @@
 using namespace delta;
 
 // --- Test helpers ---
-struct ParseResult16b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult16b Parse(const std::string& src) {
-  ParseResult16b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 namespace {
 
 // =============================================================================
 // §16.4 Deferred assertions — additional forms
 // =============================================================================
 TEST(ParserSection16, DeferredAssumeHash0WithAction) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assume #0 (valid) $display(\"assumed\");\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    assume #0 (valid) $display(\"assumed\");\n"
+                 "  end\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
 }
@@ -45,13 +26,12 @@ TEST(ParserSection16, DeferredAssumeHash0WithAction) {
 // =============================================================================
 // assert #0 ( expression ) ;
 TEST(ParserA610, DeferredAssertHash0) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assert #0 (1);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial assert #0 (1);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -59,13 +39,12 @@ TEST(ParserA610, DeferredAssertHash0) {
 
 // assert final ( expression ) ;
 TEST(ParserA610, DeferredAssertFinal) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assert final (1);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial assert final (1);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -76,13 +55,12 @@ TEST(ParserA610, DeferredAssertFinal) {
 // =============================================================================
 // assume #0 ( expression ) ;
 TEST(ParserA610, DeferredAssumeHash0) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assume #0 (1);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial assume #0 (1);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -90,13 +68,12 @@ TEST(ParserA610, DeferredAssumeHash0) {
 
 // assume final ( expression ) ;
 TEST(ParserA610, DeferredAssumeFinal) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial assume final (1);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial assume final (1);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kAssumeImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -107,13 +84,12 @@ TEST(ParserA610, DeferredAssumeFinal) {
 // =============================================================================
 // cover #0 ( expression ) ;
 TEST(ParserA610, DeferredCoverHash0) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial cover #0 (1);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial cover #0 (1);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
   EXPECT_TRUE(stmt->is_deferred);
@@ -121,16 +97,15 @@ TEST(ParserA610, DeferredCoverHash0) {
 
 // cover final ( expression ) ;
 TEST(ParserA610, DeferredCoverFinal) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial cover final (1);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial cover final (1);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-}  // namespace
+} // namespace

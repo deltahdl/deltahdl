@@ -1,6 +1,7 @@
 // §17.3: Checker instantiation
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -27,13 +28,12 @@ namespace {
 // =============================================================================
 // --- checker_instantiation: basic named port connections ---
 TEST(ParserAnnexA0414, BasicCheckerInst) {
-  auto r = Parse(
-      "checker my_chk(input logic clk, input logic data);\n"
-      "endchecker\n"
-      "module m; my_chk u0(.clk(clk), .data(data)); endmodule\n");
+  auto r = Parse("checker my_chk(input logic clk, input logic data);\n"
+                 "endchecker\n"
+                 "module m; my_chk u0(.clk(clk), .data(data)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(item->inst_module, "my_chk");
   EXPECT_EQ(item->inst_name, "u0");
@@ -41,38 +41,35 @@ TEST(ParserAnnexA0414, BasicCheckerInst) {
 
 // --- named_checker_port_connection: .* (wildcard) ---
 TEST(ParserAnnexA0414, CheckerInstWildcardPort) {
-  auto r = Parse(
-      "checker my_chk(input logic clk);\n"
-      "endchecker\n"
-      "module m; my_chk u0(.*); endmodule\n");
+  auto r = Parse("checker my_chk(input logic clk);\n"
+                 "endchecker\n"
+                 "module m; my_chk u0(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->inst_wildcard);
 }
 
 // --- list_of_checker_port_connections: empty ---
 TEST(ParserAnnexA0414, CheckerInstEmptyPorts) {
-  auto r = Parse(
-      "checker my_chk;\n"
-      "endchecker\n"
-      "module m; my_chk u0(); endmodule\n");
+  auto r = Parse("checker my_chk;\n"
+                 "endchecker\n"
+                 "module m; my_chk u0(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
 // --- name_of_instance: with unpacked_dimension (instance array) ---
 TEST(ParserAnnexA0414, CheckerInstArray) {
-  auto r = Parse(
-      "checker my_chk(input logic clk);\n"
-      "endchecker\n"
-      "module m; my_chk u0 [3:0] (.clk(clk)); endmodule\n");
+  auto r = Parse("checker my_chk(input logic clk);\n"
+                 "endchecker\n"
+                 "module m; my_chk u0 [3:0] (.clk(clk)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->inst_module, "my_chk");
   EXPECT_NE(item->inst_range_left, nullptr);
   EXPECT_NE(item->inst_range_right, nullptr);
@@ -80,18 +77,17 @@ TEST(ParserAnnexA0414, CheckerInstArray) {
 
 // --- checker_instantiation: inside another checker ---
 TEST(ParserAnnexA0414, CheckerInstInsideChecker) {
-  auto r = Parse(
-      "checker inner_chk(input logic sig);\n"
-      "endchecker\n"
-      "checker outer_chk;\n"
-      "  logic sig;\n"
-      "  inner_chk u0(.sig(sig));\n"
-      "endchecker\n");
+  auto r = Parse("checker inner_chk(input logic sig);\n"
+                 "endchecker\n"
+                 "checker outer_chk;\n"
+                 "  logic sig;\n"
+                 "  inner_chk u0(.sig(sig));\n"
+                 "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 2u);
   ASSERT_GE(r.cu->checkers[1]->items.size(), 2u);
-  auto* inst = r.cu->checkers[1]->items[1];
+  auto *inst = r.cu->checkers[1]->items[1];
   EXPECT_EQ(inst->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(inst->inst_module, "inner_chk");
   EXPECT_EQ(inst->inst_name, "u0");
@@ -99,10 +95,11 @@ TEST(ParserAnnexA0414, CheckerInstInsideChecker) {
 
 using CheckerParseTest = ProgramTestParse;
 
-static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
+static const ModuleItem *FindItemOfKind(const std::vector<ModuleItem *> &items,
                                         ModuleItemKind kind) {
-  for (const auto* item : items) {
-    if (item->kind == kind) return item;
+  for (const auto *item : items) {
+    if (item->kind == kind)
+      return item;
   }
   return nullptr;
 }
@@ -111,7 +108,7 @@ static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
 // §17.6 Checker instantiation
 // =============================================================================
 TEST_F(CheckerParseTest, CheckerInstantiatedInModule) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker my_checker(input logic clk, input logic data);
     endchecker
 
@@ -122,38 +119,19 @@ TEST_F(CheckerParseTest, CheckerInstantiatedInModule) {
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
   ASSERT_EQ(unit->modules.size(), 1u);
-  const auto* inst =
+  const auto *inst =
       FindItemOfKind(unit->modules[0]->items, ModuleItemKind::kModuleInst);
   ASSERT_NE(inst, nullptr);
   EXPECT_EQ(inst->inst_module, "my_checker");
   EXPECT_EQ(inst->inst_name, "chk_inst");
 }
-
-struct ParseResult16c {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult16c Parse(const std::string& src) {
-  ParseResult16c result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // §17.4 Checker instantiation
 // =============================================================================
 TEST_F(VerifyParseTest, CheckerInstantiationPositional) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker mutex(logic [31:0] sig, event clock, output bit failure);
       assert property (@clock $onehot0(sig))
         failure = 1'b0; else failure = 1'b1;
@@ -169,7 +147,7 @@ TEST_F(VerifyParseTest, CheckerInstantiationPositional) {
 }
 
 TEST_F(VerifyParseTest, CheckerInstantiationNamed) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker my_check(input logic clk, input logic data);
     endchecker
     module m;
@@ -183,7 +161,7 @@ TEST_F(VerifyParseTest, CheckerInstantiationNamed) {
 }
 
 TEST_F(VerifyParseTest, CheckerInstantiationInAlwaysBlock) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker c1(event clk, logic [7:0] a, b);
       logic [7:0] sum;
       always_ff @(clk) begin
@@ -201,7 +179,7 @@ TEST_F(VerifyParseTest, CheckerInstantiationInAlwaysBlock) {
 }
 
 TEST_F(VerifyParseTest, CheckerNestedWithClocking) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     checker c1(bit fclk, bit a, bit b);
       default clocking @(posedge fclk); endclocking
       checker c2(bit bclk, bit x, bit y);
@@ -222,4 +200,4 @@ TEST_F(VerifyParseTest, CheckerNestedWithClocking) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+} // namespace

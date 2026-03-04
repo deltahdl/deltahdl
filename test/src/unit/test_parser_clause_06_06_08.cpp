@@ -1,6 +1,7 @@
 // §6.6.8: Generic interconnect
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -10,7 +11,7 @@ TEST(ParserA213, NetDeclInterconnect) {
   auto r = Parse("module m; interconnect net1; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->data_type.is_interconnect);
 }
 
@@ -23,48 +24,28 @@ TEST(ParserA221, NetPortTypeInterconnect) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->items[0]->data_type.is_interconnect);
 }
-
-struct ParseResult6b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6b Parse(const std::string& src) {
-  ParseResult6b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 TEST(ParserSection6, InterconnectNet) {
   // §6.7.1: interconnect net has no data type, optional packed/unpacked dims.
-  auto r = Parse(
-      "module t;\n"
-      "  interconnect w1;\n"
-      "  interconnect [3:0] w2;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  interconnect w1;\n"
+                 "  interconnect [3:0] w2;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
 TEST(ParserSection6, InterconnectWithPackedDim) {
   // §6.6.8: interconnect may have packed dimensions.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  interconnect [7:0] ibus;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t;\n"
+                      "  interconnect [7:0] ibus;\n"
+                      "endmodule\n"));
 }
 
 // Step 2b: interconnect (fixes 6.6.8)
 TEST(ParserSection6, Interconnect_Basic) {
-  EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  interconnect bus;\n"
-               "endmodule\n"));
+  EXPECT_TRUE(ParseOk6("module t;\n"
+                       "  interconnect bus;\n"
+                       "endmodule\n"));
 }
 
-}  // namespace
+} // namespace

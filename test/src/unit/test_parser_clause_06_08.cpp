@@ -2,6 +2,7 @@
 // automatic variable.
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -21,7 +22,7 @@ TEST(ParserA213, DataDeclBasicVar) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "data");
 }
@@ -31,7 +32,7 @@ TEST(ParserA213, DataDeclVarPrefix) {
   auto r = Parse("module m; var logic x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
 }
 
@@ -40,7 +41,7 @@ TEST(ParserA213, DataDeclLifetimeAutomatic) {
   auto r = Parse("module m; automatic int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_TRUE(item->is_automatic);
 }
@@ -50,7 +51,7 @@ TEST(ParserA213, DataDeclLifetimeStatic) {
   auto r = Parse("module m; static int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_TRUE(item->is_static);
 }
@@ -69,8 +70,9 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsMultiple) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl)
+      count++;
   }
   EXPECT_GE(count, 3);
 }
@@ -84,22 +86,21 @@ TEST(ParserA24, VarDeclAssignmentBasic) {
   auto r = Parse("module m; int x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto *item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "x");
   EXPECT_EQ(item->init_expr, nullptr);
 }
 
 TEST(ParserA28, DataDeclMultiVarsInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int a = 1, b = 2, c;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    int a = 1, b = 2, c;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
+  auto *body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 3u);
   EXPECT_EQ(body->stmts[0]->var_name, "a");
@@ -121,22 +122,22 @@ TEST(ParserA213, DataDeclMultipleAssign) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl)
+      count++;
   }
   EXPECT_GE(count, 2);
 }
 
 // [class_scope | package_scope] type_identifier {packed_dimension}
 TEST(ParserA221, DataTypeScopedType) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef int my_int_t;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import pkg::*;\n"
-      "  pkg::my_int_t x;\n"
-      "endmodule");
+  auto r = Parse("package pkg;\n"
+                 "  typedef int my_int_t;\n"
+                 "endpackage\n"
+                 "module m;\n"
+                 "  import pkg::*;\n"
+                 "  pkg::my_int_t x;\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
@@ -146,45 +147,20 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsWithDims) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl) count++;
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl)
+      count++;
   }
   EXPECT_GE(count, 2);
 }
-
-struct ParseResult6j {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6j Parse(const std::string& src) {
-  ParseResult6j result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6j& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // 4. Int variable declaration.
 TEST(ParserSection6, Sec6_5_IntVarDeclKind) {
-  auto r = Parse(
-      "module t;\n"
-      "  int count;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  int count;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
@@ -194,51 +170,30 @@ TEST(ParserSection6, Sec6_5_IntVarDeclKind) {
 
 // 11. Variable with initialization (logic v = 0).
 TEST(ParserSection6, Sec6_5_LogicVarInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic v = 1'b0;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic v = 1'b0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_FALSE(item->data_type.is_net);
   ASSERT_NE(item->init_expr, nullptr);
 }
-
-struct ParseResult6h {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6h Parse(const std::string& src) {
-  ParseResult6h result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // 13. Multiple variables with packed dims share the same type.
 TEST(ParserSection6, Sec6_11_MultipleVarsWithPackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic [7:0] a, b, c;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 3u);
   EXPECT_EQ(items[0]->name, "a");
   EXPECT_EQ(items[1]->name, "b");
   EXPECT_EQ(items[2]->name, "c");
-  for (auto* item : items) {
+  for (auto *item : items) {
     EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
     ASSERT_NE(item->data_type.packed_dim_left, nullptr);
     EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
@@ -247,15 +202,14 @@ TEST(ParserSection6, Sec6_11_MultipleVarsWithPackedDims) {
 
 // 18. Multiple logic declarations on one line.
 TEST(ParserSection6, Sec6_5_MultipleLogicDecls) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic x, y, z;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic x, y, z;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 3u);
-  for (auto* item : items) {
+  for (auto *item : items) {
     EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
     EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
     EXPECT_FALSE(item->data_type.is_net);
@@ -264,22 +218,14 @@ TEST(ParserSection6, Sec6_5_MultipleLogicDecls) {
   EXPECT_EQ(items[1]->name, "y");
   EXPECT_EQ(items[2]->name, "z");
 }
-
-static ModuleItem* FirstItem(ParseResult6h& r) {
-  if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.empty())
-    return nullptr;
-  return r.cu->modules[0]->items[0];
-}
-
 // 14. Integer types with initializer expressions.
 TEST(ParserSection6, Sec6_11_ByteWithInitializer) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte b = 8'hFF;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  byte b = 8'hFF;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
   EXPECT_EQ(item->name, "b");
@@ -291,36 +237,15 @@ TEST(ParserSection6, Sec6_11_ByteWithInitializer) {
 // =========================================================================
 TEST(ParserSection6, VarKeywordLogicDecl) {
   // §6.8: "var" keyword can precede an explicit data type.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  var logic [7:0] data;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t;\n"
+                      "  var logic [7:0] data;\n"
+                      "endmodule\n"));
 }
-
-struct ParseResult616 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult616 Parse(const std::string& src) {
-  ParseResult616 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // --- Multiple integer declarations ---
 TEST(ParserSection6, MultipleIntDeclsCommaSeparated) {
-  auto r = Parse(
-      "module m;\n"
-      "  int a, b, c;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  int a, b, c;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
@@ -328,26 +253,17 @@ TEST(ParserSection6, MultipleIntDeclsCommaSeparated) {
 
 TEST(ParserSection6, VarKeywordImplicitType) {
   // §6.8: "var" without explicit type implies logic.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  var [3:0] nibble;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t;\n"
+                      "  var [3:0] nibble;\n"
+                      "endmodule\n"));
 }
-
-static ModuleItem* FirstItem(ParseResult616& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 TEST(ParserSection6, IntWithInitializer) {
-  auto r = Parse(
-      "module m;\n"
-      "  int x = 42;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  int x = 42;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_NE(item->init_expr, nullptr);
@@ -355,21 +271,19 @@ TEST(ParserSection6, IntWithInitializer) {
 
 TEST(ParserSection6, VarWithEnumType) {
   // §6.8: "var enum bit { clear, error } status;"
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  var enum bit { clear, error } status;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t;\n"
+                      "  var enum bit { clear, error } status;\n"
+                      "endmodule\n"));
 }
 
 // 19. Integer var with complex initializer expression.
 TEST(ParserSection6, Sec6_11_IntWithComplexInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  int x = 1 + 2 * 3;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  int x = 1 + 2 * 3;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_EQ(item->name, "x");
@@ -382,16 +296,15 @@ TEST(ParserSection6, Sec6_11_IntWithComplexInit) {
 // =============================================================================
 // 25. Integer types coexisting with real types in the same module.
 TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
-  auto r = Parse(
-      "module t;\n"
-      "  int count;\n"
-      "  real voltage;\n"
-      "  byte flags;\n"
-      "  shortreal gain;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  int count;\n"
+                 "  real voltage;\n"
+                 "  byte flags;\n"
+                 "  shortreal gain;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 4u);
   EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kInt);
   EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kReal);
@@ -401,80 +314,74 @@ TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
 
 TEST(ParserSection6, VarRegDecl) {
   // §6.8: "var reg r;"
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  var reg r;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t;\n"
+                      "  var reg r;\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserSection6, VarImplicitInProcedural) {
   // §6.8: "var [3:0] x;" in procedural context.
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    var [3:0] x;\n"
-              "  end\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t;\n"
+                      "  initial begin\n"
+                      "    var [3:0] x;\n"
+                      "  end\n"
+                      "endmodule\n"));
 }
 
 // --- Mixed types in one module ---
 TEST(ParserSection6, MixedIntegerRealStringTypes) {
   // All major type families coexisting
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int i;\n"
-              "  real r;\n"
-              "  shortreal sr;\n"
-              "  string s;\n"
-              "  byte b;\n"
-              "  logic [7:0] l;\n"
-              "  integer ig;\n"
-              "  realtime rt;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  int i;\n"
+                      "  real r;\n"
+                      "  shortreal sr;\n"
+                      "  string s;\n"
+                      "  byte b;\n"
+                      "  logic [7:0] l;\n"
+                      "  integer ig;\n"
+                      "  realtime rt;\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserSection6, IntegerTypesInProcedural) {
   // All integer types declared inside initial block
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    byte b;\n"
-              "    shortint si;\n"
-              "    int i;\n"
-              "    longint li;\n"
-              "    integer ig;\n"
-              "    bit bv;\n"
-              "    logic l;\n"
-              "    reg r;\n"
-              "    time t;\n"
-              "  end\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  initial begin\n"
+                      "    byte b;\n"
+                      "    shortint si;\n"
+                      "    int i;\n"
+                      "    longint li;\n"
+                      "    integer ig;\n"
+                      "    bit bv;\n"
+                      "    logic l;\n"
+                      "    reg r;\n"
+                      "    time t;\n"
+                      "  end\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserSection6, RealWithInitializer) {
-  auto r = Parse(
-      "module m;\n"
-      "  real pi = 3.14159;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  real pi = 3.14159;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
   EXPECT_NE(item->init_expr, nullptr);
 }
 
 TEST(ParserSection6, ShortrealWithInitializer) {
-  auto r = Parse(
-      "module m;\n"
-      "  shortreal f = 1.5;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  shortreal f = 1.5;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+} // namespace

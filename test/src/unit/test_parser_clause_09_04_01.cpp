@@ -1,10 +1,11 @@
 // §9.4.1: Delay control
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
-bool ParseOk(const std::string& src) {
+bool ParseOk(const std::string &src) {
   auto r = Parse(src);
   return r.cu && !r.has_errors;
 }
@@ -13,76 +14,39 @@ namespace {
 
 // Statement delay: #delay_value in procedural context.
 TEST(ParserA223, DelayValueInStatement) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial #10 $display(\"hello\");\n"
-              "endmodule"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  initial #10 $display(\"hello\");\n"
+                      "endmodule"));
 }
-
-struct ParseResult9d {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult9d Parse(const std::string& src) {
-  ParseResult9d result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static Stmt* FirstInitialBody(ParseResult9d& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) return item->body;
-  }
-  return nullptr;
-}
-
-static Stmt* FirstInitialStmt(ParseResult9d& r) {
-  auto* body = FirstInitialBody(r);
-  if (body && body->kind == StmtKind::kBlock) {
-    return body->stmts.empty() ? nullptr : body->stmts[0];
-  }
-  return body;
-}
-
 // =============================================================================
 // LRM section 9.4 -- Procedural timing controls
 // Zero-delay, chained delays, delay expressions.
 // =============================================================================
 TEST(ParserSection9c, ZeroDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #0 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #0 a = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
 }
 
 TEST(ParserSection9c, ChainedDelayControls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #5 a = 0;\n"
-      "    #10 a = 1;\n"
-      "    #15 a = 0;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #5 a = 0;\n"
+                 "    #10 a = 1;\n"
+                 "    #15 a = 0;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
+  auto *body = r.cu->modules[0]->items[0]->body;
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 3u);
   for (size_t i = 0; i < 3; ++i) {
@@ -91,70 +55,31 @@ TEST(ParserSection9c, ChainedDelayControls) {
 }
 
 TEST(ParserSection9c, DelayWithExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #(a + b) c = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #(a + b) c = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
 }
-
-struct ParseResult4b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static Stmt* FirstInitialStmt(ParseResult4b& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
-struct ParseResult4c {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult4c Parse(const std::string& src) {
-  ParseResult4c result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // ---------------------------------------------------------------------------
 // 4. #0 delay control (Inactive region)
 // ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_ZeroDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a;\n"
-      "  initial begin\n"
-      "    #0 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a;\n"
+                 "  initial begin\n"
+                 "    #0 a = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
@@ -165,76 +90,45 @@ TEST(ParserSection4, Sec4_5_ZeroDelayControl) {
 // 5. #1 delay control with blocking assign
 // ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_UnitDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a;\n"
-      "  initial begin\n"
-      "    #1 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a;\n"
+                 "  initial begin\n"
+                 "    #1 a = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
   EXPECT_NE(stmt->body, nullptr);
 }
-
-struct ParseResult9c {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult9c Parse(const std::string& src) {
-  ParseResult9c result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult9c& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kInitialBlock) continue;
-    if (item->body && item->body->kind == StmtKind::kBlock) {
-      return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-    }
-    return item->body;
-  }
-  return nullptr;
-}
-
 // =============================================================================
 // LRM section 9.4 -- Procedural timing controls (additional coverage)
 // =============================================================================
 TEST(ParserSection9, DelayControlReal) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #3.5 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #3.5 a = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-static ModuleItem* FindItemByKind(ParseResult4b& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
+static ModuleItem *FindItemByKind(ParseResult &r, ModuleItemKind kind) {
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == kind)
+      return item;
   }
   return nullptr;
 }
 
-static ModuleItem* FindInitialBlock(ParseResult4b& r) {
+static ModuleItem *FindInitialBlock(ParseResult &r) {
   return FindItemByKind(r, ModuleItemKind::kInitialBlock);
 }
 
@@ -242,17 +136,16 @@ static ModuleItem* FindInitialBlock(ParseResult4b& r) {
 // 22. initial block with delays
 // ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_InitialBlockWithDelays) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    #5 a = 1;\n"
-      "    #10 b = 0;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  reg a, b;\n"
+                 "  initial begin\n"
+                 "    #5 a = 1;\n"
+                 "    #10 b = 0;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* init_item = FindInitialBlock(r);
+  auto *init_item = FindInitialBlock(r);
   ASSERT_NE(init_item, nullptr);
   ASSERT_NE(init_item->body, nullptr);
   EXPECT_EQ(init_item->body->kind, StmtKind::kBlock);
@@ -263,15 +156,14 @@ TEST(ParserSection4, Sec4_5_InitialBlockWithDelays) {
 
 // §9.4: procedural_timing_control_statement (delay)
 TEST(ParserA604, StmtItemProceduralTimingControlDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #10 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #10 a = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
@@ -285,15 +177,14 @@ TEST(ParserA604, StmtItemProceduralTimingControlDelay) {
 // ---------------------------------------------------------------------------
 // §9.4: delay control followed by statement
 TEST(ParserA605, ProceduralTimingControlDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #10 x = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #10 x = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
@@ -303,15 +194,14 @@ TEST(ParserA605, ProceduralTimingControlDelay) {
 
 // §9.4: delay control followed by null statement
 TEST(ParserA605, ProceduralTimingControlDelayNull) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #10 ;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #10 ;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->body, nullptr);
@@ -323,15 +213,14 @@ TEST(ParserA605, ProceduralTimingControlDelayNull) {
 // ---------------------------------------------------------------------------
 // §9.4.1: simple numeric delay
 TEST(ParserA605, DelayControlNumeric) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #10 x = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #10 x = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
@@ -339,15 +228,14 @@ TEST(ParserA605, DelayControlNumeric) {
 
 // §9.4.1: identifier-based delay
 TEST(ParserA605, DelayControlIdentifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #d x = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #d x = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
@@ -356,15 +244,14 @@ TEST(ParserA605, DelayControlIdentifier) {
 
 // §9.4.1: parenthesized delay expression
 TEST(ParserA605, DelayControlParenthesized) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #(10) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #(10) x = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
@@ -372,15 +259,14 @@ TEST(ParserA605, DelayControlParenthesized) {
 
 // §9.4.1/§11.11: parenthesized mintypmax delay
 TEST(ParserA605, DelayControlMintypmax) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #(1:2:3) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #(1:2:3) x = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
@@ -393,15 +279,14 @@ TEST(ParserA605, DelayControlMintypmax) {
 // ---------------------------------------------------------------------------
 // §9.4: procedural_timing_control with delay_control
 TEST(ParserA605, ProceduralTimingControlDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #5 x = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #5 x = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
@@ -410,54 +295,35 @@ TEST(ParserA605, ProceduralTimingControlDelayControl) {
 // LRM section 9.3.1 -- Blocks with timing controls.
 // =============================================================================
 TEST(ParserSection9, Sec9_3_1_BlockWithDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #5 a = 1;\n"
-      "    #10 b = 2;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #5 a = 1;\n"
+                 "    #10 b = 2;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
+  auto *body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
   ASSERT_EQ(body->stmts.size(), 2u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDelay);
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDelay);
 }
-
-struct ParseResult90301 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult90301 Parse(const std::string& src) {
-  ParseResult90301 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 // =============================================================================
 // LRM section 9.4.1 -- Delay control (#)
 // =============================================================================
 TEST(ParserSection9, DelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #10 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  initial begin\n"
+                 "    #10 a = 1;\n"
+                 "  end\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
   EXPECT_NE(stmt->body, nullptr);
 }
 
-}  // namespace
+} // namespace

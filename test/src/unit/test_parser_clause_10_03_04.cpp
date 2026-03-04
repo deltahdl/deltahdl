@@ -1,6 +1,7 @@
 // §10.3.4: Continuous assignment strengths
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -9,52 +10,53 @@ namespace {
 // --- Drive strength in continuous assign context ---
 TEST(ParserA222, DriveStrengthContinuousAssign) {
   // drive_strength used with assign statement
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (strong0, pull1) w = 1'b1;\n"
-      "endmodule");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  assign (strong0, pull1) w = 1'b1;\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[1];
+  auto *item = r.cu->modules[0]->items[1];
   EXPECT_EQ(item->kind, ModuleItemKind::kContAssign);
-  EXPECT_EQ(item->drive_strength0, 4u);  // strong0 = 4
-  EXPECT_EQ(item->drive_strength1, 3u);  // pull1 = 3
+  EXPECT_EQ(item->drive_strength0, 4u); // strong0 = 4
+  EXPECT_EQ(item->drive_strength1, 3u); // pull1 = 3
 }
 
-static std::vector<ModuleItem*> FindUdpInsts(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> insts;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
+static std::vector<ModuleItem *>
+FindUdpInsts(const std::vector<ModuleItem *> &items) {
+  std::vector<ModuleItem *> insts;
+  for (auto *item : items) {
+    if (item->kind == ModuleItemKind::kUdpInst)
+      insts.push_back(item);
   }
   return insts;
 }
 
-static std::vector<ModuleItem*> FindContAssigns(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
+static std::vector<ModuleItem *>
+FindContAssigns(const std::vector<ModuleItem *> &items) {
+  std::vector<ModuleItem *> result;
+  for (auto *item : items) {
+    if (item->kind == ModuleItemKind::kContAssign)
+      result.push_back(item);
   }
   return result;
 }
 
-static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
-                                          ModuleItemKind kind) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == kind) result.push_back(item);
+static std::vector<ModuleItem *>
+FindItems(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
+  std::vector<ModuleItem *> result;
+  for (auto *item : items) {
+    if (item->kind == kind)
+      result.push_back(item);
   }
   return result;
 }
 
 TEST(ParserA601, ContinuousAssign_DriveStrength) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (strong0, weak1) w = 1'b1;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  assign (strong0, weak1) w = 1'b1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -64,11 +66,10 @@ TEST(ParserA601, ContinuousAssign_DriveStrength) {
 }
 
 TEST(ParserA601, ContinuousAssign_DriveStrengthReversed) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (pull1, supply0) w = 1'b0;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  assign (pull1, supply0) w = 1'b0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -78,11 +79,10 @@ TEST(ParserA601, ContinuousAssign_DriveStrengthReversed) {
 }
 
 TEST(ParserA601, ContinuousAssign_StrengthAndDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign (pull0, pull1) #5 a = b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b;\n"
+                 "  assign (pull0, pull1) #5 a = b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -91,36 +91,16 @@ TEST(ParserA601, ContinuousAssign_StrengthAndDelay) {
   EXPECT_NE(cas[0]->drive_strength1, 0u);
   EXPECT_NE(cas[0]->assign_delay, nullptr);
 }
-
-struct ParseResult10b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult10b Parse(const std::string& src) {
-  ParseResult10b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // §10.3.4: Drive strength on continuous assignment.
 TEST(ParserSection10, ContinuousAssignDriveStrength) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (strong0, weak1) w = 1'b1;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  assign (strong0, weak1) w = 1'b1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* ca = nullptr;
-  for (auto* item : mod->items) {
+  auto *mod = r.cu->modules[0];
+  ModuleItem *ca = nullptr;
+  for (auto *item : mod->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       ca = item;
       break;
@@ -135,55 +115,30 @@ TEST(ParserSection10, ContinuousAssignDriveStrength) {
 
 // §10.3.4: Drive strength order can be reversed.
 TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (pull1, supply0) w = 1'b0;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire w;\n"
+                 "  assign (pull1, supply0) w = 1'b0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ModuleItem* ca = nullptr;
-  for (auto* item : mod->items) {
+  auto *mod = r.cu->modules[0];
+  ModuleItem *ca = nullptr;
+  for (auto *item : mod->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       ca = item;
       break;
     }
   }
   ASSERT_NE(ca, nullptr);
-  EXPECT_EQ(ca->drive_strength0, 5u);  // supply0
-  EXPECT_EQ(ca->drive_strength1, 3u);  // pull1
+  EXPECT_EQ(ca->drive_strength0, 5u); // supply0
+  EXPECT_EQ(ca->drive_strength1, 3u); // pull1
 }
-
-struct ParseResult6b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6b Parse(const std::string& src) {
-  ParseResult6b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static ModuleItem* FirstItem(ParseResult6b& r) {
-  if (!r.cu || r.cu->modules.empty()) return nullptr;
-  auto& items = r.cu->modules[0]->items;
-  return items.empty() ? nullptr : items[0];
-}
-
 // §6.3.2.2: Drive strength on net declaration with inline assignment.
 TEST(ParserSection6, NetDeclDriveStrength) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire (weak0, strong1) w = 1'b1;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire (weak0, strong1) w = 1'b1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
+  auto *item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   // 2=weak, 4=strong (parser encoding)
@@ -191,4 +146,4 @@ TEST(ParserSection6, NetDeclDriveStrength) {
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-}  // namespace
+} // namespace

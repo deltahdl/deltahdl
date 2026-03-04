@@ -1,47 +1,19 @@
 // §5.8: Time literals
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 // --- §5.12 Attributes ---
-struct ParseResult512 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult512 Parse(const std::string& src) {
-  ParseResult512 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
-static Stmt* FirstInitialStmt(ParseResult512& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) {
-      if (item->body && item->body->kind == StmtKind::kBlock) {
-        return item->body->stmts.empty() ? nullptr : item->body->stmts[0];
-      }
-      return item->body;
-    }
-  }
-  return nullptr;
-}
-
 namespace {
 
 TEST(ParserCh508, TimeLiteral_IntegerNs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial #40ns;\n"
-      "endmodule");
+  auto r = Parse("module m;\n"
+                 "  initial #40ns;\n"
+                 "endmodule");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
+  auto *stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
@@ -107,15 +79,14 @@ TEST(ParserA84, TimeLiteralS) {
 
 // Time literal variants in delay: fs, ps, ns, us, ms, s.
 TEST(ParserA223, DelayValueAllTimeLiterals) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire #1fs w1;\n"
-              "  wire #2ps w2;\n"
-              "  wire #3ns w3;\n"
-              "  wire #4us w4;\n"
-              "  wire #5ms w5;\n"
-              "  wire #6s w6;\n"
-              "endmodule"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  wire #1fs w1;\n"
+                      "  wire #2ps w2;\n"
+                      "  wire #3ns w3;\n"
+                      "  wire #4us w4;\n"
+                      "  wire #5ms w5;\n"
+                      "  wire #6s w6;\n"
+                      "endmodule"));
 }
 
 // § time_literal — unsigned_number time_unit (ps)
@@ -140,18 +111,8 @@ TEST(ParserA84, TimeLiteralFixedPoint) {
 }
 
 // Helper: preprocess and parse, returning CU + preprocessor state.
-struct ParseResult3140203 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-  TimeScale preproc_timescale;
-  bool has_preproc_timescale = false;
-  TimeUnit preproc_global_precision = TimeUnit::kNs;
-};
-
-static ParseResult3140203 ParseTimescale31402(const std::string& src) {
-  ParseResult3140203 result;
+static ParseResult ParseTimescale31402(const std::string &src) {
+  ParseResult result;
   DiagEngine diag(result.mgr);
   auto fid = result.mgr.AddFile("<test>", src);
   Preprocessor preproc(result.mgr, diag, {});
@@ -196,4 +157,4 @@ TEST(ParserClause03, Cl3_14_2_2_AllSixUnitsAccepted) {
             TimeUnit::kFs);
 }
 
-}  // namespace
+} // namespace

@@ -1,6 +1,7 @@
 // §26.2: Package declarations
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -17,11 +18,10 @@ TEST(SourceText, DescriptionPackage) {
 
 // Package with items and lifetime.
 TEST(SourceText, PackageLifetimeWithItems) {
-  auto r = Parse(
-      "package automatic pkg;\n"
-      "  parameter int W = 8;\n"
-      "  typedef logic [W-1:0] word_t;\n"
-      "endpackage\n");
+  auto r = Parse("package automatic pkg;\n"
+                 "  parameter int W = 8;\n"
+                 "  typedef logic [W-1:0] word_t;\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
@@ -29,22 +29,20 @@ TEST(SourceText, PackageLifetimeWithItems) {
 }
 
 TEST(ParserSection26, PackageWithParameter) {
-  auto r = Parse(
-      "package cfg_pkg;\n"
-      "  parameter int WIDTH = 8;\n"
-      "endpackage\n");
+  auto r = Parse("package cfg_pkg;\n"
+                 "  parameter int WIDTH = 8;\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   ASSERT_FALSE(r.cu->packages[0]->items.empty());
 }
 
 TEST(ParserSection26, PackageWithFunction) {
-  auto r = Parse(
-      "package util_pkg;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endpackage\n");
+  auto r = Parse("package util_pkg;\n"
+                 "  function int add(int a, int b);\n"
+                 "    return a + b;\n"
+                 "  endfunction\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_TRUE(
@@ -52,11 +50,10 @@ TEST(ParserSection26, PackageWithFunction) {
 }
 
 TEST(ParserSection26, MultiplePackages) {
-  auto r = Parse(
-      "package a;\n"
-      "endpackage\n"
-      "package b;\n"
-      "endpackage\n");
+  auto r = Parse("package a;\n"
+                 "endpackage\n"
+                 "package b;\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 2u);
   EXPECT_EQ(r.cu->packages[0]->name, "a");
@@ -67,12 +64,11 @@ TEST(ParserSection26, MultiplePackages) {
 // LRM section 26.2 -- Package with struct typedef and class
 // =============================================================================
 TEST(ParserSection26, PackageWithStructTypedef) {
-  auto r = Parse(
-      "package types_pkg;\n"
-      "  typedef struct {\n"
-      "    shortreal i, r;\n"
-      "  } Complex;\n"
-      "endpackage\n");
+  auto r = Parse("package types_pkg;\n"
+                 "  typedef struct {\n"
+                 "    shortreal i, r;\n"
+                 "  } Complex;\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_TRUE(
@@ -80,12 +76,11 @@ TEST(ParserSection26, PackageWithStructTypedef) {
 }
 
 TEST(ParserSection26, PackageWithClassDecl) {
-  auto r = Parse(
-      "package cls_pkg;\n"
-      "  class transaction;\n"
-      "    int addr;\n"
-      "  endclass\n"
-      "endpackage\n");
+  auto r = Parse("package cls_pkg;\n"
+                 "  class transaction;\n"
+                 "    int addr;\n"
+                 "  endclass\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_TRUE(
@@ -93,10 +88,9 @@ TEST(ParserSection26, PackageWithClassDecl) {
 }
 
 TEST(Parser, PackageWithParam) {
-  auto r = Parse(
-      "package my_pkg;\n"
-      "  parameter int WIDTH = 8;\n"
-      "endpackage\n");
+  auto r = Parse("package my_pkg;\n"
+                 "  parameter int WIDTH = 8;\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1);
   ASSERT_EQ(r.cu->packages[0]->items.size(), 1);
@@ -108,13 +102,12 @@ TEST(Parser, PackageWithParam) {
 // =============================================================================
 // package_item: package_or_generate_item_declaration — net/data/task/function
 TEST(SourceText, PackageOrGenerateItemDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  wire w;\n"
-      "  int x;\n"
-      "  function void f(); endfunction\n"
-      "  task t(); endtask\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "  wire w;\n"
+                 "  int x;\n"
+                 "  function void f(); endfunction\n"
+                 "  task t(); endtask\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -123,33 +116,13 @@ TEST(SourceText, PackageOrGenerateItemDecl) {
 
 // package_or_generate_item_declaration: checker_declaration
 TEST(SourceText, PackageItemCheckerDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  checker chk; endchecker\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "  checker chk; endchecker\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
-
-struct ParseResult23b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult23b Parse(const std::string& src) {
-  ParseResult23b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 TEST(ParserSection23, EndLabelPackage) {
   auto r = Parse("package mypkg; endpackage : mypkg\n");
   ASSERT_NE(r.cu, nullptr);
@@ -159,12 +132,11 @@ TEST(ParserSection23, EndLabelPackage) {
 
 // package_or_generate_item_declaration: class_declaration
 TEST(SourceText, PackageItemClassDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  class C;\n"
-      "    int x;\n"
-      "  endclass\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "  class C;\n"
+                 "    int x;\n"
+                 "  endclass\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -172,12 +144,11 @@ TEST(SourceText, PackageItemClassDecl) {
 
 // package_or_generate_item_declaration: interface_class_declaration
 TEST(SourceText, PackageItemInterfaceClassDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  interface class IC;\n"
-      "    pure virtual function void f();\n"
-      "  endclass\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "  interface class IC;\n"
+                 "    pure virtual function void f();\n"
+                 "  endclass\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -185,10 +156,9 @@ TEST(SourceText, PackageItemInterfaceClassDecl) {
 
 // package_or_generate_item_declaration: class_constructor_declaration
 TEST(SourceText, PackageItemClassConstructorDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  function MyClass::new(); endfunction\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "  function MyClass::new(); endfunction\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -196,11 +166,10 @@ TEST(SourceText, PackageItemClassConstructorDecl) {
 
 // package_or_generate_item_declaration: local_parameter_declaration
 TEST(SourceText, PackageItemLocalparamDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  localparam int A = 1;\n"
-      "  parameter int B = 2;\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "  localparam int A = 1;\n"
+                 "  parameter int B = 2;\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -209,10 +178,9 @@ TEST(SourceText, PackageItemLocalparamDecl) {
 
 // package_or_generate_item_declaration: covergroup_declaration
 TEST(SourceText, PackageItemCovergroupDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  covergroup cg; endgroup\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "  covergroup cg; endgroup\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -220,11 +188,10 @@ TEST(SourceText, PackageItemCovergroupDecl) {
 
 // package_or_generate_item_declaration: assertion_item_declaration
 TEST(SourceText, PackageItemAssertionDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  property p; 1; endproperty\n"
-      "  sequence s; 1; endsequence\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "  property p; 1; endproperty\n"
+                 "  sequence s; 1; endsequence\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -232,11 +199,10 @@ TEST(SourceText, PackageItemAssertionDecl) {
 
 // package_or_generate_item_declaration: ; (empty statement)
 TEST(SourceText, PackageItemEmptyStmt) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  ;\n"
-      "  ;;\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "  ;\n"
+                 "  ;;\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -244,18 +210,17 @@ TEST(SourceText, PackageItemEmptyStmt) {
 
 // 8. Package with internal declarations (local scope)
 TEST(ParserClause03, Cl3_13_PackageWithInternalDeclarations) {
-  auto r = Parse(
-      "package my_pkg;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "  parameter int WIDTH = 8;\n"
-      "  function automatic int double_it(int x);\n"
-      "    return x * 2;\n"
-      "  endfunction\n"
-      "endpackage\n");
+  auto r = Parse("package my_pkg;\n"
+                 "  typedef logic [7:0] byte_t;\n"
+                 "  parameter int WIDTH = 8;\n"
+                 "  function automatic int double_it(int x);\n"
+                 "    return x * 2;\n"
+                 "  endfunction\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
-  auto* pkg = r.cu->packages[0];
+  auto *pkg = r.cu->packages[0];
   EXPECT_EQ(pkg->name, "my_pkg");
   EXPECT_GE(pkg->items.size(), 3u);
 }
@@ -289,11 +254,10 @@ TEST(SourceText, PackageEndLabel) {
 }
 
 TEST(ParserAnnexA, A1PackageDecl) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  parameter int W = 8;\n"
-      "  typedef logic [W-1:0] word_t;\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "  parameter int W = 8;\n"
+                 "  typedef logic [W-1:0] word_t;\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -304,24 +268,22 @@ TEST(ParserAnnexA, A1PackageDecl) {
 // LRM section 26.2 -- Package declarations
 // =============================================================================
 TEST(ParserSection26, EmptyPackage) {
-  auto r = Parse(
-      "package pkg;\n"
-      "endpackage\n");
+  auto r = Parse("package pkg;\n"
+                 "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
 TEST(ParserSection26, PackageWithEndLabel) {
-  auto r = Parse(
-      "package my_pkg;\n"
-      "endpackage : my_pkg\n");
+  auto r = Parse("package my_pkg;\n"
+                 "endpackage : my_pkg\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_EQ(r.cu->packages[0]->name, "my_pkg");
 }
 
-static bool ParseOk5(const std::string& src) {
+static bool ParseOk5(const std::string &src) {
   SourceManager mgr;
   Arena arena;
   auto fid = mgr.AddFile("<test>", src);
@@ -335,25 +297,9 @@ static bool ParseOk5(const std::string& src) {
 // =========================================================================
 // Section 5.6.3: System tasks and system functions
 // =========================================================================
-struct ParseResult50603 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult50603 Parse(const std::string& src) {
-  ParseResult50603 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 // --- Null module items ---
 TEST(ParserCh5, ModuleBody_NullItem) {
   EXPECT_TRUE(ParseOk5("module m; ; endmodule"));
 }
 
-}  // namespace
+} // namespace

@@ -1,33 +1,37 @@
 // §10.3.2: The continuous assignment statement
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
 
-static std::vector<ModuleItem*> FindUdpInsts(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> insts;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kUdpInst) insts.push_back(item);
+static std::vector<ModuleItem *>
+FindUdpInsts(const std::vector<ModuleItem *> &items) {
+  std::vector<ModuleItem *> insts;
+  for (auto *item : items) {
+    if (item->kind == ModuleItemKind::kUdpInst)
+      insts.push_back(item);
   }
   return insts;
 }
 
-static std::vector<ModuleItem*> FindContAssigns(
-    const std::vector<ModuleItem*>& items) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kContAssign) result.push_back(item);
+static std::vector<ModuleItem *>
+FindContAssigns(const std::vector<ModuleItem *> &items) {
+  std::vector<ModuleItem *> result;
+  for (auto *item : items) {
+    if (item->kind == ModuleItemKind::kContAssign)
+      result.push_back(item);
   }
   return result;
 }
 
-static std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
-                                          ModuleItemKind kind) {
-  std::vector<ModuleItem*> result;
-  for (auto* item : items) {
-    if (item->kind == kind) result.push_back(item);
+static std::vector<ModuleItem *>
+FindItems(const std::vector<ModuleItem *> &items, ModuleItemKind kind) {
+  std::vector<ModuleItem *> result;
+  for (auto *item : items) {
+    if (item->kind == kind)
+      result.push_back(item);
   }
   return result;
 }
@@ -41,11 +45,10 @@ namespace {
 //   | assign [ delay_control ] list_of_variable_assignments ;
 // =============================================================================
 TEST(ParserA601, ContinuousAssign_Basic) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign a = b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b;\n"
+                 "  assign a = b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -59,11 +62,10 @@ TEST(ParserA601, ContinuousAssign_Basic) {
 // list_of_net_assignments ::= net_assignment { , net_assignment }
 // =============================================================================
 TEST(ParserA601, ListOfNetAssignments_Two) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign a = b, c = d;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b, c, d;\n"
+                 "  assign a = b, c = d;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -73,11 +75,10 @@ TEST(ParserA601, ListOfNetAssignments_Two) {
 }
 
 TEST(ParserA601, ListOfNetAssignments_Three) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d, e, f;\n"
-      "  assign a = b, c = d, e = f;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b, c, d, e, f;\n"
+                 "  assign a = b, c = d, e = f;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -88,11 +89,10 @@ TEST(ParserA601, ListOfNetAssignments_Three) {
 }
 
 TEST(ParserA601, ListOfNetAssignments_SharedStrengthAndDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign (strong0, strong1) #10 a = b, c = d;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b, c, d;\n"
+                 "  assign (strong0, strong1) #10 a = b, c = d;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -110,12 +110,11 @@ TEST(ParserA601, ListOfNetAssignments_SharedStrengthAndDelay) {
 // net_assignment ::= net_lvalue = expression
 // =============================================================================
 TEST(ParserA601, NetAssignment_ConcatLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [3:0] sum;\n"
-      "  wire carry;\n"
-      "  assign {carry, sum} = 5'b10101;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire [3:0] sum;\n"
+                 "  wire carry;\n"
+                 "  assign {carry, sum} = 5'b10101;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
@@ -124,151 +123,87 @@ TEST(ParserA601, NetAssignment_ConcatLhs) {
 }
 
 TEST(ParserA601, NetAssignment_ExprRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [3:0] a, b, sum;\n"
-      "  assign sum = a + b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire [3:0] a, b, sum;\n"
+                 "  assign sum = a + b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto cas = FindContAssigns(r.cu->modules[0]->items);
   ASSERT_EQ(cas.size(), 1u);
   EXPECT_EQ(cas[0]->assign_rhs->kind, ExprKind::kBinary);
 }
-
-struct ParseResult6b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult6b Parse(const std::string& src) {
-  ParseResult6b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 TEST(ParserSection6, VariableContinuousAssign) {
   // §6.5: Variables can be written by one continuous assignment.
-  auto r = Parse(
-      "module t;\n"
-      "  logic vw;\n"
-      "  assign vw = 1'b1;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic vw;\n"
+                 "  assign vw = 1'b1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   bool found_ca = false;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kContAssign) found_ca = true;
+  for (auto *it : items) {
+    if (it->kind == ModuleItemKind::kContAssign)
+      found_ca = true;
   }
   EXPECT_TRUE(found_ca);
 }
-
-struct ParseResult10b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult10b Parse(const std::string& src) {
-  ParseResult10b result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // =============================================================================
 // LRM section 10.3.4 -- Continuous assignment with drive strengths
 // =============================================================================
 TEST(ParserSection10, ContinuousAssignMultipleTargets) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign a = b, c = d;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b, c, d;\n"
+                 "  assign a = b, c = d;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
+  auto *mod = r.cu->modules[0];
   int count = 0;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kContAssign) count++;
+  for (auto *item : mod->items) {
+    if (item->kind == ModuleItemKind::kContAssign)
+      count++;
   }
   EXPECT_GE(count, 1);
 }
-
-struct ParseResult4b {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ModuleItem* FindItemByKind(ParseResult4b& r, ModuleItemKind kind) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == kind) return item;
+static ModuleItem *FindItemByKind(ParseResult &r, ModuleItemKind kind) {
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == kind)
+      return item;
   }
   return nullptr;
 }
 
-static ModuleItem* FindContAssign(ParseResult4b& r) {
+static ModuleItem *FindContAssign(ParseResult &r) {
   return FindItemByKind(r, ModuleItemKind::kContAssign);
 }
-
-struct ParseResult4c {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult4c Parse(const std::string& src) {
-  ParseResult4c result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // ---------------------------------------------------------------------------
 // 3. Continuous assignment with assign (Active region)
 // ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_ContinuousAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y;\n"
-      "  wire a, b;\n"
-      "  assign y = a & b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire y;\n"
+                 "  wire a, b;\n"
+                 "  assign y = a & b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* ca = FindContAssign(r);
+  auto *ca = FindContAssign(r);
   ASSERT_NE(ca, nullptr);
   EXPECT_NE(ca->assign_lhs, nullptr);
   EXPECT_NE(ca->assign_rhs, nullptr);
 }
 
 TEST(ParserSection6, RealVariableContinuousAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  real circ;\n"
-      "  assign circ = 2.0 * 3.14;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  real circ;\n"
+                 "  assign circ = 2.0 * 3.14;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   bool found_ca = false;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kContAssign) found_ca = true;
+  for (auto *it : items) {
+    if (it->kind == ModuleItemKind::kContAssign)
+      found_ca = true;
   }
   EXPECT_TRUE(found_ca);
 }
@@ -277,13 +212,12 @@ TEST(ParserSection6, RealVariableContinuousAssign) {
 // LRM section 10.3 -- Continuous assignments (additional tests)
 // =============================================================================
 TEST(ParserSection10, ContinuousAssignExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [3:0] a, b, sum;\n"
-      "  assign sum = a + b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire [3:0] a, b, sum;\n"
+                 "  assign sum = a + b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* ca =
+  auto *ca =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
   ASSERT_NE(ca, nullptr);
   ASSERT_NE(ca->assign_rhs, nullptr);
@@ -291,46 +225,25 @@ TEST(ParserSection10, ContinuousAssignExpression) {
 }
 
 TEST(ParserSection10, ContinuousAssignTernary) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, sel, y;\n"
-      "  assign y = sel ? a : b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire a, b, sel, y;\n"
+                 "  assign y = sel ? a : b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* ca =
+  auto *ca =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
   ASSERT_NE(ca, nullptr);
   ASSERT_NE(ca->assign_rhs, nullptr);
 }
-
-struct ParseResult6j {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult6j Parse(const std::string& src) {
-  ParseResult6j result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 // 12. Net driven by assign statement produces kContAssign.
 TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire out;\n"
-      "  assign out = 1'b0;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire out;\n"
+                 "  assign out = 1'b0;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_GE(items.size(), 2u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(items[1]->kind, ModuleItemKind::kContAssign);
@@ -340,40 +253,39 @@ TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
 
 // 16. Variable with continuous assignment (assign logic_var = expr).
 TEST(ParserSection6, Sec6_5_VarWithContAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic y;\n"
-      "  assign y = 1'b1;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  logic y;\n"
+                 "  assign y = 1'b1;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
+  auto &items = r.cu->modules[0]->items;
   ASSERT_GE(items.size(), 2u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(items[0]->data_type.kind, DataTypeKind::kLogic);
   EXPECT_EQ(items[1]->kind, ModuleItemKind::kContAssign);
 }
 
-static Expr* FirstContAssignRHS(ParseResult& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) return item->assign_rhs;
+static Expr *FirstContAssignRHS(ParseResult &r) {
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kContAssign)
+      return item->assign_rhs;
   }
   return nullptr;
 }
 
 // tf_call in continuous assignment (function_subroutine_call as primary)
 TEST(ParserA82, TfCallInContAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [7:0] y;\n"
-      "  function logic [7:0] compute(input logic [7:0] a);\n"
-      "    return a + 8'd1;\n"
-      "  endfunction\n"
-      "  assign y = compute(8'd5);\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire [7:0] y;\n"
+                 "  function logic [7:0] compute(input logic [7:0] a);\n"
+                 "    return a + 8'd1;\n"
+                 "  endfunction\n"
+                 "  assign y = compute(8'd5);\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstContAssignRHS(r);
+  auto *rhs = FirstContAssignRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
   EXPECT_EQ(rhs->callee, "compute");
@@ -381,56 +293,36 @@ TEST(ParserA82, TfCallInContAssign) {
 
 // Continuous assignment with expression
 TEST(ParserA83, ExprInContAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [7:0] y;\n"
-      "  wire [7:0] a, b;\n"
-      "  assign y = a + b;\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  wire [7:0] y;\n"
+                 "  wire [7:0] a, b;\n"
+                 "  assign y = a + b;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstContAssignRHS(r);
+  auto *rhs = FirstContAssignRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
-
-struct ParseResult11g {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult11g Parse(const std::string& src) {
-  ParseResult11g result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* FirstContAssign(ParseResult11g& r) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) return item;
+static ModuleItem *FirstContAssign(ParseResult &r) {
+  for (auto *item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kContAssign)
+      return item;
   }
   return nullptr;
 }
 
 // --- Bit-select in continuous assignment LHS ---
 TEST(ParserSection11, Sec11_4_1_BitSelectInContAssignLhs) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire [7:0] vec;\n"
-      "  wire val;\n"
-      "  assign vec[0] = val;\n"
-      "endmodule\n");
+  auto r = Parse("module t;\n"
+                 "  wire [7:0] vec;\n"
+                 "  wire val;\n"
+                 "  assign vec[0] = val;\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* ca = FirstContAssign(r);
+  auto *ca = FirstContAssign(r);
   ASSERT_NE(ca, nullptr);
   ASSERT_NE(ca->assign_lhs, nullptr);
   EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kSelect);
@@ -439,36 +331,16 @@ TEST(ParserSection11, Sec11_4_1_BitSelectInContAssignLhs) {
 
 // --- Packed struct continuous assignment ---
 TEST(ParserSection7, Sec7_2_1_PackedContAssign) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct packed {\n"
-              "    logic [7:0] a;\n"
-              "    logic [7:0] b;\n"
-              "  } pair_t;\n"
-              "  pair_t p;\n"
-              "  assign p = 16'h1234;\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module t;\n"
+                      "  typedef struct packed {\n"
+                      "    logic [7:0] a;\n"
+                      "    logic [7:0] b;\n"
+                      "  } pair_t;\n"
+                      "  pair_t p;\n"
+                      "  assign p = 16'h1234;\n"
+                      "endmodule\n"));
 }
-
-struct ParseResult7e {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult7e Parse(const std::string& src) {
-  ParseResult7e result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
-static ModuleItem* NthItem(ParseResult7e& r, size_t n) {
+static ModuleItem *NthItem(ParseResult &r, size_t n) {
   if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
     return nullptr;
   return r.cu->modules[0]->items[n];
@@ -476,19 +348,19 @@ static ModuleItem* NthItem(ParseResult7e& r, size_t n) {
 
 // 12. Struct assigned via continuous assign statement.
 TEST(ParserSection7, Sec7_2_2_ContinuousAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } s_t;\n"
-      "  s_t s;\n"
-      "  assign s = 8'hFF;\n"
-      "endmodule\n");
+  auto r =
+      Parse("module t;\n"
+            "  typedef struct packed { logic [3:0] a; logic [3:0] b; } s_t;\n"
+            "  s_t s;\n"
+            "  assign s = 8'hFF;\n"
+            "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = NthItem(r, 2);
+  auto *item = NthItem(r, 2);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kContAssign);
   ASSERT_NE(item->assign_lhs, nullptr);
   ASSERT_NE(item->assign_rhs, nullptr);
 }
 
-}  // namespace
+} // namespace

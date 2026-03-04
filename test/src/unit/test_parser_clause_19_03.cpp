@@ -1,13 +1,15 @@
 // §19.3: Defining the coverage model: covergroup
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
-static ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
+static ModuleItem *FindItemByKind(const std::vector<ModuleItem *> &items,
                                   ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return item;
+  for (auto *item : items) {
+    if (item->kind == kind)
+      return item;
   }
   return nullptr;
 }
@@ -18,13 +20,12 @@ namespace {
 // §A.2.11 Production #1: covergroup_declaration
 // =============================================================================
 TEST(ParserA211, CovergroupDecl_Basic) {
-  auto r = Parse(
-      "module m;\n"
-      "  covergroup cg;\n"
-      "  endgroup\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  covergroup cg;\n"
+                 "  endgroup\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* item =
+  auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCovergroupDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kCovergroupDecl);
@@ -33,27 +34,24 @@ TEST(ParserA211, CovergroupDecl_Basic) {
 }
 
 TEST(ParserA211, CovergroupDecl_WithClockingEvent) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @(posedge clk);\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @(posedge clk);\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CovergroupDecl_WithPortList) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg(ref int x, input bit [3:0] y);\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg(ref int x, input bit [3:0] y);\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CovergroupDecl_WithPortsAndEvent) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg(ref int x) @(posedge clk);\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg(ref int x) @(posedge clk);\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CovergroupDecl_WithBlockEvent) {
@@ -65,13 +63,12 @@ TEST(ParserA211, CovergroupDecl_WithBlockEvent) {
 }
 
 TEST(ParserA211, CovergroupDecl_WithEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  covergroup cg;\n"
-      "  endgroup : cg\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  covergroup cg;\n"
+                 "  endgroup : cg\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* item =
+  auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCovergroupDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "cg");
@@ -81,174 +78,158 @@ TEST(ParserA211, CovergroupDecl_WithEndLabel) {
 // §A.2.11 Production #5: coverage_event
 // =============================================================================
 TEST(ParserA211, CoverageEvent_ClockingEvent) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @(posedge clk);\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @(posedge clk);\n"
+                      "    coverpoint x;\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CoverageEvent_NegedgeClocking) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @(negedge clk);\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @(negedge clk);\n"
+                      "    coverpoint x;\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CoverageEvent_BlockEventBegin) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @@(begin test_phase);\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @@(begin test_phase);\n"
+                      "    coverpoint x;\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CoverageEvent_BlockEventEnd) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @@(end test_phase);\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @@(end test_phase);\n"
+                      "    coverpoint x;\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
 // §A.2.11 Production #6: block_event_expression
 // =============================================================================
 TEST(ParserA211, BlockEventExpression_BeginHierarchical) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @@(begin top.test.run_phase);\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @@(begin top.test.run_phase);\n"
+                      "    coverpoint x;\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, BlockEventExpression_Or) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @@(begin phase1 or end phase2);\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @@(begin phase1 or end phase2);\n"
+                      "    coverpoint x;\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
 // §A.2.11 Production #7: hierarchical_btf_identifier
 // =============================================================================
 TEST(ParserA211, HierarchicalBtfIdentifier_Simple) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @@(begin my_task);\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @@(begin my_task);\n"
+                      "    coverpoint x;\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserAnnexA, A2CovergroupDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  covergroup cg @(posedge clk);\n"
-      "    coverpoint x;\n"
-      "  endgroup\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  covergroup cg @(posedge clk);\n"
+                 "    coverpoint x;\n"
+                 "  endgroup\n"
+                 "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParserA211, CovergroupDecl_WithEmptyPortList) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg();\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg();\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CoverageSpecOrOption_CoverSpec) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg;\n"
+                      "    coverpoint x;\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 // =============================================================================
 // Additional comprehensive tests
 // =============================================================================
 TEST(ParserA211, FullCovergroup_MultipleElements) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @(posedge clk);\n"
-              "    option.auto_bin_max = 64;\n"
-              "    cp_addr: coverpoint addr {\n"
-              "      bins low = {[0:63]};\n"
-              "      bins mid = {[64:191]};\n"
-              "      bins high = {[192:255]};\n"
-              "    }\n"
-              "    cp_data: coverpoint data;\n"
-              "    cross cp_addr, cp_data;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @(posedge clk);\n"
+                      "    option.auto_bin_max = 64;\n"
+                      "    cp_addr: coverpoint addr {\n"
+                      "      bins low = {[0:63]};\n"
+                      "      bins mid = {[64:191]};\n"
+                      "      bins high = {[192:255]};\n"
+                      "    }\n"
+                      "    cp_data: coverpoint data;\n"
+                      "    cross cp_addr, cp_data;\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CoverGroup_MultipleCoverpoints) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @(posedge clk);\n"
-              "    type_option.weight = 2;\n"
-              "    cp1: coverpoint a iff (enable);\n"
-              "    cp2: coverpoint b;\n"
-              "    cp3: coverpoint c {\n"
-              "      bins low = {[0:3]};\n"
-              "      bins high = {[4:7]};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @(posedge clk);\n"
+                      "    type_option.weight = 2;\n"
+                      "    cp1: coverpoint a iff (enable);\n"
+                      "    cp2: coverpoint b;\n"
+                      "    cp3: coverpoint c {\n"
+                      "      bins low = {[0:3]};\n"
+                      "      bins high = {[4:7]};\n"
+                      "    }\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CoverGroup_PortsWithBody) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg(ref int x, input int threshold);\n"
-              "    coverpoint x {\n"
-              "      bins below = {[0:threshold]};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg(ref int x, input int threshold);\n"
+                      "    coverpoint x {\n"
+                      "      bins below = {[0:threshold]};\n"
+                      "    }\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CoverGroup_InPackage) {
-  EXPECT_TRUE(
-      ParseOk("package p;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endpackage\n"));
+  EXPECT_TRUE(ParseOk("package p;\n"
+                      "  covergroup cg;\n"
+                      "    coverpoint x;\n"
+                      "  endgroup\n"
+                      "endpackage\n"));
 }
 
 TEST(ParserA211, CoverGroup_NegedgeEvent) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg @(negedge rst_n);\n"
-              "    coverpoint state;\n"
-              "  endgroup\n"
-              "endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m;\n"
+                      "  covergroup cg @(negedge rst_n);\n"
+                      "    coverpoint state;\n"
+                      "  endgroup\n"
+                      "endmodule\n"));
 }
 
 TEST(ParserA211, CoverGroup_ASTVerification) {
-  auto r = Parse(
-      "module m;\n"
-      "  covergroup my_cg @(posedge clk);\n"
-      "    coverpoint addr;\n"
-      "  endgroup\n"
-      "endmodule\n");
+  auto r = Parse("module m;\n"
+                 "  covergroup my_cg @(posedge clk);\n"
+                 "    coverpoint addr;\n"
+                 "  endgroup\n"
+                 "endmodule\n");
   EXPECT_FALSE(r.has_errors);
-  auto* item =
+  auto *item =
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kCovergroupDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "my_cg");
@@ -277,32 +258,13 @@ TEST(ParserSection40, CovergroupWithCoverpoint) {
     endmodule
   )"));
 }
-
-struct ParseResult16c {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult16c Parse(const std::string& src) {
-  ParseResult16c result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // §19 Functional coverage — covergroup
 // =============================================================================
 TEST_F(VerifyParseTest, BasicCovergroup) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       covergroup cg @(posedge clk);
         coverpoint x;
@@ -314,7 +276,7 @@ TEST_F(VerifyParseTest, BasicCovergroup) {
 }
 
 TEST_F(VerifyParseTest, CovergroupEndLabel) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     module m;
       covergroup my_cg @(posedge clk);
         coverpoint x;
@@ -324,4 +286,4 @@ TEST_F(VerifyParseTest, CovergroupEndLabel) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+} // namespace

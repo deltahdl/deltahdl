@@ -2,12 +2,13 @@
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 struct ConfigTest : ::testing::Test {
- protected:
-  CompilationUnit* Parse(const std::string& src) {
+protected:
+  CompilationUnit *Parse(const std::string &src) {
     source_ = src;
     lexer_ = std::make_unique<Lexer>(source_, 0, diag_);
     parser_ = std::make_unique<Parser>(*lexer_, arena_, diag_);
@@ -23,37 +24,19 @@ struct ConfigTest : ::testing::Test {
   std::unique_ptr<Lexer> lexer_;
   std::unique_ptr<Parser> parser_;
 };
-
-struct ParseResult34 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult34 Parse(const std::string& src) {
-  ParseResult34 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 using DpiParseTest = ProgramTestParse;
 
 namespace {
 
 // config_rule_statement: inst_clause liblist_clause with hierarchical inst_name
 TEST(SourceText, ConfigRuleInstLiblist) {
-  auto r = Parse(
-      "config cfg6;\n"
-      "  design top;\n"
-      "  instance top.u1.u2 liblist mylib;\n"
-      "endconfig\n");
+  auto r = Parse("config cfg6;\n"
+                 "  design top;\n"
+                 "  instance top.u1.u2 liblist mylib;\n"
+                 "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* rule = r.cu->configs[0]->rules[0];
+  auto *rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(rule->inst_path, "top.u1.u2");
   ASSERT_EQ(rule->liblist.size(), 1u);
@@ -61,28 +44,11 @@ TEST(SourceText, ConfigRuleInstLiblist) {
 }
 
 using ApiParseTest = ProgramTestParse;
-
-struct ParseResult40 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-};
-
-static ParseResult40 Parse(const std::string& src) {
-  ParseResult40 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  return result;
-}
-
 // =============================================================================
 // §36.9.2 Config instance clause
 // =============================================================================
 TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg1;
       design rtlLib.top;
       default liblist rtlLib;
@@ -91,7 +57,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
   )");
   ASSERT_EQ(unit->configs.size(), 1u);
   ASSERT_GE(unit->configs[0]->rules.size(), 2u);
-  auto* inst_rule = unit->configs[0]->rules[1];
+  auto *inst_rule = unit->configs[0]->rules[1];
   EXPECT_EQ(inst_rule->kind, ConfigRuleKind::kInstance);
   EXPECT_EQ(inst_rule->inst_path, "top.a2");
   ASSERT_EQ(inst_rule->liblist.size(), 1u);
@@ -109,32 +75,13 @@ TEST(ParserSection34, ConfigWithInstanceAndLiblist) {
   )");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->configs.size(), 1u);
-  auto* cfg = r.cu->configs[0];
+  auto *cfg = r.cu->configs[0];
   ASSERT_GE(cfg->rules.size(), 2u);
 }
-
-struct ParseResult31 {
-  SourceManager mgr;
-  Arena arena;
-  CompilationUnit* cu = nullptr;
-  bool has_errors = false;
-};
-
-static ParseResult31 Parse(const std::string& src) {
-  ParseResult31 result;
-  auto fid = result.mgr.AddFile("<test>", src);
-  DiagEngine diag(result.mgr);
-  Lexer lexer(result.mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, result.arena, diag);
-  result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
-  return result;
-}
-
 using ConfigParseTest = ProgramTestParse;
 
 TEST_F(ConfigParseTest, ConfigWithInstanceClause) {
-  auto* unit = Parse(R"(
+  auto *unit = Parse(R"(
     config cfg;
       design lib.top;
       instance top.u1 liblist lib2;
@@ -144,4 +91,4 @@ TEST_F(ConfigParseTest, ConfigWithInstanceClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}  // namespace
+} // namespace
