@@ -1032,6 +1032,18 @@ jobs:
           test/lib/run_tests_common/
           test/scripts/run_sim_tests/
           test/scripts/run_sv_tests/
+      - if: steps.detect.outputs.scripts_changed == 'true'
+        name: Detect copy-paste in source (Python)
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console lib/run_tests_common/
+          scripts/run_sim_tests/ scripts/run_sv_tests/
+      - if: steps.detect.outputs.scripts_changed == 'true'
+        name: Detect copy-paste in tests (Python)
+        run: >-
+          jscpd --pattern "**/*.py" --threshold 0
+          --reporters console test/lib/run_tests_common/
+          test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
       # ── C++ formatting and limits ──
       - name: Check formatting
         run: |
@@ -1050,7 +1062,7 @@ jobs:
             fi
           done
           exit $fail
-      # ── Copy-paste detection ──
+      # ── Copy-paste detection (C++) ──
       - name: Detect copy-paste (src)
         run: >-
           pmd cpd
@@ -1064,18 +1076,6 @@ jobs:
           --language cpp
           --dir test/src/
           --dir lib/test/
-      - if: steps.detect.outputs.scripts_changed == 'true'
-        name: Detect copy-paste in source (Python)
-        run: >-
-          jscpd --pattern "**/*.py" --threshold 0
-          --reporters console lib/run_tests_common/
-          scripts/run_sim_tests/ scripts/run_sv_tests/
-      - if: steps.detect.outputs.scripts_changed == 'true'
-        name: Detect copy-paste in tests (Python)
-        run: >-
-          jscpd --pattern "**/*.py" --threshold 0
-          --reporters console test/lib/run_tests_common/
-          test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
   # ── Lane: lib/run_tests_common ──
   test-lib-run-tests-common:
     if: >-
