@@ -273,9 +273,9 @@ def test_check_passes_when_no_supplementary(tmp_path):
     """Passes when clause has no figures or tables in LRM."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_NO_SUPPLEMENTARY)
-    assert check_supplementary_args(
+    assert not check_supplementary_args(
         "99", lrm, figures=[], tables=[], ignore_figures=[],
-    ) == []
+    )
 
 
 # ---- scoped supplementary (subclause-only) --------------------------------
@@ -285,9 +285,9 @@ def test_check_passes_when_subclause_has_no_refs(tmp_path):
     """Passes when subclause text has no figure/table references."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_MULTI_SUBCLAUSE)
-    assert check_supplementary_args(
+    assert not check_supplementary_args(
         "4.3", lrm, figures=[], tables=[], ignore_figures=[],
-    ) == []
+    )
 
 
 def test_check_requires_only_subclause_tables(tmp_path):
