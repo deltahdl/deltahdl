@@ -941,37 +941,23 @@ jobs:
             unzip -q "$PMD"
           fi
           echo "$PWD/pmd-bin-7.21.0/bin" >> "$GITHUB_PATH"
-      - name: Check formatting
+      # ── YAML lint (conditional) ──
+      - if: steps.detect.outputs.yaml_changed == 'true'
+        name: Lint YAML
         run: |
-          find src test -name '*.cpp' -o -name '*.h' | \
-            xargs clang-format-18 \
-            --dry-run --Werror --style=google
-      - name: Check file line limits
-        run: |
-          fail=0
-          for f in $(find src test -name '*.cpp' -o -name '*.h')
-          do
-            lines=$(wc -l < "$f")
-            if [ "$lines" -gt 1000 ]; then
-              echo "FAIL: $f has $lines lines (max 1000)"
-              fail=1
-            fi
-          done
-          exit $fail
-      - name: Detect copy-paste (src)
-        run: >-
-          pmd cpd
-          --minimum-tokens 100
-          --language cpp
-          --dir src/
-      - name: Detect copy-paste (test)
-        run: >-
-          pmd cpd
-          --minimum-tokens 100
-          --language cpp
-          --dir test/src/
-          --dir lib/test/
-      # DO NOT disable this step. Inline suppression comments (NOLINT,
+          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
+          KEY='key-ordering: enable'
+          LL='line-length: disable'
+          NL='new-line-at-end-of-file: enable'
+          TR='truthy: {allowed-values: ["true", "false", "on"]}'
+          RULES="$EMPTY, $KEY, $LL, $NL, $TR"
+          yamllint --strict \
+            --config-data \
+            "{extends: default, rules: {$RULES}}" \
+            .github/workflows/deltahdl.yml \
+            etc/clang_tidy/*.yml
+      # ── Assert steps ──
+      # DO NOT disable these steps. Inline suppression comments (NOLINT,
       # clang-format off, etc.) hide problems instead of fixing them and
       # make the codebase progressively harder to maintain.
       - name: Assert no inline directives (C++)
@@ -979,7 +965,6 @@ jobs:
           assert-no-inline-directives
           --tools clang-tidy,clang-format,clang-diagnostic
           src/ test/
-      # ── Python static analysis (conditional) ──
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Assert no inline directives (Python)
         run: >-
@@ -989,11 +974,25 @@ jobs:
           lib/run_tests_common/ scripts/run_sim_tests/
           scripts/run_sv_tests/ test/lib/run_tests_common/
           test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
+      - if: steps.detect.outputs.yaml_changed == 'true'
+        name: Assert no inline directives (YAML)
+        run: >-
+          assert-no-inline-directives
+          --tools yamllint
+          --verbose
+          ${{ github.workspace }}/**/*
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Assert no linter config files (Python)
         run: >-
           assert-no-linter-config-files
           --linters pylint,mypy
+          --verbose
+          ${{ github.workspace }}
+      - if: steps.detect.outputs.yaml_changed == 'true'
+        name: Assert no linter config files (YAML)
+        run: >-
+          assert-no-linter-config-files
+          --linters yamllint
           --verbose
           ${{ github.workspace }}
       - if: steps.detect.outputs.scripts_changed == 'true'
@@ -1004,6 +1003,7 @@ jobs:
           ${{ github.workspace }}/test/lib/run_tests_common
           ${{ github.workspace }}/test/scripts/run_sim_tests
           ${{ github.workspace }}/test/scripts/run_sv_tests
+      # ── Python linters (conditional) ──
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Run pylint on source
         run: >-
@@ -1032,6 +1032,38 @@ jobs:
           test/lib/run_tests_common/
           test/scripts/run_sim_tests/
           test/scripts/run_sv_tests/
+      # ── C++ formatting and limits ──
+      - name: Check formatting
+        run: |
+          find src test -name '*.cpp' -o -name '*.h' | \
+            xargs clang-format-18 \
+            --dry-run --Werror --style=google
+      - name: Check file line limits
+        run: |
+          fail=0
+          for f in $(find src test -name '*.cpp' -o -name '*.h')
+          do
+            lines=$(wc -l < "$f")
+            if [ "$lines" -gt 1000 ]; then
+              echo "FAIL: $f has $lines lines (max 1000)"
+              fail=1
+            fi
+          done
+          exit $fail
+      # ── Copy-paste detection ──
+      - name: Detect copy-paste (src)
+        run: >-
+          pmd cpd
+          --minimum-tokens 100
+          --language cpp
+          --dir src/
+      - name: Detect copy-paste (test)
+        run: >-
+          pmd cpd
+          --minimum-tokens 100
+          --language cpp
+          --dir test/src/
+          --dir lib/test/
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Detect copy-paste in source (Python)
         run: >-
@@ -1044,35 +1076,6 @@ jobs:
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console test/lib/run_tests_common/
           test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
-      # ── YAML lint (conditional) ──
-      - if: steps.detect.outputs.yaml_changed == 'true'
-        name: Assert no inline directives (YAML)
-        run: >-
-          assert-no-inline-directives
-          --tools yamllint
-          --verbose
-          ${{ github.workspace }}/**/*
-      - if: steps.detect.outputs.yaml_changed == 'true'
-        name: Assert no linter config files (YAML)
-        run: >-
-          assert-no-linter-config-files
-          --linters yamllint
-          --verbose
-          ${{ github.workspace }}
-      - if: steps.detect.outputs.yaml_changed == 'true'
-        name: Lint YAML
-        run: |
-          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
-          KEY='key-ordering: enable'
-          LL='line-length: disable'
-          NL='new-line-at-end-of-file: enable'
-          TR='truthy: {allowed-values: ["true", "false", "on"]}'
-          RULES="$EMPTY, $KEY, $LL, $NL, $TR"
-          yamllint --strict \
-            --config-data \
-            "{extends: default, rules: {$RULES}}" \
-            .github/workflows/deltahdl.yml \
-            etc/clang_tidy/*.yml
   # ── Lane: lib/run_tests_common ──
   test-lib-run-tests-common:
     if: >-
