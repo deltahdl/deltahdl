@@ -960,39 +960,19 @@ jobs:
       # DO NOT disable these steps. Inline suppression comments (NOLINT,
       # clang-format off, etc.) hide problems instead of fixing them and
       # make the codebase progressively harder to maintain.
-      - name: Assert no inline directives (C++)
+      - name: Assert no inline directives
         run: >-
           assert-no-inline-directives
-          --tools clang-tidy,clang-format,clang-diagnostic
+          --tools clang-tidy,clang-format,clang-diagnostic,pylint,mypy,yamllint
           src/ test/
-      - if: steps.detect.outputs.scripts_changed == 'true'
-        name: Assert no inline directives (Python)
-        run: >-
-          assert-no-inline-directives
-          --tools pylint,mypy
-          --verbose
           lib/run_tests_common/ scripts/run_sim_tests/
           scripts/run_sv_tests/ test/lib/run_tests_common/
           test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
-      - if: steps.detect.outputs.yaml_changed == 'true'
-        name: Assert no inline directives (YAML)
-        run: >-
-          assert-no-inline-directives
-          --tools yamllint
-          --verbose
           ${{ github.workspace }}/**/*
-      - if: steps.detect.outputs.scripts_changed == 'true'
-        name: Assert no linter config files (Python)
+      - name: Assert no linter config files
         run: >-
           assert-no-linter-config-files
-          --linters pylint,mypy
-          --verbose
-          ${{ github.workspace }}
-      - if: steps.detect.outputs.yaml_changed == 'true'
-        name: Assert no linter config files (YAML)
-        run: >-
-          assert-no-linter-config-files
-          --linters yamllint
+          --linters pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
       - if: steps.detect.outputs.scripts_changed == 'true'
