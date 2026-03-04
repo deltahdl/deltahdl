@@ -1,6 +1,8 @@
 // §11.4.2: Increment and decrement operators
 
+#include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "simulator/eval.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 

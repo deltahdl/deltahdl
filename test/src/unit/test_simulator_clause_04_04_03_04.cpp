@@ -139,8 +139,8 @@ TEST(SimCh4434, PostNBAExecutesAfterNBA) {
 // Post-NBA executes after NBA and before PreObserved.
 // ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBAExecutesAfterNBABeforePreObserved) {
-  VerifyThreeRegionOrder(Region::kNBA, "nba", Region::kPostNBA, "post_nba",
-                         Region::kPreObserved, "pre_observed");
+  VerifyThreeRegionOrder({Region::kNBA, "nba"}, {Region::kPostNBA, "post_nba"},
+                         {Region::kPreObserved, "pre_observed"});
 }
 
 // ---------------------------------------------------------------------------

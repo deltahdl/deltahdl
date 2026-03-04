@@ -1,6 +1,7 @@
 // Annex A.1.2: SystemVerilog source text
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
@@ -88,7 +89,6 @@ TEST(ParserAnnexA051, UdpWithModule) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST(ParserSection29, UdpCoexistsWithModule) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -103,7 +103,6 @@ TEST(ParserSection29, UdpCoexistsWithModule) {
   ASSERT_EQ(r.cu->udps.size(), 1);
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(ConfigParseTest, ConfigCoexistsWithModule) {
   auto* unit = Parse(R"(

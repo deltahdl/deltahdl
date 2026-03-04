@@ -1,5 +1,6 @@
 // §27.5: Conditional generate constructs
 
+#include "fixture_elaborator.h"
 #include "fixture_parser.h"
 
 using namespace delta;

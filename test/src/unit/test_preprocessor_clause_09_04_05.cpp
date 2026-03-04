@@ -1,6 +1,7 @@
 // §9.4.5: Intra-assignment timing controls
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

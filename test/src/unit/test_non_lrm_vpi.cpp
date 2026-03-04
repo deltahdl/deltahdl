@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "fixture_program.h"
 #include "simulator/vpi.h"
 
 namespace delta {

@@ -139,8 +139,9 @@ TEST(SimCh4437, PreReNBAExecutesBeforeReNBA) {
 // Pre-Re-NBA executes after ReInactive and before Re-NBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh4437, PreReNBAExecutesAfterReInactiveBeforeReNBA) {
-  VerifyThreeRegionOrder(Region::kReInactive, "re_inactive", Region::kPreReNBA,
-                         "pre_re_nba", Region::kReNBA, "re_nba");
+  VerifyThreeRegionOrder({Region::kReInactive, "re_inactive"},
+                         {Region::kPreReNBA, "pre_re_nba"},
+                         {Region::kReNBA, "re_nba"});
 }
 
 // ---------------------------------------------------------------------------

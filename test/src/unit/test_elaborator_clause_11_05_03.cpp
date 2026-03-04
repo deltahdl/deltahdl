@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <unordered_set>
+
 #include "builders_ast.h"
 #include "common/arena.h"
 #include "elaborator/const_eval.h"

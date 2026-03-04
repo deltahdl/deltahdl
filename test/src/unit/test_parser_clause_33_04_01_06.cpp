@@ -6,7 +6,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-using DpiParseTest = ProgramTestParse;
 
 namespace {
 
@@ -59,7 +58,6 @@ TEST(SourceText, ConfigUseCellAndParams) {
   EXPECT_TRUE(rule->use_config);
 }
 
-using ApiParseTest = ProgramTestParse;
 TEST_F(ApiParseTest, ConfigInstanceClauseUse) {
   auto* unit = Parse(R"(
     config cfg1;

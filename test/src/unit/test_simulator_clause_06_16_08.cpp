@@ -1,6 +1,8 @@
 // §6.16.8: Substr()
 
+#include "builders_ast.h"
 #include "fixture_string.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 

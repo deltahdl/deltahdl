@@ -1,6 +1,7 @@
 // §27.3: Generate construct syntax
 
 #include "fixture_elaborator.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

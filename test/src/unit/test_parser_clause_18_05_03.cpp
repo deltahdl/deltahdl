@@ -1,6 +1,7 @@
 // §18.5.3: Distribution
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -147,8 +148,6 @@ TEST(ParserSection18b, DistMultipleConstraints) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
-
-using CheckerParseTest = ProgramTestParse;
 
 // constraint_expression ::= expression_or_dist ;
 // expression_or_dist ::= expression [ dist { dist_list } ]

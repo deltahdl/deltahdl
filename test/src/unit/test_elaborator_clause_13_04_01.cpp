@@ -3,6 +3,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
 

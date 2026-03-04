@@ -1,6 +1,7 @@
 // §23.2.2.1: Non-ANSI style port declarations
 
 #include "fixture_elaborator.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -82,8 +83,6 @@ TEST(ParserSection23, NonAnsiPortsMixed) {
   }
   EXPECT_NE(mod->ports[2].data_type.packed_dim_left, nullptr);
 }
-
-using ProgramParseTest = ProgramTestParse;
 
 TEST(ParserSection23, Sec23_2_2_NonAnsiPortDeclarations) {
   // Non-ANSI style: port list + separate direction declarations

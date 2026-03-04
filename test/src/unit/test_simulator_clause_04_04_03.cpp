@@ -115,8 +115,9 @@ TEST(SimCh443, PLIRegionsAreInterleavedWithSimulationRegions) {
 // Pre-Active PLI region executes between Preponed and Active.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PreActiveExecutesBetweenPreponedAndActive) {
-  VerifyThreeRegionOrder(Region::kPreponed, "preponed", Region::kPreActive,
-                         "pre_active", Region::kActive, "active");
+  VerifyThreeRegionOrder({Region::kPreponed, "preponed"},
+                         {Region::kPreActive, "pre_active"},
+                         {Region::kActive, "active"});
 }
 
 // ---------------------------------------------------------------------------
@@ -124,8 +125,8 @@ TEST(SimCh443, PreActiveExecutesBetweenPreponedAndActive) {
 // Pre-NBA PLI region executes between Inactive and NBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PreNBAExecutesBetweenInactiveAndNBA) {
-  VerifyThreeRegionOrder(Region::kInactive, "inactive", Region::kPreNBA,
-                         "pre_nba", Region::kNBA, "nba");
+  VerifyThreeRegionOrder({Region::kInactive, "inactive"},
+                         {Region::kPreNBA, "pre_nba"}, {Region::kNBA, "nba"});
 }
 
 // ---------------------------------------------------------------------------
@@ -152,8 +153,9 @@ TEST(SimCh443, PostNBAExecutesAfterNBA) {
 // Pre-Observed PLI region executes between Post-NBA and Observed.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PreObservedExecutesBetweenPostNBAAndObserved) {
-  VerifyThreeRegionOrder(Region::kPostNBA, "post_nba", Region::kPreObserved,
-                         "pre_observed", Region::kObserved, "observed");
+  VerifyThreeRegionOrder({Region::kPostNBA, "post_nba"},
+                         {Region::kPreObserved, "pre_observed"},
+                         {Region::kObserved, "observed"});
 }
 
 // ---------------------------------------------------------------------------
@@ -162,8 +164,9 @@ TEST(SimCh443, PreObservedExecutesBetweenPostNBAAndObserved) {
 // Post-Observed PLI region executes between Observed and Reactive.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PostObservedExecutesBetweenObservedAndReactive) {
-  VerifyThreeRegionOrder(Region::kObserved, "observed", Region::kPostObserved,
-                         "post_observed", Region::kReactive, "reactive");
+  VerifyThreeRegionOrder({Region::kObserved, "observed"},
+                         {Region::kPostObserved, "post_observed"},
+                         {Region::kReactive, "reactive"});
 }
 
 // ---------------------------------------------------------------------------
@@ -172,8 +175,9 @@ TEST(SimCh443, PostObservedExecutesBetweenObservedAndReactive) {
 // Pre-Re-NBA PLI region executes between Re-Inactive and Re-NBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PreReNBAExecutesBetweenReInactiveAndReNBA) {
-  VerifyThreeRegionOrder(Region::kReInactive, "reinactive", Region::kPreReNBA,
-                         "pre_renba", Region::kReNBA, "renba");
+  VerifyThreeRegionOrder({Region::kReInactive, "reinactive"},
+                         {Region::kPreReNBA, "pre_renba"},
+                         {Region::kReNBA, "renba"});
 }
 
 // ---------------------------------------------------------------------------
@@ -182,8 +186,9 @@ TEST(SimCh443, PreReNBAExecutesBetweenReInactiveAndReNBA) {
 // Post-Re-NBA PLI region executes between Re-NBA and Pre-Postponed.
 // ---------------------------------------------------------------------------
 TEST(SimCh443, PostReNBAExecutesBetweenReNBAAndPrePostponed) {
-  VerifyThreeRegionOrder(Region::kReNBA, "renba", Region::kPostReNBA,
-                         "post_renba", Region::kPrePostponed, "pre_postponed");
+  VerifyThreeRegionOrder({Region::kReNBA, "renba"},
+                         {Region::kPostReNBA, "post_renba"},
+                         {Region::kPrePostponed, "pre_postponed"});
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cstdint>
+
+#include "model_gate_logic.h"
 enum class Val4Ext : uint8_t {
   kV0 = 0,
   kV1 = 1,

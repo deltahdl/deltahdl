@@ -278,10 +278,6 @@ TEST(Process, CoroutineDestroyOnScopeExit) {
   // Immediately destroyed — no leak if sanitizer passes.
 }
 
-static bool ParseOk(const std::string& src) {
-  return !ParseWithPreprocessor(src).has_errors;
-}
-
 // 9. SimTime: simulation time is maintained as ticks with comparison
 // and addition operators.
 TEST(ParserClause03, Cl3_14_SimTimeOperations) {

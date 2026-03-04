@@ -1,6 +1,7 @@
 // §23.2.2.2: ANSI style list of port declarations
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -55,8 +56,6 @@ TEST(ParserA212, InputUnpackedDim) {
   EXPECT_EQ(port.direction, Direction::kInput);
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
-
-using ProgramParseTest = ProgramTestParse;
 
 // =============================================================================
 // LRM section 23.2.2 -- Port declarations

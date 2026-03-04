@@ -346,9 +346,9 @@ TEST(SimCh441, ObservedRegionsBridgeActivAndReactive) {
 // all reactive regions and before the non-iterative Postponed region.
 // ---------------------------------------------------------------------------
 TEST(SimCh441, PrePostponedIsLastIterativeRegion) {
-  VerifyThreeRegionOrder(Region::kPostReNBA, "post_renba",
-                         Region::kPrePostponed, "pre_postponed",
-                         Region::kPostponed, "postponed");
+  VerifyThreeRegionOrder({Region::kPostReNBA, "post_renba"},
+                         {Region::kPrePostponed, "pre_postponed"},
+                         {Region::kPostponed, "postponed"});
 }
 
 // ---------------------------------------------------------------------------

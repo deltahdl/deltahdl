@@ -6,8 +6,6 @@
 
 using namespace delta;
 
-using CheckerParseTest = ProgramTestParse;
-
 namespace {
 
 // checker_or_generate_item_declaration ::= default disable iff expr ;

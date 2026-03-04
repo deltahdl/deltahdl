@@ -30,6 +30,16 @@ struct ProgramTestParse : ::testing::Test {
   std::unique_ptr<Parser> parser_;
 };
 
+using ProgramParseTest = ProgramTestParse;
+using AnnexHParseTest = ProgramTestParse;
+using DpiParseTest = ProgramTestParse;
+using ApiParseTest = ProgramTestParse;
+using VerifyParseTest = ProgramTestParse;
+using CheckerParseTest = ProgramTestParse;
+using ProtectedTest = ProgramTestParse;
+using ConfigParseTest = ProgramTestParse;
+using SpecifyParseTest = ProgramTestParse;
+
 struct ProgramElabFixture {
   SourceManager mgr;
   Arena arena;

@@ -22,7 +22,6 @@ static void VerifyUdpTableSpotChecks(const UdpDecl* udp,
   }
 }
 
-using SpecifyParseTest = ProgramTestParse;
 namespace {
 
 TEST(ParserSection29, MixedLevelEdgeSensitive) {

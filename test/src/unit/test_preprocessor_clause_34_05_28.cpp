@@ -4,6 +4,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_program.h"
 #include "preprocessor/preprocessor.h"
 
 using namespace delta;

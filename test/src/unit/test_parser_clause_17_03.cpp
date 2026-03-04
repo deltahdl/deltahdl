@@ -1,6 +1,7 @@
 // §17.3: Checker instantiation
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -98,8 +99,6 @@ TEST(ParserAnnexA0414, CheckerInstInsideChecker) {
   EXPECT_EQ(inst->inst_name, "u0");
 }
 
-using CheckerParseTest = ProgramTestParse;
-
 static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
                                         ModuleItemKind kind) {
   for (const auto* item : items) {
@@ -129,7 +128,6 @@ TEST_F(CheckerParseTest, CheckerInstantiatedInModule) {
   EXPECT_EQ(inst->inst_module, "my_checker");
   EXPECT_EQ(inst->inst_name, "chk_inst");
 }
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // §17.4 Checker instantiation

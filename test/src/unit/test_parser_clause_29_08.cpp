@@ -1,6 +1,7 @@
 // §29.8: UDP instances
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -294,7 +295,6 @@ static bool FindModuleInst(const std::vector<ModuleItem*>& items,
   return false;
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST(ParserSection29, UdpInstance) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"

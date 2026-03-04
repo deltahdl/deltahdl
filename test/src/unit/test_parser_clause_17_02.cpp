@@ -6,8 +6,6 @@
 
 using namespace delta;
 
-using CheckerParseTest = ProgramTestParse;
-
 namespace {
 
 // =============================================================================
@@ -363,7 +361,6 @@ TEST(SourceText, CheckerFunctionDecl) {
   EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(r.cu->checkers[0]->items[0]->name, "add");
 }
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // §17 Checker declarations

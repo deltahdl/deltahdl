@@ -1,6 +1,7 @@
 // §16.9.9: Conditions over sequences
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -15,8 +16,6 @@ TEST(ParserA210, SequenceExpr_Throughout) {
               "    en throughout (a ##1 b ##1 c));\n"
               "endmodule\n"));
 }
-
-using VerifyParseTest = ProgramTestParse;
 
 // Assert property with throughout operator.
 TEST(ParserSection16, Sec16_5_1_SequenceThroughout) {

@@ -1,6 +1,7 @@
 // Annex A.8.2: Subroutine calls
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

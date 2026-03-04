@@ -10,6 +10,11 @@
 
 using namespace delta;
 
+struct RegionLabel {
+  Region region;
+  std::string label;
+};
+
 // Schedule a labeled event at time 0.
 inline void ScheduleLabeled(Scheduler& sched, Region region,
                             const std::string& label,
@@ -29,55 +34,50 @@ inline void ScheduleLabeled(Scheduler& sched, uint64_t time, Region region,
 }
 
 // Verify that two regions execute in the given order.
-inline void VerifyTwoRegionOrder(Region first, const std::string& first_label,
-                                 Region second,
-                                 const std::string& second_label) {
+inline void VerifyTwoRegionOrder(RegionLabel first, RegionLabel second) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
-  ScheduleLabeled(sched, second, second_label, order);
-  ScheduleLabeled(sched, first, first_label, order);
+  ScheduleLabeled(sched, second.region, second.label, order);
+  ScheduleLabeled(sched, first.region, first.label, order);
   sched.Run();
   ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], first_label);
-  EXPECT_EQ(order[1], second_label);
+  EXPECT_EQ(order[0], first.label);
+  EXPECT_EQ(order[1], second.label);
 }
 
 // Verify that three regions execute in the given order.
-inline void VerifyThreeRegionOrder(Region r1, const std::string& l1, Region r2,
-                                   const std::string& l2, Region r3,
-                                   const std::string& l3) {
+inline void VerifyThreeRegionOrder(RegionLabel r1, RegionLabel r2,
+                                   RegionLabel r3) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
-  ScheduleLabeled(sched, r3, l3, order);
-  ScheduleLabeled(sched, r2, l2, order);
-  ScheduleLabeled(sched, r1, l1, order);
+  ScheduleLabeled(sched, r3.region, r3.label, order);
+  ScheduleLabeled(sched, r2.region, r2.label, order);
+  ScheduleLabeled(sched, r1.region, r1.label, order);
   sched.Run();
   ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], l1);
-  EXPECT_EQ(order[1], l2);
-  EXPECT_EQ(order[2], l3);
+  EXPECT_EQ(order[0], r1.label);
+  EXPECT_EQ(order[1], r2.label);
+  EXPECT_EQ(order[2], r3.label);
 }
 
 // Verify that four regions execute in the given order.
-inline void VerifyFourRegionOrder(Region r1, const std::string& l1, Region r2,
-                                  const std::string& l2, Region r3,
-                                  const std::string& l3, Region r4,
-                                  const std::string& l4) {
+inline void VerifyFourRegionOrder(RegionLabel r1, RegionLabel r2,
+                                  RegionLabel r3, RegionLabel r4) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
-  ScheduleLabeled(sched, r4, l4, order);
-  ScheduleLabeled(sched, r3, l3, order);
-  ScheduleLabeled(sched, r2, l2, order);
-  ScheduleLabeled(sched, r1, l1, order);
+  ScheduleLabeled(sched, r4.region, r4.label, order);
+  ScheduleLabeled(sched, r3.region, r3.label, order);
+  ScheduleLabeled(sched, r2.region, r2.label, order);
+  ScheduleLabeled(sched, r1.region, r1.label, order);
   sched.Run();
   ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], l1);
-  EXPECT_EQ(order[1], l2);
-  EXPECT_EQ(order[2], l3);
-  EXPECT_EQ(order[3], l4);
+  EXPECT_EQ(order[0], r1.label);
+  EXPECT_EQ(order[1], r2.label);
+  EXPECT_EQ(order[2], r3.label);
+  EXPECT_EQ(order[3], r4.label);
 }
 
 // Verify main→side→main iteration (e.g., Active→NBA→Active).
@@ -111,34 +111,31 @@ inline void VerifyIterationChain(Region main_region,
 }
 
 // Verify region restart: initial runs, trigger schedules into target.
-inline void VerifyRegionRestart(Region initial,
-                                const std::string& initial_label,
-                                Region trigger,
-                                const std::string& trigger_label, Region target,
-                                const std::string& target_label) {
+inline void VerifyRegionRestart(RegionLabel initial, RegionLabel trigger,
+                                RegionLabel target) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
   auto* first = sched.GetEventPool().Acquire();
-  first->callback = [&order, initial_label]() {
-    order.push_back(initial_label);
-  };
-  sched.ScheduleEvent({0}, initial, first);
+  first->callback = [&order, lbl = initial.label]() { order.push_back(lbl); };
+  sched.ScheduleEvent({0}, initial.region, first);
   auto* trig = sched.GetEventPool().Acquire();
-  trig->callback = [&]() {
+  trig->callback = [&, trigger_label = trigger.label,
+                    target_region = target.region,
+                    target_label = target.label]() {
     order.push_back(trigger_label);
     auto* restart = sched.GetEventPool().Acquire();
     restart->callback = [&order, target_label]() {
       order.push_back(target_label);
     };
-    sched.ScheduleEvent({0}, target, restart);
+    sched.ScheduleEvent({0}, target_region, restart);
   };
-  sched.ScheduleEvent({0}, trigger, trig);
+  sched.ScheduleEvent({0}, trigger.region, trig);
   sched.Run();
   ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], initial_label);
-  EXPECT_EQ(order[1], trigger_label);
-  EXPECT_EQ(order[2], target_label);
+  EXPECT_EQ(order[0], initial.label);
+  EXPECT_EQ(order[1], trigger.label);
+  EXPECT_EQ(order[2], target.label);
 }
 
 // Verify events at times 0, 1, 2 execute in order for a given region.

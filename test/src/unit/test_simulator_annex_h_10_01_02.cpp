@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "simulator/dpi_runtime.h"
 #include "simulator/svdpi.h"
 
 namespace {

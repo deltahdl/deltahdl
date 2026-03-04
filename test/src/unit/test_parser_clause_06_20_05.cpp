@@ -1,6 +1,7 @@
 // §6.20.5: Specify parameters
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
@@ -44,7 +45,6 @@ TEST(ParserA24, SpecparamAssignmentBasic) {
   EXPECT_FALSE(r.has_errors);
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST_F(SpecifyParseTest, SpecparamDeclaration) {
   auto* unit = Parse("module m; specparam tRISE = 10; endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);

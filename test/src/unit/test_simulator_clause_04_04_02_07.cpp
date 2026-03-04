@@ -43,8 +43,8 @@ TEST(SimCh4427, ReInactiveRegionExecutesEvents) {
 // Re-Inactive events execute only after Reactive events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveExecutesAfterReactive) {
-  VerifyTwoRegionOrder(Region::kReactive, "reactive", Region::kReInactive,
-                       "reinactive");
+  VerifyTwoRegionOrder({Region::kReactive, "reactive"},
+                       {Region::kReInactive, "reinactive"});
 }
 
 // ---------------------------------------------------------------------------
@@ -193,8 +193,8 @@ TEST(SimCh4427, ReInactiveIsWithinReactiveRegionSet) {
 // to PreReNBA/ReNBA.  This test verifies Re-Inactive executes before ReNBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveExecutesBeforeReNBA) {
-  VerifyTwoRegionOrder(Region::kReInactive, "reinactive", Region::kReNBA,
-                       "renba");
+  VerifyTwoRegionOrder({Region::kReInactive, "reinactive"},
+                       {Region::kReNBA, "renba"});
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,9 @@
 // §11.4.3: Arithmetic operators
 
 #include "fixture_parser.h"
+#include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 

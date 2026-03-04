@@ -1,6 +1,7 @@
 // §10.6.2: The force and release procedural statements
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -144,9 +145,6 @@ TEST(ParserA604, StmtItemReleaseStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kRelease);
 }
 
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
 TEST(ParserSection38, VpiSystemCallForce) {
   auto r = Parse(
       "module m;\n"

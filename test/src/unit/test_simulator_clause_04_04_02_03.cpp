@@ -41,8 +41,8 @@ TEST(SimCh4423, InactiveRegionExecutesEvents) {
 // Inactive events execute only after Active events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4423, InactiveExecutesAfterActive) {
-  VerifyTwoRegionOrder(Region::kActive, "active", Region::kInactive,
-                       "inactive");
+  VerifyTwoRegionOrder({Region::kActive, "active"},
+                       {Region::kInactive, "inactive"});
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ TEST(SimCh4423, InactiveIsWithinActiveRegionSet) {
 // to PreNBA/NBA.  This test verifies Inactive executes before NBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh4423, InactiveExecutesBeforeNBA) {
-  VerifyTwoRegionOrder(Region::kInactive, "inactive", Region::kNBA, "nba");
+  VerifyTwoRegionOrder({Region::kInactive, "inactive"}, {Region::kNBA, "nba"});
 }
 
 // ---------------------------------------------------------------------------

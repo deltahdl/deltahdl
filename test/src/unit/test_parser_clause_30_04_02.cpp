@@ -1,6 +1,7 @@
 // §30.4.2: Simple module paths
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
@@ -31,7 +32,6 @@ TEST(ParserA701, SpecifyBlockSingleItem) {
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST(ParserSection28, Sec28_12_MultiplePathsInSpecifyBlock) {
   auto r = Parse(
@@ -268,7 +268,6 @@ TEST(ParserA83, ModulePathExprInSpecify) {
   EXPECT_FALSE(r.has_errors);
 }
 
-using SpecifyParseTest = ProgramTestParse;
 // §3.3 Specify blocks
 TEST(ParserClause03, Cl3_3_SpecifyBlock) {
   EXPECT_TRUE(

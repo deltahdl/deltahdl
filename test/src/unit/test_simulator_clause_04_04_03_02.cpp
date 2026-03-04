@@ -135,8 +135,9 @@ TEST(SimCh4432, PreActiveExecutesBeforeActive) {
 // Pre-Active executes after Preponed and before Active.
 // ---------------------------------------------------------------------------
 TEST(SimCh4432, PreActiveExecutesAfterPreponedBeforeActive) {
-  VerifyThreeRegionOrder(Region::kPreponed, "preponed", Region::kPreActive,
-                         "pre_active", Region::kActive, "active");
+  VerifyThreeRegionOrder({Region::kPreponed, "preponed"},
+                         {Region::kPreActive, "pre_active"},
+                         {Region::kActive, "active"});
 }
 
 // ---------------------------------------------------------------------------

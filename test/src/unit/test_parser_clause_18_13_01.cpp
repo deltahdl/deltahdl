@@ -1,6 +1,7 @@
 // §18.13.1: $urandom
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 

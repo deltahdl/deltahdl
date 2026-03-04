@@ -4,6 +4,7 @@
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
+#include "simulator/sva_engine.h"
 
 using namespace delta;
 

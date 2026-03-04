@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <fstream>
 
+#include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"

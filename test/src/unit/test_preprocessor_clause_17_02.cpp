@@ -1,6 +1,7 @@
 // §17.2: Checker declaration
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

@@ -1,6 +1,7 @@
 // §24.3: The program construct
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

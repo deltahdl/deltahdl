@@ -1,6 +1,7 @@
 // §35.5.6: Types of formal arguments
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 

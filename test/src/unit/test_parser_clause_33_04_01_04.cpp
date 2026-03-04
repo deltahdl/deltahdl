@@ -7,9 +7,6 @@
 
 using namespace delta;
 
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
 namespace {
 
 // =============================================================================
@@ -64,7 +61,6 @@ TEST(SourceText, ConfigCellUnqualified) {
   EXPECT_EQ(rule->cell_name, "mux4");
   EXPECT_EQ(rule->use_cell, "better_mux");
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(ConfigParseTest, ConfigWithCellClause) {
   auto* unit = Parse(R"(

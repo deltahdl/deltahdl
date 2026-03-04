@@ -1,6 +1,7 @@
 // §9.7: Fine-grain process control
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 

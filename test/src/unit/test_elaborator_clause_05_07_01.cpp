@@ -1,6 +1,8 @@
 // §5.7.1: Integer literal constants
 
 #include "fixture_elaborator.h"
+#include "fixture_simulator.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 

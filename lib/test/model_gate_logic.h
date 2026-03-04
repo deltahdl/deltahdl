@@ -2,8 +2,9 @@
 
 #include <cstdint>
 
+#include "model_val4.h"
+
 // --- Local types for logic gate evaluation (§28.4, §28.5) ---
-enum class Val4 : uint8_t { kV0 = 0, kV1 = 1, kX = 2, kZ = 3 };
 
 enum class GateKind : uint8_t {
   kAnd,

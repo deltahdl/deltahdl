@@ -1,6 +1,7 @@
 // §16.12.4: Disjunction property
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -14,8 +15,6 @@ TEST(ParserA210, PropertyExpr_Or) {
               "  assert property (@(posedge clk) a or b);\n"
               "endmodule\n"));
 }
-
-using VerifyParseTest = ProgramTestParse;
 
 // Assert property with or (disjunction).
 TEST(ParserSection16, Sec16_5_1_PropertyOr) {

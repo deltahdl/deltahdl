@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "model_gate_logic.h"
 #include "model_switch_eval.h"
 
 namespace {

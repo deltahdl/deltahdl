@@ -6,7 +6,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-using DpiParseTest = ProgramTestParse;
 
 namespace {
 
@@ -84,7 +83,6 @@ TEST(SourceText, ConfigRuleCellLiblist) {
   EXPECT_EQ(rule->liblist[1], "lib_b");
 }
 
-using ApiParseTest = ProgramTestParse;
 // =============================================================================
 // §36.3 Configuration rules (config ... endconfig)
 // =============================================================================
@@ -215,7 +213,6 @@ TEST_F(ConfigTest, EndconfigWithLabel) {
   EXPECT_EQ(unit->configs[0]->name, "my_config");
   EXPECT_FALSE(HasErrors());
 }
-using ConfigParseTest = ProgramTestParse;
 
 // =============================================================================
 // §33 Configuration declarations

@@ -1,5 +1,6 @@
 // §11.2.1: Constant expressions
 
+#include "fixture_evaluator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 

@@ -1,6 +1,7 @@
 // §3.12.1: Compilation units
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -49,8 +50,6 @@ TEST(ParserSection23, MultipleModuleDefinitions) {
   EXPECT_EQ(r.cu->modules[1]->name, "b");
   EXPECT_EQ(r.cu->modules[2]->name, "c");
 }
-
-using CheckerParseTest = ProgramTestParse;
 
 // --- Top-level function declaration (§13) ---
 TEST(ParserSection18, TopLevelFunction) {

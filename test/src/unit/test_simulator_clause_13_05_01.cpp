@@ -1,6 +1,7 @@
 // §13.5.1: Pass by value
 
 #include "fixture_simulator.h"
+#include "simulator/eval.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 

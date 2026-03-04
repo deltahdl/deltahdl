@@ -6,8 +6,6 @@
 
 using namespace delta;
 
-using CheckerParseTest = ProgramTestParse;
-
 namespace {
 
 TEST(ParserSection18, RandcMultiDeclarator) {

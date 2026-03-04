@@ -1,6 +1,8 @@
 // §31.4.3: $fullskew
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -41,7 +43,6 @@ TEST(ParserA70501, FullskewWithFlags) {
   ASSERT_NE(tc->event_based_flag, nullptr);
   ASSERT_NE(tc->remain_active_flag, nullptr);
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(SpecifyTest, FullskewTimingCheck) {
   auto* cu = Parse(

@@ -3,6 +3,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -23,9 +24,6 @@ TEST(ParserA26, DpiExportTask) {
   EXPECT_EQ(item->name, "sv_task");
 }
 
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
 TEST_F(DpiParseTest, ExportTask) {
   auto* unit = Parse(R"(
     module m;

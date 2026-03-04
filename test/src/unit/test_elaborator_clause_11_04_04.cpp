@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_evaluator.h"
+#include "fixture_simulator.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 

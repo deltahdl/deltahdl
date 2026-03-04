@@ -74,8 +74,9 @@ TEST(SimCh4436, PostObservedReadsAfterObservedRegion) {
 // Post-Observed executes after Observed and before Reactive.
 // ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedExecutesAfterObservedBeforeReactive) {
-  VerifyThreeRegionOrder(Region::kObserved, "observed", Region::kPostObserved,
-                         "post_observed", Region::kReactive, "reactive");
+  VerifyThreeRegionOrder({Region::kObserved, "observed"},
+                         {Region::kPostObserved, "post_observed"},
+                         {Region::kReactive, "reactive"});
 }
 
 // ---------------------------------------------------------------------------

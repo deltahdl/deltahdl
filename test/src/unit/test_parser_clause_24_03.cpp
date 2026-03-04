@@ -1,6 +1,7 @@
 // §24.3: The program construct
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -260,8 +261,6 @@ TEST(ParserSection4, Sec4_5_ProgramBlock) {
   ASSERT_FALSE(r.cu->programs[0]->items.empty());
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
-
-using ProgramParseTest = ProgramTestParse;
 
 // =============================================================================
 // §24.1 Basic program declarations

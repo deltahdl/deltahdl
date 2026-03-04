@@ -19,8 +19,6 @@ TEST(SourceText, PackageItemExternConstraint) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-using CheckerParseTest = ProgramTestParse;
-
 // constraint_prototype ::=
 //   [constraint_prototype_qualifier] [static] constraint
 //   [dynamic_override_specifiers] constraint_identifier ;

@@ -1,6 +1,8 @@
 // §31.4.2: $timeskew
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -74,7 +76,6 @@ TEST(ParserA70502, RemainActiveFlagMinTypMax) {
   ASSERT_NE(tc->remain_active_flag, nullptr);
   EXPECT_EQ(tc->remain_active_flag->kind, ExprKind::kMinTypMax);
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(SpecifyTest, TimeskewTimingCheck) {
   auto* cu = Parse(

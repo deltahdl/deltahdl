@@ -1,7 +1,9 @@
 // §11.4.11: Conditional operator
 
 #include "fixture_parser.h"
+#include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
+#include "simulator/eval.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;

@@ -1,6 +1,8 @@
 // §31.4.1: $skew
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -40,8 +42,6 @@ TEST(ParserA70501, SkewTimingCheck) {
   EXPECT_EQ(tc->data_terminal.name, "clk2");
   EXPECT_EQ(tc->notifier, "ntfr");
 }
-
-using ConfigParseTest = ProgramTestParse;
 
 TEST(ParserSection28, Sec28_12_TimingCheckSkew) {
   auto sp = ParseSpecifySingle(

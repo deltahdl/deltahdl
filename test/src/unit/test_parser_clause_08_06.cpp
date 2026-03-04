@@ -1,6 +1,7 @@
 // §8.6: Object methods
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

@@ -1,6 +1,7 @@
 // §18.7: Inline constraints—randomize() with
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -42,8 +43,6 @@ TEST(ParserA82, RandomizeCallWithConstraintBlock) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-using CheckerParseTest = ProgramTestParse;
 
 // --- Inline randomize with constraint block (§18.7) ---
 TEST(ParserSection18, RandomizeWithInlineConstraint) {

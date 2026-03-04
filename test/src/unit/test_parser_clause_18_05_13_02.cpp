@@ -5,8 +5,6 @@
 
 using namespace delta;
 
-using CheckerParseTest = ProgramTestParse;
-
 namespace {
 
 // Constraint implication and disable soft

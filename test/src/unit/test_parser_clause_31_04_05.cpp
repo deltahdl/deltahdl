@@ -1,6 +1,8 @@
 // §31.4.5: $period
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -57,8 +59,6 @@ TEST(ParserA70502, ControlledReferenceEvent) {
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
 }
-
-using ConfigParseTest = ProgramTestParse;
 
 TEST(ParserSection28, Sec28_12_TimingCheckPeriod) {
   auto sp = ParseSpecifySingle(

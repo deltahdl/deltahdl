@@ -1,6 +1,8 @@
 // §30.7.4.1: On-event versus on-detect pulse filtering
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -97,7 +99,6 @@ TEST(ParserA701, PulsestyleOndetectMultipleOutputs) {
   EXPECT_EQ(item->signal_list[0], "q1");
   EXPECT_EQ(item->signal_list[1], "q2");
 }
-using ConfigParseTest = ProgramTestParse;
 
 // =============================================================================
 // §30.4 Pulsestyle and showcancelled

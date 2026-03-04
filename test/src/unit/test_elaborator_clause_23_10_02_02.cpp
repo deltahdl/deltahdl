@@ -1,5 +1,6 @@
 // §23.10.2.2: Parameter value assignment by name
 
+#include "fixture_elaborator.h"
 #include "fixture_parser.h"
 
 using namespace delta;

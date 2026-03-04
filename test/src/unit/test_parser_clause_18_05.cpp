@@ -1,6 +1,7 @@
 // §18.5: Constraint blocks
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 
@@ -16,8 +17,6 @@ TEST(ParserAnnexA, A2ClassWithConstraint) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
-
-using CheckerParseTest = ProgramTestParse;
 
 // class_item ::= { attribute_instance } class_constraint
 TEST(SourceText, ClassConstraint) {

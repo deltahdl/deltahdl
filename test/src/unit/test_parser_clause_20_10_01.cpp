@@ -1,6 +1,7 @@
 // §20.10.1: Elaboration severity system tasks
 
 #include "builders_ast.h"
+#include "fixture_program.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
 
@@ -39,8 +40,6 @@ TEST(SourceText, ElabSeverityAllForms) {
               ModuleItemKind::kElabSystemTask);
   }
 }
-
-using ProgramParseTest = ProgramTestParse;
 
 // Returns true if any item in the list matches the given kind.
 bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "fixture_elaborator.h"
+#include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 

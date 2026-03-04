@@ -1,6 +1,7 @@
 // §11.4.9: Reduction operators
 
 #include "fixture_elaborator.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
 

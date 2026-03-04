@@ -6,7 +6,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-using DpiParseTest = ProgramTestParse;
 
 namespace {
 
@@ -26,7 +25,6 @@ TEST(SourceText, ConfigRuleInstLiblist) {
   EXPECT_EQ(rule->liblist[0], "mylib");
 }
 
-using ApiParseTest = ProgramTestParse;
 // =============================================================================
 // §36.9.2 Config instance clause
 // =============================================================================
@@ -61,7 +59,6 @@ TEST(ParserSection34, ConfigWithInstanceAndLiblist) {
   auto* cfg = r.cu->configs[0];
   ASSERT_GE(cfg->rules.size(), 2u);
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(ConfigParseTest, ConfigWithInstanceClause) {
   auto* unit = Parse(R"(

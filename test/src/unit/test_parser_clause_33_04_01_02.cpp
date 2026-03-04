@@ -6,7 +6,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-using DpiParseTest = ProgramTestParse;
 
 namespace {
 
@@ -65,7 +64,6 @@ TEST(ParserSection34, ConfigCoexistsWithModuleAndProtected) {
   EXPECT_EQ(r.cu->modules[0]->name, "protected_ip");
   EXPECT_EQ(r.cu->configs[0]->name, "ip_cfg");
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(ConfigParseTest, ConfigWithDefaultClause) {
   auto* unit = Parse(R"(

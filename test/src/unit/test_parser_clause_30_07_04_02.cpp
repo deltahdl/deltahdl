@@ -1,6 +1,8 @@
 // §30.7.4.2: Negative pulse detection
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -77,7 +79,6 @@ TEST(ParserA701, NoshowcancelledMultipleOutputs) {
   EXPECT_EQ(item->signal_list[0], "out1");
   EXPECT_EQ(item->signal_list[1], "out2");
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(SpecifyTest, Showcancelled) {
   auto* cu = Parse(

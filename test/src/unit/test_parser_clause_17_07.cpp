@@ -6,8 +6,6 @@
 
 using namespace delta;
 
-using CheckerParseTest = ProgramTestParse;
-
 namespace {
 
 TEST_F(CheckerParseTest, CheckerWithBitVector) {
@@ -19,7 +17,6 @@ TEST_F(CheckerParseTest, CheckerWithBitVector) {
   ASSERT_EQ(unit->checkers.size(), 1u);
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
-using VerifyParseTest = ProgramTestParse;
 
 TEST_F(VerifyParseTest, CheckerWithRandVariable) {
   auto* unit = Parse(R"(

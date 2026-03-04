@@ -1,6 +1,7 @@
 // §19.3: Defining the coverage model: covergroup
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;

@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"

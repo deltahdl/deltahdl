@@ -3,6 +3,7 @@
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
 #include "helpers_parser_verify.h"
+#include "parser/time_resolve.h"
 
 using namespace delta;
 

@@ -1,6 +1,7 @@
 // §31.3.1: $setup
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
@@ -104,7 +105,6 @@ TEST(ParserA70503, TimingCheckEventNoEdge) {
   EXPECT_EQ(tc->data_terminal.name, "clk");
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST_F(SpecifyParseTest, SpecifyBlockWithTimingCheck) {
   auto* unit = Parse(
       "module m; specify $setup(data, posedge clk, 10); endspecify "
@@ -114,8 +114,6 @@ TEST_F(SpecifyParseTest, SpecifyBlockWithTimingCheck) {
   ASSERT_EQ(items.size(), 1u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecifyBlock);
 }
-
-using ConfigParseTest = ProgramTestParse;
 
 TEST(ParserSection28, Sec28_12_TimingCheckSetup) {
   auto sp = ParseSpecifySingle(

@@ -1,6 +1,7 @@
 // §31.3.5: $recovery
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -23,8 +24,6 @@ TEST(ParserA70501, RecoveryTimingCheck) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecovery);
   EXPECT_EQ(tc->notifier, "ntfr");
 }
-
-using ConfigParseTest = ProgramTestParse;
 
 TEST(ParserSection28, Sec28_12_TimingCheckRecovery) {
   auto sp = ParseSpecifySingle(

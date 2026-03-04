@@ -1,7 +1,10 @@
 // §20.8.1: Integer math functions
 
+#include "builders_ast.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "fixture_simulator.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 

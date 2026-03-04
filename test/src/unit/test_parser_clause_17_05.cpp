@@ -6,8 +6,6 @@
 
 using namespace delta;
 
-using CheckerParseTest = ProgramTestParse;
-
 namespace {
 
 // =============================================================================
@@ -37,7 +35,6 @@ TEST_F(CheckerParseTest, CheckerWithInitialBlock) {
   EXPECT_TRUE(
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // §17.5 Checker procedures

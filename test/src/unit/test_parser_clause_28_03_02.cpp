@@ -2,7 +2,9 @@
 
 #include <gtest/gtest.h>
 
+#include "helpers_parser_verify.h"
 #include "model_gate_declaration.h"
+#include "model_gate_logic.h"
 
 namespace {
 

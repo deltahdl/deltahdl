@@ -1,6 +1,7 @@
 // §9.2.3: Final procedures
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;

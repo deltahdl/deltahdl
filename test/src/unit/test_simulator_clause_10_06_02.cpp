@@ -1,7 +1,9 @@
 // §10.6.2: The force and release procedural statements
 
+#include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_force_target.h"
+#include "helpers_stmt_exec.h"
 #include "helpers_switch_network.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"

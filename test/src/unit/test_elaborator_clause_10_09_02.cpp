@@ -1,6 +1,7 @@
 // §10.9.2: Structure assignment patterns
 
 #include "builders_ast.h"
+#include "fixture_program.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -189,10 +190,6 @@ TEST(Elaboration, StructPattern_DuplicateKey) {
       f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
 
 // §10.9: named assignment pattern elaborates for struct init
 TEST(ElabA60701, StructNamedPatternElaborates) {

@@ -1,6 +1,7 @@
 // §13.5.5: Optional argument list
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

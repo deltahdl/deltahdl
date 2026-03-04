@@ -1,6 +1,7 @@
 // §6.24.1: Cast operator
 
 #include "fixture_elaborator.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
 

@@ -1,7 +1,9 @@
 // §5.6.3: System tasks and system functions
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "simulator/vpi.h"
 
 using namespace delta;
 
@@ -55,9 +57,6 @@ TEST(ParserA609, SystemTfCallEmptyArgs) {
   ASSERT_NE(expr->args[2], nullptr);
 }
 
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
 // =============================================================================
 // LRM section 38.36 -- vpi_register_cb: DPI-C imports for VPI callbacks
 // These tests verify that DPI-C import declarations with signatures typical

@@ -30,8 +30,9 @@ TEST(ClockingSim, HierarchicalAccess) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0xCC);
 
   ClockingManager cmgr;
-  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data_in",
-                     ClockingDir::kInput);
+  SetupClockingBlock(
+      f, cmgr,
+      {"cb", Edge::kPosedge, {0}, {0}, "data_in", ClockingDir::kInput});
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();

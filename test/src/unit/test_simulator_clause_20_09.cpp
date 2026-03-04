@@ -1,5 +1,6 @@
 // §20.9: Bit vector system functions
 
+#include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"

@@ -1,6 +1,8 @@
 // §31.3.6: $recrem
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -27,7 +29,6 @@ TEST(ParserA70501, RecremFullArgs) {
   EXPECT_EQ(tc->delayed_ref, "dCLK");
   EXPECT_EQ(tc->delayed_data, "dRST");
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(SpecifyTest, RecremTimingCheck) {
   auto* cu = Parse(

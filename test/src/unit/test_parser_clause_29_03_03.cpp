@@ -1,6 +1,7 @@
 // §29.3.3: Sequential UDP initial statement
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -264,7 +265,6 @@ TEST(ParserAnnexA053, InitVal_Bare1) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
-using SpecifyParseTest = ProgramTestParse;
 // §3.7: Sequential UDP with initial statement — timing-accurate modeling
 //        for sequential gate-level circuits.
 TEST(ParserClause03, Cl3_7_SequentialUdp) {

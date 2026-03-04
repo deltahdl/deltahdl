@@ -133,8 +133,8 @@ TEST(SimCh4433, PreNBAExecutesBeforeNBA) {
 // Pre-NBA executes after Inactive and before NBA.
 // ---------------------------------------------------------------------------
 TEST(SimCh4433, PreNBAExecutesAfterInactiveBeforeNBA) {
-  VerifyThreeRegionOrder(Region::kInactive, "inactive", Region::kPreNBA,
-                         "pre_nba", Region::kNBA, "nba");
+  VerifyThreeRegionOrder({Region::kInactive, "inactive"},
+                         {Region::kPreNBA, "pre_nba"}, {Region::kNBA, "nba"});
 }
 
 // ---------------------------------------------------------------------------

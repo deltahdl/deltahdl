@@ -1,6 +1,7 @@
 // §13.5: Subroutine calls and argument passing
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

@@ -1,6 +1,7 @@
 // §16.12.3: Negation property
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -14,8 +15,6 @@ TEST(ParserA210, PropertyExpr_Not) {
               "  assert property (@(posedge clk) not a);\n"
               "endmodule\n"));
 }
-
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // Section 16.5.1 -- Property operators in concurrent assertions

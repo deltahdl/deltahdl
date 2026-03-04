@@ -1,6 +1,7 @@
 // §16.12.6: If-else property
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -23,8 +24,6 @@ TEST(ParserA210, PropertyExpr_IfNoElse) {
               "    if (mode) a |-> b);\n"
               "endmodule\n"));
 }
-
-using VerifyParseTest = ProgramTestParse;
 
 // Assert property with if-else inside property expression.
 TEST(ParserSection16, Sec16_5_1_PropertyIfElse) {

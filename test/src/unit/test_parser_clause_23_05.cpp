@@ -1,6 +1,7 @@
 // §23.5: Extern modules
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -38,8 +39,6 @@ TEST(ParserSection23, ExternModuleNoBody) {
     EXPECT_EQ(r.cu->modules[i]->is_extern, expected[i].is_extern);
   }
 }
-
-using ProgramParseTest = ProgramTestParse;
 
 // =========================================================================
 // LRM section 23.5: Extern modules

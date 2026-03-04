@@ -5,8 +5,6 @@
 
 using namespace delta;
 
-using ConfigParseTest = ProgramTestParse;
-
 ParseResult ParseLibrary(const std::string& src) {
   ParseResult result;
   auto fid = result.mgr.AddFile("<test>", src);

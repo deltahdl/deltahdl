@@ -5,7 +5,6 @@
 #include "fixture_program.h"
 
 using namespace delta;
-using DpiParseTest = ProgramTestParse;
 
 namespace {
 
@@ -154,8 +153,6 @@ TEST(LibraryText, ConfigInLibraryText) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
-
-using ConfigParseTest = ProgramTestParse;
 
 ParseResult ParseLibrary(const std::string& src) {
   ParseResult result;

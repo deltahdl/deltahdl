@@ -2,11 +2,10 @@
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-
-using ConfigParseTest = ProgramTestParse;
 
 namespace {
 

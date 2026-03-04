@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "simulator/dpi_runtime.h"
+#include "simulator/svdpi.h"
 
 using namespace delta;
 

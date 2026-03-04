@@ -1,6 +1,7 @@
 // §16.12.2: Sequence property
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -33,8 +34,6 @@ TEST(ParserA210, PropertyExpr_Weak) {
               "  assert property (@(posedge clk) weak(a ##1 b));\n"
               "endmodule\n"));
 }
-
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // Section 16.5.1 -- Strong and weak sequences

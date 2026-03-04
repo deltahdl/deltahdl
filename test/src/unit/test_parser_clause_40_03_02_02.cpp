@@ -6,9 +6,6 @@
 
 using namespace delta;
 
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
 namespace {
 
 TEST_F(ApiParseTest, CoverageGetMaxSystemCall) {

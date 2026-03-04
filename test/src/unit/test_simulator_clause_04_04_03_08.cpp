@@ -139,8 +139,9 @@ TEST(SimCh4438, PostReNBAExecutesAfterReNBA) {
 // Post-Re-NBA executes after Re-NBA and before Pre-Postponed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBAExecutesAfterReNBABeforePrePostponed) {
-  VerifyThreeRegionOrder(Region::kReNBA, "re_nba", Region::kPostReNBA,
-                         "post_re_nba", Region::kPrePostponed, "pre_postponed");
+  VerifyThreeRegionOrder({Region::kReNBA, "re_nba"},
+                         {Region::kPostReNBA, "post_re_nba"},
+                         {Region::kPrePostponed, "pre_postponed"});
 }
 
 // ---------------------------------------------------------------------------

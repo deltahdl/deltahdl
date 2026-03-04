@@ -1,6 +1,8 @@
 // §10.4.2: Nonblocking procedural assignments
 
+#include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_stmt_exec.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 

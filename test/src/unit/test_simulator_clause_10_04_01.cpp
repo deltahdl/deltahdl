@@ -1,7 +1,10 @@
 // §10.4.1: Blocking procedural assignments
 
+#include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "helpers_stmt_exec.h"
+#include "simulator/compiled_sim.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 

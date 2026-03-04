@@ -1,6 +1,7 @@
 // §21.4: Loading memory array data from a file
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -42,9 +43,6 @@ TEST(ParserSection21, ReadmembWithAddresses) {
               "endmodule\n"));
 }
 
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
 TEST_F(ApiParseTest, ReadmemhSystemCall) {
   auto* unit = Parse(R"(
     module m;

@@ -1,6 +1,7 @@
 // §11.5.1: Vector bit-select and part-select addressing
 
 #include "fixture_elaborator.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
 

@@ -1,6 +1,7 @@
 // §18.16: Random weighted case—randcase
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -68,8 +69,6 @@ TEST(ParserA604, StmtItemRandcaseStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
 }
 
-using CheckerParseTest = ProgramTestParse;
-
 // --- Randcase statement (§18.16) ---
 TEST(ParserSection18, RandcaseStmt) {
   auto r = Parse(
@@ -86,7 +85,6 @@ TEST(ParserSection18, RandcaseStmt) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // §18 Constrained random — randcase

@@ -1,6 +1,7 @@
 // §30.4.4.2: Simple state-dependent paths
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
@@ -39,7 +40,6 @@ TEST(ParserA702, PolarityWithConditionalPath) {
   EXPECT_NE(si->path.condition, nullptr);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
 }
-using ConfigParseTest = ProgramTestParse;
 
 // =============================================================================
 // §30.3.3 Conditional path delays
@@ -110,7 +110,6 @@ TEST(ParserA704, SixDelaysConditionalPath) {
   ASSERT_EQ(si->path.delays.size(), 6u);
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST(ParserSection28, Sec28_12_ConditionalPath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, en, output b);\n"

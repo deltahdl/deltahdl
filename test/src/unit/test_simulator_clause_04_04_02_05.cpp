@@ -120,9 +120,9 @@ TEST(SimCh4425, MultiplePassFailActionsScheduledInReactive) {
 // This confirms its position in the region ordering per §4.4.2.
 // ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedExecutesAfterActiveRegionSet) {
-  VerifyFourRegionOrder(Region::kActive, "active", Region::kInactive,
-                        "inactive", Region::kNBA, "nba", Region::kObserved,
-                        "observed");
+  VerifyFourRegionOrder({Region::kActive, "active"},
+                        {Region::kInactive, "inactive"}, {Region::kNBA, "nba"},
+                        {Region::kObserved, "observed"});
 }
 
 // ---------------------------------------------------------------------------

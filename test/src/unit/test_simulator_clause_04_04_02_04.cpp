@@ -43,7 +43,7 @@ TEST(SimCh4424, NBARegionExecutesEvents) {
 // NBA events execute only after Inactive events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAExecutesAfterInactive) {
-  VerifyTwoRegionOrder(Region::kInactive, "inactive", Region::kNBA, "nba");
+  VerifyTwoRegionOrder({Region::kInactive, "inactive"}, {Region::kNBA, "nba"});
 }
 
 // ---------------------------------------------------------------------------
@@ -137,9 +137,9 @@ TEST(SimCh4424, NBAToActiveIteration) {
 // This confirms its position in the region ordering per §4.4.2.
 // ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAExecutesAfterActiveAndInactiveBeforeObserved) {
-  VerifyFourRegionOrder(Region::kActive, "active", Region::kInactive,
-                        "inactive", Region::kNBA, "nba", Region::kObserved,
-                        "observed");
+  VerifyFourRegionOrder({Region::kActive, "active"},
+                        {Region::kInactive, "inactive"}, {Region::kNBA, "nba"},
+                        {Region::kObserved, "observed"});
 }
 
 // ---------------------------------------------------------------------------

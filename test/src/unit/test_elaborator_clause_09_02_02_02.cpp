@@ -1,6 +1,7 @@
 // §9.2.2.2: Combinational logic always_comb procedure
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 

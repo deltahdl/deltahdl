@@ -1,6 +1,7 @@
 // §27.4: Loop generate constructs
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -169,8 +170,6 @@ TEST(ParserSection27, GenerateForWithModuleInst2) {
   ASSERT_EQ(gen->gen_body.size(), 1u);
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
-
-using ProgramParseTest = ProgramTestParse;
 
 // =========================================================================
 // LRM section 27.3: Generate construct syntax / generate regions

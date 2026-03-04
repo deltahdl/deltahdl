@@ -1,6 +1,7 @@
 // Annex H.7.4: Basic types
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 

@@ -1,6 +1,7 @@
 // §17.3: Checker instantiation
 
 #include "fixture_checker_elab.h"
+#include "fixture_elaborator.h"
 
 namespace {
 

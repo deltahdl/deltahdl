@@ -2,6 +2,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_scheduler.h"
 #include "lexer/lexer.h"
 
 using namespace delta;

@@ -1,6 +1,7 @@
 // §16.14.1: Assert statement
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;

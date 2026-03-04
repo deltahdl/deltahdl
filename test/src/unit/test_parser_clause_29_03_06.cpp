@@ -1,6 +1,7 @@
 // §29.3.6: Summary of symbols
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -233,7 +234,6 @@ TEST(ParserAnnexA053, EdgeSymbol_SimStar) {
   EXPECT_EQ(eval.EvaluateWithEdge({'0'}, 0, '1'), '1');
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST(ParserSection29, UdpTableSpecialChars) {
   auto r = Parse(
       "primitive edge_detect(output reg q, input d, clk);\n"

@@ -1,6 +1,7 @@
 // §16.13.6: Sequence methods
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -40,8 +41,6 @@ TEST(ParserSection9, WaitSequenceTriggeredIfCheck) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
-
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // Section 16.5.1 -- Assert property with sequence methods

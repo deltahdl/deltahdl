@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/type_eval.h"
+#include "fixture_simulator.h"
 #include "parser/ast.h"
 
 using namespace delta;

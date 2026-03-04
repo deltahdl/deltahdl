@@ -6,6 +6,7 @@
 #include "fixture_lexer.h"
 #include "fixture_preprocessor.h"
 #include "fixture_simulator.h"
+#include "simulator/eval.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;

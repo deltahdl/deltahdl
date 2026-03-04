@@ -1,6 +1,7 @@
 // §30.4.4.4: The ifnone condition
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
@@ -24,7 +25,6 @@ TEST(ParserA702, StateDependentIfnoneSimple) {
   EXPECT_EQ(si->path.condition, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(SpecifyTest, IfnoneConditionalPath) {
   auto* cu = Parse(
@@ -75,7 +75,6 @@ TEST(ParserA83, ModulePathConditionalInSpecify) {
   EXPECT_FALSE(r.has_errors);
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST(ParserSection28, Sec28_12_IfnonePath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"

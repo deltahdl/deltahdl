@@ -5,8 +5,6 @@
 
 using namespace delta;
 
-using CheckerParseTest = ProgramTestParse;
-
 namespace {
 
 // Constraint with foreach and nested constraint_set

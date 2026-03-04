@@ -1,6 +1,7 @@
 // §29.3.2: UDP port declarations
 
 #include "fixture_parser.h"
+#include "simulator/udp_eval.h"
 
 using namespace delta;
 

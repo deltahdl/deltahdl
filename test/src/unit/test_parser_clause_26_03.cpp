@@ -1,6 +1,7 @@
 // §26.3: Referencing data in packages
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -79,9 +80,6 @@ TEST(ParserSection26, ModuleImportSpecific) {
   EXPECT_EQ(imp->import_item.item_name, "X");
 }
 
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
 // =============================================================================
 // Coexistence with package imports/exports
 // =============================================================================
@@ -389,8 +387,6 @@ TEST_F(ProgramTestParse, ProgramWithImport) {
   EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kImportDecl);
   EXPECT_TRUE(unit->programs[0]->items[0]->import_item.is_wildcard);
 }
-
-using ProgramParseTest = ProgramTestParse;
 
 TEST_F(ProgramParseTest, ProgramWithImportStatement) {
   auto* unit = Parse(

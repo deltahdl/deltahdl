@@ -18,8 +18,6 @@ TEST(SourceText, PackageItemStaticExternConstraint) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-using CheckerParseTest = ProgramTestParse;
-
 // extern_constraint_declaration with static and dynamic_override_specifiers
 TEST(SourceText, ExternConstraintDeclStaticOverride) {
   auto r = Parse(

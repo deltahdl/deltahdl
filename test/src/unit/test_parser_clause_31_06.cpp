@@ -1,6 +1,8 @@
 // §31.6: Notifiers: user-defined responses to timing violations
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -22,7 +24,6 @@ TEST(ParserA70502, NotifierVariable) {
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->notifier, "ntfr");
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(SpecifyTest, TimingCheckWithNotifier) {
   auto* cu = Parse(

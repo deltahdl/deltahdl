@@ -309,6 +309,9 @@ inline ModuleItem* FindClockingBlock(T& r, std::string_view name) {
 }
 
 // Find the specify block from a vector of module items.
+inline ModuleItem* FindSpecifyBlock(std::vector<ModuleItem*>& items) {
+  return FindItemByKind(items, ModuleItemKind::kSpecifyBlock);
+}
 inline ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
   return FindItemByKind(items, ModuleItemKind::kSpecifyBlock);
 }

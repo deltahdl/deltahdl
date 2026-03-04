@@ -1,6 +1,7 @@
 // §29.3.4: UDP state table
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -130,7 +131,6 @@ TEST(ParserAnnexA053, EdgeInputList_LeadingLevel) {
   EXPECT_EQ(udp->table[0].inputs[1], 'r');
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST(ParserSection29, SequentialCurrentStateField) {
   auto r = Parse(
       "primitive srff(output reg q, input s, r);\n"

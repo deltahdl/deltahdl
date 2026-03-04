@@ -1,6 +1,7 @@
 // §30.5: Assigning delays to module paths
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

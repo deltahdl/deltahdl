@@ -1,6 +1,7 @@
 // §35.5.1.2: input, output, and inout arguments
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 

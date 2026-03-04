@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "fixture_enum_methods.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 

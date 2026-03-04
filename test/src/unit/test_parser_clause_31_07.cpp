@@ -1,6 +1,8 @@
 // §31.7: Enabling timing checks with conditioned events
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -131,8 +133,6 @@ TEST(ParserA70503, EdgeTerminalPartSelectWithCondition) {
   EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kPartSelect);
   EXPECT_NE(tc->data_condition, nullptr);
 }
-
-using ConfigParseTest = ProgramTestParse;
 
 TEST(ParserSection28, Sec28_12_TimingCheckWithEdges) {
   auto sp = ParseSpecifySingle(

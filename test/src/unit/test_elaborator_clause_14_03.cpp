@@ -1,6 +1,8 @@
 // §14.3: Clocking block declaration
 
 #include "fixture_elaborator.h"
+#include "fixture_program.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -71,10 +73,6 @@ TEST(ElabA611, MultipleClockingBlocksElaborate) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
 
 // Clocking block with assertion_item_declaration elaborates
 TEST(ElabA611, AssertionItemDeclElaborates) {

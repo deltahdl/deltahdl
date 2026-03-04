@@ -1,6 +1,7 @@
 // §16.12.16: Case
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -58,7 +59,6 @@ TEST(ParserA210, PropertyCaseItem_DefaultNoColon) {
               "    endcase);\n"
               "endmodule\n"));
 }
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // §16.14.6 -- Property case (additional tests)

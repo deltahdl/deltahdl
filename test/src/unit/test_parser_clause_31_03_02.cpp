@@ -1,6 +1,7 @@
 // §31.3.2: $hold
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -36,8 +37,6 @@ TEST(ParserAnnexA, A7TimingCheckHold) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-using ConfigParseTest = ProgramTestParse;
 
 TEST(ParserSection28, Sec28_12_TimingCheckHold) {
   auto sp = ParseSpecifySingle(

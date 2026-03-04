@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -47,8 +48,6 @@ TEST(ParserSection23, TimeunitAndTimeprecision) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
-
-using ProgramParseTest = ProgramTestParse;
 
 // non_port_program_item ::= timeunits_declaration
 TEST(SourceText, ProgramTimeunitsDecl) {

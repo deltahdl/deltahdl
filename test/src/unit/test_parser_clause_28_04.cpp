@@ -1,8 +1,10 @@
 // §28.4: and, nand, nor, or, xor, and xnor gates
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
+#include "model_gate_logic.h"
 
 using namespace delta;
 
@@ -266,7 +268,6 @@ TEST(ParserA304, NInputGatetype_Xnor) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-using SpecifyParseTest = ProgramTestParse;
 // delay2: two values on n_input gate (rise, fall).
 TEST(ParserA223, Delay2NInputGateTwoValues) {
   auto r = Parse(

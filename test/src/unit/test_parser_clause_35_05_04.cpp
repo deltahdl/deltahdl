@@ -4,7 +4,9 @@
 #include "elaborator/rtlir.h"
 #include "fixture_config.h"
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "simulator/vpi.h"
 
 using namespace delta;
 
@@ -227,9 +229,6 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportWithCName) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
 TEST_F(DpiParseTest, DpiImportCoexistsWithPackageImport) {
   auto* unit = Parse(R"(
     module m;

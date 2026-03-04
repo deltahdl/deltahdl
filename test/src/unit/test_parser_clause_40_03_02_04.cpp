@@ -5,10 +5,6 @@
 
 using namespace delta;
 
-using DpiParseTest = ProgramTestParse;
-
-using ApiParseTest = ProgramTestParse;
-
 namespace {
 
 TEST(ParserSection40, CoverageMergeSystemCall) {

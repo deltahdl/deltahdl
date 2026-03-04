@@ -5,8 +5,6 @@
 
 using namespace delta;
 
-using VerifyParseTest = ProgramTestParse;
-
 namespace {
 
 // =============================================================================

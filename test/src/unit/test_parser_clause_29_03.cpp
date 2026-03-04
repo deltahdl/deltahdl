@@ -1,6 +1,7 @@
 // §29.3: UDP definition
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -63,7 +64,6 @@ TEST(ParserA504, UdpInst_ExternUdp) {
   EXPECT_EQ(insts[0]->inst_module, "my_udp");
 }
 
-using SpecifyParseTest = ProgramTestParse;
 // description: udp_declaration
 TEST(SourceText, DescriptionUdp) {
   auto r = Parse(

@@ -5,8 +5,6 @@
 
 using namespace delta;
 
-using CheckerParseTest = ProgramTestParse;
-
 namespace {
 
 // uniqueness_constraint ::= unique { range_list }

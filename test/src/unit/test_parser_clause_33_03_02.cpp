@@ -5,7 +5,6 @@
 #include "fixture_program.h"
 
 using namespace delta;
-using DpiParseTest = ProgramTestParse;
 
 namespace {
 

@@ -1,6 +1,7 @@
 // Annex G.4: Mailbox
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 

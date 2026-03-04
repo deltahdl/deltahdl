@@ -1,9 +1,12 @@
 // §21.5: Writing memory array data to a file
 
+#include <fstream>
+
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 namespace {

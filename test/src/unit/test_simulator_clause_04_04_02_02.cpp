@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "helpers_scheduler_event.h"
+#include "simulator/process.h"
 #include "simulator/scheduler.h"
 
 using namespace delta;
@@ -116,8 +117,8 @@ TEST(SimCh4422, ActiveSelfLoopSchedulesMoreActiveEvents) {
 // active region set iteration.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveExecutesBeforeInactive) {
-  VerifyTwoRegionOrder(Region::kActive, "active", Region::kInactive,
-                       "inactive");
+  VerifyTwoRegionOrder({Region::kActive, "active"},
+                       {Region::kInactive, "inactive"});
 }
 
 // ---------------------------------------------------------------------------
@@ -137,8 +138,9 @@ TEST(SimCh4422, ActiveIsWithinActiveRegionSet) {
 // The flow is: Preponed -> PreActive -> Active.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveExecutesAfterPreponedAndPreActive) {
-  VerifyThreeRegionOrder(Region::kPreponed, "preponed", Region::kPreActive,
-                         "preactive", Region::kActive, "active");
+  VerifyThreeRegionOrder({Region::kPreponed, "preponed"},
+                         {Region::kPreActive, "preactive"},
+                         {Region::kActive, "active"});
 }
 
 // ---------------------------------------------------------------------------
@@ -164,8 +166,9 @@ TEST(SimCh4422, ActiveParticipatesInNBAIteration) {
 // Active region is the target of this restart path.
 // ---------------------------------------------------------------------------
 TEST(SimCh4422, ActiveRestartsFromReactiveRegion) {
-  VerifyRegionRestart(Region::kActive, "active1", Region::kReactive, "reactive",
-                      Region::kActive, "active2");
+  VerifyRegionRestart({Region::kActive, "active1"},
+                      {Region::kReactive, "reactive"},
+                      {Region::kActive, "active2"});
 }
 TEST(Process, ProcessDefaultState_KindAndCoro) {
   Process p;

@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"

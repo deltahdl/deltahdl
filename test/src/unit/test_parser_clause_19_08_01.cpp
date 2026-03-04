@@ -1,6 +1,7 @@
 // §19.8.1: Overriding the built-in sample method
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

@@ -2,6 +2,7 @@
 
 #include "fixture_config.h"
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -87,7 +88,6 @@ TEST(ParserCh501, Sec5_1_AdjacentLineComments) {
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "a");
 }
-using DpiParseTest = ProgramTestParse;
 
 // Block comments.
 TEST(LibraryText, BlockComments) {

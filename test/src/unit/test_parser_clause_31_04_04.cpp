@@ -1,6 +1,8 @@
 // §31.4.4: $width
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -40,7 +42,6 @@ TEST(ParserA70501, WidthWithThreshold) {
   ASSERT_GE(tc->limits.size(), 2u);
   EXPECT_EQ(tc->notifier, "ntfr");
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(SpecifyTest, WidthTimingCheck) {
   auto* cu = Parse(

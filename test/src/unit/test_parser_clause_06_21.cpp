@@ -1,6 +1,7 @@
 // §6.21: Scope and lifetime
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -299,8 +300,6 @@ TEST(ParserSection4, Sec4_9_4_AutoVarInBeginEnd) {
   EXPECT_EQ(stmt->var_name, "temp");
   EXPECT_NE(stmt->var_init, nullptr);
 }
-
-using ProgramParseTest = ProgramTestParse;
 
 // =============================================================================
 // §24.5 Program lifetime qualifier

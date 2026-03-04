@@ -7,7 +7,6 @@
 
 using namespace delta;
 
-using SpecifyParseTest = ProgramTestParse;
 namespace {
 
 TEST(ParserSection28, SpecifyBlockSimplePath) {

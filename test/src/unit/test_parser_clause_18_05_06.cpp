@@ -1,6 +1,7 @@
 // §18.5.6: if–else constraints
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -24,8 +25,6 @@ TEST(ParserSection18b, DistInsideIfConstraint) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
-
-using CheckerParseTest = ProgramTestParse;
 
 // constraint_set ::= constraint_expression | { { constraint_expression } }
 TEST(SourceText, ConstraintSet) {

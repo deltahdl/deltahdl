@@ -1,6 +1,7 @@
 // §16.12.1: Property instantiation
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -88,7 +89,6 @@ TEST(ParserAnnexF, AnnexFPropertyReference) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // Section 16.5.1 -- Assert property with named property instance

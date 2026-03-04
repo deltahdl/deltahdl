@@ -1,6 +1,7 @@
 // §34.4: Protect pragma directives
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 

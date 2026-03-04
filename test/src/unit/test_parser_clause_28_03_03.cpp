@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "model_gate_logic.h"
 
 using namespace delta;
 

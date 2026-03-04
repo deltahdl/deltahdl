@@ -1,6 +1,7 @@
 // §18.17: Random sequence generation—randsequence
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -168,8 +169,6 @@ TEST(ParserA612, RsProductionItemBare) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-using CheckerParseTest = ProgramTestParse;
 
 // --- Randsequence statement (§18.17) ---
 TEST(ParserSection18, RandsequenceStmt) {

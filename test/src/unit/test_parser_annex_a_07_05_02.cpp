@@ -1,6 +1,7 @@
 // Annex A.7.5.2: System timing check command arguments
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

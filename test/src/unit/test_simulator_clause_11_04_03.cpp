@@ -4,6 +4,7 @@
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
 #include "parser/ast.h"
+#include "simulator/compiled_sim.h"
 #include "simulator/eval.h"
 #include "simulator/lowerer.h"
 

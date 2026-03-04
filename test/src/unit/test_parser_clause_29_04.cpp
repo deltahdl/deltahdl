@@ -1,8 +1,10 @@
 // §29.4: Combinational UDPs
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
+#include "simulator/udp_eval.h"
 
 using namespace delta;
 
@@ -309,7 +311,6 @@ static void VerifyUdpInputNames(const UdpDecl* udp,
   }
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST(ParserSection29, CombinationalUdp) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"

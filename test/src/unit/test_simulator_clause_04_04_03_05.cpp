@@ -80,8 +80,9 @@ TEST(SimCh4435, PreObservedReadsAfterActiveRegionSetStabilized) {
 // Pre-Observed executes after PostNBA and before Observed.
 // ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedExecutesAfterPostNBABeforeObserved) {
-  VerifyThreeRegionOrder(Region::kPostNBA, "post_nba", Region::kPreObserved,
-                         "pre_observed", Region::kObserved, "observed");
+  VerifyThreeRegionOrder({Region::kPostNBA, "post_nba"},
+                         {Region::kPreObserved, "pre_observed"},
+                         {Region::kObserved, "observed"});
 }
 
 // ---------------------------------------------------------------------------

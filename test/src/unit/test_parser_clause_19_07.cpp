@@ -1,6 +1,7 @@
 // §19.7: Specifying coverage options
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -67,7 +68,6 @@ TEST(ParserA211, CoverGroup_MultipleOptions) {
               "  endgroup\n"
               "endmodule\n"));
 }
-using VerifyParseTest = ProgramTestParse;
 
 TEST_F(VerifyParseTest, CovergroupWithOption) {
   auto* unit = Parse(R"(

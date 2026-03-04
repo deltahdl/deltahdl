@@ -1,6 +1,7 @@
 // §19.5: Defining coverage points
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -118,7 +119,6 @@ TEST(ParserA211, CoverGroup_WildcardIllegalIgnore) {
               "  endgroup\n"
               "endmodule\n"));
 }
-using VerifyParseTest = ProgramTestParse;
 
 TEST_F(VerifyParseTest, CovergroupWithIff) {
   auto* unit = Parse(R"(

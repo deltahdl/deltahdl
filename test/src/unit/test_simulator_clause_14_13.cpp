@@ -22,8 +22,9 @@ TEST(SimA611, InputSamplingPosedge) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
 
   ClockingManager cmgr;
-  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data_in",
-                     ClockingDir::kInput);
+  SetupClockingBlock(
+      f, cmgr,
+      {"cb", Edge::kPosedge, {0}, {0}, "data_in", ClockingDir::kInput});
 
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
@@ -47,8 +48,8 @@ TEST(SimA611, SampledValueUpdatesAcrossEdges) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0x11);
 
   ClockingManager cmgr;
-  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data",
-                     ClockingDir::kInput);
+  SetupClockingBlock(
+      f, cmgr, {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
 
   // First posedge at t=10 samples 0x11
   SchedulePosedge(f, clk, 10);
@@ -115,8 +116,8 @@ TEST(ClockingSim, SampledValueUpdatesOnEachEdge) {
   data->value = MakeLogic4VecVal(f.arena, 8, 0x11);
 
   ClockingManager cmgr;
-  SetupClockingBlock(f, cmgr, "cb", Edge::kPosedge, {0}, {0}, "data",
-                     ClockingDir::kInput);
+  SetupClockingBlock(
+      f, cmgr, {"cb", Edge::kPosedge, {0}, {0}, "data", ClockingDir::kInput});
 
   // First posedge: data = 0x11
   auto* ev1 = f.scheduler.GetEventPool().Acquire();

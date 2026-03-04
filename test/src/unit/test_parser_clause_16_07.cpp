@@ -1,6 +1,7 @@
 // §16.7: Sequences
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -121,8 +122,6 @@ TEST(ParserA210, SequenceExpr_ParenWithMatchItems) {
               "    (a ##1 b, x = c) |-> d);\n"
               "endmodule\n"));
 }
-
-using VerifyParseTest = ProgramTestParse;
 
 // =============================================================================
 // Section 16.5.1 -- Sequence operators in concurrent assertions

@@ -43,8 +43,8 @@ TEST(SimCh4428, ReNBARegionExecutesEvents) {
 // Re-NBA events execute only after Re-Inactive events have drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAExecutesAfterReInactive) {
-  VerifyTwoRegionOrder(Region::kReInactive, "reinactive", Region::kReNBA,
-                       "renba");
+  VerifyTwoRegionOrder({Region::kReInactive, "reinactive"},
+                       {Region::kReNBA, "renba"});
 }
 
 // ---------------------------------------------------------------------------
@@ -138,9 +138,9 @@ TEST(SimCh4428, ReNBAToReactiveIteration) {
 // PostReNBA.  This confirms its position in the region ordering per §4.4.2.
 // ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAExecutesAfterReactiveAndReInactiveBeforePostReNBA) {
-  VerifyFourRegionOrder(Region::kReactive, "reactive", Region::kReInactive,
-                        "reinactive", Region::kReNBA, "renba",
-                        Region::kPostReNBA, "post_renba");
+  VerifyFourRegionOrder(
+      {Region::kReactive, "reactive"}, {Region::kReInactive, "reinactive"},
+      {Region::kReNBA, "renba"}, {Region::kPostReNBA, "post_renba"});
 }
 
 // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 
 #include "fixture_config.h"
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -22,7 +23,6 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportPure) {
   EXPECT_FALSE(items[0]->dpi_is_context);
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
-using DpiParseTest = ProgramTestParse;
 
 TEST_F(DpiParseTest, ImportPureFunction) {
   auto* unit = Parse(R"(

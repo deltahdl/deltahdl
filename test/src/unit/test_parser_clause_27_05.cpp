@@ -1,6 +1,7 @@
 // §27.5: Conditional generate constructs
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -171,8 +172,6 @@ TEST(ParserSection27, GenerateIfWithNestedFor) {
   ASSERT_GE(mod->items[0]->gen_body.size(), 1u);
   EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
-
-using ProgramParseTest = ProgramTestParse;
 
 TEST(ParserSection23, GenerateRegionWithIf) {
   auto r = Parse(

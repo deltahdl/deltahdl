@@ -1,6 +1,7 @@
 // §8.6: Object methods
 
 #include "builders_ast.h"
+#include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "parser/ast.h"

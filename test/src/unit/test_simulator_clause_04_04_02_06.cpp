@@ -117,8 +117,8 @@ TEST(SimCh4426, ReactiveSelfLoopSchedulesMoreReactiveEvents) {
 // same reactive region set iteration.
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveExecutesBeforeReInactive) {
-  VerifyTwoRegionOrder(Region::kReactive, "reactive", Region::kReInactive,
-                       "reinactive");
+  VerifyTwoRegionOrder({Region::kReactive, "reactive"},
+                       {Region::kReInactive, "reinactive"});
 }
 
 // ---------------------------------------------------------------------------
@@ -139,8 +139,9 @@ TEST(SimCh4426, ReactiveIsWithinReactiveRegionSet) {
 // Figure 4-1.  The flow is: Observed -> PostObserved -> Reactive.
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveExecutesAfterObservedAndPostObserved) {
-  VerifyThreeRegionOrder(Region::kObserved, "observed", Region::kPostObserved,
-                         "post_observed", Region::kReactive, "reactive");
+  VerifyThreeRegionOrder({Region::kObserved, "observed"},
+                         {Region::kPostObserved, "post_observed"},
+                         {Region::kReactive, "reactive"});
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +167,7 @@ TEST(SimCh4426, ReactiveParticipatesInReNBAIteration) {
 // restarts (per Figure 4-1 feedback).
 // ---------------------------------------------------------------------------
 TEST(SimCh4426, ReactiveSchedulesActiveRestart) {
-  VerifyRegionRestart(Region::kActive, "active1", Region::kReactive, "reactive",
-                      Region::kActive, "active2");
+  VerifyRegionRestart({Region::kActive, "active1"},
+                      {Region::kReactive, "reactive"},
+                      {Region::kActive, "active2"});
 }

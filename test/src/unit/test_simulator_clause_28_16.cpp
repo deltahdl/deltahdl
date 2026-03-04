@@ -7,6 +7,7 @@
 #include <initializer_list>
 
 #include "helpers_mintymax.h"
+#include "model_gate_logic.h"
 
 // --- Local types for gate/net delays (§28.16) ---
 struct DelaySpec {

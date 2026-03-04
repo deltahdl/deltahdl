@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
 namespace {

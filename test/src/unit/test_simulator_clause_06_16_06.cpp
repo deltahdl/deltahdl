@@ -1,6 +1,8 @@
 // §6.16.6: Compare()
 
+#include "builders_ast.h"
 #include "fixture_string.h"
+#include "simulator/eval.h"
 
 using namespace delta;
 

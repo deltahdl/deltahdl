@@ -6,7 +6,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-using ConfigParseTest = ProgramTestParse;
 
 namespace {
 
@@ -288,7 +287,6 @@ TEST(ParserA702, EdgeSensitiveFullEdgeKeywordWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST(ParserSection28, Sec28_12_PosedgeSensitivePath) {
   auto sp = ParseSpecifySingle(
       "module m(input clk, output q);\n"

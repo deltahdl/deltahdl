@@ -5,8 +5,6 @@
 
 using namespace delta;
 
-using CheckerParseTest = ProgramTestParse;
-
 namespace {
 
 // constraint_declaration with dynamic_override_specifiers (§8.20)

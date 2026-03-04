@@ -5,7 +5,6 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-using VerifyParseTest = ProgramTestParse;
 
 namespace {
 

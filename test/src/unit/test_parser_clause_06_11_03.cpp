@@ -1,6 +1,7 @@
 // §6.11.3: Signed and unsigned integer types
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -229,8 +230,6 @@ TEST(ParserSection6, RegUnsignedDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   EXPECT_FALSE(item->data_type.is_signed);
 }
-
-using CheckerParseTest = ProgramTestParse;
 
 // --- int unsigned return type and variable decl (§18.13) ---
 TEST(ParserSection18, IntUnsignedFunctionReturnType) {

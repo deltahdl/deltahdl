@@ -2,6 +2,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "helpers_scheduler_event.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -274,8 +275,9 @@ TEST(SimCh45, ReactiveSetReIteratesWhenReInactiveGeneratesReactive) {
 // Pre-Postponed only fires after Active and Reactive sets are fully drained.
 // ---------------------------------------------------------------------------
 TEST(SimCh45, PrePostponedOnlyAfterActiveAndReactiveSetsEmpty) {
-  VerifyThreeRegionOrder(Region::kActive, "active", Region::kReactive,
-                         "reactive", Region::kPrePostponed, "pre_postponed");
+  VerifyThreeRegionOrder({Region::kActive, "active"},
+                         {Region::kReactive, "reactive"},
+                         {Region::kPrePostponed, "pre_postponed"});
 }
 
 // ---------------------------------------------------------------------------

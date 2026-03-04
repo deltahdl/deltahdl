@@ -1,6 +1,7 @@
 // §19.6: Defining cross coverage
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -130,7 +131,6 @@ TEST(ParserA211, CoverGroup_CrossThreeItems) {
               "  endgroup\n"
               "endmodule\n"));
 }
-using VerifyParseTest = ProgramTestParse;
 
 TEST_F(VerifyParseTest, CovergroupWithCross) {
   auto* unit = Parse(R"(

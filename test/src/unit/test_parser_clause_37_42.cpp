@@ -1,6 +1,7 @@
 // §37.42: Task and function call
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 

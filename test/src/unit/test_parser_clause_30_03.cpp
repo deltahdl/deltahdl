@@ -1,6 +1,7 @@
 // §30.3: Specify block declaration
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
@@ -140,8 +141,6 @@ TEST(ParserA701, SpecifyBlockCoexistsWithModuleItems) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
 }
 
-using ConfigParseTest = ProgramTestParse;
-
 TEST(ParserSection28, Sec28_12_MixedPathsAndTimingChecks) {
   EXPECT_TRUE(
       ParseOk("module m(input a, d, clk, output b);\n"
@@ -176,7 +175,6 @@ TEST(ParserA701, MultipleSpecifyBlocksInModule) {
   EXPECT_EQ(spec_count, 2);
 }
 
-using SpecifyParseTest = ProgramTestParse;
 TEST_F(SpecifyParseTest, EmptySpecifyBlock) {
   auto* unit = Parse("module m; specify endspecify endmodule");
   ASSERT_EQ(unit->modules.size(), 1u);

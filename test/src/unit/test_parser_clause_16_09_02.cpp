@@ -1,6 +1,7 @@
 // §16.9.2: Repetition in sequences
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -115,8 +116,6 @@ TEST(ParserA210, SequenceExpr_SequenceInstanceWithAbbrev) {
               "  assert property (@(posedge clk) s [*3] |-> c);\n"
               "endmodule\n"));
 }
-
-using VerifyParseTest = ProgramTestParse;
 
 // Assert property with [*N] consecutive repetition.
 TEST(ParserSection16, Sec16_5_1_SequenceConsecutiveRepetition) {

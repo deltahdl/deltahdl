@@ -1,5 +1,6 @@
 // §6.11.2: 2-state (two-value) and 4-state (four-value) data types
 
+#include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 

@@ -1,6 +1,7 @@
 // §16.12.7: Implication
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -37,7 +38,6 @@ TEST(ParserA210, SequenceInstance_InProperty) {
               "  assert property (p);\n"
               "endmodule\n"));
 }
-using VerifyParseTest = ProgramTestParse;
 
 // Assert property with overlapped implication (|->).
 TEST(ParserSection16, Sec16_5_1_AssertPropertyOverlappedImplication) {

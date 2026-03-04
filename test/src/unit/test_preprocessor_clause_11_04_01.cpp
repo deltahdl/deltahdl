@@ -1,6 +1,7 @@
 // §11.4.1: Assignment operators
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 

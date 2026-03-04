@@ -1,6 +1,7 @@
 // §35.5.1.3: Special properties pure and context
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 
 using namespace delta;
 

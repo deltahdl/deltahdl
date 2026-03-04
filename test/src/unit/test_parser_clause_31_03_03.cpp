@@ -1,6 +1,8 @@
 // §31.3.3: $setuphold
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
+#include "fixture_specify.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -90,7 +92,6 @@ TEST(ParserA70502, DelayedRefDataSimple) {
   EXPECT_EQ(tc->delayed_ref, "dCLK");
   EXPECT_EQ(tc->delayed_data, "dDATA");
 }
-using ConfigParseTest = ProgramTestParse;
 
 TEST_F(SpecifyTest, SetupholdTimingCheck) {
   auto* cu = Parse(

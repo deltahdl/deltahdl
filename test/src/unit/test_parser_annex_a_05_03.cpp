@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "simulator/udp_eval.h"
 
 using namespace delta;
 

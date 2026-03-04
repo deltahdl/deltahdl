@@ -1,6 +1,7 @@
 // §13.4: Functions
 
 #include "fixture_parser.h"
+#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -231,8 +232,6 @@ TEST(ParserA604, FunctionBodyMultipleStatements) {
   EXPECT_EQ(func->func_body_stmts[1]->kind, StmtKind::kNull);
   EXPECT_EQ(func->func_body_stmts[2]->kind, StmtKind::kBlockingAssign);
 }
-
-using CheckerParseTest = ProgramTestParse;
 
 // --- Block-level var decl in function body ---
 TEST(ParserSection18, FuncBodyVarDecl) {
