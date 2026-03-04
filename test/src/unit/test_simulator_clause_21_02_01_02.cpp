@@ -44,4 +44,10 @@ TEST(FormatArg, OctalLeadingZeros) {
   EXPECT_EQ(FormatArg(val, 'o'), "005");
 }
 
+TEST(FormatArg, BinaryReturnsToString) {
+  Arena arena;
+  auto val = MakeLogic4VecVal(arena, 4, 0b1010);
+  EXPECT_EQ(FormatArg(val, 'b'), "1010");
+}
+
 }  // namespace
