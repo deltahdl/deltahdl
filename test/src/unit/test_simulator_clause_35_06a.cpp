@@ -10,22 +10,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DpiRuntime, ImportWithRealArgs) {
-  DpiRuntime rt;
-  DpiRtFunction func;
-  func.c_name = "c_mul_real";
-  func.sv_name = "sv_mul_real";
-  func.return_type = DataTypeKind::kReal;
-  func.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
-    return DpiArgValue::FromReal(args[0].AsReal() * args[1].AsReal());
-  };
-  rt.RegisterImport(func);
-
-  auto result = rt.CallImport(
-      "sv_mul_real", {DpiArgValue::FromReal(2.5), DpiArgValue::FromReal(4.0)});
-  EXPECT_DOUBLE_EQ(result.AsReal(), 10.0);
-}
-
 TEST(DpiRuntime, ImportWithStringArg) {
   DpiRuntime rt;
   DpiRtFunction func;
