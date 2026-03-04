@@ -37,9 +37,7 @@ TEST(SimCh4097, CopyInOnInvocation) {
 
   auto* invoke = sched.GetEventPool().Acquire();
   invoke->kind = EventKind::kEvaluation;
-  invoke->callback = [&]() {
-    copied_in = src;
-  };
+  invoke->callback = [&]() { copied_in = src; };
   sched.ScheduleEvent({0}, Region::kActive, invoke);
 
   auto* change_src = sched.GetEventPool().Acquire();
