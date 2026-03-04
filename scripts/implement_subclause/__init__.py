@@ -134,10 +134,11 @@ def check_supplementary_args(
     figures: list[Path],
     tables: list[Path],
     ignore_figures: list[str],
-) -> None:
+) -> list[str]:
     """Validate that all required figures/tables are provided.
 
-    Exits with an error if any are missing or paths don't exist.
+    Returns the list of validated labels.
+    Raises ``SystemExit`` if any are missing or paths don't exist.
     """
     errors: list[str] = []
 
@@ -182,6 +183,8 @@ def check_supplementary_args(
         for e in errors:
             print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
+
+    return lrm_figs + lrm_tbls
 
 
 def build_supplementary_lines(

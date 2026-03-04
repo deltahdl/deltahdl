@@ -71,8 +71,12 @@ def check_supplementary_args(
     figures: list[Path],
     tables: list[Path],
     ignore_figures: list[str],
-) -> None:
-    """Validate that all clause-level figures/tables are provided."""
+) -> list[str]:
+    """Validate that all clause-level figures/tables are provided.
+
+    Returns the list of validated labels.
+    Raises ``SystemExit`` if any are missing or paths don't exist.
+    """
     errors: list[str] = []
 
     for path in figures:
@@ -116,6 +120,8 @@ def check_supplementary_args(
         for e in errors:
             print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
+
+    return lrm_figs + lrm_tbls
 
 
 def filter_implementable(

@@ -266,10 +266,9 @@ def test_check_supplementary_passes_when_all_provided(tmp_path) -> None:
     fig.write_text("digraph {}")
     tbl = tmp_path / "TABLE_4_1.md"
     tbl.write_text("| col |\n")
-    check_supplementary_args(
+    assert check_supplementary_args(
         "4", lrm, figures=[fig], tables=[tbl], ignore_figures=[],
-    )
-    assert not False
+    ) == ["4-1", "4-1"]
 
 
 def test_check_supplementary_fails_figure_path_missing(tmp_path) -> None:
@@ -303,10 +302,9 @@ def test_check_supplementary_ignore_figures(tmp_path) -> None:
     lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
     tbl = tmp_path / "TABLE_4_1.md"
     tbl.write_text("| col |\n")
-    check_supplementary_args(
+    assert check_supplementary_args(
         "4", lrm, figures=[], tables=[tbl], ignore_figures=["4-1"],
-    )
-    assert not False
+    ) == ["4-1", "4-1"]
 
 
 # --- parse_args supplementary flags ---
