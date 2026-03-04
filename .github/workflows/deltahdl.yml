@@ -556,7 +556,7 @@ jobs:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [integration-test-asan-ubsan, test-run-sim-tests]
     runs-on: ubuntu-24.04
     steps:
@@ -574,7 +574,7 @@ jobs:
   e2e-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [integration-test-coverage, test-run-sim-tests]
     runs-on: ubuntu-24.04
     steps:
@@ -596,7 +596,7 @@ jobs:
           path: profraw/
           retention-days: 1
   e2e-test-macos-26-arm64-clang:
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [integration-test-macos-26-arm64-clang, test-run-sim-tests]
     runs-on: macos-26
     steps:
@@ -614,7 +614,7 @@ jobs:
   e2e-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [integration-test-tsan, test-run-sim-tests]
     runs-on: ubuntu-24.04
     steps:
@@ -630,7 +630,7 @@ jobs:
       - name: E2E tests
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
   e2e-test-ubuntu-24-04-x86-64-clang:
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [integration-test-ubuntu-24-04-x86-64-clang, test-run-sim-tests]
     runs-on: ubuntu-24.04
     steps:
@@ -646,7 +646,7 @@ jobs:
       - name: E2E tests
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
   e2e-test-ubuntu-24-04-x86-64-gcc:
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [integration-test-ubuntu-24-04-x86-64-gcc, test-run-sim-tests]
     runs-on: ubuntu-24.04
     steps:
@@ -672,7 +672,7 @@ jobs:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: ubuntu-24.04
     steps:
@@ -696,7 +696,7 @@ jobs:
   integration-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: ubuntu-24.04
     steps:
@@ -724,7 +724,7 @@ jobs:
           path: profraw/
           retention-days: 1
   integration-test-macos-26-arm64-clang:
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: macos-26
     steps:
@@ -748,7 +748,7 @@ jobs:
   integration-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: ubuntu-24.04
     steps:
@@ -770,7 +770,7 @@ jobs:
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
   integration-test-ubuntu-24-04-x86-64-clang:
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: ubuntu-24.04
     steps:
@@ -792,7 +792,7 @@ jobs:
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
   integration-test-ubuntu-24-04-x86-64-gcc:
-    if: !failure() && !cancelled()
+    if: ${{ !failure() && !cancelled() }}
     needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: ubuntu-24.04
     steps:
