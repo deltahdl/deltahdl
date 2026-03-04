@@ -313,6 +313,7 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
     cmd = [
         "claude", "-p",
         "--model", model,
+        "--verbose",
         "--dangerously-skip-permissions",
     ]
 
