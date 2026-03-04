@@ -186,6 +186,17 @@ TEST(ElabA91, DefaultValueBitOne) {
   EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 1);
 }
 
+static void VerifyFirstAttrResolved(RtlirDesign* design, ElabFixture& f,
+                                    int64_t expected) {
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  ASSERT_FALSE(mod->variables[0].attrs.empty());
+  ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), expected);
+}
+
 // =========================================================================
 // §5.12 Semantic: Attribute takes type of expression when value assigned
 // =========================================================================
@@ -216,13 +227,7 @@ TEST(ElabA91, AttributeValueConstExpr) {
       "  (* depth = 3 + 5 *) logic [7:0] mem;\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  ASSERT_FALSE(mod->variables[0].attrs.empty());
-  ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 8);
+  VerifyFirstAttrResolved(design, f, 8);
 }
 
 TEST(ElabA91, AttributeValueString) {
@@ -605,13 +610,7 @@ TEST(ElabA91, AttrValueLargeInt) {
       "  (* weight = 255 *) logic x;\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  ASSERT_FALSE(mod->variables[0].attrs.empty());
-  ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 255);
+  VerifyFirstAttrResolved(design, f, 255);
 }
 
 // =========================================================================
