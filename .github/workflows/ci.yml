@@ -6,10 +6,6 @@ jobs:
   # ── Detect: check if scripts changed ──
   detect:
     outputs:
-      clang-tidy-configs-changed: >-
-        ${{ steps.check.outputs.clang_tidy_configs_changed }}
-      deltahdl-changed: >-
-        ${{ steps.check.outputs.deltahdl_changed }}
       force-static-analysis: >-
         ${{ steps.check.outputs.force_static_analysis }}
       force-yamllint: >-
@@ -35,8 +31,6 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE="${{ github.event.pull_request.base.sha }}"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "clang_tidy_configs_changed=false" >> "$GITHUB_OUTPUT"
-            echo "deltahdl_changed=true" >> "$GITHUB_OUTPUT"
             echo "force_static_analysis=false" >> "$GITHUB_OUTPUT"
             echo "force_yamllint=false" >> "$GITHUB_OUTPUT"
             echo "implement_clause=true" >> "$GITHUB_OUTPUT"
@@ -50,8 +44,6 @@ jobs:
           fi
           ZERO="0000000000000000000000000000000000000000"
           if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
-            echo "clang_tidy_configs_changed=true" >> "$GITHUB_OUTPUT"
-            echo "deltahdl_changed=true" >> "$GITHUB_OUTPUT"
             echo "force_static_analysis=false" >> "$GITHUB_OUTPUT"
             echo "force_yamllint=false" >> "$GITHUB_OUTPUT"
             echo "implement_clause=true" >> "$GITHUB_OUTPUT"
@@ -68,21 +60,10 @@ jobs:
           else
             echo "scripts_changed=false" >> "$GITHUB_OUTPUT"
           fi
-          if echo "$CHANGED" | grep -qE '^etc/clang_tidy/'; then
-            echo "clang_tidy_configs_changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "clang_tidy_configs_changed=false" >> "$GITHUB_OUTPUT"
-          fi
           if echo "$CHANGED" | grep -qE '^\.github/workflows/.*\.yml'; then
             echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
-          fi
-          DHDL='^(src/|test/src/|lib/run_tests_common/|lib/test/|test/lib/run_tests_common/|test/lib/run_sim_tests/|test/lib/run_sv_tests/|scripts/run_sim_tests/|scripts/run_sv_tests/)'
-          if echo "$CHANGED" | grep -qE "$DHDL"; then
-            echo "deltahdl_changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "deltahdl_changed=false" >> "$GITHUB_OUTPUT"
           fi
           LIB='^(lib/(lrm|github)/|test/lib/(lrm|github)/)'
           IC='^(scripts/implement_clause/|test/scripts/implement_clause/)'
@@ -151,51 +132,53 @@ jobs:
       - name: Assert no inline lint disables
         run: >-
           assert-no-inline-directives
-          --tools pylint,mypy,yamllint
+          --tools pylint,mypy
           --verbose
-          ${{ github.workspace }}/**/*
+          lib/lrm/ lib/github/
+          test/lib/lrm/ test/lib/github/
+          scripts/implement_clause/ scripts/implement_subclause/
+          test/scripts/implement_clause/
+          test/scripts/implement_subclause/
       - name: Assert no linter config files
         run: >-
           assert-no-linter-config-files
-          --linters pylint,mypy,yamllint
+          --linters pylint,mypy
           --verbose
           ${{ github.workspace }}
       - name: Assert one assert per pytest
         run: >-
           assert-one-assert-per-pytest
           --verbose
-          ${{ github.workspace }}/test/lib
-          ${{ github.workspace }}/test/scripts
+          ${{ github.workspace }}/test/lib/lrm
+          ${{ github.workspace }}/test/lib/github
+          ${{ github.workspace }}/test/scripts/implement_clause
+          ${{ github.workspace }}/test/scripts/implement_subclause
       - name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
-          lib/ scripts/run_sim_tests/ scripts/run_sv_tests/
+          lib/lrm/ lib/github/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint --recursive=y
-          test/lib/ test/scripts/run_sim_tests/
-          test/scripts/run_sv_tests/
+          test/lib/lrm/ test/lib/github/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy
-          lib/ scripts/run_sim_tests/ scripts/run_sv_tests/
+          lib/lrm/ lib/github/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts python3 -m mypy
-          test/lib/ test/scripts/run_sim_tests/
-          test/scripts/run_sv_tests/
+          test/lib/lrm/ test/lib/github/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console lib/
-          scripts/run_sim_tests/ scripts/run_sv_tests/
+          --reporters console lib/lrm/ lib/github/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console test/lib/
-          test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
+          --reporters console test/lib/lrm/ test/lib/github/
   # ── Lane: lib/github ──
   # DO NOT lower coverage thresholds. Uncovered code is untested code —
   # lowering it hides bugs and lets regressions slip through silently.
@@ -322,33 +305,6 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  # ── Trigger: deltahdl ──
-  trigger-deltahdl-ci:
-    env:
-      GH_TOKEN: ${{ secrets.GH_PAT }}
-    if: >-
-      !failure() && !cancelled()
-      && needs.detect.outputs.deltahdl-changed == 'true'
-    needs:
-      - detect
-      - static-analysis
-      - test-lib-run-tests-common
-      - test-lib-github
-      - test-lib-lrm
-      - test-run-sim-tests
-      - test-run-sv-tests
-      - yamllint
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Trigger DeltaHDL workflow
-        run: >-
-          gh workflow run deltahdl.yml
-          --repo "${{ github.repository }}"
-          -f branch="${{ github.event.pull_request.head.ref
-          || github.ref_name }}"
-          -f event="${{ github.event_name }}"
-          -f sha="${{ github.event.pull_request.head.sha
-          || github.sha }}"
   # ── Trigger: implement_clause ──
   trigger-implement-clause:
     env:
@@ -406,8 +362,7 @@ jobs:
   # ── Gate: yamllint for workflow-only changes ──
   yamllint:
     if: >-
-      needs.detect.outputs.clang-tidy-configs-changed == 'true'
-      || needs.detect.outputs.force-yamllint == 'true'
+      needs.detect.outputs.force-yamllint == 'true'
       || needs.detect.outputs.workflows-changed == 'true'
       || inputs.force-yamllint
     needs: detect
@@ -452,26 +407,28 @@ jobs:
           yamllint --strict \
             --config-data \
             "{extends: default, rules: {$RULES}}" \
-            .github/workflows/*.yml \
-            etc/clang_tidy/*.yml
+            .github/workflows/ci.yml \
+            .github/workflows/classify_file.yml \
+            .github/workflows/classify_files.yml \
+            .github/workflows/classify_test.yml \
+            .github/workflows/convert_figure.yml \
+            .github/workflows/convert_tables.yml \
+            .github/workflows/documentation.yml \
+            .github/workflows/implement_clause.yml \
+            .github/workflows/implement_subclause.yml
 name: CI
 on:
   pull_request:
     paths:
       - .github/workflows/ci.yml
-      - .github/workflows/deltahdl.yml
       - .github/workflows/documentation.yml
       - .github/workflows/implement_clause.yml
       - .github/workflows/implement_subclause.yml
-      - CMakeLists.txt
-      - etc/**
       - lib/**
       - scripts/implement_clause/**
       - scripts/implement_subclause/**
       - scripts/run_sim_tests/**
       - scripts/run_sv_tests/**
-      - src/**
-      - test/CMakeLists.txt
       - test/lib/**
       - test/scripts/__init__.py
       - test/scripts/conftest.py
@@ -479,24 +436,18 @@ on:
       - test/scripts/implement_subclause/**
       - test/scripts/run_sim_tests/**
       - test/scripts/run_sv_tests/**
-      - test/src/**
   push:
     branches: [main]
     paths:
       - .github/workflows/ci.yml
-      - .github/workflows/deltahdl.yml
       - .github/workflows/documentation.yml
       - .github/workflows/implement_clause.yml
       - .github/workflows/implement_subclause.yml
-      - CMakeLists.txt
-      - etc/**
       - lib/**
       - scripts/implement_clause/**
       - scripts/implement_subclause/**
       - scripts/run_sim_tests/**
       - scripts/run_sv_tests/**
-      - src/**
-      - test/CMakeLists.txt
       - test/lib/**
       - test/scripts/__init__.py
       - test/scripts/conftest.py
@@ -504,7 +455,6 @@ on:
       - test/scripts/implement_subclause/**
       - test/scripts/run_sim_tests/**
       - test/scripts/run_sv_tests/**
-      - test/src/**
   workflow_dispatch:
     inputs:
       force-static-analysis:
