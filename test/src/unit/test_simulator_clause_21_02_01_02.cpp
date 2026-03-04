@@ -37,4 +37,11 @@ TEST(FormatArg, HexLeadingZeros) {
   EXPECT_EQ(FormatArg(val, 'h'), "0a");
 }
 
+TEST(FormatArg, OctalLeadingZeros) {
+  Arena arena;
+  auto val = MakeLogic4VecVal(arena, 8, 5);
+  // %o for 8-bit value: ceil(8/3) = 3 octal digits.
+  EXPECT_EQ(FormatArg(val, 'o'), "005");
+}
+
 }  // namespace
