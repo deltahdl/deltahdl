@@ -10,12 +10,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DpiRuntime, CallMissingImportReturnsZero) {
-  DpiRuntime rt;
-  auto result = rt.CallImport("nonexistent", {});
-  EXPECT_EQ(result.AsInt(), 0);
-}
-
 TEST(DpiRuntime, ImportWithRealArgs) {
   DpiRuntime rt;
   DpiRtFunction func;

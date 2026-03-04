@@ -67,4 +67,10 @@ TEST(DpiRuntime, ScopeManagement) {
   EXPECT_EQ(rt.CurrentScope(), nullptr);
 }
 
+TEST(DpiRuntime, CallMissingImportReturnsZero) {
+  DpiRuntime rt;
+  auto result = rt.CallImport("nonexistent", {});
+  EXPECT_EQ(result.AsInt(), 0);
+}
+
 }  // namespace
