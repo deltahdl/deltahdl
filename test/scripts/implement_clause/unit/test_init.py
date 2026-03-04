@@ -7,7 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
-from implement_clause import invoke_implement_subclause, main, parse_args
+from implement_clause import (
+    check_supplementary_args,
+    invoke_implement_subclause,
+    main,
+    parse_args,
+)
 
 @contextmanager
 def _patch_main_with_subclauses(
@@ -229,3 +234,117 @@ def test_invoke_implement_subclause_failure() -> None:
                 organization="deltahdl",
                 repo="deltahdl",
             )
+
+
+# --- check_supplementary_args (whole-clause) ---
+
+
+_LRM_CLAUSE_WITH_TABLE = """\
+List of figures
+Figure 4-1\u2014Event scheduling regions
+
+List of tables
+Table 4-1\u2014PLI callbacks
+"""
+
+
+def test_check_supplementary_fails_when_clause_table_missing(tmp_path) -> None:
+    """Fails when clause has a table in the LRM but none provided."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
+    with pytest.raises(SystemExit):
+        check_supplementary_args(
+            "4", lrm, figures=[], tables=[], ignore_figures=[],
+        )
+
+
+def test_check_supplementary_passes_when_all_provided(tmp_path) -> None:
+    """Passes when all clause-level figures and tables are provided."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
+    fig = tmp_path / "Figure_4_1.gv"
+    fig.write_text("digraph {}")
+    tbl = tmp_path / "TABLE_4_1.md"
+    tbl.write_text("| col |\n")
+    assert check_supplementary_args(
+        "4", lrm, figures=[fig], tables=[tbl], ignore_figures=[],
+    ) is None
+
+
+def test_check_supplementary_fails_figure_path_missing(tmp_path) -> None:
+    """Fails when a --figures path does not exist on disk."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    with pytest.raises(SystemExit):
+        check_supplementary_args(
+            "99", lrm,
+            figures=[tmp_path / "nonexistent.gv"],
+            tables=[], ignore_figures=[],
+        )
+
+
+def test_check_supplementary_fails_table_path_missing(tmp_path) -> None:
+    """Fails when a --tables path does not exist on disk."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    with pytest.raises(SystemExit):
+        check_supplementary_args(
+            "99", lrm,
+            figures=[],
+            tables=[tmp_path / "nonexistent.md"],
+            ignore_figures=[],
+        )
+
+
+def test_check_supplementary_ignore_figures(tmp_path) -> None:
+    """Passes when figure is in ignore list."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
+    tbl = tmp_path / "TABLE_4_1.md"
+    tbl.write_text("| col |\n")
+    assert check_supplementary_args(
+        "4", lrm, figures=[], tables=[tbl], ignore_figures=["4-1"],
+    ) is None
+
+
+# --- parse_args supplementary flags ---
+
+
+def test_parse_args_figures(tmp_path) -> None:
+    """--figures flag is parsed as list of Paths."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    gv = tmp_path / "Figure_4_1.gv"
+    gv.write_text("digraph {}")
+    args = parse_args([
+        "--lrm", str(lrm), "--clause", "4",
+        "--issue", "1", "--organization", "o", "--repo", "r",
+        "--figures", str(gv),
+    ])
+    assert len(args.figures) == 1
+
+
+def test_parse_args_tables(tmp_path) -> None:
+    """--tables flag is parsed as list of Paths."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    md = tmp_path / "TABLE_4_1.md"
+    md.write_text("| col |\n")
+    args = parse_args([
+        "--lrm", str(lrm), "--clause", "4",
+        "--issue", "1", "--organization", "o", "--repo", "r",
+        "--tables", str(md),
+    ])
+    assert len(args.tables) == 1
+
+
+def test_parse_args_ignore_figures(tmp_path) -> None:
+    """--ignore-figures flag is parsed as list of strings."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    args = parse_args([
+        "--lrm", str(lrm), "--clause", "4",
+        "--issue", "1", "--organization", "o", "--repo", "r",
+        "--ignore-figures", "4-1,4-2",
+    ])
+    assert args.ignore_figures == ["4-1", "4-2"]

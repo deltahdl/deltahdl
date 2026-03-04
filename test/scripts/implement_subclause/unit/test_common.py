@@ -167,17 +167,34 @@ def test_build_supplementary_lines_includes_table(tmp_path):
 
 
 _LRM_WITH_FIGURES_AND_TABLES = """\
-List of figures
+4. Scheduling semantics
 Figure 4-1\u2014Event scheduling regions
-
-List of tables
 Table 4-1\u2014PLI callbacks
+
+5. Data types
 """
 
 _LRM_NO_SUPPLEMENTARY = """\
-List of figures
+99. Empty clause
+Nothing here.
 
-List of tables
+100. Next clause
+"""
+
+_LRM_MULTI_SUBCLAUSE = """\
+4. Scheduling semantics
+Table 4-1\u2014PLI callbacks
+
+4.1 General
+General text.
+
+4.2 Events
+Table 4-2\u2014Event types
+
+4.3 Other
+No figures or tables.
+
+5. Data types
 """
 
 
@@ -259,6 +276,39 @@ def test_check_passes_when_no_supplementary(tmp_path):
     assert check_supplementary_args(
         "99", lrm, figures=[], tables=[], ignore_figures=[],
     ) is None
+
+
+# ---- scoped supplementary (subclause-only) --------------------------------
+
+
+def test_check_passes_when_subclause_has_no_refs(tmp_path):
+    """Passes when subclause text has no figure/table references."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_MULTI_SUBCLAUSE)
+    assert check_supplementary_args(
+        "4.3", lrm, figures=[], tables=[], ignore_figures=[],
+    ) is None
+
+
+def test_check_requires_only_subclause_tables(tmp_path):
+    """Only requires tables referenced in the target subclause."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_MULTI_SUBCLAUSE)
+    tbl = tmp_path / "TABLE_4_2.md"
+    tbl.write_text("| col |\n")
+    assert check_supplementary_args(
+        "4.2", lrm, figures=[], tables=[tbl], ignore_figures=[],
+    ) is None
+
+
+def test_check_fails_when_subclause_table_missing(tmp_path):
+    """Fails when subclause references a table but it is not provided."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_MULTI_SUBCLAUSE)
+    with pytest.raises(SystemExit):
+        check_supplementary_args(
+            "4.2", lrm, figures=[], tables=[], ignore_figures=[],
+        )
 
 
 # ---- format_prompt --------------------------------------------------------

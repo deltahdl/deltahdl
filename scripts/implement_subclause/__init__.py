@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lib.lrm import load_lrm_titles
+from lib.lrm import extract_clause_text, load_lrm_titles
 
 
 # ---------------------------------------------------------------------------
@@ -107,24 +107,21 @@ def _shorthand_from_label(label: str) -> str:
     return label.split(" ", 1)[1]
 
 
-def _lrm_labels_for_clause(
+def _lrm_labels_for_subclause(
     lrm_path: Path, clause: str,
 ) -> tuple[list[str], list[str]]:
-    """Parse the LRM to find figure/table labels for a clause's top-level."""
-    top = clause.split(".")[0]
-    prefix_fig = f"Figure {top}-"
-    prefix_tbl = f"Table {top}-"
+    """Parse the LRM to find figure/table labels within *clause*'s text."""
+    text = extract_clause_text(lrm_path, clause)
     figures: list[str] = []
     tables: list[str] = []
 
-    text = lrm_path.read_text(errors="replace")
     for line in text.splitlines():
         m = FIGURE_LABEL_RE.match(line)
-        if m and line.startswith(prefix_fig):
+        if m:
             figures.append(m.group(1))
             continue
         m = TABLE_LABEL_RE.match(line)
-        if m and line.startswith(prefix_tbl):
+        if m:
             tables.append(m.group(1))
 
     return figures, tables
@@ -156,7 +153,7 @@ def check_supplementary_args(
             print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
 
-    lrm_figs, lrm_tbls = _lrm_labels_for_clause(lrm_path, clause)
+    lrm_figs, lrm_tbls = _lrm_labels_for_subclause(lrm_path, clause)
 
     provided_fig_shorthands = {
         _shorthand_from_label(_label_from_gv(p)) for p in figures
