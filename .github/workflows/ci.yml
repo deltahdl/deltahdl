@@ -16,8 +16,6 @@ jobs:
         ${{ steps.check.outputs.implement_subclause }}
       lib-changed: >-
         ${{ steps.check.outputs.lib_changed }}
-      scripts-changed: >-
-        ${{ steps.check.outputs.scripts_changed }}
       workflows-changed: >-
         ${{ steps.check.outputs.workflows_changed }}
     runs-on: ubuntu-24.04
@@ -36,7 +34,6 @@ jobs:
             echo "implement_clause=true" >> "$GITHUB_OUTPUT"
             echo "implement_subclause=true" >> "$GITHUB_OUTPUT"
             echo "lib_changed=true" >> "$GITHUB_OUTPUT"
-            echo "scripts_changed=false" >> "$GITHUB_OUTPUT"
             echo "workflows_changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           else
@@ -49,17 +46,10 @@ jobs:
             echo "implement_clause=true" >> "$GITHUB_OUTPUT"
             echo "implement_subclause=true" >> "$GITHUB_OUTPUT"
             echo "lib_changed=true" >> "$GITHUB_OUTPUT"
-            echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
             echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
-          PAT='^(scripts/run_sim_tests/|scripts/run_sv_tests/|lib/run_tests_common/|test/scripts/run_sim_tests/|test/scripts/run_sv_tests/|test/lib/run_tests_common/)'
-          if echo "$CHANGED" | grep -qE "$PAT"; then
-            echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "scripts_changed=false" >> "$GITHUB_OUTPUT"
-          fi
           if echo "$CHANGED" | grep -qE '^\.github/workflows/.*\.yml'; then
             echo "workflows_changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -106,7 +96,6 @@ jobs:
     if: >-
       needs.detect.outputs.force-static-analysis == 'true'
       || needs.detect.outputs.lib-changed == 'true'
-      || needs.detect.outputs.scripts-changed == 'true'
       || inputs.force-static-analysis
     needs: detect
     runs-on: ubuntu-24.04
@@ -229,82 +218,6 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  # ── Lane: lib/run_tests_common ──
-  test-lib-run-tests-common:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/ci.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-${{ github.job }}-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/run_tests_common/ -v
-          --cov=lib.run_tests_common
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  # ── Lane: run_sim_tests ──
-  test-run-sim-tests:
-    needs:
-      - static-analysis
-      - test-lib-run-tests-common
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/ci.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-${{ github.job }}-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/scripts/run_sim_tests/ -v
-          --cov=run_sim_tests
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  # ── Lane: run_sv_tests ──
-  test-run-sv-tests:
-    needs:
-      - static-analysis
-      - test-lib-run-tests-common
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/ci.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-${{ github.job }}-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/scripts/run_sv_tests/ -v
-          --cov=run_sv_tests
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
   # ── Trigger: implement_clause ──
   trigger-implement-clause:
     env:
@@ -315,11 +228,8 @@ jobs:
     needs:
       - detect
       - static-analysis
-      - test-lib-run-tests-common
       - test-lib-github
       - test-lib-lrm
-      - test-run-sim-tests
-      - test-run-sv-tests
       - yamllint
     runs-on: ubuntu-24.04
     steps:
@@ -342,11 +252,8 @@ jobs:
     needs:
       - detect
       - static-analysis
-      - test-lib-run-tests-common
       - test-lib-github
       - test-lib-lrm
-      - test-run-sim-tests
-      - test-run-sv-tests
       - yamllint
     runs-on: ubuntu-24.04
     steps:
@@ -427,15 +334,9 @@ on:
       - lib/**
       - scripts/implement_clause/**
       - scripts/implement_subclause/**
-      - scripts/run_sim_tests/**
-      - scripts/run_sv_tests/**
       - test/lib/**
-      - test/scripts/__init__.py
-      - test/scripts/conftest.py
       - test/scripts/implement_clause/**
       - test/scripts/implement_subclause/**
-      - test/scripts/run_sim_tests/**
-      - test/scripts/run_sv_tests/**
   push:
     branches: [main]
     paths:
@@ -446,15 +347,9 @@ on:
       - lib/**
       - scripts/implement_clause/**
       - scripts/implement_subclause/**
-      - scripts/run_sim_tests/**
-      - scripts/run_sv_tests/**
       - test/lib/**
-      - test/scripts/__init__.py
-      - test/scripts/conftest.py
       - test/scripts/implement_clause/**
       - test/scripts/implement_subclause/**
-      - test/scripts/run_sim_tests/**
-      - test/scripts/run_sv_tests/**
   workflow_dispatch:
     inputs:
       force-static-analysis:

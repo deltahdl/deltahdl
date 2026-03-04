@@ -556,7 +556,8 @@ jobs:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: integration-test-asan-ubsan
+    if: !failure() && !cancelled()
+    needs: [integration-test-asan-ubsan, test-run-sim-tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -573,7 +574,8 @@ jobs:
   e2e-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    needs: integration-test-coverage
+    if: !failure() && !cancelled()
+    needs: [integration-test-coverage, test-run-sim-tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -594,7 +596,8 @@ jobs:
           path: profraw/
           retention-days: 1
   e2e-test-macos-26-arm64-clang:
-    needs: integration-test-macos-26-arm64-clang
+    if: !failure() && !cancelled()
+    needs: [integration-test-macos-26-arm64-clang, test-run-sim-tests]
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -611,7 +614,8 @@ jobs:
   e2e-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
-    needs: integration-test-tsan
+    if: !failure() && !cancelled()
+    needs: [integration-test-tsan, test-run-sim-tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -626,7 +630,8 @@ jobs:
       - name: E2E tests
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
   e2e-test-ubuntu-24-04-x86-64-clang:
-    needs: integration-test-ubuntu-24-04-x86-64-clang
+    if: !failure() && !cancelled()
+    needs: [integration-test-ubuntu-24-04-x86-64-clang, test-run-sim-tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -641,7 +646,8 @@ jobs:
       - name: E2E tests
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
   e2e-test-ubuntu-24-04-x86-64-gcc:
-    needs: integration-test-ubuntu-24-04-x86-64-gcc
+    if: !failure() && !cancelled()
+    needs: [integration-test-ubuntu-24-04-x86-64-gcc, test-run-sim-tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -666,7 +672,8 @@ jobs:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    needs: cache-sv-tests
+    if: !failure() && !cancelled()
+    needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -689,7 +696,8 @@ jobs:
   integration-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    needs: cache-sv-tests
+    if: !failure() && !cancelled()
+    needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -716,7 +724,8 @@ jobs:
           path: profraw/
           retention-days: 1
   integration-test-macos-26-arm64-clang:
-    needs: cache-sv-tests
+    if: !failure() && !cancelled()
+    needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -739,7 +748,8 @@ jobs:
   integration-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
-    needs: cache-sv-tests
+    if: !failure() && !cancelled()
+    needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -760,7 +770,8 @@ jobs:
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
   integration-test-ubuntu-24-04-x86-64-clang:
-    needs: cache-sv-tests
+    if: !failure() && !cancelled()
+    needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -781,7 +792,8 @@ jobs:
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
   integration-test-ubuntu-24-04-x86-64-gcc:
-    needs: cache-sv-tests
+    if: !failure() && !cancelled()
+    needs: [cache-sv-tests, test-run-sv-tests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -860,6 +872,9 @@ jobs:
           git tag -f latest
           git push origin latest --force
   static-analysis:
+    outputs:
+      scripts-changed: >-
+        ${{ steps.detect.outputs.scripts_changed }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -1058,6 +1073,84 @@ jobs:
             "{extends: default, rules: {$RULES}}" \
             .github/workflows/deltahdl.yml \
             etc/clang_tidy/*.yml
+  # ── Lane: lib/run_tests_common ──
+  test-lib-run-tests-common:
+    if: >-
+      needs.static-analysis.outputs.scripts-changed == 'true'
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/deltahdl.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/run_tests_common/ -v
+          --cov=lib.run_tests_common
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  # ── Lane: run_sim_tests ──
+  test-run-sim-tests:
+    if: >-
+      needs.static-analysis.outputs.scripts-changed == 'true'
+    needs: test-lib-run-tests-common
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/deltahdl.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/scripts/run_sim_tests/ -v
+          --cov=run_sim_tests
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  # ── Lane: run_sv_tests ──
+  test-run-sv-tests:
+    if: >-
+      needs.static-analysis.outputs.scripts-changed == 'true'
+    needs: test-lib-run-tests-common
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/deltahdl.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/scripts/run_sv_tests/ -v
+          --cov=run_sv_tests
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   unit-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
