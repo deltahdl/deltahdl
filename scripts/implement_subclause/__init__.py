@@ -313,7 +313,7 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
         "--dangerously-skip-permissions",
     ]
 
-    print(f"Invoking Claude ({model})...", file=sys.stderr)
+    print(f"Invoking Claude ({model})...")
     with subprocess.Popen(
         cmd,
         stdin=subprocess.PIPE,
@@ -338,12 +338,9 @@ def run_prompt(
 ) -> None:
     """Load titles, build a prompt via *build_fn*, and invoke Claude."""
     titles = load_lrm_titles(lrm_path)
-    print(
-        f"Loaded {len(titles)} LRM clause titles from {lrm_path}",
-        file=sys.stderr,
-    )
+    print(f"Loaded {len(titles)} LRM clause titles from {lrm_path}")
     prompt = build_fn(clause, titles, str(lrm_path), issue=issue)
-    print(f"Built prompt ({len(prompt)} characters)", file=sys.stderr)
+    print(f"Built prompt ({len(prompt)} characters)")
     invoke_claude(prompt, model=model)
 
 
@@ -438,7 +435,6 @@ def main(argv=None):
     print(
         f"Clause {args.subclause} (depth {depth}),"
         f" issue #{args.issue}, model {args.model}",
-        file=sys.stderr,
     )
 
     check_supplementary_args(
@@ -453,10 +449,7 @@ def main(argv=None):
     )
     if supplementary:
         n_supp = supplementary.count("\n") + 1
-        print(
-            f"Found {n_supp} supplementary files",
-            file=sys.stderr,
-        )
+        print(f"Found {n_supp} supplementary files")
 
     bound_handler = functools.partial(
         build_prompt, supplementary=supplementary,
