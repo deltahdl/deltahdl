@@ -1,4 +1,4 @@
-// §21.2: Display system tasks
+// §21.2.2: Strobed monitoring
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
