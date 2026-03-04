@@ -19,6 +19,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from lib.lrm import load_lrm_titles
+
 from ._github import (
     _validate_issue_args,
     fetch_issue_body,
@@ -616,20 +618,6 @@ def find_merge_target(target_base, test_dir, exclude_path=None):
 # ---------------------------------------------------------------------------
 # Stage 5: Generate files
 # ---------------------------------------------------------------------------
-
-def load_lrm_titles(lrm_path):
-    """Build clause -> title map from LRM."""
-    titles = {}
-    if not lrm_path.exists():
-        return titles
-    for line in lrm_path.read_text(encoding="utf-8").splitlines():
-        m = re.match(r"^(\d+(?:\.\d+)*)\s+(.+)$", line)
-        if m:
-            titles[m.group(1)] = m.group(2).strip()
-        m = re.match(r"^([A-Z]\.\d+(?:\.\d+)*)\s+(.+)$", line)
-        if m:
-            titles[m.group(1)] = m.group(2).strip()
-    return titles
 
 
 def _preamble_name(item):

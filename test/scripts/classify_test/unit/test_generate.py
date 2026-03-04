@@ -212,35 +212,6 @@ def test_find_merge_target_excludes_source(tmp_path):
     ) is None
 
 
-# ---- load_lrm_titles -------------------------------------------------------
-
-
-def test_load_lrm_titles_missing(tmp_path):
-    """Returns empty dict when LRM file is missing."""
-    assert not classify_test.load_lrm_titles(tmp_path / "no.txt")
-
-
-def test_load_lrm_titles_clause(tmp_path):
-    """Parses numeric clauses from LRM."""
-    lrm = tmp_path / "LRM.txt"
-    lrm.write_text("6.3 Data types\n", encoding="utf-8")
-    assert classify_test.load_lrm_titles(lrm)["6.3"] == "Data types"
-
-
-def test_load_lrm_titles_annex(tmp_path):
-    """Parses annex clauses from LRM."""
-    lrm = tmp_path / "LRM.txt"
-    lrm.write_text("A.6.3 Grammar stuff\n", encoding="utf-8")
-    assert classify_test.load_lrm_titles(lrm)["A.6.3"] == "Grammar stuff"
-
-
-def test_load_lrm_titles_non_matching(tmp_path):
-    """Non-matching lines are skipped."""
-    lrm = tmp_path / "LRM.txt"
-    lrm.write_text("This is not a clause\n", encoding="utf-8")
-    assert not classify_test.load_lrm_titles(lrm)
-
-
 # ---- strip_lrm_quotes ------------------------------------------------------
 
 

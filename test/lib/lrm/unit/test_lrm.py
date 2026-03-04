@@ -2,7 +2,109 @@
 
 from pathlib import Path
 
-from lib.lrm import extract_clause_text, parse_subclauses
+import pytest
+
+from lib.lrm import extract_clause_text, load_lrm_titles, parse_subclauses
+
+
+# ---- load_lrm_titles -------------------------------------------------------
+
+
+_SAMPLE_LRM = """\
+IEEE Std 1800-2023
+
+3. Design and verification building blocks
+3.1 General
+This clause describes the following:
+3.2 Design elements
+
+4. Scheduling semantics
+4.1 General
+This clause describes the scheduling semantics.
+4.4 Stratified event scheduler
+4.4.3 The PLI callback control points
+4.4.3.1 Preponed PLI region
+
+A.1 Source text
+A.1.1 Library source text
+A.8 Classes
+A.8.1 Concatenations
+
+Annex A
+(normative)
+
+Formal syntax
+
+Annex B
+(normative)
+
+Keywords
+SystemVerilog reserves the keywords listed in Table B.1.
+
+Annex P
+(informative)
+
+Glossary
+"""
+
+
+class TestLoadLrmTitles:
+    """Tests for load_lrm_titles."""
+
+    @pytest.fixture()
+    def titles(self, tmp_path):
+        """Load titles from the sample LRM text."""
+        lrm = tmp_path / "lrm.txt"
+        lrm.write_text(_SAMPLE_LRM)
+        return load_lrm_titles(lrm)
+
+    @pytest.mark.parametrize("key, expected", [
+        ("3.1", "General"),
+        ("4.4.3.1", "Preponed PLI region"),
+        ("A.8.1", "Concatenations"),
+    ])
+    def test_subclause_titles(self, titles, key, expected):
+        """Extracts dot-separated subclause titles."""
+        assert titles[key] == expected
+
+    @pytest.mark.parametrize("key, expected", [
+        ("3", "Design and verification building blocks"),
+        ("4", "Scheduling semantics"),
+    ])
+    def test_top_level_clause_titles(self, titles, key, expected):
+        """Extracts top-level numeric clause titles."""
+        assert titles[key] == expected
+
+    @pytest.mark.parametrize("key, expected", [
+        ("A", "(normative) Formal syntax"),
+        ("B", "(normative) Keywords"),
+        ("P", "(informative) Glossary"),
+    ])
+    def test_annex_header_titles(self, titles, key, expected):
+        """Extracts multi-line annex header titles."""
+        assert titles[key] == expected
+
+
+def test_load_missing_file(tmp_path):
+    """Returns empty dict when file does not exist."""
+    assert not load_lrm_titles(tmp_path / "no_such_file.txt")
+
+
+def test_load_annex_title_without_normative(tmp_path):
+    """Annex header with title but no (normative)/(informative) line."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("Annex Z\n\nCustom Title\n")
+    assert load_lrm_titles(lrm)["Z"] == "Custom Title"
+
+
+def test_load_annex_no_title_found(tmp_path):
+    """Annex header followed only by blank lines produces no entry."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("Annex Q\n\n\n\n\n\n\n")
+    assert "Q" not in load_lrm_titles(lrm)
+
+
+# ---- parse_subclauses ------------------------------------------------------
 
 
 SAMPLE_NUMERIC = """\

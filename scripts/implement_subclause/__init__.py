@@ -11,6 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from lib.lrm import load_lrm_titles
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -19,71 +21,6 @@ from pathlib import Path
 CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 FIGURE_LABEL_RE = re.compile(r"^Figure ([\d\w]+-[\d\w]+)")
 TABLE_LABEL_RE = re.compile(r"^Table ([\d\w]+-[\d\w]+)")
-
-
-# ---------------------------------------------------------------------------
-# LRM title extraction
-# ---------------------------------------------------------------------------
-
-def load_lrm_titles(lrm_path: Path) -> dict[str, str]:
-    """Build clause -> title map from an LRM text file.
-
-    Handles three formats:
-    - Subclauses: "4.1 General" or "A.8.1 Concatenations"
-    - Top-level numeric: "4. Scheduling semantics"
-    - Annex headers (multi-line): "Annex B\\n(normative)\\n\\nKeywords"
-    """
-    if not lrm_path.exists():
-        return {}
-
-    titles = {}
-    lines = lrm_path.read_text(encoding="utf-8").splitlines()
-
-    for i, line in enumerate(lines):
-        # Subclauses: "4.1 General", "A.8.1 Concatenations"
-        m = re.match(r"^(\d+(?:\.\d+)+)\s+(.+)$", line)
-        if m:
-            titles[m.group(1)] = m.group(2).strip()
-            continue
-        m = re.match(r"^([A-Z]\.\d+(?:\.\d+)*)\s+(.+)$", line)
-        if m:
-            titles[m.group(1)] = m.group(2).strip()
-            continue
-
-        # Top-level numeric: "4. Scheduling semantics"
-        m = re.match(r"^(\d+)\.\s+(.+)$", line)
-        if m:
-            titles[m.group(1)] = m.group(2).strip()
-            continue
-
-        # Annex headers (multi-line):
-        #   Annex B
-        #   (normative)
-        #
-        #   Keywords
-        m = re.match(r"^Annex\s+([A-Z])$", line)
-        if m:
-            letter = m.group(1)
-            normative = ""
-            title = ""
-            # Look ahead for (normative)/(informative) and title
-            for j in range(i + 1, min(i + 6, len(lines))):
-                nxt = lines[j].strip()
-                if not nxt:
-                    continue
-                nm = re.match(r"^\((normative|informative)\)$", nxt)
-                if nm:
-                    normative = f"({nm.group(1)})"
-                    continue
-                # First non-empty, non-normative line is the title
-                title = nxt
-                break
-            if normative and title:
-                titles[letter] = f"{normative} {title}"
-            elif title:
-                titles[letter] = title
-
-    return titles
 
 
 # ---------------------------------------------------------------------------

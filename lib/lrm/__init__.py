@@ -4,12 +4,21 @@ import re
 from pathlib import Path
 
 
-def _load_all_titles(lrm_path: Path) -> dict[str, str]:
-    """Build clause -> title map from an LRM text file."""
+def load_lrm_titles(lrm_path: Path) -> dict[str, str]:
+    """Build clause -> title map from an LRM text file.
+
+    Handles three formats:
+    - Subclauses: "4.1 General" or "A.8.1 Concatenations"
+    - Top-level numeric: "4. Scheduling semantics"
+    - Annex headers (multi-line): "Annex B\\n(normative)\\n\\nKeywords"
+    """
+    if not lrm_path.exists():
+        return {}
+
     titles: dict[str, str] = {}
     lines = lrm_path.read_text(encoding="utf-8").splitlines()
 
-    for line in lines:
+    for i, line in enumerate(lines):
         m = re.match(r"^(\d+(?:\.\d+)+)\s+(.+)$", line)
         if m:
             titles[m.group(1)] = m.group(2).strip()
@@ -17,6 +26,32 @@ def _load_all_titles(lrm_path: Path) -> dict[str, str]:
         m = re.match(r"^([A-Z]\.\d+(?:\.\d+)*)\s+(.+)$", line)
         if m:
             titles[m.group(1)] = m.group(2).strip()
+            continue
+
+        m = re.match(r"^(\d+)\.\s+(.+)$", line)
+        if m:
+            titles[m.group(1)] = m.group(2).strip()
+            continue
+
+        m = re.match(r"^Annex\s+([A-Z])$", line)
+        if m:
+            letter = m.group(1)
+            normative = ""
+            title = ""
+            for j in range(i + 1, min(i + 6, len(lines))):
+                nxt = lines[j].strip()
+                if not nxt:
+                    continue
+                nm = re.match(r"^\((normative|informative)\)$", nxt)
+                if nm:
+                    normative = f"({nm.group(1)})"
+                    continue
+                title = nxt
+                break
+            if normative and title:
+                titles[letter] = f"{normative} {title}"
+            elif title:
+                titles[letter] = title
 
     return titles
 
@@ -71,7 +106,7 @@ def extract_clause_text(lrm_path: Path, clause: str) -> str:
 
 def parse_subclauses(lrm_path: Path, clause: str) -> dict[str, str]:
     """Return direct subclauses of *clause* as a ``{number: title}`` dict."""
-    all_titles = _load_all_titles(lrm_path)
+    all_titles = load_lrm_titles(lrm_path)
     prefix = clause + "."
     parent_dots = clause.count(".")
     return {
