@@ -190,10 +190,13 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc) {
       diag_.Error(loc, "`resetall illegal inside a design element");
       return true;
     }
-    // §22.3: `resetall does NOT affect text macros.
+    // §22.3: `resetall does NOT affect text macros, `line, or
+    // `begin_keywords/`end_keywords.
     default_net_type_ = NetType::kWire;
     in_celldefine_ = false;
     unconnected_drive_ = NetType::kWire;
+    has_timescale_ = false;
+    current_timescale_ = TimeScale{};
     return true;
   }
   if (StartsWithDirective(line, "default_nettype")) {
