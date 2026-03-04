@@ -1022,13 +1022,13 @@ jobs:
           done
           exit $fail
       # ── Copy-paste detection (C++) ──
-      - name: Detect copy-paste (src)
+      - name: Detect copy-paste in source (C++)
         run: >-
           pmd cpd
           --minimum-tokens 100
           --language cpp
           --dir src/
-      - name: Detect copy-paste (test)
+      - name: Detect copy-paste in tests (C++)
         run: >-
           pmd cpd
           --minimum-tokens 100
