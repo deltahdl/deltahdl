@@ -1,5 +1,7 @@
 // §5.12 Attributes — elaboration-level semantics (A.9.1 BNF)
 
+#include <cstdint>
+
 #include "common/types.h"
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -183,7 +185,7 @@ TEST(ElabA91, DefaultValueBitOne) {
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   EXPECT_EQ(mod->variables[0].attrs[0].name, "full_case");
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 1);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 1);
 }
 
 static void VerifyFirstAttrResolved(RtlirDesign* design, ElabFixture& f,
@@ -194,7 +196,8 @@ static void VerifyFirstAttrResolved(RtlirDesign* design, ElabFixture& f,
   ASSERT_FALSE(mod->variables.empty());
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), expected);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN),
+            expected);
 }
 
 // =========================================================================
@@ -216,7 +219,7 @@ TEST(ElabA91, AttributeValueFromExpression) {
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   EXPECT_EQ(mod->variables[0].attrs[0].name, "depth");
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 8);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 8);
 }
 
 TEST(ElabA91, AttributeValueConstExpr) {
@@ -272,7 +275,7 @@ TEST(ElabA91, DuplicateAttrLastWins) {
     if (a.name == "depth") {
       ++depth_count;
       ASSERT_NE(a.resolved_value, std::nullopt);
-      EXPECT_EQ(a.resolved_value.value(), 8);
+      EXPECT_EQ(a.resolved_value.value_or(INT64_MIN), 8);
     }
   }
   EXPECT_EQ(depth_count, 1);
@@ -309,7 +312,7 @@ TEST(ElabA91, DuplicateAttrAcrossInstances) {
     if (a.name == "depth") {
       ++depth_count;
       ASSERT_NE(a.resolved_value, std::nullopt);
-      EXPECT_EQ(a.resolved_value.value(), 16);
+      EXPECT_EQ(a.resolved_value.value_or(INT64_MIN), 16);
     }
   }
   EXPECT_EQ(depth_count, 1);
@@ -599,7 +602,7 @@ TEST(ElabA91, AttrValueZero) {
   ASSERT_FALSE(mod->variables.empty());
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
-  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value(), 0);
+  EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 0);
 }
 
 TEST(ElabA91, AttrValueLargeInt) {
