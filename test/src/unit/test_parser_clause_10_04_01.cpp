@@ -19,7 +19,6 @@ TEST(ParserA602, BlockingAssignment_Simple) {
 }
 
 TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin a = #10 b; end\n"
@@ -528,4 +527,4 @@ TEST(ParserSection9b, BlockingAssignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-}
+}  // namespace

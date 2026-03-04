@@ -176,4 +176,4 @@ TEST(ParserA70503, TimingCheckConditionParenthesized) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-}
+}  // namespace

@@ -76,4 +76,4 @@ TEST(ParserSection8, ExtendsAndImplements) {
   EXPECT_EQ(r.cu->classes[2]->base_class, "Base");
 }
 
-}
+}  // namespace

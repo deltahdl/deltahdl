@@ -8,7 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(Lowerer, WaitConditionTrue) {
-
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -31,7 +30,6 @@ TEST(Lowerer, WaitConditionTrue) {
 }
 
 TEST(Lowerer, WaitConditionDeferred) {
-
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -57,4 +55,4 @@ TEST(Lowerer, WaitConditionDeferred) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

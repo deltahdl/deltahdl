@@ -28,4 +28,4 @@ TEST(Parser, GatePullup) {
   EXPECT_EQ(item->gate_terminals.size(), 1);
 }
 
-}
+}  // namespace

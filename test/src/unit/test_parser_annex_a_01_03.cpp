@@ -15,4 +15,4 @@ TEST(ParserAnnexA, A1ModuleWithParams) {
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 1u);
 }
 
-}
+}  // namespace

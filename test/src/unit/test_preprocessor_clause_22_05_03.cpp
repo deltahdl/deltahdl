@@ -18,4 +18,4 @@ TEST(Preprocessor, UndefineAll) {
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
 
-}
+}  // namespace

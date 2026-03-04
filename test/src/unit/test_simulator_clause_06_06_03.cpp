@@ -10,7 +10,6 @@ using namespace delta;
 namespace {
 
 TEST(NetResolution, WandZeroDominates) {
-
   Logic4Word a{0, 0};
   Logic4Word b{1, 0};
   auto r = ResolveWandWord(a, b);
@@ -19,7 +18,6 @@ TEST(NetResolution, WandZeroDominates) {
 }
 
 TEST(NetResolution, WandBothOne) {
-
   Logic4Word a{1, 0};
   Logic4Word b{1, 0};
   auto r = ResolveWandWord(a, b);
@@ -28,7 +26,6 @@ TEST(NetResolution, WandBothOne) {
 }
 
 TEST(NetResolution, WandXWithOne) {
-
   Logic4Word x{0, 1};
   Logic4Word one{1, 0};
   auto r = ResolveWandWord(x, one);
@@ -37,7 +34,6 @@ TEST(NetResolution, WandXWithOne) {
 }
 
 TEST(NetResolution, WandXWithZero) {
-
   Logic4Word x{0, 1};
   Logic4Word zero{0, 0};
   auto r = ResolveWandWord(x, zero);
@@ -46,7 +42,6 @@ TEST(NetResolution, WandXWithZero) {
 }
 
 TEST(NetResolution, WorOneDominates) {
-
   Logic4Word a{1, 0};
   Logic4Word b{0, 0};
   auto r = ResolveWorWord(a, b);
@@ -55,7 +50,6 @@ TEST(NetResolution, WorOneDominates) {
 }
 
 TEST(NetResolution, WorBothZero) {
-
   Logic4Word a{0, 0};
   Logic4Word b{0, 0};
   auto r = ResolveWorWord(a, b);
@@ -64,7 +58,6 @@ TEST(NetResolution, WorBothZero) {
 }
 
 TEST(NetResolution, WorXWithZero) {
-
   Logic4Word x{0, 1};
   Logic4Word zero{0, 0};
   auto r = ResolveWorWord(x, zero);
@@ -73,7 +66,6 @@ TEST(NetResolution, WorXWithZero) {
 }
 
 TEST(NetResolution, WorXWithOne) {
-
   Logic4Word x{0, 1};
   Logic4Word one{1, 0};
   auto r = ResolveWorWord(x, one);
@@ -111,4 +103,4 @@ TEST(NetResolution, ResolveWorNet) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-}
+}  // namespace

@@ -59,4 +59,4 @@ TEST(ParserA86, BinaryModulePathXnorAlt) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -46,4 +46,4 @@ TEST(Dpi, FindImport) {
   EXPECT_EQ(ctx.FindImport("missing"), nullptr);
 }
 
-}
+}  // namespace

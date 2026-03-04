@@ -17,4 +17,4 @@ TEST(ElabA70501, WidthWithThresholdElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

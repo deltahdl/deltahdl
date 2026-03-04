@@ -12,4 +12,4 @@ TEST(Lexer, KeywordVersion_1800_2005_LogicIsKeyword) {
   EXPECT_EQ(kw, std::optional(TokenKind::kKwLogic));
 }
 
-}
+}  // namespace

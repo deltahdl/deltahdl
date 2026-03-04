@@ -23,4 +23,4 @@ TEST(ParserA87, ZDigitLower) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-}
+}  // namespace

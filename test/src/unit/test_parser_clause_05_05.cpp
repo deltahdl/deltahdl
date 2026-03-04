@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh501, Sec5_1_TwoCharOperators) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -27,7 +26,6 @@ TEST(ParserCh501, Sec5_1_TwoCharOperators) {
 }
 
 TEST(ParserCh501, Sec5_1_TwoCharOperatorTokenKinds) {
-
   auto r = Parse(
       "module m;\n"
       "  initial x = (a == b);\n"
@@ -42,7 +40,6 @@ TEST(ParserCh501, Sec5_1_TwoCharOperatorTokenKinds) {
 }
 
 TEST(ParserCh501, Sec5_1_ThreeCharOperators) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -56,4 +53,4 @@ TEST(ParserCh501, Sec5_1_ThreeCharOperators) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

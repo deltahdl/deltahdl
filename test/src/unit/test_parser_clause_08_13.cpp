@@ -67,4 +67,4 @@ TEST(ParserSection8, ClassExtendsDerived) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
-}
+}  // namespace

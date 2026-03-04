@@ -46,4 +46,4 @@ TEST(StmtExec, NonblockingAssignBitSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0x20u);
 }
 
-}
+}  // namespace

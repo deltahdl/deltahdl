@@ -58,7 +58,6 @@ TEST(ParserSection11, WildcardEqInIfCondition) {
 }
 
 TEST(ParserCh501, Sec5_1_ThreeCharOperatorWildcardInequality) {
-
   auto r = Parse(
       "module m;\n"
       "  initial x = (a !=? b);\n"
@@ -73,8 +72,7 @@ TEST(ParserCh501, Sec5_1_ThreeCharOperatorWildcardInequality) {
 }
 
 TEST(ParserCh505, Operator_WildcardEquality) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = (a ==? b); endmodule"));
 }
 
-}
+}  // namespace

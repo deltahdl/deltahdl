@@ -110,4 +110,4 @@ TEST(SimA606, PriorityIfFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}
+}  // namespace

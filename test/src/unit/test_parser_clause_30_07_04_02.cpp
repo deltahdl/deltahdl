@@ -154,4 +154,4 @@ TEST(ParserA701, ShowcancelledMultipleOutputs) {
   EXPECT_EQ(item->signal_list[2], "out3");
 }
 
-}
+}  // namespace

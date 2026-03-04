@@ -26,4 +26,4 @@ TEST(ParserA705, MultipleTimingChecks) {
             TimingCheckKind::kPeriod);
 }
 
-}
+}  // namespace

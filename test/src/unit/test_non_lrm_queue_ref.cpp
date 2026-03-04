@@ -84,4 +84,4 @@ TEST(QueueRef, SurvivesPushFront) {
   EXPECT_EQ(q->elements[3].ToUint64(), 30u);
 }
 
-}
+}  // namespace

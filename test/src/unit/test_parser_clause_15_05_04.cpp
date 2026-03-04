@@ -106,7 +106,6 @@ TEST(ParserSection15, WaitOrderNullAction) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
-
 }
 
 TEST(ParserA605, WaitOrderNull) {
@@ -172,4 +171,4 @@ TEST(ParserA605, WaitOrderElseOnly) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-}
+}  // namespace

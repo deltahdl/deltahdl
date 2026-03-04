@@ -97,4 +97,4 @@ TEST_F(SpecifyTest, TimeskewWithNotifier) {
   EXPECT_EQ(tc.notifier, "ntfr");
 }
 
-}
+}  // namespace

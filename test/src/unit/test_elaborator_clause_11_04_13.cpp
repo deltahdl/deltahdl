@@ -54,4 +54,4 @@ TEST(ElabA83, InsideExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -39,4 +39,4 @@ TEST(ClassSim, PureVirtualMethodNullBody) {
   EXPECT_EQ(resolved, method);
 }
 
-}
+}  // namespace

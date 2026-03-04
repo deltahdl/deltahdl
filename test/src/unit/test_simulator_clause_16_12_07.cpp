@@ -27,7 +27,6 @@ struct SvaFixture {
 namespace {
 
 TEST(SvaEngine, OverlappingImplication) {
-
   EXPECT_EQ(EvalImplication(true, true, false), PropertyResult::kPass);
   EXPECT_EQ(EvalImplication(true, false, false), PropertyResult::kFail);
 
@@ -35,13 +34,11 @@ TEST(SvaEngine, OverlappingImplication) {
 }
 
 TEST(SvaEngine, NonOverlappingImplication) {
-
   EXPECT_EQ(EvalImplication(true, true, true), PropertyResult::kPending);
   EXPECT_EQ(EvalImplication(false, false, true), PropertyResult::kVacuousPass);
 }
 
 TEST(SvaEngine, PropertyPendingResolvesPass) {
-
   auto r1 = EvalImplication(true, false, true);
   EXPECT_EQ(r1, PropertyResult::kPending);
 
@@ -57,4 +54,4 @@ TEST(SvaEngine, PropertyPendingResolvesFail) {
   EXPECT_EQ(resolved, PropertyResult::kFail);
 }
 
-}
+}  // namespace

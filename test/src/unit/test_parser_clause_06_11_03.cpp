@@ -163,7 +163,6 @@ TEST(ParserSection6, Sec6_11_BitSignedOverride) {
 }
 
 TEST(ParserSection6, IntUnsignedDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  int unsigned ui;\n"
@@ -178,7 +177,6 @@ TEST(ParserSection6, IntUnsignedDecl) {
 }
 
 TEST(ParserSection6, IntSignedDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  int signed si;\n"
@@ -192,7 +190,6 @@ TEST(ParserSection6, IntSignedDecl) {
 }
 
 TEST(ParserSection6, LogicSignedDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  logic signed [7:0] sv;\n"
@@ -437,4 +434,4 @@ TEST(ParserSection6, RegDefaultUnsigned) {
   EXPECT_FALSE(item->data_type.is_signed) << "reg is unsigned by default";
 }
 
-}
+}  // namespace

@@ -100,4 +100,4 @@ TEST(Constraint, ImplicationFalseAntecedent) {
   EXPECT_LE(solver.GetValue("data"), 255);
 }
 
-}
+}  // namespace

@@ -26,4 +26,4 @@ TEST(ParserSection6, Sec6_6_7_NettypeUsedForNetDecl) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

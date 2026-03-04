@@ -778,4 +778,4 @@ TEST(SimCh10b, NBAReplicationRHS) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-}
+}  // namespace

@@ -22,4 +22,4 @@ TEST(ParserAnnexF, AnnexFNegedgeClocking) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}
+}  // namespace

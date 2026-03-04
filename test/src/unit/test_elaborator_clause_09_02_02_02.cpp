@@ -153,4 +153,4 @@ TEST(SimCh9b, AlwaysCombBlockMultipleOutputs) {
   EXPECT_EQ(diff->value.ToUint64(), 0x1Bu);
 }
 
-}
+}  // namespace

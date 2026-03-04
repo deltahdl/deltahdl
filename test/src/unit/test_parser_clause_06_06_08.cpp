@@ -14,14 +14,12 @@ TEST(ParserA213, NetDeclInterconnect) {
 }
 
 TEST(ParserA221, NetPortTypeInterconnect) {
-
   auto r = Parse("module m; interconnect [7:0] net1; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->items[0]->data_type.is_interconnect);
 }
 TEST(ParserSection6, InterconnectNet) {
-
   auto r = Parse(
       "module t;\n"
       "  interconnect w1;\n"
@@ -32,7 +30,6 @@ TEST(ParserSection6, InterconnectNet) {
 }
 
 TEST(ParserSection6, InterconnectWithPackedDim) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  interconnect [7:0] ibus;\n"
@@ -46,4 +43,4 @@ TEST(ParserSection6, Interconnect_Basic) {
                "endmodule\n"));
 }
 
-}
+}  // namespace

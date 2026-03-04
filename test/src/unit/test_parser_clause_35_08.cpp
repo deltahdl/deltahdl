@@ -50,7 +50,6 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportTask) {
 }
 
 TEST(ParserSection38, DpiExportTaskForSystf) {
-
   auto r = Parse(R"(
     module m;
       export "DPI-C" task systf_handler;
@@ -64,4 +63,4 @@ TEST(ParserSection38, DpiExportTaskForSystf) {
   EXPECT_TRUE(items[0]->dpi_is_task);
 }
 
-}
+}  // namespace

@@ -64,7 +64,6 @@ TEST(ParserA23, ListOfParamAssignmentsMultiple) {
 }
 
 TEST(ParserA24, ParamAssignmentNoDefault) {
-
   auto r = Parse("module m #(parameter int P); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -94,4 +93,4 @@ TEST(SourceText, ParamPortLocalparam) {
   EXPECT_EQ(r.cu->modules[0]->params[0].first, "X");
 }
 
-}
+}  // namespace

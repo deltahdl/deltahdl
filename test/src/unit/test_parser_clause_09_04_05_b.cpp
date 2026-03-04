@@ -174,4 +174,4 @@ TEST(ParserSection9, RepeatEventControl) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-}
+}  // namespace

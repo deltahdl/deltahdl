@@ -7,17 +7,17 @@ namespace {
 TEST(ParserSection22, ResetallDirective) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`resetall\n"
-              "module t;\n"
-              "endmodule\n"));
+                              "module t;\n"
+                              "endmodule\n"));
 }
 
 TEST(ParserSection22, ResetallBeforeMultipleModules) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`resetall\n"
-              "module m1;\n"
-              "endmodule\n"
-              "module m2;\n"
-              "endmodule\n"));
+                              "module m1;\n"
+                              "endmodule\n"
+                              "module m2;\n"
+                              "endmodule\n"));
 }
 
-}
+}  // namespace

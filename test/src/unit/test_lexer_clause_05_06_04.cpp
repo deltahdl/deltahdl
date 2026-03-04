@@ -7,7 +7,6 @@
 using namespace delta;
 
 TEST(LexerCh50604, BacktickIsUnexpected) {
-
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", "`define FOO 1");

@@ -46,4 +46,4 @@ TEST(SimA611, DefaultClocking) {
   EXPECT_EQ(cmgr.GetDefaultClocking(), "sys_cb");
 }
 
-}
+}  // namespace

@@ -51,7 +51,6 @@ TEST(ParserA601, NetAlias_FourNets) {
 }
 
 TEST(ParserA601, NetAlias_BitSelect) {
-
   auto r = Parse(
       "module m;\n"
       "  wire [31:0] A, B;\n"
@@ -64,4 +63,4 @@ TEST(ParserA601, NetAlias_BitSelect) {
   ASSERT_EQ(alias->alias_nets.size(), 2u);
 }
 
-}
+}  // namespace

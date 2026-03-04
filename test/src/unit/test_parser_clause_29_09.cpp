@@ -46,4 +46,4 @@ TEST(ParserSection29, MixedLevelEdgeSensitive) {
   VerifyUdpTableSpotChecks(udp, checks, std::size(checks));
 }
 
-}
+}  // namespace

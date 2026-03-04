@@ -35,4 +35,4 @@ TEST(ParserAnnexA, A1ModuleDecl) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
-}
+}  // namespace

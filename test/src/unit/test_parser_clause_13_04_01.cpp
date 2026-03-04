@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA221, DataTypeOrVoidReturn) {
-
   auto r = Parse(
       "module m;\n"
       "  function void do_nothing; endfunction\n"
@@ -92,7 +91,6 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncReturningVoid) {
   EXPECT_EQ(item->name, "log_msg");
 }
 TEST(ParserSection6, RealInFunction) {
-
   auto r = Parse(
       "module t;\n"
       "  function real compute();\n"
@@ -335,4 +333,4 @@ TEST(ParserSection6, VoidFunctionInClass) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}
+}  // namespace

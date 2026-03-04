@@ -83,7 +83,6 @@ TEST(ParserSection18b, DistWithRangeAndEqualWeight) {
 }
 
 TEST(ParserSection18b, DistWithMixedWeightTypes) {
-
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -106,7 +105,6 @@ TEST(ParserSection18b, DistWithDefaultWeight) {
 }
 
 TEST(ParserSection18b, DistWithExpressionWeights) {
-
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -129,7 +127,6 @@ TEST(ParserSection18b, DistWithNegativeValues) {
 }
 
 TEST(ParserSection18b, DistMultipleConstraints) {
-
   auto r = Parse(
       "class C;\n"
       "  rand int x, y;\n"
@@ -154,4 +151,4 @@ TEST(SourceText, ConstraintExpressionOrDist) {
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "dist_c");
 }
 
-}
+}  // namespace

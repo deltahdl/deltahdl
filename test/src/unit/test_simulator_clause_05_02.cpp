@@ -7,7 +7,6 @@
 using namespace delta;
 
 TEST(SimCh502, LexicalTokenFreeFormatIdenticalResult) {
-
   auto compact = RunAndGet(
       "module t;logic [7:0] result;initial result=8'd42;endmodule", "result");
   auto spread = RunAndGet(
@@ -19,7 +18,6 @@ TEST(SimCh502, LexicalTokenFreeFormatIdenticalResult) {
 }
 
 TEST(SimCh502, LexicalTokenCommentsDoNotAffectSimulation) {
-
   auto result = RunAndGet(
       "module /* block */ t; // line\n"
       "  logic [7:0] /* type */ result /* name */;\n"
@@ -32,7 +30,6 @@ TEST(SimCh502, LexicalTokenCommentsDoNotAffectSimulation) {
 }
 
 TEST(SimCh502, LexicalTokenAllCategoriesInSimulation) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -47,7 +44,6 @@ TEST(SimCh502, LexicalTokenAllCategoriesInSimulation) {
 }
 
 TEST(SimCh502, LexicalTokenMultilineExpression) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -64,7 +60,6 @@ TEST(SimCh502, LexicalTokenMultilineExpression) {
 }
 
 TEST(SimCh502, LexicalTokenMultipleStatementsOneLine) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -82,7 +77,6 @@ TEST(SimCh502, LexicalTokenMultipleStatementsOneLine) {
 }
 
 TEST(SimCh502, LexicalTokenBlockCommentAsSeparator) {
-
   auto result = RunAndGet(
       "module/**/t;logic/**/[7:0]/**/result;initial/**/result=8'd66;"
       "endmodule",
@@ -91,7 +85,6 @@ TEST(SimCh502, LexicalTokenBlockCommentAsSeparator) {
 }
 
 TEST(SimCh502, LexicalTokenLineCommentTerminatesAtNewline) {
-
   auto result = RunAndGet(
       "module t; // this is a comment\n"
       "  logic [7:0] result; // another comment\n"
@@ -102,7 +95,6 @@ TEST(SimCh502, LexicalTokenLineCommentTerminatesAtNewline) {
 }
 
 TEST(SimCh502, LexicalTokenFreeFormatAlwaysComb) {
-
   auto result = RunAndGet(
       "module t; logic [7:0] a, result;\n"
       "initial a = 8'd5;\n"

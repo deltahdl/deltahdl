@@ -16,7 +16,6 @@ TEST(ParserSection6, TypesNotEquivalentDifferentSign) {
 }
 
 TEST(ParserSection6, TypesEquivalentDiffSignedness) {
-
   DataType a;
   a.kind = DataTypeKind::kInt;
   a.is_signed = true;
@@ -27,7 +26,6 @@ TEST(ParserSection6, TypesEquivalentDiffSignedness) {
 }
 
 TEST(ParserSection6, NotEquivalentDiffWidth) {
-
   DataType a;
   a.kind = DataTypeKind::kByte;
   a.is_signed = true;
@@ -38,7 +36,6 @@ TEST(ParserSection6, NotEquivalentDiffWidth) {
 }
 
 TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
-
   DataType a;
   a.kind = DataTypeKind::kByte;
   DataType b;
@@ -49,7 +46,6 @@ TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
 }
 
 TEST(ParserSection6, TypesNotEquivalentDifferentState) {
-
   DataType a;
   a.kind = DataTypeKind::kBit;
   DataType b;
@@ -58,7 +54,6 @@ TEST(ParserSection6, TypesNotEquivalentDifferentState) {
 }
 
 TEST(ParserSection6, TypesEquivalentSameKind) {
-
   DataType a;
   a.kind = DataTypeKind::kInt;
   a.is_signed = true;
@@ -68,4 +63,4 @@ TEST(ParserSection6, TypesEquivalentSameKind) {
   EXPECT_TRUE(TypesEquivalent(a, b));
 }
 
-}
+}  // namespace

@@ -27,7 +27,6 @@ struct SvaFixture {
 namespace {
 
 TEST(SvaEngine, SequenceThroughout) {
-
   std::vector<uint64_t> values = {1, 1, 1, 1};
   auto check = [](uint64_t v) { return v == 1; };
   EXPECT_TRUE(EvalThroughout(check, values));
@@ -42,4 +41,4 @@ TEST(SvaEngine, SequenceThroughoutEmpty) {
   EXPECT_TRUE(EvalThroughout(check, values));
 }
 
-}
+}  // namespace

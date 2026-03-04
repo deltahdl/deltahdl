@@ -32,4 +32,4 @@ TEST(SimA608, ForeachBasic) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}
+}  // namespace

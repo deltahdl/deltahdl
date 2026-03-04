@@ -30,4 +30,4 @@ TEST(SimA612, RandJoinBothExecute) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-}
+}  // namespace

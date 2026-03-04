@@ -36,7 +36,6 @@ TEST(Elaborator, AlwaysCombSensitivityInferred) {
 }
 
 TEST(Sensitivity, SelectVarIdxUsesLSP) {
-
   Arena arena;
   auto* expr = SensSelect(arena, SensId(arena, "a"), SensId(arena, "i"));
   std::unordered_set<std::string> reads;
@@ -340,4 +339,4 @@ TEST(SimCh9b, AlwaysCombSensitivityRegistered) {
   EXPECT_FALSE(procs.empty());
 }
 
-}
+}  // namespace

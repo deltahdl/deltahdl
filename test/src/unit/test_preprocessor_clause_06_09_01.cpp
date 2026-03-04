@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, VectorBigEndian) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [31:0] wide;\n"
@@ -21,7 +20,6 @@ TEST(ParserSection6, VectorBigEndian) {
 }
 
 TEST(ParserSection6, VectorLittleEndian) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [0:7] le;\n"
@@ -36,7 +34,6 @@ TEST(ParserSection6, VectorLittleEndian) {
 }
 
 TEST(ParserSection6, VectorUnsignedExplicit) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic unsigned [7:0] uv;\n"
@@ -48,4 +45,4 @@ TEST(ParserSection6, VectorUnsignedExplicit) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-}
+}  // namespace

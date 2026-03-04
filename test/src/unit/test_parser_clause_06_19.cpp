@@ -72,7 +72,6 @@ TEST(ParserA221, EnumBaseVectorWithDim) {
 }
 
 TEST(ParserA221, EnumBaseTypeIdentifier) {
-
   auto r = Parse(
       "module m;\n"
       "  typedef logic [3:0] nibble_t;\n"
@@ -82,4 +81,4 @@ TEST(ParserA221, EnumBaseTypeIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

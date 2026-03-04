@@ -37,4 +37,4 @@ TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
 }
 
-}
+}  // namespace

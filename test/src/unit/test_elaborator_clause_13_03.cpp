@@ -19,4 +19,4 @@ TEST(ParserA27, ElabTaskDeclInModule) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

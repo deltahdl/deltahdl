@@ -29,4 +29,4 @@ TEST(ParserA82, ConstantFunctionCallInLocalparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA221, EnumNameWithRange) {
-
   auto r = Parse("module m; enum {A[3]} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +13,6 @@ TEST(ParserA221, EnumNameWithRange) {
 }
 
 TEST(ParserA221, EnumNameWithRangeColon) {
-
   auto r = Parse("module m; enum {A[0:3] = 10} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -24,4 +22,4 @@ TEST(ParserA221, EnumNameWithRangeColon) {
   EXPECT_NE(member.value, nullptr);
 }
 
-}
+}  // namespace

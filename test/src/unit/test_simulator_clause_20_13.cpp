@@ -60,4 +60,4 @@ TEST(Coverage, GlobalCoverageSingleGroup) {
   EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 100.0);
 }
 
-}
+}  // namespace

@@ -29,7 +29,6 @@ TEST(ParserSection11, StringReplication) {
 }
 
 TEST(ParserSection6, StringConcatOp) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  string a, b, c;\n"
@@ -41,4 +40,4 @@ TEST(ParserSection6, StringConcatOp) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(LexerCh50603, EmbeddedDollar) {
-
   auto tokens = Lex("$test$plusargs $value$plusargs");
   ASSERT_EQ(tokens.size(), 3);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
@@ -17,10 +16,9 @@ TEST(LexerCh50603, EmbeddedDollar) {
 }
 
 TEST(LexerCh50603, DollarAloneIsNotSystemIdentifier) {
-
   auto tokens = Lex("$");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
 }
 
-}
+}  // namespace

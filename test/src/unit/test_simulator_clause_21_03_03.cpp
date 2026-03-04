@@ -16,4 +16,4 @@ TEST(Section20, SformatfBasic) {
   EXPECT_EQ(result.width, 48u);
 }
 
-}
+}  // namespace

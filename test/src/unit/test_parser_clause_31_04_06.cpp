@@ -60,4 +60,4 @@ TEST(ParserA70502, StartEndEdgeOffsetMinTypMax) {
   EXPECT_EQ(tc->limits[1]->kind, ExprKind::kMinTypMax);
 }
 
-}
+}  // namespace

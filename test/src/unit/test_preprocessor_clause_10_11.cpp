@@ -59,4 +59,4 @@ TEST(ParserSection10, NetAliasThreeNets) {
   ASSERT_EQ(alias_item->alias_nets.size(), 3u);
 }
 
-}
+}  // namespace

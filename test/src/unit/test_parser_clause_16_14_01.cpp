@@ -187,7 +187,6 @@ using DpiParseTest = ProgramTestParse;
 using ApiParseTest = ProgramTestParse;
 
 TEST(ParserSection39, AssertPropertyStatement) {
-
   auto r = Parse(R"(
     module m;
       logic clk, a, b;
@@ -250,4 +249,4 @@ TEST(ParserAnnexF, AnnexFAssertActionBlocks) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

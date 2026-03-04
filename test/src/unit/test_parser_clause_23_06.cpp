@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserClause03, Cl3_13_HierarchicalReferenceSyntax) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -15,4 +14,4 @@ TEST(ParserClause03, Cl3_13_HierarchicalReferenceSyntax) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

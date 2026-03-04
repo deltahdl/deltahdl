@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportChandle) {
-
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function chandle create_handle();\n"
@@ -24,4 +23,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportChandle) {
   EXPECT_EQ(items[1]->func_args[0].data_type.kind, DataTypeKind::kChandle);
 }
 
-}
+}  // namespace

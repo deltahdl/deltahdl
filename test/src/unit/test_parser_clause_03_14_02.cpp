@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserClause03, Cl3_14_2_BothMechanismsMagnitudes) {
-
   auto r1 = PreprocessTimescale("`timescale 1ns / 1ps\n");
   EXPECT_EQ(r1.timescale.magnitude, 1);
   auto r10 = PreprocessTimescale("`timescale 10ns / 10ps\n");
@@ -23,4 +22,4 @@ TEST(ParserClause03, Cl3_14_2_BothMechanismsMagnitudes) {
       ParseTimescale31402("module m; timeunit 100ns; endmodule\n").has_errors);
 }
 
-}
+}  // namespace

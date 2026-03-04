@@ -51,4 +51,4 @@ TEST(ParserA705, SystemTimingCheckRemoval) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRemoval);
 }
 
-}
+}  // namespace

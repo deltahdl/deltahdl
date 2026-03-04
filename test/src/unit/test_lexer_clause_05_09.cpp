@@ -7,7 +7,6 @@
 using namespace delta;
 
 TEST(LexerCh509, EmptyString) {
-
   auto tokens = Lex("\"\"");
   ASSERT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
@@ -15,14 +14,12 @@ TEST(LexerCh509, EmptyString) {
 }
 
 TEST(LexerCh509, TripleQuotedWithEscape) {
-
   auto tokens = Lex(R"("""hello\nworld""")");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
 TEST(LexerCh509, UnterminatedTripleQuotedStringError) {
-
   std::string src = R"("""no closing triple)";
   SourceManager mgr;
   DiagEngine diag(mgr);

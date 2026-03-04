@@ -42,4 +42,4 @@ TEST(EnumMethods, NameForFirstMember) {
   EXPECT_EQ(ExtractEnumName(result), "RED");
 }
 
-}
+}  // namespace

@@ -57,4 +57,4 @@ TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
             static_cast<int8_t>(TimeUnit::kS));
 }
 
-}
+}  // namespace

@@ -23,4 +23,4 @@ TEST(IpcSync, SemaphoreNewWithKeys) {
   EXPECT_EQ(sem.key_count, 5);
 }
 
-}
+}  // namespace

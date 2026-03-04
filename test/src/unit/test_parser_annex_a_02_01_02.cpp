@@ -21,4 +21,4 @@ TEST(ParserA212, InputVariablePortTypeLogic) {
   EXPECT_EQ(port.direction, Direction::kInput);
 }
 
-}
+}  // namespace

@@ -31,4 +31,4 @@ TEST(ParserSection9, AlwaysBlock) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
 
-}
+}  // namespace

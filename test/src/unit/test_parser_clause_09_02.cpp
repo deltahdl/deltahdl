@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, InitialConstruct_Multiple) {
-
   auto r = Parse(
       "module m;\n"
       "  initial a = 0;\n"
@@ -49,4 +48,4 @@ TEST(ParserSection9c, MultipleInitialProcedures) {
   EXPECT_EQ(count, 3);
 }
 
-}
+}  // namespace

@@ -61,4 +61,4 @@ TEST(AssocTraversal, ByteIndexFirstReturnsOneForByteRef) {
   EXPECT_EQ(ref->value.ToUint64(), 200u);
 }
 
-}
+}  // namespace

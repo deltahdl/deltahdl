@@ -26,7 +26,6 @@ TEST(ParserSection38, DpiImportForVpiAccess) {
 }
 
 TEST(ParserSection38, DpiImportContextCallbackWithArgs) {
-
   auto r = Parse(R"(
     module m;
       import "DPI-C" context function int register_cb_wrapper(
@@ -74,4 +73,4 @@ TEST(ParserSection13, DpiImportContextTask) {
   EXPECT_TRUE(dpi->dpi_is_task);
 }
 
-}
+}  // namespace

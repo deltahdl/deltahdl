@@ -64,4 +64,4 @@ TEST(ParserA705, SystemTimingCheckHold) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kHold);
 }
 
-}
+}  // namespace

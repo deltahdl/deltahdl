@@ -153,7 +153,6 @@ TEST(ParserCh510, AssignmentPattern_NestedReplication) {
 }
 
 TEST(ParserCh510, StructLiteral_NestedBraces) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -162,7 +161,6 @@ TEST(ParserCh510, StructLiteral_NestedBraces) {
 }
 
 TEST(ParserCh511, ArrayLiteral_Nested) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
@@ -183,4 +181,4 @@ TEST(ParserCh511, ArrayLiteral_DefaultValue) {
               "endmodule"));
 }
 
-}
+}  // namespace

@@ -207,4 +207,4 @@ TEST(ParserA85, VarLvalueStreamingConcat) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
 }
 
-}
+}  // namespace

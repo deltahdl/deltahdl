@@ -38,7 +38,6 @@ TEST(ParserA84, ConstantPrimaryNull) {
 }
 
 TEST(ParserSection6, ChandleMultipleDecls) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  chandle h1, h2;\n"
@@ -57,4 +56,4 @@ TEST(ParserSection6, ChandleVarDecl) {
   EXPECT_EQ(item->name, "ch");
 }
 
-}
+}  // namespace

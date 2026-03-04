@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, ValueSet_2StateBitDecl) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  bit [7:0] val;\n"
@@ -18,4 +17,4 @@ TEST(ParserSection6, ValueSet_2StateBitDecl) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kBit));
 }
 
-}
+}  // namespace

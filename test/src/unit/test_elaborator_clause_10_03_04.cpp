@@ -37,4 +37,4 @@ TEST(ElabClause1003, Validate_LegalDriveStrengthHighz0Strong1) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

@@ -39,7 +39,6 @@ TEST(ParserSection8, TypeParameterLogicVector) {
 }
 
 TEST(ParserSection6, TypeParamDefaultLogicVector) {
-
   EXPECT_TRUE(
       ParseOk("module m #(parameter type DATA_T = logic [15:0])\n"
               "  ();\n"
@@ -76,4 +75,4 @@ TEST(ParserSection6, TypeParameterDefaultShortint) {
                "endmodule\n"));
 }
 
-}
+}  // namespace

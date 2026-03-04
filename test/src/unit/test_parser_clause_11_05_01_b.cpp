@@ -160,4 +160,4 @@ TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectMinus) {
   EXPECT_TRUE(stmt->rhs->is_part_select_minus);
 }
 
-}
+}  // namespace

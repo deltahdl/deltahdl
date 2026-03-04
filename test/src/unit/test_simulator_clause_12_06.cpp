@@ -8,7 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(Matches, ExactMatchTrue) {
-
   SimFixture f;
   auto* expr = ParseExprFrom("42 matches 42", f);
   ASSERT_NE(expr, nullptr);
@@ -18,7 +17,6 @@ TEST(Matches, ExactMatchTrue) {
 }
 
 TEST(Matches, ExactMatchFalse) {
-
   SimFixture f;
   auto* expr = ParseExprFrom("42 matches 99", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -34,4 +32,4 @@ TEST(Matches, VariableMatch) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-}
+}  // namespace

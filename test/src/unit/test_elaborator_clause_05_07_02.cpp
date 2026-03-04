@@ -28,4 +28,4 @@ TEST(ElabA87, ScientificNotationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

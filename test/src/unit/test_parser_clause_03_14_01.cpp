@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserClause03, Cl3_14_1_PerElementAccuracy) {
-
   TimeScale ts_a{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
 
   TimeScale ts_b{TimeUnit::kNs, 1, TimeUnit::kPs, 1};
@@ -20,7 +19,6 @@ TEST(ParserClause03, Cl3_14_1_PerElementAccuracy) {
 }
 
 TEST(ParserClause03, Cl3_14_1_MagnitudeRounding) {
-
   TimeScale ts{TimeUnit::kNs, 10, TimeUnit::kNs, 1};
 
   EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kNs), 28u);
@@ -45,7 +43,6 @@ TEST(ParserClause03, Cl3_14_1_SamePrecisionRoundsToInteger) {
 }
 
 TEST(ParserClause03, Cl3_14_1_OneOrderSmallerRoundsToOneDecimal) {
-
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
 
   EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kPs), 2800u);
@@ -62,7 +59,6 @@ TEST(ParserClause03, Cl3_14_1_LrmExample_2_75ns) {
 }
 
 TEST(ParserClause03, Cl3_14_1_TwoOrdersSmaller) {
-
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 10};
 
   EXPECT_EQ(RealDelayToTicks(2.756, ts, TimeUnit::kPs), 2760u);
@@ -71,7 +67,6 @@ TEST(ParserClause03, Cl3_14_1_TwoOrdersSmaller) {
 }
 
 TEST(ParserClause03, Cl3_14_1_ThreeOrdersNoRounding) {
-
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 1};
 
   EXPECT_EQ(RealDelayToTicks(2.756, ts, TimeUnit::kPs), 2756u);
@@ -90,4 +85,4 @@ TEST(ParserClause03, Cl3_14_1_ExactIntegerPassThrough) {
   EXPECT_EQ(RealDelayToTicks(3.0, ts, TimeUnit::kPs), 3000u);
 }
 
-}
+}  // namespace

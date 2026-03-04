@@ -7,7 +7,6 @@
 using namespace delta;
 
 TEST(LexerA94, SpaceSeparatesTokens) {
-
   auto tokens = Lex("a b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -18,7 +17,6 @@ TEST(LexerA94, SpaceSeparatesTokens) {
 }
 
 TEST(LexerA94, TabSeparatesTokens) {
-
   auto tokens = Lex("a\tb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -26,7 +24,6 @@ TEST(LexerA94, TabSeparatesTokens) {
 }
 
 TEST(LexerA94, NewlineSeparatesTokens) {
-
   auto tokens = Lex("a\nb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -34,7 +31,6 @@ TEST(LexerA94, NewlineSeparatesTokens) {
 }
 
 TEST(LexerA94, FormfeedSeparatesTokens) {
-
   auto tokens = Lex("a\fb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -42,7 +38,6 @@ TEST(LexerA94, FormfeedSeparatesTokens) {
 }
 
 TEST(LexerA94, EofTerminatesTokenStream) {
-
   auto tokens = Lex("a");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -51,14 +46,12 @@ TEST(LexerA94, EofTerminatesTokenStream) {
 }
 
 TEST(LexerA94, EofOnEmptyInput) {
-
   auto tokens = Lex("");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
 TEST(LexerA94, WhitespaceIgnoredBetweenOperators) {
-
   auto tokens = Lex("a+b");
   ASSERT_EQ(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -67,7 +60,6 @@ TEST(LexerA94, WhitespaceIgnoredBetweenOperators) {
 }
 
 TEST(LexerA94, MultipleSpacesIgnored) {
-
   auto tokens = Lex("a     b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -75,7 +67,6 @@ TEST(LexerA94, MultipleSpacesIgnored) {
 }
 
 TEST(LexerA94, MixedWhitespaceIgnored) {
-
   auto tokens = Lex("a \t \n \f b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -83,14 +74,12 @@ TEST(LexerA94, MixedWhitespaceIgnored) {
 }
 
 TEST(LexerA94, LeadingWhitespaceIgnored) {
-
   auto tokens = Lex("  \t\n  a");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].text, "a");
 }
 
 TEST(LexerA94, TrailingWhitespaceIgnored) {
-
   auto tokens = Lex("a  \t\n  ");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -98,14 +87,12 @@ TEST(LexerA94, TrailingWhitespaceIgnored) {
 }
 
 TEST(LexerA94, OnlyWhitespaceInput) {
-
   auto tokens = Lex("   \t\t\n\n\f  ");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
 TEST(LexerA94, WhitespaceRequiredBetweenKeywords) {
-
   auto tokens = Lex("moduleendmodule");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -113,7 +100,6 @@ TEST(LexerA94, WhitespaceRequiredBetweenKeywords) {
 }
 
 TEST(LexerA94, WhitespaceCorrectlySeparatesKeywords) {
-
   auto tokens = Lex("module endmodule");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
@@ -121,7 +107,6 @@ TEST(LexerA94, WhitespaceCorrectlySeparatesKeywords) {
 }
 
 TEST(LexerA94, FormfeedSeparatesKeywords) {
-
   auto tokens = Lex("module\fendmodule");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
@@ -143,7 +128,6 @@ TEST(LexerA94, NewlineSeparatesKeywords) {
 }
 
 TEST(LexerA94, NewlineAdvancesLineNumber) {
-
   auto [tokens, errors] = LexWithDiag("a\nb");
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 3u);
@@ -152,7 +136,6 @@ TEST(LexerA94, NewlineAdvancesLineNumber) {
 }
 
 TEST(LexerA94, TabAdvancesColumn) {
-
   auto [tokens, errors] = LexWithDiag("a\tb");
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 3u);
@@ -161,7 +144,6 @@ TEST(LexerA94, TabAdvancesColumn) {
 }
 
 TEST(LexerA94, FormfeedAdvancesColumn) {
-
   auto [tokens, errors] = LexWithDiag("a\fb");
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 3u);
@@ -188,7 +170,6 @@ TEST(LexerA94, SpaceAdvancesColumn) {
 }
 
 TEST(LexerA94, CarriageReturnIsWhitespace) {
-
   auto tokens = Lex("a\rb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -196,7 +177,6 @@ TEST(LexerA94, CarriageReturnIsWhitespace) {
 }
 
 TEST(LexerA94, VerticalTabIsWhitespace) {
-
   auto tokens = Lex("a\vb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -204,7 +184,6 @@ TEST(LexerA94, VerticalTabIsWhitespace) {
 }
 
 TEST(LexerA94, CrLfPairIsWhitespace) {
-
   auto tokens = Lex("a\r\nb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -212,7 +191,6 @@ TEST(LexerA94, CrLfPairIsWhitespace) {
 }
 
 TEST(LexerA94, EscapedIdentTerminatedBySpace) {
-
   auto tokens = Lex("\\esc_id ");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
@@ -234,7 +212,6 @@ TEST(LexerA94, EscapedIdentTerminatedByNewline) {
 }
 
 TEST(LexerA94, EscapedIdentTerminatedByFormfeed) {
-
   auto tokens = Lex("\\esc_id\f");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
@@ -242,7 +219,6 @@ TEST(LexerA94, EscapedIdentTerminatedByFormfeed) {
 }
 
 TEST(LexerA94, EscapedIdentTerminatedByEof) {
-
   auto tokens = Lex("\\esc_id");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
@@ -250,7 +226,6 @@ TEST(LexerA94, EscapedIdentTerminatedByEof) {
 }
 
 TEST(LexerA94, StringLiteralPreservesSpaces) {
-
   auto tokens = Lex("\"a b c\"");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
@@ -258,7 +233,6 @@ TEST(LexerA94, StringLiteralPreservesSpaces) {
 }
 
 TEST(LexerA94, StringLiteralPreservesTabs) {
-
   auto tokens = Lex("\"a\tb\"");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
@@ -266,7 +240,6 @@ TEST(LexerA94, StringLiteralPreservesTabs) {
 }
 
 TEST(LexerA94, NoErrorsForAllWhitespaceTypes) {
-
   auto [tokens, errors] = LexWithDiag(
       "module m;\n"
       "\tlogic\fa;\n"

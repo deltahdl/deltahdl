@@ -39,4 +39,4 @@ TEST(ElabA612, BasicRandsequenceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

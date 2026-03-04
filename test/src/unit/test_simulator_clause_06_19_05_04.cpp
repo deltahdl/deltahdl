@@ -54,7 +54,6 @@ TEST(EnumMethods, PrevOnNonMemberValue) {
 }
 
 TEST(EnumMethods, PrevFullIteration) {
-
   EnumFixture f;
   auto* var =
       f.RegisterEnum("state", "state_t", {{"A", 10}, {"B", 20}, {"C", 30}});
@@ -70,4 +69,4 @@ TEST(EnumMethods, PrevFullIteration) {
   EXPECT_EQ(visited, (std::vector<uint64_t>{10, 30, 20, 10}));
 }
 
-}
+}  // namespace

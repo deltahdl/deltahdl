@@ -21,4 +21,4 @@ TEST(ParserSection8, ClassWithQualifiersLocalProtected) {
   EXPECT_TRUE(cls->members[1]->is_protected);
 }
 
-}
+}  // namespace

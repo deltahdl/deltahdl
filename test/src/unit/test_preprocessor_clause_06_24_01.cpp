@@ -19,7 +19,6 @@ TEST(ParserSection6, TypeExprInCast) {
 }
 
 TEST(ParserSection6, CastUnsigned) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  initial x = unsigned'(y);\n"
@@ -33,4 +32,4 @@ TEST(ParserSection6, CastUnsigned) {
   EXPECT_EQ(rhs->text, "unsigned");
 }
 
-}
+}  // namespace

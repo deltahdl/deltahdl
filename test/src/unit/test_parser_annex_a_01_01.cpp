@@ -12,4 +12,4 @@ TEST(LibraryText, NullDescription) {
   EXPECT_TRUE(r.cu->libraries.empty());
 }
 
-}
+}  // namespace

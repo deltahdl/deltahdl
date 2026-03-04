@@ -71,4 +71,4 @@ TEST(ParserSection21, DumpvarsInsideBeginEnd) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
-}
+}  // namespace

@@ -138,7 +138,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarComplexLogic) {
 }
 
 TEST(ParserSection9, StarEventBareAlways) {
-
   auto r = Parse(
       "module m;\n"
       "  always @* a = b;\n"
@@ -152,7 +151,6 @@ TEST(ParserSection9, StarEventBareAlways) {
 }
 
 TEST(ParserSection9, StarEventParenAlways) {
-
   auto r = Parse(
       "module m;\n"
       "  always @(*) begin a = b; end\n"
@@ -166,7 +164,6 @@ TEST(ParserSection9, StarEventParenAlways) {
 }
 
 TEST(ParserSection9, StarEventBareStmt) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -182,7 +179,6 @@ TEST(ParserSection9, StarEventBareStmt) {
 }
 
 TEST(ParserSection9, StarEventParenStmt) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -197,4 +193,4 @@ TEST(ParserSection9, StarEventParenStmt) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-}
+}  // namespace

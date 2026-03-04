@@ -15,4 +15,4 @@ TEST(Section20, Typename) {
   EXPECT_GT(result.width, 0u);
 }
 
-}
+}  // namespace

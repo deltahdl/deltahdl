@@ -5,6 +5,5 @@
 using namespace delta;
 
 TEST(LexerCh50901, OctalMaxDigits) {
-
   EXPECT_EQ(InterpretStringEscapes(R"(\1019)"), "A9");
 }

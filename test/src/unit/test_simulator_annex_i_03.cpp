@@ -30,4 +30,4 @@ TEST(SvDpi, CanonicalValueConstants) {
   EXPECT_EQ(sv_x, 3);
 }
 
-}
+}  // namespace

@@ -13,7 +13,6 @@ static CompilationUnit* ParseSrc(const std::string& src, ElabFixture& f) {
 }
 
 TEST(ElabA93, SimpleIdentResolvesInModule) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -26,7 +25,6 @@ TEST(ElabA93, SimpleIdentResolvesInModule) {
 }
 
 TEST(ElabA93, IdentCaseSensitiveElaboration) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -43,7 +41,6 @@ TEST(ElabA93, IdentCaseSensitiveElaboration) {
 }
 
 TEST(ElabA93, EscapedIdentEquivalence) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -56,7 +53,6 @@ TEST(ElabA93, EscapedIdentEquivalence) {
 }
 
 TEST(ElabA93, EscapedIdentWithKeywordName) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -69,7 +65,6 @@ TEST(ElabA93, EscapedIdentWithKeywordName) {
 }
 
 TEST(ElabA93, PackageScopeParamResolution) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "package pkg;\n"
@@ -84,7 +79,6 @@ TEST(ElabA93, PackageScopeParamResolution) {
 }
 
 TEST(ElabA93, PackageScopeTypeResolution) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "package pkg;\n"
@@ -99,7 +93,6 @@ TEST(ElabA93, PackageScopeTypeResolution) {
 }
 
 TEST(ElabA93, PackageImportIdentAccess) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "package pkg;\n"
@@ -115,7 +108,6 @@ TEST(ElabA93, PackageImportIdentAccess) {
 }
 
 TEST(ElabA93, HierarchicalIdentInContAssign) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module sub(input a, output b);\n"
@@ -131,7 +123,6 @@ TEST(ElabA93, HierarchicalIdentInContAssign) {
 }
 
 TEST(ElabA93, InstanceNameIsIdentifier) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module sub; endmodule\n"
@@ -147,7 +138,6 @@ TEST(ElabA93, InstanceNameIsIdentifier) {
 }
 
 TEST(ElabA93, GenvarIdentifier) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -160,7 +150,6 @@ TEST(ElabA93, GenvarIdentifier) {
 }
 
 TEST(ElabA93, ParamIdentInExpression) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -174,7 +163,6 @@ TEST(ElabA93, ParamIdentInExpression) {
 }
 
 TEST(ElabA93, FunctionCallIdentResolution) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -190,7 +178,6 @@ TEST(ElabA93, FunctionCallIdentResolution) {
 }
 
 TEST(ElabA93, SystemCallElaboration) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -205,7 +192,6 @@ TEST(ElabA93, SystemCallElaboration) {
 }
 
 TEST(ElabA93, DpiImportElaboration) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -220,7 +206,6 @@ TEST(ElabA93, DpiImportElaboration) {
 }
 
 TEST(ElabA93, DpiExportElaboration) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -233,7 +218,6 @@ TEST(ElabA93, DpiExportElaboration) {
 }
 
 TEST(ElabA93, MixedIdentifierForms) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -249,4 +233,4 @@ TEST(ElabA93, MixedIdentifierForms) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

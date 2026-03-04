@@ -27,4 +27,4 @@ TEST(SourceText, InterfaceMultipleItemTypes) {
       HasItemKindNamed(ifc->items, ModuleItemKind::kTaskDecl, "run_parallel"));
 }
 
-}
+}  // namespace

@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection15, SemaphoreVarDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -18,4 +17,4 @@ TEST(ParserSection15, SemaphoreVarDecl) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}
+}  // namespace

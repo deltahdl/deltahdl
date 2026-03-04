@@ -30,4 +30,4 @@ TEST(ParserA84, ConstantPrimaryTypeReference) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

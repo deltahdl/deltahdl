@@ -40,4 +40,4 @@ TEST(ParserSection11, ConditionalTernary) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-}
+}  // namespace

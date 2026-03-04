@@ -9,4 +9,4 @@ TEST(GateDecl, Highz1OutputsZInsteadOf1) {
                                    GateType::kNor));
 }
 
-}
+}  // namespace

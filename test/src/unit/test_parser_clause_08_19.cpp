@@ -47,4 +47,4 @@ TEST(SourceText, ClassConstProperty) {
   EXPECT_TRUE(members[1]->is_static);
 }
 
-}
+}  // namespace

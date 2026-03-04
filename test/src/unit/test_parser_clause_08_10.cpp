@@ -43,4 +43,4 @@ TEST(ParserSection13, Sec13_8_MultiArgParameterizedWidth) {
               "endclass\n"));
 }
 
-}
+}  // namespace

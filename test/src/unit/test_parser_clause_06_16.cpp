@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA212, VarDataTypeString) {
-
   auto r = Parse("module m(input string name); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -19,7 +18,6 @@ TEST(ParserA221, DataTypeString) {
 }
 
 TEST(ParserSection6, StringBlockDecl) {
-
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -35,7 +33,6 @@ TEST(ParserSection6, StringBlockDecl) {
 }
 
 TEST(ParserSection6, StringFunctionArg) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  function void print_msg(string s);\n"
@@ -132,7 +129,6 @@ TEST(ParserSection8, StringTypeBlockLevel) {
 }
 
 TEST(ParserSection6, StringInProcedural) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -143,7 +139,6 @@ TEST(ParserSection6, StringInProcedural) {
 }
 
 TEST(ParserSection6, StringDeclBasic) {
-
   auto r = Parse(
       "module m;\n"
       "  string s;\n"
@@ -157,7 +152,6 @@ TEST(ParserSection6, StringDeclBasic) {
 }
 
 TEST(ParserSection6, StringDeclWithInitializer) {
-
   auto r = Parse(
       "module m;\n"
       "  string name = \"hello\";\n"
@@ -171,7 +165,6 @@ TEST(ParserSection6, StringDeclWithInitializer) {
 }
 
 TEST(ParserSection6, StringDeclEmptyInit) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  string s = \"\";\n"
@@ -179,7 +172,6 @@ TEST(ParserSection6, StringDeclEmptyInit) {
 }
 
 TEST(ParserSection6, StringParameterDecl) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter string DEFAULT_NAME = \"John Smith\";\n"
@@ -206,7 +198,6 @@ TEST(ParserSection6, StringFunctionReturn) {
 }
 
 TEST(ParserSection6, StringComparison) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  string a, b;\n"
@@ -230,4 +221,4 @@ TEST(ParserSection6, MultipleStringDecls) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-}
+}  // namespace

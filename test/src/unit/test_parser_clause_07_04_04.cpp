@@ -38,4 +38,4 @@ TEST(ParserSection7, MultidimensionalPackedArray) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-}
+}  // namespace

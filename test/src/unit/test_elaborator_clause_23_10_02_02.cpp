@@ -22,4 +22,4 @@ TEST(ParserAnnexA0413, ElaborationProgramInstWithParams) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
-}
+}  // namespace

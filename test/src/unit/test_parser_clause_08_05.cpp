@@ -22,4 +22,4 @@ TEST(ParserSection8, ClassWithProperties) {
   }
 }
 
-}
+}  // namespace

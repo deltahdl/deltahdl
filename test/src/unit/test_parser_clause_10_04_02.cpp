@@ -19,7 +19,6 @@ TEST(ParserA602, NonblockingAssignment_Simple) {
 }
 
 TEST(ParserA602, NonblockingAssignment_WithIntraDelay) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= #5 d; end\n"
@@ -34,7 +33,6 @@ TEST(ParserA602, NonblockingAssignment_WithIntraDelay) {
 }
 
 TEST(ParserA602, NonblockingAssignment_WithIntraEvent) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= @(posedge clk) d; end\n"
@@ -699,4 +697,4 @@ TEST(ParserSection9b, NonblockingAssignMultiple) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-}
+}  // namespace

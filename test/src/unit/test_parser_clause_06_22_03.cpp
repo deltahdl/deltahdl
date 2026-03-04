@@ -14,7 +14,6 @@ TEST(ParserSection6, AssignmentCompatibleRealToReal) {
 }
 
 TEST(ParserSection6, AssignCompatibleByteToShortint) {
-
   DataType a;
   a.kind = DataTypeKind::kByte;
   DataType b;
@@ -23,7 +22,6 @@ TEST(ParserSection6, AssignCompatibleByteToShortint) {
 }
 
 TEST(ParserSection6, AssignCompatibleRealToReal) {
-
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -32,7 +30,6 @@ TEST(ParserSection6, AssignCompatibleRealToReal) {
 }
 
 TEST(ParserSection6, AssignCompatibleEnumToLogic) {
-
   DataType a;
   a.kind = DataTypeKind::kEnum;
   DataType b;
@@ -41,7 +38,6 @@ TEST(ParserSection6, AssignCompatibleEnumToLogic) {
 }
 
 TEST(ParserSection6, AssignmentCompatibleIntegral) {
-
   DataType a;
   a.kind = DataTypeKind::kInt;
   DataType b;
@@ -50,7 +46,6 @@ TEST(ParserSection6, AssignmentCompatibleIntegral) {
 }
 
 TEST(ParserSection6, AssignmentCompatibleEnumToInt) {
-
   DataType a;
   a.kind = DataTypeKind::kEnum;
   DataType b;
@@ -59,7 +54,6 @@ TEST(ParserSection6, AssignmentCompatibleEnumToInt) {
 }
 
 TEST(ParserSection6, NotAssignmentCompatibleStringInt) {
-
   DataType a;
   a.kind = DataTypeKind::kString;
   DataType b;
@@ -67,4 +61,4 @@ TEST(ParserSection6, NotAssignmentCompatibleStringInt) {
   EXPECT_FALSE(IsAssignmentCompatible(a, b));
 }
 
-}
+}  // namespace

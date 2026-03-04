@@ -31,4 +31,4 @@ TEST(ClassSim, PolymorphicVTableMultiLevel) {
   EXPECT_EQ(obj->ResolveVirtualMethod("f"), m_leaf);
 }
 
-}
+}  // namespace

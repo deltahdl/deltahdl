@@ -90,4 +90,4 @@ TEST(Section20, Signed) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}
+}  // namespace

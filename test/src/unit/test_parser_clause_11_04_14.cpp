@@ -87,4 +87,4 @@ TEST(ParserSection6, BitStreamCastStreaming) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

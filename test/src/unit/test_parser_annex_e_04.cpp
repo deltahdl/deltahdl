@@ -26,4 +26,4 @@ TEST(ParserAnnexE2, AnnexEDelayModeDistributed) {
   }
 }
 
-}
+}  // namespace

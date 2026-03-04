@@ -9,7 +9,6 @@ SimCoroutine MakeTestCoroutine() { co_return; }
 namespace {
 
 TEST(Process, ProcessKindEnum) {
-
   struct {
     ProcessKind kind;
     uint8_t expected;
@@ -24,4 +23,4 @@ TEST(Process, ProcessKindEnum) {
   }
 }
 
-}
+}  // namespace

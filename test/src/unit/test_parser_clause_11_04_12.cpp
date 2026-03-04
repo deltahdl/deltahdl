@@ -244,4 +244,4 @@ TEST(ParserSection11, ConcatenationBasic) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-}
+}  // namespace

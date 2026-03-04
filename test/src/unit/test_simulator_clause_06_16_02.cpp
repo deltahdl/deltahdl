@@ -15,4 +15,4 @@ TEST(StringMethods, Putc) {
   EXPECT_EQ(VecToString(var->value), "Hello");
 }
 
-}
+}  // namespace

@@ -36,4 +36,4 @@ TEST(ClassSim, NestedThisScoping) {
   EXPECT_EQ(f.ctx.CurrentThis(), nullptr);
 }
 
-}
+}  // namespace

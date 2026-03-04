@@ -35,4 +35,4 @@ TEST(SimCh9, AlwaysCombPriorityEncoder) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}
+}  // namespace

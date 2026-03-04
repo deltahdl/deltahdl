@@ -42,4 +42,4 @@ TEST(AdvSim, EventCoalescerKeepsDistinctTargets) {
   EXPECT_EQ(entries.size(), 3u);
 }
 
-}
+}  // namespace

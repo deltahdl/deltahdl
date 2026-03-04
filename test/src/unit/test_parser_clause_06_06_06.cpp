@@ -54,4 +54,4 @@ TEST(ParserSection6, Sec6_7_1_Supply1Decl) {
   EXPECT_EQ(item->name, "vdd");
 }
 
-}
+}  // namespace

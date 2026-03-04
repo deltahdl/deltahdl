@@ -316,4 +316,4 @@ TEST(ParserSection29, UdpMultiple) {
   EXPECT_EQ(r.cu->udps[1]->name, "buf2");
 }
 
-}
+}  // namespace

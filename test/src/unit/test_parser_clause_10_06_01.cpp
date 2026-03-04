@@ -104,7 +104,6 @@ TEST(ParserSection10, Sec10_6_1_FullDFlipFlopPattern) {
 }
 
 TEST(ParserSection10, AssignInAlwaysBlock) {
-
   auto r = Parse(
       "module dff(output q, input d, clear, preset, clock);\n"
       "  logic q;\n"
@@ -697,4 +696,4 @@ TEST(ParserSection10, Sec10_6_1_AssignToVector) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}
+}  // namespace

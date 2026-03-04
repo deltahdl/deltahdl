@@ -16,4 +16,4 @@ TEST_F(AnnexHParseTest, AnnexKVpiSysGetValue) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-}
+}  // namespace

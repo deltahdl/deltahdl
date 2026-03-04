@@ -159,4 +159,4 @@ TEST(ParserSection28, Sec28_12_PulsestyleOndetect) {
   EXPECT_EQ(si->signal_list[1], "c");
 }
 
-}
+}  // namespace

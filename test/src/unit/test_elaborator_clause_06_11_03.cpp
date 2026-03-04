@@ -9,7 +9,6 @@ using namespace delta;
 namespace {
 
 TEST(TypeEval, ImplicitlySignedTypes) {
-
   struct Case {
     DataTypeKind kind;
     bool expected;
@@ -51,4 +50,4 @@ TEST(SimCh6b, TypeOpByteIsSigned) {
   EXPECT_EQ(var->value.width, 8u);
 }
 
-}
+}  // namespace

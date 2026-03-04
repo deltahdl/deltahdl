@@ -78,7 +78,6 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBALaterTime) {
 
   auto* active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
-
     auto* nba = sched.GetEventPool().Acquire();
     nba->callback = [&nba_times, &sched]() {
       nba_times.push_back(sched.CurrentTime().ticks);

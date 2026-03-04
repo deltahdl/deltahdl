@@ -190,7 +190,6 @@ TEST(ParserCh512, Expr_AttributeOnTernary) {
 }
 
 TEST(ParserCh512, PostfixFunctionAttribute) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic a, b, c;\n"
@@ -207,7 +206,6 @@ TEST(ParserCh512, PostfixFunctionAttribute_NoArgs) {
 }
 
 TEST(ParserCh512, NestedAttribute_Error) {
-
   EXPECT_FALSE(
       ParseOk("module t;\n"
               "  (* foo = 1 + (* bar *) 2 *) logic x;\n"
@@ -222,7 +220,6 @@ TEST(ParserCh512, AttributeValue_NoNesting_Ok) {
 }
 
 TEST(ParserCh512, Attribute_OnCaseStatement) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -242,7 +239,6 @@ TEST(ParserCh512, Attribute_OnCaseStatement) {
 }
 
 TEST(ParserCh512, Attribute_MultipleInstances) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  (* full_case=1 *)\n"
@@ -252,7 +248,6 @@ TEST(ParserCh512, Attribute_MultipleInstances) {
 }
 
 TEST(ParserCh512, Attribute_OnModuleInstantiation) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  (* optimize_power=0 *)\n"
@@ -296,7 +291,6 @@ TEST(ParserCh512, Attribute_OnAssignment) {
 }
 
 TEST(ParserCh512, Attribute_OnContAssign) {
-
   auto r = Parse(
       "module m;\n"
       "  logic a, b;\n"
@@ -311,7 +305,6 @@ TEST(ParserCh512, Attribute_OnContAssign) {
   EXPECT_EQ(item->attrs[0].name, "synthesis_on");
 }
 TEST(ParserCh512, AttributeValue_ConstExpr) {
-
   auto r = Parse(
       "module m;\n"
       "  (* depth = 3 + 1 *)\n"
@@ -335,7 +328,6 @@ TEST(ParserCh512, AttributeValue_String) {
 }
 
 TEST(ParserCh512, Attribute_MultipleSeparateInstances) {
-
   auto r = Parse(
       "module m;\n"
       "  (* first *)\n"
@@ -350,4 +342,4 @@ TEST(ParserCh512, Attribute_MultipleSeparateInstances) {
   EXPECT_EQ(item->attrs[1].name, "second");
 }
 
-}
+}  // namespace

@@ -24,7 +24,6 @@ TEST(Process, ProcessDefaultState_Flags) {
 }
 
 TEST(Process, ProcessWithCoroutine) {
-
   auto coro = MakeTestCoroutine();
   Process p;
   p.coro = coro.Release();
@@ -33,4 +32,4 @@ TEST(Process, ProcessWithCoroutine) {
   EXPECT_TRUE(p.Done());
 }
 
-}
+}  // namespace

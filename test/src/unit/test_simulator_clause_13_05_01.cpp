@@ -126,4 +126,4 @@ TEST(Eval, NestedFunctionOutputArgs) {
   EXPECT_EQ(result_var->value.ToUint64(), 105u);
 }
 
-}
+}  // namespace

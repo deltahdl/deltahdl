@@ -193,4 +193,4 @@ TEST(SimCh10, BlockingAssignLogicalOps) {
   EXPECT_EQ(r_or->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

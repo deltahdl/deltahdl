@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, AutomaticFunctionLocalVar) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  function automatic int factorial(int n);\n"
@@ -21,4 +20,4 @@ TEST(ParserSection6, AutomaticFunctionLocalVar) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-}
+}  // namespace

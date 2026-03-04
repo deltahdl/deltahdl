@@ -133,4 +133,4 @@ TEST(ParserA705, SystemTimingCheckSetup) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetup);
 }
 
-}
+}  // namespace

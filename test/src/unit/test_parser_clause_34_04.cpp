@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST_F(AnnexHParseTest, AnnexOPragmaProtect) {
-
   auto* unit = Parse(
       "module m;\n"
       "  logic x;\n"
@@ -18,4 +17,4 @@ TEST_F(AnnexHParseTest, AnnexOPragmaProtect) {
   EXPECT_EQ(items[0]->name, "x");
 }
 
-}
+}  // namespace

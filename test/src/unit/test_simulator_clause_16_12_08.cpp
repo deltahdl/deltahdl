@@ -33,4 +33,4 @@ TEST(SvaEngine, PropertyNot) {
             PropertyResult::kFail);
 }
 
-}
+}  // namespace

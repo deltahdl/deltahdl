@@ -32,4 +32,4 @@ TEST_F(ProtectedTest, ViewportPragma) {
   EXPECT_NE(result.find("module m;"), std::string::npos);
 }
 
-}
+}  // namespace

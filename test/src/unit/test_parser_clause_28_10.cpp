@@ -63,4 +63,4 @@ TEST(ParserA301, PullGateInst_PullupUnnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
-}
+}  // namespace

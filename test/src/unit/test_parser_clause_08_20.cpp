@@ -116,4 +116,4 @@ TEST(ParserSection8, ClassWithVirtualMethod) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

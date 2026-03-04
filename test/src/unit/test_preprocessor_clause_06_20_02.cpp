@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, ParameterWithExplicitType) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  parameter int WIDTH = 8;\n"
@@ -18,4 +17,4 @@ TEST(ParserSection6, ParameterWithExplicitType) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

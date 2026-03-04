@@ -306,4 +306,4 @@ TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
   EXPECT_EQ(y_star->value.ToUint64(), y_comb->value.ToUint64());
 }
 
-}
+}  // namespace

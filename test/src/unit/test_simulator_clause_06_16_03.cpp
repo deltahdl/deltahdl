@@ -14,4 +14,4 @@ TEST(StringMethods, Getc) {
   EXPECT_EQ(result.ToUint64(), static_cast<uint64_t>('e'));
 }
 
-}
+}  // namespace

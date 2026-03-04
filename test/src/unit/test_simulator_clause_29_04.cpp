@@ -48,4 +48,4 @@ TEST(UdpCombinational, UnmatchedIsX) {
   EXPECT_EQ(state.Evaluate({'1', '0'}), 'x');
 }
 
-}
+}  // namespace

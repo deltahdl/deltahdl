@@ -30,4 +30,4 @@ TEST_F(ConfigTest, NestedConfigReference) {
   EXPECT_TRUE(rule->use_config);
 }
 
-}
+}  // namespace

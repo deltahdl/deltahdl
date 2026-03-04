@@ -180,4 +180,4 @@ TEST(ElabA60701, StructNamedPatternElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}
+}  // namespace

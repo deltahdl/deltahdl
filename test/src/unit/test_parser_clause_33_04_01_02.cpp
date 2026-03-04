@@ -40,7 +40,6 @@ TEST_F(ConfigTest, DefaultLiblistSingleLib) {
 }
 
 TEST(ParserSection34, ConfigCoexistsWithModuleAndProtected) {
-
   auto r = Parse(R"(
     module protected_ip;
       logic [7:0] data;
@@ -69,4 +68,4 @@ TEST_F(ConfigParseTest, ConfigWithDefaultClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}
+}  // namespace

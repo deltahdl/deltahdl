@@ -25,4 +25,4 @@ TEST(IpcSync, MailboxNewBounded) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-}
+}  // namespace

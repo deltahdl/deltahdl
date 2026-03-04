@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA221, ImplicitDataType) {
-
   auto r = Parse("module m(input [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -16,7 +15,6 @@ TEST(ParserA221, ImplicitDataType) {
 }
 
 TEST(ParserA221, ImplicitDataTypeSigned) {
-
   auto r = Parse("module m(input signed [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -42,7 +40,6 @@ TEST(ParserA212, OutputUnpackedDim) {
 }
 
 TEST(ParserA212, InputUnpackedDim) {
-
   auto r = Parse("module m(input logic d [3:0]); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -52,7 +49,6 @@ TEST(ParserA212, InputUnpackedDim) {
 }
 
 TEST(ParserSection23, Sec23_2_2_AnsiPortDirections) {
-
   auto r = Parse(
       "module m (input logic a, output logic y,\n"
       "          inout wire [7:0] data, ref logic [3:0] r);\n"
@@ -147,4 +143,4 @@ TEST(ParserSection23, AnsiHeaderEmptyParenPorts) {
   EXPECT_TRUE(r.cu->modules[0]->ports.empty());
 }
 
-}
+}  // namespace

@@ -31,4 +31,4 @@ TEST(ParserA210, SequenceFormalType_DataType) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

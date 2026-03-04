@@ -330,4 +330,4 @@ TEST(ParserSection9, Sec9_2_2_CaseStatement) {
   EXPECT_TRUE(stmt->case_items[3].is_default);
 }
 
-}
+}  // namespace

@@ -8,7 +8,6 @@
 using namespace delta;
 
 TEST(LexerCh50701, NoDigitsAfterBaseError) {
-
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", "8'd-6");
@@ -18,7 +17,6 @@ TEST(LexerCh50701, NoDigitsAfterBaseError) {
 }
 
 TEST(LexerCh50701, DecimalXZMixedError) {
-
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", "8'd1x");
@@ -28,7 +26,6 @@ TEST(LexerCh50701, DecimalXZMixedError) {
 }
 
 TEST(LexerCh50701, DecimalXZMultiError) {
-
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", "8'dxz");
@@ -38,7 +35,6 @@ TEST(LexerCh50701, DecimalXZMultiError) {
 }
 
 TEST(SimCh50701, SizedHexLiteral) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -49,7 +45,6 @@ TEST(SimCh50701, SizedHexLiteral) {
 }
 
 TEST(SimCh50701, LeftPadWithZeros) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -60,7 +55,6 @@ TEST(SimCh50701, LeftPadWithZeros) {
 }
 
 TEST(SimCh50701, WhiteSpaceSizeAndBase) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -71,7 +65,6 @@ TEST(SimCh50701, WhiteSpaceSizeAndBase) {
 }
 
 TEST(SimCh50701, SizeConstantNonzero) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"

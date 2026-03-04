@@ -93,7 +93,6 @@ TEST(ParserA601, NetAssignment_ExprRhs) {
   EXPECT_EQ(cas[0]->assign_rhs->kind, ExprKind::kBinary);
 }
 TEST(ParserSection6, VariableContinuousAssign) {
-
   auto r = Parse(
       "module t;\n"
       "  logic vw;\n"
@@ -316,4 +315,4 @@ TEST(ParserSection7, Sec7_2_2_ContinuousAssign) {
   ASSERT_NE(item->assign_rhs, nullptr);
 }
 
-}
+}  // namespace

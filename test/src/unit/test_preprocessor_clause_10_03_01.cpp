@@ -17,4 +17,4 @@ TEST(ParserSection10, NetDeclAssignment) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

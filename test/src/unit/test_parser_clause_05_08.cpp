@@ -24,7 +24,6 @@ TEST(ParserA84, PrimaryLiteralTimeLiteral) {
 }
 
 TEST(ParserCh508, TimeLiteral_FixedPointNs) {
-
   EXPECT_TRUE(ParseOk("module m; initial #2.1ns; endmodule"));
 }
 
@@ -125,4 +124,4 @@ TEST(ParserClause03, Cl3_14_2_2_AllSixUnitsAccepted) {
             TimeUnit::kFs);
 }
 
-}
+}  // namespace

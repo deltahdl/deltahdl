@@ -30,4 +30,4 @@ TEST(ElabA82, NamedArgsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

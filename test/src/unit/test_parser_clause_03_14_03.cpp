@@ -118,4 +118,4 @@ TEST(ParserClause03, Cl3_14_3_ConsidersTimeunitPrecArg) {
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
 
-}
+}  // namespace

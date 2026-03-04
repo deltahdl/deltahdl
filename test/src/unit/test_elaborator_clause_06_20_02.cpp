@@ -49,4 +49,4 @@ TEST(ElabA84, ConstantPrimaryParameterRef) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

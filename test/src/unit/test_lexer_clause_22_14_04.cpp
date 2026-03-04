@@ -8,7 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(Lexer, KeywordVersion_Noconfig_ExcludesConfigKeywords) {
-
   auto kw = LookupKeyword("config", KeywordVersion::kVer13642001Noconfig);
   EXPECT_FALSE(kw.has_value());
 
@@ -16,4 +15,4 @@ TEST(Lexer, KeywordVersion_Noconfig_ExcludesConfigKeywords) {
   EXPECT_TRUE(gen.has_value());
 }
 
-}
+}  // namespace

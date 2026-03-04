@@ -17,4 +17,4 @@ TEST(StringMethods, Atoreal) {
   EXPECT_NEAR(d, 3.14, 0.001);
 }
 
-}
+}  // namespace

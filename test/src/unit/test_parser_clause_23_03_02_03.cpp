@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserAnnexA0411, NamedPortWithoutParens) {
-
   auto r = Parse("module m; sub u0(.clk, .data); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -39,4 +38,4 @@ TEST(ParserAnnexA0413, ProgramInstNamedPortNoParens) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-}
+}  // namespace

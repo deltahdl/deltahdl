@@ -25,7 +25,6 @@ TEST(ParserSection23, TimeunitDecl) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->modules[0]->name, "m");
-
 }
 
 TEST(ParserSection23, TimeprecisionDecl) {
@@ -171,7 +170,6 @@ TEST(ParserClause03, Cl3_14_2_2_LrmExampleE) {
 }
 
 TEST(ParserClause03, Cl3_14_2_2_RemovesFileOrderDependency) {
-
   auto r1 = ParseTimescale31402(
       "`timescale 1us / 1ns\n"
       "module m;\n"
@@ -191,7 +189,6 @@ TEST(ParserClause03, Cl3_14_2_2_RemovesFileOrderDependency) {
 }
 
 TEST(ParserClause03, Cl3_14_2_2_DefinesTimeScope) {
-
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -363,4 +360,4 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitSlashSyntax) {
   EXPECT_EQ(r.cu->cu_time_prec, TimeUnit::kFs);
 }
 
-}
+}  // namespace

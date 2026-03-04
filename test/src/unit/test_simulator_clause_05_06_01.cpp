@@ -7,7 +7,6 @@
 using namespace delta;
 
 TEST(SimCh50601, EscapedIdentAsVariable) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\myvar ;\n"
@@ -18,7 +17,6 @@ TEST(SimCh50601, EscapedIdentAsVariable) {
 }
 
 TEST(SimCh50601, EscapedIdentSpecialChars) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\data+bus ;\n"
@@ -29,7 +27,6 @@ TEST(SimCh50601, EscapedIdentSpecialChars) {
 }
 
 TEST(SimCh50601, EscapedKeywordAsVariable) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\module ;\n"
@@ -40,7 +37,6 @@ TEST(SimCh50601, EscapedKeywordAsVariable) {
 }
 
 TEST(SimCh50601, EscapedIdentMultipleVars) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -64,7 +60,6 @@ TEST(SimCh50601, EscapedIdentMultipleVars) {
 }
 
 TEST(SimCh50601, EscapedIdentInExpression) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -25,4 +25,4 @@ TEST(ParserCh50901, StringEscape_Quote) {
               "endmodule"));
 }
 
-}
+}  // namespace

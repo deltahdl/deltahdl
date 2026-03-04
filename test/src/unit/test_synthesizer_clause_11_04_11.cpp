@@ -22,4 +22,4 @@ TEST(SynthLower, AssignTernaryMux) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}
+}  // namespace

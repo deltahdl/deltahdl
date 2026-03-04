@@ -34,4 +34,4 @@ TEST(ClassSim, HandleNullAssignment) {
   EXPECT_EQ(f.ctx.GetClassObject(null_handle), nullptr);
 }
 
-}
+}  // namespace

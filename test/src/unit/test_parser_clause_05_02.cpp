@@ -5,12 +5,10 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh501, FreeFormatLayout) {
-
   EXPECT_TRUE(ParseOk("module t; logic a; endmodule"));
 }
 
 TEST(ParserCh501, FreeFormatMultiline) {
-
   EXPECT_TRUE(
       ParseOk("module\n"
               "  t\n"
@@ -22,7 +20,6 @@ TEST(ParserCh501, FreeFormatMultiline) {
 }
 
 TEST(ParserCh501, AllTokenTypesPresent) {
-
   EXPECT_TRUE(
       ParseOk("module t; // one-line comment\n"
               "  /* block comment */\n"
@@ -31,4 +28,4 @@ TEST(ParserCh501, AllTokenTypesPresent) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh501, Sec5_1_KeywordsAreReserved) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire w;\n"
@@ -19,8 +18,7 @@ TEST(ParserCh501, Sec5_1_KeywordsAreReserved) {
 }
 
 TEST(ParserCh50602, Keyword_AllLowercase) {
-
   EXPECT_FALSE(ParseOk("MODULE m; endmodule"));
 }
 
-}
+}  // namespace

@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST_F(AnnexHParseTest, AnnexGRandomizeCall) {
-
   auto* unit = Parse(
       "module m;\n"
       "  int x;\n"
@@ -20,4 +19,4 @@ TEST_F(AnnexHParseTest, AnnexGRandomizeCall) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-}
+}  // namespace

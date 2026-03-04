@@ -107,4 +107,4 @@ TEST(ParserSection28, SpecifyBlockWithSpecparam) {
   EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kPathDecl));
 }
 
-}
+}  // namespace

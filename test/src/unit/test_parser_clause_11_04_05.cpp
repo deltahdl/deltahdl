@@ -130,7 +130,6 @@ TEST(ParserA83, ExprCaseEquality) {
 }
 
 TEST(ParserCh505, Operator_CaseEquality) {
-
   auto r = Parse(
       "module m;\n"
       "  initial x = (a === b);\n"
@@ -145,8 +144,7 @@ TEST(ParserCh505, Operator_CaseEquality) {
 }
 
 TEST(ParserCh505, Operator_CaseInequality) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = (a !== b); endmodule"));
 }
 
-}
+}  // namespace

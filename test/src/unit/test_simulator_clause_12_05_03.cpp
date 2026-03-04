@@ -53,4 +53,4 @@ TEST(SimA607, PriorityCaseFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}
+}  // namespace

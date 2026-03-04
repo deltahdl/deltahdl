@@ -34,4 +34,4 @@ TEST(ParserA210, PropertyExpr_SyncRejectOn) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -7,7 +7,6 @@
 using namespace delta;
 
 TEST(SimCh50602, KeywordDefinesConstruct) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -23,7 +22,6 @@ TEST(SimCh50602, KeywordDefinesConstruct) {
 }
 
 TEST(SimCh50602, EscapedKeywordCoexistsWithKeyword) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\begin ;\n"
@@ -36,7 +34,6 @@ TEST(SimCh50602, EscapedKeywordCoexistsWithKeyword) {
 }
 
 TEST(SimCh50602, KeywordLowercaseOnly) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

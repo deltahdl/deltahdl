@@ -41,4 +41,4 @@ TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

@@ -16,7 +16,6 @@ TEST(ParserA213, DataDeclBasicVar) {
 }
 
 TEST(ParserA213, DataDeclVarPrefix) {
-
   auto r = Parse("module m; var logic x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -25,7 +24,6 @@ TEST(ParserA213, DataDeclVarPrefix) {
 }
 
 TEST(ParserA213, DataDeclLifetimeAutomatic) {
-
   auto r = Parse("module m; automatic int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -35,7 +33,6 @@ TEST(ParserA213, DataDeclLifetimeAutomatic) {
 }
 
 TEST(ParserA213, DataDeclLifetimeStatic) {
-
   auto r = Parse("module m; static int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -98,7 +95,6 @@ TEST(ParserAnnexA, A2VarDeclWithInit) {
 }
 
 TEST(ParserA213, DataDeclMultipleAssign) {
-
   auto r = Parse("module m; int a = 1, b = 2; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -215,7 +211,6 @@ TEST(ParserSection6, Sec6_11_ByteWithInitializer) {
 }
 
 TEST(ParserSection6, VarKeywordLogicDecl) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var logic [7:0] data;\n"
@@ -233,7 +228,6 @@ TEST(ParserSection6, MultipleIntDeclsCommaSeparated) {
 }
 
 TEST(ParserSection6, VarKeywordImplicitType) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var [3:0] nibble;\n"
@@ -253,7 +247,6 @@ TEST(ParserSection6, IntWithInitializer) {
 }
 
 TEST(ParserSection6, VarWithEnumType) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var enum bit { clear, error } status;\n"
@@ -294,7 +287,6 @@ TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
 }
 
 TEST(ParserSection6, VarRegDecl) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var reg r;\n"
@@ -302,7 +294,6 @@ TEST(ParserSection6, VarRegDecl) {
 }
 
 TEST(ParserSection6, VarImplicitInProcedural) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -312,7 +303,6 @@ TEST(ParserSection6, VarImplicitInProcedural) {
 }
 
 TEST(ParserSection6, MixedIntegerRealStringTypes) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int i;\n"
@@ -327,7 +317,6 @@ TEST(ParserSection6, MixedIntegerRealStringTypes) {
 }
 
 TEST(ParserSection6, IntegerTypesInProcedural) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -370,4 +359,4 @@ TEST(ParserSection6, ShortrealWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

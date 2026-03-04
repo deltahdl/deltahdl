@@ -516,7 +516,6 @@ TEST(SimA87, HexDigitUppercase) {
 }
 
 TEST(SimCh50701, SimpleDecimalNumber) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -527,7 +526,6 @@ TEST(SimCh50701, SimpleDecimalNumber) {
 }
 
 TEST(SimCh50701, SizedBinaryLiteral) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -538,7 +536,6 @@ TEST(SimCh50701, SizedBinaryLiteral) {
 }
 
 TEST(SimCh50701, SizedOctalLiteral) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [15:0] x;\n"
@@ -549,7 +546,6 @@ TEST(SimCh50701, SizedOctalLiteral) {
 }
 
 TEST(SimCh50701, SizedDecimalLiteral) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -560,7 +556,6 @@ TEST(SimCh50701, SizedDecimalLiteral) {
 }
 
 TEST(SimCh50701, UnsizedHexLiteral) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -571,7 +566,6 @@ TEST(SimCh50701, UnsizedHexLiteral) {
 }
 
 TEST(SimCh50701, UnsizedOctalLiteral) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -582,7 +576,6 @@ TEST(SimCh50701, UnsizedOctalLiteral) {
 }
 
 TEST(SimCh50701, UnaryMinusBeforeSize) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -593,7 +586,6 @@ TEST(SimCh50701, UnaryMinusBeforeSize) {
 }
 
 TEST(SimCh50701, NegativeTwosComplement) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -604,7 +596,6 @@ TEST(SimCh50701, NegativeTwosComplement) {
 }
 
 TEST(SimCh50701, TruncationFromLeft) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -615,7 +606,6 @@ TEST(SimCh50701, TruncationFromLeft) {
 }
 
 TEST(SimCh50701, SignedBasedLiteral) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  integer x;\n"
@@ -626,4 +616,4 @@ TEST(SimCh50701, SignedBasedLiteral) {
   EXPECT_EQ(result & mask, mask);
 }
 
-}
+}  // namespace

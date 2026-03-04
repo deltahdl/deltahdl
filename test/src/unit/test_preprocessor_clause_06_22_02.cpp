@@ -16,4 +16,4 @@ TEST(ParserSection6, CompatibleTypesParseLogicVectors) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

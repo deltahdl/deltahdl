@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, TypeCompatibilityAnonymousStruct) {
-
   auto r = Parse(
       "module m;\n"
       "  struct packed { int A; int B; } AB1, AB2;\n"
@@ -18,7 +17,6 @@ TEST(ParserSection6, TypeCompatibilityAnonymousStruct) {
 }
 
 TEST(ParserSection6, MatchingTypesSameSigningModifier) {
-
   DataType a;
   a.kind = DataTypeKind::kByte;
   a.is_signed = true;
@@ -29,7 +27,6 @@ TEST(ParserSection6, MatchingTypesSameSigningModifier) {
 }
 
 TEST(ParserSection6, TypesMatchNamedSameType) {
-
   DataType a;
   a.kind = DataTypeKind::kNamed;
   a.type_name = "mytype";
@@ -40,7 +37,6 @@ TEST(ParserSection6, TypesMatchNamedSameType) {
 }
 
 TEST(ParserSection6, TypesMatchNamedDifferentType) {
-
   DataType a;
   a.kind = DataTypeKind::kNamed;
   a.type_name = "type_a";
@@ -51,7 +47,6 @@ TEST(ParserSection6, TypesMatchNamedDifferentType) {
 }
 
 TEST(ParserSection6, TypesEquivalentSameSignedInt) {
-
   DataType a;
   a.kind = DataTypeKind::kInt;
   a.is_signed = true;
@@ -62,7 +57,6 @@ TEST(ParserSection6, TypesEquivalentSameSignedInt) {
 }
 
 TEST(ParserSection6, TypesMatchBuiltin) {
-
   DataType a;
   a.kind = DataTypeKind::kInt;
   DataType b;
@@ -79,7 +73,6 @@ TEST(ParserSection6, TypesMatchDifferent) {
 }
 
 TEST(ParserSection6, TypesMatchSignedness) {
-
   DataType a;
   a.kind = DataTypeKind::kLogic;
   a.is_signed = true;
@@ -141,7 +134,6 @@ TEST(ParserSection6, MatchingTypesArrayTypedef) {
 }
 
 TEST(ParserSection6, TypesMatchNamedSame) {
-
   DataType a;
   a.kind = DataTypeKind::kNamed;
   a.type_name = "mytype";
@@ -152,7 +144,6 @@ TEST(ParserSection6, TypesMatchNamedSame) {
 }
 
 TEST(ParserSection6, TypesMatchNamedDifferent) {
-
   DataType a;
   a.kind = DataTypeKind::kNamed;
   a.type_name = "type_a";
@@ -162,4 +153,4 @@ TEST(ParserSection6, TypesMatchNamedDifferent) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
-}
+}  // namespace

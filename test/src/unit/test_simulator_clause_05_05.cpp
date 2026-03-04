@@ -5,7 +5,6 @@
 using namespace delta;
 
 TEST(SimCh505, OperatorSingleCharInExpr) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -16,7 +15,6 @@ TEST(SimCh505, OperatorSingleCharInExpr) {
 }
 
 TEST(SimCh505, OperatorDoubleCharInExpr) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -27,7 +25,6 @@ TEST(SimCh505, OperatorDoubleCharInExpr) {
 }
 
 TEST(SimCh505, OperatorTripleCharInExpr) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -38,7 +35,6 @@ TEST(SimCh505, OperatorTripleCharInExpr) {
 }
 
 TEST(SimCh505, OperatorUnaryLeftOfOperand) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -49,7 +45,6 @@ TEST(SimCh505, OperatorUnaryLeftOfOperand) {
 }
 
 TEST(SimCh505, OperatorBinaryBetweenOperands) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -60,7 +55,6 @@ TEST(SimCh505, OperatorBinaryBetweenOperands) {
 }
 
 TEST(SimCh505, OperatorConditionalThreeOperands) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -71,7 +65,6 @@ TEST(SimCh505, OperatorConditionalThreeOperands) {
 }
 
 TEST(SimCh505, OperatorConditionalFalseBranch) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -82,7 +75,6 @@ TEST(SimCh505, OperatorConditionalFalseBranch) {
 }
 
 TEST(SimCh505, OperatorMixedInExpression) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -93,7 +85,6 @@ TEST(SimCh505, OperatorMixedInExpression) {
 }
 
 TEST(SimCh505, OperatorUnaryNegation) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -104,7 +95,6 @@ TEST(SimCh505, OperatorUnaryNegation) {
 }
 
 TEST(SimCh505, OperatorNoWhitespace) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"

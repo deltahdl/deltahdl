@@ -196,7 +196,6 @@ TEST(ParserClause03, Cl3_14_2_3_TimescaleBeforeCUTimeunit) {
 }
 
 TEST(ParserClause03, Cl3_14_2_3_SameRulesForPrecision) {
-
   auto r = ParseTimescale31402(
       "module outer;\n"
       "  timeunit 1ns;\n"
@@ -253,7 +252,6 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToProgram) {
 }
 
 TEST(ParserClause03, Cl3_14_2_3_ProgramsCannotBeNested) {
-
   auto r = ParseTimescale31402(
       "program p;\n"
       "endprogram\n");
@@ -309,4 +307,4 @@ TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
 }
 
-}
+}  // namespace

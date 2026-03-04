@@ -58,7 +58,6 @@ TEST(ParserSection11, Sec11_1_AllUnaryOperatorsParse) {
 }
 
 TEST(ParserCh501, Sec5_1_SingleCharOperators) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -75,4 +74,4 @@ TEST(ParserCh501, Sec5_1_SingleCharOperators) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

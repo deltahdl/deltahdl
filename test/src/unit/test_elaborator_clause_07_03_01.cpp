@@ -38,4 +38,4 @@ TEST(Elaboration, HardPackedUnion_DifferentWidth_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

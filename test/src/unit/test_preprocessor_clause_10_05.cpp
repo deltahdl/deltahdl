@@ -28,4 +28,4 @@ TEST(ParserSection10, VarDeclAssignmentLogic) {
   EXPECT_NE(mod->items[0]->init_expr, nullptr);
 }
 
-}
+}  // namespace

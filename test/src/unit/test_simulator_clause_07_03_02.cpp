@@ -16,4 +16,4 @@ TEST(TaggedUnion, ChangeTag) {
   EXPECT_EQ(f.ctx.GetVariableTag("u"), "b");
 }
 
-}
+}  // namespace

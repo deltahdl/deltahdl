@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
-
   auto pp = PreprocessTimescale("`timescale 1ns / 1ps\n");
   EXPECT_FALSE(pp.has_errors);
 
@@ -22,4 +21,4 @@ TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
   EXPECT_EQ(pp.timescale.precision, pr.cu->modules[0]->time_prec);
 }
 
-}
+}  // namespace

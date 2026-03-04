@@ -53,4 +53,4 @@ TEST(Elaborator, TypedefChain) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

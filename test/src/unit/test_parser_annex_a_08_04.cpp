@@ -103,4 +103,4 @@ TEST(ParserA84, PrimaryParenthesizedExpr) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
 }
 
-}
+}  // namespace

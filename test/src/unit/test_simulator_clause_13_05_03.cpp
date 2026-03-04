@@ -75,4 +75,4 @@ TEST(SimA609, FunctionDefaultArg) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-}
+}  // namespace

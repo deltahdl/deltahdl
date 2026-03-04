@@ -703,4 +703,4 @@ TEST(SimCh6b, TypeOpByteFromWiderAssignment) {
   EXPECT_TRUE(var->is_signed);
 }
 
-}
+}  // namespace

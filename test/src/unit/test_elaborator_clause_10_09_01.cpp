@@ -9,7 +9,6 @@ using namespace delta;
 namespace {
 
 TEST(ElabCh511, ArrayInitPattern_SimpleArrayOk) {
-
   SimFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -149,7 +148,6 @@ TEST(SimA60701, PatternInForLoop) {
 }
 
 TEST(ElabCh511, ArrayInitPattern_NestedOk) {
-
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -161,7 +159,6 @@ TEST(ElabCh511, ArrayInitPattern_NestedOk) {
 }
 
 TEST(ElabCh511, ArrayInitPattern_SizeMismatch) {
-
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -184,4 +181,4 @@ TEST(ElabA60701, PatternDefaultKeyElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}
+}  // namespace

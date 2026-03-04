@@ -20,4 +20,4 @@ TEST(ParserAnnexE2, AnnexEAllDirectivesCombined) {
   }
 }
 
-}
+}  // namespace

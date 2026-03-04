@@ -50,7 +50,6 @@ TEST(ParserA213, NetDeclMultipleAssign) {
 }
 
 TEST(ParserA222, DriveStrengthOnTri) {
-
   auto r = Parse(
       "module m;\n"
       "  tri (strong0, strong1) t;\n"
@@ -63,7 +62,6 @@ TEST(ParserA222, DriveStrengthOnTri) {
 }
 
 TEST(ParserA222, DriveStrengthOnWand) {
-
   auto r = Parse(
       "module m;\n"
       "  wand (pull0, pull1) w;\n"
@@ -285,7 +283,6 @@ TEST(ParserSection6, Sec6_7_1_NetImplicitSigned) {
 }
 
 TEST(ParserSection6, WireImplicitLogic) {
-
   auto r = Parse(
       "module t;\n"
       "  wire w;\n"
@@ -298,7 +295,6 @@ TEST(ParserSection6, WireImplicitLogic) {
 }
 
 TEST(ParserSection6, WireWithRange) {
-
   auto r = Parse(
       "module t;\n"
       "  wire [15:0] ww;\n"
@@ -336,7 +332,6 @@ TEST(ParserSection6, WireExplicitLogicType) {
 }
 
 TEST(ParserSection6, TriregDefaultInit) {
-
   auto r = Parse(
       "module t;\n"
       "  trireg t1;\n"
@@ -348,7 +343,6 @@ TEST(ParserSection6, TriregDefaultInit) {
 }
 
 TEST(ParserSection6, WireWithPackedStruct) {
-
   auto r = Parse(
       "module t;\n"
       "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
@@ -360,7 +354,6 @@ TEST(ParserSection6, WireWithPackedStruct) {
 }
 
 TEST(ParserSection6, WireWithTypedef) {
-
   auto r = Parse(
       "module t;\n"
       "  typedef logic [31:0] addressT;\n"
@@ -712,4 +705,4 @@ TEST(ParserSection6, Sec6_7_1_Supply1WithRange) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

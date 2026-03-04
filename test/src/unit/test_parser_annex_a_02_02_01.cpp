@@ -66,7 +66,6 @@ TEST(ParserA221, NetPortTypeWithNetType) {
 }
 
 TEST(ParserA221, VarDataTypeWithVar) {
-
   auto r = Parse("module m(input var logic d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -100,4 +99,4 @@ TEST(ParserA221, DataTypeClassType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

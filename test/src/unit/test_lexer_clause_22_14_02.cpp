@@ -13,9 +13,8 @@ TEST(Lexer, KeywordVersion_1364_1995_ModuleIsKeyword) {
 }
 
 TEST(Lexer, KeywordVersion_1364_1995_AutomaticIsNotKeyword) {
-
   auto kw = LookupKeyword("automatic", KeywordVersion::kVer13641995);
   EXPECT_FALSE(kw.has_value());
 }
 
-}
+}  // namespace

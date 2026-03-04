@@ -93,4 +93,4 @@ TEST(ParserA27, TaskBodyOutOfBlockMethod) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

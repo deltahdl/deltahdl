@@ -34,4 +34,4 @@ TEST(Lowerer, PosedgeWakeup) {
   EXPECT_EQ(count->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

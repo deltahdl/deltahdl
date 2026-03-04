@@ -196,4 +196,4 @@ TEST(SimCh10, BlockingAssignTernaryFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

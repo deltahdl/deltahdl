@@ -28,7 +28,6 @@ static uint64_t PreprocessAndGet(const std::string& src, const char* var_name) {
 }
 
 TEST(SimCh50604, DefineMacroAffectsSimulation) {
-
   auto result = PreprocessAndGet(
       "`define MY_VAL 8'd42\n"
       "module t;\n"
@@ -40,7 +39,6 @@ TEST(SimCh50604, DefineMacroAffectsSimulation) {
 }
 
 TEST(SimCh50604, DirectivePersistsInCompilationUnit) {
-
   auto result = PreprocessAndGet(
       "`define CONST 8'd99\n"
       "module other; endmodule\n"
@@ -53,7 +51,6 @@ TEST(SimCh50604, DirectivePersistsInCompilationUnit) {
 }
 
 TEST(SimCh50604, DirectiveCanBeOverridden) {
-
   auto result = PreprocessAndGet(
       "`define X 8'd10\n"
       "`define X 8'd20\n"

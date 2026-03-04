@@ -23,7 +23,6 @@ TEST(ParserA602, AlwaysConstruct_AlwaysFF) {
 }
 
 TEST(ParserA602, Integration_AlwaysFFWithBlockingAndNonblocking) {
-
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk or negedge rst_n) begin\n"
@@ -222,4 +221,4 @@ TEST(ParserSection4, Sec4_6_AlwaysFfFlipFlop) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-}
+}  // namespace

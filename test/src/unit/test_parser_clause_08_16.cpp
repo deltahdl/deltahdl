@@ -23,4 +23,4 @@ TEST(ParserSection8, DynamicCastClassHandles) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

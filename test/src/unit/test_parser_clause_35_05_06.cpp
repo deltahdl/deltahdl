@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportBitLogicArgs) {
-
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function void send_bits(\n"
@@ -25,4 +24,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportBitLogicArgs) {
   EXPECT_EQ(items[0]->func_args[1].name, "ctrl");
 }
 
-}
+}  // namespace

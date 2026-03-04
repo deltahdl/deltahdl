@@ -15,4 +15,4 @@ TEST(ParserSection21, DumpOffOnSequence) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

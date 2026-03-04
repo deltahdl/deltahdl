@@ -76,4 +76,4 @@ TEST(ClassSim, MethodResolutionWalksChain) {
   EXPECT_EQ(resolved, m);
 }
 
-}
+}  // namespace

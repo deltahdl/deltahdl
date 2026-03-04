@@ -29,7 +29,6 @@ static bool LowerRunAndFindIR(SimFixture& f, RtlirDesign* design,
 }
 
 TEST(SimCh507, NumberBothFormsCoexist) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -54,14 +53,12 @@ TEST(SimCh507, NumberBothFormsCoexist) {
 }
 
 TEST(SimCh507, NumberIntegralDecimal) {
-
   auto v = RunAndGet(
       "module t;\n  logic [31:0] x;\n  initial x = 100;\nendmodule\n", "x");
   EXPECT_EQ(v, 100u);
 }
 
 TEST(SimCh507, NumberIntegralBinary) {
-
   auto v = RunAndGet(
       "module t;\n  logic [7:0] x;\n  initial x = 8'b1010_0101;\nendmodule\n",
       "x");
@@ -69,7 +66,6 @@ TEST(SimCh507, NumberIntegralBinary) {
 }
 
 TEST(SimCh507, NumberIntegralOctal) {
-
   auto v = RunAndGet(
       "module t;\n  logic [11:0] x;\n  initial x = 12'o7654;\nendmodule\n",
       "x");
@@ -77,7 +73,6 @@ TEST(SimCh507, NumberIntegralOctal) {
 }
 
 TEST(SimCh507, NumberIntegralHex) {
-
   auto v = RunAndGet(
       "module t;\n  logic [15:0] x;\n  initial x = 16'hCAFE;\nendmodule\n",
       "x");
@@ -85,21 +80,18 @@ TEST(SimCh507, NumberIntegralHex) {
 }
 
 TEST(SimCh507, NumberRealFixedPoint) {
-
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 42.5;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 42.5);
 }
 
 TEST(SimCh507, NumberRealScientific) {
-
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 5.0e3;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 5000.0);
 }
 
 TEST(SimCh507, NumberAllIntegralBases) {
-
   SimFixture f;
   ASSERT_TRUE(RunSim(f,
                      "module t;\n"
@@ -120,7 +112,6 @@ TEST(SimCh507, NumberAllIntegralBases) {
 }
 
 TEST(SimCh507, NumberMixedInExpression) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -145,7 +136,6 @@ TEST(SimCh507, NumberMixedInExpression) {
 }
 
 TEST(SimCh507, NumberAsPrimaryLiteralInTernary) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -156,14 +146,12 @@ TEST(SimCh507, NumberAsPrimaryLiteralInTernary) {
 }
 
 TEST(SimCh507, NumberSizedDecimalBase) {
-
   auto v = RunAndGet(
       "module t;\n  logic [7:0] x;\n  initial x = 8'd200;\nendmodule\n", "x");
   EXPECT_EQ(v, 200u);
 }
 
 TEST(SimCh507, NumberUnderscoreInIntegral) {
-
   auto v = RunAndGet(
       "module t;\n  logic [31:0] x;\n  initial x = 1_000_000;\nendmodule\n",
       "x");

@@ -186,4 +186,4 @@ TEST(CapacitiveNetwork, OnlyWhenBothCapacitive) {
   EXPECT_EQ(var_b->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

@@ -33,4 +33,4 @@ TEST(SvaEngine, SequenceOperatorOr) {
   EXPECT_FALSE(EvalSequenceOr(false, false));
 }
 
-}
+}  // namespace

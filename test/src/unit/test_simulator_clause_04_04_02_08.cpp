@@ -79,7 +79,6 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBALaterTime) {
 
   auto* reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() {
-
     auto* renba = sched.GetEventPool().Acquire();
     renba->callback = [&renba_times, &sched]() {
       renba_times.push_back(sched.CurrentTime().ticks);

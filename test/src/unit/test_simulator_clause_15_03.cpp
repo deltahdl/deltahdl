@@ -64,4 +64,4 @@ TEST(IpcSync, MultipleSemaphoresInContext) {
   EXPECT_NE(f.ctx.FindSemaphore("s1"), f.ctx.FindSemaphore("s2"));
 }
 
-}
+}  // namespace

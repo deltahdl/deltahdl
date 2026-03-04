@@ -37,7 +37,6 @@ TEST(ParserSection9, EventControlEdge) {
 }
 
 TEST(ParserSection9c, EventControlAtIdentifier) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -102,7 +101,6 @@ TEST(ParserSection4, Sec4_5_NegedgeEventControl) {
 }
 
 TEST(ParserSection9c, EventControlNullStatement) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -424,4 +422,4 @@ TEST(ParserSection9, EventControlNegedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
 
-}
+}  // namespace

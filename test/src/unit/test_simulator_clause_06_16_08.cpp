@@ -15,4 +15,4 @@ TEST(StringMethods, Substr) {
   EXPECT_EQ(VecToString(result), "world");
 }
 
-}
+}  // namespace

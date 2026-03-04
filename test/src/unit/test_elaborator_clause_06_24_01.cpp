@@ -177,4 +177,4 @@ TEST(SimCh10, BlockingAssignTypeCast) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-}
+}  // namespace

@@ -60,4 +60,4 @@ TEST(ParserSection8, ConstructorChainingDefault) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
 }
 
-}
+}  // namespace

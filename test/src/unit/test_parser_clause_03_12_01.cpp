@@ -14,7 +14,6 @@ TEST(SourceText, DescriptionPackageItemTask) {
 }
 
 TEST(ParserClause03, Cl3_12_1_ForwardRefSyntaxValid) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire w;\n"
@@ -54,4 +53,4 @@ TEST(ParserSection18, TopLevelFunction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

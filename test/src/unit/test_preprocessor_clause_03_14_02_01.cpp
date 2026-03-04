@@ -13,7 +13,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserClause03, Cl3_14_2_1_GlobalPrecisionTracking) {
-
   auto r = PreprocessTimescale(
       "`timescale 1ns / 1ps\n"
       "`timescale 1us / 1ns\n");
@@ -59,7 +58,6 @@ TEST(ParserClause03, Cl3_14_2_1_DefaultForFollowingElements) {
 }
 
 TEST(ParserClause03, Cl3_14_2_1_PersistsUntilReplaced) {
-
   auto r = PreprocessTimescale(
       "`timescale 1ns / 1ps\n"
       "`timescale 1us / 1ns\n");
@@ -72,7 +70,6 @@ TEST(ParserClause03, Cl3_14_2_1_PersistsUntilReplaced) {
 }
 
 TEST(ParserClause03, Cl3_14_2_1_CuScoped) {
-
   auto r1 = PreprocessTimescale("`timescale 1ps / 1fs\n");
   EXPECT_TRUE(r1.has_timescale);
   EXPECT_EQ(r1.timescale.unit, TimeUnit::kPs);
@@ -82,7 +79,6 @@ TEST(ParserClause03, Cl3_14_2_1_CuScoped) {
 }
 
 TEST(ParserClause03, Cl3_14_2_1_FileOrderDependency) {
-
   auto r1 = PreprocessTimescale(
       "`timescale 1ns / 10ps\n"
       "module B; endmodule\n"
@@ -109,7 +105,6 @@ TEST(ParserClause03, Cl3_14_2_1_ErrorInvalidMagnitude) {
 }
 
 TEST(ParserClause03, Cl3_14_2_1_WhitespaceAroundSlash) {
-
   auto r1 = PreprocessTimescale("`timescale 1ns/1ps\n");
   EXPECT_FALSE(r1.has_errors);
   EXPECT_EQ(r1.timescale.unit, TimeUnit::kNs);
@@ -137,4 +132,4 @@ TEST(ParserClause03, Cl3_14_2_1_LrmExampleThreeModules) {
   EXPECT_FALSE(r.cu->modules[2]->has_timeunit);
 }
 
-}
+}  // namespace

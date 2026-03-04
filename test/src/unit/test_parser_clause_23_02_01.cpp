@@ -119,4 +119,4 @@ TEST(ParserCh512, TopLevel_TrailingSemicolonAfterEndmodule) {
   EXPECT_TRUE(ParseOk("module m; endmodule;"));
 }
 
-}
+}  // namespace

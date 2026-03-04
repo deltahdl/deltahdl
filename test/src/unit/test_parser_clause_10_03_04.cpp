@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA222, DriveStrengthContinuousAssign) {
-
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -117,4 +116,4 @@ TEST(ParserSection6, NetDeclDriveStrength) {
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-}
+}  // namespace

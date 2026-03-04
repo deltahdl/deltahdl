@@ -40,4 +40,4 @@ TEST_F(VerifyParseTest, CheckerContextInferenceInstantiation) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}
+}  // namespace

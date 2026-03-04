@@ -13,8 +13,7 @@ namespace {
 
 TEST(CompiledSim, ValidCompiledProcess) {
   bool executed = false;
-  CompiledProcess proc(1,
-                       [&executed](SimContext& ) { executed = true; });
+  CompiledProcess proc(1, [&executed](SimContext&) { executed = true; });
   EXPECT_EQ(proc.Id(), 1u);
   EXPECT_TRUE(proc.IsValid());
 }
@@ -86,4 +85,4 @@ TEST(CompiledSim, CompileReturnsValidForCombinational) {
   EXPECT_EQ(compiled.Id(), 42u);
 }
 
-}
+}  // namespace

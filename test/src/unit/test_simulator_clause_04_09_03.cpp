@@ -19,7 +19,6 @@ TEST(SimCh4093, ComputesRhsUsingCurrentValues) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     captured_rhs = src;
 
     auto* future = sched.GetEventPool().Acquire();
@@ -130,7 +129,6 @@ TEST(SimCh4093, NoDelayAssignsImmediately) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     dst = 42;
 
     next_stmt_executed = true;
@@ -205,7 +203,6 @@ TEST(SimCh4093, TargetDeterminedAtResumeTime) {
     auto* assign = sched.GetEventPool().Acquire();
     assign->kind = EventKind::kUpdate;
     assign->callback = [&, rhs_val]() {
-
       if (select == 0) {
         dst_a = rhs_val;
       } else {

@@ -32,7 +32,6 @@ TEST(SimCh443, PLIRegionEnumsExist) {
 }
 
 TEST(SimCh443, ExactlyNinePLIRegionsExist) {
-
   std::vector<Region> pli_regions = {
       Region::kPreponed, Region::kPreActive,   Region::kPreNBA,
       Region::kPostNBA,  Region::kPreObserved, Region::kPostObserved,
@@ -45,7 +44,6 @@ TEST(SimCh443, ExactlyNinePLIRegionsExist) {
 }
 
 TEST(SimCh443, PLIRegionsAreInterleavedWithSimulationRegions) {
-
   EXPECT_LT(static_cast<int>(Region::kPreActive),
             static_cast<int>(Region::kActive));
   EXPECT_LT(static_cast<int>(Region::kPreNBA), static_cast<int>(Region::kNBA));

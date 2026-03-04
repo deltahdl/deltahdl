@@ -24,4 +24,4 @@ TEST(Lowerer, EventVariableCreated) {
   EXPECT_TRUE(var->is_event);
 }
 
-}
+}  // namespace

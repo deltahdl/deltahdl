@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection18b, DistInsideIfConstraint) {
-
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -39,4 +38,4 @@ TEST(SourceText, ConstraintSet) {
   EXPECT_EQ(r.cu->classes[0]->members[2]->name, "cs");
 }
 
-}
+}  // namespace

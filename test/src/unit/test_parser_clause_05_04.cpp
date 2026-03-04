@@ -8,7 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh501, Sec5_1_CommentDoesNotProduceTokens) {
-
   auto r = Parse(
       "module m;\n"
       "  // line comment\n"
@@ -20,17 +19,14 @@ TEST(ParserCh501, Sec5_1_CommentDoesNotProduceTokens) {
 }
 
 TEST(ParserCh501, Sec5_1_LineCommentAtEofNoNewline) {
-
   EXPECT_TRUE(ParseOk("module t; endmodule // trailing comment"));
 }
 
 TEST(ParserCh501, Sec5_1_BlockCommentBetweenTokens) {
-
   EXPECT_TRUE(ParseOk("module/* comment */t;/* another */endmodule"));
 }
 
 TEST(ParserCh501, Sec5_1_BlockCommentInsideExpression) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic a, b, c;\n"
@@ -39,7 +35,6 @@ TEST(ParserCh501, Sec5_1_BlockCommentInsideExpression) {
 }
 
 TEST(ParserCh501, Sec5_1_NestedBlockCommentStartInsideLineComment) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  // this /* is not special\n"
@@ -48,7 +43,6 @@ TEST(ParserCh501, Sec5_1_NestedBlockCommentStartInsideLineComment) {
 }
 
 TEST(ParserCh501, Sec5_1_AdjacentLineComments) {
-
   auto r = Parse(
       "module m;\n"
       "  // first comment\n"
@@ -74,7 +68,6 @@ TEST(LibraryText, BlockComments) {
 }
 
 TEST(ParserCh501, Sec5_1_EmptyCuCommentsOnly) {
-
   auto r = Parse(
       "// line comment\n"
       "/* block\n"
@@ -102,4 +95,4 @@ TEST(ParserCh503, OneLineCommentEndsAtNewline) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, ShortrealInit) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  shortreal sr = 1.5;\n"
@@ -18,4 +17,4 @@ TEST(ParserSection6, ShortrealInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

@@ -27,4 +27,4 @@ TEST(SysTask, FflushDoesNotCrash) {
   std::remove(tmp.c_str());
 }
 
-}
+}  // namespace

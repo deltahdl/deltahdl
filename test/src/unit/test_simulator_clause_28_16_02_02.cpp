@@ -33,4 +33,4 @@ TEST(TriregChargeDecay, TwoDelaysHasNoChargeDecay) {
   EXPECT_FALSE(ValidateTriregChargeDecaySpec(spec));
 }
 
-}
+}  // namespace

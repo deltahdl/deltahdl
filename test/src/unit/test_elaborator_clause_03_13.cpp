@@ -12,7 +12,6 @@ TEST(ElabClause03, Cl3_13_DistinctNamesInModuleScope) {
 }
 
 TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
-
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -36,7 +35,6 @@ TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
 }
 
 TEST(ElabClause03, Cl3_13_RedeclVarInModuleScope) {
-
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic x;\n"
@@ -52,4 +50,4 @@ TEST(ElabClause03, Cl3_13_RedeclNetInModuleScope) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

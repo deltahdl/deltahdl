@@ -28,7 +28,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithIntType) {
   EXPECT_EQ(nt->name, "mynet");
 }
 TEST(ParserSection6, NettypeDeclWithResolveFunc) {
-
   auto r = Parse(
       "module t;\n"
       "  typedef struct { real field1; bit field2; } T;\n"
@@ -61,7 +60,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithLogicType) {
 }
 
 TEST(ParserSection6, NettypeDeclAlias) {
-
   auto r = Parse(
       "module t;\n"
       "  typedef real TR[5];\n"
@@ -164,7 +162,6 @@ TEST(ParserSection6, Sec6_6_7_MultipleNettypesInModule) {
 }
 
 TEST(ParserA213, DataDeclNettypeDeclaration) {
-
   auto r = Parse("module m; nettype logic my_net; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -205,7 +202,6 @@ TEST(ParserA213, NettypeDeclWithResolve) {
 }
 
 TEST(ParserA213, NettypeDeclWithScopedResolve) {
-
   auto r =
       Parse("module m; nettype logic my_net with pkg::resolve_fn; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -368,4 +364,4 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithResolveAndNetDecl) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

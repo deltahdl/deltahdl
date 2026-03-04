@@ -161,4 +161,4 @@ TEST(Liberty, ParseCellAreaValues) {
   EXPECT_FLOAT_EQ(lib.cells[1].area, 4.0f);
 }
 
-}
+}  // namespace

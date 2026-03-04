@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh513, BuiltInMethod_ChainedAccess) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial x = obj.sub.method();\n"
@@ -55,4 +54,4 @@ TEST(ParserSection7, StructMemberAccess) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-}
+}  // namespace

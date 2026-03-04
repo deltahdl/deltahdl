@@ -15,7 +15,6 @@ TEST(ParserAnnexA, A4ModuleInstNamed) {
 }
 
 TEST(ParserAnnexA0411, NamedPortEmptyExpression) {
-
   auto r = Parse("module m; sub u0(.clk(clk), .nc()); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -206,4 +205,4 @@ TEST(ParserCh512, Attribute_OnPortConnection) {
               "endmodule"));
 }
 
-}
+}  // namespace

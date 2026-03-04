@@ -135,7 +135,6 @@ TEST(ParserSection4, Sec4_9_4_BlockVarDeclNoLifetime) {
 }
 
 TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
-
   EXPECT_TRUE(ParseOk("module automatic m; endmodule\n"));
   EXPECT_TRUE(ParseOk("module static m; endmodule\n"));
   auto fa = Parse(
@@ -655,4 +654,4 @@ TEST(ParserSection4, Sec4_9_3_StaticVarInAutoFunc) {
   EXPECT_NE(var_stmt->var_init, nullptr);
 }
 
-}
+}  // namespace

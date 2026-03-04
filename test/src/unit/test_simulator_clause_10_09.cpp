@@ -8,7 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(AssignmentPattern, PositionalTwoElements) {
-
   SimFixture f;
   auto* a = f.ctx.CreateVariable("a", 8);
   auto* b = f.ctx.CreateVariable("b", 8);
@@ -55,7 +54,6 @@ TEST(AssignmentPattern, EmptyPattern) {
 }
 
 TEST(AssignmentPattern, SizedLiterals) {
-
   SimFixture f;
   auto* expr = ParseExprFrom("'{32'd5, 32'd10}", f);
   ASSERT_NE(expr, nullptr);
@@ -67,4 +65,4 @@ TEST(AssignmentPattern, SizedLiterals) {
   EXPECT_EQ(result.ToUint64(), expected);
 }
 
-}
+}  // namespace

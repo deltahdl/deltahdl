@@ -602,4 +602,4 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithForLoop) {
   EXPECT_NE(for_stmt->for_body, nullptr);
 }
 
-}
+}  // namespace

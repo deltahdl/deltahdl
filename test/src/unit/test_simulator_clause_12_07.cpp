@@ -194,4 +194,4 @@ TEST(SimA608, MixedRepeatInsideFor) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-}
+}  // namespace

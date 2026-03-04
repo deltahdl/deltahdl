@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA24, ClassNewCopy) {
-
   auto r = Parse(
       "class C;\n"
       "endclass\n"
@@ -34,4 +33,4 @@ TEST(ParserSection8, ShallowCopy) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}
+}  // namespace

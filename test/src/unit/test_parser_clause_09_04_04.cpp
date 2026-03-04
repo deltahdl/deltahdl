@@ -36,7 +36,6 @@ TEST(ParserSection9, WaitSequenceTriggeredOr) {
 }
 
 TEST(ParserSection9c, WaitSequenceTriggeredWithAction) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence req_ack;\n"
@@ -65,4 +64,4 @@ TEST(ParserSection9c, WaitTriggeredInLoop) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

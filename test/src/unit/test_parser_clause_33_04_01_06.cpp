@@ -121,7 +121,6 @@ TEST_F(ConfigTest, CellClauseWithLibUse) {
 }
 
 TEST(ParserSection34, ConfigWithUseClause) {
-
   auto r = Parse(R"(
     config map_cfg;
       design work.top;
@@ -134,4 +133,4 @@ TEST(ParserSection34, ConfigWithUseClause) {
   ASSERT_GE(r.cu->configs[0]->rules.size(), 1u);
 }
 
-}
+}  // namespace

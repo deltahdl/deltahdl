@@ -238,7 +238,6 @@ using DpiParseTest = ProgramTestParse;
 using ApiParseTest = ProgramTestParse;
 
 TEST(ParserSection40, CovergroupWithCoverpoint) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic [2:0] addr;
@@ -259,7 +258,6 @@ TEST_F(VerifyParseTest, BasicCovergroup) {
     endmodule
   )");
   ASSERT_EQ(unit->modules.size(), 1u);
-
 }
 
 TEST_F(VerifyParseTest, CovergroupEndLabel) {
@@ -273,4 +271,4 @@ TEST_F(VerifyParseTest, CovergroupEndLabel) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}
+}  // namespace

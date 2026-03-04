@@ -197,7 +197,6 @@ TEST(SimCh49, SubroutineArgumentPassingAsBlockingAssignment) {
   auto* call = sched.GetEventPool().Acquire();
   call->kind = EventKind::kEvaluation;
   call->callback = [&]() {
-
     callee_local = caller_arg;
 
     callee_local += 5;
@@ -216,10 +215,8 @@ TEST(SimCh49, AllAssignmentTypesUseSchedulerInfrastructure) {
   std::vector<std::string> executed;
 
   ScheduleLabeled(sched, Region::kActive, "continuous", executed);
-  ScheduleLabeled(sched, Region::kActive, "proc_continuous",
-                  executed);
-  ScheduleLabeled(sched, Region::kInactive, "blocking",
-                  executed);
+  ScheduleLabeled(sched, Region::kActive, "proc_continuous", executed);
+  ScheduleLabeled(sched, Region::kInactive, "blocking", executed);
   ScheduleLabeled(sched, Region::kNBA, "nonblocking", executed);
   ScheduleLabeled(sched, Region::kActive, "switch", executed);
   ScheduleLabeled(sched, Region::kActive, "port", executed);

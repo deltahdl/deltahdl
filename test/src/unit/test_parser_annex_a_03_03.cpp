@@ -18,7 +18,6 @@ TEST(ParserA303, EnableTerminal_SimpleIdent) {
 }
 
 TEST(ParserA303, EnableTerminal_ComplexExpr) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  bufif1 (out, in, a & b);\n"
@@ -47,7 +46,6 @@ TEST(ParserA303, EnableTerminal_BitSelect) {
 }
 
 TEST(ParserA303, EnableTerminal_PassEnableSwitch) {
-
   auto r = Parse(
       "module m;\n"
       "  tranif1 (a, b, en);\n"
@@ -87,7 +85,6 @@ TEST(ParserA303, InoutTerminal_Concatenation) {
 }
 
 TEST(ParserA303, InoutTerminal_PassEnableSwitch) {
-
   auto r = Parse(
       "module m;\n"
       "  tranif0 (x, y, en);\n"
@@ -110,7 +107,6 @@ TEST(ParserA303, InputTerminal_SimpleIdent) {
 }
 
 TEST(ParserA303, InputTerminal_ComplexExpr) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  or (out, a & b, c | d);\n"
@@ -132,7 +128,6 @@ TEST(ParserA303, InputTerminal_BitSelect) {
 }
 
 TEST(ParserA303, InputTerminal_NOutputGate) {
-
   auto r = Parse(
       "module m;\n"
       "  buf (o1, o2, in);\n"
@@ -144,7 +139,6 @@ TEST(ParserA303, InputTerminal_NOutputGate) {
 }
 
 TEST(ParserA303, InputTerminal_NOutputExpr) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  not (out, a ^ b);\n"
@@ -152,7 +146,6 @@ TEST(ParserA303, InputTerminal_NOutputExpr) {
 }
 
 TEST(ParserA303, InputTerminal_MultipleInputs) {
-
   auto r = Parse(
       "module m;\n"
       "  nor (out, a, b, c, d, e);\n"
@@ -164,7 +157,6 @@ TEST(ParserA303, InputTerminal_MultipleInputs) {
 }
 
 TEST(ParserA303, InputTerminal_CmosSwitch) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  cmos (out, data[3:0], nctrl, pctrl);\n"
@@ -243,7 +235,6 @@ TEST(ParserA303, OutputTerminal_PullGateBitSelect) {
 }
 
 TEST(ParserA303, OutputTerminal_EnableGate) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  bufif0 (out[7:0], in, en);\n"
@@ -306,4 +297,4 @@ TEST(ParserA303, AllTerminalTypes) {
   EXPECT_EQ(gates.size(), 7u);
 }
 
-}
+}  // namespace

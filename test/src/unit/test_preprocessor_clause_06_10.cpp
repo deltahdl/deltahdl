@@ -35,4 +35,4 @@ TEST(ParserSection6, ImplicitNetInModuleInst) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

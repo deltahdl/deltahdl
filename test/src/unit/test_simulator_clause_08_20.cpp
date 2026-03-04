@@ -91,4 +91,4 @@ TEST(ClassSim, EmptyVTable) {
   EXPECT_EQ(type->FindVTableIndex("anything"), -1);
 }
 
-}
+}  // namespace

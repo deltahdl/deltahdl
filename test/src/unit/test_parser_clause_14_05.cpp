@@ -67,4 +67,4 @@ TEST(ParserSection14, HierarchicalExpression) {
   ASSERT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
 
-}
+}  // namespace

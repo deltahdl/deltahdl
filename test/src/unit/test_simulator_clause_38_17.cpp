@@ -35,8 +35,7 @@ TEST_F(VpiClause3817Test, GetVlogInfoReturnsProductAndVersion) {
 
 TEST_F(VpiClause3817Test, GetVlogInfoNullDoesNotCrash) {
   vpi_get_vlog_info(nullptr);
-
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

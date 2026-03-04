@@ -68,4 +68,4 @@ TEST(ParserA705, SystemTimingCheckRecrem) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecrem);
 }
 
-}
+}  // namespace

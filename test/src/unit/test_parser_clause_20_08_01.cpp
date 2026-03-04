@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh50603, SystemFunction_InExpression) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter W = $clog2(256);\n"
@@ -46,4 +45,4 @@ TEST(ParserA84, PrimarySystemCall) {
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
 }
 
-}
+}  // namespace

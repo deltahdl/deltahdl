@@ -97,4 +97,4 @@ TEST(SimCh10b, NBAPreservesWidth) {
   EXPECT_EQ(b->value.ToUint64(), 0xBEu);
 }
 
-}
+}  // namespace

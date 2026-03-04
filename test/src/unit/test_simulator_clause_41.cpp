@@ -82,12 +82,12 @@ TEST(Api, DataReadValueChangeCallback) {
 
   bool cb_fired = false;
   int cb_new_val = 0;
-  api.RegisterValueChangeCb("sig",
-                            [&cb_fired, &cb_new_val](std::string_view ,
-                                                     const DataReadValue& val) {
-                              cb_fired = true;
-                              cb_new_val = val.int_val;
-                            });
+  api.RegisterValueChangeCb(
+      "sig",
+      [&cb_fired, &cb_new_val](std::string_view, const DataReadValue& val) {
+        cb_fired = true;
+        cb_new_val = val.int_val;
+      });
   EXPECT_EQ(api.ValueChangeCbCount(), 1u);
 
   DataReadValue updated;
@@ -106,4 +106,4 @@ TEST(Api, DataReadMissingVariableReturnsDefault) {
   EXPECT_EQ(result.format, DataReadFormat::kInt);
 }
 
-}
+}  // namespace

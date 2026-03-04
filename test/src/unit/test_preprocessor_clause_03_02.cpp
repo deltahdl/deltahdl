@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserClause03, AllSevenDesignElements) {
-
   auto r = ParseWithPreprocessor(
       "module m; endmodule\n"
       "program p; endprogram\n"
@@ -44,4 +43,4 @@ TEST(ParserClause03, AllSevenDesignElements) {
               "module m; import p::*; endmodule\n"));
 }
 
-}
+}  // namespace

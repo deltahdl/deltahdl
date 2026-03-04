@@ -33,4 +33,4 @@ TEST(QueueRef, AcceptRefInAutoFunc) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

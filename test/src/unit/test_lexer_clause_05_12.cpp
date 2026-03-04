@@ -5,7 +5,6 @@
 using namespace delta;
 
 TEST(LexerCh512, AttrDoesNotConfuseMultiply) {
-
   auto tokens = Lex("(a * b)");
   EXPECT_EQ(tokens[0].kind, TokenKind::kLParen);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);

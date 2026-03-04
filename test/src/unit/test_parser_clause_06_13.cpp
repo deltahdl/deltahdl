@@ -17,4 +17,4 @@ TEST(ParserSection6, VoidFunctionReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-}
+}  // namespace

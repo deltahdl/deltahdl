@@ -247,7 +247,6 @@ TEST(ParserSection8, EmptyClassDecl) {
 }
 
 TEST(ParserSection6, ClassVarDecl_ClassParsed) {
-
   auto r = Parse(
       "class MyClass;\n"
       "  int x;\n"
@@ -261,4 +260,4 @@ TEST(ParserSection6, ClassVarDecl_ClassParsed) {
   ASSERT_FALSE(r.cu->modules.empty());
 }
 
-}
+}  // namespace

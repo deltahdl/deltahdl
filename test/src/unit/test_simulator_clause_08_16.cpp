@@ -46,4 +46,4 @@ TEST(ClassSim, IsAUnrelated) {
   EXPECT_FALSE(type_b->IsA(type_a));
 }
 
-}
+}  // namespace

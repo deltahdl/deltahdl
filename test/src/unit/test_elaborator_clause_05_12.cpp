@@ -17,7 +17,6 @@ static CompilationUnit* ParseSrc(const std::string& src, ElabFixture& f) {
 }
 
 TEST(ElabA91, LexerRecognizesAttrStartEnd) {
-
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>", "(* foo *)");
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -28,7 +27,6 @@ TEST(ElabA91, LexerRecognizesAttrStartEnd) {
 }
 
 TEST(ElabA91, LexerDisambiguatesAttrFromMul) {
-
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>", "(a * b)");
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -38,7 +36,6 @@ TEST(ElabA91, LexerDisambiguatesAttrFromMul) {
 }
 
 TEST(ElabA91, ParserSingleAttrNoValue) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -54,7 +51,6 @@ TEST(ElabA91, ParserSingleAttrNoValue) {
 }
 
 TEST(ElabA91, ParserAttrWithConstExpr) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -69,7 +65,6 @@ TEST(ElabA91, ParserAttrWithConstExpr) {
 }
 
 TEST(ElabA91, ParserMultipleAttrSpecs) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -84,7 +79,6 @@ TEST(ElabA91, ParserMultipleAttrSpecs) {
 }
 
 TEST(ElabA91, ParserMultipleSeparateInstances) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -101,7 +95,6 @@ TEST(ElabA91, ParserMultipleSeparateInstances) {
 }
 
 TEST(ElabA91, AttrNameIsIdentifier) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -115,7 +108,6 @@ TEST(ElabA91, AttrNameIsIdentifier) {
 }
 
 TEST(ElabA91, NestedAttributeDisallowed) {
-
   ElabFixture f;
   ParseSrc(
       "module m;\n"
@@ -126,7 +118,6 @@ TEST(ElabA91, NestedAttributeDisallowed) {
 }
 
 TEST(ElabA91, NonNestedConstExprOk) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -138,7 +129,6 @@ TEST(ElabA91, NonNestedConstExprOk) {
 }
 
 TEST(ElabA91, DefaultValueBitOne) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -170,7 +160,6 @@ static void VerifyFirstAttrResolved(RtlirDesign* design, ElabFixture& f,
 }
 
 TEST(ElabA91, AttributeValueFromExpression) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -188,7 +177,6 @@ TEST(ElabA91, AttributeValueFromExpression) {
 }
 
 TEST(ElabA91, AttributeValueConstExpr) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -199,7 +187,6 @@ TEST(ElabA91, AttributeValueConstExpr) {
 }
 
 TEST(ElabA91, AttributeValueString) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -217,7 +204,6 @@ TEST(ElabA91, AttributeValueString) {
 }
 
 TEST(ElabA91, DuplicateAttrLastWins) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -241,7 +227,6 @@ TEST(ElabA91, DuplicateAttrLastWins) {
 }
 
 TEST(ElabA91, DuplicateAttrWarning) {
-
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -252,7 +237,6 @@ TEST(ElabA91, DuplicateAttrWarning) {
 }
 
 TEST(ElabA91, DuplicateAttrAcrossInstances) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -278,7 +262,6 @@ TEST(ElabA91, DuplicateAttrAcrossInstances) {
 }
 
 TEST(ElabA91, AttrOnVarDecl) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -293,7 +276,6 @@ TEST(ElabA91, AttrOnVarDecl) {
 }
 
 TEST(ElabA91, AttrOnNetDecl) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -308,7 +290,6 @@ TEST(ElabA91, AttrOnNetDecl) {
 }
 
 TEST(ElabA91, AttrOnContAssign) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -324,7 +305,6 @@ TEST(ElabA91, AttrOnContAssign) {
 }
 
 TEST(ElabA91, AttrOnModuleInst) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module sub(input a);\n"
@@ -342,7 +322,6 @@ TEST(ElabA91, AttrOnModuleInst) {
 }
 
 TEST(ElabA91, AttrOnModuleDefinition) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "(* optimize_power *)\n"
@@ -356,7 +335,6 @@ TEST(ElabA91, AttrOnModuleDefinition) {
 }
 
 TEST(ElabA91, AttrOnCaseStmt) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -381,7 +359,6 @@ TEST(ElabA91, AttrOnCaseStmt) {
 }
 
 TEST(ElabA91, AttrOnIfStmt) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -400,7 +377,6 @@ TEST(ElabA91, AttrOnIfStmt) {
 }
 
 TEST(ElabA91, AttrOnForLoop) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -418,7 +394,6 @@ TEST(ElabA91, AttrOnForLoop) {
 }
 
 TEST(ElabA91, AttrOnAssignStmt) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -435,7 +410,6 @@ TEST(ElabA91, AttrOnAssignStmt) {
 }
 
 TEST(ElabA91, AttrOnPortConnection) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -447,7 +421,6 @@ TEST(ElabA91, AttrOnPortConnection) {
 }
 
 TEST(ElabA91, AttrOnBinaryOperator) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -460,7 +433,6 @@ TEST(ElabA91, AttrOnBinaryOperator) {
 }
 
 TEST(ElabA91, AttrOnTernaryOperator) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -473,7 +445,6 @@ TEST(ElabA91, AttrOnTernaryOperator) {
 }
 
 TEST(ElabA91, AttrOnFunctionCall) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -486,7 +457,6 @@ TEST(ElabA91, AttrOnFunctionCall) {
 }
 
 TEST(ElabA91, AttrOnFunctionCallNoArgs) {
-
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -499,7 +469,6 @@ TEST(ElabA91, AttrOnFunctionCallNoArgs) {
 }
 
 TEST(ElabA91, AttrPropagatedToRtlirProcess) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -516,7 +485,6 @@ TEST(ElabA91, AttrPropagatedToRtlirProcess) {
 }
 
 TEST(ElabA91, AttrValueZero) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -532,7 +500,6 @@ TEST(ElabA91, AttrValueZero) {
 }
 
 TEST(ElabA91, AttrValueLargeInt) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -543,7 +510,6 @@ TEST(ElabA91, AttrValueLargeInt) {
 }
 
 TEST(ElabA91, MultipleDistinctAttrsPreserved) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -577,4 +543,4 @@ TEST(SimA604, AttributedStatementExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

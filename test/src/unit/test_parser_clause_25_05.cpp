@@ -170,4 +170,4 @@ TEST(ParserA29, ModportDeclHasSourceLoc) {
   EXPECT_TRUE(mp->loc.IsValid());
 }
 
-}
+}  // namespace

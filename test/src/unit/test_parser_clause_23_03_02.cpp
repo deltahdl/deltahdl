@@ -48,7 +48,6 @@ TEST(ParserAnnexA0411, MultipleInstancesWithParams) {
 }
 
 TEST(ParserAnnexA0411, EmptyParameterValueAssignment) {
-
   auto r = Parse("module m; sub #() u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -58,7 +57,6 @@ TEST(ParserAnnexA0411, EmptyParameterValueAssignment) {
 }
 
 TEST(ParserAnnexA0411, FullCombination) {
-
   auto r = Parse(
       "module m;\n"
       "  sub #(.W(8)) u0[3:0](.clk(clk), .*);\n"
@@ -142,4 +140,4 @@ TEST(ParserSection23, ModuleInstanceEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-}
+}  // namespace

@@ -244,7 +244,6 @@ TEST(ParserA302, PulldownStrength_SingleStrength0_MultipleInstances) {
 }
 
 TEST(ParserA302, PulldownStrength_AllStrength0Values) {
-
   EXPECT_TRUE(ParseOk("module m; pulldown (highz0) (out); endmodule"));
   EXPECT_TRUE(ParseOk("module m; pulldown (weak0) (out); endmodule"));
   EXPECT_TRUE(ParseOk("module m; pulldown (pull0) (out); endmodule"));
@@ -253,7 +252,6 @@ TEST(ParserA302, PulldownStrength_AllStrength0Values) {
 }
 
 TEST(ParserA302, PullupStrength_AllStrength1Values) {
-
   EXPECT_TRUE(ParseOk("module m; pullup (highz1) (out); endmodule"));
   EXPECT_TRUE(ParseOk("module m; pullup (weak1) (out); endmodule"));
   EXPECT_TRUE(ParseOk("module m; pullup (pull1) (out); endmodule"));
@@ -261,4 +259,4 @@ TEST(ParserA302, PullupStrength_AllStrength1Values) {
   EXPECT_TRUE(ParseOk("module m; pullup (supply1) (out); endmodule"));
 }
 
-}
+}  // namespace

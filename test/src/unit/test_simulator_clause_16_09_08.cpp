@@ -27,11 +27,10 @@ struct SvaFixture {
 namespace {
 
 TEST(SvaEngine, SequenceOperatorIntersect) {
-
   EXPECT_TRUE(EvalSequenceIntersect(true, true, 3, 3));
 
   EXPECT_FALSE(EvalSequenceIntersect(true, true, 3, 4));
   EXPECT_FALSE(EvalSequenceIntersect(true, false, 3, 3));
 }
 
-}
+}  // namespace

@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA221, CastingTypeSimpleInt) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin int x; x = int'(3.14); end\n"
@@ -17,7 +16,6 @@ TEST(ParserA221, CastingTypeSimpleInt) {
 }
 
 TEST(ParserA221, CastingTypeSigning) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin int x; x = signed'(8'hFF); end\n"
@@ -27,7 +25,6 @@ TEST(ParserA221, CastingTypeSigning) {
 }
 
 TEST(ParserA221, CastingTypeString) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin string s; s = string'(65); end\n"
@@ -37,7 +34,6 @@ TEST(ParserA221, CastingTypeString) {
 }
 
 TEST(ParserA221, CastingTypeConst) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin int x; x = const'(42); end\n"
@@ -47,7 +43,6 @@ TEST(ParserA221, CastingTypeConst) {
 }
 
 TEST(ParserA221, CastingTypeUserDefined) {
-
   auto r = Parse(
       "module m;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -235,7 +230,6 @@ TEST(ParserSection6, CastCompatibleRealToInt) {
 }
 
 TEST(ParserSection6, StaticCastRealToInt) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -246,7 +240,6 @@ TEST(ParserSection6, StaticCastRealToInt) {
 }
 
 TEST(ParserSection6, StaticCastStringType) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -336,7 +329,6 @@ TEST(ParserSection6, ConstCast) {
 }
 
 TEST(ParserSection6, RealCastExplicit) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 3.7;\n"
@@ -346,7 +338,6 @@ TEST(ParserSection6, RealCastExplicit) {
 }
 
 TEST(ParserSection6, ShortrealCast) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int i = 42;\n"
@@ -355,4 +346,4 @@ TEST(ParserSection6, ShortrealCast) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

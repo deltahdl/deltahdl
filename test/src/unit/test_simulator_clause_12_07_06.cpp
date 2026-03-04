@@ -29,4 +29,4 @@ TEST(SimA608, ForeverBreak) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-}
+}  // namespace

@@ -37,4 +37,4 @@ TEST(ParserA27, TaskPrototypePureVirtual) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

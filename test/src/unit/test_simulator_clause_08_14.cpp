@@ -38,4 +38,4 @@ TEST(ClassSim, ChildMethodOverridesParent) {
   EXPECT_EQ(resolved, child_method);
 }
 
-}
+}  // namespace

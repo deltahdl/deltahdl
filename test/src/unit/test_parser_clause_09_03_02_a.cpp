@@ -663,4 +663,4 @@ TEST(ParserSection9, Sec9_3_2_VarDeclInFork) {
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-}
+}  // namespace

@@ -6,7 +6,6 @@
 using namespace delta;
 
 TEST(SimCh506, IdentifierWithDollarSign) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] n$657;\n"
@@ -17,7 +16,6 @@ TEST(SimCh506, IdentifierWithDollarSign) {
 }
 
 TEST(SimCh506, IdentifierStartingWithUnderscore) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] _bus3;\n"
@@ -28,7 +26,6 @@ TEST(SimCh506, IdentifierStartingWithUnderscore) {
 }
 
 TEST(SimCh506, IdentifiersCaseSensitive) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -56,7 +53,6 @@ TEST(SimCh506, IdentifiersCaseSensitive) {
 }
 
 TEST(SimCh506, LongIdentifier1024Chars) {
-
   std::string long_id(1024, 'a');
   auto result = RunAndGet(
       "module t;\n"
@@ -72,7 +68,6 @@ TEST(SimCh506, LongIdentifier1024Chars) {
 }
 
 TEST(SimCh506, IdentifierWithDigits) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] abc123;\n"
@@ -83,7 +78,6 @@ TEST(SimCh506, IdentifierWithDigits) {
 }
 
 TEST(SimCh506, IdentifierReferencesObject) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -104,7 +98,6 @@ TEST(SimCh506, IdentifierReferencesObject) {
 }
 
 TEST(SimCh506, IdentifierMixedCharClasses) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

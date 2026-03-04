@@ -45,4 +45,4 @@ TEST(ClassSim, ParameterizedClassInstantiation) {
   EXPECT_EQ(obj->GetProperty("second", f.arena).ToUint64(), 20u);
 }
 
-}
+}  // namespace

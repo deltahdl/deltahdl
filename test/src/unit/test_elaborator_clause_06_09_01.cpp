@@ -28,4 +28,4 @@ TEST(ElabA83, GenvarExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

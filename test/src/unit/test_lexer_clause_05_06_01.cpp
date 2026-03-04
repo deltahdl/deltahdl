@@ -5,7 +5,6 @@
 using namespace delta;
 
 TEST(LexerCh50601, TerminatedByNewline) {
-
   auto tokens = Lex("\\esc_id\n");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
@@ -13,7 +12,6 @@ TEST(LexerCh50601, TerminatedByNewline) {
 }
 
 TEST(LexerCh50601, TerminatedByTab) {
-
   auto tokens = Lex("\\esc_id\t");
   ASSERT_GE(tokens.size(), 2);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);

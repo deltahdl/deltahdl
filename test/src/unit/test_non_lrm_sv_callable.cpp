@@ -104,4 +104,4 @@ TEST(SvCallableContext, NestedCalls) {
   EXPECT_TRUE(ctx.Empty());
 }
 
-}
+}  // namespace

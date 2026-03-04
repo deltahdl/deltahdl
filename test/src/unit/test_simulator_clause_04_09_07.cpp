@@ -18,11 +18,9 @@ TEST(SimCh4097, ArgumentPassedByValue) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     subroutine_local = caller_var;
 
     subroutine_local = 99;
-
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
@@ -40,9 +38,7 @@ TEST(SimCh4097, CopyInOnInvocation) {
   auto* invoke = sched.GetEventPool().Acquire();
   invoke->kind = EventKind::kEvaluation;
   invoke->callback = [&]() {
-
     copied_in = src;
-
   };
   sched.ScheduleEvent({0}, Region::kActive, invoke);
 
@@ -66,7 +62,6 @@ TEST(SimCh4097, CopyOutOnReturn) {
   auto* invoke = sched.GetEventPool().Acquire();
   invoke->kind = EventKind::kEvaluation;
   invoke->callback = [&]() {
-
     int output_arg = 77;
 
     caller_dst = output_arg;
@@ -87,7 +82,6 @@ TEST(SimCh4097, InoutArgCopiedInAndOut) {
   auto* invoke = sched.GetEventPool().Acquire();
   invoke->kind = EventKind::kEvaluation;
   invoke->callback = [&]() {
-
     int arg = caller_var;
 
     arg = arg + 10;
@@ -110,7 +104,6 @@ TEST(SimCh4097, MultipleCopyOutArgsOnReturn) {
   auto* invoke = sched.GetEventPool().Acquire();
   invoke->kind = EventKind::kEvaluation;
   invoke->callback = [&]() {
-
     int out_a = 1;
     int out_b = 2;
     int out_c = 3;
@@ -136,7 +129,6 @@ TEST(SimCh4097, CopyOutBehavesAsBlockingAssignment) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     int out_arg = 42;
     result = out_arg;
 
@@ -158,7 +150,6 @@ TEST(SimCh4097, CopyOutEnablesEventsOnUpdate) {
   auto* invoke = sched.GetEventPool().Acquire();
   invoke->kind = EventKind::kEvaluation;
   invoke->callback = [&]() {
-
     int out_arg = 5;
 
     sig = out_arg;
@@ -206,7 +197,6 @@ TEST(SimCh4097, CopyOutOccursInActiveRegion) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     order.push_back("copyout_active");
 
     auto* nba = sched.GetEventPool().Acquire();
@@ -231,7 +221,6 @@ TEST(SimCh4097, CopyInAndCopyOutAreIndependent) {
   auto* invoke = sched.GetEventPool().Acquire();
   invoke->kind = EventKind::kEvaluation;
   invoke->callback = [&]() {
-
     int x_local = caller_x;
 
     int y_local = x_local * 2;

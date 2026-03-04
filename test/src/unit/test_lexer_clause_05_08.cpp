@@ -40,4 +40,4 @@ TEST(ParserClause03, Cl3_14_LexerTimeMagnitudes) {
   EXPECT_EQ(r100.token.text, "100ns");
 }
 
-}
+}  // namespace

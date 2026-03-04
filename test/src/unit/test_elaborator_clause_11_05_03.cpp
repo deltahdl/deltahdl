@@ -50,7 +50,6 @@ TEST(ConstEval, LongestStaticPrefixParamIdx) {
 }
 
 TEST(Sensitivity, SelectConstIdxUsesLSP) {
-
   Arena arena;
   auto* expr = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
   std::unordered_set<std::string> reads;
@@ -60,7 +59,6 @@ TEST(Sensitivity, SelectConstIdxUsesLSP) {
 }
 
 TEST(Sensitivity, NestedSelectUsesLSP) {
-
   Arena arena;
   auto* inner = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
   auto* outer = SensSelect(arena, inner, SensId(arena, "i"));
@@ -71,4 +69,4 @@ TEST(Sensitivity, NestedSelectUsesLSP) {
   EXPECT_FALSE(reads.count("a"));
 }
 
-}
+}  // namespace

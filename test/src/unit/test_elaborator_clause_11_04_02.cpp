@@ -40,4 +40,4 @@ TEST(ElabA86, IncOrDecElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

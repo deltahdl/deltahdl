@@ -50,4 +50,4 @@ TEST(ParserA705, SystemTimingCheckRecovery) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecovery);
 }
 
-}
+}  // namespace

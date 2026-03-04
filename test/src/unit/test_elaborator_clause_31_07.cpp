@@ -82,4 +82,4 @@ TEST(ElabA70503, FullCombinationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

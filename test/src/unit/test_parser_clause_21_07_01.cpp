@@ -39,4 +39,4 @@ TEST(ParserSection21, FullVcdWorkflow) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

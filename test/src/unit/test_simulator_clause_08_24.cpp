@@ -28,4 +28,4 @@ TEST(ClassSim, ExternMethodRegisteredSeparately) {
   EXPECT_EQ(resolved->name, "get_val");
 }
 
-}
+}  // namespace

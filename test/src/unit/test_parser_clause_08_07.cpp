@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, BlockingAssignment_ClassNew) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin obj = new; end\n"
@@ -18,7 +17,6 @@ TEST(ParserA602, BlockingAssignment_ClassNew) {
 }
 
 TEST(ParserA602, BlockingAssignment_ClassNewWithArgs) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin obj = new(1, 2); end\n"
@@ -150,4 +148,4 @@ TEST(ParserSection8, ClassWithInitializer) {
   EXPECT_NE(cls->members[0]->init_expr, nullptr);
 }
 
-}
+}  // namespace

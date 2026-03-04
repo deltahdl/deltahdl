@@ -199,4 +199,4 @@ TEST(ParserCh505, Operator_UnaryBitwiseNegate) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-}
+}  // namespace

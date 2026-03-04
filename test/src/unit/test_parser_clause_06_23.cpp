@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA221, DataTypeTypeReference) {
-
   auto r = Parse(
       "module m;\n"
       "  int a;\n"
@@ -22,7 +21,6 @@ TEST(ParserA221, DataTypeTypeReference) {
 }
 
 TEST(ParserA221, TypeRefExpression) {
-
   auto r = Parse(
       "module m;\n"
       "  int a;\n"
@@ -33,7 +31,6 @@ TEST(ParserA221, TypeRefExpression) {
 }
 
 TEST(ParserA221, TypeRefDataType) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin $display(\"%s\", $typename(type(logic [7:0]))); end\n"
@@ -43,7 +40,6 @@ TEST(ParserA221, TypeRefDataType) {
 }
 
 TEST(ParserA221, IncompleteClassScopedType) {
-
   auto r = Parse(
       "class outer;\n"
       "  typedef int inner_t;\n"
@@ -489,7 +485,6 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnTime) {
 }
 
 TEST(ParserSection6, VarTypeOpDecl) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int a;\n"
@@ -498,7 +493,6 @@ TEST(ParserSection6, VarTypeOpDecl) {
 }
 
 TEST(ParserSection6, TypeOpInParamDefault) {
-
   EXPECT_TRUE(
       ParseOk("module t #(parameter type T = type(logic [7:0]));\n"
               "  T data;\n"
@@ -506,7 +500,6 @@ TEST(ParserSection6, TypeOpInParamDefault) {
 }
 
 TEST(ParserSection6, TypeRefInferWidth) {
-
   Arena arena;
   auto* inner = arena.Create<Expr>();
   inner->kind = ExprKind::kIntegerLiteral;
@@ -544,4 +537,4 @@ TEST(ParserSection6, TypeRef_DataType) {
                "endmodule\n"));
 }
 
-}
+}  // namespace

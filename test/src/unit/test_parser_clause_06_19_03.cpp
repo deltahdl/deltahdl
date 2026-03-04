@@ -14,4 +14,4 @@ TEST(ParserA84, ConstantPrimaryEnumIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

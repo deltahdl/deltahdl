@@ -33,4 +33,4 @@ TEST(ParserSection16, PropertyConjunction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

@@ -7,7 +7,6 @@
 using namespace delta;
 
 TEST(LexerA93, SimpleIdentSingleChar) {
-
   auto tokens = Lex("a");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -15,7 +14,6 @@ TEST(LexerA93, SimpleIdentSingleChar) {
 }
 
 TEST(LexerA93, SimpleIdentSingleUnderscore) {
-
   auto tokens = Lex("_");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -30,7 +28,6 @@ TEST(LexerA93, SimpleIdentAllAlpha) {
 }
 
 TEST(LexerA93, SimpleIdentAlphaNumUnderscore) {
-
   auto tokens = Lex("data_bus_32bit");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -38,7 +35,6 @@ TEST(LexerA93, SimpleIdentAlphaNumUnderscore) {
 }
 
 TEST(LexerA93, SimpleIdentWithDollar) {
-
   auto tokens = Lex("my$var");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -60,7 +56,6 @@ TEST(LexerA93, SimpleIdentLeadingUnderscores) {
 }
 
 TEST(LexerA93, SimpleIdentMaxLength) {
-
   std::string id(1024, 'a');
   auto [tokens, errors] = LexWithDiag(id);
   EXPECT_FALSE(errors);
@@ -70,14 +65,12 @@ TEST(LexerA93, SimpleIdentMaxLength) {
 }
 
 TEST(LexerA93, SimpleIdentExceedsMaxLength) {
-
   std::string id(1025, 'a');
   auto [tokens, errors] = LexWithDiag(id);
   EXPECT_TRUE(errors);
 }
 
 TEST(LexerA93, SimpleIdentCaseSensitive) {
-
   auto tokens = Lex("foo FOO Foo");
   ASSERT_EQ(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].text, "foo");
@@ -86,14 +79,12 @@ TEST(LexerA93, SimpleIdentCaseSensitive) {
 }
 
 TEST(LexerA93, SimpleIdentKeywordDisambiguation) {
-
   auto tokens = Lex("module");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
 }
 
 TEST(LexerA93, SimpleIdentNotKeyword) {
-
   auto tokens = Lex("modules");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -101,7 +92,6 @@ TEST(LexerA93, SimpleIdentNotKeyword) {
 }
 
 TEST(LexerA93, SimpleIdentSourceLocation) {
-
   auto [tokens, errors] = LexWithDiag("  foo");
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 2u);
@@ -110,7 +100,6 @@ TEST(LexerA93, SimpleIdentSourceLocation) {
 }
 
 TEST(LexerA93, EscapedIdentBasic) {
-
   auto tokens = Lex("\\my_id ");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
@@ -118,7 +107,6 @@ TEST(LexerA93, EscapedIdentBasic) {
 }
 
 TEST(LexerA93, EscapedIdentWithKeyword) {
-
   auto tokens = Lex("\\module ");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
@@ -126,7 +114,6 @@ TEST(LexerA93, EscapedIdentWithKeyword) {
 }
 
 TEST(LexerA93, EscapedIdentWithSpecialChars) {
-
   auto tokens = Lex("\\a+b*c/d ");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
@@ -134,7 +121,6 @@ TEST(LexerA93, EscapedIdentWithSpecialChars) {
 }
 
 TEST(LexerA93, EscapedIdentTerminatedByNewline) {
-
   auto tokens = Lex("\\esc_id\n");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
@@ -177,7 +163,6 @@ TEST(LexerA93, EscapedIdentExceedsMaxLength) {
 }
 
 TEST(LexerA93, EscapedIdentFollowedByToken) {
-
   auto tokens = Lex("\\my_id ; \\next_id ;");
   ASSERT_GE(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
@@ -188,7 +173,6 @@ TEST(LexerA93, EscapedIdentFollowedByToken) {
 }
 
 TEST(LexerA93, CIdentNoDollarChar) {
-
   auto tokens = Lex("my$func");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -196,7 +180,6 @@ TEST(LexerA93, CIdentNoDollarChar) {
 }
 
 TEST(LexerA93, CIdentValidChars) {
-
   auto tokens = Lex("my_c_func_123");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -204,7 +187,6 @@ TEST(LexerA93, CIdentValidChars) {
 }
 
 TEST(LexerA93, SystemIdBasic) {
-
   auto tokens = Lex("$display");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
@@ -226,7 +208,6 @@ TEST(LexerA93, SystemIdWithDigits) {
 }
 
 TEST(LexerA93, SystemIdEmbeddedDollar) {
-
   auto tokens = Lex("$test$plusargs $value$plusargs");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
@@ -250,14 +231,12 @@ TEST(LexerA93, SystemIdExceedsMaxLength) {
 }
 
 TEST(LexerA93, DollarAloneIsNotSystemId) {
-
   auto tokens = Lex("$ ");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
 }
 
 TEST(LexerA93, DollarFollowedByDigit) {
-
   auto tokens = Lex("$0");
   ASSERT_GE(tokens.size(), 2u);
 
@@ -265,7 +244,6 @@ TEST(LexerA93, DollarFollowedByDigit) {
 }
 
 TEST(LexerA93, MultipleIdentTypes) {
-
   auto tokens = Lex("foo \\bar $baz");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -277,7 +255,6 @@ TEST(LexerA93, MultipleIdentTypes) {
 }
 
 TEST(LexerA93, IdentifiersSeparatedByDot) {
-
   auto tokens = Lex("a.b.c");
   ASSERT_GE(tokens.size(), 6u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -288,7 +265,6 @@ TEST(LexerA93, IdentifiersSeparatedByDot) {
 }
 
 TEST(LexerA93, IdentifiersSeparatedByColonColon) {
-
   auto tokens = Lex("pkg::item");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].text, "pkg");

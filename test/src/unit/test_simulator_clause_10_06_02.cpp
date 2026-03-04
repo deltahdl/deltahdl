@@ -65,7 +65,6 @@ void ReleaseVariable(Variable& var, bool has_continuous_driver,
   if (has_continuous_driver && continuous_value) {
     var.value = *continuous_value;
   }
-
 }
 
 TEST(ForceRelease, ReleaseUndrivenVariableHoldsValue) {
@@ -120,7 +119,6 @@ void ReleaseNet(Net& net, Arena& arena) {
   if (!net.drivers.empty()) {
     net.resolved->value = net.drivers[0];
   } else {
-
     for (uint32_t i = 0; i < net.resolved->value.nwords; ++i) {
       net.resolved->value.words[i].aval = 1;
       net.resolved->value.words[i].bval = 1;
@@ -287,4 +285,4 @@ TEST(StmtExec, ForceReleaseThenAssign) {
   EXPECT_EQ(var->value.ToUint64(), 75u);
 }
 
-}
+}  // namespace

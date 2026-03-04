@@ -52,4 +52,4 @@ TEST(TaskCall, SetupReturnsNullForUnknown) {
   EXPECT_EQ(result, nullptr);
 }
 
-}
+}  // namespace

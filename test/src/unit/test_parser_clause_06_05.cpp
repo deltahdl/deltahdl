@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, NetsCantBeProcAssigned) {
-
   auto r = Parse(
       "module t;\n"
       "  wire a;\n"
@@ -75,4 +74,4 @@ TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
   EXPECT_EQ(item->name, "v");
 }
 
-}
+}  // namespace

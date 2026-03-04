@@ -41,4 +41,4 @@ TEST_F(CheckerParseTest, CheckerWithCovergroup) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kCovergroupDecl));
 }
 
-}
+}  // namespace

@@ -20,4 +20,4 @@ TEST(AdvSim, AssocArrayInsertAndLookup) {
   EXPECT_EQ(arr.Lookup("key2"), 200u);
 }
 
-}
+}  // namespace

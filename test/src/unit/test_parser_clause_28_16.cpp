@@ -76,4 +76,4 @@ TEST(ParserSection6, TriregSingleDelay_NoFallDecay) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-}
+}  // namespace

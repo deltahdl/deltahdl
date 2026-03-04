@@ -15,8 +15,8 @@ TEST(Api, AssertionRegisterCallback) {
   AssertionApi api;
   bool fired = false;
   api.RegisterCallback(
-      kCbAssertionFailure,
-      [&fired](const AssertionCbData& ) { fired = true; }, nullptr);
+      kCbAssertionFailure, [&fired](const AssertionCbData&) { fired = true; },
+      nullptr);
   EXPECT_EQ(api.CallbackCount(), 1u);
 
   AssertionCbData data;
@@ -30,7 +30,7 @@ TEST(Api, AssertionCallbackReasonFiltering) {
   int fire_count = 0;
   api.RegisterCallback(
       kCbAssertionSuccess,
-      [&fire_count](const AssertionCbData& ) { ++fire_count; }, nullptr);
+      [&fire_count](const AssertionCbData&) { ++fire_count; }, nullptr);
 
   AssertionCbData data;
   data.reason = kCbAssertionFailure;
@@ -47,11 +47,11 @@ TEST(Api, AssertionMultipleCallbacks) {
   int count_a = 0;
   int count_b = 0;
   api.RegisterCallback(
-      kCbAssertionStart,
-      [&count_a](const AssertionCbData& ) { ++count_a; }, nullptr);
+      kCbAssertionStart, [&count_a](const AssertionCbData&) { ++count_a; },
+      nullptr);
   api.RegisterCallback(
-      kCbAssertionStart,
-      [&count_b](const AssertionCbData& ) { ++count_b; }, nullptr);
+      kCbAssertionStart, [&count_b](const AssertionCbData&) { ++count_b; },
+      nullptr);
   EXPECT_EQ(api.CallbackCount(), 2u);
 
   AssertionCbData data;
@@ -93,4 +93,4 @@ TEST(SvVpiUser, AttemptInfoStruct) {
   EXPECT_EQ(info.attempt_start_time.low, 100u);
 }
 
-}
+}  // namespace

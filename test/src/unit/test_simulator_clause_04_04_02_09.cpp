@@ -108,7 +108,6 @@ TEST(SimCh4429, PostponedDoesNotReExecuteDuringIteration) {
   active->callback = [&]() {
     auto* nba = sched.GetEventPool().Acquire();
     nba->callback = [&]() {
-
       auto* act2 = sched.GetEventPool().Acquire();
       act2->callback = []() {};
       sched.ScheduleEvent({0}, Region::kActive, act2);

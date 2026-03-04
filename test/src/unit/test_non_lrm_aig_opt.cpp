@@ -47,7 +47,6 @@ TEST(AigOpt, ConstPropPreservesNonTrivial) {
 }
 
 TEST(AigOpt, BalanceReducesDepth) {
-
   AigGraph g;
   auto a = g.AddInput();
   auto b = g.AddInput();
@@ -126,7 +125,6 @@ TEST(AigOpt, RedundancyRemovalNoChange) {
 }
 
 TEST(AdvSynth, RetimeForwardMovesLatch) {
-
   AigGraph g;
   auto a = g.AddInput();
   auto b = g.AddInput();
@@ -155,7 +153,6 @@ TEST(AdvSynth, RetimeForwardNoOpWhenNoLatches) {
 }
 
 TEST(AdvSynth, RetimeForwardSkipsNonAndNextState) {
-
   AigGraph g;
   auto a = g.AddInput();
   g.AddLatch(a);
@@ -181,4 +178,4 @@ TEST(AdvSynth, RetimeBackwardPreservesOutputs) {
   EXPECT_EQ(g.outputs.size(), output_count);
 }
 
-}
+}  // namespace

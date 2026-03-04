@@ -65,4 +65,4 @@ TEST(ClassSim, ConstructorBodyExecutesStatements) {
   EXPECT_EQ(obj->GetProperty("val", f.arena).ToUint64(), 77u);
 }
 
-}
+}  // namespace

@@ -71,4 +71,4 @@ TEST(Lowerer, FinalBlocksFIFOOrder) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}
+}  // namespace

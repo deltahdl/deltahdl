@@ -133,4 +133,4 @@ TEST(SimA70503, FullCombinationSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-}
+}  // namespace

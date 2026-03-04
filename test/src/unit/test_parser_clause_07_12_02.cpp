@@ -30,7 +30,6 @@ TEST(ParserSection7, ArrayShuffleMethod) {
 }
 
 TEST(ParserCh513, BuiltInMethod_WithArgs) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
@@ -98,4 +97,4 @@ TEST(ParserSection7, ArrayMethodReverse) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}
+}  // namespace

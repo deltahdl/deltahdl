@@ -8,7 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(UnpackedArrayConcat, BasicConcat) {
-
   SimFixture f;
   auto* a0 = f.ctx.CreateVariable("a[0]", 8);
   auto* a1 = f.ctx.CreateVariable("a[1]", 8);
@@ -23,4 +22,4 @@ TEST(UnpackedArrayConcat, BasicConcat) {
   EXPECT_EQ(found1->value.ToUint64(), 20u);
 }
 
-}
+}  // namespace

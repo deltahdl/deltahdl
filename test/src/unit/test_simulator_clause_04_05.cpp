@@ -237,7 +237,6 @@ TEST(SimCh45, ExecuteRegionDrainsAllEventsInFIFOOrder) {
 }
 
 TEST(SimCh45, IterativeRegionOrderMatchesAlgorithm) {
-
   constexpr Region kIterativeRegions[] = {
       Region::kActive,     Region::kInactive,     Region::kPreNBA,
       Region::kNBA,        Region::kPostNBA,      Region::kPreObserved,
@@ -262,4 +261,4 @@ TEST(Scheduler, InitialState) {
   EXPECT_EQ(sched.CurrentTime().ticks, 0);
 }
 
-}
+}  // namespace

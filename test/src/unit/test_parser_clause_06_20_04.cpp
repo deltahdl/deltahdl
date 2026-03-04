@@ -62,7 +62,6 @@ TEST(ParserA28, LocalparamInBlock) {
 }
 
 TEST(ParserSection6, LocalparamConstant) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  localparam int DEPTH = 16;\n"
@@ -70,11 +69,10 @@ TEST(ParserSection6, LocalparamConstant) {
 }
 
 TEST(ParserSection6, LocalparamInHeaderPort) {
-
   EXPECT_TRUE(
       ParseOk("module m #(parameter int W = 8, localparam int W2 = W * 2)\n"
               "  (input logic [W-1:0] d);\n"
               "endmodule\n"));
 }
 
-}
+}  // namespace

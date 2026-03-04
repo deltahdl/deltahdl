@@ -37,4 +37,4 @@ TEST(ParserAnnexD2, AnnexDIncsaveExpr) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-}
+}  // namespace

@@ -8,7 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(Functions, ConstantFunctionEvalAtElaboration) {
-
   FuncFixture f;
 
   auto* func = f.arena.Create<ModuleItem>();
@@ -24,4 +23,4 @@ TEST(Functions, ConstantFunctionEvalAtElaboration) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 42u);
 }
 
-}
+}  // namespace

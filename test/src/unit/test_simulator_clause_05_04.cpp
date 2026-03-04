@@ -6,7 +6,6 @@
 using namespace delta;
 
 TEST(SimCh504, CommentLineCommentStripped) {
-
   auto result = RunAndGet(
       "module t; // module declaration\n"
       "  logic [7:0] result; // variable\n"
@@ -17,7 +16,6 @@ TEST(SimCh504, CommentLineCommentStripped) {
 }
 
 TEST(SimCh504, CommentBlockCommentStripped) {
-
   auto result = RunAndGet(
       "module /* module */ t /* name */;\n"
       "  logic /* type */ [7:0] /* width */ result /* var */;\n"
@@ -28,7 +26,6 @@ TEST(SimCh504, CommentBlockCommentStripped) {
 }
 
 TEST(SimCh504, CommentBlockNotNested) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -39,7 +36,6 @@ TEST(SimCh504, CommentBlockNotNested) {
 }
 
 TEST(SimCh504, CommentLineInsideBlockNoEffect) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -52,7 +48,6 @@ TEST(SimCh504, CommentLineInsideBlockNoEffect) {
 }
 
 TEST(SimCh504, CommentBlockInsideLineNoEffect) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -65,7 +60,6 @@ TEST(SimCh504, CommentBlockInsideLineNoEffect) {
 }
 
 TEST(SimCh504, CommentMixedInExpression) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -80,7 +74,6 @@ TEST(SimCh504, CommentMixedInExpression) {
 }
 
 TEST(SimCh504, CommentMultilineBlockSpan) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -96,7 +89,6 @@ TEST(SimCh504, CommentMultilineBlockSpan) {
 }
 
 TEST(SimCh504, CommentBlockAsSeparator) {
-
   auto result = RunAndGet(
       "module/**/t;logic/**/[7:0]/**/result;initial/**/result=8'd71;"
       "endmodule",

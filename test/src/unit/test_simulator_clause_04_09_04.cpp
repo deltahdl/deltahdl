@@ -40,7 +40,6 @@ TEST(SimCh4094, SchedulesUpdateAsNbaEvent) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     auto* nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&]() { order.push_back("nba_update"); };
@@ -228,7 +227,6 @@ TEST(SimCh4094, NbaExecutesAfterActiveAndInactive) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     auto* inactive = sched.GetEventPool().Acquire();
     inactive->kind = EventKind::kUpdate;
     inactive->callback = [&]() { order.push_back("inactive"); };

@@ -48,4 +48,4 @@ TEST(IpcSync, SemaphoreTryGetZeroCount) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
-}
+}  // namespace

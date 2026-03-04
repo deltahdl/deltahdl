@@ -13,7 +13,6 @@ TEST(ParserA223, IntraAssignmentDelay) {
               "endmodule"));
 }
 TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin a = @(posedge clk) b; end\n"
@@ -28,7 +27,6 @@ TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
 }
 
 TEST(ParserA602, BlockingAssignment_WithRepeatEvent) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin a = repeat(3) @(posedge clk) b; end\n"
@@ -43,7 +41,6 @@ TEST(ParserA602, BlockingAssignment_WithRepeatEvent) {
 }
 
 TEST(ParserA602, BlockingAssignment_ParenthesizedIntraDelay) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin a = #(1:2:3) b; end\n"
@@ -57,7 +54,6 @@ TEST(ParserA602, BlockingAssignment_ParenthesizedIntraDelay) {
 }
 
 TEST(ParserA602, NonblockingAssignment_WithRepeatEvent) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= repeat(2) @(posedge clk) d; end\n"
@@ -681,4 +677,4 @@ TEST(ParserSection4, Sec4_5_BlockingIntraAssignDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-}
+}  // namespace

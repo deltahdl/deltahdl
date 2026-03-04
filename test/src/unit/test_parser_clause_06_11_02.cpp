@@ -58,7 +58,6 @@ TEST(ParserSection6, IntegerTypeLongintDecl) {
 }
 
 TEST(ParserSection6, IntegerTypeIntegerDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  integer x;\n"
@@ -72,7 +71,6 @@ TEST(ParserSection6, IntegerTypeIntegerDecl) {
 }
 
 TEST(ParserSection6, IntegerTypeLogicDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  logic [15:0] data;\n"
@@ -86,7 +84,6 @@ TEST(ParserSection6, IntegerTypeLogicDecl) {
 }
 
 TEST(ParserSection6, IntegerTypeRegDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] r;\n"
@@ -100,7 +97,6 @@ TEST(ParserSection6, IntegerTypeRegDecl) {
 }
 
 TEST(ParserSection6, IntegerTypeBitDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  bit [31:0] val;\n"
@@ -141,7 +137,6 @@ TEST(ParserSection6, Sec6_11_ShortintFunctionReturnType) {
 }
 
 TEST(ParserSection6, All2StateTypes) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  byte b;\n"
@@ -153,7 +148,6 @@ TEST(ParserSection6, All2StateTypes) {
 }
 
 TEST(ParserSection6, All4StateTypes) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic l;\n"
@@ -348,12 +342,10 @@ TEST(ParserSection6, Sec6_11_TimeUnpackedArray) {
 }
 
 TEST(ParserSection6, ValueSet_IntegerIs4State) {
-
   EXPECT_TRUE(Is4stateType(DataTypeKind::kInteger));
 }
 
 TEST(ParserSection6, ValueSet_IntIs2State) {
-
   EXPECT_FALSE(Is4stateType(DataTypeKind::kInt));
 }
 TEST(ParserSection6, ByteVarDecl) {
@@ -391,4 +383,4 @@ TEST(ParserSection6, IntegerTypeByteDecl) {
   EXPECT_EQ(item->name, "b");
 }
 
-}
+}  // namespace

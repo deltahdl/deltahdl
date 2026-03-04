@@ -62,7 +62,6 @@ TEST(ParserSection9, Sec9_3_2_NamedForkDisabledByName) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisable);
 }
 TEST(ParserSection9c, DisableLabeledBlock) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin : block_name\n"
@@ -109,7 +108,6 @@ TEST(ParserSection9, DisableTaskName) {
 }
 
 TEST(ParserSection9c, DisableBlockFromOutside) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin : outer\n"
@@ -133,7 +131,6 @@ TEST(ParserSection9c, DisableBlockFromOutside) {
 }
 
 TEST(ParserSection9c, DisableWithIfCondition) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin : block_name\n"
@@ -224,4 +221,4 @@ TEST(ParserSection4, Sec4_5_DisableStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
 }
 
-}
+}  // namespace

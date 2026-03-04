@@ -37,4 +37,4 @@ TEST(SysTask, FerrorReturns0OnGoodFd) {
   std::remove(tmp.c_str());
 }
 
-}
+}  // namespace

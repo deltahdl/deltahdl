@@ -30,4 +30,4 @@ TEST(ElabA70503, TimingCheckEventNegedgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

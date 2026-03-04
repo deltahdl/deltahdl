@@ -28,4 +28,4 @@ TEST(ParserSection8, TypedefClass) {
   EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
 }
 
-}
+}  // namespace

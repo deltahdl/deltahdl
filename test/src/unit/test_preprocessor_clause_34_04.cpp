@@ -28,4 +28,4 @@ TEST_F(ProtectedTest, PragmaProtectConsumed) {
   EXPECT_EQ(result.find("pragma"), std::string::npos);
 }
 
-}
+}  // namespace

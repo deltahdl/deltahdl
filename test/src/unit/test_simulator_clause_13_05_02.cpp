@@ -65,4 +65,4 @@ TEST(QueueRef, RefReadsCurrentValue) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 20u);
 }
 
-}
+}  // namespace

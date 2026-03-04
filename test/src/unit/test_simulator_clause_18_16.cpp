@@ -65,7 +65,6 @@ TEST(StmtExec, RandcaseSingleBranchAlwaysSelected) {
 }
 
 TEST(StmtExec, RandcaseRespectsWeights) {
-
   StmtFixture f;
   auto* result_var = f.ctx.CreateVariable("rw", 32);
 
@@ -83,4 +82,4 @@ TEST(StmtExec, RandcaseRespectsWeights) {
   }
 }
 
-}
+}  // namespace

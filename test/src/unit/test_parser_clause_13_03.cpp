@@ -300,7 +300,6 @@ TEST(ParserA27, TaskBodyOldStyleOutputPort) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 TEST(ParserSection6, VoidTaskReturnType) {
-
   auto r = Parse(
       "module t;\n"
       "  task do_nothing();\n"
@@ -312,4 +311,4 @@ TEST(ParserSection6, VoidTaskReturnType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
 }
 
-}
+}  // namespace

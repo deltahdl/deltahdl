@@ -115,4 +115,4 @@ TEST(ParserSection8, ClassWithTask) {
   EXPECT_EQ(m->method->kind, ModuleItemKind::kTaskDecl);
 }
 
-}
+}  // namespace

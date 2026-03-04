@@ -22,4 +22,4 @@ TEST(ElabA81, EmptyUnpackedArrayConcatElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

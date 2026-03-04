@@ -55,4 +55,4 @@ TEST(ParserSection28, Sec28_12_TimingCheckSkew) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk2");
 }
 
-}
+}  // namespace

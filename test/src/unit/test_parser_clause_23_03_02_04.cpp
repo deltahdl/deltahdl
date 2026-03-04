@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserAnnexA0411, WildcardPortConnection) {
-
   auto r = Parse("module m; sub u0(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +14,6 @@ TEST(ParserAnnexA0411, WildcardPortConnection) {
 }
 
 TEST(ParserAnnexA0411, WildcardWithNamedPorts) {
-
   auto r = Parse("module m; sub u0(.clk(clk), .*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -132,4 +130,4 @@ TEST(ParserSection23, WildcardWithEmptyPort) {
   EXPECT_EQ(item->inst_ports[0].second, nullptr);
 }
 
-}
+}  // namespace

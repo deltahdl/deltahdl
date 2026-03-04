@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST_F(AnnexHParseTest, AnnexGProcessMethodCalls) {
-
   auto* unit = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -25,7 +24,6 @@ TEST_F(AnnexHParseTest, AnnexGProcessMethodCalls) {
 }
 
 TEST_F(AnnexHParseTest, AnnexGProcessScopeResolution) {
-
   auto* unit = Parse(
       "module m;\n"
       "  process::state_e st;\n"
@@ -40,7 +38,6 @@ TEST_F(AnnexHParseTest, AnnexGProcessScopeResolution) {
 }
 
 TEST(ParserSection9c, ProcessSelfAssignment) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -89,4 +86,4 @@ TEST(ParserSection9c, ProcessStatusCheck) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

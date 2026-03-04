@@ -28,4 +28,4 @@ TEST(SimCh9, AlwaysCombResultWidth32) {
   EXPECT_EQ(var->value.ToUint64(), 200u);
 }
 
-}
+}  // namespace

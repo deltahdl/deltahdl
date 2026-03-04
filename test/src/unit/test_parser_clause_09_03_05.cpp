@@ -181,4 +181,4 @@ TEST(ParserSection12, StatementLabelOnForever) {
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
 
-}
+}  // namespace

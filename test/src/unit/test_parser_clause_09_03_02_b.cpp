@@ -274,4 +274,4 @@ TEST(ParserSection9, Sec9_3_2_AutomaticVarInForkBlock) {
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->fork_stmts[0]->var_is_automatic);
 }
-}
+}  // namespace

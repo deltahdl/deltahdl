@@ -34,7 +34,6 @@ TEST(ParserClause03, Cl3_7_BuiltInPrimitives) {
 }
 
 TEST(ParserA222, DriveStrengthGateInst) {
-
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire y, a, b;\n"
@@ -127,4 +126,4 @@ TEST(Parser, GateNoInstanceName) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
-}
+}  // namespace

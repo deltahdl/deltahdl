@@ -66,4 +66,4 @@ TEST(ClassSim, MethodNotFound) {
   EXPECT_EQ(resolved, nullptr);
 }
 
-}
+}  // namespace

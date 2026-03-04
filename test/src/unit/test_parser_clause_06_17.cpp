@@ -49,4 +49,4 @@ TEST(ParserSection6, EventVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
 }
 
-}
+}  // namespace

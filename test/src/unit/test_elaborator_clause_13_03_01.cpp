@@ -19,4 +19,4 @@ TEST(ParserA27, ElabTaskAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

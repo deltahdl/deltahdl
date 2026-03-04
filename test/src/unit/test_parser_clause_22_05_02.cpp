@@ -7,9 +7,9 @@ namespace {
 TEST(ParserSection22, DefineAndUndef) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define FOO 1\n"
-              "module t;\n"
-              "endmodule\n"
-              "`undef FOO\n"));
+                              "module t;\n"
+                              "endmodule\n"
+                              "`undef FOO\n"));
 }
 
-}
+}  // namespace

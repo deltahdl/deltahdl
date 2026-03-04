@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, ProceduralContinuous_AllForms) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -25,4 +24,4 @@ TEST(ParserA602, ProceduralContinuous_AllForms) {
   EXPECT_EQ(stmts[3]->kind, StmtKind::kRelease);
 }
 
-}
+}  // namespace

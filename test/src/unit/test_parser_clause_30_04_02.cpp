@@ -284,4 +284,4 @@ TEST_F(SpecifyTest, ParallelPathDelay) {
   ASSERT_EQ(item->path.delays.size(), 1u);
 }
 
-}
+}  // namespace

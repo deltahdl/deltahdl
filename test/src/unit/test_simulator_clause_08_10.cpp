@@ -26,4 +26,4 @@ TEST(ClassSim, StaticMethodResolution) {
   EXPECT_TRUE(it->second->is_static);
 }
 
-}
+}  // namespace

@@ -215,7 +215,6 @@ TEST(MtSim, RunTimestepEmptyPartitions) {
   std::vector<CompiledProcess> processes;
   MtScheduler sched(2);
   sched.RunTimestep(f.ctx, processes);
-
 }
 
 TEST(MtSim, RunTimestepMultipleThreads) {
@@ -261,7 +260,6 @@ TEST(Process, ProcessResumeNullSafe) {
 
 TEST(Process, CoroutineDestroyOnScopeExit) {
   SimCoroutine coro = MakeTestCoroutine();
-
 }
 
 TEST(ParserClause03, Cl3_14_SimTimeOperations) {
@@ -279,4 +277,4 @@ TEST(ParserClause03, Cl3_14_SimTimeOperations) {
   EXPECT_EQ(t3.ticks, 1000u);
 }
 
-}
+}  // namespace

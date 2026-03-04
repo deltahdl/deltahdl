@@ -23,4 +23,4 @@ TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
   EXPECT_EQ(blocks[3]->always_kind, AlwaysKind::kAlwaysFF);
 }
 
-}
+}  // namespace

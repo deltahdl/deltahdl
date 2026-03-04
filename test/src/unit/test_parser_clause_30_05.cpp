@@ -51,4 +51,4 @@ TEST(ParserA704, PathDelayWithSpecparam) {
   ASSERT_EQ(path_item->path.delays.size(), 1u);
 }
 
-}
+}  // namespace

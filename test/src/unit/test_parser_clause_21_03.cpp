@@ -19,4 +19,4 @@ TEST(ParserSection21, FileIOSequence) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

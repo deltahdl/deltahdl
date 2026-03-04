@@ -38,7 +38,6 @@ TEST(Parser, ExpressionPrecedence) {
   ASSERT_NE(r.cu, nullptr);
 }
 TEST(ParserSection11, ImplicationRightAssocParses) {
-
   auto r = Parse(
       "module t;\n"
       "  logic a, b, c, d;\n"
@@ -152,4 +151,4 @@ TEST(ParserSection11, OperatorPrecedenceCompareAndLogical) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-}
+}  // namespace

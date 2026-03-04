@@ -274,7 +274,6 @@ TEST(ElabA87, UnderscoredDecimalElaborates) {
 }
 
 TEST(SimCh50701, HexDigitsCaseInsensitive) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -298,7 +297,6 @@ TEST(SimCh50701, HexDigitsCaseInsensitive) {
 }
 
 TEST(SimCh50701, UnderscoreInNumber) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -326,7 +324,6 @@ TEST(SimCh50701, UnderscoreInNumber) {
 }
 
 TEST(SimCh50701, XValueInHexLiteral) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -344,7 +341,6 @@ TEST(SimCh50701, XValueInHexLiteral) {
 }
 
 TEST(SimCh50701, ZValueInHexLiteral) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -365,7 +361,6 @@ TEST(SimCh50701, ZValueInHexLiteral) {
 }
 
 TEST(SimCh50701, XInBinaryLiteral) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -398,7 +393,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
 }
 
 TEST(SimCh50701, QuestionMarkAsZ) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -414,7 +408,6 @@ TEST(SimCh50701, QuestionMarkAsZ) {
 }
 
 TEST(SimCh50701, UnbasedUnsizedLiteral01) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -438,7 +431,6 @@ TEST(SimCh50701, UnbasedUnsizedLiteral01) {
 }
 
 TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -466,7 +458,6 @@ TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
 }
 
 TEST(SimCh50701, LeftPadWithX) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -487,7 +478,6 @@ TEST(SimCh50701, LeftPadWithX) {
 }
 
 TEST(SimCh50701, LeftPadWithZ) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -508,7 +498,6 @@ TEST(SimCh50701, LeftPadWithZ) {
 }
 
 TEST(SimCh50701, SignedDesignatorBitPattern) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -526,7 +515,6 @@ TEST(SimCh50701, SignedDesignatorBitPattern) {
 }
 
 TEST(SimCh50701, XZCaseInsensitive) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -542,7 +530,6 @@ TEST(SimCh50701, XZCaseInsensitive) {
 }
 
 TEST(SimCh50701, XInOctalLiteral) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -561,7 +548,6 @@ TEST(SimCh50701, XInOctalLiteral) {
 }
 
 TEST(SimCh50701, BaseFormatCaseInsensitive) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -593,7 +579,6 @@ TEST(SimCh50701, BaseFormatCaseInsensitive) {
 }
 
 TEST(SimCh50701, LeftPadKnownHex) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -614,7 +599,6 @@ TEST(SimCh50701, LeftPadKnownHex) {
 }
 
 TEST(SimCh50701, DecimalSingleDigitX) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -671,4 +655,4 @@ TEST(EvalAdv, SignedHexLiteralIsSigned) {
   EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
-}
+}  // namespace

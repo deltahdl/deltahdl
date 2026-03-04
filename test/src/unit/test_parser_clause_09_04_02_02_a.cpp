@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityStar) {
-
   auto r = Parse(
       "module m;\n"
       "  always @* y = a + b;\n"
@@ -17,7 +16,6 @@ TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityStar) {
 }
 
 TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityParenStar) {
-
   auto r = Parse(
       "module m;\n"
       "  always @(*) y = a + b;\n"
@@ -720,4 +718,4 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenEquivalent) {
   EXPECT_TRUE(item->sensitivity.empty());
 }
 
-}
+}  // namespace

@@ -561,7 +561,6 @@ TEST(ParserA84, ConstantLetExpression) {
 }
 
 TEST(ParserLet, InstantiationParsed) {
-
   auto r = Parse(
       "module t;\n"
       "  let op(x, y) = x + y;\n"
@@ -655,4 +654,4 @@ TEST(ParserA210, AssertionItemDecl_LetDecl) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

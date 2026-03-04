@@ -27,13 +27,11 @@ struct SvaFixture {
 namespace {
 
 TEST(SvaEngine, DisableIffTrue) {
-
   PropertyResult result = EvalWithDisableIff(true, PropertyResult::kFail);
   EXPECT_EQ(result, PropertyResult::kVacuousPass);
 }
 
 TEST(SvaEngine, DisableIffFalse) {
-
   PropertyResult result = EvalWithDisableIff(false, PropertyResult::kFail);
   EXPECT_EQ(result, PropertyResult::kFail);
 }
@@ -43,4 +41,4 @@ TEST(SvaEngine, DisableIffFalsePass) {
   EXPECT_EQ(result, PropertyResult::kPass);
 }
 
-}
+}  // namespace

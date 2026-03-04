@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA222, DriveStrengthStr0Str1) {
-
   auto r = Parse(
       "module m;\n"
       "  wire (strong0, weak1) w;\n"
@@ -18,7 +17,6 @@ TEST(ParserA222, DriveStrengthStr0Str1) {
 }
 
 TEST(ParserA222, DriveStrengthStr1Str0) {
-
   auto r = Parse(
       "module m;\n"
       "  wire (pull1, supply0) w;\n"
@@ -31,7 +29,6 @@ TEST(ParserA222, DriveStrengthStr1Str0) {
 }
 
 TEST(ParserA222, DriveStrengthStr0Highz1) {
-
   auto r = Parse(
       "module m;\n"
       "  wire (pull0, highz1) w;\n"
@@ -44,7 +41,6 @@ TEST(ParserA222, DriveStrengthStr0Highz1) {
 }
 
 TEST(ParserA222, DriveStrengthHighz0Str1) {
-
   auto r = Parse(
       "module m;\n"
       "  wire (highz0, supply1) w;\n"
@@ -57,7 +53,6 @@ TEST(ParserA222, DriveStrengthHighz0Str1) {
 }
 
 TEST(ParserA222, DriveStrengthHighz1Str0) {
-
   auto r = Parse(
       "module m;\n"
       "  wire (highz1, weak0) w;\n"
@@ -70,7 +65,6 @@ TEST(ParserA222, DriveStrengthHighz1Str0) {
 }
 
 TEST(ParserA222, Strength0AllKeywords) {
-
   const struct {
     const char* keyword;
     uint8_t expected;
@@ -92,7 +86,6 @@ TEST(ParserA222, Strength0AllKeywords) {
 }
 
 TEST(ParserA222, Strength1AllKeywords) {
-
   const struct {
     const char* keyword;
     uint8_t expected;
@@ -114,7 +107,6 @@ TEST(ParserA222, Strength1AllKeywords) {
 }
 
 TEST(ParserA222, ChargeStrengthSmall) {
-
   auto r = Parse(
       "module m;\n"
       "  trireg (small) t;\n"
@@ -126,7 +118,6 @@ TEST(ParserA222, ChargeStrengthSmall) {
 }
 
 TEST(ParserA222, ChargeStrengthLarge) {
-
   auto r = Parse(
       "module m;\n"
       "  trireg (large) t;\n"
@@ -138,7 +129,6 @@ TEST(ParserA222, ChargeStrengthLarge) {
 }
 
 TEST(ParserA222, StrengthValueEncoding) {
-
   auto r = Parse(
       "module m;\n"
       "  wire (weak0, pull1) w1;\n"
@@ -155,7 +145,6 @@ TEST(ParserA222, StrengthValueEncoding) {
 }
 
 TEST(ParserA222, NoDriveStrengthDefault) {
-
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -167,4 +156,4 @@ TEST(ParserA222, NoDriveStrengthDefault) {
   EXPECT_EQ(item->drive_strength1, 0u);
 }
 
-}
+}  // namespace

@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(SimA88, QuotedStringPacksBigEndian) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  bit [15:0] s;\n"
@@ -17,7 +16,6 @@ TEST(SimA88, QuotedStringPacksBigEndian) {
 }
 
 TEST(SimA88, TripleQuotedStringPacksBigEndian) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  bit [15:0] s;\n"
@@ -118,7 +116,6 @@ TEST(SimA88, EscapeSeqHexTwoDigits) {
 }
 
 TEST(SimA88, TripleQuotedStringItemNewlineIsLiteral) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  bit [23:0] s;\n"
@@ -129,7 +126,6 @@ TEST(SimA88, TripleQuotedStringItemNewlineIsLiteral) {
 }
 
 TEST(SimA88, TripleQuotedStringItemDoubleQuoteIsLiteral) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  bit [23:0] s;\n"
@@ -140,7 +136,6 @@ TEST(SimA88, TripleQuotedStringItemDoubleQuoteIsLiteral) {
 }
 
 TEST(SimA88, TripleQuotedStringEscapeSeq) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -171,7 +166,6 @@ TEST(SimA88, TripleQuotedStringEscapeSeqHex) {
 }
 
 TEST(SimA88, QuotedStringWidthPerCharacter) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  bit [23:0] s;\n"
@@ -181,4 +175,4 @@ TEST(SimA88, QuotedStringWidthPerCharacter) {
   EXPECT_EQ(v, 0x414243u);
 }
 
-}
+}  // namespace

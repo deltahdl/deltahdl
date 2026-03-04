@@ -6,12 +6,10 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh501, Sec5_1_WhitespaceTabDelimiter) {
-
   EXPECT_TRUE(ParseOk("module\tt;\tlogic\ta;\tendmodule"));
 }
 
 TEST(ParserCh501, Sec5_1_WhitespaceNewlineDelimiter) {
-
   EXPECT_TRUE(
       ParseOk("module\n"
               "t\n"
@@ -23,12 +21,10 @@ TEST(ParserCh501, Sec5_1_WhitespaceNewlineDelimiter) {
 }
 
 TEST(ParserCh501, Sec5_1_WhitespaceSpaceDelimiter) {
-
   EXPECT_TRUE(ParseOk("module t ; logic a ; endmodule"));
 }
 
 TEST(ParserCh501, Sec5_1_WhitespaceInsideStringPreserved) {
-
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"  hello   world  \");\n"
@@ -45,24 +41,20 @@ TEST(ParserCh501, Sec5_1_WhitespaceInsideStringPreserved) {
 }
 
 TEST(ParserCh501, Sec5_1_MultipleConsecutiveWhitespace) {
-
   EXPECT_TRUE(
       ParseOk("module   \t\t   t  \n\n\n ;   logic   a  ;   endmodule"));
 }
 
 TEST(ParserCh501, Sec5_1_EmptyModuleMinimalWhitespace) {
-
   EXPECT_TRUE(ParseOk("module t;endmodule"));
 }
 
 TEST(ParserCh501, Sec5_1_EmptyModuleExcessiveWhitespace) {
-
   EXPECT_TRUE(
       ParseOk("  \t\n  module  \t  t  \n  ;  \n\n\t  endmodule  \n\n  "));
 }
 
 TEST(ParserCh501, Sec5_1_OperatorFollowedByNumber) {
-
   auto r = Parse(
       "module m;\n"
       "  initial x = a+1;\n"
@@ -80,7 +72,6 @@ TEST(ParserCh501, Sec5_1_OperatorFollowedByNumber) {
 }
 
 TEST(ParserCh501, Sec5_1_MixedTokensNoWhitespace) {
-
   EXPECT_TRUE(ParseOk("module m;logic a;assign a=1'b0;endmodule"));
 }
 
@@ -98,7 +89,6 @@ TEST(ParserCh501, Sec5_1_MultipleStatementsOnOneLine) {
 }
 
 TEST(ParserCh501, Sec5_1_StatementSpanningManyLines) {
-
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c, d;\n"
@@ -120,7 +110,6 @@ TEST(ParserCh501, Sec5_1_StatementSpanningManyLines) {
 }
 
 TEST(ParserCh501, Sec5_1_TabCharactersAsWhitespace) {
-
   EXPECT_TRUE(
       ParseOk("module\tm;\n"
               "\tlogic\ta;\n"
@@ -129,7 +118,6 @@ TEST(ParserCh501, Sec5_1_TabCharactersAsWhitespace) {
 }
 
 TEST(ParserCh501, Sec5_1_CarriageReturnLineFeed) {
-
   EXPECT_TRUE(
       ParseOk("module t;\r\n"
               "  logic a;\r\n"
@@ -137,11 +125,10 @@ TEST(ParserCh501, Sec5_1_CarriageReturnLineFeed) {
 }
 
 TEST(ParserCh501, Sec5_1_EmptyCuWhitespaceOnly) {
-
   auto r = Parse("   \t\n\n  \t  ");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->modules.empty());
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
-}
+}  // namespace

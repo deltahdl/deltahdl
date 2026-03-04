@@ -39,4 +39,4 @@ TEST(ClassSim, UndefinedPropertyReturnsZero) {
   EXPECT_EQ(obj->GetProperty("nonexistent", f.arena).ToUint64(), 0u);
 }
 
-}
+}  // namespace

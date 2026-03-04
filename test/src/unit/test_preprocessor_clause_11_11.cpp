@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA24, DefparamAssignmentMintypmax) {
-
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  defparam u0.DELAY = 1:2:3;\n"
@@ -18,4 +17,4 @@ TEST(ParserA24, DefparamAssignmentMintypmax) {
   ASSERT_EQ(item->defparam_assigns.size(), 1u);
 }
 
-}
+}  // namespace

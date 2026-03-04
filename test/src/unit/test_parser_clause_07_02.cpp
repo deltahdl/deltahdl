@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA221, StructMemberRandc) {
-
   auto r = Parse(
       "module m;\n"
       "  struct { randc bit [7:0] x; } s;\n"
@@ -32,7 +31,6 @@ TEST(ParserA221, StructMemberBasic) {
 }
 
 TEST(ParserA221, StructMemberRand) {
-
   auto r = Parse(
       "module m;\n"
       "  struct { rand int a; int b; } s;\n"
@@ -46,7 +44,6 @@ TEST(ParserA221, StructMemberRand) {
 }
 
 TEST(ParserA221, StructMemberAttr) {
-
   auto r = Parse(
       "module m;\n"
       "  struct { (* mark *) int a; int b; } s;\n"
@@ -221,4 +218,4 @@ TEST(ParserCh5, StructMembers_Single) {
   EXPECT_TRUE(ParseOk5("module m; struct { int X; } s; endmodule"));
 }
 
-}
+}  // namespace

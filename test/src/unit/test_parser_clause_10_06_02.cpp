@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, Force_Variable) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin force q = 1; end\n"
@@ -21,7 +20,6 @@ TEST(ParserA602, Force_Variable) {
 }
 
 TEST(ParserA602, Force_Net) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin force net_a = 0; end\n"
@@ -178,4 +176,4 @@ TEST(ParserA85, VarLvalueRelease) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

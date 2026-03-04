@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA213, DataDeclTypeDeclaration) {
-
   auto r = Parse("module m; typedef int my_int_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -43,4 +42,4 @@ TEST(ParserA213, GenvarDeclSingle) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
 }
 
-}
+}  // namespace

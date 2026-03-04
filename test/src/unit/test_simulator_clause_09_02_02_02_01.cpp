@@ -28,4 +28,4 @@ TEST(SimCh4, AlwaysCombReactsToDelayedChange) {
   EXPECT_EQ(var->value.ToUint64(), 14u);
 }
 
-}
+}  // namespace

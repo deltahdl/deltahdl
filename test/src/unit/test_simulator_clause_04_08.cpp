@@ -268,7 +268,6 @@ TEST(SimCh48, NBAEliminatesActiveRegionRace) {
   auto* process = sched.GetEventPool().Acquire();
   process->kind = EventKind::kEvaluation;
   process->callback = [&]() {
-
     auto* nba_q = sched.GetEventPool().Acquire();
     nba_q->kind = EventKind::kUpdate;
     nba_q->callback = [&]() {

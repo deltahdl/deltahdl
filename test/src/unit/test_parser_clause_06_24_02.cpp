@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, DynamicCastTask) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef enum { A, B, C } abc_t;\n"
@@ -19,7 +18,6 @@ TEST(ParserSection6, DynamicCastTask) {
 }
 
 TEST(ParserSection6, DynamicCastFunction) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef enum { X, Y, Z } xyz_t;\n"
@@ -72,4 +70,4 @@ TEST(ParserSection6, DynamicCastAssignResult) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

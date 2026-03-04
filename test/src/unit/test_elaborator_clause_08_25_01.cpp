@@ -9,7 +9,6 @@ using namespace delta;
 namespace {
 
 TEST(Elaboration, ParameterizedType_Vector) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "class C #(type T = int);\n"
@@ -27,4 +26,4 @@ TEST(Elaboration, ParameterizedType_Vector) {
   EXPECT_EQ(mod->variables[0].width, 8);
 }
 
-}
+}  // namespace

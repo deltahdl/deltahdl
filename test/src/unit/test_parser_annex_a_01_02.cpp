@@ -170,10 +170,9 @@ TEST(ParserAnnexA, A2ClassDecl) {
 }
 
 TEST(ParserCh501, Sec5_1_EmptyCuCompletelyEmpty) {
-
   auto r = Parse("");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->modules.empty());
 }
 
-}
+}  // namespace

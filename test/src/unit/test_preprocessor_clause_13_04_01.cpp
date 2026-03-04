@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, AutomaticFunctionReturnType) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  function automatic int get_value();\n"
@@ -19,4 +18,4 @@ TEST(ParserSection6, AutomaticFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-}
+}  // namespace

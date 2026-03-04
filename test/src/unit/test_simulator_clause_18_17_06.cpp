@@ -30,4 +30,4 @@ TEST(SimA612, BreakTerminatesRandsequence) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}
+}  // namespace

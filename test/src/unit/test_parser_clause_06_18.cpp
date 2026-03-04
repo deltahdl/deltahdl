@@ -32,7 +32,6 @@ TEST(ParserA213, ForwardTypedefInterfaceClass) {
 }
 
 TEST(ParserA213, ForwardTypedefEnum) {
-
   auto r = Parse("module m; typedef enum color_e; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -42,7 +41,6 @@ TEST(ParserA213, ForwardTypedefEnum) {
 }
 
 TEST(ParserA213, ForwardTypedefStruct) {
-
   auto r = Parse("module m; typedef struct my_struct; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -52,7 +50,6 @@ TEST(ParserA213, ForwardTypedefStruct) {
 }
 
 TEST(ParserA213, ForwardTypedefUnion) {
-
   auto r = Parse("module m; typedef union my_union; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -101,7 +98,6 @@ TEST(ParserA28, TypedefInFunction) {
 }
 
 TEST(ParserSection6, TypeCompatibilityTypedefParsing) {
-
   auto r = Parse(
       "module m;\n"
       "  typedef bit node;\n"
@@ -190,4 +186,4 @@ TEST(ParserCh5, UnpackedDim_Typedef) {
   EXPECT_TRUE(ParseOk5("module m; typedef int triple[1:3]; endmodule"));
 }
 
-}
+}  // namespace

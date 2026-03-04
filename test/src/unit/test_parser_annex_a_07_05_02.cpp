@@ -47,4 +47,4 @@ TEST(ParserA70502, ThresholdExpression) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-}
+}  // namespace

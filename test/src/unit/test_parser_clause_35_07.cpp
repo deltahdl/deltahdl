@@ -91,7 +91,6 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportWithCName) {
 }
 
 TEST(ParserSection38, DpiExportFunctionForCalltf) {
-
   auto r = Parse(R"(
     module m;
       export "DPI-C" function calltf_routine;
@@ -107,7 +106,6 @@ TEST(ParserSection38, DpiExportFunctionForCalltf) {
 }
 
 TEST(ParserSection38, DpiExportWithCNameForSystf) {
-
   auto r = Parse(R"(
     module m;
       export "DPI-C" my_c_calltf = function sv_calltf;
@@ -135,4 +133,4 @@ TEST_F(DpiParseTest, ExportFunction) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-}
+}  // namespace

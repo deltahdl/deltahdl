@@ -650,5 +650,4 @@ TEST(SimCh13, ParserPreservesParams) {
   auto* cu = parser.Parse();
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(cu->modules.empty());
-
 }

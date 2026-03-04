@@ -18,4 +18,4 @@ TEST(SimA705, RuntimeTimingCheckEntryHold) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].kind, TimingCheckKind::kHold);
 }
 
-}
+}  // namespace

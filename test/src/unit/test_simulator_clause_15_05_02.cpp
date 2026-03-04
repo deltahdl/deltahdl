@@ -66,4 +66,4 @@ TEST(IpcSync, EventTriggeredStickyWithinTimeslot) {
   EXPECT_FALSE(f.ctx.IsEventTriggered("ev2"));
 }
 
-}
+}  // namespace

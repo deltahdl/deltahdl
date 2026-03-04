@@ -62,4 +62,4 @@ TEST(DpiRuntime, ImportWithChandleArg) {
   EXPECT_EQ(result.AsChandle(), &dummy);
 }
 
-}
+}  // namespace

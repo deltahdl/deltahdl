@@ -71,4 +71,4 @@ TEST(ParserSection9, InitialBlock) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

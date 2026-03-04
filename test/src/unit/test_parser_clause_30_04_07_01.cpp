@@ -34,4 +34,4 @@ TEST(ParserA702, FullPathNoPolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
 }
 
-}
+}  // namespace

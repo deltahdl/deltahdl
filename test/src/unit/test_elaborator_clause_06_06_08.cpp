@@ -9,7 +9,6 @@ using namespace delta;
 namespace {
 
 TEST(Elaboration, InterconnectContAssign_Error) {
-
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -21,7 +20,6 @@ TEST(Elaboration, InterconnectContAssign_Error) {
 }
 
 TEST(Elaboration, InterconnectDecl_OK) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -40,4 +38,4 @@ TEST(Elaboration, InterconnectDecl_OK) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

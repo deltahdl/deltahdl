@@ -24,4 +24,4 @@ TEST(ParserA212, InoutPackedDim) {
   EXPECT_NE(port.data_type.packed_dim_left, nullptr);
 }
 
-}
+}  // namespace

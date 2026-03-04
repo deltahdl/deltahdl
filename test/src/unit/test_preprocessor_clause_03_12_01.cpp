@@ -8,7 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
-
   auto r1 = ParseWithPreprocessor(
       "`define FOO 1\n"
       "module m1;\n"
@@ -52,7 +51,6 @@ TEST(ParserClause03, Cl3_12_1_CuScopeContainsPackageItems) {
 }
 
 TEST(ParserClause03, Cl3_12_1_IncludeBecomesPartOfCU) {
-
   auto r = ParseWithPreprocessor(
       "`define MY_CONST 42\n"
       "module m;\n"
@@ -108,7 +106,6 @@ static const ModuleItem* FindItemByKindAndName(
 }
 
 TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
-
   auto r = ParseWithPreprocessor(
       "function int helper(int x); return x; endfunction\n"
       "module m;\n"
@@ -127,7 +124,6 @@ TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
 }
 
 TEST(ParserClause03, Cl3_12_1_CuScopeCannotBeImported) {
-
   auto r = ParseWithPreprocessor(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -220,4 +216,4 @@ TEST(Parser, MultipleModules) {
   EXPECT_EQ(r.cu->modules[2]->name, "c");
 }
 
-}
+}  // namespace

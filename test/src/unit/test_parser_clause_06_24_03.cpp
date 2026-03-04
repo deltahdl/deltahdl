@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, BitstreamCastStructToInt) {
-
   EXPECT_TRUE(ParseOk(
       "module t;\n"
       "  typedef struct packed { logic [15:0] hi; logic [15:0] lo; } pair_t;\n"
@@ -20,7 +19,6 @@ TEST(ParserSection6, BitstreamCastStructToInt) {
 }
 
 TEST(ParserSection6, BitstreamCastIntToStruct) {
-
   EXPECT_TRUE(ParseOk(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -56,4 +54,4 @@ TEST(ParserSection6, BitStreamCastFromStruct) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

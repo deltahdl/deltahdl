@@ -6,7 +6,6 @@
 namespace {
 
 TEST(CmosSwitches, CmosIsNmosPlusPmos) {
-
   EXPECT_NE(EvalMosSwitch(SwitchType::kCmos, Val4::kV1, Val4::kV1),
             Val4Ext::kZ);
 }
@@ -16,4 +15,4 @@ TEST(CmosSwitches, CmosMaxThreeDelays) {
   EXPECT_EQ(MaxSwitchDelays(SwitchType::kRcmos), 3u);
 }
 
-}
+}  // namespace

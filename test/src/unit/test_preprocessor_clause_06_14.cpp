@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, ChandleInClass) {
-
   auto r = ParseWithPreprocessor(
       "class Wrapper;\n"
       "  chandle ptr;\n"
@@ -18,4 +17,4 @@ TEST(ParserSection6, ChandleInClass) {
             DataTypeKind::kChandle);
 }
 
-}
+}  // namespace

@@ -30,4 +30,4 @@ TEST(ParserSection7, ArraySliceAssign) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-}
+}  // namespace

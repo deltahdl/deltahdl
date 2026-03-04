@@ -43,4 +43,4 @@ TEST(Types, Logic4VecCreationAndToString) {
   EXPECT_EQ(vec.ToString(), "10100101");
 }
 
-}
+}  // namespace

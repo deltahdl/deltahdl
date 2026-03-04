@@ -9,7 +9,6 @@ using namespace delta;
 namespace {
 
 TEST(Elaboration, ChandlePort_Error) {
-
   ElabFixture f;
   ElaborateSrc(
       "module top(input chandle ch);\n"
@@ -19,7 +18,6 @@ TEST(Elaboration, ChandlePort_Error) {
 }
 
 TEST(Elaboration, ChandleContAssign_Error) {
-
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -31,7 +29,6 @@ TEST(Elaboration, ChandleContAssign_Error) {
 }
 
 TEST(Elaboration, ChandleSensitivity_Error) {
-
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -43,7 +40,6 @@ TEST(Elaboration, ChandleSensitivity_Error) {
 }
 
 TEST(Elaboration, ChandleVarDecl_OK) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -54,4 +50,4 @@ TEST(Elaboration, ChandleVarDecl_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

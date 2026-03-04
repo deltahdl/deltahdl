@@ -49,7 +49,6 @@ TEST_F(ConfigTest, CellClauseLiblist) {
 }
 
 TEST(ParserSection34, ConfigWithDefaultLiblist) {
-
   auto r = Parse(R"(
     config cfg1;
       design mylib.top;
@@ -62,7 +61,6 @@ TEST(ParserSection34, ConfigWithDefaultLiblist) {
 }
 
 TEST(ParserSection34, ConfigWithMultipleLibraries) {
-
   auto r = Parse(R"(
     config design_cfg;
       design lib1.chip_top;
@@ -78,4 +76,4 @@ TEST(ParserSection34, ConfigWithMultipleLibraries) {
   ASSERT_GE(cfg->design_cells.size(), 1u);
 }
 
-}
+}  // namespace

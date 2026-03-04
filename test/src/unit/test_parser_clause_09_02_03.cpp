@@ -47,7 +47,6 @@ TEST(ParserA602, FinalConstruct_Multiple) {
 }
 
 TEST(ParserA602, Integration_InitialFinalCoexistence) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -187,4 +186,4 @@ TEST(ParserSection9, FinalBlock) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

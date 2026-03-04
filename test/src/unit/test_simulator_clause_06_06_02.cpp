@@ -10,7 +10,6 @@ using namespace delta;
 namespace {
 
 TEST(NetResolution, WireBothZero) {
-
   Logic4Word a{0, 0};
   Logic4Word b{0, 0};
   auto r = ResolveWireWord(a, b);
@@ -19,7 +18,6 @@ TEST(NetResolution, WireBothZero) {
 }
 
 TEST(NetResolution, WireBothOne) {
-
   Logic4Word a{1, 0};
   Logic4Word b{1, 0};
   auto r = ResolveWireWord(a, b);
@@ -28,7 +26,6 @@ TEST(NetResolution, WireBothOne) {
 }
 
 TEST(NetResolution, WireConflict) {
-
   Logic4Word a{0, 0};
   Logic4Word b{1, 0};
   auto r = ResolveWireWord(a, b);
@@ -37,7 +34,6 @@ TEST(NetResolution, WireConflict) {
 }
 
 TEST(NetResolution, WireZAndValue) {
-
   Logic4Word z{1, 1};
   Logic4Word one{1, 0};
   auto r = ResolveWireWord(z, one);
@@ -51,7 +47,6 @@ TEST(NetResolution, WireZAndValue) {
 }
 
 TEST(NetResolution, WireBothZ) {
-
   Logic4Word z{1, 1};
   auto r = ResolveWireWord(z, z);
   EXPECT_EQ(r.aval, 1u);
@@ -59,7 +54,6 @@ TEST(NetResolution, WireBothZ) {
 }
 
 TEST(NetResolution, WireXPropagates) {
-
   Logic4Word x{0, 1};
   Logic4Word zero{0, 0};
   auto r = ResolveWireWord(x, zero);
@@ -123,4 +117,4 @@ TEST(NetResolution, ResolveEmptyDrivers) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

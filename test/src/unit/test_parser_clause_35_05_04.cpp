@@ -248,7 +248,6 @@ TEST_F(AnnexHParseTest, AnnexHDpiContextTaskWithCName) {
 }
 
 TEST_F(AnnexHParseTest, AnnexHDpiImportNoArgs) {
-
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function int get_seed;\n"
@@ -277,7 +276,6 @@ TEST_F(AnnexHParseTest, AnnexJDpiImportCoexistence) {
 }
 
 TEST(ParserSection38, DpiImportVoidCallbackFunction) {
-
   auto r = Parse(R"(
     module m;
       import "DPI-C" function void my_callback();
@@ -293,7 +291,6 @@ TEST(ParserSection38, DpiImportVoidCallbackFunction) {
 }
 
 TEST(ParserSection38, DpiImportWithCNameForCallback) {
-
   auto r = Parse(R"(
     module m;
       import "DPI-C" vpi_cb_rtn =
@@ -309,7 +306,6 @@ TEST(ParserSection38, DpiImportWithCNameForCallback) {
 }
 
 TEST(ParserSection38, DpiImportPureFunctionForSizetf) {
-
   auto r = Parse(R"(
     module m;
       import "DPI-C" pure function int my_sizetf(input string data);
@@ -379,7 +375,6 @@ static bool ParseOk38(const std::string& src) {
 }
 
 TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
-
   EXPECT_TRUE(ParseOk38(R"(
     module m;
       import "DPI-C" context function int calltf(input string data);
@@ -465,4 +460,4 @@ TEST(ParserSection13, DpiImportWithCName) {
   EXPECT_EQ(dpi->name, "sv_wrapper");
 }
 
-}
+}  // namespace

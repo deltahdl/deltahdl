@@ -28,4 +28,4 @@ TEST(Elaboration, UnpackedStructMemberDefault_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

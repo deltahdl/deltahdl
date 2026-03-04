@@ -82,7 +82,6 @@ TEST(ParserSection23, NonAnsiPortsMixed) {
 }
 
 TEST(ParserSection23, Sec23_2_2_NonAnsiPortDeclarations) {
-
   auto r = Parse(
       "module m (a, b, y);\n"
       "  input a, b;\n"
@@ -125,4 +124,4 @@ TEST(ParserSection23, NonAnsiMultiplePortsSameDir) {
   }
 }
 
-}
+}  // namespace

@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ElabCh511, ArrayInitPattern_FlatIllegal) {
-
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -16,4 +15,4 @@ TEST(ElabCh511, ArrayInitPattern_FlatIllegal) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

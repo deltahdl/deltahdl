@@ -20,4 +20,4 @@ TEST(ParserAnnexA042, GenerateItemInChecker) {
   EXPECT_TRUE(found_if);
 }
 
-}
+}  // namespace

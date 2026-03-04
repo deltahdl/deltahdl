@@ -110,4 +110,4 @@ TEST(SimCh4, ProcessWithLoop) {
   EXPECT_EQ(result, 15u);
 }
 
-}
+}  // namespace

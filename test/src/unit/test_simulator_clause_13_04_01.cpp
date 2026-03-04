@@ -195,4 +195,4 @@ TEST(Functions, VoidFunctionSideEffect) {
   EXPECT_EQ(g_var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

@@ -719,4 +719,4 @@ TEST(SimCh9d, AlwaysStarParenResultWidth32) {
   EXPECT_EQ(y->value.ToUint64(), 0xDEADBEEFu);
 }
 
-}
+}  // namespace

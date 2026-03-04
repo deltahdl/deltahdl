@@ -22,4 +22,4 @@ TEST(ClassSim, StaticPropertySharedAcrossInstances) {
   EXPECT_EQ(type->static_properties["counter"].ToUint64(), 42u);
 }
 
-}
+}  // namespace

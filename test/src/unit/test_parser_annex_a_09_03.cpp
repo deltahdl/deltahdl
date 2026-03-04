@@ -25,7 +25,6 @@ static CompilationUnit* ParseSrc(const std::string& src, ParseFixture& f) {
 }
 
 TEST(ParserA93, SimpleIdentInExpr) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -38,7 +37,6 @@ TEST(ParserA93, SimpleIdentInExpr) {
 }
 
 TEST(ParserA93, HierarchicalIdentDotted) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -51,7 +49,6 @@ TEST(ParserA93, HierarchicalIdentDotted) {
 }
 
 TEST(ParserA93, HierarchicalIdentDeep) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -64,7 +61,6 @@ TEST(ParserA93, HierarchicalIdentDeep) {
 }
 
 TEST(ParserA93, HierarchicalIdentWithBitSelect) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -77,7 +73,6 @@ TEST(ParserA93, HierarchicalIdentWithBitSelect) {
 }
 
 TEST(ParserA93, HierarchicalIdentWithMultipleBitSelects) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -90,7 +85,6 @@ TEST(ParserA93, HierarchicalIdentWithMultipleBitSelects) {
 }
 
 TEST(ParserA93, EscapedIdentInHierPath) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -103,7 +97,6 @@ TEST(ParserA93, EscapedIdentInHierPath) {
 }
 
 TEST(ParserA93, PackageScopeAccess) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "package pkg;\n"
@@ -118,7 +111,6 @@ TEST(ParserA93, PackageScopeAccess) {
 }
 
 TEST(ParserA93, PackageScopeOnType) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "package pkg;\n"
@@ -133,7 +125,6 @@ TEST(ParserA93, PackageScopeOnType) {
 }
 
 TEST(ParserA93, PackageScopeInAssign) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "package pkg;\n"
@@ -150,7 +141,6 @@ TEST(ParserA93, PackageScopeInAssign) {
 }
 
 TEST(ParserA93, DpiImportWithCIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -166,7 +156,6 @@ TEST(ParserA93, DpiImportWithCIdentifier) {
 }
 
 TEST(ParserA93, DpiImportWithoutCIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -182,7 +171,6 @@ TEST(ParserA93, DpiImportWithoutCIdentifier) {
 }
 
 TEST(ParserA93, DpiExportWithCIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -195,7 +183,6 @@ TEST(ParserA93, DpiExportWithCIdentifier) {
 }
 
 TEST(ParserA93, DpiImportPureFunction) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -210,7 +197,6 @@ TEST(ParserA93, DpiImportPureFunction) {
 }
 
 TEST(ParserA93, DpiImportContextTask) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -225,7 +211,6 @@ TEST(ParserA93, DpiImportContextTask) {
 }
 
 TEST(ParserA93, ModuleIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc("module my_module; endmodule\n", f);
   ASSERT_NE(cu, nullptr);
@@ -234,7 +219,6 @@ TEST(ParserA93, ModuleIdentifier) {
 }
 
 TEST(ParserA93, FunctionIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -248,7 +232,6 @@ TEST(ParserA93, FunctionIdentifier) {
 }
 
 TEST(ParserA93, TaskIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -260,7 +243,6 @@ TEST(ParserA93, TaskIdentifier) {
 }
 
 TEST(ParserA93, ParameterIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -272,7 +254,6 @@ TEST(ParserA93, ParameterIdentifier) {
 }
 
 TEST(ParserA93, InstanceIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module sub; endmodule\n"
@@ -285,7 +266,6 @@ TEST(ParserA93, InstanceIdentifier) {
 }
 
 TEST(ParserA93, GenerateBlockIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -302,7 +282,6 @@ TEST(ParserA93, GenerateBlockIdentifier) {
 }
 
 TEST(ParserA93, InterfaceIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "interface my_intf;\n"
@@ -314,7 +293,6 @@ TEST(ParserA93, InterfaceIdentifier) {
 }
 
 TEST(ParserA93, PackageIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "package my_pkg;\n"
@@ -327,7 +305,6 @@ TEST(ParserA93, PackageIdentifier) {
 }
 
 TEST(ParserA93, NetIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -339,7 +316,6 @@ TEST(ParserA93, NetIdentifier) {
 }
 
 TEST(ParserA93, VariableIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -351,7 +327,6 @@ TEST(ParserA93, VariableIdentifier) {
 }
 
 TEST(ParserA93, PortIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m(input a, output b, inout c);\n"
@@ -363,7 +338,6 @@ TEST(ParserA93, PortIdentifier) {
 }
 
 TEST(ParserA93, EnumIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -376,7 +350,6 @@ TEST(ParserA93, EnumIdentifier) {
 }
 
 TEST(ParserA93, ClassIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "class my_class;\n"
@@ -388,7 +361,6 @@ TEST(ParserA93, ClassIdentifier) {
 }
 
 TEST(ParserA93, MemberIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -403,7 +375,6 @@ TEST(ParserA93, MemberIdentifier) {
 }
 
 TEST(ParserA93, SpecparamIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m(input a, output b);\n"
@@ -417,7 +388,6 @@ TEST(ParserA93, SpecparamIdentifier) {
 }
 
 TEST(ParserA93, GotoBlockLabel) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -431,7 +401,6 @@ TEST(ParserA93, GotoBlockLabel) {
 }
 
 TEST(ParserA93, ConfigIdentifier) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "config my_cfg;\n"
@@ -443,7 +412,6 @@ TEST(ParserA93, ConfigIdentifier) {
 }
 
 TEST(ParserA93, EscapedIdentAsModuleName) {
-
   ParseFixture f;
   auto* cu = ParseSrc("module \\my-module ; endmodule\n", f);
   ASSERT_NE(cu, nullptr);
@@ -451,7 +419,6 @@ TEST(ParserA93, EscapedIdentAsModuleName) {
 }
 
 TEST(ParserA93, SystemCallInExpr) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -463,7 +430,6 @@ TEST(ParserA93, SystemCallInExpr) {
 }
 
 TEST(ParserA93, SystemCallClog2) {
-
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -475,4 +441,4 @@ TEST(ParserA93, SystemCallClog2) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

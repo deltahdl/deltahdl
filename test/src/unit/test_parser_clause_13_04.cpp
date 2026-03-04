@@ -407,4 +407,4 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithOutputArg) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-}
+}  // namespace

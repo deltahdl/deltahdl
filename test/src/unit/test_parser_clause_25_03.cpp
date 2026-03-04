@@ -233,4 +233,4 @@ TEST(ParserSection23, InterfaceLifetimeAutomatic) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "myif");
 }
 
-}
+}  // namespace

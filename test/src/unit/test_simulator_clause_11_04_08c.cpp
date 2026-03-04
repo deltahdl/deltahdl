@@ -88,4 +88,4 @@ TEST(Types, Logic4WordNot) {
   EXPECT_NE(r3.bval, 0);
 }
 
-}
+}  // namespace

@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA213, DataDeclConstVar) {
-
   auto r = Parse("module m; const int MAX = 100; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -56,7 +55,6 @@ TEST(ParserA28, ConstWithLifetimeInBlock) {
 }
 
 TEST(ParserSection6, ConstRealDecl) {
-
   auto r = Parse(
       "module t;\n"
       "  const real PI = 3.14159;\n"
@@ -69,7 +67,6 @@ TEST(ParserSection6, ConstRealDecl) {
 }
 
 TEST(ParserSection6, ConstStringDecl) {
-
   auto r = Parse(
       "module t;\n"
       "  const string GREETING = \"Hi\";\n"
@@ -117,4 +114,4 @@ TEST(ParserSection6, ConstIntDecl) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-}
+}  // namespace

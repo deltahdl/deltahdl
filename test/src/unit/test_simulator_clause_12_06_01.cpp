@@ -79,4 +79,4 @@ TEST(SimA60701, CaseMatchesFirstMatchWins) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}
+}  // namespace

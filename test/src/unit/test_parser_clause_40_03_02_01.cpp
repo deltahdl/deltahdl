@@ -16,7 +16,6 @@ TEST_F(ApiParseTest, CoverageControlSystemCall) {
 }
 
 TEST(ParserSection40, CoverageControlInAlwaysBlock) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, reset;
@@ -29,4 +28,4 @@ TEST(ParserSection40, CoverageControlInAlwaysBlock) {
   )"));
 }
 
-}
+}  // namespace

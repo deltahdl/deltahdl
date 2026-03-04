@@ -64,7 +64,6 @@ TEST(ParserSection38, VpiSystemCallDeposit) {
 }
 
 TEST(ParserCh50603, SystemTask_Display) {
-
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"hello\");\n"
@@ -77,4 +76,4 @@ TEST(ParserCh50603, SystemTask_Display) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-}
+}  // namespace

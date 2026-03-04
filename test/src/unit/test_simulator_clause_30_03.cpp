@@ -50,4 +50,4 @@ TEST(SimA701, SpecifyBlockDoesNotInterfereBehavioral) {
   LowerRunAndCheck(f, design, {{"a", 11u}, {"b", 22u}});
 }
 
-}
+}  // namespace

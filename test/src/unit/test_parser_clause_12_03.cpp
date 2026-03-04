@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, InitialConstruct_NullStmt) {
-
   auto r = Parse(
       "module m;\n"
       "  initial ;\n"
@@ -105,4 +104,4 @@ TEST(ParserA604, StatementWithLabelAndAttribute) {
   EXPECT_EQ(stmt->attrs[0].name, "mark");
 }
 
-}
+}  // namespace

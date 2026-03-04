@@ -44,4 +44,4 @@ TEST(ElabClause1003, MultipleContAssigns) {
   ASSERT_GE(mod->assigns.size(), 2u);
 }
 
-}
+}  // namespace

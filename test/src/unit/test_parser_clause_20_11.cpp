@@ -34,7 +34,6 @@ TEST_F(ApiParseTest, AssertKillSystemCall) {
 }
 
 TEST(ParserSection39, AssertOnNoArgs) {
-
   auto r = Parse(R"(
     module m;
       initial $asserton;
@@ -45,7 +44,6 @@ TEST(ParserSection39, AssertOnNoArgs) {
 }
 
 TEST(ParserSection39, AssertOffNoArgs) {
-
   auto r = Parse(R"(
     module m;
       initial $assertoff;
@@ -56,7 +54,6 @@ TEST(ParserSection39, AssertOffNoArgs) {
 }
 
 TEST(ParserSection39, AssertKillNoArgs) {
-
   auto r = Parse(R"(
     module m;
       initial $assertkill;
@@ -67,7 +64,6 @@ TEST(ParserSection39, AssertKillNoArgs) {
 }
 
 TEST(ParserSection39, AssertOnWithLevelArg) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial $asserton(0);
@@ -76,7 +72,6 @@ TEST(ParserSection39, AssertOnWithLevelArg) {
 }
 
 TEST(ParserSection39, AssertOffWithLevelAndModuleArgs) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial $assertoff(0, m);
@@ -85,7 +80,6 @@ TEST(ParserSection39, AssertOffWithLevelAndModuleArgs) {
 }
 
 TEST(ParserSection39, AssertControlSystemTask) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial $assertcontrol(3);
@@ -94,7 +88,6 @@ TEST(ParserSection39, AssertControlSystemTask) {
 }
 
 TEST(ParserSection39, AssertControlWithMultipleArgs) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial $assertcontrol(3, 1);
@@ -103,7 +96,6 @@ TEST(ParserSection39, AssertControlWithMultipleArgs) {
 }
 
 TEST(ParserSection39, AssertPassStepAndFailStep) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial begin
@@ -115,7 +107,6 @@ TEST(ParserSection39, AssertPassStepAndFailStep) {
 }
 
 TEST(ParserSection39, AssertionControlInAlwaysBlock) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, reset;
@@ -130,7 +121,6 @@ TEST(ParserSection39, AssertionControlInAlwaysBlock) {
 }
 
 TEST(ParserSection39, AssertionControlSequence) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial begin
@@ -143,4 +133,4 @@ TEST(ParserSection39, AssertionControlSequence) {
   )"));
 }
 
-}
+}  // namespace

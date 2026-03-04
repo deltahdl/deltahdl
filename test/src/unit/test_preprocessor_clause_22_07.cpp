@@ -85,4 +85,4 @@ TEST(ParserSection22, TimescaleModuleNamePreserved) {
   EXPECT_EQ(r.cu->modules[0]->name, "foo");
 }
 
-}
+}  // namespace

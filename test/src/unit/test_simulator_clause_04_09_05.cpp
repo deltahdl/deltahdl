@@ -46,7 +46,6 @@ TEST(SimCh4095, BidirectionalSignalFlow) {
   drive_a->callback = [&]() {
     net_a = 1;
     if (switch_on) {
-
       auto* update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;
       update->callback = [&]() { net_b = net_a; };
@@ -87,12 +86,10 @@ TEST(SimCh4095, CoordinatedProcessingOfConnectedNodes) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     if (sw0_on && sw1_on) {
       auto* update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;
       update->callback = [&]() {
-
         n1 = n0;
         n2 = n0;
       };
@@ -118,11 +115,9 @@ TEST(SimCh4095, InputsAndOutputsInteract) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     auto* update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
-
       node_a = driver_a_val;
       node_b = driver_b_val;
     };
@@ -147,7 +142,6 @@ TEST(SimCh4095, RelaxationTechnique) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     int prev_n1 = 0;
     int prev_n2 = 0;
     do {
@@ -218,7 +212,6 @@ TEST(SimCh4095, SteadyStateUniqueLevel) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     int result_gate_on = 1;
     int result_gate_off = 1;
 
@@ -280,10 +273,8 @@ TEST(SimCh4095, UserDefinedNetTypeSwitchOffForXZ) {
     auto* update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     if (switch_off) {
-
       update->callback = []() {};
     } else {
-
       update->callback = [&]() { udn_b = udn_a; };
     }
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
@@ -343,4 +334,4 @@ TEST(SwitchProcessing, UserDefinedNetXControlTreatedAsOff) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-}
+}  // namespace

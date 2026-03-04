@@ -288,7 +288,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevelBody) {
 }
 
 TEST(ParserSection9c, AlwaysFFWithReset) {
-
   auto r = Parse(
       "module m;\n"
       "  logic clock, reset;\n"
@@ -367,7 +366,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardEdgeKeyword) {
 }
 
 TEST(ParserSection9c, IffGuardStmtLevelNoEdge) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -399,7 +397,6 @@ TEST(ParserSection9b, ConditionalEventIffBasic) {
 }
 
 TEST(ParserSection9c, IffGuardAlwaysFF) {
-
   auto r = Parse(
       "module m;\n"
       "  logic clk, en;\n"
@@ -695,4 +692,4 @@ TEST(ParserSection9, IffGuardStmtLevelEvent) {
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
-}
+}  // namespace

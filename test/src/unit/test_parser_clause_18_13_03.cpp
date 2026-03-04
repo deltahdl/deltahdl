@@ -44,4 +44,4 @@ TEST(ParserSection18, SrandomWithExpression) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}
+}  // namespace

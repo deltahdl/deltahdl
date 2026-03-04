@@ -108,4 +108,4 @@ TEST(Lowerer, FunctionCallReturnsValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

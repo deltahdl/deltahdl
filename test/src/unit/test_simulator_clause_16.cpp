@@ -24,7 +24,6 @@ struct SimCh16Fixture {
 };
 
 TEST(SimCh16, AssertPropertySimpleBooleanPass) {
-
   SimCh16Fixture f;
   DeferredAssertion da;
   da.condition_val = 1;
@@ -40,7 +39,6 @@ TEST(SimCh16, AssertPropertySimpleBooleanPass) {
 }
 
 TEST(SimCh16, AssertPropertySimpleBooleanFail) {
-
   SimCh16Fixture f;
   DeferredAssertion da;
   da.condition_val = 0;
@@ -56,7 +54,6 @@ TEST(SimCh16, AssertPropertySimpleBooleanFail) {
 }
 
 TEST(SimCh16, AssertPropertyWithPassActionBlock) {
-
   DeferredAssertion da;
   da.condition_val = 1;
   int pass_count = 0;
@@ -67,7 +64,6 @@ TEST(SimCh16, AssertPropertyWithPassActionBlock) {
 }
 
 TEST(SimCh16, AssertPropertyWithFailActionBlock) {
-
   DeferredAssertion da;
   da.condition_val = 0;
   int fail_count = 0;
@@ -78,7 +74,6 @@ TEST(SimCh16, AssertPropertyWithFailActionBlock) {
 }
 
 TEST(SimCh16, AssertPropertyWithBothPassAndFailActions) {
-
   bool pass_called = false;
   bool fail_called = false;
 
@@ -103,7 +98,6 @@ TEST(SimCh16, AssertPropertyWithBothPassAndFailActions) {
 }
 
 TEST(SimCh16, AssumePropertySimplePass) {
-
   DeferredAssertion da;
   da.condition_val = 1;
   da.instance_name = "assume_pass";
@@ -115,7 +109,6 @@ TEST(SimCh16, AssumePropertySimplePass) {
 }
 
 TEST(SimCh16, AssumePropertySimpleFail) {
-
   DeferredAssertion da;
   da.condition_val = 0;
   da.instance_name = "assume_fail";
@@ -127,7 +120,6 @@ TEST(SimCh16, AssumePropertySimpleFail) {
 }
 
 TEST(SimCh16, CoverPropertyMatchTriggersAction) {
-
   DeferredAssertion da;
   da.condition_val = 1;
   da.instance_name = "cover_match";
@@ -139,7 +131,6 @@ TEST(SimCh16, CoverPropertyMatchTriggersAction) {
 }
 
 TEST(SimCh16, CoverPropertyNoMatchNoAction) {
-
   DeferredAssertion da;
   da.condition_val = 0;
   da.instance_name = "cover_no_match";
@@ -153,13 +144,11 @@ TEST(SimCh16, CoverPropertyNoMatchNoAction) {
 }
 
 TEST(SimCh16, AssertPropertyOverlappingImplication) {
-
   EXPECT_EQ(EvalImplication(true, true, false), PropertyResult::kPass);
   EXPECT_EQ(EvalImplication(true, false, false), PropertyResult::kFail);
 }
 
 TEST(SimCh16, AssertPropertyNonOverlappingImplication) {
-
   auto result = EvalImplication(true, false, true);
   EXPECT_EQ(result, PropertyResult::kPending);
 
@@ -169,7 +158,6 @@ TEST(SimCh16, AssertPropertyNonOverlappingImplication) {
 }
 
 TEST(SimCh16, AssertPropertyVacuousPassAntecedentFalse) {
-
   EXPECT_EQ(EvalImplication(false, false, false), PropertyResult::kVacuousPass);
   EXPECT_EQ(EvalImplication(false, true, false), PropertyResult::kVacuousPass);
   EXPECT_EQ(EvalImplication(false, false, true), PropertyResult::kVacuousPass);
@@ -177,7 +165,6 @@ TEST(SimCh16, AssertPropertyVacuousPassAntecedentFalse) {
 }
 
 TEST(SimCh16, AssertPropertyDisableIffConditionTrue) {
-
   EXPECT_EQ(EvalWithDisableIff(true, PropertyResult::kFail),
             PropertyResult::kVacuousPass);
   EXPECT_EQ(EvalWithDisableIff(true, PropertyResult::kPass),
@@ -185,7 +172,6 @@ TEST(SimCh16, AssertPropertyDisableIffConditionTrue) {
 }
 
 TEST(SimCh16, AssertPropertyDisableIffConditionFalse) {
-
   EXPECT_EQ(EvalWithDisableIff(false, PropertyResult::kPass),
             PropertyResult::kPass);
   EXPECT_EQ(EvalWithDisableIff(false, PropertyResult::kFail),
@@ -195,7 +181,6 @@ TEST(SimCh16, AssertPropertyDisableIffConditionFalse) {
 }
 
 TEST(SimCh16, AssertPropertySequenceDelay) {
-
   SvaSequence seq;
   seq.kind = SvaSequenceKind::kDelay;
   seq.delay_cycles = 3;
@@ -250,7 +235,6 @@ TEST(SimCh16, AssertPropertyNonConsecutiveRepetition) {
 }
 
 TEST(SimCh16, PropertyNotOperator) {
-
   EXPECT_EQ(EvalPropertyNot(PropertyResult::kPass), PropertyResult::kFail);
   EXPECT_EQ(EvalPropertyNot(PropertyResult::kFail), PropertyResult::kPass);
 
@@ -259,7 +243,6 @@ TEST(SimCh16, PropertyNotOperator) {
 }
 
 TEST(SimCh16, PropertyAndOperator) {
-
   EXPECT_EQ(EvalPropertyAnd(PropertyResult::kPass, PropertyResult::kPass),
             PropertyResult::kPass);
 
@@ -270,7 +253,6 @@ TEST(SimCh16, PropertyAndOperator) {
 }
 
 TEST(SimCh16, PropertyOrOperator) {
-
   EXPECT_EQ(EvalPropertyOr(PropertyResult::kPass, PropertyResult::kFail),
             PropertyResult::kPass);
   EXPECT_EQ(EvalPropertyOr(PropertyResult::kFail, PropertyResult::kPass),
@@ -283,7 +265,6 @@ TEST(SimCh16, PropertyOrOperator) {
 }
 
 TEST(SimCh16, SequenceAndOperator) {
-
   EXPECT_TRUE(EvalSequenceAnd(true, true));
   EXPECT_FALSE(EvalSequenceAnd(true, false));
   EXPECT_FALSE(EvalSequenceAnd(false, true));
@@ -291,7 +272,6 @@ TEST(SimCh16, SequenceAndOperator) {
 }
 
 TEST(SimCh16, SequenceOrOperator) {
-
   EXPECT_TRUE(EvalSequenceOr(true, false));
   EXPECT_TRUE(EvalSequenceOr(false, true));
   EXPECT_TRUE(EvalSequenceOr(true, true));
@@ -299,7 +279,6 @@ TEST(SimCh16, SequenceOrOperator) {
 }
 
 TEST(SimCh16, SequenceIntersectOperator) {
-
   EXPECT_TRUE(EvalSequenceIntersect(true, true, 5, 5));
 
   EXPECT_FALSE(EvalSequenceIntersect(true, true, 5, 6));
@@ -309,7 +288,6 @@ TEST(SimCh16, SequenceIntersectOperator) {
 }
 
 TEST(SimCh16, SequenceThroughoutOperator) {
-
   auto check = [](uint64_t v) { return v != 0; };
   EXPECT_TRUE(EvalThroughout(check, {1, 2, 3, 4}));
 

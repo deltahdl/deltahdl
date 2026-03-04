@@ -163,7 +163,6 @@ TEST(ParserA602, OperatorAssignment_ArithRightShiftEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_WithSelectLhs) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin mem[0] += 1; end\n"
@@ -575,4 +574,4 @@ TEST(ParserSection9b, BlockingAssignCompound) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

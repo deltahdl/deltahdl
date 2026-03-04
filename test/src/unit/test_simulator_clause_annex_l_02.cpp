@@ -16,4 +16,4 @@ TEST(VpiCompatL2, VersionChaining2023Implies2012) {
 #endif
 }
 
-}
+}  // namespace

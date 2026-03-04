@@ -208,7 +208,6 @@ TEST(SimCh4096, PrimitiveTerminalsDirectConnection) {
   auto* prim_eval = sched.GetEventPool().Acquire();
   prim_eval->kind = EventKind::kEvaluation;
   prim_eval->callback = [&]() {
-
     int in_a = 1;
     int in_b = 1;
     int result = in_a & in_b;
@@ -259,7 +258,6 @@ TEST(SimCh4096, PrimitiveChangesScheduledAsActiveUpdateEvents) {
   auto* prim_eval = sched.GetEventPool().Acquire();
   prim_eval->kind = EventKind::kEvaluation;
   prim_eval->callback = [&]() {
-
     auto* prim_update = sched.GetEventPool().Acquire();
     prim_update->kind = EventKind::kUpdate;
     prim_update->callback = [&]() { order.push_back("prim_active_update"); };
@@ -289,7 +287,6 @@ TEST(SimCh4096, PrimitiveInputExprImplicitContinuousAssignment) {
   auto* expr_eval = sched.GetEventPool().Acquire();
   expr_eval->kind = EventKind::kEvaluation;
   expr_eval->callback = [&]() {
-
     implicit_net = a & b;
 
     auto* connect = sched.GetEventPool().Acquire();

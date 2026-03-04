@@ -29,4 +29,4 @@ TEST(SimA609, TaskCallNoParens) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-}
+}  // namespace

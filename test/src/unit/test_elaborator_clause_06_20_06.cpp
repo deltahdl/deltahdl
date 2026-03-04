@@ -9,7 +9,6 @@ using namespace delta;
 namespace {
 
 TEST(Elaboration, ConstVarNoInit_Error) {
-
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -20,7 +19,6 @@ TEST(Elaboration, ConstVarNoInit_Error) {
 }
 
 TEST(Elaboration, ConstVarWithInit_OK) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -32,7 +30,6 @@ TEST(Elaboration, ConstVarWithInit_OK) {
 }
 
 TEST(Elaboration, ConstVarReassign_Error) {
-
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -43,4 +40,4 @@ TEST(Elaboration, ConstVarReassign_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

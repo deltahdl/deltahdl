@@ -169,4 +169,4 @@ TEST(SimA82, NamedArgBinding) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-}
+}  // namespace

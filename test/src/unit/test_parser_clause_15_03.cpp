@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST_F(AnnexHParseTest, AnnexGSemaphoreAllMethods) {
-
   auto* unit = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -34,4 +33,4 @@ TEST(ParserAnnexG, AnnexGSemaphoreUsage) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}
+}  // namespace

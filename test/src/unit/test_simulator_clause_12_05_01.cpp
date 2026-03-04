@@ -172,4 +172,4 @@ TEST(StmtExec, CasezWithZInSelector) {
   EXPECT_EQ(result_var->value.ToUint64(), 55u);
 }
 
-}
+}  // namespace

@@ -53,4 +53,4 @@ TEST_F(SpecifyTest, FullskewTimingCheck) {
   ASSERT_GE(tc.limits.size(), 2u);
 }
 
-}
+}  // namespace

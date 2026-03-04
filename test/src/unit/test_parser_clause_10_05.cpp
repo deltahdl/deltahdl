@@ -15,7 +15,6 @@ TEST(ParserA24, VarDeclAssignmentWithInit) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 TEST(ParserSection6, VariableInitialization) {
-
   auto r = Parse(
       "module t;\n"
       "  logic v = 1'b1;\n"
@@ -53,4 +52,4 @@ TEST(ParserCh90301, BlockVarDecl_WithInit) {
   EXPECT_NE(blk->stmts[0]->var_init, nullptr);
 }
 
-}
+}  // namespace

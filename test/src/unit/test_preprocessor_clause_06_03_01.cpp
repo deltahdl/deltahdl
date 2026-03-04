@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, ValueSet_4StateLogicDecl) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [3:0] val;\n"
@@ -18,4 +17,4 @@ TEST(ParserSection6, ValueSet_4StateLogicDecl) {
   EXPECT_TRUE(Is4stateType(DataTypeKind::kLogic));
 }
 
-}
+}  // namespace

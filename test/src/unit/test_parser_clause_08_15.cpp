@@ -39,4 +39,4 @@ TEST(SourceText, ClassConstructorSuperNew) {
   EXPECT_EQ(r.cu->classes[1]->members[0]->method->name, "new");
 }
 
-}
+}  // namespace

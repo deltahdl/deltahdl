@@ -64,4 +64,4 @@ TEST(ParserSection28, Sec28_12_TimingCheckPeriod) {
   EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
 }
 
-}
+}  // namespace

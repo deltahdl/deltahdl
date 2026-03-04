@@ -12,7 +12,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
-
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -28,4 +27,4 @@ TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
   EXPECT_EQ(t3.text, "b");
 }
 
-}
+}  // namespace

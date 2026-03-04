@@ -26,4 +26,4 @@ TEST(ParserSection8, CovergroupInClass) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}
+}  // namespace

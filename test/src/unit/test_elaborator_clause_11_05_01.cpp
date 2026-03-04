@@ -180,4 +180,4 @@ TEST(SimCh10, BlockingAssignSplitPacked) {
   EXPECT_EQ(lo->value.ToUint64(), 0xADu);
 }
 
-}
+}  // namespace

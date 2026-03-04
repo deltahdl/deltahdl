@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, BlockingAssignment_IncExpression) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin i++; end\n"
@@ -20,7 +19,6 @@ TEST(ParserA602, BlockingAssignment_IncExpression) {
 }
 
 TEST(ParserA602, BlockingAssignment_DecExpression) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin j--; end\n"
@@ -34,7 +32,6 @@ TEST(ParserA602, BlockingAssignment_DecExpression) {
 }
 
 TEST(ParserA602, BlockingAssignment_PrefixInc) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin ++i; end\n"
@@ -48,7 +45,6 @@ TEST(ParserA602, BlockingAssignment_PrefixInc) {
 }
 
 TEST(ParserA602, BlockingAssignment_PrefixDec) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin --j; end\n"
@@ -278,4 +274,4 @@ TEST(ParserSection11, PostfixDecrementOp) {
   EXPECT_EQ(stmt->expr->op, TokenKind::kMinusMinus);
 }
 
-}
+}  // namespace

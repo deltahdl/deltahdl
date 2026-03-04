@@ -18,7 +18,6 @@ TEST(ParserA212, LetIdentifier_Underscore) {
 }
 
 TEST(ParserCh501, Sec5_1_IdentifierAllLegalChars) {
-
   auto r = Parse("module m; logic abc_123$xyz; endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = FirstItem(r);
@@ -43,7 +42,6 @@ TEST(ParserCh501, Sec5_1_IdentifierStartsWithLetter) {
 }
 
 TEST(ParserCh501, Sec5_1_NumberFollowedByIdentifier) {
-
   auto r = Parse(
       "module m;\n"
       "  initial x = 42 + abc;\n"
@@ -77,7 +75,6 @@ TEST(ParserCh506, Ident_SimpleWithDollarSign) {
 }
 
 TEST(ParserCh506, Ident_CaseSensitive) {
-
   auto r = Parse(
       "module m;\n"
       "  logic X;\n"
@@ -89,4 +86,4 @@ TEST(ParserCh506, Ident_CaseSensitive) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->name, "x");
 }
 
-}
+}  // namespace

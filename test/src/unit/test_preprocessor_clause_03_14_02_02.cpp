@@ -21,7 +21,8 @@ TEST(ParserClause03, Cl3_14_TimeunitsAndTimescale) {
       ParseOk("program p; timeunit 10us; timeprecision 100ns; endprogram\n"));
   EXPECT_TRUE(ParseOk("interface ifc; timeunit 1ns; endinterface\n"));
 
-  EXPECT_TRUE(ParseWithPreprocessorOk("`timescale 1ns/1ps\nmodule m; endmodule\n"));
+  EXPECT_TRUE(
+      ParseWithPreprocessorOk("`timescale 1ns/1ps\nmodule m; endmodule\n"));
 
   EXPECT_TRUE(ParseOk("module m; initial #10ns $display(\"d\"); endmodule\n"));
   EXPECT_TRUE(ParseOk("module m; initial #2.1ns $display(\"d\"); endmodule\n"));
@@ -69,7 +70,6 @@ TEST(Lexical, Timeprecision_BasicParse) {
 }
 
 TEST(Lexical, Timeunit_WithSlash) {
-
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  timeunit 1ns / 1ps;\n"
@@ -79,7 +79,6 @@ TEST(Lexical, Timeunit_WithSlash) {
 }
 
 TEST(Lexical, Timeunit_DifferentValues) {
-
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  timeunit 100us;\n"
@@ -90,7 +89,6 @@ TEST(Lexical, Timeunit_DifferentValues) {
 }
 
 TEST(Lexical, Timeunit_StoredInModuleDecl_Values) {
-
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  timeunit 1ns;\n"
@@ -116,4 +114,4 @@ TEST(Lexical, Timeunit_StoredInModuleDecl_Flags) {
   EXPECT_TRUE(mod->has_timeprecision);
 }
 
-}
+}  // namespace

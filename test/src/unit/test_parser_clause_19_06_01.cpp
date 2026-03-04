@@ -215,4 +215,4 @@ TEST(ParserA211, CoverGroup_CrossWithBinsSelection) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

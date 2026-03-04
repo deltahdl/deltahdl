@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection40, CoverageSaveSystemCall) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial $coverage_save("coverage.ucdb");
@@ -14,4 +13,4 @@ TEST(ParserSection40, CoverageSaveSystemCall) {
   )"));
 }
 
-}
+}  // namespace

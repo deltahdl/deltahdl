@@ -200,4 +200,4 @@ TEST(SynthLower, PortInputsMappedToAigInputs) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}
+}  // namespace

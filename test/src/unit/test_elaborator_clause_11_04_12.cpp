@@ -148,4 +148,4 @@ TEST(SimCh10, BlockingAssignConcatRHS) {
   EXPECT_EQ(c->value.ToUint64(), 0xCAFEu);
 }
 
-}
+}  // namespace

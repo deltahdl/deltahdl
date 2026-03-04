@@ -34,4 +34,4 @@ TEST(ClassSim, ScopeResolutionMethodLookup) {
   EXPECT_EQ(it->second->name, "compute");
 }
 
-}
+}  // namespace

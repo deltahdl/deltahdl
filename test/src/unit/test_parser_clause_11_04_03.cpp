@@ -231,7 +231,6 @@ TEST(ParserSection11, ArithmeticDiv) {
 }
 
 TEST(ParserSection6, RealInExpression) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real a, b, c;\n"
@@ -268,4 +267,4 @@ TEST(Eval, Addition) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}
+}  // namespace

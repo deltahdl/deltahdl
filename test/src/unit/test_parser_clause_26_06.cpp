@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA213, PackageExportMultipleItems) {
-
   auto r = Parse(
       "package pkg;\n"
       "  export p1::a, p2::b;\n"
@@ -91,4 +90,4 @@ TEST(ParserA213, PackageExportSingleItem) {
   EXPECT_EQ(item->import_item.item_name, "some_func");
 }
 
-}
+}  // namespace

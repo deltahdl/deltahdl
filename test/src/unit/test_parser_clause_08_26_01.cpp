@@ -33,4 +33,4 @@ TEST(SourceText, InterfaceClassDecl) {
   EXPECT_EQ(r.cu->classes[0]->name, "IC");
 }
 
-}
+}  // namespace

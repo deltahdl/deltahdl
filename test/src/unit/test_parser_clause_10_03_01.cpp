@@ -36,7 +36,6 @@ TEST(ParserA24, NetDeclAssignmentDimsAndInit) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 TEST(ParserSection6, NetWithImplicitContAssign) {
-
   auto r = Parse(
       "module t;\n"
       "  wire w = 1'b0;\n"
@@ -86,4 +85,4 @@ TEST(ParserSection6, Sec6_7_1_WireWithInitializer) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

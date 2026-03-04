@@ -32,4 +32,4 @@ TEST(ElabA84, PrimaryFunctionCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

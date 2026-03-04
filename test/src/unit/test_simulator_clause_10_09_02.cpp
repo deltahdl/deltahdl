@@ -10,7 +10,6 @@ using namespace delta;
 namespace {
 
 TEST(StructPattern, NamedMemberTwoFields) {
-
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
@@ -30,7 +29,6 @@ TEST(StructPattern, NamedMemberTwoFields) {
 }
 
 TEST(StructPattern, NamedMemberReversedOrder) {
-
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
@@ -49,7 +47,6 @@ TEST(StructPattern, NamedMemberReversedOrder) {
 }
 
 TEST(StructPattern, NamedMemberThreeFields) {
-
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "rgb_t";
@@ -70,7 +67,6 @@ TEST(StructPattern, NamedMemberThreeFields) {
 }
 
 TEST(StructPattern, DefaultAllFields) {
-
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "pair_t";
@@ -89,7 +85,6 @@ TEST(StructPattern, DefaultAllFields) {
 }
 
 TEST(StructPattern, DefaultWithNamedOverride) {
-
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "pair_t";
@@ -108,7 +103,6 @@ TEST(StructPattern, DefaultWithNamedOverride) {
 }
 
 TEST(StructPattern, TypeKeyedInt) {
-
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "mixed_t";
@@ -127,7 +121,6 @@ TEST(StructPattern, TypeKeyedInt) {
 }
 
 TEST(StructPattern, MixedPrecedence) {
-
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "multi_t";
@@ -190,4 +183,4 @@ TEST(SimA60701, NamedStructPatternOnlyDefault) {
   EXPECT_EQ(var->value.ToUint64(), 14135u);
 }
 
-}
+}  // namespace

@@ -64,4 +64,4 @@ TEST(NetDecl, UserDefinedNettypeDefaultIsDataTypeDefault) {
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-}
+}  // namespace

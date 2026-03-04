@@ -10,7 +10,6 @@ using namespace delta;
 namespace {
 
 TEST(Coverage, CoverGroupAsClassMember) {
-
   struct MyClass {
     CoverageDB db;
     CoverGroup* cg = nullptr;
@@ -22,4 +21,4 @@ TEST(Coverage, CoverGroupAsClassMember) {
   EXPECT_EQ(obj.cg->name, "cg_in_class");
 }
 
-}
+}  // namespace

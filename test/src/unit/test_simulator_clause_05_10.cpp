@@ -8,7 +8,6 @@
 using namespace delta;
 
 TEST(SimCh510, StructLitPositional) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -20,7 +19,6 @@ TEST(SimCh510, StructLitPositional) {
 }
 
 TEST(SimCh510, StructLitMemberName) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -32,7 +30,6 @@ TEST(SimCh510, StructLitMemberName) {
 }
 
 TEST(SimCh510, StructLitDefault) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -44,7 +41,6 @@ TEST(SimCh510, StructLitDefault) {
 }
 
 TEST(SimCh510, StructLitMemberNameReverse) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -56,7 +52,6 @@ TEST(SimCh510, StructLitMemberNameReverse) {
 }
 
 TEST(SimCh510, StructLitVarInit) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; logic [7:0] y; } pt_t;\n"
@@ -67,7 +62,6 @@ TEST(SimCh510, StructLitVarInit) {
 }
 
 TEST(SimCh510, StructLitDefaultDiffWidth) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [3:0] b; } ab_t;\n"
@@ -80,7 +74,6 @@ TEST(SimCh510, StructLitDefaultDiffWidth) {
 }
 
 TEST(SimCh510, StructLitPositionalThree) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -94,7 +87,6 @@ TEST(SimCh510, StructLitPositionalThree) {
 }
 
 TEST(SimCh510, StructLitFieldAccess) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -123,7 +115,6 @@ TEST(SimCh510, StructLitFieldAccess) {
 }
 
 TEST(SimCh510, StructLitDefaultZero) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -135,7 +126,6 @@ TEST(SimCh510, StructLitDefaultZero) {
 }
 
 TEST(SimCh510, StructLitPositionalInit) {
-
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"

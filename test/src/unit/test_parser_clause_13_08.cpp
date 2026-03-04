@@ -163,4 +163,4 @@ TEST(ParserSection13, ParameterizedSubroutine_DifferentSpecializations) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

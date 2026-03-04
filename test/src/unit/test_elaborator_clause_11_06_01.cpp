@@ -54,4 +54,4 @@ TEST(Elaboration, WidthInference_Concatenation) {
   EXPECT_EQ(InferExprWidth(&concat, typedefs), 64);
 }
 
-}
+}  // namespace

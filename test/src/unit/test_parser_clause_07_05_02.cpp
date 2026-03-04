@@ -20,7 +20,6 @@ TEST(ParserCh513, BuiltInMethodCall_Parse) {
 }
 
 TEST(ParserCh513, BuiltInMethodCall_Callee) {
-
   auto r = Parse(
       "module t;\n"
       "  initial x = arr.size();\n"
@@ -62,4 +61,4 @@ TEST(ParserSection7, DynamicArraySizeMethod) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-}
+}  // namespace

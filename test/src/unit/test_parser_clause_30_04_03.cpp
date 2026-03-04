@@ -305,4 +305,4 @@ TEST(ParserSection28, Sec28_12_PosedgeFullPath) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

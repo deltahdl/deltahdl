@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST_F(AnnexHParseTest, AnnexGMailboxAllMethods) {
-
   auto* unit = Parse(
       "module m;\n"
       "  int val;\n"
@@ -24,4 +23,4 @@ TEST_F(AnnexHParseTest, AnnexGMailboxAllMethods) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-}
+}  // namespace

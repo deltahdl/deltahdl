@@ -55,7 +55,6 @@ TEST(ParserA212, InoutNonAnsi) {
 }
 
 TEST(ParserA212, InputNonAnsiMultiple) {
-
   auto r =
       ParseWithPreprocessor("module m(a, b); input wire [7:0] a, b; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -73,7 +72,6 @@ TEST(ParserA212, OutputNonAnsi) {
 }
 
 TEST(ParserA212, OutputNonAnsiUnpackedDim) {
-
   auto r =
       ParseWithPreprocessor("module m(q); output logic q [3:0]; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -100,4 +98,4 @@ TEST(ParserA23, ListOfPortIdentifiersMultipleNonAnsi) {
   }
 }
 
-}
+}  // namespace

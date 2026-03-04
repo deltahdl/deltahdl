@@ -104,7 +104,6 @@ TEST(ParserAnnexA, A1ModulePortDirections) {
 }
 
 TEST(ParserA212, InputVariablePortTypeVar) {
-
   auto r = ParseWithPreprocessor("module m(input var logic d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -140,7 +139,6 @@ TEST(ParserA212, NetPortTypeTriType) {
 }
 
 TEST(ParserA212, VarDataTypeExplicit) {
-
   auto r = ParseWithPreprocessor(
       "module m(input logic signed [15:0] val); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -149,7 +147,6 @@ TEST(ParserA212, VarDataTypeExplicit) {
 }
 
 TEST(ParserA212, VarDataTypeInt) {
-
   auto r = ParseWithPreprocessor("module m(input int count); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -208,4 +205,4 @@ TEST(ParserA25, PortWithPackedDim) {
   ASSERT_NE(r.cu->modules[0]->ports[0].data_type.packed_dim_left, nullptr);
 }
 
-}
+}  // namespace

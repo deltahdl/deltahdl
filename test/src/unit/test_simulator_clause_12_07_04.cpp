@@ -46,4 +46,4 @@ TEST(SimA608, WhileZeroIter) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

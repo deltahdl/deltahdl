@@ -9,11 +9,10 @@ SimCoroutine MakeTestCoroutine() { co_return; }
 namespace {
 
 TEST(Process, ProcessReactiveFlag) {
-
   Process p;
   p.is_reactive = true;
   p.kind = ProcessKind::kInitial;
   EXPECT_TRUE(p.is_reactive);
 }
 
-}
+}  // namespace

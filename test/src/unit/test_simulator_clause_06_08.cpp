@@ -24,4 +24,4 @@ TEST(Lowerer, VariableCreation) {
   ASSERT_NE(var, nullptr);
 }
 
-}
+}  // namespace

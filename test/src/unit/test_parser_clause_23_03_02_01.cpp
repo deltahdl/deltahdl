@@ -28,7 +28,6 @@ TEST(ParserAnnexA0411, OrderedPortConnections) {
 }
 
 TEST(ParserAnnexA0411, OrderedPortBlankPosition) {
-
   auto r = Parse("module m; sub u0(a, , c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -118,4 +117,4 @@ TEST(ParserSection23, PositionalPortWithExpression) {
   EXPECT_NE(item->inst_ports[1].second, nullptr);
 }
 
-}
+}  // namespace

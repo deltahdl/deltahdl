@@ -333,7 +333,6 @@ TEST(ParserCh510, AssignmentPattern_DefaultKey) {
 }
 
 TEST(ParserCh510, StructLiteral_Positional) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -343,7 +342,6 @@ TEST(ParserCh510, StructLiteral_Positional) {
 }
 
 TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -352,4 +350,4 @@ TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
               "endmodule"));
 }
 
-}
+}  // namespace

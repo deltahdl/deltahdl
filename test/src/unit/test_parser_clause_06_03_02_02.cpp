@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA222, DriveStrengthStr1Highz0) {
-
   auto r = Parse(
       "module m;\n"
       "  wire (strong1, highz0) w;\n"
@@ -17,4 +16,4 @@ TEST(ParserA222, DriveStrengthStr1Highz0) {
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-}
+}  // namespace

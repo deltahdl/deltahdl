@@ -13,4 +13,4 @@ TEST(ParserAnnexE, AnnexEDelayModeZero) {
   }
 }
 
-}
+}  // namespace

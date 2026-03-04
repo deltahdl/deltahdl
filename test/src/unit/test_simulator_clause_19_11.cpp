@@ -58,4 +58,4 @@ TEST(Coverage, MultipleCoverpointsAveraged) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 50.0);
 }
 
-}
+}  // namespace

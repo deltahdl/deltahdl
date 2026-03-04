@@ -17,7 +17,6 @@ TEST(ParserAnnexA0411, OrderedParameterAssignment) {
 }
 
 TEST(ParserAnnexA0411, NamedParameterAssignment) {
-
   auto r = Parse("module m; sub #(.WIDTH(8), .DEPTH(4)) u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -30,7 +29,6 @@ TEST(ParserAnnexA0411, NamedParameterAssignment) {
 }
 
 TEST(ParserAnnexA0411, NamedParameterEmptyExpression) {
-
   auto r = Parse("module m; sub #(.WIDTH()) u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -49,7 +47,6 @@ TEST(ParserAnnexA0411, SingleOrderedParam) {
 }
 
 TEST(ParserAnnexA0411, InstanceArrayWithSize) {
-
   auto r = Parse("module m; sub u0[4](.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -60,7 +57,6 @@ TEST(ParserAnnexA0411, InstanceArrayWithSize) {
 }
 
 TEST(ParserAnnexA0411, EmptyPortList) {
-
   auto r = Parse("module m; sub u0(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -119,4 +115,4 @@ TEST(ParserAnnexA0411, ElaborationInstanceArray) {
   EXPECT_NE(inst->inst_range_right, nullptr);
 }
 
-}
+}  // namespace

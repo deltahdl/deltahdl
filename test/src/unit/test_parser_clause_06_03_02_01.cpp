@@ -12,7 +12,6 @@ TEST(ParserA213, NetDeclTriregChargeStrength) {
 }
 
 TEST(ParserA222, ChargeStrengthMedium) {
-
   auto r = Parse(
       "module m;\n"
       "  trireg (medium) t;\n"
@@ -24,7 +23,6 @@ TEST(ParserA222, ChargeStrengthMedium) {
 }
 
 TEST(ParserA222, ChargeStrengthNoSpecDefault) {
-
   auto r = Parse(
       "module m;\n"
       "  trireg t;\n"
@@ -83,4 +81,4 @@ TEST(ParserSection6, TriregChargeStrengthLarge) {
   EXPECT_EQ(item->data_type.charge_strength, 4);
 }
 
-}
+}  // namespace

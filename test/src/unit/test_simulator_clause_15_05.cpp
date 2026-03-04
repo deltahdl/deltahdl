@@ -84,4 +84,4 @@ TEST(SimA605, EventTriggerAndWait) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}
+}  // namespace

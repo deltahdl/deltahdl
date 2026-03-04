@@ -268,4 +268,4 @@ TEST(SimA607, CaseWithBlockBody) {
   EXPECT_EQ(y->value.ToUint64(), 6u);
 }
 
-}
+}  // namespace

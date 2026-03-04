@@ -58,7 +58,6 @@ TEST(SimCh4091, UsesCurrentValuesToDetermineTarget) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-
     auto* update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {

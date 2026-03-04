@@ -118,4 +118,4 @@ TEST(ParserCh505, Operator_ArithShiftRight) {
   EXPECT_TRUE(ParseOk("module m; initial x = a >>> 1; endmodule"));
 }
 
-}
+}  // namespace

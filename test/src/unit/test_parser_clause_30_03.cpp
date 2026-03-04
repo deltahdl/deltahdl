@@ -202,4 +202,4 @@ TEST_F(SpecifyTest, MixedSpecifyBlockItems) {
   EXPECT_EQ(spec->specify_items[4]->kind, SpecifyItemKind::kTimingCheck);
 }
 
-}
+}  // namespace

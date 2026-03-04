@@ -108,4 +108,4 @@ TEST(LogicGates, NoDelayZeroPropagation) {
   EXPECT_EQ(ComputeGateDelay(0, 0, Val4::kV0, Val4::kV1), 0u);
 }
 
-}
+}  // namespace

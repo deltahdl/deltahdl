@@ -73,4 +73,4 @@ TEST(Functions, StaticFunctionWithArgs) {
   EXPECT_EQ(EvalExpr(c3, f.ctx, f.arena).ToUint64(), 10u);
 }
 
-}
+}  // namespace

@@ -15,4 +15,4 @@ TEST(ElabA609, MethodCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

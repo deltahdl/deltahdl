@@ -18,4 +18,4 @@ TEST(ParserAnnexA0413, ProgramInstArray) {
   EXPECT_NE(item->inst_range_right, nullptr);
 }
 
-}
+}  // namespace

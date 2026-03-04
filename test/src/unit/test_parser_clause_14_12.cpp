@@ -165,4 +165,4 @@ TEST(ParserSection19, DefaultClocking_InInterface) {
               "endinterface\n"));
 }
 
-}
+}  // namespace

@@ -61,7 +61,6 @@ TEST(ParserCh50701, IntLiteral_UnsizedDecimal) {
 }
 
 TEST(ParserCh50701, IntLiteral_SizedBinary) {
-
   auto r = Parse(
       "module m;\n"
       "  initial x = 4'b1001;\n"
@@ -99,7 +98,6 @@ TEST(ParserCh50701, IntLiteral_SizedHex) {
 }
 
 TEST(ParserCh50701, IntLiteral_UnsizedHex) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = 'h837FF; endmodule"));
 }
 
@@ -126,7 +124,6 @@ TEST(ParserA87, UnbasedUnsizedZero) {
 }
 
 TEST(ParserCh50701, IntLiteral_SignedLiteral) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = 4'shf; endmodule"));
 }
 
@@ -140,7 +137,6 @@ TEST(ParserA87, UnbasedUnsizedOne) {
 }
 
 TEST(ParserCh50701, IntLiteral_UnbasedUnsized_One) {
-
   auto r = Parse(
       "module m;\n"
       "  initial x = '1;\n"
@@ -163,7 +159,6 @@ TEST(ParserA87, UnbasedUnsizedX) {
 }
 
 TEST(ParserCh50701, IntLiteral_UnbasedUnsized_Zero) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = '0; endmodule"));
 }
 
@@ -177,33 +172,27 @@ TEST(ParserA87, UnbasedUnsizedZ) {
 }
 
 TEST(ParserCh50701, IntLiteral_Underscore) {
-
   EXPECT_TRUE(
       ParseOk("module m; initial x = 16'b0011_0101_0001_1111; endmodule"));
 }
 
 TEST(ParserCh50701, IntLiteral_XValue) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = 12'hx; endmodule"));
 }
 
 TEST(ParserCh50701, IntLiteral_ZValue) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = 16'hz; endmodule"));
 }
 
 TEST(ParserCh50701, IntLiteral_QuestionMark) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = 16'sd?; endmodule"));
 }
 
 TEST(ParserCh50701, IntLiteral_NegativeUnsized) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = -8'd6; endmodule"));
 }
 
 TEST(ParserCh50701, IntLiteral_SizedDecimal) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = 5'D3; endmodule"));
 }
 
@@ -217,7 +206,6 @@ TEST(ParserA84, PrimaryLiteralDecimalNumber) {
 }
 
 TEST(ParserCh50701, IntLiteral_SpaceBetweenBaseAndDigits) {
-
   EXPECT_TRUE(ParseOk("module m; initial x = 32 'h 12ab_f001; endmodule"));
 }
 
@@ -231,7 +219,6 @@ TEST(ParserA84, PrimaryLiteralHexNumber) {
 }
 
 TEST(ParserCh50701, IntLiteral_LargeUnsized) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [63:0] big;\n"
@@ -710,4 +697,4 @@ TEST(Eval, IntegerLiteral) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}
+}  // namespace

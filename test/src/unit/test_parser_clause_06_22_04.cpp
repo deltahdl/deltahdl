@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, CastCompatibleRealToIntType) {
-
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -16,7 +15,6 @@ TEST(ParserSection6, CastCompatibleRealToIntType) {
 }
 
 TEST(ParserSection6, CastCompatibleEnumToInt) {
-
   DataType a;
   a.kind = DataTypeKind::kEnum;
   DataType b;
@@ -25,7 +23,6 @@ TEST(ParserSection6, CastCompatibleEnumToInt) {
 }
 
 TEST(ParserSection6, CastCompatibleIntToEnum) {
-
   DataType a;
   a.kind = DataTypeKind::kInt;
   DataType b;
@@ -33,4 +30,4 @@ TEST(ParserSection6, CastCompatibleIntToEnum) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-}
+}  // namespace

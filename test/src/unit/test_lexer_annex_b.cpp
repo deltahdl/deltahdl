@@ -333,7 +333,6 @@ TEST(LexerAnnexB, EscapedKeywordsAreIdentifiers) {
       "property", "sequence", "covergroup", "constraint", "assert",  "assume",
   };
   for (const char* kw : kSamples) {
-
     std::string escaped = std::string("\\") + kw + " ";
     auto tokens = Lex(escaped);
     ASSERT_GE(tokens.size(), 2u) << "escaped: " << kw;
@@ -394,4 +393,4 @@ TEST(LexerAnnexB, NoDuplicateTokenKinds) {
   EXPECT_EQ(seen.size(), kTableB1Count);
 }
 
-}
+}  // namespace

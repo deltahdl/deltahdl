@@ -15,4 +15,4 @@ TEST(ParserAnnexE2, AnnexEDefaultTriregStrength) {
   }
 }
 
-}
+}  // namespace

@@ -40,7 +40,6 @@ TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
 }
 
 TEST(ParserSection34, ConfigWithInstanceAndLiblist) {
-
   auto r = Parse(R"(
     config inst_cfg;
       design work.top;
@@ -65,4 +64,4 @@ TEST_F(ConfigParseTest, ConfigWithInstanceClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}
+}  // namespace

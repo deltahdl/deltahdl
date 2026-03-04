@@ -29,7 +29,6 @@ TEST(ParserCh509, StringLiteral_Basic) {
 }
 
 TEST(ParserCh509, StringLiteral_Assignment) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  byte c1;\n"
@@ -38,7 +37,6 @@ TEST(ParserCh509, StringLiteral_Assignment) {
 }
 
 TEST(ParserCh509, StringLiteral_PackedArray) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  bit [8*12:1] stringvar = \"Hello world\\n\";\n"
@@ -46,7 +44,6 @@ TEST(ParserCh509, StringLiteral_PackedArray) {
 }
 
 TEST(ParserCh509, StringLiteral_InConcatenation) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial $display({\"A\", \"B\"});\n"
@@ -71,4 +68,4 @@ TEST(ParserA84, PrimaryStringLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-}
+}  // namespace

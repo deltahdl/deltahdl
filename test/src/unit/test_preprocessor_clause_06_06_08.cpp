@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, InterconnectDeclFlag) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  interconnect ibus;\n"
@@ -18,4 +17,4 @@ TEST(ParserSection6, InterconnectDeclFlag) {
   EXPECT_EQ(item->name, "ibus");
 }
 
-}
+}  // namespace

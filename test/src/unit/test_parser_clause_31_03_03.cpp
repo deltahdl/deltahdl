@@ -125,4 +125,4 @@ TEST(ParserA705, SystemTimingCheckSetuphold) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetuphold);
 }
 
-}
+}  // namespace

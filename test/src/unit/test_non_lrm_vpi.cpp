@@ -12,10 +12,7 @@ TEST(NonLrmVpi, DefaultContextIsAvailable) {
   (void)ctx;
 }
 
-TEST(VpiCompatL2, HeaderIncludable) {
-
-  SUCCEED();
-}
+TEST(VpiCompatL2, HeaderIncludable) { SUCCEED(); }
 
 TEST_F(AnnexHParseTest, AnnexKVpiSystemCalls) {
   auto* unit = Parse(
@@ -43,5 +40,5 @@ TEST_F(AnnexHParseTest, AnnexMSvVpiCalls) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-}
-}
+}  // namespace
+}  // namespace delta

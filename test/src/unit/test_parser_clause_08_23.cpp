@@ -112,4 +112,4 @@ TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

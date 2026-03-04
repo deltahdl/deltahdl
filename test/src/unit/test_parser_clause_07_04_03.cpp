@@ -98,4 +98,4 @@ TEST(ParserSection6, VectorWithMultipleDims) {
   EXPECT_EQ(item->name, "mem");
 }
 
-}
+}  // namespace

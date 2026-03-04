@@ -67,7 +67,6 @@ TEST(ParserSection22, DefaultNettypeModuleCount) {
 }
 
 TEST(ParserSection6, DefaultNettypeWire) {
-
   auto r = ParseWithPreprocessor(
       "`default_nettype wire\n"
       "module t;\n"
@@ -77,7 +76,6 @@ TEST(ParserSection6, DefaultNettypeWire) {
   EXPECT_EQ(r.cu->default_nettype, NetType::kWire);
 }
 TEST(ParserSection6, DefaultNettypeNone) {
-
   auto r = ParseWithPreprocessor(
       "`default_nettype none\n"
       "module t;\n"

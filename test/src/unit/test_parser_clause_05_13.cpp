@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh513, BuiltInMethodCall_ChainedAccess) {
-
   auto r = Parse(
       "module t;\n"
       "  initial x = obj.arr.size();\n"
@@ -20,7 +19,6 @@ TEST(ParserCh513, BuiltInMethodCall_ChainedAccess) {
 }
 
 TEST(ParserCh513, BuiltInMethod_NoParens) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
@@ -28,4 +26,4 @@ TEST(ParserCh513, BuiltInMethod_NoParens) {
               "endmodule"));
 }
 
-}
+}  // namespace

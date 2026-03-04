@@ -60,4 +60,4 @@ TEST(Preprocessor, DelayToTicks_Basic) {
   EXPECT_EQ(DelayToTicks(10, ts, TimeUnit::kPs), 10000);
 }
 
-}
+}  // namespace

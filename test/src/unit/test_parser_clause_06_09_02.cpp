@@ -75,4 +75,4 @@ TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
   EXPECT_EQ(item->name, "sc");
 }
 
-}
+}  // namespace

@@ -68,4 +68,4 @@ TEST_F(ConfigParseTest, ConfigWithCellClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}
+}  // namespace

@@ -33,4 +33,4 @@ TEST(ElabA603, ForkJoinAnyIllegalInFunction) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

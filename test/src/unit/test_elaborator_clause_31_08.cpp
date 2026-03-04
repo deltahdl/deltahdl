@@ -17,4 +17,4 @@ TEST(ElabA70503, TerminalPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

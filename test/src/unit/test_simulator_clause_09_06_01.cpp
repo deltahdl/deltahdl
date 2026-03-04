@@ -26,4 +26,4 @@ TEST(StmtExec, WaitForkNoForkReturnsDone) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-}
+}  // namespace

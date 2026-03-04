@@ -66,4 +66,4 @@ TEST(SimA87, NumberReal) {
   EXPECT_DOUBLE_EQ(ToDouble(var), 3.14);
 }
 
-}
+}  // namespace

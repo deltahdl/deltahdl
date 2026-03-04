@@ -35,7 +35,6 @@ TEST(ParserA24, DynamicArrayDeclWithNew) {
   EXPECT_FALSE(r.has_errors);
 }
 TEST(ParserA602, BlockingAssignment_DynamicArrayNew) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin arr = new[10]; end\n"
@@ -48,7 +47,6 @@ TEST(ParserA602, BlockingAssignment_DynamicArrayNew) {
 }
 
 TEST(ParserA602, BlockingAssignment_DynamicArrayNewWithInit) {
-
   auto r = Parse(
       "module m;\n"
       "  initial begin arr = new[10](old_arr); end\n"
@@ -96,4 +94,4 @@ TEST(ParserSection7, DynamicArrayNewWithInit) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

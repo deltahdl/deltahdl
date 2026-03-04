@@ -189,7 +189,6 @@ using DpiParseTest = ProgramTestParse;
 using ApiParseTest = ProgramTestParse;
 
 TEST(ParserSection39, CoverPropertyStatement) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, a, b;
@@ -199,7 +198,6 @@ TEST(ParserSection39, CoverPropertyStatement) {
 }
 
 TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, a, b;
@@ -242,4 +240,4 @@ TEST(ParserA610, CoverPropertyPassAction) {
   ASSERT_NE(item->assert_pass_stmt, nullptr);
 }
 
-}
+}  // namespace

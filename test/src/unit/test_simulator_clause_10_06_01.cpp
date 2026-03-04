@@ -81,4 +81,4 @@ TEST(StmtExec, AssignDeassignBlockingAssign) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-}
+}  // namespace

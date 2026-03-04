@@ -30,4 +30,4 @@ TEST(SimA607, CaseInsideMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}
+}  // namespace

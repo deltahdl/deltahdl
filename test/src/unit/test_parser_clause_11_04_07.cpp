@@ -84,7 +84,6 @@ TEST(ParserA83, ExprUnaryNot) {
 }
 
 TEST(ParserSection11, ImplicationRightAssocStructure) {
-
   auto r = Parse(
       "module t;\n"
       "  logic a, b, c, d;\n"
@@ -168,4 +167,4 @@ TEST(ParserSection11, ShortCircuitAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

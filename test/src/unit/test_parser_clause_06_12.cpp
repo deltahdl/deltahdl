@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, RealtimeWithInit) {
-
   auto r = Parse(
       "module t;\n"
       "  realtime ts = 100.0;\n"
@@ -81,7 +80,6 @@ TEST(ParserSection6, RealtimeVarDecl) {
 }
 
 TEST(ParserSection6, RealTypesInProcedural) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -93,7 +91,6 @@ TEST(ParserSection6, RealTypesInProcedural) {
 }
 
 TEST(ParserSection6, RealDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  real r;\n"
@@ -107,7 +104,6 @@ TEST(ParserSection6, RealDecl) {
 }
 
 TEST(ParserSection6, ShortrealDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  shortreal sr;\n"
@@ -121,7 +117,6 @@ TEST(ParserSection6, ShortrealDecl) {
 }
 
 TEST(ParserSection6, RealtimeDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  realtime rt;\n"
@@ -145,7 +140,6 @@ TEST(ParserSection6, MultipleRealDecls) {
 }
 
 TEST(ParserSection6, AllRealTypes) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r;\n"
@@ -155,7 +149,6 @@ TEST(ParserSection6, AllRealTypes) {
 }
 
 TEST(ParserSection6, ShortrealInModule) {
-
   auto r = Parse(
       "module m;\n"
       "  shortreal x = 1.0;\n"
@@ -168,7 +161,6 @@ TEST(ParserSection6, ShortrealInModule) {
 }
 
 TEST(ParserSection6, ShortrealInFunctionArg) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function shortreal scale(shortreal val, shortreal factor);\n"
@@ -193,4 +185,4 @@ TEST(ParserA221, NonIntegerTypes) {
             DataTypeKind::kRealtime);
 }
 
-}
+}  // namespace

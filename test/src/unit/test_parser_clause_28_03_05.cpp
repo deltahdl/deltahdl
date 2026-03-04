@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserAnnexA0411, InstanceArrayWithRange) {
-
   auto r = Parse("module m; sub u0[3:0](.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -49,4 +48,4 @@ TEST(ParserSection23, InstanceArrayRange) {
   EXPECT_NE(item->inst_range_right, nullptr);
 }
 
-}
+}  // namespace

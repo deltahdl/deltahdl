@@ -58,7 +58,6 @@ TEST(LexA88, TripleQuotedStringItemDoubleQuote) {
 }
 
 TEST(LexA88, StringEscapeSeqAnyAsciiNamed) {
-
   auto tokens = Lex("\"\\n\\t\\\\\\\"\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
@@ -121,4 +120,4 @@ TEST(LexA88, TwoConsecutiveStringLiterals) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kStringLiteral);
 }
 
-}
+}  // namespace

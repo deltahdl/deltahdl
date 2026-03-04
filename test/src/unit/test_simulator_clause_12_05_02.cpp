@@ -120,4 +120,4 @@ TEST(SimA607, SequentialCaseStatements) {
   EXPECT_EQ(y->value.ToUint64(), 22u);
 }
 
-}
+}  // namespace

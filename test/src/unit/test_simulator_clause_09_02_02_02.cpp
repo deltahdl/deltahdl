@@ -32,7 +32,6 @@ TEST(Lowerer, AlwaysCombRetrigger) {
 }
 
 TEST(Lowerer, AlwaysCombAutoTriggerTimeZero) {
-
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -147,4 +146,4 @@ TEST(SimCh4, AlwaysCombWithBeginEnd) {
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 7u);
 }
 
-}
+}  // namespace

@@ -44,4 +44,4 @@ TEST(IpcSync, MailboxPeekDoesNotConsume) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-}
+}  // namespace

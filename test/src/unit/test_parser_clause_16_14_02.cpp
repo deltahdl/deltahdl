@@ -125,7 +125,6 @@ using DpiParseTest = ProgramTestParse;
 using ApiParseTest = ProgramTestParse;
 
 TEST(ParserSection39, AssumePropertyStatement) {
-
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, req, gnt;
@@ -145,4 +144,4 @@ TEST(ParserA610, AssumePropertyModule) {
   ASSERT_NE(item, nullptr);
 }
 
-}
+}  // namespace

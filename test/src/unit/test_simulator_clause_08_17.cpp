@@ -48,4 +48,4 @@ TEST(ClassSim, SuperNewWithArgs) {
   EXPECT_EQ(base_ctor->func_args.size(), 1u);
 }
 
-}
+}  // namespace

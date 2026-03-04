@@ -45,4 +45,4 @@ TEST(SimA611, GlobalClocking) {
   EXPECT_TRUE(cmgr.Find("gclk")->is_global);
 }
 
-}
+}  // namespace

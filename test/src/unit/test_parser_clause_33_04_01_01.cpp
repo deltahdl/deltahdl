@@ -68,4 +68,4 @@ TEST_F(ConfigTest, DesignStatementMultipleTopCells) {
   EXPECT_EQ(cfg->design_cells[1].second, "top2");
 }
 
-}
+}  // namespace

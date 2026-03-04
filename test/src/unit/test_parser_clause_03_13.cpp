@@ -38,7 +38,6 @@ TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
 }
 
 TEST(ParserClause03, Cl3_13_VarNameSameAsModuleName) {
-
   EXPECT_TRUE(
       ParseOk("module top;\n"
               "  logic top;\n"
@@ -58,7 +57,6 @@ TEST(ParserClause03, Cl3_13_ForkJoinBlockSubscope) {
 }
 
 TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
-
   auto r = ParseWithPreprocessor(
       "`define WIDTH 8\n"
       "`define DEPTH 16\n"
@@ -72,7 +70,7 @@ TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
 
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define data 42\n"
-              "module m; logic [7:0] data; endmodule\n"));
+                              "module m; logic [7:0] data; endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_13_NestedClassInModule) {
@@ -87,4 +85,4 @@ TEST(ParserClause03, Cl3_13_NestedClassInModule) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

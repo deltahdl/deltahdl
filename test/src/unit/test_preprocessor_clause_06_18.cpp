@@ -36,7 +36,6 @@ TEST(ParserSection6, TypedefUnion) {
 }
 
 TEST(ParserSection6, TypedefLogicVector) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -49,7 +48,6 @@ TEST(ParserSection6, TypedefLogicVector) {
 }
 
 TEST(ParserSection6, TypedefUsedInVarDecl) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  typedef int counter_t;\n"
@@ -62,4 +60,4 @@ TEST(ParserSection6, TypedefUsedInVarDecl) {
   EXPECT_EQ(var->data_type.type_name, "counter_t");
 }
 
-}
+}  // namespace

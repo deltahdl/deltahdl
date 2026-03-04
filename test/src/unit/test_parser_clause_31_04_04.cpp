@@ -82,4 +82,4 @@ TEST(ParserA70503, ControlledTimingCheckEventWidth) {
   EXPECT_EQ(tc->ref_terminal.name, "rst");
 }
 
-}
+}  // namespace

@@ -8,7 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
-
   std::string input;
   input += kKeywordMarker;
   input +=
@@ -27,7 +26,6 @@ TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
 }
 
 TEST(Lexer, ParseKeywordVersion_ValidVersions) {
-
   struct Case {
     const char* input;
     KeywordVersion expected;
@@ -54,4 +52,4 @@ TEST(Lexer, ParseKeywordVersion_Invalid) {
   EXPECT_FALSE(ParseKeywordVersion("").has_value());
 }
 
-}
+}  // namespace

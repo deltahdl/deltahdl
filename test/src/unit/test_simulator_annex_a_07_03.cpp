@@ -26,4 +26,4 @@ TEST(SimA703, TerminalPartSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}
+}  // namespace

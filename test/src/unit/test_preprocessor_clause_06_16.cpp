@@ -17,7 +17,6 @@ TEST(ParserSection6, AssignCompatibleStringLiteral) {
 }
 
 TEST(ParserSection6, StringDeclModule) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  string name;\n"
@@ -30,7 +29,6 @@ TEST(ParserSection6, StringDeclModule) {
 }
 
 TEST(ParserSection6, StringDeclWithInit) {
-
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  string msg = \"hello\";\n"
@@ -42,4 +40,4 @@ TEST(ParserSection6, StringDeclWithInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}
+}  // namespace

@@ -20,4 +20,4 @@ TEST(ParserClause03, Cl3_3_DesignElementInstantiations) {
       HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
 
-}
+}  // namespace

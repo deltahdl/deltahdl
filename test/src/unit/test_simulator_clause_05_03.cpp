@@ -7,7 +7,6 @@
 using namespace delta;
 
 TEST(SimCh503, WhitespaceSameResultWithSpaces) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -22,7 +21,6 @@ TEST(SimCh503, WhitespaceSameResultWithSpaces) {
 }
 
 TEST(SimCh503, WhitespaceSameResultWithTabs) {
-
   auto result = RunAndGet(
       "module\tt\t;\n"
       "\tlogic\t[7:0]\ta\t,\tb\t,\tresult\t;\n"
@@ -37,7 +35,6 @@ TEST(SimCh503, WhitespaceSameResultWithTabs) {
 }
 
 TEST(SimCh503, WhitespaceSameResultWithNewlines) {
-
   auto result = RunAndGet(
       "module\n"
       "t\n"
@@ -57,14 +54,12 @@ TEST(SimCh503, WhitespaceSameResultWithNewlines) {
 }
 
 TEST(SimCh503, WhitespaceSameResultMinimal) {
-
   auto result = RunAndGet(
       "module t;logic [7:0] result;initial result=8'd55;endmodule", "result");
   EXPECT_EQ(result, 55u);
 }
 
 TEST(SimCh503, WhitespaceSameResultExcessive) {
-
   auto result = RunAndGet(
       "  \t\n  module   \t  t  \n  ;  \n"
       "  logic   [  7  :  0  ]   result  ;  \n"
@@ -75,7 +70,6 @@ TEST(SimCh503, WhitespaceSameResultExcessive) {
 }
 
 TEST(SimCh503, WhitespaceFormfeedInSource) {
-
   auto result = RunAndGet(
       "module t;\f"
       "logic [7:0] result;\f"
@@ -86,7 +80,6 @@ TEST(SimCh503, WhitespaceFormfeedInSource) {
 }
 
 TEST(SimCh503, WhitespaceMixedInExpression) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, c, result;\n"
@@ -102,7 +95,6 @@ TEST(SimCh503, WhitespaceMixedInExpression) {
 }
 
 TEST(SimCh503, WhitespaceAroundAssignment) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -113,7 +105,6 @@ TEST(SimCh503, WhitespaceAroundAssignment) {
 }
 
 TEST(SimCh503, WhitespaceStringLiteralPreserved) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -135,7 +126,6 @@ TEST(SimCh503, WhitespaceStringLiteralPreserved) {
 }
 
 TEST(SimCh503, WhitespaceStringLiteralTabPreserved) {
-
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -157,7 +147,6 @@ TEST(SimCh503, WhitespaceStringLiteralTabPreserved) {
 }
 
 TEST(SimCh503, WhitespaceSeparatesKeywords) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -168,7 +157,6 @@ TEST(SimCh503, WhitespaceSeparatesKeywords) {
 }
 
 TEST(SimCh503, WhitespaceAlwaysCombWithFormfeed) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, result;\n"
@@ -182,7 +170,6 @@ TEST(SimCh503, WhitespaceAlwaysCombWithFormfeed) {
 }
 
 TEST(SimCh503, WhitespaceInConcatenation) {
-
   auto result = RunAndGet(
       "module t;\n"
       "  logic [3:0] a, b;\n"

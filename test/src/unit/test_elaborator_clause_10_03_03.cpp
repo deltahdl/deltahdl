@@ -50,4 +50,4 @@ TEST(ElabClause1003, ContAssignDelayThreeValues) {
   EXPECT_NE(mod->assigns[0].delay_decay, nullptr);
 }
 
-}
+}  // namespace

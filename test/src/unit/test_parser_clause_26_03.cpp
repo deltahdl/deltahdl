@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA213, DataDeclPackageImport) {
-
   auto r = Parse(
       "package pkg; endpackage\n"
       "module m; import pkg::*; endmodule");
@@ -16,7 +15,6 @@ TEST(ParserA213, DataDeclPackageImport) {
 }
 
 TEST(ParserA213, PackageImportMultiple) {
-
   auto r = Parse(
       "package p1; endpackage\n"
       "package p2; endpackage\n"
@@ -129,7 +127,6 @@ TEST(ParserSection26, ImportWildcardField) {
 }
 
 TEST_F(AnnexHParseTest, AnnexGStdRandomizePackageImport) {
-
   auto* unit = Parse(
       "module m;\n"
       "  import std_pkg::*;\n"
@@ -373,4 +370,4 @@ TEST_F(ProgramParseTest, ProgramWithImportStatement) {
   EXPECT_TRUE(unit->programs[0]->items[0]->import_item.is_wildcard);
 }
 
-}
+}  // namespace

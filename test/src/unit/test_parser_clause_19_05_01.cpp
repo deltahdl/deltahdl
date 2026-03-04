@@ -245,4 +245,4 @@ TEST_F(VerifyParseTest, CovergroupWithBins) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}
+}  // namespace

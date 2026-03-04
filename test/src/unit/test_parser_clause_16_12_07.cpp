@@ -114,4 +114,4 @@ TEST(ParserSection16, SequenceUsedInPropertyDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -216,4 +216,4 @@ TEST(SourceText, ClassWithParams) {
   EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
-}
+}  // namespace

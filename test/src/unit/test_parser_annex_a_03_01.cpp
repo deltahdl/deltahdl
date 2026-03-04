@@ -7,7 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserA303, OutputTerminal_MultipleOutputs) {
-
   auto r = Parse(
       "module m;\n"
       "  buf (o1, o2, o3, in);\n"
@@ -19,7 +18,6 @@ TEST(ParserA303, OutputTerminal_MultipleOutputs) {
 }
 
 TEST(ParserA303, OutputTerminal_PullGate) {
-
   auto r = Parse(
       "module m;\n"
       "  pullup (net_a);\n"
@@ -30,4 +28,4 @@ TEST(ParserA303, OutputTerminal_PullGate) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
-}
+}  // namespace

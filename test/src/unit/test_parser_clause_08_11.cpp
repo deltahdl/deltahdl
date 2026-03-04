@@ -69,4 +69,4 @@ TEST(ParserSection8, ThisKeywordPropertyAccess) {
               "endclass\n"));
 }
 
-}
+}  // namespace

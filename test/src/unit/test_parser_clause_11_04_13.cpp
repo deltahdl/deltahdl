@@ -187,7 +187,6 @@ TEST(ParserSection11, InsideBasicListParses) {
 }
 
 TEST(AggregateExpr, PackedStructInsideSet) {
-
   SimFixture f;
   auto* var = f.ctx.CreateVariable("s", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 5);
@@ -205,4 +204,4 @@ TEST(AggregateExpr, PackedStructNotInSet) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}
+}  // namespace

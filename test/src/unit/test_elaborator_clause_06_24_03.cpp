@@ -58,4 +58,4 @@ TEST(SimCh6, BitStreamShortArrayToInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEu);
 }
 
-}
+}  // namespace

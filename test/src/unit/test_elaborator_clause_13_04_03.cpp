@@ -16,4 +16,4 @@ TEST(ElabA82, ConstantFunctionCallInParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

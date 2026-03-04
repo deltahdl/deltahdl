@@ -15,4 +15,4 @@ TEST(ParserA25, UnsizedDimElaboratesDynamic) {
   EXPECT_TRUE(mod->variables[0].is_dynamic);
 }
 
-}
+}  // namespace

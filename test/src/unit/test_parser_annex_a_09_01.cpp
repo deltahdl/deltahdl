@@ -12,4 +12,4 @@ TEST(ParserA212, LetPortItem_AttributeWithValue) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

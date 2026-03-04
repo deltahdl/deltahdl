@@ -9,7 +9,6 @@ using namespace delta;
 namespace {
 
 TEST(Elaboration, ImplicitNetOnAssignLhs) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -31,7 +30,6 @@ TEST(Elaboration, ImplicitNetOnAssignLhs) {
 }
 
 TEST(Elaboration, ImplicitNetOnInstancePort) {
-
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
@@ -55,7 +53,6 @@ TEST(Elaboration, ImplicitNetOnInstancePort) {
 }
 
 TEST(Elaboration, ImplicitNetNone_Error) {
-
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>",
                            "module top;\n"
@@ -70,4 +67,4 @@ TEST(Elaboration, ImplicitNetNone_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

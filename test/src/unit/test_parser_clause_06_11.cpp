@@ -5,7 +5,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, IntegerTypeTimeDecl) {
-
   auto r = Parse(
       "module m;\n"
       "  time t;\n"
@@ -96,4 +95,4 @@ TEST(ParserA221, IntegerAtomTypes) {
   EXPECT_EQ(r.cu->modules[0]->items[5]->data_type.kind, DataTypeKind::kTime);
 }
 
-}
+}  // namespace

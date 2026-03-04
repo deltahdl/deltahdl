@@ -9,7 +9,6 @@ using namespace delta;
 namespace {
 
 TEST(Lowerer, ForkJoinNone) {
-
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -27,7 +26,6 @@ TEST(Lowerer, ForkJoinNone) {
 }
 
 TEST(Lowerer, ForkJoin) {
-
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -161,4 +159,4 @@ TEST(SimA603, EmptyForkJoin) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

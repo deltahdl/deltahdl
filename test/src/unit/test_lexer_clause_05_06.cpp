@@ -11,7 +11,6 @@ using namespace delta;
 namespace {
 
 TEST(LexerCh506, IdentifierMaxLengthError) {
-
   std::string id(1025, 'a');
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -22,7 +21,6 @@ TEST(LexerCh506, IdentifierMaxLengthError) {
 }
 
 TEST(LexerCh506, EscapedIdentifierMaxLengthError) {
-
   std::string id = "\\" + std::string(1025, 'a') + " ";
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -32,4 +30,4 @@ TEST(LexerCh506, EscapedIdentifierMaxLengthError) {
   EXPECT_TRUE(diag.HasErrors());
 }
 
-}
+}  // namespace

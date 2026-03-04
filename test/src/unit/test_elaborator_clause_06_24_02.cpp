@@ -59,4 +59,4 @@ TEST(SimCh6, CastEnumFailure) {
   EXPECT_EQ(c->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

@@ -14,7 +14,6 @@ TEST(ParserA212, InoutImplicitType) {
 }
 
 TEST(ParserA212, InterfacePortParsedAsNonAnsi) {
-
   auto r = Parse("module m(a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -146,14 +145,12 @@ TEST(ParserSection6, Sec6_11_IntegerAsPort) {
 }
 
 TEST(ParserSection6, VarImplicitInPort) {
-
   EXPECT_TRUE(
       ParseOk("module t(input var [7:0] data_in);\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection6, ShortrealInPort) {
-
   EXPECT_TRUE(
       ParseOk("module m (input var shortreal in_val,\n"
               "          output var shortreal out_val);\n"
@@ -161,4 +158,4 @@ TEST(ParserSection6, ShortrealInPort) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -43,7 +43,6 @@ TEST(ParserCh50702, RealLiteral_ScientificNotation) {
 }
 
 TEST(ParserCh50702, RealLiteral_ExponentOnly) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r;\n"
@@ -161,7 +160,6 @@ TEST(ParserSection11, Sec11_1_RealLiteralAsExpression) {
 }
 
 TEST(ParserSection6, RealLiteralDecimalPoint) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 1.5;\n"
@@ -169,7 +167,6 @@ TEST(ParserSection6, RealLiteralDecimalPoint) {
 }
 
 TEST(ParserSection6, RealLiteralScientificNotation) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 1.3e2;\n"
@@ -177,7 +174,6 @@ TEST(ParserSection6, RealLiteralScientificNotation) {
 }
 
 TEST(ParserSection6, RealLiteralNegativeExponent) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 1.0e-3;\n"
@@ -185,7 +181,6 @@ TEST(ParserSection6, RealLiteralNegativeExponent) {
 }
 
 TEST(ParserSection6, RealLiteralPositiveExponent) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 2.5E+4;\n"
@@ -193,7 +188,6 @@ TEST(ParserSection6, RealLiteralPositiveExponent) {
 }
 
 TEST(ParserSection6, RealLiteralUnderscoresInValue) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 1_000.000_1;\n"
@@ -207,4 +201,4 @@ TEST(ParserSection6, RealLiteralZeroPointSomething) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

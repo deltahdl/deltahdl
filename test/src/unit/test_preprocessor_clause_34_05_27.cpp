@@ -35,4 +35,4 @@ TEST_F(ProtectedTest, KeyBlockPragma) {
   EXPECT_EQ(result.find("key_method"), std::string::npos);
 }
 
-}
+}  // namespace
