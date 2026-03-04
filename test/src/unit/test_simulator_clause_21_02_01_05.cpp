@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §21.2.1.5: Hierarchical name format
 
 #include <gtest/gtest.h>
 #include <cstring>
