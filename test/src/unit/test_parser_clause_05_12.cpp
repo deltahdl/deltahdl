@@ -1,5 +1,3 @@
-// §5.12: Attributes
-
 #include "fixture_program.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §35.2.1 Attributes on modules/instances
-// =============================================================================
 TEST_F(DpiParseTest, AttributeOnModuleDefinition) {
   auto* unit = Parse(R"(
     (* optimize_power *)
@@ -52,18 +47,12 @@ TEST_F(DpiParseTest, AttributeWithValueOnInstance) {
   EXPECT_NE(items[0]->attrs[0].value, nullptr);
 }
 
-// =============================================================================
-// A.9 -- General (attributes, identifiers)
-// =============================================================================
 TEST(ParserAnnexA, A9AttributeOnContAssign) {
   auto r = Parse("module m; wire y; (* synthesis *) assign y = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// §35.5 Attribute compatibility (multiple attributes)
-// =============================================================================
 TEST_F(DpiParseTest, MultipleAttributesOnDecl) {
   auto* unit = Parse(R"(
     module m;
@@ -99,7 +88,6 @@ TEST_F(DpiParseTest, AttributeWithAndWithoutValue) {
   EXPECT_NE(items[0]->attrs[1].value, nullptr);
 }
 
-// §12.3: statement with attribute having value
 TEST(ParserA604, StatementWithAttributeValue) {
   auto r = Parse(
       "module m;\n"
@@ -116,7 +104,6 @@ TEST(ParserA604, StatementWithAttributeValue) {
   EXPECT_NE(stmt->attrs[0].value, nullptr);
 }
 
-// §12.3: statement with multiple attributes
 TEST(ParserA604, StatementWithMultipleAttributes) {
   auto r = Parse(
       "module m;\n"
@@ -133,8 +120,6 @@ TEST(ParserA604, StatementWithMultipleAttributes) {
   EXPECT_EQ(stmt->attrs[1].name, "bar");
 }
 
-// --- §5.12 Attributes ---
-// From test_parser_clause_05.cpp
 TEST(ParserCh512, AttributeOnModuleItem) {
   auto r = Parse(
       "module t;\n"
@@ -205,7 +190,7 @@ TEST(ParserCh512, Expr_AttributeOnTernary) {
 }
 
 TEST(ParserCh512, PostfixFunctionAttribute) {
-  // §5.12 Example 7: a = add (* mode = "cla" *) (b, c);
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic a, b, c;\n"
@@ -222,7 +207,7 @@ TEST(ParserCh512, PostfixFunctionAttribute_NoArgs) {
 }
 
 TEST(ParserCh512, NestedAttribute_Error) {
-  // §5.12: Nesting of attribute instances is disallowed.
+
   EXPECT_FALSE(
       ParseOk("module t;\n"
               "  (* foo = 1 + (* bar *) 2 *) logic x;\n"
@@ -235,9 +220,9 @@ TEST(ParserCh512, AttributeValue_NoNesting_Ok) {
               "  (* foo = 1 + 2 *) logic x;\n"
               "endmodule\n"));
 }
-// From test_parser_clause_05b.cpp
+
 TEST(ParserCh512, Attribute_OnCaseStatement) {
-  // Section 5.12 Example 1: full_case, parallel_case on a case statement.
+
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -257,7 +242,7 @@ TEST(ParserCh512, Attribute_OnCaseStatement) {
 }
 
 TEST(ParserCh512, Attribute_MultipleInstances) {
-  // Multiple separate attribute instances before the same item.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  (* full_case=1 *)\n"
@@ -267,7 +252,7 @@ TEST(ParserCh512, Attribute_MultipleInstances) {
 }
 
 TEST(ParserCh512, Attribute_OnModuleInstantiation) {
-  // Section 5.12 Example 4: attribute on a module instantiation.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  (* optimize_power=0 *)\n"
@@ -311,7 +296,7 @@ TEST(ParserCh512, Attribute_OnAssignment) {
 }
 
 TEST(ParserCh512, Attribute_OnContAssign) {
-  // Attribute on a continuous assignment statement.
+
   auto r = Parse(
       "module m;\n"
       "  logic a, b;\n"
@@ -326,7 +311,7 @@ TEST(ParserCh512, Attribute_OnContAssign) {
   EXPECT_EQ(item->attrs[0].name, "synthesis_on");
 }
 TEST(ParserCh512, AttributeValue_ConstExpr) {
-  // The attribute value can be an arbitrary constant expression.
+
   auto r = Parse(
       "module m;\n"
       "  (* depth = 3 + 1 *)\n"
@@ -350,7 +335,7 @@ TEST(ParserCh512, AttributeValue_String) {
 }
 
 TEST(ParserCh512, Attribute_MultipleSeparateInstances) {
-  // Multiple attribute instances are merged.
+
   auto r = Parse(
       "module m;\n"
       "  (* first *)\n"
@@ -365,4 +350,4 @@ TEST(ParserCh512, Attribute_MultipleSeparateInstances) {
   EXPECT_EQ(item->attrs[1].name, "second");
 }
 
-}  // namespace
+}

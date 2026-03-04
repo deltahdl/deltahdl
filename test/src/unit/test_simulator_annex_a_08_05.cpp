@@ -1,5 +1,3 @@
-// Annex A.8.5: Expression left-side values
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — simple variable blocking assignment
 TEST(SimA85, VarLvalueSimpleBlocking) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -26,7 +23,6 @@ TEST(SimA85, VarLvalueSimpleBlocking) {
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
 
-// § nonrange_variable_lvalue — simple variable simulates
 TEST(SimA85, NonrangeVarLvalueSimple) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -44,4 +40,4 @@ TEST(SimA85, NonrangeVarLvalueSimple) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

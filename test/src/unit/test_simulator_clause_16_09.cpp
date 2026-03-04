@@ -1,5 +1,3 @@
-// §16.9: Sequence operations
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -24,28 +22,18 @@ TEST(Assertion, RoseDetection) {
   prop.signal_name = "sig";
   monitor.AddProperty(prop);
 
-  // First evaluation: cycle_count==0, vacuous pass (initializes prev).
   auto r0 = monitor.Evaluate("p_rose", 0);
   EXPECT_EQ(r0, AssertionResult::kVacuousPass);
 
-  // Simulate one tick to advance cycle count.
-  // We need a SimContext, but Tick just increments cycle_count.
-  // Use a minimal approach: manually increment via a second Evaluate.
-  // Actually, we need to call Tick. Let's hack around it by
-  // constructing a dummy approach. For the test we'll directly
-  // modify the entry cycle count by calling Evaluate after AddProperty.
-  // The first Evaluate set prev_value=0, cycle_count was 0.
-  // Now "tick" it:
   auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_rose"));
   ASSERT_NE(entry, nullptr);
   entry->cycle_count = 1;
 
-  // 0 -> 1 is a rising edge.
   auto r1 = monitor.Evaluate("p_rose", 1);
   EXPECT_EQ(r1, AssertionResult::kPass);
 
   entry->cycle_count = 2;
-  // 1 -> 1 is NOT a rising edge.
+
   auto r2 = monitor.Evaluate("p_rose", 1);
   EXPECT_EQ(r2, AssertionResult::kFail);
 }
@@ -58,17 +46,15 @@ TEST(Assertion, FellDetection) {
   prop.signal_name = "sig";
   monitor.AddProperty(prop);
 
-  // Initialize: prev_value = 1.
   monitor.Evaluate("p_fell", 1);
   auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_fell"));
   entry->cycle_count = 1;
 
-  // 1 -> 0 is a falling edge.
   auto r1 = monitor.Evaluate("p_fell", 0);
   EXPECT_EQ(r1, AssertionResult::kPass);
 
   entry->cycle_count = 2;
-  // 0 -> 0 is NOT a falling edge.
+
   auto r2 = monitor.Evaluate("p_fell", 0);
   EXPECT_EQ(r2, AssertionResult::kFail);
 }
@@ -93,9 +79,6 @@ TEST(Assertion, StableDetection) {
   EXPECT_EQ(r2, AssertionResult::kFail);
 }
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -105,9 +88,6 @@ struct SvaFixture {
   SvaEngine engine;
 };
 
-// =============================================================================
-// SequenceAttempt basics
-// =============================================================================
 TEST(SvaEngine, SequenceAttemptDefaultState) {
   SequenceAttempt sa;
   EXPECT_EQ(sa.position, 0u);
@@ -129,4 +109,4 @@ TEST(SvaEngine, SequenceAttemptDelayCountdown) {
   EXPECT_EQ(sa.delay_remaining, 0u);
 }
 
-}  // namespace
+}

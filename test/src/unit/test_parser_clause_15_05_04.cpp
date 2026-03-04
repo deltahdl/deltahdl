@@ -1,5 +1,3 @@
-// §15.5.4: Event sequencing: wait_order()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.4: action_block in wait_order statement
 TEST(ParserA603, ActionBlockWaitOrder) {
   auto r = Parse(
       "module m;\n"
@@ -22,7 +19,6 @@ TEST(ParserA603, ActionBlockWaitOrder) {
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
 }
 
-// §15.5.4: action_block in wait_order with else clause
 TEST(ParserA603, ActionBlockWaitOrderElse) {
   auto r = Parse(
       "module m;\n"
@@ -37,10 +33,6 @@ TEST(ParserA603, ActionBlockWaitOrderElse) {
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §15.5.4 — wait_order basic parsing
-// =============================================================================
 TEST(ParserSection15, WaitOrderBasic) {
   auto r = Parse(
       "module m;\n"
@@ -59,9 +51,6 @@ TEST(ParserSection15, WaitOrderBasic) {
   }
 }
 
-// =============================================================================
-// §15.5.4 — wait_order with else clause
-// =============================================================================
 TEST(ParserSection15, WaitOrderWithElseKind) {
   auto r = Parse(
       "module m;\n"
@@ -92,9 +81,6 @@ TEST(ParserSection15, WaitOrderWithElseBranches) {
   ASSERT_NE(stmt->else_branch, nullptr);
 }
 
-// =============================================================================
-// §15.5.4 — wait_order with two events
-// =============================================================================
 TEST(ParserSection15, WaitOrderTwoEvents) {
   auto r = Parse(
       "module m;\n"
@@ -109,9 +95,6 @@ TEST(ParserSection15, WaitOrderTwoEvents) {
   ASSERT_EQ(stmt->wait_order_events.size(), 2u);
 }
 
-// =============================================================================
-// §15.5.4 — wait_order null action (just semicolon)
-// =============================================================================
 TEST(ParserSection15, WaitOrderNullAction) {
   auto r = Parse(
       "module m;\n"
@@ -123,10 +106,9 @@ TEST(ParserSection15, WaitOrderNullAction) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
-  // Null action: then_branch is null or a null stmt.
+
 }
 
-// §15.5.4: wait_order with semicolon (null action)
 TEST(ParserA605, WaitOrderNull) {
   auto r = Parse(
       "module m;\n"
@@ -142,7 +124,6 @@ TEST(ParserA605, WaitOrderNull) {
   ASSERT_EQ(stmt->wait_order_events.size(), 3u);
 }
 
-// §15.5.4: wait_order with success statement
 TEST(ParserA605, WaitOrderWithAction) {
   auto r = Parse(
       "module m;\n"
@@ -158,7 +139,6 @@ TEST(ParserA605, WaitOrderWithAction) {
   EXPECT_NE(stmt->then_branch, nullptr);
 }
 
-// §15.5.4: wait_order with else clause
 TEST(ParserA605, WaitOrderWithElse) {
   auto r = Parse(
       "module m;\n"
@@ -176,7 +156,6 @@ TEST(ParserA605, WaitOrderWithElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-// §15.5.4: wait_order with only else clause
 TEST(ParserA605, WaitOrderElseOnly) {
   auto r = Parse(
       "module m;\n"
@@ -193,4 +172,4 @@ TEST(ParserA605, WaitOrderElseOnly) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-}  // namespace
+}

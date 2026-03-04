@@ -1,12 +1,9 @@
-// §14.4: Input and output skews
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Clocking block with skew variations elaborates
 TEST(ElabA611, SkewVariationsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,4 +19,4 @@ TEST(ElabA611, SkewVariationsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §12.6.2: Pattern matching in if statements
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// matches operator in if-condition — simulation
-// ---------------------------------------------------------------------------
-// §12.6.2: matches with constant pattern — true case
 TEST(SimA60701, MatchesConstantTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +27,6 @@ TEST(SimA60701, MatchesConstantTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.6.2: matches with constant pattern — false case
 TEST(SimA60701, MatchesConstantFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -55,4 +48,4 @@ TEST(SimA60701, MatchesConstantFalse) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

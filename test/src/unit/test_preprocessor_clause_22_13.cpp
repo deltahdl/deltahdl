@@ -19,8 +19,6 @@ TEST(Preprocessor, LineExpansion) {
   EXPECT_NE(result.find('2'), std::string::npos);
 }
 
-// --- __LINE__ with `line directive ---
-
 TEST(Preprocessor, LineDirectiveAffectsLineMacro) {
   PreprocFixture f;
   auto result = Preprocess(

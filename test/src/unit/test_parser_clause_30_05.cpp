@@ -1,5 +1,3 @@
-// §30.5: Assigning delays to module paths
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.4 path_delay_value — bare vs parenthesized
-// =============================================================================
-// path_delay_value ::= list_of_path_delay_expressions (bare form)
 TEST(ParserA704, PathDelayValueBare) {
   auto r = Parse(
       "module m;\n"
@@ -25,7 +19,6 @@ TEST(ParserA704, PathDelayValueBare) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-// path_delay_value ::= ( list_of_path_delay_expressions ) (parenthesized)
 TEST(ParserA704, PathDelayValueParenthesized) {
   auto r = Parse(
       "module m;\n"
@@ -40,10 +33,6 @@ TEST(ParserA704, PathDelayValueParenthesized) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-// =============================================================================
-// A.7.4 path_delay_value with specparam reference
-// =============================================================================
-// Delay using specparam identifier
 TEST(ParserA704, PathDelayWithSpecparam) {
   auto r = Parse(
       "module m;\n"
@@ -62,4 +51,4 @@ TEST(ParserA704, PathDelayWithSpecparam) {
   ASSERT_EQ(path_item->path.delays.size(), 1u);
 }
 
-}  // namespace
+}

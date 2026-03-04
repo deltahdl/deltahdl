@@ -1,5 +1,3 @@
-// §6.12: Real, shortreal, and realtime data types
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,11 +5,8 @@
 using namespace delta;
 namespace {
 
-// =========================================================================
-// §6.12: Realtime type — alias for real
-// =========================================================================
 TEST(ParserSection6, RealtimeWithInit) {
-  // §6.12: realtime is equivalent to real for simulation.
+
   auto r = Parse(
       "module t;\n"
       "  realtime ts = 100.0;\n"
@@ -22,7 +17,7 @@ TEST(ParserSection6, RealtimeWithInit) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kRealtime);
   ASSERT_NE(item->init_expr, nullptr);
 }
-// 5. Real variable declaration.
+
 TEST(ParserSection6, Sec6_5_RealVarDeclKind) {
   auto r = Parse(
       "module t;\n"
@@ -36,7 +31,7 @@ TEST(ParserSection6, Sec6_5_RealVarDeclKind) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
   EXPECT_FALSE(item->data_type.is_net);
 }
-// Non-integer types (real, shortreal, realtime).
+
 TEST(ParserSection8, DataTypeSyntaxNonInteger) {
   auto r = Parse(
       "module m;\n"
@@ -51,9 +46,7 @@ TEST(ParserSection8, DataTypeSyntaxNonInteger) {
   EXPECT_EQ(items[1]->data_type.kind, DataTypeKind::kShortreal);
   EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kRealtime);
 }
-// =========================================================================
-// §6.12: Real, shortreal, and realtime data types
-// =========================================================================
+
 TEST(ParserSection6, RealVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -88,7 +81,7 @@ TEST(ParserSection6, RealtimeVarDecl) {
 }
 
 TEST(ParserSection6, RealTypesInProcedural) {
-  // All real types declared inside initial block
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -98,11 +91,9 @@ TEST(ParserSection6, RealTypesInProcedural) {
               "  end\n"
               "endmodule\n"));
 }
-// =============================================================================
-// LRM section 6.12 -- Real, shortreal, and realtime data types
-// =============================================================================
+
 TEST(ParserSection6, RealDecl) {
-  // real is same as C double (LRM 6.12)
+
   auto r = Parse(
       "module m;\n"
       "  real r;\n"
@@ -116,7 +107,7 @@ TEST(ParserSection6, RealDecl) {
 }
 
 TEST(ParserSection6, ShortrealDecl) {
-  // shortreal is same as C float (LRM 6.12)
+
   auto r = Parse(
       "module m;\n"
       "  shortreal sr;\n"
@@ -130,7 +121,7 @@ TEST(ParserSection6, ShortrealDecl) {
 }
 
 TEST(ParserSection6, RealtimeDecl) {
-  // realtime is synonymous with real (LRM 6.12)
+
   auto r = Parse(
       "module m;\n"
       "  realtime rt;\n"
@@ -154,7 +145,7 @@ TEST(ParserSection6, MultipleRealDecls) {
 }
 
 TEST(ParserSection6, AllRealTypes) {
-  // All three real-family types in one module
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r;\n"
@@ -163,9 +154,8 @@ TEST(ParserSection6, AllRealTypes) {
               "endmodule\n"));
 }
 
-// --- Shortreal specifics (LRM 6.12) ---
 TEST(ParserSection6, ShortrealInModule) {
-  // shortreal is same as C float (LRM 6.12)
+
   auto r = Parse(
       "module m;\n"
       "  shortreal x = 1.0;\n"
@@ -178,7 +168,7 @@ TEST(ParserSection6, ShortrealInModule) {
 }
 
 TEST(ParserSection6, ShortrealInFunctionArg) {
-  // shortreal as function argument type
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function shortreal scale(shortreal val, shortreal factor);\n"
@@ -187,8 +177,6 @@ TEST(ParserSection6, ShortrealInFunctionArg) {
               "endmodule\n"));
 }
 
-// --- non_integer_type ---
-// shortreal | real | realtime
 TEST(ParserA221, NonIntegerTypes) {
   auto r = Parse(
       "module m;\n"
@@ -205,4 +193,4 @@ TEST(ParserA221, NonIntegerTypes) {
             DataTypeKind::kRealtime);
 }
 
-}  // namespace
+}

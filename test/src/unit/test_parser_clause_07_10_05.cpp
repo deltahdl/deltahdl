@@ -1,5 +1,3 @@
-// §7.10.5: Bounded queues
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -19,7 +17,7 @@ TEST(ParserA25, QueueDimBounded) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "$");
   ASSERT_NE(item->unpacked_dims[0]->rhs, nullptr);
 }
-// --- Test helpers ---
+
 TEST(ParserSection7, QueueWithBound) {
   auto r = Parse(
       "module t;\n"
@@ -51,4 +49,4 @@ TEST(ParserSection7c, QueueWithMaxSize) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

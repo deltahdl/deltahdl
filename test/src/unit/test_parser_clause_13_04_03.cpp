@@ -1,5 +1,3 @@
-// §13.4.3: Constant functions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.2 Subroutine calls — constant_function_call
-// =============================================================================
-// § constant_function_call ::= function_subroutine_call (footnote 41)
 TEST(ParserA82, ConstantFunctionCallInParam) {
   auto r = Parse(
       "module m #(parameter int P = calc(4));\n"
@@ -35,4 +29,4 @@ TEST(ParserA82, ConstantFunctionCallInLocalparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

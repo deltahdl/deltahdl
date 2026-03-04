@@ -1,5 +1,3 @@
-// §30.4.6: Declaring multiple module paths in a single statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -14,10 +12,6 @@ TEST(ParserAnnexA, A7SpecifyFullPath) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.7.3 list_of_path_inputs / list_of_path_outputs
-// =============================================================================
-// list_of_path_inputs — multiple simple input terminals
 TEST(ParserA703, ListOfPathInputsMultiple) {
   auto r = Parse(
       "module m;\n"
@@ -35,7 +29,6 @@ TEST(ParserA703, ListOfPathInputsMultiple) {
   EXPECT_EQ(si->path.src_ports[2].name, "c");
 }
 
-// Multiple output terminals with mixed forms in full path
 TEST(ParserA703, MixedOutputTerminalsFullPath) {
   auto r = Parse(
       "module m;\n"
@@ -56,4 +49,4 @@ TEST(ParserA703, MixedOutputTerminalsFullPath) {
   EXPECT_EQ(si->path.dst_ports[2].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-}  // namespace
+}

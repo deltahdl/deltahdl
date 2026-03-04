@@ -1,5 +1,3 @@
-// §33.4.1.5: The liblist clause
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §33.4.1.3 Instance clause with liblist
-// =============================================================================
 TEST_F(ConfigTest, InstanceLiblist) {
   auto* unit = Parse(R"(
     config cfg;
@@ -35,9 +30,6 @@ TEST_F(ConfigTest, InstanceLiblist) {
   EXPECT_EQ(r1->liblist[0], "gateLib");
 }
 
-// =============================================================================
-// §33.4.1.4/5 Cell clause for library binding
-// =============================================================================
 TEST_F(ConfigTest, CellClauseLiblist) {
   auto* unit = Parse(R"(
     config cfg;
@@ -56,13 +48,8 @@ TEST_F(ConfigTest, CellClauseLiblist) {
   EXPECT_EQ(rule->liblist[1], "lib3");
 }
 
-// =============================================================================
-// LRM section 34.5.6 -- author_info pragma: config declarations with libraries
-// These tests verify that configuration declarations (which reference library
-// mappings) parse correctly alongside other design units.
-// =============================================================================
 TEST(ParserSection34, ConfigWithDefaultLiblist) {
-  // Config with default clause specifying a library list
+
   auto r = Parse(R"(
     config cfg1;
       design mylib.top;
@@ -75,7 +62,7 @@ TEST(ParserSection34, ConfigWithDefaultLiblist) {
 }
 
 TEST(ParserSection34, ConfigWithMultipleLibraries) {
-  // Config referencing multiple libraries in liblist
+
   auto r = Parse(R"(
     config design_cfg;
       design lib1.chip_top;
@@ -87,8 +74,8 @@ TEST(ParserSection34, ConfigWithMultipleLibraries) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
   auto* cfg = r.cu->configs[0];
   EXPECT_EQ(cfg->name, "design_cfg");
-  // Should have design cells
+
   ASSERT_GE(cfg->design_cells.size(), 1u);
 }
 
-}  // namespace
+}

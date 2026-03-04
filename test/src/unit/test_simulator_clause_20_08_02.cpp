@@ -1,5 +1,3 @@
-// §20.8.2: Real math functions
-
 #include <cstring>
 
 #include "builders_systask.h"
@@ -9,14 +7,6 @@
 #include "simulator/eval.h"
 
 using namespace delta;
-
-// ============================================================================
-// Test helpers (shared with test_systask.cpp)
-// ============================================================================
-
-// ============================================================================
-// Math functions (section 20.8)
-// ============================================================================
 
 TEST(SysTaskMath, LnOfE) {
   SysTaskMathFixture f;

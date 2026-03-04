@@ -1,5 +1,3 @@
-// §11.4.12: Concatenation operators
-
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "helpers_eval_op.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § concatenation with variables
 TEST(SimA81, ConcatWithVariables) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +29,6 @@ TEST(SimA81, ConcatWithVariables) {
   EXPECT_EQ(var->value.ToUint64(), 0xC3u);
 }
 
-// § concatenation — does not interfere with other initial blocks
 TEST(SimA81, ConcatDoesNotInterfere) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,10 +50,6 @@ TEST(SimA81, ConcatDoesNotInterfere) {
   EXPECT_EQ(vb->value.ToUint64(), 99u);
 }
 
-// =============================================================================
-// A.8.1 Concatenations — Elaboration
-// =============================================================================
-// § concatenation elaborates in continuous assignment
 TEST(ElabA81, ConcatenationInContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -71,7 +63,6 @@ TEST(ElabA81, ConcatenationInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § constant_concatenation in parameter initialization
 TEST(ElabA81, ConstantConcatenationInParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -83,7 +74,6 @@ TEST(ElabA81, ConstantConcatenationInParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § concatenation in initial block elaborates
 TEST(ElabA81, ConcatInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -97,7 +87,6 @@ TEST(ElabA81, ConcatInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § primary — concatenation elaborates
 TEST(ElabA84, PrimaryConcatenationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -111,9 +100,6 @@ TEST(ElabA84, PrimaryConcatenationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// 16. Concatenation in always_comb.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombConcatenation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -138,9 +124,6 @@ TEST(SimCh9, AlwaysCombConcatenation) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-// ---------------------------------------------------------------------------
-// 7. Blocking assignment with concatenation on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignConcatRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -165,4 +148,4 @@ TEST(SimCh10, BlockingAssignConcatRHS) {
   EXPECT_EQ(c->value.ToUint64(), 0xCAFEu);
 }
 
-}  // namespace
+}

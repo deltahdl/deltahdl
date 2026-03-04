@@ -1,5 +1,3 @@
-// §12.6.1: Pattern matching in case statements
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// case-matches: constant pattern — simulation
-// ---------------------------------------------------------------------------
-// §12.6.1: case-matches selects matching constant pattern
 TEST(SimA60701, CaseMatchesConstantMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +31,6 @@ TEST(SimA60701, CaseMatchesConstantMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.6.1: case-matches falls through to default
 TEST(SimA60701, CaseMatchesDefaultFallthrough) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -62,7 +55,6 @@ TEST(SimA60701, CaseMatchesDefaultFallthrough) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §12.6.1: case-matches first match wins
 TEST(SimA60701, CaseMatchesFirstMatchWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -87,4 +79,4 @@ TEST(SimA60701, CaseMatchesFirstMatchWins) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

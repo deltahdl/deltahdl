@@ -1,5 +1,3 @@
-// §16.14.1: Assert statement
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Production #1: concurrent_assertion_item
-// concurrent_assertion_item ::=
-//     [ block_identifier : ] concurrent_assertion_statement
-//   | checker_instantiation
-// =============================================================================
 TEST(ParserA210, ConcurrentAssertionItem_AssertProperty) {
   auto r = Parse(
       "module m;\n"
@@ -26,10 +18,6 @@ TEST(ParserA210, ConcurrentAssertionItem_AssertProperty) {
   EXPECT_TRUE(item->loc.IsValid());
 }
 
-// =============================================================================
-// §A.2.10 Production #3: assert_property_statement
-// assert_property_statement ::= assert property ( property_spec ) action_block
-// =============================================================================
 TEST(ParserA210, AssertProperty_WithActionBlock) {
   auto r = Parse(
       "module m;\n"
@@ -71,10 +59,6 @@ TEST(ParserA210, AssertProperty_FailOnly) {
 }
 using VerifyParseTest = ProgramTestParse;
 
-// =============================================================================
-// Section 16.5.1 -- Concurrent assertion statements: assert property
-// =============================================================================
-// Assert property with a simple property expression (no clock, no implication).
 TEST(ParserSection16, Sec16_5_1_AssertPropertySimple) {
   auto r = Parse(
       "module m;\n"
@@ -88,10 +72,6 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertySimple) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.5 Concurrent assertions — assert property (module-level)
-// =============================================================================
 TEST(ParserSection16, AssertPropertyModuleLevel) {
   auto r = Parse(
       "module m;\n"
@@ -123,7 +103,6 @@ TEST(ParserSection16, AssertPropertyWithElse) {
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
-// Assert property with a posedge-clocked property.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyClockedPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -137,7 +116,6 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyClockedPosedge) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-// Assert property with both pass and fail action blocks.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyPassAndFailActions) {
   auto r = Parse(
       "module m;\n"
@@ -153,7 +131,6 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyPassAndFailActions) {
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
-// Assert property with only a pass action (no else).
 TEST(ParserSection16, Sec16_5_1_AssertPropertyPassOnly) {
   auto r = Parse(
       "module m;\n"
@@ -169,7 +146,6 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyPassOnly) {
   EXPECT_EQ(ap->assert_fail_stmt, nullptr);
 }
 
-// Assert property with only an else (fail) action.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyFailOnly) {
   auto r = Parse(
       "module m;\n"
@@ -185,9 +161,6 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyFailOnly) {
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
-// =============================================================================
-// §16.5 Concurrent assertions overview — clocked property
-// =============================================================================
 TEST(ParserSection16, ConcurrentAssertWithClock) {
   auto r = Parse(
       "module m;\n"
@@ -212,13 +185,9 @@ TEST(ParserSection16, ConcurrentAssertNegedgeClock) {
 using DpiParseTest = ProgramTestParse;
 
 using ApiParseTest = ProgramTestParse;
-// =============================================================================
-// LRM section 39.4.2 -- Placing assertion callbacks
-// These tests verify assertion-related syntax that enables placement of
-// callbacks on assertion statements (assert, assume, cover properties).
-// =============================================================================
+
 TEST(ParserSection39, AssertPropertyStatement) {
-  // assert property is the target of assertion callbacks
+
   auto r = Parse(R"(
     module m;
       logic clk, a, b;
@@ -227,7 +196,7 @@ TEST(ParserSection39, AssertPropertyStatement) {
   )");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  // Find the assert property item
+
   bool found_assert = false;
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAssertProperty) {
@@ -237,10 +206,6 @@ TEST(ParserSection39, AssertPropertyStatement) {
   EXPECT_TRUE(found_assert);
 }
 
-// =============================================================================
-// A.6.10 — concurrent_assertion_statement (module-level)
-// =============================================================================
-// assert_property_statement
 TEST(ParserA610, AssertPropertyModule) {
   auto r = Parse(
       "module m;\n"
@@ -252,10 +217,6 @@ TEST(ParserA610, AssertPropertyModule) {
   ASSERT_NE(item, nullptr);
 }
 
-// =============================================================================
-// A.6.10 — concurrent assertion with action_block
-// =============================================================================
-// assert property with pass and else actions
 TEST(ParserA610, AssertPropertyActionBlock) {
   auto r = Parse(
       "module m;\n"
@@ -269,7 +230,6 @@ TEST(ParserA610, AssertPropertyActionBlock) {
   ASSERT_NE(item->assert_fail_stmt, nullptr);
 }
 
-// --- F.19: Assert with action blocks (pass/fail) ---
 TEST(ParserAnnexF, AnnexFAssertActionBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -290,4 +250,4 @@ TEST(ParserAnnexF, AnnexFAssertActionBlocks) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

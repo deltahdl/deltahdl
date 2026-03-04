@@ -1,5 +1,3 @@
-// §9.4.1: Delay control
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -32,4 +30,4 @@ TEST(Lowerer, DelayBasic) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §13.4.2: Static and automatic functions
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,11 +5,8 @@
 using namespace delta;
 namespace {
 
-// =========================================================================
-// §6.11.1: Integral types — automatic variables in functions
-// =========================================================================
 TEST(ParserSection6, AutomaticFunctionLocalVar) {
-  // §6.11.1: Automatic function has automatic local variables.
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  function automatic int factorial(int n);\n"
@@ -26,4 +21,4 @@ TEST(ParserSection6, AutomaticFunctionLocalVar) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-}  // namespace
+}

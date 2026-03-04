@@ -1,12 +1,9 @@
-// §8.6: Object methods
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// method_call elaborates without error
 TEST(ElabA609, MethodCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -18,4 +15,4 @@ TEST(ElabA609, MethodCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

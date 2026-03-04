@@ -1,12 +1,9 @@
-// §10.11: Net aliasing
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// net_alias: alias net1 = net2 = net3;
 TEST(SourceText, NetAlias) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -16,15 +13,12 @@ TEST(SourceText, NetAlias) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto& items = r.cu->modules[0]->items;
-  // 3 wire decls + 1 alias
+
   auto* alias_item = items.back();
   EXPECT_EQ(alias_item->kind, ModuleItemKind::kAlias);
   EXPECT_EQ(alias_item->alias_nets.size(), 3u);
 }
 
-// =============================================================================
-// LRM section 10.11 -- Net aliasing
-// =============================================================================
 TEST(ParserSection10, NetAliasTwoNets) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -34,7 +28,7 @@ TEST(ParserSection10, NetAliasTwoNets) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
   auto* mod = r.cu->modules[0];
-  // Find the alias item.
+
   ModuleItem* alias_item = nullptr;
   for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kAlias) {
@@ -65,4 +59,4 @@ TEST(ParserSection10, NetAliasThreeNets) {
   ASSERT_EQ(alias_item->alias_nets.size(), 3u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §10.9.2: Structure assignment patterns
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -12,7 +10,7 @@ using namespace delta;
 namespace {
 
 TEST(StructPattern, NamedMemberTwoFields) {
-  // '{x: 5, y: 10} on struct { logic [7:0] x; logic [7:0] y; }
+
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
@@ -32,7 +30,7 @@ TEST(StructPattern, NamedMemberTwoFields) {
 }
 
 TEST(StructPattern, NamedMemberReversedOrder) {
-  // '{y: 10, x: 5} — order-independent, same result
+
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "point_t";
@@ -51,7 +49,7 @@ TEST(StructPattern, NamedMemberReversedOrder) {
 }
 
 TEST(StructPattern, NamedMemberThreeFields) {
-  // '{r: 0xFF, g: 0x80, b: 0x00} on 24-bit struct
+
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "rgb_t";
@@ -71,11 +69,8 @@ TEST(StructPattern, NamedMemberThreeFields) {
   EXPECT_EQ(result.ToUint64(), 0xFF8000u);
 }
 
-// =============================================================================
-// §10.9.2 Structure assignment patterns — default and type-keyed
-// =============================================================================
 TEST(StructPattern, DefaultAllFields) {
-  // '{default: 0xFF} → all fields filled with 0xFF
+
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "pair_t";
@@ -94,7 +89,7 @@ TEST(StructPattern, DefaultAllFields) {
 }
 
 TEST(StructPattern, DefaultWithNamedOverride) {
-  // '{a: 1, default: 0} → a=1, b=0
+
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "pair_t";
@@ -113,7 +108,7 @@ TEST(StructPattern, DefaultWithNamedOverride) {
 }
 
 TEST(StructPattern, TypeKeyedInt) {
-  // '{int: 42} on struct { int a; logic [7:0] b; } → a=42, b=0
+
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "mixed_t";
@@ -132,10 +127,7 @@ TEST(StructPattern, TypeKeyedInt) {
 }
 
 TEST(StructPattern, MixedPrecedence) {
-  // '{a: 1, byte: 2, default: 3} — member > type > default
-  // struct { byte a; byte b; logic [7:0] c; }
-  // a=1 (explicit member overrides byte key), b=2 (byte type key), c=3
-  // (default)
+
   SimFixture f;
   StructTypeInfo info;
   info.type_name = "multi_t";
@@ -156,7 +148,6 @@ TEST(StructPattern, MixedPrecedence) {
   EXPECT_EQ(result.ToUint64(), expected);
 }
 
-// §10.9.2: named pattern with default key fills remaining fields
 TEST(SimA60701, NamedStructPatternWithDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -174,11 +165,10 @@ TEST(SimA60701, NamedStructPatternWithDefault) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("p");
   ASSERT_NE(var, nullptr);
-  // a=10 (explicit), b=99 (default): (10 << 8) | 99 = 2659
+
   EXPECT_EQ(var->value.ToUint64(), 2659u);
 }
 
-// §10.9.2: named pattern with only default key
 TEST(SimA60701, NamedStructPatternOnlyDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -196,8 +186,8 @@ TEST(SimA60701, NamedStructPatternOnlyDefault) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("p");
   ASSERT_NE(var, nullptr);
-  // Both a=55, b=55: (55 << 8) | 55 = 14135
+
   EXPECT_EQ(var->value.ToUint64(), 14135u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §7.8: Associative arrays
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -19,4 +17,4 @@ TEST(ParserSection7, AssocArrayIntIndex_DimExpr) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "int");
 }
 
-}  // namespace
+}

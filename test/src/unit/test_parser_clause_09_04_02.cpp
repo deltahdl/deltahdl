@@ -1,5 +1,3 @@
-// §9.4.2: Event control
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// edge_identifier ::= posedge | negedge | edge
-// ---------------------------------------------------------------------------
-// §9.4.2: all three edge identifiers parsed correctly
 TEST(ParserA605, EdgeIdentifiers) {
   auto r = Parse(
       "module m;\n"
@@ -27,9 +21,7 @@ TEST(ParserA605, EdgeIdentifiers) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
   EXPECT_EQ(stmt->events[2].edge, Edge::kEdge);
 }
-// =============================================================================
-// §9.4.2 -- edge keyword in event control
-// =============================================================================
+
 TEST(ParserSection9, EventControlEdge) {
   auto r = Parse(
       "module m;\n"
@@ -43,12 +35,9 @@ TEST(ParserSection9, EventControlEdge) {
   ASSERT_EQ(item->sensitivity.size(), 1u);
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kEdge);
 }
-// =============================================================================
-// LRM section 9.4.2 -- Event control
-// Named event trigger and bare @identifier event control.
-// =============================================================================
+
 TEST(ParserSection9c, EventControlAtIdentifier) {
-  // @clk shorthand for @(clk)
+
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -75,9 +64,7 @@ TEST(ParserSection9, EventControlBareSignal) {
   ASSERT_FALSE(stmt->events.empty());
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
 }
-// ---------------------------------------------------------------------------
-// 11. @(posedge clk) event control
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_PosedgeEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -96,9 +83,6 @@ TEST(ParserSection4, Sec4_5_PosedgeEventControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 12. @(negedge clk) event control
-// ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_NegedgeEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -117,12 +101,8 @@ TEST(ParserSection4, Sec4_5_NegedgeEventControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.2 -- Event control (additional edge cases)
-// Null statement after event control, back-to-back event controls.
-// =============================================================================
 TEST(ParserSection9c, EventControlNullStatement) {
-  // @(posedge clk); -- event control with null statement (just a semicolon)
+
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -169,7 +149,6 @@ TEST(Parser, EventWaitWithParens) {
   EXPECT_EQ(stmt->events[0].signal->text, "ev");
 }
 
-// §9.4.2: procedural_timing_control_statement (event control)
 TEST(ParserA604, StmtItemProceduralTimingControlEvent) {
   auto r = Parse(
       "module m;\n"
@@ -184,7 +163,6 @@ TEST(ParserA604, StmtItemProceduralTimingControlEvent) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
-// §9.4.2: event control followed by statement
 TEST(ParserA605, ProceduralTimingControlEvent) {
   auto r = Parse(
       "module m;\n"
@@ -201,7 +179,6 @@ TEST(ParserA605, ProceduralTimingControlEvent) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// §9.4.2: event control followed by null statement
 TEST(ParserA605, ProceduralTimingControlEventNull) {
   auto r = Parse(
       "module m;\n"
@@ -218,7 +195,6 @@ TEST(ParserA605, ProceduralTimingControlEventNull) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
 }
 
-// §9.4.2: @identifier simple event control
 TEST(ParserA605, EventControlBareIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -236,7 +212,6 @@ TEST(ParserA605, EventControlBareIdentifier) {
   EXPECT_NE(stmt->events[0].signal, nullptr);
 }
 
-// §9.4.2: @(expression) parenthesized event control
 TEST(ParserA605, EventControlParenthesized) {
   auto r = Parse(
       "module m;\n"
@@ -252,11 +227,6 @@ TEST(ParserA605, EventControlParenthesized) {
   ASSERT_EQ(stmt->events.size(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// clocking_event ::=
-//   @ ps_identifier | @ hierarchical_identifier | @ ( event_expression )
-// ---------------------------------------------------------------------------
-// §9.4.2: @(posedge clk) — clocking event with edge
 TEST(ParserA605, ClockingEventPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -272,7 +242,6 @@ TEST(ParserA605, ClockingEventPosedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-// §9.4.2: @(negedge clk) — clocking event with negedge
 TEST(ParserA605, ClockingEventNegedge) {
   auto r = Parse(
       "module m;\n"
@@ -288,15 +257,6 @@ TEST(ParserA605, ClockingEventNegedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
 
-// ---------------------------------------------------------------------------
-// event_expression ::=
-//   [ edge_identifier ] expression [ iff expression ]
-//   | sequence_instance [ iff expression ]
-//   | event_expression or event_expression
-//   | event_expression , event_expression
-//   | ( event_expression )
-// ---------------------------------------------------------------------------
-// §9.4.2: edge_identifier = edge (generic)
 TEST(ParserA605, EventExprEdge) {
   auto r = Parse(
       "module m;\n"
@@ -312,7 +272,6 @@ TEST(ParserA605, EventExprEdge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kEdge);
 }
 
-// §9.4.2: expression without edge (any change)
 TEST(ParserA605, EventExprAnyChange) {
   auto r = Parse(
       "module m;\n"
@@ -328,7 +287,6 @@ TEST(ParserA605, EventExprAnyChange) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
 }
 
-// §9.4: procedural_timing_control with event_control
 TEST(ParserA605, ProceduralTimingControlEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -343,11 +301,6 @@ TEST(ParserA605, ProceduralTimingControlEventControl) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// LRM section 15.5.2 -- Waiting for an event
-// =============================================================================
-// §15.5.2: basic @ event wait with named event (from LRM).
 TEST(ParserSection15, WaitForEventBasicAt) {
   auto r = Parse(
       "module m;\n"
@@ -362,7 +315,6 @@ TEST(ParserSection15, WaitForEventBasicAt) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
-// §15.5.2: @ event wait with parenthesized expression.
 TEST(ParserSection15, WaitForEventParenthesized) {
   auto r = Parse(
       "module m;\n"
@@ -378,7 +330,6 @@ TEST(ParserSection15, WaitForEventParenthesized) {
   ASSERT_EQ(stmt->events.size(), 1u);
 }
 
-// §15.5.2: event wait with posedge-qualified event expression.
 TEST(ParserSection15, WaitForEventPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -430,9 +381,6 @@ TEST(Parser, EventWaitBareIdentifier) {
   EXPECT_EQ(stmt->events[0].signal->text, "ev");
 }
 
-// =============================================================================
-// LRM section 9.4.2 -- Event control (@)
-// =============================================================================
 TEST(ParserSection9, EventControlPosedgeKind) {
   auto r = Parse(
       "module m;\n"
@@ -476,4 +424,4 @@ TEST(ParserSection9, EventControlNegedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
 
-}  // namespace
+}

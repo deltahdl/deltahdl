@@ -1,5 +1,3 @@
-// §14.5: Hierarchical expressions
-
 #include <cstdint>
 #include <string_view>
 
@@ -12,16 +10,8 @@
 
 using namespace delta;
 
-// Helper fixture for clocking simulation tests.
-// Schedule posedge at a given time through the scheduler.
-
-// Schedule negedge at a given time through the scheduler.
-
 namespace {
 
-// =============================================================================
-// 12. Hierarchical access to clocking signals (S14.10)
-// =============================================================================
 TEST(ClockingSim, HierarchicalAccess) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -41,4 +31,4 @@ TEST(ClockingSim, HierarchicalAccess) {
   EXPECT_EQ(sampled, 0xCCu);
 }
 
-}  // namespace
+}

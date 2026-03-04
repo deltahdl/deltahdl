@@ -1,5 +1,3 @@
-// §6.19: Enumerations
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §6.19: Enum validation ---
 TEST(Elaboration, EnumSizedLiteralMismatch_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -44,4 +41,4 @@ TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

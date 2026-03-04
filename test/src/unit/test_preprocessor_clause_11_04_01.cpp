@@ -1,5 +1,3 @@
-// §11.4.1: Assignment operators
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 10.8 -- Operator assignments (+=, -=, etc.)
-// =============================================================================
 TEST(ParserSection10, OperatorAssignPlusEq) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -50,4 +45,4 @@ TEST(ParserSection10, OperatorAssignStarEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

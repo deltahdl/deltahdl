@@ -1,5 +1,3 @@
-// Annex A.8.1: Concatenations
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// § module_path_concatenation (in specify context)
 TEST(ParserA81, ModulePathConcatenation) {
   auto r = Parse(
       "module m;\n"
@@ -19,4 +16,4 @@ TEST(ParserA81, ModulePathConcatenation) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §22.14.4: IEEE Std 1364-2001-noconfig keywords
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -15,4 +13,4 @@ TEST(ParserSection22, BeginKeywords1364_2001_noconfig) {
               "`end_keywords\n"));
 }
 
-}  // namespace
+}

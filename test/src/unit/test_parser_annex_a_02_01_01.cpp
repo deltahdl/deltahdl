@@ -1,17 +1,9 @@
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-namespace {}  // namespace
-
-// =============================================================================
-// A.2.1.1 Module parameter declarations
-// =============================================================================
-
-// --- local_parameter_declaration ---
-// localparam data_type_or_implicit list_of_param_assignments
+namespace {}
 
 TEST(ParserA211, LocalparamExplicitType) {
   auto r = Parse("module m; localparam int X = 5; endmodule");
@@ -41,8 +33,6 @@ TEST(ParserA211, LocalparamPackedDimImplicit) {
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
-// localparam type_parameter_declaration
-
 TEST(ParserA211, LocalparamTypeParam) {
   auto r = Parse("module m; localparam type T = int; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -51,9 +41,6 @@ TEST(ParserA211, LocalparamTypeParam) {
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kVoid);
 }
-
-// --- parameter_declaration ---
-// parameter data_type_or_implicit list_of_param_assignments
 
 TEST(ParserA211, ParameterExplicitType) {
   auto r = Parse("module m; parameter int WIDTH = 8; endmodule");
@@ -80,8 +67,6 @@ TEST(ParserA211, ParameterPackedDim) {
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
-// parameter type_parameter_declaration
-
 TEST(ParserA211, ParameterTypeParam) {
   auto r = Parse("module m; parameter type BusType = logic [7:0]; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -89,8 +74,6 @@ TEST(ParserA211, ParameterTypeParam) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kVoid);
 }
-
-// parameter data_type_or_implicit: various data types
 
 TEST(ParserA211, ParameterStringType) {
   auto r = Parse("module m; parameter string NAME = \"hello\"; endmodule");
@@ -103,9 +86,6 @@ TEST(ParserA211, ParameterRealType) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// --- type_parameter_declaration ---
-// type [ forward_type ] list_of_type_assignments
 
 TEST(ParserA211, TypeParamForwardEnum) {
   auto r = Parse("module m; parameter type enum E = my_enum_t; endmodule");
@@ -147,8 +127,6 @@ TEST(ParserA211, TypeParamForwardInterfaceClass) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "IC");
 }
 
-// list_of_param_assignments: multiple comma-separated params
-
 TEST(ParserA211, ListOfParamAssignments) {
   auto r = Parse("module m; parameter int A = 1, B = 2, C = 3; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -171,8 +149,6 @@ TEST(ParserA211, ListOfLocalparamAssignments) {
   EXPECT_GE(param_count, 2);
 }
 
-// list_of_type_assignments: multiple type params
-
 TEST(ParserA211, ListOfTypeAssignments) {
   auto r = Parse("module m; parameter type T1 = int, T2 = real; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -183,9 +159,6 @@ TEST(ParserA211, ListOfTypeAssignments) {
   }
   EXPECT_GE(param_count, 2);
 }
-
-// --- specparam_declaration ---
-// specparam [ packed_dimension ] list_of_specparam_assignments ;
 
 TEST(ParserA211, SpecparamBasic) {
   auto r = Parse(
@@ -214,17 +187,12 @@ TEST(ParserA211, SpecparamMultipleAssignments) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// specparam as non_port_module_item (outside specify)
-
 TEST(ParserA211, SpecparamOutsideSpecify) {
   auto r = Parse("module m; specparam tPD = 10; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
 }
-
-// param_assignment with unpacked dimensions (no default value)
-// param_assignment ::= parameter_identifier { variable_dimension } [ = ... ]
 
 TEST(ParserA211, ParamAssignmentNoDefault) {
   auto r = Parse("module m #(parameter int P)(); endmodule");

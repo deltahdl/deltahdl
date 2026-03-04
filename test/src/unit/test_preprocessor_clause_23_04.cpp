@@ -1,5 +1,3 @@
-// §23.4: Nested modules
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Nested module_declaration as non_port_module_item.
 TEST(SourceText, NestedModuleDeclaration) {
   auto r = ParseWithPreprocessor(
       "module outer;\n"
@@ -23,4 +20,4 @@ TEST(SourceText, NestedModuleDeclaration) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->nested_module_decl->name, "inner");
 }
 
-}  // namespace
+}

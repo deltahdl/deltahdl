@@ -1,5 +1,3 @@
-// §27.4: Loop generate constructs
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- Generate tests ---
 TEST(Elaborator, GenerateForCreatesVars) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -69,10 +66,6 @@ TEST(Elaborator, GenerateForWithAssign) {
   EXPECT_EQ(mod->variables[1].name, "i_1_w");
 }
 
-// =============================================================================
-// Elaboration tests -- generate constructs resolved through elaborator
-// =============================================================================
-// --- Elaborator expands loop_generate_construct ---
 TEST(ParserAnnexA042, ElaborationGenerateForExpansion) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -92,7 +85,6 @@ TEST(ParserAnnexA042, ElaborationGenerateForExpansion) {
   EXPECT_EQ(mod->variables[2].name, "i_2_x");
 }
 
-// --- Elaborator handles zero-iteration loop ---
 TEST(ParserAnnexA042, ElaborationGenerateForZeroIter) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -109,7 +101,6 @@ TEST(ParserAnnexA042, ElaborationGenerateForZeroIter) {
   EXPECT_EQ(mod->variables.size(), 0u);
 }
 
-// --- Elaborator expands for-generate with continuous assigns ---
 TEST(ParserAnnexA042, ElaborationGenerateForWithAssign) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -128,7 +119,6 @@ TEST(ParserAnnexA042, ElaborationGenerateForWithAssign) {
   EXPECT_EQ(mod->assigns.size(), 2u);
 }
 
-// --- Elaborator expands for-generate with module instantiation ---
 TEST(ParserAnnexA042, ElaborationGenerateForModuleInst) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -146,4 +136,4 @@ TEST(ParserAnnexA042, ElaborationGenerateForModuleInst) {
   EXPECT_GE(mod->children.size(), 2u);
 }
 
-}  // namespace
+}

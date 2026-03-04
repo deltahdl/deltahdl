@@ -1,5 +1,3 @@
-// §35.5.1.3: Special properties pure and context
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -22,4 +20,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportContext) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-}  // namespace
+}

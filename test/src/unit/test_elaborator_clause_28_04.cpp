@@ -1,5 +1,3 @@
-// §28.4: and, nand, nor, or, xor, and xnor gates
-
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -17,12 +15,12 @@ TEST(ParserSection28, ElaborateAndGate) {
       f);
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
-  // Gate should produce a continuous assign.
+
   ASSERT_GE(mod->assigns.size(), 1);
   auto& ca = mod->assigns[0];
   EXPECT_NE(ca.lhs, nullptr);
   EXPECT_NE(ca.rhs, nullptr);
-  // The rhs should be a binary '&' expression.
+
   EXPECT_EQ(ca.rhs->op, TokenKind::kAmp);
 }
 
@@ -51,7 +49,7 @@ TEST(ParserSection28, ElaborateNandGate) {
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
-  // nand -> ~(a & b): unary kTilde wrapping binary kAmp.
+
   auto* rhs = mod->assigns[0].rhs;
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
   EXPECT_NE(rhs->lhs, nullptr);
@@ -83,9 +81,9 @@ TEST(ParserSection28, ElaborateMultiInputAnd) {
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1);
-  // 3-input and: (a & b) & c -- nested binary.
+
   auto* rhs = mod->assigns[0].rhs;
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-}  // namespace
+}

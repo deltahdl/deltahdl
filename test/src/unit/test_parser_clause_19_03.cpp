@@ -1,5 +1,3 @@
-// §19.3: Defining the coverage model: covergroup
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.11 Production #1: covergroup_declaration
-// =============================================================================
 TEST(ParserA211, CovergroupDecl_Basic) {
   auto r = Parse(
       "module m;\n"
@@ -71,9 +66,6 @@ TEST(ParserA211, CovergroupDecl_WithEndLabel) {
   EXPECT_EQ(item->name, "cg");
 }
 
-// =============================================================================
-// §A.2.11 Production #5: coverage_event
-// =============================================================================
 TEST(ParserA211, CoverageEvent_ClockingEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -110,9 +102,6 @@ TEST(ParserA211, CoverageEvent_BlockEventEnd) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #6: block_event_expression
-// =============================================================================
 TEST(ParserA211, BlockEventExpression_BeginHierarchical) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -131,9 +120,6 @@ TEST(ParserA211, BlockEventExpression_Or) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #7: hierarchical_btf_identifier
-// =============================================================================
 TEST(ParserA211, HierarchicalBtfIdentifier_Simple) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -171,9 +157,6 @@ TEST(ParserA211, CoverageSpecOrOption_CoverSpec) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// Additional comprehensive tests
-// =============================================================================
 TEST(ParserA211, FullCovergroup_MultipleElements) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -254,14 +237,8 @@ using DpiParseTest = ProgramTestParse;
 
 using ApiParseTest = ProgramTestParse;
 
-// =============================================================================
-// LRM section 40.5.2 -- Coverage with assertion and covergroup constructs
-// The VPI coverage API queries are applied to assertion handles and
-// covergroup instances. These tests verify the parser handles the
-// constructs that coverage queries operate on.
-// =============================================================================
 TEST(ParserSection40, CovergroupWithCoverpoint) {
-  // Covergroup with coverpoint -- target of vpi_get(vpiCovered, ...)
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic [2:0] addr;
@@ -273,9 +250,6 @@ TEST(ParserSection40, CovergroupWithCoverpoint) {
 }
 using VerifyParseTest = ProgramTestParse;
 
-// =============================================================================
-// §19 Functional coverage — covergroup
-// =============================================================================
 TEST_F(VerifyParseTest, BasicCovergroup) {
   auto* unit = Parse(R"(
     module m;
@@ -285,7 +259,7 @@ TEST_F(VerifyParseTest, BasicCovergroup) {
     endmodule
   )");
   ASSERT_EQ(unit->modules.size(), 1u);
-  // Covergroup should parse without error.
+
 }
 
 TEST_F(VerifyParseTest, CovergroupEndLabel) {
@@ -299,4 +273,4 @@ TEST_F(VerifyParseTest, CovergroupEndLabel) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §30.4.7.2: Positive polarity
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -13,10 +11,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.7.2 parallel_path_description — polarity_operator
-// =============================================================================
-// ( input + => output ) — positive polarity, parallel
 TEST(ParserA702, ParallelPathPositivePolarity) {
   auto r = Parse(
       "module m;\n"
@@ -32,4 +26,4 @@ TEST(ParserA702, ParallelPathPositivePolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
 }
 
-}  // namespace
+}

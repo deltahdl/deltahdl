@@ -9,8 +9,6 @@
 
 using namespace delta;
 
-// Capture src and schedule an NBA update that assigns the captured value to
-// dst.
 static void ScheduleNbaAssign(Scheduler& sched, const int& src, int& dst) {
   int rhs_val = src;
   auto* nba = sched.GetEventPool().Acquire();
@@ -19,20 +17,12 @@ static void ScheduleNbaAssign(Scheduler& sched, const int& src, int& dst) {
   sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
 }
 
-// ===========================================================================
-// §4.9.4 Nonblocking assignment
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.9.4 — RHS always evaluated before NBA is scheduled
-// ---------------------------------------------------------------------------
 TEST(SimCh4094, AlwaysComputesUpdatedValue) {
   Arena arena;
   Scheduler sched(arena);
   int src = 42;
   int dst = 0;
 
-  // Model: dst <= src;  (src=42 at evaluation time)
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() { ScheduleNbaAssign(sched, src, dst); };
@@ -42,26 +32,20 @@ TEST(SimCh4094, AlwaysComputesUpdatedValue) {
   EXPECT_EQ(dst, 42);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.4 — Update scheduled in NBA region, not Active or Inactive
-// ---------------------------------------------------------------------------
 TEST(SimCh4094, SchedulesUpdateAsNbaEvent) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Schedule an NBA update and an Active update at the same time.
-  // The Active update must execute before the NBA update.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    // NBA update.
+
     auto* nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&]() { order.push_back("nba_update"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
 
-    // Active update (should execute before NBA).
     auto* active = sched.GetEventPool().Acquire();
     active->kind = EventKind::kUpdate;
     active->callback = [&]() { order.push_back("active_update"); };
@@ -75,16 +59,12 @@ TEST(SimCh4094, SchedulesUpdateAsNbaEvent) {
   EXPECT_EQ(order[1], "nba_update");
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.4 — Zero delay schedules NBA in current time step
-// ---------------------------------------------------------------------------
 TEST(SimCh4094, ZeroDelaySchedulesNbaInCurrentTimestep) {
   Arena arena;
   Scheduler sched(arena);
   int dst = 0;
   bool nba_executed_at_time_zero = false;
 
-  // Model: dst <= #0 5;
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
@@ -104,16 +84,12 @@ TEST(SimCh4094, ZeroDelaySchedulesNbaInCurrentTimestep) {
   EXPECT_TRUE(nba_executed_at_time_zero);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.4 — Nonzero delay schedules NBA as future event
-// ---------------------------------------------------------------------------
 TEST(SimCh4094, NonzeroDelaySchedulesNbaAsFutureEvent) {
   Arena arena;
   Scheduler sched(arena);
   int dst = 0;
   uint64_t nba_time = 0;
 
-  // Model: dst <= #10 99;
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
@@ -133,34 +109,26 @@ TEST(SimCh4094, NonzeroDelaySchedulesNbaAsFutureEvent) {
   EXPECT_EQ(nba_time, 10u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.4 — RHS computed using values at schedule time, not execution time
-// ---------------------------------------------------------------------------
 TEST(SimCh4094, RhsComputedAtScheduleTime) {
   Arena arena;
   Scheduler sched(arena);
   int src = 10;
   int dst = 0;
 
-  // Model: dst <= src; at time 0 when src=10.
-  // src changes later but dst should get the captured value 10.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     ScheduleNbaAssign(sched, src, dst);
-    // Change src after scheduling the NBA but before it executes.
+
     src = 99;
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
   sched.Run();
-  // dst should be 10 (value when NBA was placed), not 99.
+
   EXPECT_EQ(dst, 10);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.4 — LHS target determined at schedule time, not execution time
-// ---------------------------------------------------------------------------
 TEST(SimCh4094, LhsTargetDeterminedAtScheduleTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -168,13 +136,10 @@ TEST(SimCh4094, LhsTargetDeterminedAtScheduleTime) {
   int dst_a = 0;
   int dst_b = 0;
 
-  // Model: (select ? dst_b : dst_a) <= 1;
-  // At time 0, select=0 → target is dst_a. Target is captured at schedule
-  // time, so even if select changes before the NBA executes, dst_a is used.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int target_select = select;  // Capture target at schedule time.
+    int target_select = select;
     auto* nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&, target_select]() {
@@ -185,20 +150,17 @@ TEST(SimCh4094, LhsTargetDeterminedAtScheduleTime) {
       }
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-    // Change select after scheduling, before NBA executes.
+
     select = 1;
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
   sched.Run();
-  // Target was dst_a (select=0 at schedule time), not dst_b.
+
   EXPECT_EQ(dst_a, 1);
   EXPECT_EQ(dst_b, 0);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.4 — Multiple NBAs all schedule in NBA region
-// ---------------------------------------------------------------------------
 TEST(SimCh4094, MultipleNbasAllScheduleInNbaRegion) {
   Arena arena;
   Scheduler sched(arena);
@@ -206,8 +168,6 @@ TEST(SimCh4094, MultipleNbasAllScheduleInNbaRegion) {
   int b = 0;
   int c = 0;
 
-  // Model: a <= 1; b <= 2; c <= 3;
-  // All three NBAs schedule in NBA region and all execute.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
@@ -234,26 +194,21 @@ TEST(SimCh4094, MultipleNbasAllScheduleInNbaRegion) {
   EXPECT_EQ(c, 3);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.4 — NBA does not block the executing process
-// ---------------------------------------------------------------------------
 TEST(SimCh4094, NbaDoesNotBlockProcess) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Model: begin dst <= 1; next_stmt; end
-  // The process schedules the NBA and immediately continues to next_stmt.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     order.push_back("before_nba");
-    // Schedule NBA (does not block).
+
     auto* nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&]() { order.push_back("nba_update"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-    // Process continues immediately.
+
     order.push_back("after_nba_next_stmt");
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
@@ -265,9 +220,6 @@ TEST(SimCh4094, NbaDoesNotBlockProcess) {
   EXPECT_EQ(order[2], "nba_update");
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.4 — NBA executes after Active and Inactive in the same time step
-// ---------------------------------------------------------------------------
 TEST(SimCh4094, NbaExecutesAfterActiveAndInactive) {
   Arena arena;
   Scheduler sched(arena);
@@ -276,13 +228,12 @@ TEST(SimCh4094, NbaExecutesAfterActiveAndInactive) {
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    // Schedule an Inactive event.
+
     auto* inactive = sched.GetEventPool().Acquire();
     inactive->kind = EventKind::kUpdate;
     inactive->callback = [&]() { order.push_back("inactive"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kInactive, inactive);
 
-    // Schedule an NBA event.
     auto* nba = sched.GetEventPool().Acquire();
     nba->kind = EventKind::kUpdate;
     nba->callback = [&]() { order.push_back("nba"); };
@@ -299,22 +250,17 @@ TEST(SimCh4094, NbaExecutesAfterActiveAndInactive) {
   EXPECT_EQ(order[2], "nba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.4 — Swap pattern: both RHS values computed before either NBA executes
-// ---------------------------------------------------------------------------
 TEST(SimCh4094, SwapPatternBothRhsComputedBeforeUpdate) {
   Arena arena;
   Scheduler sched(arena);
   int x = 1;
   int y = 2;
 
-  // Model: x <= y; y <= x;
-  // Both RHS values (y=2, x=1) captured before either NBA executes.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    int rhs_x = y;  // Capture y=2 for x.
-    int rhs_y = x;  // Capture x=1 for y.
+    int rhs_x = y;
+    int rhs_y = x;
 
     auto* nba1 = sched.GetEventPool().Acquire();
     nba1->kind = EventKind::kUpdate;
@@ -329,7 +275,7 @@ TEST(SimCh4094, SwapPatternBothRhsComputedBeforeUpdate) {
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
   sched.Run();
-  // After swap: x=2, y=1.
+
   EXPECT_EQ(x, 2);
   EXPECT_EQ(y, 1);
 }

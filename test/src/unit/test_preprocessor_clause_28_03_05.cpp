@@ -1,5 +1,3 @@
-// §28.3.5: The range specification
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -30,4 +28,4 @@ TEST(ParserSection28, GateArrayWithDelay) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-}  // namespace
+}

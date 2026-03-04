@@ -1,5 +1,3 @@
-// Annex A.5.3: UDP body
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -22,7 +20,6 @@ TEST(ParserAnnexA, A5UdpSequential) {
   EXPECT_TRUE(r.cu->udps[0]->is_sequential);
 }
 
-// Combinational entry with multi-input level_input_list
 TEST(ParserAnnexA053, CombEntry_MultiInput) {
   auto r = Parse(
       "primitive three_in(output y, input a, b, c);\n"
@@ -46,7 +43,6 @@ TEST(ParserAnnexA053, CombEntry_MultiInput) {
   EXPECT_EQ(udp->table[1].output, '1');
 }
 
-// Sequential body with single entry
 TEST(ParserAnnexA053, SeqBody_SingleEntry) {
   auto r = Parse(
       "primitive sr_min(output reg q, input s, r);\n"
@@ -61,7 +57,6 @@ TEST(ParserAnnexA053, SeqBody_SingleEntry) {
   EXPECT_EQ(udp->table.size(), 1);
 }
 
-// seq_input_list as edge_input_list (contains edge symbol)
 TEST(ParserAnnexA053, SeqInputList_WithEdge) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -73,12 +68,11 @@ TEST(ParserAnnexA053, SeqInputList_WithEdge) {
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   auto* udp = r.cu->udps[0];
-  // Row 0: 'd' is level, 'clk' is edge
+
   EXPECT_EQ(udp->table[0].inputs[1], 'r');
   EXPECT_EQ(udp->table[2].inputs[1], 'f');
 }
 
-// Multiple level symbols in input list
 TEST(ParserAnnexA053, LevelInputList_Multiple) {
   auto r = Parse(
       "primitive four_in(output y, input a, b, c, d);\n"
@@ -95,7 +89,6 @@ TEST(ParserAnnexA053, LevelInputList_Multiple) {
   EXPECT_EQ(udp->table[0].inputs[3], '1');
 }
 
-// Edge indicator with trailing level symbol
 TEST(ParserAnnexA053, EdgeInputList_TrailingLevel) {
   auto r = Parse(
       "primitive clk_first(output reg q, input clk, d);\n"
@@ -110,7 +103,6 @@ TEST(ParserAnnexA053, EdgeInputList_TrailingLevel) {
   EXPECT_EQ(udp->table[0].inputs[1], '0');
 }
 
-// Edge indicator surrounded by level symbols (3 inputs)
 TEST(ParserAnnexA053, EdgeInputList_SurroundedByLevels) {
   auto r = Parse(
       "primitive three_in(output reg q, input a, clk, b);\n"
@@ -126,7 +118,6 @@ TEST(ParserAnnexA053, EdgeInputList_SurroundedByLevels) {
   EXPECT_EQ(udp->table[0].inputs[2], '1');
 }
 
-// edge_indicator as parenthesized form (01)
 TEST(ParserAnnexA053, EdgeIndicator_Paren01) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -138,11 +129,10 @@ TEST(ParserAnnexA053, EdgeIndicator_Paren01) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.has_errors);
   auto* udp = r.cu->udps[0];
-  // Parenthesized (01) should produce exactly 2 input entries per row
+
   ASSERT_EQ(udp->table[0].inputs.size(), 2);
 }
 
-// edge_indicator as parenthesized form (10)
 TEST(ParserAnnexA053, EdgeIndicator_Paren10) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -156,7 +146,6 @@ TEST(ParserAnnexA053, EdgeIndicator_Paren10) {
   ASSERT_EQ(udp->table[0].inputs.size(), 2);
 }
 
-// edge_indicator as parenthesized form (0x)
 TEST(ParserAnnexA053, EdgeIndicator_Paren0x) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -170,7 +159,6 @@ TEST(ParserAnnexA053, EdgeIndicator_Paren0x) {
   ASSERT_EQ(udp->table[0].inputs.size(), 2);
 }
 
-// edge_indicator as parenthesized form (x1)
 TEST(ParserAnnexA053, EdgeIndicator_Parenx1) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -184,10 +172,6 @@ TEST(ParserAnnexA053, EdgeIndicator_Parenx1) {
   ASSERT_EQ(udp->table[0].inputs.size(), 2);
 }
 
-// ---------------------------------------------------------------------------
-// Production 12: current_state ::= level_symbol
-// ---------------------------------------------------------------------------
-// current_state as '0'
 TEST(ParserAnnexA053, CurrentState_Zero) {
   auto r = Parse(
       "primitive p(output reg q, input s, r);\n"
@@ -199,7 +183,6 @@ TEST(ParserAnnexA053, CurrentState_Zero) {
   EXPECT_EQ(r.cu->udps[0]->table[0].current_state, '0');
 }
 
-// current_state as '1'
 TEST(ParserAnnexA053, CurrentState_One) {
   auto r = Parse(
       "primitive p(output reg q, input s, r);\n"
@@ -211,7 +194,6 @@ TEST(ParserAnnexA053, CurrentState_One) {
   EXPECT_EQ(r.cu->udps[0]->table[0].current_state, '1');
 }
 
-// current_state as '?'
 TEST(ParserAnnexA053, CurrentState_Question) {
   auto r = Parse(
       "primitive p(output reg q, input d, en);\n"
@@ -223,7 +205,6 @@ TEST(ParserAnnexA053, CurrentState_Question) {
   EXPECT_EQ(r.cu->udps[0]->table[0].current_state, '?');
 }
 
-// current_state as 'x'
 TEST(ParserAnnexA053, CurrentState_X) {
   auto r = Parse(
       "primitive p(output reg q, input d, en);\n"
@@ -235,7 +216,6 @@ TEST(ParserAnnexA053, CurrentState_X) {
   EXPECT_EQ(r.cu->udps[0]->table[0].current_state, 'x');
 }
 
-// current_state as 'b'
 TEST(ParserAnnexA053, CurrentState_B) {
   auto r = Parse(
       "primitive p(output reg q, input d, en);\n"
@@ -247,10 +227,6 @@ TEST(ParserAnnexA053, CurrentState_B) {
   EXPECT_EQ(r.cu->udps[0]->table[0].current_state, 'b');
 }
 
-// ---------------------------------------------------------------------------
-// Production 13: next_state ::= output_symbol | -
-// ---------------------------------------------------------------------------
-// next_state as output_symbol '0'
 TEST(ParserAnnexA053, NextState_Zero) {
   auto r = Parse(
       "primitive p(output reg q, input d, en);\n"
@@ -262,7 +238,6 @@ TEST(ParserAnnexA053, NextState_Zero) {
   EXPECT_EQ(r.cu->udps[0]->table[0].output, '0');
 }
 
-// next_state as output_symbol '1'
 TEST(ParserAnnexA053, NextState_One) {
   auto r = Parse(
       "primitive p(output reg q, input d, en);\n"
@@ -274,7 +249,6 @@ TEST(ParserAnnexA053, NextState_One) {
   EXPECT_EQ(r.cu->udps[0]->table[0].output, '1');
 }
 
-// next_state as output_symbol 'x'
 TEST(ParserAnnexA053, NextState_X) {
   auto r = Parse(
       "primitive p(output reg q, input d, en);\n"
@@ -285,10 +259,7 @@ TEST(ParserAnnexA053, NextState_X) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->udps[0]->table[0].output, 'x');
 }
-// ---------------------------------------------------------------------------
-// Production 14: output_symbol ::= 0 | 1 | x | X
-// ---------------------------------------------------------------------------
-// All four output_symbol values in combinational entries
+
 TEST(ParserAnnexA053, OutputSymbol_AllFour) {
   auto r = Parse(
       "primitive p(output y, input a, b);\n"
@@ -306,14 +277,10 @@ TEST(ParserAnnexA053, OutputSymbol_AllFour) {
   EXPECT_EQ(udp->table[0].output, '0');
   EXPECT_EQ(udp->table[1].output, '1');
   EXPECT_EQ(udp->table[2].output, 'x');
-  // 'X' is stored as-is by UdpCharFromToken (first char)
+
   EXPECT_TRUE(udp->table[3].output == 'X' || udp->table[3].output == 'x');
 }
 
-// ---------------------------------------------------------------------------
-// Production 15: level_symbol ::= 0 | 1 | x | X | ? | b | B
-// ---------------------------------------------------------------------------
-// All level symbols in input positions
 TEST(ParserAnnexA053, LevelSymbol_AllValues) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -340,10 +307,6 @@ TEST(ParserAnnexA053, LevelSymbol_AllValues) {
   EXPECT_TRUE(udp->table[6].inputs[0] == 'B' || udp->table[6].inputs[0] == 'b');
 }
 
-// ---------------------------------------------------------------------------
-// Production 16: edge_symbol ::= r | R | f | F | p | P | n | N | *
-// ---------------------------------------------------------------------------
-// All edge symbols parsed
 TEST(ParserAnnexA053, EdgeSymbol_AllValues) {
   auto r = Parse(
       "primitive p(output reg q, input a);\n"
@@ -374,7 +337,6 @@ TEST(ParserAnnexA053, EdgeSymbol_AllValues) {
   EXPECT_EQ(udp->table[8].inputs[0], '*');
 }
 
-// Simulation: 'r' matches rising edge (0->1)
 TEST(ParserAnnexA053, EdgeSymbol_SimR) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -389,8 +351,8 @@ TEST(ParserAnnexA053, EdgeSymbol_SimR) {
   auto* udp = r.cu->udps[0];
   UdpEvalState eval(*udp);
   eval.SetInputs({'1', '0'});
-  // Rising edge (0->1) with d=1 -> output=1
+
   EXPECT_EQ(eval.EvaluateWithEdge({'1', '1'}, 1, '0'), '1');
 }
 
-}  // namespace
+}

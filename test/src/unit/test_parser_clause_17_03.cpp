@@ -1,5 +1,3 @@
-// §17.3: Checker instantiation
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,26 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.4.1.4 -- Checker instantiation
-//
-// checker_instantiation ::=
-//   ps_checker_identifier name_of_instance
-//     ( [ list_of_checker_port_connections ] ) ;
-//
-// list_of_checker_port_connections ::=
-//   ordered_checker_port_connection { , ordered_checker_port_connection }
-//   | named_checker_port_connection { , named_checker_port_connection }
-//
-// ordered_checker_port_connection ::=
-//   { attribute_instance } [ property_actual_arg ]
-//
-// named_checker_port_connection ::=
-//   { attribute_instance } . formal_port_identifier
-//     [ ( [ property_actual_arg ] ) ]
-//   | { attribute_instance } . *
-// =============================================================================
-// --- checker_instantiation: basic named port connections ---
 TEST(ParserAnnexA0414, BasicCheckerInst) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic data);\n"
@@ -41,7 +19,6 @@ TEST(ParserAnnexA0414, BasicCheckerInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-// --- named_checker_port_connection: .* (wildcard) ---
 TEST(ParserAnnexA0414, CheckerInstWildcardPort) {
   auto r = Parse(
       "checker my_chk(input logic clk);\n"
@@ -53,7 +30,6 @@ TEST(ParserAnnexA0414, CheckerInstWildcardPort) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
-// --- list_of_checker_port_connections: empty ---
 TEST(ParserAnnexA0414, CheckerInstEmptyPorts) {
   auto r = Parse(
       "checker my_chk;\n"
@@ -66,7 +42,6 @@ TEST(ParserAnnexA0414, CheckerInstEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-// --- name_of_instance: with unpacked_dimension (instance array) ---
 TEST(ParserAnnexA0414, CheckerInstArray) {
   auto r = Parse(
       "checker my_chk(input logic clk);\n"
@@ -80,7 +55,6 @@ TEST(ParserAnnexA0414, CheckerInstArray) {
   EXPECT_NE(item->inst_range_right, nullptr);
 }
 
-// --- checker_instantiation: inside another checker ---
 TEST(ParserAnnexA0414, CheckerInstInsideChecker) {
   auto r = Parse(
       "checker inner_chk(input logic sig);\n"
@@ -107,9 +81,6 @@ static const ModuleItem* FindItemOfKind(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// =============================================================================
-// §17.6 Checker instantiation
-// =============================================================================
 TEST_F(CheckerParseTest, CheckerInstantiatedInModule) {
   auto* unit = Parse(R"(
     checker my_checker(input logic clk, input logic data);
@@ -129,9 +100,6 @@ TEST_F(CheckerParseTest, CheckerInstantiatedInModule) {
   EXPECT_EQ(inst->inst_name, "chk_inst");
 }
 
-// =============================================================================
-// §17.4 Checker instantiation
-// =============================================================================
 TEST_F(VerifyParseTest, CheckerInstantiationPositional) {
   auto* unit = Parse(R"(
     checker mutex(logic [31:0] sig, event clock, output bit failure);
@@ -202,4 +170,4 @@ TEST_F(VerifyParseTest, CheckerNestedWithClocking) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+}

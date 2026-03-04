@@ -1,6 +1,3 @@
-// §6.8: on variable initialization). This is roughly equivalent to a C
-// automatic variable.
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -27,4 +24,4 @@ TEST(Lowerer, VariableCreation) {
   ASSERT_NE(var, nullptr);
 }
 
-}  // namespace
+}

@@ -1,14 +1,9 @@
-// Annex A.2.3: Declaration lists
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// --- list_of_variable_port_identifiers ---
-// port_identifier { variable_dimension } [ = constant_expression ]
-//     { , port_identifier { variable_dimension } [ = constant_expression ] }
 TEST(ParserA23, ListOfVariablePortIdentifiersSingle) {
   auto r = Parse("module m(output logic q = 1'b0); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -35,9 +30,6 @@ TEST(ParserA23, ListOfTfVariableIdentifiersMultiple) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-// --- list_of_tf_variable_identifiers ---
-// port_identifier { variable_dimension } [ = expression ]
-//     { , port_identifier { variable_dimension } [ = expression ] }
 TEST(ParserA23, ListOfTfVariableIdentifiersSingle) {
   auto r = Parse(
       "module m;\n"
@@ -65,8 +57,6 @@ TEST(ParserA23, ListOfTypeAssignmentsMultiple) {
   EXPECT_GE(count, 3);
 }
 
-// --- list_of_udp_port_identifiers ---
-// port_identifier { , port_identifier }
 TEST(ParserA23, ListOfUdpPortIdentifiersSingle) {
   auto r = Parse(
       "primitive buf_p(output out, input in);\n"
@@ -76,4 +66,4 @@ TEST(ParserA23, ListOfUdpPortIdentifiersSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §19.5: Defining coverage points
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.11 Production #4: coverage_spec
-// =============================================================================
 TEST(ParserA211, CoverageSpec_CoverPoint) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -20,9 +15,6 @@ TEST(ParserA211, CoverageSpec_CoverPoint) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #8: cover_point
-// =============================================================================
 TEST(ParserA211, CoverPoint_BasicExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -131,4 +123,4 @@ TEST_F(VerifyParseTest, CovergroupWithIff) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

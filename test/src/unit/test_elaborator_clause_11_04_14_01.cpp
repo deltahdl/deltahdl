@@ -1,5 +1,3 @@
-// §11.4.14.1: Concatenation of stream_expressions
-
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "helpers_eval_op.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § streaming_concatenation — multiple stream elements
 TEST(SimA81, StreamingMultipleElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -27,4 +24,4 @@ TEST(SimA81, StreamingMultipleElements) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-}  // namespace
+}

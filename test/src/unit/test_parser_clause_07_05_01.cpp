@@ -1,5 +1,3 @@
-// §7.5.1: New[ ]
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- dynamic_array_new ---
-// new [ expression ] [ ( expression ) ]
 TEST(ParserA24, DynamicArrayNewSize) {
   auto r = Parse(
       "module m;\n"
@@ -39,7 +35,7 @@ TEST(ParserA24, DynamicArrayDeclWithNew) {
   EXPECT_FALSE(r.has_errors);
 }
 TEST(ParserA602, BlockingAssignment_DynamicArrayNew) {
-  // nonrange_variable_lvalue = dynamic_array_new
+
   auto r = Parse(
       "module m;\n"
       "  initial begin arr = new[10]; end\n"
@@ -52,7 +48,7 @@ TEST(ParserA602, BlockingAssignment_DynamicArrayNew) {
 }
 
 TEST(ParserA602, BlockingAssignment_DynamicArrayNewWithInit) {
-  // dynamic_array_new with copy initializer: new[size](init)
+
   auto r = Parse(
       "module m;\n"
       "  initial begin arr = new[10](old_arr); end\n"
@@ -64,7 +60,6 @@ TEST(ParserA602, BlockingAssignment_DynamicArrayNewWithInit) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-// --- Test helpers ---
 TEST(ParserSection7c, DynamicArrayNewConstruct) {
   auto r = Parse(
       "module m;\n"
@@ -74,9 +69,7 @@ TEST(ParserSection7c, DynamicArrayNewConstruct) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// =========================================================================
-// §7.5.1: Dynamic array new[]
-// =========================================================================
+
 TEST(ParserSection7, DynamicArrayNew) {
   auto r = Parse(
       "module t;\n"
@@ -103,4 +96,4 @@ TEST(ParserSection7, DynamicArrayNewWithInit) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

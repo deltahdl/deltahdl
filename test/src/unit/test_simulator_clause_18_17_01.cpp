@@ -1,5 +1,3 @@
-// §18.17.1: Random production weights
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Weighted alternatives: both are reachable (statistical test)
 TEST(SimA612, WeightedAlternativesReachable) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -30,8 +27,8 @@ TEST(SimA612, WeightedAlternativesReachable) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // One of the alternatives was chosen
+
   EXPECT_TRUE(var->value.ToUint64() == 1u || var->value.ToUint64() == 2u);
 }
 
-}  // namespace
+}

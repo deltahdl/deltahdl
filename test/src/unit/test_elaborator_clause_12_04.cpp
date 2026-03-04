@@ -1,5 +1,3 @@
-// §12.4: Conditional if–else statement
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// 9. Blocking assignment in if-else: sequential execution order matters.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignIfElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -37,4 +32,4 @@ TEST(SimCh10, BlockingAssignIfElse) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

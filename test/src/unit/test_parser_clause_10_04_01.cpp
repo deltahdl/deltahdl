@@ -1,21 +1,9 @@
-// §10.4.1: Blocking procedural assignments
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.6.2 Production: blocking_assignment
-// blocking_assignment ::=
-//   variable_lvalue = delay_or_event_control expression
-//   | nonrange_variable_lvalue = dynamic_array_new
-//   | [implicit_class_handle . | class_scope | package_scope]
-//     hierarchical_variable_identifier select = class_new
-//   | operator_assignment
-//   | inc_or_dec_expression
-// =============================================================================
 TEST(ParserA602, BlockingAssignment_Simple) {
   auto r = Parse(
       "module m;\n"
@@ -31,7 +19,7 @@ TEST(ParserA602, BlockingAssignment_Simple) {
 }
 
 TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
-  // §10.4.1: blocking with intra-assignment delay
+
   auto r = Parse(
       "module m;\n"
       "  initial begin a = #10 b; end\n"
@@ -84,10 +72,6 @@ TEST(ParserA602, BlockingAssignment_PartSelectLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-// =============================================================================
-// A.6.2 Production: variable_assignment
-// variable_assignment ::= variable_lvalue = expression
-// =============================================================================
 TEST(ParserA602, VariableAssignment_SimpleExpr) {
   auto r = Parse(
       "module m;\n"
@@ -113,10 +97,7 @@ TEST(ParserA602, VariableAssignment_CallRhs) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
-// =============================================================================
-// LRM section 10.4.1 -- Blocking procedural assignments
-// =============================================================================
-// --- 1. Simple blocking assignment: a = b ---
+
 TEST(ParserSection10, Sec10_4_1_SimpleBlocking) {
   auto r = Parse(
       "module m;\n"
@@ -138,7 +119,6 @@ TEST(ParserSection10, Sec10_4_1_SimpleBlocking) {
   EXPECT_EQ(stmt->rhs->text, "b");
 }
 
-// --- 4. Blocking assignment with addition expression ---
 TEST(ParserSection10, Sec10_4_1_ExprAddition) {
   auto r = Parse(
       "module m;\n"
@@ -156,7 +136,6 @@ TEST(ParserSection10, Sec10_4_1_ExprAddition) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-// --- 6. Blocking assignment to bit-select: a[3] = 1 ---
 TEST(ParserSection10, Sec10_4_1_BitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -174,9 +153,7 @@ TEST(ParserSection10, Sec10_4_1_BitSelect) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
   ASSERT_NE(stmt->rhs, nullptr);
 }
-// =============================================================================
-// §4.6: Blocking assignment ordering — sequential within block
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_BlockingAssignOrdering) {
   auto r = Parse(
       "module m;\n"
@@ -196,17 +173,7 @@ TEST(ParserSection4, Sec4_6_BlockingAssignOrdering) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
-// Returns the first always_* item from the first module.
-// =============================================================================
-// LRM section 4.5 -- Simulation scheduling semantics
-//
-// These tests verify that all syntactic constructs related to the simulation
-// scheduling regions (Active, Inactive, NBA, Observed, Reactive, Preponed,
-// Postponed) parse correctly.
-// =============================================================================
-// ---------------------------------------------------------------------------
-// 1. Blocking assignment in always block (Active region)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_BlockingAssignInAlways) {
   auto r = Parse(
       "module m;\n"
@@ -224,7 +191,6 @@ TEST(ParserSection4, Sec4_5_BlockingAssignInAlways) {
   EXPECT_NE(item->body->rhs, nullptr);
 }
 
-// --- 8. Blocking assignment to concatenation: {a, b} = {c, d} ---
 TEST(ParserSection10, Sec10_4_1_Concatenation) {
   auto r = Parse(
       "module m;\n"
@@ -245,7 +211,7 @@ TEST(ParserSection10, Sec10_4_1_Concatenation) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
-// --- 10. Blocking assignment in begin-end block ---
+
 TEST(ParserSection10, Sec10_4_1_InBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -267,7 +233,6 @@ TEST(ParserSection10, Sec10_4_1_InBeginEndBlock) {
   EXPECT_EQ(s1->lhs->text, "y");
 }
 
-// --- 11. Blocking assignment in if-else branches ---
 TEST(ParserSection10, Sec10_4_1_InIfElseBranches) {
   auto r = Parse(
       "module m;\n"
@@ -294,7 +259,7 @@ static Expr* FirstAssignLhs(ParseResult& r) {
   if (!stmt) return nullptr;
   return stmt->lhs;
 }
-// --- Bit-select on LHS of blocking assignment ---
+
 TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsBlocking) {
   auto r = Parse(
       "module t;\n"
@@ -315,7 +280,6 @@ TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsBlocking) {
   EXPECT_EQ(lhs->index_end, nullptr);
 }
 
-// --- 12. Blocking assignment in case items ---
 TEST(ParserSection10, Sec10_4_1_InCaseItems) {
   auto r = Parse(
       "module m;\n"
@@ -342,7 +306,6 @@ TEST(ParserSection10, Sec10_4_1_InCaseItems) {
   EXPECT_EQ(stmt->case_items[3].body->kind, StmtKind::kBlockingAssign);
 }
 
-// --- 14. Blocking assignment with function call RHS ---
 TEST(ParserSection10, Sec10_4_1_FunctionCallRhs) {
   auto r = Parse(
       "module m;\n"
@@ -360,7 +323,6 @@ TEST(ParserSection10, Sec10_4_1_FunctionCallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-// --- 15. Blocking assignment with system call RHS: a = $random ---
 TEST(ParserSection10, Sec10_4_1_SystemCallRhs) {
   auto r = Parse(
       "module m;\n"
@@ -377,7 +339,7 @@ TEST(ParserSection10, Sec10_4_1_SystemCallRhs) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
-// --- 16. Multiple sequential blocking assignments ---
+
 TEST(ParserSection10, Sec10_4_1_MultipleSequential) {
   auto r = Parse(
       "module m;\n"
@@ -402,7 +364,6 @@ TEST(ParserSection10, Sec10_4_1_MultipleSequential) {
   EXPECT_EQ(s3->lhs->text, "a");
 }
 
-// --- 18. Blocking assignment to array element: arr[i] = val ---
 TEST(ParserSection10, Sec10_4_1_ArrayElementLhs) {
   auto r = Parse(
       "module m;\n"
@@ -421,12 +382,6 @@ TEST(ParserSection10, Sec10_4_1_ArrayElementLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// statement_item — all 19 alternatives recognized by the dispatcher
-// Each sub-alternative is defined in its own subclause; here we verify the
-// statement_item dispatch recognizes each one.
-// ---------------------------------------------------------------------------
-// §10.4.1: blocking_assignment ;
 TEST(ParserA604, StmtItemBlockingAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -441,7 +396,6 @@ TEST(ParserA604, StmtItemBlockingAssignment) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-// --- 27. Blocking assignment to nested struct member: s.inner.field = val ---
 TEST(ParserSection10, Sec10_4_1_NestedStructMemberLhs) {
   auto r = Parse(
       "module m;\n"
@@ -458,7 +412,6 @@ TEST(ParserSection10, Sec10_4_1_NestedStructMemberLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-// --- 30. Blocking assignment with complex LHS and RHS combinations ---
 TEST(ParserSection10, Sec10_4_1_ComplexLhsRhsCombinations) {
   auto r = Parse(
       "module m;\n"
@@ -482,9 +435,7 @@ TEST(ParserSection10, Sec10_4_1_ComplexLhsRhsCombinations) {
   EXPECT_EQ(s0->rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(s1->rhs->kind, ExprKind::kBinary);
 }
-// =============================================================================
-// §10.4.1 -- Blocking procedural assignments
-// =============================================================================
+
 TEST(ParserSection9b, BlockingAssignSimple) {
   auto r = Parse(
       "module m;\n"
@@ -498,10 +449,6 @@ TEST(ParserSection9b, BlockingAssignSimple) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-// =============================================================================
-// A.8.5 Expression left-side values — nonrange_variable_lvalue
-// =============================================================================
-// § nonrange_variable_lvalue — simple identifier (no range)
 TEST(ParserA85, NonrangeVarLvalueSimple) {
   auto r = Parse("module m; int x; initial x = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -513,7 +460,6 @@ TEST(ParserA85, NonrangeVarLvalueSimple) {
   EXPECT_EQ(stmt->lhs->text, "x");
 }
 
-// § nonrange_variable_lvalue — member access (no range)
 TEST(ParserA85, NonrangeVarLvalueMemberAccess) {
   auto r = Parse(
       "module m;\n"
@@ -529,7 +475,6 @@ TEST(ParserA85, NonrangeVarLvalueMemberAccess) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-// --- 17. Blocking assignment to struct member: s.field = val ---
 TEST(ParserSection10, Sec10_4_1_StructMemberLhs) {
   auto r = Parse(
       "module m;\n"
@@ -583,4 +528,4 @@ TEST(ParserSection9b, BlockingAssignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-}  // namespace
+}

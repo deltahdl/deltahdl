@@ -1,5 +1,3 @@
-// Annex D.9: $save, $restart, and $incsave
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -15,7 +13,6 @@ TEST(ParserAnnexD, AnnexDSave) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// --- D.2: $incsave ---
 TEST(ParserAnnexD2, AnnexDIncsaveParse) {
   auto r = Parse(
       "module m;\n"
@@ -40,4 +37,4 @@ TEST(ParserAnnexD2, AnnexDIncsaveExpr) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

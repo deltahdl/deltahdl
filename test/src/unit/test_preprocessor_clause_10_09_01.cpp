@@ -1,5 +1,3 @@
-// §10.9.1: Array assignment patterns
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -27,9 +25,6 @@ TEST(Lexical, AssignmentPattern_Named) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// ===========================================================================
-// §10.9-10.10: Assignment pattern evaluation
-// ===========================================================================
 TEST(Lexical, AssignmentPattern_DefaultZero) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
@@ -37,8 +32,8 @@ TEST(Lexical, AssignmentPattern_DefaultZero) {
       "  initial a = '{default: 0};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // Should parse without error.
+
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
-}  // namespace
+}

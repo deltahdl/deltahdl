@@ -1,5 +1,3 @@
-// §9.4.2: Event control
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -36,4 +34,4 @@ TEST(Lowerer, PosedgeWakeup) {
   EXPECT_EQ(count->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

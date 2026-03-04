@@ -1,5 +1,3 @@
-// §18.6: Randomization methods
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.7: randomize() return value
-// =============================================================================
 TEST(Constraint, RandomizeSuccess) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -53,9 +48,6 @@ TEST(Constraint, RandomizeFailureContradiction) {
   EXPECT_FALSE(solver.Solve());
 }
 
-// =============================================================================
-// §18.7.2: Pre/post randomize hooks
-// =============================================================================
 TEST(Constraint, PreRandomizeHook) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -104,9 +96,6 @@ TEST(Constraint, PrePostRandomizeOrder) {
   EXPECT_EQ(order[1], "post");
 }
 
-// =============================================================================
-// Values map access
-// =============================================================================
 TEST(Constraint, GetValuesMap) {
   ConstraintSolver solver(42);
   RandVariable va;
@@ -128,9 +117,6 @@ TEST(Constraint, GetValuesMap) {
   EXPECT_TRUE(vals.count("b"));
 }
 
-// =============================================================================
-// Post-randomize not called on failure
-// =============================================================================
 TEST(Constraint, PostRandomizeFailureNoCallback) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -160,4 +146,4 @@ TEST(Constraint, PostRandomizeFailureNoCallback) {
   EXPECT_FALSE(post_called);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §19.4.1: Embedded covergroup inheritance
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -38,4 +36,4 @@ TEST(ParserA211, CoverGroup_ExtendsASTVerification) {
   EXPECT_EQ(item->name, "child_cg");
 }
 
-}  // namespace
+}

@@ -1,12 +1,9 @@
-// Annex A.4.1.4: Checker instantiation
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// --- ordered_checker_port_connection ---
 TEST(ParserAnnexA0414, CheckerInstOrderedPorts) {
   auto r = Parse(
       "checker my_chk(input logic a, input logic b, input logic c);\n"
@@ -18,7 +15,6 @@ TEST(ParserAnnexA0414, CheckerInstOrderedPorts) {
   EXPECT_EQ(item->inst_ports.size(), 3u);
 }
 
-// --- named_checker_port_connection: .port_identifier(property_actual_arg) ---
 TEST(ParserAnnexA0414, CheckerInstNamedPorts) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic rst);\n"
@@ -32,7 +28,6 @@ TEST(ParserAnnexA0414, CheckerInstNamedPorts) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-// --- named_checker_port_connection: .port_identifier (no parentheses) ---
 TEST(ParserAnnexA0414, CheckerInstNamedPortNoParens) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic rst);\n"
@@ -46,4 +41,4 @@ TEST(ParserAnnexA0414, CheckerInstNamedPortNoParens) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-}  // namespace
+}

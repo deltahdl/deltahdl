@@ -1,12 +1,9 @@
-// §6.17: Event data type
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// --- Named event tests ---
 TEST(Parser, EventDeclaration) {
   auto r = Parse(
       "module t;\n"
@@ -19,14 +16,13 @@ TEST(Parser, EventDeclaration) {
   EXPECT_EQ(item->name, "ev");
 }
 
-// event
 TEST(ParserA221, DataTypeEvent) {
   auto r = Parse("module m; event ev; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEvent);
 }
-// 24. Event variable declaration.
+
 TEST(ParserSection6, Sec6_5_EventVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -41,9 +37,7 @@ TEST(ParserSection6, Sec6_5_EventVarDecl) {
   EXPECT_FALSE(item->data_type.is_net);
   EXPECT_EQ(item->name, "done");
 }
-// =========================================================================
-// §6.17: Event data type
-// =========================================================================
+
 TEST(ParserSection6, EventVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -55,4 +49,4 @@ TEST(ParserSection6, EventVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §21.7.2.2: Formats of variable values
-
 #include "fixture_vcd.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -46,5 +44,5 @@ TEST_F(VcdClause21070202Test, DumpChangedValuesOnlyEmitsChanged) {
   EXPECT_NE(content.find("1\""), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

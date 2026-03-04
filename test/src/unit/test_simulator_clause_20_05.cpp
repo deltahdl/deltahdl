@@ -1,5 +1,3 @@
-// §20.5: Conversion functions
-
 #include <cstring>
 
 #include "builders_ast.h"
@@ -61,7 +59,6 @@ TEST(SysTask, RealtobitsReinterpretsRealAsBits) {
   EXPECT_EQ(result.ToUint64(), expected_bits);
 }
 
-// § system_tf_call — $unsigned
 TEST(SimA82, SystemTfCallUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -79,9 +76,6 @@ TEST(SimA82, SystemTfCallUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// ============================================================================
-// §20.6.1 — $unsigned, $signed
-// ============================================================================
 TEST(Section20, Unsigned) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$unsigned", {MakeInt(f.arena, 42)});
@@ -96,4 +90,4 @@ TEST(Section20, Signed) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}  // namespace
+}

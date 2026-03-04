@@ -1,5 +1,3 @@
-// §18.13: Random number system functions and methods
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -22,4 +20,4 @@ TEST(ParserSection18, GetSetRandstateRoundtrip) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §6.18: User-defined types
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- type_declaration ---
-// Form 1: typedef data_type type_identifier { variable_dimension } ;
-// Form 2: typedef ifc_port[sel].type_id type_id ; (not implemented)
-// Form 3: typedef [ forward_type ] type_identifier ;
 TEST(ParserA213, TypedefBasic) {
   auto r = Parse("module m; typedef logic [7:0] byte_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -20,8 +14,6 @@ TEST(ParserA213, TypedefBasic) {
   EXPECT_EQ(item->name, "byte_t");
 }
 
-// --- forward_type ---
-// enum | struct | union | class | interface class
 TEST(ParserA213, ForwardTypedefClass) {
   auto r = Parse("module m; typedef class my_class; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -40,7 +32,7 @@ TEST(ParserA213, ForwardTypedefInterfaceClass) {
 }
 
 TEST(ParserA213, ForwardTypedefEnum) {
-  // forward_type: enum
+
   auto r = Parse("module m; typedef enum color_e; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -50,7 +42,7 @@ TEST(ParserA213, ForwardTypedefEnum) {
 }
 
 TEST(ParserA213, ForwardTypedefStruct) {
-  // forward_type: struct
+
   auto r = Parse("module m; typedef struct my_struct; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -60,7 +52,7 @@ TEST(ParserA213, ForwardTypedefStruct) {
 }
 
 TEST(ParserA213, ForwardTypedefUnion) {
-  // forward_type: union
+
   auto r = Parse("module m; typedef union my_union; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -69,7 +61,6 @@ TEST(ParserA213, ForwardTypedefUnion) {
   EXPECT_EQ(item->name, "my_union");
 }
 
-// data_declaration alternative: type_declaration (typedef)
 TEST(ParserA28, TypedefInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -100,7 +91,6 @@ TEST(ParserA213, TypedefWithDims) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-// typedef in function body
 TEST(ParserA28, TypedefInFunction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -111,7 +101,7 @@ TEST(ParserA28, TypedefInFunction) {
 }
 
 TEST(ParserSection6, TypeCompatibilityTypedefParsing) {
-  // §6.22.1b: A simple typedef that renames a built-in type matches it.
+
   auto r = Parse(
       "module m;\n"
       "  typedef bit node;\n"
@@ -122,7 +112,6 @@ TEST(ParserSection6, TypeCompatibilityTypedefParsing) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-// 22. Typedef in package scope
 TEST(ParserClause03, Cl3_13_TypedefInPackageScope) {
   auto r = Parse(
       "package types_pkg;\n"
@@ -150,10 +139,7 @@ TEST(ParserSection26, PackageWithTypedef) {
   ASSERT_FALSE(r.cu->packages[0]->items.empty());
   EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
-// =============================================================================
-// Section 8.18 -- User-defined types (typedef)
-// =============================================================================
-// Simple typedef of built-in type.
+
 TEST(ParserSection8, TypedefSimpleBuiltin) {
   auto r = Parse(
       "module m;\n"
@@ -168,7 +154,6 @@ TEST(ParserSection8, TypedefSimpleBuiltin) {
   EXPECT_EQ(items[0]->name, "my_int");
 }
 
-// Forward typedef declaration for enum.
 TEST(ParserSection8, TypedefForwardEnum) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -176,9 +161,7 @@ TEST(ParserSection8, TypedefForwardEnum) {
               "  typedef enum {A, B, C} my_enum;\n"
               "endmodule\n"));
 }
-// =========================================================================
-// §6.18: User-defined types (typedef)
-// =========================================================================
+
 TEST(ParserSection6, TypedefInt) {
   auto r = Parse(
       "module t;\n"
@@ -203,11 +186,8 @@ static bool ParseOk5(const std::string& src) {
   return !diag.HasErrors();
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
 TEST(ParserCh5, UnpackedDim_Typedef) {
   EXPECT_TRUE(ParseOk5("module m; typedef int triple[1:3]; endmodule"));
 }
 
-}  // namespace
+}

@@ -1,14 +1,9 @@
-// §31.3.6: $recrem
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 $recrem_timing_check — full 9-argument form
-// =============================================================================
 TEST(ElabA70501, RecremFullArgsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,4 +17,4 @@ TEST(ElabA70501, RecremFullArgsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

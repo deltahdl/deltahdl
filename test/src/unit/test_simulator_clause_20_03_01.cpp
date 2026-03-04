@@ -1,5 +1,3 @@
-// §20.3.1: $time
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -20,4 +18,4 @@ TEST(SysTask, TimeReturnsCurrentTicks) {
   EXPECT_EQ(result.width, 64u);
 }
 
-}  // namespace
+}

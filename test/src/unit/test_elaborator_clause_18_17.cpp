@@ -1,12 +1,9 @@
-// §18.17: Random sequence generation—randsequence
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Randsequence with if-else, repeat, case elaborates
 TEST(ElabA612, ControlFlowProdsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -25,10 +22,6 @@ TEST(ElabA612, ControlFlowProdsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// =============================================================================
-// A.6.12 Randsequence — Elaboration
-// =============================================================================
-// Basic randsequence elaborates without errors
 TEST(ElabA612, BasicRandsequenceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -46,4 +39,4 @@ TEST(ElabA612, BasicRandsequenceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

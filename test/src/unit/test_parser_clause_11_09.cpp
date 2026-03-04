@@ -1,5 +1,3 @@
-// §11.9: Tagged union expressions and member access
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -15,7 +13,6 @@ TEST(ParserAnnexA, A8MemberAccess) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-// §12.6: tagged expression — AST kind is kTagged
 TEST(ParserA60701, TaggedExprAstKind) {
   auto r = Parse(
       "module m;\n"
@@ -30,15 +27,11 @@ TEST(ParserA60701, TaggedExprAstKind) {
   auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTagged);
-  // member identifier stored in rhs->rhs
+
   ASSERT_NE(rhs->rhs, nullptr);
   EXPECT_EQ(rhs->rhs->text, "Valid");
 }
 
-// =============================================================================
-// A.8.3 Expressions — tagged_union_expression
-// =============================================================================
-// § tagged_union_expression ::= tagged member_identifier [ primary ]
 TEST(ParserA83, TaggedUnionWithValue) {
   auto r = Parse("module m; initial x = tagged Valid 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -62,7 +55,7 @@ TEST(ParserA83, TaggedUnionWithoutValue) {
   EXPECT_EQ(rhs->rhs->text, "Invalid");
   EXPECT_EQ(rhs->lhs, nullptr);
 }
-// --- Tagged union expressions (§11.9) ---
+
 TEST(ParserSection11, TaggedUnionExpr) {
   auto r = Parse(
       "module t;\n"
@@ -76,4 +69,4 @@ TEST(ParserSection11, TaggedUnionExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

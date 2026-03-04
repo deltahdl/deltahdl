@@ -1,5 +1,3 @@
-// §10.6.2: The force and release procedural statements
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_force_target.h"
@@ -12,7 +10,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — force overwrites variable
 TEST(SimA85, VarLvalueForce) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,13 +26,7 @@ TEST(SimA85, VarLvalueForce) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
-// =============================================================
-// §10.6.2: The force and release procedural statements
-// =============================================================
-// --- Legal LHS targets ---
-// §10.6.2: "The left-hand side of the assignment can be a reference to
-//  a singular variable, a net, a constant bit-select of a vector net,
-//  a constant part-select of a vector net, or a concatenation of these."
+
 TEST(ForceRelease, LegalTargetSingularVariable) {
   ForceInfo info{ForceTarget::kSingularVariable};
   EXPECT_TRUE(ValidateForceTarget(info));
@@ -51,17 +42,13 @@ TEST(ForceRelease, LegalTargetConstPartSelectNet) {
   EXPECT_TRUE(ValidateForceTarget(info));
 }
 
-// §10.6.2: "... or of a net with a user-defined nettype."
 TEST(ForceRelease, IllegalUserDefinedNettypePartSelect) {
   ForceInfo info{ForceTarget::kUserDefinedNettypePartSelect};
   EXPECT_FALSE(ValidateForceTarget(info));
 }
 
 void ForceVariable(Variable& var, const Logic4Vec& value) { var.value = value; }
-// --- Force on variable ---
-// §10.6.2: "A force statement to a variable shall override a procedural
-//  assignment, continuous assignment or an assign procedural continuous
-//  assignment to the variable."
+
 TEST(ForceRelease, ForceVariableOverridesValue) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -78,12 +65,9 @@ void ReleaseVariable(Variable& var, bool has_continuous_driver,
   if (has_continuous_driver && continuous_value) {
     var.value = *continuous_value;
   }
-  // Otherwise keep current value.
+
 }
 
-// §10.6.2: "When released, then if the variable is not driven by a
-//  continuous assignment ... the variable shall not immediately change
-//  value and shall maintain its current value."
 TEST(ForceRelease, ReleaseUndrivenVariableHoldsValue) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -93,25 +77,22 @@ TEST(ForceRelease, ReleaseUndrivenVariableHoldsValue) {
   EXPECT_EQ(ValOf(*var), kVal1);
 
   ReleaseVariable(*var, false, nullptr, arena);
-  // Value should remain at forced value (1) since no continuous driver.
+
   EXPECT_EQ(ValOf(*var), kVal1);
 }
 
-// §10.6.2: "Releasing a variable that is driven by a continuous
-//  assignment ... shall reestablish that assignment."
 TEST(ForceRelease, ReleaseContinuouslyDrivenVariableReestablishes) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 1, 0);
 
-  // Continuous driver has value 0.
   Logic4Vec continuous_val = MakeLogic4VecVal(arena, 1, 0);
 
   ForceVariable(*var, MakeLogic4VecVal(arena, 1, 1));
   EXPECT_EQ(ValOf(*var), kVal1);
 
   ReleaseVariable(*var, true, &continuous_val, arena);
-  // Should reestablish continuous assignment value (0).
+
   EXPECT_EQ(ValOf(*var), kVal0);
 }
 
@@ -120,10 +101,6 @@ void ForceNet(Net& net, const Logic4Vec& value, Arena& arena) {
   net.resolved->value = value;
 }
 
-// --- Force on net ---
-// §10.6.2: "A force procedural statement on a net shall override all
-//  drivers of the net — gate outputs, module outputs, and continuous
-//  assignments."
 TEST(ForceRelease, ForceNetOverridesAllDrivers) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -143,7 +120,7 @@ void ReleaseNet(Net& net, Arena& arena) {
   if (!net.drivers.empty()) {
     net.resolved->value = net.drivers[0];
   } else {
-    // Set to z: aval=1, bval=1.
+
     for (uint32_t i = 0; i < net.resolved->value.nwords; ++i) {
       net.resolved->value.words[i].aval = 1;
       net.resolved->value.words[i].bval = 1;
@@ -151,8 +128,6 @@ void ReleaseNet(Net& net, Arena& arena) {
   }
 }
 
-// §10.6.2: "When released, the net shall immediately be assigned the
-//  value determined by the drivers of the net."
 TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -167,11 +142,10 @@ TEST(ForceRelease, ReleaseNetImmediatelyRestoresDriverValue) {
   EXPECT_EQ(ValOf(*var), kVal1);
 
   ReleaseNet(net, arena);
-  // Should immediately restore to driver value (0).
+
   EXPECT_EQ(ValOf(*var), kVal0);
 }
 
-// --- Normative example (§10.6.2) ---
 struct TwoNets {
   Arena arena;
   Variable* vd = nullptr;
@@ -195,13 +169,9 @@ static TwoNets MakeTwoWireNets() {
   return tn;
 }
 
-// §10.6.2 example: at time 0, d=0 (a&b&c=1&0&1=0), e=0 (and gate).
-// At time 10, force d and e to a|b|c=1. At time 20, release both back
-// to driver values (0).
 TEST(ForceRelease, NormativeExampleForceAndRelease_InitialState) {
   auto tn = MakeTwoWireNets();
 
-  // Time 0: d=0, e=0.
   ReleaseNet(tn.net_d, tn.arena);
   ReleaseNet(tn.net_e, tn.arena);
   EXPECT_EQ(ValOf(*tn.vd), kVal0);
@@ -211,26 +181,17 @@ TEST(ForceRelease, NormativeExampleForceAndRelease_InitialState) {
 TEST(ForceRelease, NormativeExampleForceAndRelease_ForceAndRelease) {
   auto tn = MakeTwoWireNets();
 
-  // Time 10: force both to a|b|c = 1.
   ForceNet(tn.net_d, MakeLogic4VecVal(tn.arena, 1, 1), tn.arena);
   ForceNet(tn.net_e, MakeLogic4VecVal(tn.arena, 1, 1), tn.arena);
   EXPECT_EQ(ValOf(*tn.vd), kVal1);
   EXPECT_EQ(ValOf(*tn.ve), kVal1);
 
-  // Time 20: release both — should revert to driver value 0.
   ReleaseNet(tn.net_d, tn.arena);
   ReleaseNet(tn.net_e, tn.arena);
   EXPECT_EQ(ValOf(*tn.vd), kVal0);
   EXPECT_EQ(ValOf(*tn.ve), kVal0);
 }
 
-// Helper to create a blocking assignment statement: lhs = rhs_val.
-// Driver coroutine that co_awaits an ExecTask and stores its result.
-// Helper to run ExecStmt synchronously (for non-suspending statements).
-// Creates a wrapper coroutine, resumes it, and returns the result.
-// =============================================================================
-// 1. Force / Release (StmtKind::kForce, kRelease)
-// =============================================================================
 TEST(StmtExec, ForceOverridesValue) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("x", 32);
@@ -283,42 +244,30 @@ TEST(StmtExec, ReleaseUnknownVarNoOp) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-// =============================================================================
-// 14. Force prevents normal assignment
-// =============================================================================
 TEST(StmtExec, ForcePreventsNormalAssign) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("fv", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // Force fv = 50;
   auto* force_stmt = f.arena.Create<Stmt>();
   force_stmt->kind = StmtKind::kForce;
   force_stmt->lhs = MakeId(f.arena, "fv");
   force_stmt->rhs = MakeInt(f.arena, 50);
   RunStmt(force_stmt, f.ctx, f.arena);
 
-  // Normal blocking assign: fv = 100;
-  // The blocking assignment should be overridden by the force.
   auto* assign_stmt = MakeBlockAssign(f.arena, "fv", 100);
   RunStmt(assign_stmt, f.ctx, f.arena);
 
-  // Since force is active, the value should remain forced value.
   EXPECT_TRUE(var->is_forced);
-  // The blocking assign does set value, but force should logically override.
-  // In our implementation, the force checks and restores the forced value.
+
   EXPECT_EQ(var->forced_value.ToUint64(), 50u);
 }
 
-// =============================================================================
-// 18. Force then release then assign
-// =============================================================================
 TEST(StmtExec, ForceReleaseThenAssign) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("fra", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // Force fra = 50;
   auto* force_stmt = f.arena.Create<Stmt>();
   force_stmt->kind = StmtKind::kForce;
   force_stmt->lhs = MakeId(f.arena, "fra");
@@ -327,17 +276,15 @@ TEST(StmtExec, ForceReleaseThenAssign) {
   EXPECT_EQ(var->value.ToUint64(), 50u);
   EXPECT_TRUE(var->is_forced);
 
-  // Release fra;
   auto* release_stmt = f.arena.Create<Stmt>();
   release_stmt->kind = StmtKind::kRelease;
   release_stmt->lhs = MakeId(f.arena, "fra");
   RunStmt(release_stmt, f.ctx, f.arena);
   EXPECT_FALSE(var->is_forced);
 
-  // Assign fra = 75 (normal blocking)
   auto* assign_stmt = MakeBlockAssign(f.arena, "fra", 75);
   RunStmt(assign_stmt, f.ctx, f.arena);
   EXPECT_EQ(var->value.ToUint64(), 75u);
 }
 
-}  // namespace
+}

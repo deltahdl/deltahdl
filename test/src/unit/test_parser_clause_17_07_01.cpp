@@ -1,5 +1,3 @@
-// §17.7.1: Checker variable assignments
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §17.4 Checker variables
-// =============================================================================
 TEST_F(CheckerParseTest, CheckerWithVariables) {
   auto* unit = Parse(R"(
     checker var_check;
@@ -21,4 +16,4 @@ TEST_F(CheckerParseTest, CheckerWithVariables) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §31.4.5: $period
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// system_timing_check ::= $period_timing_check
 TEST(ParserA705, SystemTimingCheckPeriod) {
   auto r = Parse(
       "module m;\n"
@@ -22,11 +19,6 @@ TEST(ParserA705, SystemTimingCheckPeriod) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kPeriod);
 }
 
-// =============================================================================
-// A.7.5.1 $period_timing_check
-// =============================================================================
-// $period ( controlled_reference_event , timing_check_limit [ , [ notifier ] ]
-// )
 TEST(ParserA70501, PeriodTimingCheck) {
   auto r = Parse(
       "module m;\n"
@@ -43,10 +35,6 @@ TEST(ParserA70501, PeriodTimingCheck) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// =============================================================================
-// A.7.5.2 controlled_reference_event ::= controlled_timing_check_event
-// =============================================================================
-// $period requires controlled_reference_event (mandatory edge)
 TEST(ParserA70502, ControlledReferenceEvent) {
   auto r = Parse(
       "module m;\n"
@@ -76,4 +64,4 @@ TEST(ParserSection28, Sec28_12_TimingCheckPeriod) {
   EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
 }
 
-}  // namespace
+}

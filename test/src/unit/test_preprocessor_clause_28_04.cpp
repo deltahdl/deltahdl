@@ -1,5 +1,3 @@
-// §28.4: and, nand, nor, or, xor, and xnor gates
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -53,7 +51,6 @@ TEST(ParserSection28, AllNInputGates) {
   }
 }
 
-// --- Gate primitive tests ---
 TEST(Parser, GateAndInst) {
   auto r = ParseWithPreprocessor("module t; and g1(out, a, b); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -86,4 +83,4 @@ TEST(ParserSection28, GateWithTwoDelays) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-}  // namespace
+}

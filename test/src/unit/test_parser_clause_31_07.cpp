@@ -1,5 +1,3 @@
-// §31.7: Enabling timing checks with conditioned events
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// scalar_timing_check_condition ::= expression === scalar_constant
 TEST(ParserA70503, ScalarTimingCheckCondCaseEquality) {
   auto r = Parse(
       "module m;\n"
@@ -23,7 +20,6 @@ TEST(ParserA70503, ScalarTimingCheckCondCaseEquality) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-// scalar_timing_check_condition ::= expression !== scalar_constant
 TEST(ParserA70503, ScalarTimingCheckCondCaseInequality) {
   auto r = Parse(
       "module m;\n"
@@ -37,10 +33,6 @@ TEST(ParserA70503, ScalarTimingCheckCondCaseInequality) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-// =============================================================================
-// A.7.5.3 scalar_constant
-// =============================================================================
-// scalar_constant ::= 1'b0
 TEST(ParserA70503, ScalarConstant1b0) {
   auto r = Parse(
       "module m;\n"
@@ -51,7 +43,6 @@ TEST(ParserA70503, ScalarConstant1b0) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// scalar_constant ::= 1'B1
 TEST(ParserA70503, ScalarConstant1B1) {
   auto r = Parse(
       "module m;\n"
@@ -62,7 +53,6 @@ TEST(ParserA70503, ScalarConstant1B1) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// scalar_constant ::= 1
 TEST(ParserA70503, ScalarConstantDecimal1) {
   auto r = Parse(
       "module m;\n"
@@ -73,7 +63,6 @@ TEST(ParserA70503, ScalarConstantDecimal1) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// scalar_constant ::= 0
 TEST(ParserA70503, ScalarConstantDecimal0) {
   auto r = Parse(
       "module m;\n"
@@ -84,10 +73,6 @@ TEST(ParserA70503, ScalarConstantDecimal0) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.7.5.3 &&& condition on both reference and data events
-// =============================================================================
-// &&& on both reference and data events
 TEST(ParserA70503, ConditionBothEvents) {
   auto r = Parse(
       "module m;\n"
@@ -102,7 +87,6 @@ TEST(ParserA70503, ConditionBothEvents) {
   EXPECT_NE(tc->data_condition, nullptr);
 }
 
-// Terminal with bit select + &&& condition combined
 TEST(ParserA70503, TerminalBitSelectWithCondition) {
   auto r = Parse(
       "module m;\n"
@@ -118,7 +102,6 @@ TEST(ParserA70503, TerminalBitSelectWithCondition) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-// Edge + terminal with part select + &&& condition
 TEST(ParserA70503, EdgeTerminalPartSelectWithCondition) {
   auto r = Parse(
       "module m;\n"
@@ -151,9 +134,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckWithEdges) {
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
 }
-// =============================================================================
-// §31.7 Conditioned events
-// =============================================================================
+
 TEST_F(SpecifyTest, ConditionedSetup) {
   auto* cu = Parse(
       "module m;\n"
@@ -184,7 +165,6 @@ TEST_F(SpecifyTest, ConditionedHoldBothSignals) {
   EXPECT_NE(tc.data_condition, nullptr);
 }
 
-// controlled_timing_check_event with &&& condition
 TEST(ParserA70503, ControlledTimingCheckEventWithCondition) {
   auto r = Parse(
       "module m;\n"
@@ -200,10 +180,6 @@ TEST(ParserA70503, ControlledTimingCheckEventWithCondition) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-// =============================================================================
-// A.7.5.3 specify_terminal_descriptor
-// =============================================================================
-// specify_terminal_descriptor — simple identifier
 TEST(ParserA70503, TerminalSimpleIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -220,4 +196,4 @@ TEST(ParserA70503, TerminalSimpleIdentifier) {
   EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kNone);
 }
 
-}  // namespace
+}

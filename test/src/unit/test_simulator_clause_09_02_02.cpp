@@ -1,5 +1,3 @@
-// §9.2.2: Always procedures
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -27,10 +25,8 @@ TEST(Lowerer, AlwaysLoopWithDelay) {
 
   auto* var = f.ctx.FindVariable("clk");
   ASSERT_NE(var, nullptr);
-  // clk starts at 0, incremented at t=5,10,15,20 → 4 increments.
-  // At t=20: $finish fires (sets StopRequested), always loop checks
-  // StopRequested and exits. clk should be 4.
+
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-}  // namespace
+}

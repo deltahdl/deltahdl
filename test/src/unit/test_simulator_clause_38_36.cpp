@@ -23,8 +23,6 @@ class VpiClause3836Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.36: vpi_register_cb / §38.39: vpi_remove_cb
-
 TEST_F(VpiClause3836Test, RegisterCbReturnsHandle) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
@@ -56,7 +54,7 @@ TEST_F(VpiClause3836Test, RemoveCbMarksRemoved) {
 
   int result = VpiRemoveCbC(h);
   EXPECT_EQ(result, 1);
-  // After removal the callback reason is set to -1.
+
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks()[0].reason, -1);
 }
 
@@ -84,5 +82,5 @@ TEST_F(VpiClause3836Test, CbValueChangeWithWatcherFires) {
   EXPECT_TRUE(fired);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

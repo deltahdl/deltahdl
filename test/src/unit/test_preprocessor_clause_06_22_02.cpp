@@ -1,5 +1,3 @@
-// §6.22.2: Equivalent types
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 6.22.2 -- Compatible types
-// =============================================================================
 TEST(ParserSection6, CompatibleTypesParseLogicVectors) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -21,4 +16,4 @@ TEST(ParserSection6, CompatibleTypesParseLogicVectors) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

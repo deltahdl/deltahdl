@@ -1,15 +1,10 @@
-// §11.5.2: Array and memory addressing
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-// --- Test helpers ---
+
 namespace {
 
-// =========================================================================
-// §7.4.5: Array indexing (element select)
-// =========================================================================
 TEST(ParserSection7, ArrayElementSelect) {
   auto r = Parse(
       "module t;\n"
@@ -35,7 +30,7 @@ TEST(ParserSection7, MultiDimSelect) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
-// --- Nested bit-selects a[i][j] ---
+
 TEST(ParserSection11, Sec11_4_1_NestedBitSelects) {
   auto r = Parse(
       "module t;\n"
@@ -64,7 +59,6 @@ TEST(ParserSection11, BitSelectChained) {
   EXPECT_EQ(rhs->base->kind, ExprKind::kSelect);
 }
 
-// § variable_lvalue — multi-dimensional array element select
 TEST(ParserA85, VarLvalueMultiDimSelect) {
   auto r = Parse(
       "module m; logic [7:0] mem [0:3][0:3];\n"
@@ -88,4 +82,4 @@ TEST(ParserSection11, ArrayThenPartSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

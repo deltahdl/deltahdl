@@ -1,13 +1,8 @@
-// §30.5: Assigning delays to module paths
-
 #include "fixture_specify.h"
 #include "simulator/specify.h"
 
 namespace {
 
-// =============================================================================
-// Runtime SpecifyManager tests
-// =============================================================================
 TEST_F(SpecifyTest, RuntimePathDelay) {
   SpecifyManager mgr;
   PathDelay pd;
@@ -24,4 +19,4 @@ TEST_F(SpecifyTest, RuntimePathDelay) {
   EXPECT_EQ(mgr.PathDelayCount(), 1u);
 }
 
-}  // namespace
+}

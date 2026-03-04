@@ -1,5 +1,3 @@
-// §21.2.2: Strobed monitoring
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -31,4 +29,4 @@ TEST(Lowerer, StrobeDoesNotCrash) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §8.7: Constructors
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, BlockingAssignment_ClassNew) {
-  // class_new: obj = new;
+
   auto r = Parse(
       "module m;\n"
       "  initial begin obj = new; end\n"
@@ -20,7 +18,7 @@ TEST(ParserA602, BlockingAssignment_ClassNew) {
 }
 
 TEST(ParserA602, BlockingAssignment_ClassNewWithArgs) {
-  // class_new with arguments: obj = new(arg1, arg2)
+
   auto r = Parse(
       "module m;\n"
       "  initial begin obj = new(1, 2); end\n"
@@ -31,7 +29,7 @@ TEST(ParserA602, BlockingAssignment_ClassNewWithArgs) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
-// §8.7 — Constructor (function new)
+
 TEST(ParserSection8, ClassConstructor) {
   auto r = Parse(
       "class Packet;\n"
@@ -48,7 +46,6 @@ TEST(ParserSection8, ClassConstructor) {
   EXPECT_EQ(m->method->name, "new");
 }
 
-// §8.7 — Constructor with parameters
 TEST(ParserSection8, ClassConstructorWithParams) {
   auto r = Parse(
       "class Packet;\n"
@@ -61,7 +58,6 @@ TEST(ParserSection8, ClassConstructorWithParams) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// §8.4 — Class instantiation with 'new' expression
 TEST(ParserSection8, NewExpression) {
   auto r = Parse(
       "module m;\n"
@@ -77,7 +73,6 @@ TEST(ParserSection8, NewExpression) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §8.7 — Constructor with arguments
 TEST(ParserSection8, NewWithArgs) {
   auto r = Parse(
       "module m;\n"
@@ -96,7 +91,6 @@ TEST(ParserSection8, NewWithArgs) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// class_method ::= { method_qualifier } class_constructor_declaration
 TEST(SourceText, ClassConstructorDecl) {
   auto r = Parse(
       "class C;\n"
@@ -156,4 +150,4 @@ TEST(ParserSection8, ClassWithInitializer) {
   EXPECT_NE(cls->members[0]->init_expr, nullptr);
 }
 
-}  // namespace
+}

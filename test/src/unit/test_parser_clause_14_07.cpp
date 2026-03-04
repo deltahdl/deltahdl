@@ -1,5 +1,3 @@
-// §14.7: Clocking block scope and lifetime
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Clocking block within a program.
 TEST(ParserSection19, ClockingBlock_InProgram) {
   EXPECT_TRUE(
       ParseOk("program test_prog(input clk, input [7:0] data);\n"
@@ -18,9 +15,6 @@ TEST(ParserSection19, ClockingBlock_InProgram) {
               "endprogram\n"));
 }
 
-// =============================================================================
-// §4.6: Program block with clocking block reference
-// =============================================================================
 TEST(ParserSection4, Sec4_6_ProgramWithClockingBlock) {
   EXPECT_TRUE(
       ParseOk("program p(input logic clk);\n"
@@ -34,10 +28,7 @@ TEST(ParserSection4, Sec4_6_ProgramWithClockingBlock) {
               "  end\n"
               "endprogram\n"));
 }
-// =============================================================================
-// LRM section 19.5.2 -- Clocking block scope
-// =============================================================================
-// Clocking block coexists with other module items (variables, always blocks).
+
 TEST(ParserSection19, ClockingBlockScope_AmongOtherItems) {
   auto r = Parse(
       "module t;\n"
@@ -57,7 +48,6 @@ TEST(ParserSection19, ClockingBlockScope_AmongOtherItems) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 4u);
 }
 
-// Clocking block in a checker (valid scope per LRM).
 TEST(ParserSection19, ClockingBlockScope_InChecker) {
   EXPECT_TRUE(
       ParseOk("checker my_check(input clk, input data);\n"
@@ -67,4 +57,4 @@ TEST(ParserSection19, ClockingBlockScope_InChecker) {
               "endchecker\n"));
 }
 
-}  // namespace
+}

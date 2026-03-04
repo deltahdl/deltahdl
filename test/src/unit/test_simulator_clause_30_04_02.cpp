@@ -1,5 +1,3 @@
-// §30.4.2: Simple module paths
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Module with specify block containing path declaration simulates correctly
 TEST(SimA701, SpecifyWithPathDeclSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,10 +26,6 @@ TEST(SimA701, SpecifyWithPathDeclSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// =============================================================================
-// Simulation tests — A.7.3 Specify block terminals
-// =============================================================================
-// Terminal with bit-select in specify does not interfere with simulation
 TEST(SimA703, TerminalBitSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -53,4 +46,4 @@ TEST(SimA703, TerminalBitSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

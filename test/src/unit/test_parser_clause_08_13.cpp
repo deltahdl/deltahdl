@@ -1,12 +1,9 @@
-// §8.13: Inheritance and subclasses
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// §8.15 — Extends with scoped class name
 TEST(ParserSection8, ExtendsScopedName) {
   auto r = Parse(
       "class Child extends pkg::Base;\n"
@@ -25,7 +22,6 @@ TEST(Parser, ClassExtends) {
   EXPECT_EQ(cls->base_class, "parent");
 }
 
-// Class with extends.
 TEST(SourceText, ClassWithExtends) {
   auto r = Parse("class Child extends Parent; endclass\n");
   ASSERT_NE(r.cu, nullptr);
@@ -34,10 +30,6 @@ TEST(SourceText, ClassWithExtends) {
   EXPECT_EQ(r.cu->classes[0]->base_class, "Parent");
 }
 
-// =============================================================================
-// A.1.2 class_declaration — additional forms
-// =============================================================================
-// Class with final_specifier: class :final C;
 TEST(SourceText, ClassWithFinal) {
   auto r = Parse("class :final C; endclass\n");
   ASSERT_NE(r.cu, nullptr);
@@ -75,4 +67,4 @@ TEST(ParserSection8, ClassExtendsDerived) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
-}  // namespace
+}

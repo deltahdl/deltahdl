@@ -1,5 +1,3 @@
-// §non-lrm:netlist_writer
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// BLIF output
-// =============================================================================
 TEST(NetlistWriter, BlifSimpleAnd) {
   AigGraph g;
   auto a = g.AddInput();
@@ -27,7 +22,7 @@ TEST(NetlistWriter, BlifSimpleAnd) {
   EXPECT_NE(blif.find(".inputs"), std::string::npos);
   EXPECT_NE(blif.find(".outputs"), std::string::npos);
   EXPECT_NE(blif.find(".end"), std::string::npos);
-  // AND gate truth table row: both inputs high -> output high.
+
   EXPECT_NE(blif.find("11 1"), std::string::npos);
 }
 
@@ -39,15 +34,11 @@ TEST(NetlistWriter, BlifConstantOutput) {
   std::string blif = NetlistWriter::WriteBlif(g, "const_mod");
 
   EXPECT_NE(blif.find(".model const_mod"), std::string::npos);
-  // Constant-0 output: empty cover (no rows) produces 0.
-  // Constant-1 output: single row with no inputs produces 1.
+
   EXPECT_NE(blif.find(".outputs"), std::string::npos);
   EXPECT_NE(blif.find(".end"), std::string::npos);
 }
 
-// =============================================================================
-// Verilog output
-// =============================================================================
 TEST(NetlistWriter, VerilogSimpleAnd) {
   AigGraph g;
   auto a = g.AddInput();
@@ -61,7 +52,7 @@ TEST(NetlistWriter, VerilogSimpleAnd) {
   EXPECT_NE(vlog.find("input"), std::string::npos);
   EXPECT_NE(vlog.find("output"), std::string::npos);
   EXPECT_NE(vlog.find("endmodule"), std::string::npos);
-  // Should contain an AND assign.
+
   EXPECT_NE(vlog.find('&'), std::string::npos);
 }
 
@@ -78,9 +69,6 @@ TEST(NetlistWriter, VerilogConstantOutput) {
   EXPECT_NE(vlog.find("endmodule"), std::string::npos);
 }
 
-// =============================================================================
-// JSON output
-// =============================================================================
 TEST(NetlistWriter, JsonContainsExpectedKeys) {
   AigGraph g;
   auto a = g.AddInput();
@@ -97,9 +85,6 @@ TEST(NetlistWriter, JsonContainsExpectedKeys) {
   EXPECT_NE(json.find("\"top\""), std::string::npos);
 }
 
-// =============================================================================
-// EDIF output
-// =============================================================================
 TEST(NetlistWriter, EdifBasicStructure) {
   AigGraph g;
   auto a = g.AddInput();
@@ -116,9 +101,6 @@ TEST(NetlistWriter, EdifBasicStructure) {
   EXPECT_NE(edif.find("interface"), std::string::npos);
 }
 
-// =============================================================================
-// Multi-input, multi-output
-// =============================================================================
 TEST(NetlistWriter, BlifMultiInputMultiOutput) {
   AigGraph g;
   auto a = g.AddInput();
@@ -135,16 +117,13 @@ TEST(NetlistWriter, BlifMultiInputMultiOutput) {
 
   EXPECT_NE(blif.find(".model multi"), std::string::npos);
   EXPECT_NE(blif.find(".end"), std::string::npos);
-  // Three inputs and three outputs.
+
   const char* const kExpectedNames[] = {"i0", "i1", "i2", "o0", "o1", "o2"};
   for (const char* name : kExpectedNames) {
     EXPECT_NE(blif.find(name), std::string::npos);
   }
 }
 
-// =============================================================================
-// Format dispatch
-// =============================================================================
 TEST(NetlistWriter, DispatchByFormat) {
   AigGraph g;
   auto a = g.AddInput();
@@ -161,4 +140,4 @@ TEST(NetlistWriter, DispatchByFormat) {
   EXPECT_NE(edif.find("test"), std::string::npos);
 }
 
-}  // namespace
+}

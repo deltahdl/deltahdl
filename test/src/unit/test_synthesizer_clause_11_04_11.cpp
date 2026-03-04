@@ -1,5 +1,3 @@
-// §11.4.11: Conditional operator
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -24,4 +22,4 @@ TEST(SynthLower, AssignTernaryMux) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}  // namespace
+}

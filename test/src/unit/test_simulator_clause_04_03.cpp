@@ -1,4 +1,3 @@
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "helpers_scheduler_event.h"
@@ -8,25 +7,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.3 Event simulation
-//
-// LRM §4.3 defines the discrete event execution model:
-//   - Processes are objects that can be evaluated, have state, and respond
-//     to changes on their inputs to produce outputs.
-//   - Examples: initial, always, always_comb, always_latch, always_ff
-//     procedures; continuous assignments; procedural assignments.
-//   - Every change in state of a net or variable is an update event.
-//   - Processes sensitive to update events are evaluated (evaluation events)
-//     in an arbitrary order.
-//   - Simulation time models the actual time of the system being simulated.
-//   - A single time slot is divided into multiple regions for ordering.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.3 Process: initial procedure is a process that can be evaluated,
-// has state, and produces output.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, InitialProcedureIsProcess) {
   auto result = RunAndGet(
       "module t;\n"
@@ -37,9 +17,6 @@ TEST(SimCh43, InitialProcedureIsProcess) {
   EXPECT_EQ(result, 42u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Process: always_comb is a process that responds to input changes.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysCombIsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -56,9 +33,6 @@ TEST(SimCh43, AlwaysCombIsProcess) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 6u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Process: always_latch is a process for latch-based logic.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysLatchIsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -79,9 +53,6 @@ TEST(SimCh43, AlwaysLatchIsProcess) {
   EXPECT_EQ(f.ctx.FindVariable("q")->value.ToUint64(), 99u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Process: always_ff is a process for flip-flop-based logic.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, AlwaysFFIsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -103,9 +74,6 @@ TEST(SimCh43, AlwaysFFIsProcess) {
   EXPECT_EQ(f.ctx.FindVariable("q")->value.ToUint64(), 55u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Process: continuous assignment is an implicit process.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, ContinuousAssignIsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -122,10 +90,6 @@ TEST(SimCh43, ContinuousAssignIsProcess) {
   EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 33u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Process: procedural assignment within a begin-end is evaluated
-// sequentially within the process.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, ProceduralAssignmentInProcess) {
   auto result = RunAndGet(
       "module t;\n"
@@ -139,10 +103,6 @@ TEST(SimCh43, ProceduralAssignmentInProcess) {
   EXPECT_EQ(result, 15u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Update event: every change in state of a variable is an update event.
-// A blocking assignment changes state, creating an update event.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, BlockingAssignCreatesUpdateEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -159,10 +119,6 @@ TEST(SimCh43, BlockingAssignCreatesUpdateEvent) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 21u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Update event: non-blocking assignment creates a deferred update event
-// in the NBA region.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, NonBlockingAssignCreatesUpdateEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -180,9 +136,6 @@ TEST(SimCh43, NonBlockingAssignCreatesUpdateEvent) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 88u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Update event: continuous assignment change propagates as update event.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, ContinuousAssignUpdateEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -201,10 +154,6 @@ TEST(SimCh43, ContinuousAssignUpdateEvent) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 6u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Evaluation event: process sensitive to an update event re-evaluates.
-// always_comb is sensitive to all RHS variables and re-evaluates on change.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, EvaluationEventOnInputChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -224,10 +173,6 @@ TEST(SimCh43, EvaluationEventOnInputChange) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 110u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Evaluation event: multiple processes sensitive to the same update
-// event all evaluate.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, MultipleProcessesSensitiveToSameEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -246,10 +191,6 @@ TEST(SimCh43, MultipleProcessesSensitiveToSameEvent) {
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 7u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Evaluation event: continuous assignment and always_comb both sensitive
-// to the same variable both evaluate when the source is set.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, MixedProcessTypesSensitiveToSameVariable) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -268,17 +209,11 @@ TEST(SimCh43, MixedProcessTypesSensitiveToSameVariable) {
   EXPECT_EQ(f.ctx.FindVariable("via_comb")->value.ToUint64(), 30u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Simulation time: time starts at zero.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, SimulationTimeStartsAtZero) {
   SimFixture f;
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Simulation time: processes with no delays execute at time 0.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, NoDelayExecutesAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -294,9 +229,6 @@ TEST(SimCh43, NoDelayExecutesAtTimeZero) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Simulation time: a #delay advances simulation time.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, DelayAdvancesSimulationTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -315,9 +247,6 @@ TEST(SimCh43, DelayAdvancesSimulationTime) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Simulation time: multiple delays accumulate correctly.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, MultipleDelaysAccumulate) {
   auto result = RunAndGet(
       "module t;\n"
@@ -333,10 +262,6 @@ TEST(SimCh43, MultipleDelaysAccumulate) {
   EXPECT_EQ(result, 3u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Simulation time: events at different times execute in chronological
-// order (time never goes backwards).
-// ---------------------------------------------------------------------------
 TEST(SimCh43, EventsExecuteInChronologicalOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -358,11 +283,6 @@ TEST(SimCh43, EventsExecuteInChronologicalOrder) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 5u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Time slot regions: active region events execute before NBA region.
-// A blocking assignment (active) and non-blocking assignment (NBA) in the
-// same process demonstrate region ordering.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, ActiveRegionBeforeNBARegion) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -382,11 +302,6 @@ TEST(SimCh43, ActiveRegionBeforeNBARegion) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Time slot regions: NBA update is visible after the active region.
-// The non-blocking assignment value is applied in the NBA region and can
-// be observed by processes that re-evaluate.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, NBAUpdateVisibleAfterActiveRegion) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -406,9 +321,6 @@ TEST(SimCh43, NBAUpdateVisibleAfterActiveRegion) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 51u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Processes have state: a process maintains state across time steps.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessMaintainsStateAcrossTime) {
   auto result = RunAndGet(
       "module t;\n"
@@ -423,10 +335,6 @@ TEST(SimCh43, ProcessMaintainsStateAcrossTime) {
   EXPECT_EQ(result, 3u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Processes respond to input changes: always_comb re-evaluates each
-// time an input variable changes, tracking intermediate values.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessRespondsToMultipleInputChanges) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -447,10 +355,6 @@ TEST(SimCh43, ProcessRespondsToMultipleInputChanges) {
   EXPECT_EQ(f.ctx.FindVariable("doubled")->value.ToUint64(), 20u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Processes are concurrently scheduled: multiple process types
-// (initial, always_comb, assign) all execute within the same simulation.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, ConcurrentProcessTypes) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -470,10 +374,6 @@ TEST(SimCh43, ConcurrentProcessTypes) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 9u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Update event cascading: an update event triggers evaluation events,
-// which may produce further update events (chain of assign statements).
-// ---------------------------------------------------------------------------
 TEST(SimCh43, UpdateEventCascade) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -488,11 +388,6 @@ TEST(SimCh43, UpdateEventCascade) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}, {"d", 4u}});
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Time slot region ordering: verify that region ordering provides
-// predictable interactions (properties sample stable data).
-// Blocking in Active, NBA applied later, always_comb re-evaluates.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, RegionOrderingPredictableInteraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -512,10 +407,6 @@ TEST(SimCh43, RegionOrderingPredictableInteraction) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 30u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Processes produce outputs: an always_comb process computes a
-// combinational function and makes it visible to other processes.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessProducesOutputVisibleToOthers) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -534,10 +425,6 @@ TEST(SimCh43, ProcessProducesOutputVisibleToOthers) {
   EXPECT_EQ(f.ctx.FindVariable("out")->value.ToUint64(), 13u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Discrete event model: events scheduled at different simulation times
-// execute in time order. Processes at time 5 execute before time 10.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, DiscreteEventsInTimeOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -558,10 +445,6 @@ TEST(SimCh43, DiscreteEventsInTimeOrder) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Scheduler low-level: EventPool acquire and release cycle.
-// Events are recycled for efficiency.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, EventPoolRecycles) {
   Arena arena;
   EventPool pool(arena);
@@ -574,15 +457,8 @@ TEST(SimCh43, EventPoolRecycles) {
   EXPECT_EQ(pool.FreeCount(), 0u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Scheduler low-level: events scheduled at the same time and region
-// execute in FIFO order.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, SameTimeAndRegionFIFO) { VerifyActiveRegionFIFO(); }
 
-// ---------------------------------------------------------------------------
-// §4.3 Scheduler low-level: time ordering — earlier time executes first.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, SchedulerTimeOrdering) {
   Arena arena;
   Scheduler sched(arena);
@@ -602,10 +478,6 @@ TEST(SimCh43, SchedulerTimeOrdering) {
   EXPECT_EQ(order[1], 2);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Scheduler low-level: region ordering within a time slot.
-// Active executes before Inactive, Inactive before NBA.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, SchedulerRegionOrdering) {
   Arena arena;
   Scheduler sched(arena);
@@ -630,10 +502,6 @@ TEST(SimCh43, SchedulerRegionOrdering) {
   EXPECT_EQ(order[2], "nba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Update and evaluation event kinds: both EventKind::kUpdate and
-// EventKind::kEvaluation are executed by the scheduler.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, UpdateAndEvaluationEventKinds) {
   Arena arena;
   Scheduler sched(arena);
@@ -655,10 +523,6 @@ TEST(SimCh43, UpdateAndEvaluationEventKinds) {
   EXPECT_TRUE(eval_ran);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Variable watcher: update events are detected via the watcher
-// mechanism on Variable. A watcher is notified when NotifyWatchers is called.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, VariableWatcherNotifiesOnUpdate) {
   Variable var;
   bool notified = false;
@@ -670,10 +534,6 @@ TEST(SimCh43, VariableWatcherNotifiesOnUpdate) {
   EXPECT_TRUE(notified);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Variable watcher: a watcher returning false persists for subsequent
-// notifications (reusable sensitivity).
-// ---------------------------------------------------------------------------
 TEST(SimCh43, WatcherPersistsIfNotConsumed) {
   Variable var;
   int count = 0;
@@ -686,10 +546,6 @@ TEST(SimCh43, WatcherPersistsIfNotConsumed) {
   EXPECT_EQ(count, 2);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Variable watcher: a watcher returning true is removed after first
-// notification (one-shot sensitivity).
-// ---------------------------------------------------------------------------
 TEST(SimCh43, WatcherRemovedIfConsumed) {
   Variable var;
   int count = 0;
@@ -702,11 +558,6 @@ TEST(SimCh43, WatcherRemovedIfConsumed) {
   EXPECT_EQ(count, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Process kinds: ProcessKind enum covers all process types listed in
-// the LRM (initial, always, always_comb, always_latch, always_ff, final,
-// continuous assignment).
-// ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessKindsEnumCoverage) {
   EXPECT_EQ(static_cast<int>(ProcessKind::kInitial), 0);
   EXPECT_EQ(static_cast<int>(ProcessKind::kAlways), 1);
@@ -717,10 +568,6 @@ TEST(SimCh43, ProcessKindsEnumCoverage) {
   EXPECT_EQ(static_cast<int>(ProcessKind::kContAssign), 6);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Process default state: a newly created Process has default state
-// (active, non-reactive, home region = Active).
-// ---------------------------------------------------------------------------
 TEST(SimCh43, ProcessDefaultState) {
   Process proc;
   EXPECT_EQ(proc.kind, ProcessKind::kInitial);
@@ -730,9 +577,6 @@ TEST(SimCh43, ProcessDefaultState) {
   EXPECT_EQ(proc.id, 0u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Scheduler initial state: no events, time at zero.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, SchedulerInitialState) {
   Arena arena;
   Scheduler sched(arena);
@@ -740,9 +584,6 @@ TEST(SimCh43, SchedulerInitialState) {
   EXPECT_EQ(sched.CurrentTime().ticks, 0u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.3 Time slot regions: all 17 regions from §4.4 are defined and ordered.
-// ---------------------------------------------------------------------------
 TEST(SimCh43, AllRegionsDefined) {
   EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
   EXPECT_EQ(static_cast<int>(Region::kPreActive), 1);
@@ -763,24 +604,7 @@ TEST(SimCh43, AllRegionsDefined) {
   EXPECT_EQ(static_cast<int>(Region::kPostponed), 16);
   EXPECT_EQ(kRegionCount, 17u);
 }
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
 
-// ---------------------------------------------------------------------------
-// 5. §4.2 Abstraction levels: behavioral (initial block) and dataflow
-//    (continuous assignment) coexist and interact.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, BehavioralAndDataflowCoexist) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -802,10 +626,6 @@ TEST(SimCh4, BehavioralAndDataflowCoexist) {
   EXPECT_EQ(vb->value.ToUint64(), 6u);
 }
 
-// ---------------------------------------------------------------------------
-// 8. §4.2 Multiple processes across simulation time: two initial blocks
-//    with different delays both produce correct final values.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, MultipleProcessesAcrossTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -833,10 +653,6 @@ TEST(SimCh4, MultipleProcessesAcrossTime) {
   EXPECT_EQ(vb->value.ToUint64(), 20u);
 }
 
-// ---------------------------------------------------------------------------
-// 14. §4.2 Cascade of processes: initial sets a, assign b = a + 1,
-//     always_comb c = b * 2. All three execute and propagate.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, CascadeOfProcesses) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -856,10 +672,6 @@ TEST(SimCh4, CascadeOfProcesses) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 12u);
 }
 
-// ---------------------------------------------------------------------------
-// 26. §4.2 Parallel processes with time delays: interleaved execution across
-//     simulation time.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, InterleavedTimeExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -879,7 +691,7 @@ TEST(SimCh4, InterleavedTimeExecution) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // a: set 1@t5, set 3@t15. b: set 2@t10, set 4@t15.
+
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 3u);
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 4u);
 }

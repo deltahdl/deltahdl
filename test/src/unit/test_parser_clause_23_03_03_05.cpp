@@ -1,5 +1,3 @@
-// §23.3.3.5: Unpacked array ports and arrays of instances
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- program_instantiation: with instance array ---
 TEST(ParserAnnexA0413, ProgramInstArray) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
@@ -21,4 +18,4 @@ TEST(ParserAnnexA0413, ProgramInstArray) {
   EXPECT_NE(item->inst_range_right, nullptr);
 }
 
-}  // namespace
+}

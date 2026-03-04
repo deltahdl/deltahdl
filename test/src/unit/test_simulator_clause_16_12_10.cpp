@@ -1,5 +1,3 @@
-// §16.12.10: Nexttime property
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -40,4 +35,4 @@ TEST(SvaEngine, PropertyOr) {
             PropertyResult::kPass);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §30.4.6: Declaring multiple module paths in a single statement
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Mixed terminal forms do not interfere with behavioral simulation
 TEST(SimA703, MixedTerminalFormsDoNotInterfere) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -28,4 +25,4 @@ TEST(SimA703, MixedTerminalFormsDoNotInterfere) {
   LowerRunAndCheck(f, design, {{"a", 11u}, {"b", 22u}});
 }
 
-}  // namespace
+}

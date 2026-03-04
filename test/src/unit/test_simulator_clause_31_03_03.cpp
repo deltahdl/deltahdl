@@ -1,5 +1,3 @@
-// §31.3.3: $setuphold
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 Runtime — $setuphold dual limits stored in TimingCheckEntry
-// =============================================================================
 TEST(SimA70501, SetupholdDualLimitsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -30,9 +25,6 @@ TEST(SimA70501, SetupholdDualLimitsStored) {
   EXPECT_EQ(stored.notifier, "ntfr");
 }
 
-// =============================================================================
-// A.7.5.1 End-to-end — $setuphold with extended args simulates
-// =============================================================================
 TEST(SimA70501, SetupholdFullArgsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -53,4 +45,4 @@ TEST(SimA70501, SetupholdFullArgsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

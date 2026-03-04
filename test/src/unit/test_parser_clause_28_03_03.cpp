@@ -1,5 +1,3 @@
-// §28.3.3: The delay specification
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -32,4 +30,4 @@ TEST(ParserA301, GateInst_SharedDelayAcrossInstances) {
   EXPECT_NE(gates[1]->gate_delay, nullptr);
 }
 
-}  // namespace
+}

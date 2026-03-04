@@ -1,5 +1,3 @@
-// §12.7.3: The foreach-loop
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- foreach ---
-// §12.7.3: foreach iterates over array elements
 TEST(SimA608, ForeachBasic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,8 +28,8 @@ TEST(SimA608, ForeachBasic) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("total");
   ASSERT_NE(var, nullptr);
-  // 1 + 2 + 3 + 4 = 10
+
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

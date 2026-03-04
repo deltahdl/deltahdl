@@ -1,5 +1,3 @@
-// §8.3: Syntax
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// description: class_declaration
 TEST(SourceText, DescriptionClass) {
   auto r = Parse("class C; endclass\n");
   ASSERT_NE(r.cu, nullptr);
@@ -15,7 +12,7 @@ TEST(SourceText, DescriptionClass) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->name, "C");
 }
-// class_item ::= { attribute_instance } covergroup_declaration
+
 TEST(SourceText, ClassCovergroupDecl) {
   auto r = Parse(
       "class C;\n"
@@ -29,7 +26,7 @@ TEST(SourceText, ClassCovergroupDecl) {
   EXPECT_EQ(members[0]->kind, ClassMemberKind::kCovergroup);
   EXPECT_EQ(members[0]->name, "cg");
 }
-// §8.3 — Lifetime specifier on class
+
 TEST(ParserSection8, ClassWithLifetime) {
   auto r = Parse(
       "class automatic MyClass;\n"
@@ -40,7 +37,6 @@ TEST(ParserSection8, ClassWithLifetime) {
   EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
 }
 
-// §8.5 — Parameter inside class body
 TEST(ParserSection8, ClassWithParameter) {
   auto r = Parse(
       "class par_cls;\n"
@@ -57,7 +53,6 @@ TEST(ParserSection23, EndLabelClass) {
   EXPECT_EQ(r.cu->classes[0]->name, "myclass");
 }
 
-// --- Class tests ---
 TEST(Parser, EmptyClass) {
   auto r = Parse("class empty_cls; endclass");
   ASSERT_NE(r.cu, nullptr);
@@ -66,7 +61,6 @@ TEST(Parser, EmptyClass) {
   EXPECT_FALSE(r.cu->classes[0]->is_virtual);
 }
 
-// §8.15 — Constructor end label
 TEST(ParserSection8, ConstructorEndLabel) {
   auto r = Parse(
       "class Base;\n"
@@ -77,7 +71,6 @@ TEST(ParserSection8, ConstructorEndLabel) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// class_item ::= local_parameter_declaration ; | parameter_declaration ;
 TEST(SourceText, ClassParameters) {
   auto r = Parse(
       "class C;\n"
@@ -92,7 +85,6 @@ TEST(SourceText, ClassParameters) {
   EXPECT_EQ(members[1]->kind, ClassMemberKind::kProperty);
 }
 
-// class_item ::= ; (empty statement)
 TEST(SourceText, ClassEmptyItem) {
   auto r = Parse(
       "class C;\n"
@@ -102,11 +94,10 @@ TEST(SourceText, ClassEmptyItem) {
       "endclass\n");
   ASSERT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-  // Empty semicolons are consumed, only real members remain.
+
   EXPECT_EQ(r.cu->classes[0]->members.size(), 1u);
 }
 
-// §8.3 — Multiple properties on one line (comma-separated)
 TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
   auto r = Parse(
       "class MyClass;\n"
@@ -122,7 +113,6 @@ TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
   }
 }
 
-// 12. Class scope -- members in class name space
 TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
   auto r = Parse(
       "class my_cls;\n"
@@ -141,7 +131,6 @@ TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
   EXPECT_EQ(cls->members[1]->name, "name");
 }
 
-// Class with end label.
 TEST(SourceText, ClassEndLabel) {
   auto r = Parse("class C; endclass : C\n");
   ASSERT_NE(r.cu, nullptr);
@@ -158,11 +147,6 @@ TEST(Parser, ClassWithProperty) {
   EXPECT_EQ(cls->members[0]->data_type.kind, DataTypeKind::kInt);
 }
 
-// =============================================================================
-// A.1.9 Class items
-// =============================================================================
-// class_item ::= { attribute_instance } class_property (property_qualifier
-// path)
 TEST(SourceText, ClassPropertyWithQualifiers) {
   auto r = Parse(
       "class C;\n"
@@ -185,7 +169,6 @@ TEST(SourceText, ClassPropertyWithQualifiers) {
   EXPECT_TRUE(members[4]->is_local);
 }
 
-// class_item_qualifier / property_qualifier / method_qualifier (footnote 10)
 TEST(SourceText, ClassQualifierCombinations) {
   auto r = Parse(
       "class C;\n"
@@ -218,8 +201,6 @@ TEST(Parser, ClassPropertyQualifiers) {
   EXPECT_TRUE(cls->members[1]->is_local);
 }
 
-// class_method ::= pure virtual { class_item_qualifier } method_prototype ;
-//                | extern { method_qualifier } method_prototype ;
 TEST(SourceText, ClassPureVirtualAndExtern) {
   auto r = Parse(
       "class C;\n"
@@ -242,7 +223,6 @@ TEST(SourceText, ClassPureVirtualAndExtern) {
   EXPECT_TRUE(members[3]->is_static);
 }
 
-// class_item ::= { attribute_instance } interface_class_declaration
 TEST(SourceText, ClassNestedInterfaceClass) {
   auto r = Parse(
       "class Outer;\n"
@@ -258,9 +238,6 @@ TEST(SourceText, ClassNestedInterfaceClass) {
   EXPECT_TRUE(members[0]->nested_class->is_interface);
 }
 
-// =============================================================================
-// §8 Class declarations — parsing
-// =============================================================================
 TEST(ParserSection8, EmptyClassDecl) {
   auto r = Parse("class Packet; endclass");
   ASSERT_NE(r.cu, nullptr);
@@ -268,11 +245,9 @@ TEST(ParserSection8, EmptyClassDecl) {
   EXPECT_EQ(r.cu->classes[0]->name, "Packet");
   EXPECT_TRUE(r.cu->classes[0]->members.empty());
 }
-// =========================================================================
-// §6.15: Class
-// =========================================================================
+
 TEST(ParserSection6, ClassVarDecl_ClassParsed) {
-  // Class declared at top-level, then used as a type inside a module.
+
   auto r = Parse(
       "class MyClass;\n"
       "  int x;\n"
@@ -286,4 +261,4 @@ TEST(ParserSection6, ClassVarDecl_ClassParsed) {
   ASSERT_FALSE(r.cu->modules.empty());
 }
 
-}  // namespace
+}

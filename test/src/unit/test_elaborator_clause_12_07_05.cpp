@@ -1,12 +1,9 @@
-// §12.7.5: The do...while-loop
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// §12.7.5: do-while loop elaborates without error
 TEST(ElabA608, DoWhileLoop) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,4 +18,4 @@ TEST(ElabA608, DoWhileLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

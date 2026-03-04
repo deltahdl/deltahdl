@@ -1,5 +1,3 @@
-// §12.8: Jump statements
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -59,7 +57,7 @@ TEST(Parser, ReturnWithValue) {
   EXPECT_EQ(stmt->kind, StmtKind::kReturn);
   EXPECT_NE(stmt->expr, nullptr);
 }
-// Break inside while loop.
+
 TEST(ParserSection12, BreakInsideWhile) {
   auto r = Parse(
       "module t;\n"
@@ -83,7 +81,6 @@ TEST(ParserSection12, BreakInsideWhile) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
 }
 
-// Continue inside do-while loop.
 TEST(ParserSection12, ContinueInsideDoWhile) {
   auto r = Parse(
       "module t;\n"
@@ -107,7 +104,6 @@ TEST(ParserSection12, ContinueInsideDoWhile) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
 }
 
-// Break inside foreach loop (LRM 12.8: break jumps out of entire loop).
 TEST(ParserSection12, BreakInsideForeach) {
   auto r = Parse(
       "module t;\n"
@@ -128,7 +124,6 @@ TEST(ParserSection12, BreakInsideForeach) {
   EXPECT_EQ(blk->stmts[0]->then_branch->kind, StmtKind::kBreak);
 }
 
-// Continue inside foreach loop.
 TEST(ParserSection12, ContinueInsideForeach) {
   auto r = Parse(
       "module t;\n"
@@ -158,7 +153,6 @@ static ModuleItem* FindFunc12b(ParseResult& r, std::string_view name) {
   return nullptr;
 }
 
-// Return from void function (task-like usage).
 TEST(ParserSection12, ReturnFromVoidFunctionEarly) {
   auto r = Parse(
       "module t;\n"
@@ -171,14 +165,14 @@ TEST(ParserSection12, ReturnFromVoidFunctionEarly) {
   auto* fn = FindFunc12b(r, "check");
   ASSERT_NE(fn, nullptr);
   ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  // First statement is an if whose then_branch is a return.
+
   auto* if_stmt = fn->func_body_stmts[0];
   EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
   ASSERT_NE(if_stmt->then_branch, nullptr);
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kReturn);
   EXPECT_EQ(if_stmt->then_branch->expr, nullptr);
 }
-// §12.8: jump_statement (break)
+
 TEST(ParserA604, StmtItemJumpStatementBreak) {
   auto r = Parse(
       "module m;\n"
@@ -195,7 +189,6 @@ TEST(ParserA604, StmtItemJumpStatementBreak) {
   VerifyForeverLoopJump(body, StmtKind::kBreak);
 }
 
-// §12.8: jump_statement (continue)
 TEST(ParserA604, StmtItemJumpStatementContinue) {
   auto r = Parse(
       "module m;\n"
@@ -211,7 +204,7 @@ TEST(ParserA604, StmtItemJumpStatementContinue) {
   ASSERT_NE(body, nullptr);
   VerifyForeverLoopJump(body, StmtKind::kContinue);
 }
-// §12.8: jump_statement (return)
+
 TEST(ParserA604, StmtItemJumpStatementReturn) {
   auto r = Parse(
       "module m;\n"
@@ -227,10 +220,6 @@ TEST(ParserA604, StmtItemJumpStatementReturn) {
   EXPECT_EQ(func->func_body_stmts[0]->kind, StmtKind::kReturn);
 }
 
-// ---------------------------------------------------------------------------
-// jump_statement ::= return [ expression ] ; | break ; | continue ;
-// ---------------------------------------------------------------------------
-// §12.8: return with expression from non-void function
 TEST(ParserA605, JumpReturnWithExpr) {
   auto r = Parse(
       "module m;\n"
@@ -246,7 +235,6 @@ TEST(ParserA605, JumpReturnWithExpr) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-// §12.8: return without expression from void function
 TEST(ParserA605, JumpReturnVoid) {
   auto r = Parse(
       "module m;\n"
@@ -262,7 +250,6 @@ TEST(ParserA605, JumpReturnVoid) {
   EXPECT_EQ(stmt->expr, nullptr);
 }
 
-// §12.8: break statement
 TEST(ParserA605, JumpBreak) {
   auto r = Parse(
       "module m;\n"
@@ -279,7 +266,6 @@ TEST(ParserA605, JumpBreak) {
   VerifyForeverLoopJump(body, StmtKind::kBreak);
 }
 
-// §12.8: continue statement
 TEST(ParserA605, JumpContinue) {
   auto r = Parse(
       "module m;\n"
@@ -336,7 +322,7 @@ TEST(ParserSection12, BreakStatementInBody) {
       "endmodule\n");
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  // The body contains an if whose then_branch is break.
+
   auto* if_stmt = stmt->body->stmts[0];
   ASSERT_NE(if_stmt, nullptr);
   EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
@@ -382,4 +368,4 @@ TEST(ParserSection12, ContinueStatementInBody) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
 }
 
-}  // namespace
+}

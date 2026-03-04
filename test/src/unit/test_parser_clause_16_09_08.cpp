@@ -1,12 +1,9 @@
-// §16.9.8: First_match operation
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// sequence_expr ::= first_match ( sequence_expr {, sequence_match_item} )
 TEST(ParserA210, SequenceExpr_FirstMatch) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -22,7 +19,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.6: first_match ---
 TEST(ParserAnnexF, AnnexFFirstMatch) {
   auto r = Parse(
       "module m;\n"
@@ -34,4 +30,4 @@ TEST(ParserAnnexF, AnnexFFirstMatch) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}  // namespace
+}

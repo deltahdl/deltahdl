@@ -1,5 +1,3 @@
-// §14.11: Cycle delay: ##
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.11 cycle_delay — ## identifier
-// =============================================================================
 TEST(ParserA611, CycleDelayIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -24,4 +19,4 @@ TEST(ParserA611, CycleDelayIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

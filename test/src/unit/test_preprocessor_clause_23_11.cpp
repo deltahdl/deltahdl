@@ -1,12 +1,9 @@
-// §23.11: Binding auxiliary code to scopes or instances
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// 3. Bind constructs at CU scope (§23.11) — CU scope can also hold bind.
 TEST(ParserClause03, Cl3_12_1_CuScopeBindDirective) {
   auto r = ParseWithPreprocessor(
       "module target; endmodule\n"
@@ -17,10 +14,6 @@ TEST(ParserClause03, Cl3_12_1_CuScopeBindDirective) {
   EXPECT_EQ(r.cu->bind_directives[0]->target, "target");
 }
 
-// =============================================================================
-// A.1.2 bind_directive (§23.11)
-// =============================================================================
-// Form 1: bind target_scope bind_instantiation
 TEST(SourceText, BindDirectiveBasic) {
   auto r =
       ParseWithPreprocessor("bind target_mod checker_mod chk_inst(.a(sig));\n");
@@ -35,7 +28,6 @@ TEST(SourceText, BindDirectiveBasic) {
   EXPECT_EQ(r.cu->bind_directives[0]->instantiation->inst_name, "chk_inst");
 }
 
-// Form 1 with instance list: bind scope : inst1, inst2 instantiation
 TEST(SourceText, BindDirectiveWithInstanceList) {
   auto r = ParseWithPreprocessor("bind dut : i1, i2 chk chk_i(.clk(clk));\n");
   ASSERT_NE(r.cu, nullptr);
@@ -47,7 +39,6 @@ TEST(SourceText, BindDirectiveWithInstanceList) {
   EXPECT_EQ(r.cu->bind_directives[0]->target_instances[1], "i2");
 }
 
-// Form 2: bind hierarchical_instance instantiation
 TEST(SourceText, BindDirectiveHierarchical) {
   auto r = ParseWithPreprocessor("bind top.dut.u1 checker_mod chk(.a(sig));\n");
   ASSERT_NE(r.cu, nullptr);
@@ -56,4 +47,4 @@ TEST(SourceText, BindDirectiveHierarchical) {
   EXPECT_EQ(r.cu->bind_directives[0]->target, "top.dut.u1");
 }
 
-}  // namespace
+}

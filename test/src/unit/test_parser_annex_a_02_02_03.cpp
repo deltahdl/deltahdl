@@ -1,5 +1,3 @@
-// Annex A.2.2.3: Delays
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,14 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.2.2.3 Delays
-// =============================================================================
-// ---------------------------------------------------------------------------
-// delay_value ::= unsigned_number | real_number | ps_identifier
-//               | time_literal | 1step
-// ---------------------------------------------------------------------------
-// delay_value: unsigned_number — integer literal as delay value.
 TEST(ParserA223, DelayValueUnsignedNumber) {
   auto r = Parse(
       "module m;\n"
@@ -28,7 +18,6 @@ TEST(ParserA223, DelayValueUnsignedNumber) {
   EXPECT_EQ(item->net_delay->int_val, 10u);
 }
 
-// delay_value: real_number — real literal as delay value.
 TEST(ParserA223, DelayValueRealNumber) {
   auto r = Parse(
       "module m;\n"
@@ -41,7 +30,6 @@ TEST(ParserA223, DelayValueRealNumber) {
   EXPECT_EQ(item->net_delay->kind, ExprKind::kRealLiteral);
 }
 
-// delay3: two values on net (rise, fall).
 TEST(ParserA223, Delay3NetTwoValues) {
   auto r = Parse(
       "module m;\n"
@@ -57,7 +45,6 @@ TEST(ParserA223, Delay3NetTwoValues) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-// delay3: three values on net (rise, fall, charge_decay).
 TEST(ParserA223, Delay3NetThreeValues) {
   auto r = Parse(
       "module m;\n"
@@ -74,8 +61,6 @@ TEST(ParserA223, Delay3NetThreeValues) {
   EXPECT_EQ(item->net_delay_decay->int_val, 30u);
 }
 
-// --- delay3 on gate instantiations ---
-// delay3: single value on gate (# delay_value form).
 TEST(ParserA223, Delay3GateSingleValue) {
   auto r = Parse(
       "module m;\n"
@@ -84,7 +69,7 @@ TEST(ParserA223, Delay3GateSingleValue) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // wire y, a, b creates 3 items; gate is items[3]
+
   auto* item = r.cu->modules[0]->items[3];
   ASSERT_NE(item->gate_delay, nullptr);
   EXPECT_EQ(item->gate_delay->int_val, 5u);
@@ -92,7 +77,6 @@ TEST(ParserA223, Delay3GateSingleValue) {
   EXPECT_EQ(item->gate_delay_decay, nullptr);
 }
 
-// delay3: two values on gate (rise, fall).
 TEST(ParserA223, Delay3GateTwoValues) {
   auto r = Parse(
       "module m;\n"
@@ -109,7 +93,6 @@ TEST(ParserA223, Delay3GateTwoValues) {
   EXPECT_EQ(item->gate_delay_decay, nullptr);
 }
 
-// delay3: two values on continuous assign (rise, fall).
 TEST(ParserA223, Delay3AssignTwoValues) {
   auto r = Parse(
       "module m;\n"
@@ -126,11 +109,6 @@ TEST(ParserA223, Delay3AssignTwoValues) {
   EXPECT_EQ(item->assign_delay_decay, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// delay2 ::= # delay_value
-//          | # ( mintypmax_expression [, mintypmax_expression] )
-// ---------------------------------------------------------------------------
-// delay2: single value on n_input gate (uses delay2 per BNF).
 TEST(ParserA223, Delay2NInputGateSingleValue) {
   auto r = Parse(
       "module m;\n"
@@ -144,7 +122,6 @@ TEST(ParserA223, Delay2NInputGateSingleValue) {
   EXPECT_EQ(item->gate_delay->int_val, 7u);
 }
 
-// No delay specified — fields remain nullptr.
 TEST(ParserA223, NoDelayDefault) {
   auto r = Parse(
       "module m;\n"
@@ -158,8 +135,6 @@ TEST(ParserA223, NoDelayDefault) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-// --- §5.12 Attributes ---
-// delay_value: time_literal — time literal (e.g. 10ns) as delay.
 TEST(ParserA223, DelayValueTimeLiteral) {
   auto r = Parse(
       "module m;\n"
@@ -172,4 +147,4 @@ TEST(ParserA223, DelayValueTimeLiteral) {
   EXPECT_EQ(item->net_delay->kind, ExprKind::kTimeLiteral);
 }
 
-}  // namespace
+}

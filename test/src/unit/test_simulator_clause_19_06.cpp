@@ -1,5 +1,3 @@
-// §19.6: Defining cross coverage
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -12,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// S19.6: Cross coverage
-// =============================================================================
 TEST(Coverage, CrossCoverageCreation) {
   CoverageDB db;
   auto* g = SetupTwoPointCross(db);
@@ -34,4 +29,4 @@ TEST(Coverage, CrossCoverageSampling) {
   EXPECT_EQ(g->crosses[0].bins[1].hit_count, 1u);
 }
 
-}  // namespace
+}

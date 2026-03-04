@@ -1,5 +1,3 @@
-// §31.2: Overview
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// All 12 kinds can be stored in SpecifyManager
 TEST(SimA705, RuntimeAllTwelveKinds) {
   SpecifyManager mgr;
   TimingCheckKind kinds[] = {
@@ -34,4 +31,4 @@ TEST(SimA705, RuntimeAllTwelveKinds) {
   }
 }
 
-}  // namespace
+}

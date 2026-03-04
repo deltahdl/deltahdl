@@ -1,5 +1,3 @@
-// §non-lrm:eval_advanced
-
 #include <cstring>
 
 #include "fixture_simulator.h"
@@ -7,16 +5,12 @@
 #include "parser/ast.h"
 #include "simulator/adv_sim.h"
 #include "simulator/eval.h"
-#include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
-// Shared fixture for advanced expression evaluation tests (§11 phases 22+).
 namespace {
 
-// =============================================================================
-// TwoStateDetector
-// =============================================================================
 TEST(AdvSim, TwoStateDetectorKnown2State) {
   Arena arena;
   auto vec = MakeLogic4VecVal(arena, 8, 0x42);
@@ -26,7 +20,7 @@ TEST(AdvSim, TwoStateDetectorKnown2State) {
 TEST(AdvSim, TwoStateDetectorWith4StateValue) {
   Arena arena;
   auto vec = MakeLogic4Vec(arena, 8);
-  // Set bval to non-zero to indicate X/Z.
+
   vec.words[0].bval = 0x01;
   EXPECT_FALSE(TwoStateDetector::Is2State(vec));
 }
@@ -48,4 +42,4 @@ TEST(AdvSim, EventCoalescerKeepsDistinctTargets) {
   EXPECT_EQ(entries.size(), 3u);
 }
 
-}  // namespace
+}

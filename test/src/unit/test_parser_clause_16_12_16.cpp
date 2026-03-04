@@ -1,5 +1,3 @@
-// §16.12.16: Case
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// property_expr ::= case (...) property_case_item ... endcase
 TEST(ParserA210, PropertyExpr_Case) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -21,12 +18,6 @@ TEST(ParserA210, PropertyExpr_Case) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #20: property_case_item
-// property_case_item ::=
-//     expression_or_dist { , expression_or_dist } : property_expr ;
-//   | default [ : ] property_expr ;
-// =============================================================================
 TEST(ParserA210, PropertyCaseItem_MultiExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -48,7 +39,6 @@ TEST(ParserA210, PropertyCaseItem_DefaultOnly) {
               "endmodule\n"));
 }
 
-// property_case_item — default without colon
 TEST(ParserA210, PropertyCaseItem_DefaultNoColon) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -60,9 +50,6 @@ TEST(ParserA210, PropertyCaseItem_DefaultNoColon) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §16.14.6 -- Property case (additional tests)
-// =============================================================================
 TEST(ParserSection16, PropertyCaseWithDefaultOnly) {
   auto r = Parse(
       "module m;\n"
@@ -76,10 +63,6 @@ TEST(ParserSection16, PropertyCaseWithDefaultOnly) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.14.6 Property case
-// =============================================================================
 TEST(ParserSection16, PropertyCaseBasic) {
   auto r = Parse(
       "module m;\n"
@@ -113,4 +96,4 @@ TEST(ParserSection16, PropertyCaseInAssert) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §17.3: Checker instantiation
-
 #include "fixture_checker_elab.h"
 #include "fixture_elaborator.h"
 
@@ -22,10 +20,6 @@ TEST(CheckerElab, CheckerInstantiatedFromModule) {
   EXPECT_EQ(mod->children[0].resolved->name, "sub_chk");
 }
 
-// =============================================================================
-// Elaboration tests -- checker instantiation resolved through elaborator
-// =============================================================================
-// --- Elaborator resolves checker instantiation within a module ---
 TEST(ParserAnnexA0414, ElaborationCheckerInstInModule) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -45,7 +39,6 @@ TEST(ParserAnnexA0414, ElaborationCheckerInstInModule) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
-// --- Elaborator resolves checker instantiation with port bindings ---
 TEST(ParserAnnexA0414, ElaborationCheckerInstPortBindings) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -63,7 +56,6 @@ TEST(ParserAnnexA0414, ElaborationCheckerInstPortBindings) {
   EXPECT_EQ(top->children[0].port_bindings[0].port_name, "data");
 }
 
-// --- Elaborator resolves checker inside checker ---
 TEST(ParserAnnexA0414, ElaborationCheckerInsideChecker) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -88,4 +80,4 @@ TEST(ParserAnnexA0414, ElaborationCheckerInsideChecker) {
   EXPECT_NE(outer->children[0].resolved, nullptr);
 }
 
-}  // namespace
+}

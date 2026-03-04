@@ -1,5 +1,3 @@
-// §9.6.2: Disable statement
-
 #include <cstdint>
 #include <string_view>
 
@@ -17,17 +15,8 @@
 
 using namespace delta;
 
-// Helper to create a blocking assignment statement: lhs = rhs_val.
-
-// Driver coroutine that co_awaits an ExecTask and stores its result.
-
-// Helper to run ExecStmt synchronously (for non-suspending statements).
-// Creates a wrapper coroutine, resumes it, and returns the result.
 namespace {
 
-// =============================================================================
-// 3. Disable (StmtKind::kDisable)
-// =============================================================================
 TEST(StmtExec, DisableReturnsKDone) {
   StmtFixture f;
   auto* stmt = f.arena.Create<Stmt>();
@@ -38,4 +27,4 @@ TEST(StmtExec, DisableReturnsKDone) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-}  // namespace
+}

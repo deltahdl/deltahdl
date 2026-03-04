@@ -1,4 +1,3 @@
-
 #include <cstring>
 
 #include "fixture_simulator.h"
@@ -8,15 +7,8 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §5.10 Structure literals
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// 1. Positional assignment pattern — type from left-hand context
-// ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitPositional) {
-  // §5.10: c = '{0, 0.0}; — type from left-hand context (packed struct).
+
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -27,11 +19,8 @@ TEST(SimCh510, StructLitPositional) {
   EXPECT_EQ(v, 0xAABBu);
 }
 
-// ---------------------------------------------------------------------------
-// 2. Member name and value — §5.10 / §10.9.2
-// ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitMemberName) {
-  // §5.10: c = '{a:0, b:0.0};  — member name and value for that member
+
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -42,11 +31,8 @@ TEST(SimCh510, StructLitMemberName) {
   EXPECT_EQ(v, 0x1122u);
 }
 
-// ---------------------------------------------------------------------------
-// 3. Default value — all elements set to same value
-// ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitDefault) {
-  // §5.10: c = '{default:0};  — all elements of structure c are set to 0
+
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -57,11 +43,8 @@ TEST(SimCh510, StructLitDefault) {
   EXPECT_EQ(v, 0xFFFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 4. Member name and value — reverse order
-// ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitMemberNameReverse) {
-  // §5.10 / §10.9.2: Named patterns can be in any order.
+
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -72,11 +55,8 @@ TEST(SimCh510, StructLitMemberNameReverse) {
   EXPECT_EQ(v, 0x1122u);
 }
 
-// ---------------------------------------------------------------------------
-// 5. Struct literal in variable initialization
-// ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitVarInit) {
-  // §5.10: Structure literal used in variable declaration initializer.
+
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; logic [7:0] y; } pt_t;\n"
@@ -86,11 +66,8 @@ TEST(SimCh510, StructLitVarInit) {
   EXPECT_EQ(v, 0xAABBu);
 }
 
-// ---------------------------------------------------------------------------
-// 6. Default value with different-width fields
-// ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitDefaultDiffWidth) {
-  // §5.10: '{default:val} applies to all fields; each truncates to width.
+
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [3:0] b; } ab_t;\n"
@@ -98,15 +75,12 @@ TEST(SimCh510, StructLitDefaultDiffWidth) {
       "  initial c = '{default: '1};\n"
       "endmodule\n",
       "c");
-  // a = 8'hFF (bits 11:4), b = 4'hF (bits 3:0) → 0xFFF
+
   EXPECT_EQ(v, 0xFFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 7. Positional pattern with three fields
-// ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitPositionalThree) {
-  // §5.10: Positional assignment with 3 fields.
+
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -119,11 +93,8 @@ TEST(SimCh510, StructLitPositionalThree) {
   EXPECT_EQ(v, 0x112233u);
 }
 
-// ---------------------------------------------------------------------------
-// 8. Struct field access after literal assignment
-// ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitFieldAccess) {
-  // §5.10: After assigning via struct literal, individual fields are readable.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -151,11 +122,8 @@ TEST(SimCh510, StructLitFieldAccess) {
   EXPECT_EQ(vry->value.ToUint64(), 0xADu);
 }
 
-// ---------------------------------------------------------------------------
-// 9. Default value with zero — all fields cleared
-// ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitDefaultZero) {
-  // §5.10 LRM example: c = '{default:0};
+
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -166,11 +134,8 @@ TEST(SimCh510, StructLitDefaultZero) {
   EXPECT_EQ(v, 0u);
 }
 
-// ---------------------------------------------------------------------------
-// 10. Positional pattern — type from init context (declaration)
-// ---------------------------------------------------------------------------
 TEST(SimCh510, StructLitPositionalInit) {
-  // §5.10: Structure literal type from declaration context.
+
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"

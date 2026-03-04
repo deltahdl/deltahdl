@@ -1,5 +1,3 @@
-// §7.2: Structures
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -8,12 +6,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Helper fixture
-// =============================================================================
-// =============================================================================
-// §7.2 Struct type metadata — StructTypeInfo registration
-// =============================================================================
 static void VerifyStructField(const StructFieldInfo& field,
                               const char* expected_name,
                               uint32_t expected_offset, uint32_t expected_width,
@@ -31,8 +23,8 @@ TEST(StructType, RegisterAndFind_Metadata) {
   info.type_name = "point_t";
   info.is_packed = true;
   info.total_width = 16;
-  info.fields.push_back({"x", 8, 8});  // MSB field: bits [15:8]
-  info.fields.push_back({"y", 0, 8});  // LSB field: bits [7:0]
+  info.fields.push_back({"x", 8, 8});
+  info.fields.push_back({"y", 0, 8});
 
   f.ctx.RegisterStructType("point_t", info);
   auto* found = f.ctx.FindStructType("point_t");
@@ -106,12 +98,9 @@ TEST(StructType, FieldTypeKindPreserved) {
   EXPECT_EQ(found->fields[1].type_kind, DataTypeKind::kByte);
 }
 
-// ==========================================================================
-// Member access (struct_var.field)
-// ==========================================================================
 TEST(EvalOp, MemberAccessBasic) {
   SimFixture f;
-  // Simulate a struct with a 32-bit field stored as a variable "s.x".
+
   auto* var = f.ctx.CreateVariable("s.x", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 99);
 
@@ -124,4 +113,4 @@ TEST(EvalOp, MemberAccessBasic) {
   EXPECT_EQ(result.ToUint64(), 99u);
 }
 
-}  // namespace
+}

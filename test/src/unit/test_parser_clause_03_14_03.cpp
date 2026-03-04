@@ -1,5 +1,3 @@
-// §3.14.3: Simulation time unit
-
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@
 using namespace delta;
 namespace {
 
-// 21. Global precision considers `timescale precision.
 TEST(ParserClause03, Cl3_14_3_ConsidersTimescalePrec) {
   auto r = ParseTimescale31402(
       "`timescale 1ns / 1ps\n"
@@ -18,11 +15,9 @@ TEST(ParserClause03, Cl3_14_3_ConsidersTimescalePrec) {
   EXPECT_FALSE(r.has_errors);
   auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
                                        r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kPs);  // min of ns, ps = ps
+  EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
-// 22. Global precision across all three sources: timeprecision, timeunit
-//     precision arg, and `timescale.
 TEST(ParserClause03, Cl3_14_3_MinAcrossAllThreeSources) {
   auto r = ParseTimescale31402(
       "`timescale 1us / 1ns\n"
@@ -35,10 +30,9 @@ TEST(ParserClause03, Cl3_14_3_MinAcrossAllThreeSources) {
   EXPECT_FALSE(r.has_errors);
   auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
                                        r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kPs);  // min of ns(`ts), us(tu/), ps(tp) = ps
+  EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
-// 23. With no time declarations, default is implementation-specific (kNs).
 TEST(ParserClause03, Cl3_14_3_DefaultWhenNoneSpecified) {
   auto r = ParseTimescale31402(
       "module a;\n"
@@ -46,10 +40,9 @@ TEST(ParserClause03, Cl3_14_3_DefaultWhenNoneSpecified) {
   EXPECT_FALSE(r.has_errors);
   auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
                                        r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kNs);  // default
+  EXPECT_EQ(gp, TimeUnit::kNs);
 }
 
-// 24. Step time unit equals global time precision.
 TEST(ParserClause03, Cl3_14_3_StepEqualsGlobalPrecision) {
   auto r = ParseTimescale31402(
       "module a;\n"
@@ -65,7 +58,6 @@ TEST(ParserClause03, Cl3_14_3_StepEqualsGlobalPrecision) {
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
 
-// 25. CU-scope timeprecision is included in global computation.
 TEST(ParserClause03, Cl3_14_3_CUScopeTimeprecisionIncluded) {
   auto r = ParseTimescale31402(
       "timeprecision 1fs;\n"
@@ -75,10 +67,9 @@ TEST(ParserClause03, Cl3_14_3_CUScopeTimeprecisionIncluded) {
   EXPECT_FALSE(r.has_errors);
   auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
                                        r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kFs);  // CU-scope fs < module ns
+  EXPECT_EQ(gp, TimeUnit::kFs);
 }
 
-// 26. Interfaces and programs also contribute to global precision.
 TEST(ParserClause03, Cl3_14_3_InterfacesAndProgramsContribute) {
   auto r = ParseTimescale31402(
       "interface i;\n"
@@ -93,13 +84,9 @@ TEST(ParserClause03, Cl3_14_3_InterfacesAndProgramsContribute) {
   EXPECT_FALSE(r.has_errors);
   auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
                                        r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kPs);  // min of ps, ns, us = ps
+  EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
-// =============================================================================
-// LRM §3.14.3 — Simulation time unit (global time precision)
-// =============================================================================
-// 19. Global precision is minimum of all timeprecision statements.
 TEST(ParserClause03, Cl3_14_3_MinOfTimeprecisionStatements) {
   auto r = ParseTimescale31402(
       "module a;\n"
@@ -114,10 +101,9 @@ TEST(ParserClause03, Cl3_14_3_MinOfTimeprecisionStatements) {
   EXPECT_FALSE(r.has_errors);
   auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
                                        r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kPs);  // min of ns, ps, us = ps
+  EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
-// 20. Global precision considers timeunit precision argument (slash syntax).
 TEST(ParserClause03, Cl3_14_3_ConsidersTimeunitPrecArg) {
   auto r = ParseTimescale31402(
       "module a;\n"
@@ -129,7 +115,7 @@ TEST(ParserClause03, Cl3_14_3_ConsidersTimeunitPrecArg) {
   EXPECT_FALSE(r.has_errors);
   auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
                                        r.preproc_global_precision);
-  EXPECT_EQ(gp, TimeUnit::kFs);  // min of fs, ns = fs
+  EXPECT_EQ(gp, TimeUnit::kFs);
 }
 
-}  // namespace
+}

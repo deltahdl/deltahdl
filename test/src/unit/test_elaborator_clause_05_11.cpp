@@ -1,14 +1,11 @@
-// §5.11: Array literals
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// --- §5.11: Array literals ---
 TEST(ElabCh511, ArrayInitPattern_FlatIllegal) {
-  // §5.11: Nesting of braces shall follow the number of dimensions.
+
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -19,4 +16,4 @@ TEST(ElabCh511, ArrayInitPattern_FlatIllegal) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

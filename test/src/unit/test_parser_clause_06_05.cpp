@@ -1,5 +1,3 @@
-// §6.5: for more details.
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,12 +5,8 @@
 using namespace delta;
 namespace {
 
-// =========================================================================
-// §6.5: Nets and variables
-// =========================================================================
 TEST(ParserSection6, NetsCantBeProcAssigned) {
-  // Nets are driven by continuous assignments, variables by procedural.
-  // This test verifies both constructs parse correctly.
+
   auto r = Parse(
       "module t;\n"
       "  wire a;\n"
@@ -23,7 +17,7 @@ TEST(ParserSection6, NetsCantBeProcAssigned) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_GE(r.cu->modules[0]->items.size(), 4u);
 }
-// 13. Variable driven by initial block (procedural assignment).
+
 TEST(ParserSection6, Sec6_5_VarDrivenByInitialBlock) {
   auto r = Parse(
       "module t;\n"
@@ -39,7 +33,6 @@ TEST(ParserSection6, Sec6_5_VarDrivenByInitialBlock) {
   ASSERT_NE(items[1]->body, nullptr);
 }
 
-// 26. Mixed net and variable declarations coexist in same module.
 TEST(ParserSection6, Sec6_5_MixedNetAndVarDecls) {
   auto r = Parse(
       "module t;\n"
@@ -53,12 +46,12 @@ TEST(ParserSection6, Sec6_5_MixedNetAndVarDecls) {
   EXPECT_FALSE(r.has_errors);
   auto& items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 5u);
-  // Nets
+
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(items[0]->data_type.is_net);
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(items[2]->data_type.is_net);
-  // Variables
+
   EXPECT_EQ(items[1]->kind, ModuleItemKind::kVarDecl);
   EXPECT_FALSE(items[1]->data_type.is_net);
   EXPECT_EQ(items[3]->kind, ModuleItemKind::kVarDecl);
@@ -66,7 +59,7 @@ TEST(ParserSection6, Sec6_5_MixedNetAndVarDecls) {
   EXPECT_EQ(items[4]->kind, ModuleItemKind::kVarDecl);
   EXPECT_FALSE(items[4]->data_type.is_net);
 }
-// 2. Logic variable declaration produces kVarDecl with is_net=false.
+
 TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
   auto r = Parse(
       "module t;\n"
@@ -82,4 +75,4 @@ TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
   EXPECT_EQ(item->name, "v");
 }
 
-}  // namespace
+}

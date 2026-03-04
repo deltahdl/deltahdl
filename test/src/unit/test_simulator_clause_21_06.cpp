@@ -1,5 +1,3 @@
-// §21.6: Command line input
-
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -9,9 +7,6 @@
 using namespace delta;
 namespace {
 
-// ============================================================================
-// §20.11 — $test$plusargs, $value$plusargs
-// ============================================================================
 TEST(Section20, TestPlusargsNotFound) {
   SimFixture f;
   auto* expr =
@@ -61,4 +56,4 @@ TEST(Section20, ValuePlusargsNotFound) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+}

@@ -1,10 +1,8 @@
-// §7.10.2.1: Size()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-// --- Test helpers ---
+
 namespace {
 
 TEST(ParserSection7, QueueSizeMethod) {
@@ -33,4 +31,4 @@ TEST(ParserSection7, QueueMethodSize) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-}  // namespace
+}

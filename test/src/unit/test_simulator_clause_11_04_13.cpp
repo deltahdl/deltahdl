@@ -1,5 +1,3 @@
-// §11.4.13: for an explanation of range list syntax.
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
@@ -7,7 +5,7 @@
 #include "simulator/adv_sim.h"
 #include "simulator/eval.h"
 #include "simulator/lowerer.h"
-#include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -65,13 +63,10 @@ TEST(EvalAdv, InsideRelTolerance) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// ==========================================================================
-// Inside operator X/Z — §11.4.13
-// ==========================================================================
 TEST(EvalOpXZ, InsideXOperand) {
   SimFixture f;
-  // x inside {3, 5, 7} → x (unknown operand, no definite match)
-  MakeVar4(f, "ix", 4, 0b0000, 0b0100);  // 4'b0x00
+
+  MakeVar4(f, "ix", 4, 0b0000, 0b0100);
 
   auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
@@ -84,7 +79,6 @@ TEST(EvalOpXZ, InsideXOperand) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// § inside_expression — value match
 TEST(SimA83, InsideValueMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -102,12 +96,9 @@ TEST(SimA83, InsideValueMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// ==========================================================================
-// Inside operator (expr inside {val1, val2, [lo:hi]})
-// ==========================================================================
 TEST(EvalOp, InsideMatch) {
   SimFixture f;
-  // 5 inside {3, 5, 7} = 1
+
   auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeInt(f.arena, 5);
@@ -121,7 +112,7 @@ TEST(EvalOp, InsideMatch) {
 
 TEST(EvalOp, InsideNoMatch) {
   SimFixture f;
-  // 4 inside {3, 5, 7} = 0
+
   auto* inside = f.arena.Create<Expr>();
   inside->kind = ExprKind::kInside;
   inside->lhs = MakeInt(f.arena, 4);
@@ -135,7 +126,7 @@ TEST(EvalOp, InsideNoMatch) {
 
 TEST(EvalOp, InsideRange) {
   SimFixture f;
-  // 5 inside {[3:7]} = 1 (range element)
+
   auto* range = f.arena.Create<Expr>();
   range->kind = ExprKind::kSelect;
   range->index = MakeInt(f.arena, 3);
@@ -152,7 +143,7 @@ TEST(EvalOp, InsideRange) {
 
 TEST(EvalOp, InsideRangeNoMatch) {
   SimFixture f;
-  // 10 inside {[3:7]} = 0
+
   auto* range = f.arena.Create<Expr>();
   range->kind = ExprKind::kSelect;
   range->index = MakeInt(f.arena, 3);
@@ -200,4 +191,4 @@ TEST(EvalAdv, InsideDollarUpperBound) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-}  // namespace
+}

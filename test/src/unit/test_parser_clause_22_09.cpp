@@ -1,5 +1,3 @@
-// §22.9: `unconnected_drive and `nounconnected_drive
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -22,4 +20,4 @@ TEST(ParserSection22, UnconnectedDrivePull0) {
               "`nounconnected_drive\n"));
 }
 
-}  // namespace
+}

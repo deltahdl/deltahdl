@@ -1,5 +1,3 @@
-// §13.5: Subroutine calls and argument passing
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/eval.h"
@@ -10,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Simulation tests — A.6.9 Subroutine call statements
-// =============================================================================
-// --- tf_call: task call ---
-// Simple task call modifies a variable
 TEST(SimA609, TaskCallSimple) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -38,7 +31,6 @@ TEST(SimA609, TaskCallSimple) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// --- void'(function_subroutine_call) ---
 TEST(SimA609, VoidCastFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -57,7 +49,6 @@ TEST(SimA609, VoidCastFunctionCall) {
   LowerRunAndCheck(f, design, {{"x", 55u}});
 }
 
-// --- nested function calls ---
 TEST(SimA609, NestedFunctionCalls) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -83,7 +74,6 @@ TEST(SimA609, NestedFunctionCalls) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-// --- task with output argument ---
 TEST(SimA609, TaskOutputArg) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -107,7 +97,6 @@ TEST(SimA609, TaskOutputArg) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// § tf_call — task call modifies variable
 TEST(SimA82, TfCallTaskModifiesVar) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -131,7 +120,6 @@ TEST(SimA82, TfCallTaskModifiesVar) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// § tf_call — function call in expression with binary op
 TEST(SimA82, FunctionCallInBinaryExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -151,19 +139,12 @@ TEST(SimA82, FunctionCallInBinaryExpr) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-// =============================================================================
-// Function output argument writeback
-// =============================================================================
 TEST(Eval, FunctionOutputArgWriteback) {
   ExprFixture f;
 
-  // Create variable "result" in global scope.
   auto* result_var = f.ctx.CreateVariable("result", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // Build function: function void compute(input int a, output int b);
-  //   b = a * 2;
-  // endfunction
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "compute";
@@ -172,7 +153,6 @@ TEST(Eval, FunctionOutputArgWriteback) {
       {Direction::kOutput, false, {}, "b", nullptr, {}},
   };
 
-  // Body: b = a * 2
   auto* lhs = f.arena.Create<Expr>();
   lhs->kind = ExprKind::kIdentifier;
   lhs->text = "b";
@@ -199,7 +179,6 @@ TEST(Eval, FunctionOutputArgWriteback) {
 
   f.ctx.RegisterFunction("compute", func);
 
-  // Build call expression: compute(21, result)
   auto* arg0 = f.arena.Create<Expr>();
   arg0->kind = ExprKind::kIntegerLiteral;
   arg0->int_val = 21;
@@ -215,20 +194,15 @@ TEST(Eval, FunctionOutputArgWriteback) {
 
   EvalExpr(call, f.ctx, f.arena);
 
-  // Output arg "b" should have been written back to "result".
   EXPECT_EQ(result_var->value.ToUint64(), 42u);
 }
 
 TEST(Eval, FunctionInoutArgWriteback) {
   ExprFixture f;
 
-  // Create variable "x" with initial value 10.
   auto* x_var = f.ctx.CreateVariable("x", 32);
   x_var->value = MakeLogic4VecVal(f.arena, 32, 10);
 
-  // Build function: function void increment(inout int v);
-  //   v = v + 1;
-  // endfunction
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "increment";
@@ -260,7 +234,6 @@ TEST(Eval, FunctionInoutArgWriteback) {
 
   f.ctx.RegisterFunction("increment", func);
 
-  // Build call: increment(x)
   auto* arg = f.arena.Create<Expr>();
   arg->kind = ExprKind::kIdentifier;
   arg->text = "x";
@@ -272,8 +245,7 @@ TEST(Eval, FunctionInoutArgWriteback) {
 
   EvalExpr(call, f.ctx, f.arena);
 
-  // Inout arg "v" should read 10 and write back 11 to "x".
   EXPECT_EQ(x_var->value.ToUint64(), 11u);
 }
 
-}  // namespace
+}

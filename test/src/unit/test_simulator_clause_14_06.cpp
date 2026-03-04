@@ -1,5 +1,3 @@
-// §14.6: Signals in multiple clocking blocks
-
 #include <cstdint>
 #include <string_view>
 
@@ -12,16 +10,8 @@
 
 using namespace delta;
 
-// Helper fixture for clocking simulation tests.
-// Schedule posedge at a given time through the scheduler.
-
-// Schedule negedge at a given time through the scheduler.
-
 namespace {
 
-// =============================================================================
-// 15. Multiple clocking blocks
-// =============================================================================
 TEST(ClockingSim, MultipleClockingBlocks) {
   ClockingManager cmgr;
 
@@ -48,4 +38,4 @@ TEST(ClockingSim, MultipleClockingBlocks) {
   EXPECT_EQ(cmgr.Find("cb_slow")->clock_edge, Edge::kNegedge);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.3.1: Sequential blocks
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// 12. Blocking assignment in begin-end block.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -37,4 +32,4 @@ TEST(SimCh10, BlockingAssignBeginEnd) {
   EXPECT_EQ(c->value.ToUint64(), 30u);
 }
 
-}  // namespace
+}

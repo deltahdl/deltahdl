@@ -1,12 +1,9 @@
-// §16.4: Deferred assertions
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// deferred_immediate_assert_statement elaborates
 TEST(ElabA610, DeferredAssertElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -18,4 +15,4 @@ TEST(ElabA610, DeferredAssertElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

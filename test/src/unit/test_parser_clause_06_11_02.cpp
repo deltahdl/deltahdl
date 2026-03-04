@@ -1,5 +1,3 @@
-// §6.11.2: 2-state (two-value) and 4-state (four-value) data types
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,7 +5,6 @@
 using namespace delta;
 namespace {
 
-// 3. Reg variable declaration produces kVarDecl.
 TEST(ParserSection6, Sec6_5_RegVarDeclKind) {
   auto r = Parse(
       "module t;\n"
@@ -60,9 +57,8 @@ TEST(ParserSection6, IntegerTypeLongintDecl) {
   EXPECT_EQ(item->name, "li");
 }
 
-// --- 4-state integer types ---
 TEST(ParserSection6, IntegerTypeIntegerDecl) {
-  // 'integer' is 4-state, 32-bit signed (LRM 6.11)
+
   auto r = Parse(
       "module m;\n"
       "  integer x;\n"
@@ -76,7 +72,7 @@ TEST(ParserSection6, IntegerTypeIntegerDecl) {
 }
 
 TEST(ParserSection6, IntegerTypeLogicDecl) {
-  // 'logic' is 4-state, user-defined width, unsigned (LRM 6.11)
+
   auto r = Parse(
       "module m;\n"
       "  logic [15:0] data;\n"
@@ -90,7 +86,7 @@ TEST(ParserSection6, IntegerTypeLogicDecl) {
 }
 
 TEST(ParserSection6, IntegerTypeRegDecl) {
-  // 'reg' is identical to 'logic' (LRM 6.11.2)
+
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] r;\n"
@@ -104,7 +100,7 @@ TEST(ParserSection6, IntegerTypeRegDecl) {
 }
 
 TEST(ParserSection6, IntegerTypeBitDecl) {
-  // 'bit' is 2-state, user-defined width, unsigned (LRM 6.11)
+
   auto r = Parse(
       "module m;\n"
       "  bit [31:0] val;\n"
@@ -116,7 +112,7 @@ TEST(ParserSection6, IntegerTypeBitDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
   EXPECT_EQ(item->name, "val");
 }
-// 14b. shortint with negative initializer.
+
 TEST(ParserSection6, Sec6_11_ShortintWithNegativeInit) {
   auto r = Parse(
       "module t;\n"
@@ -130,7 +126,6 @@ TEST(ParserSection6, Sec6_11_ShortintWithNegativeInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-// 16b. shortint as function return type.
 TEST(ParserSection6, Sec6_11_ShortintFunctionReturnType) {
   auto r = Parse(
       "module t;\n"
@@ -146,7 +141,7 @@ TEST(ParserSection6, Sec6_11_ShortintFunctionReturnType) {
 }
 
 TEST(ParserSection6, All2StateTypes) {
-  // Verify all 2-state types parse correctly together
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  byte b;\n"
@@ -158,7 +153,7 @@ TEST(ParserSection6, All2StateTypes) {
 }
 
 TEST(ParserSection6, All4StateTypes) {
-  // Verify all 4-state types parse correctly together
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic l;\n"
@@ -167,10 +162,7 @@ TEST(ParserSection6, All4StateTypes) {
               "  time t;\n"
               "endmodule\n"));
 }
-// =============================================================================
-// Section 8.2 -- Data type syntax
-// =============================================================================
-// Integer vector types with packed dimensions.
+
 TEST(ParserSection8, DataTypeSyntaxIntegerVector) {
   auto r = Parse(
       "module m;\n"
@@ -190,7 +182,6 @@ TEST(ParserSection8, DataTypeSyntaxIntegerVector) {
   EXPECT_EQ(items[2]->name, "nibble");
 }
 
-// Integer atom types.
 TEST(ParserSection8, DataTypeSyntaxIntegerAtom) {
   auto r = Parse(
       "module m;\n"
@@ -210,7 +201,6 @@ TEST(ParserSection8, DataTypeSyntaxIntegerAtom) {
   EXPECT_EQ(items[4]->data_type.kind, DataTypeKind::kInteger);
 }
 
-// 30. Reg used in always block (procedural context).
 TEST(ParserSection6, Sec6_5_RegInAlwaysBlock) {
   auto r = Parse(
       "module t;\n"
@@ -227,10 +217,6 @@ TEST(ParserSection6, Sec6_5_RegInAlwaysBlock) {
   ASSERT_NE(items[1]->body, nullptr);
 }
 
-// =============================================================================
-// LRM section 6.11.2 -- reg and logic equivalence
-// =============================================================================
-// 22. reg and logic both parse to their respective DataTypeKind.
 TEST(ParserSection6, Sec6_11_2_RegAndLogicDistinctKinds) {
   auto r = Parse(
       "module t;\n"
@@ -247,10 +233,6 @@ TEST(ParserSection6, Sec6_11_2_RegAndLogicDistinctKinds) {
   EXPECT_EQ(items[1]->name, "l");
 }
 
-// =============================================================================
-// LRM section 6.11 -- Integer types in package scope
-// =============================================================================
-// 26. Integer types in package scope.
 TEST(ParserSection6, Sec6_11_IntegerTypesInPackage) {
   auto r = Parse(
       "package pkg;\n"
@@ -271,10 +253,6 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInPackage) {
   EXPECT_EQ(items[2]->name, "pkg_id");
 }
 
-// =============================================================================
-// LRM section 6.11 -- Integer types in class members
-// =============================================================================
-// 27. Integer types in class members.
 TEST(ParserSection6, Sec6_11_IntegerTypesInClassMembers) {
   auto r = Parse(
       "class Counter;\n"
@@ -295,7 +273,6 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInClassMembers) {
   EXPECT_EQ(members[2]->name, "timestamp");
 }
 
-// Integer (4-state) with initializer.
 TEST(ParserSection6, Sec6_11_IntegerWithInit) {
   auto r = Parse(
       "module t;\n"
@@ -309,7 +286,6 @@ TEST(ParserSection6, Sec6_11_IntegerWithInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-// Longint function return type.
 TEST(ParserSection6, Sec6_11_LongintFunctionReturnType) {
   auto r = Parse(
       "module t;\n"
@@ -324,7 +300,6 @@ TEST(ParserSection6, Sec6_11_LongintFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kLongint);
 }
 
-// Integer function return type.
 TEST(ParserSection6, Sec6_11_IntegerFunctionReturnType) {
   auto r = Parse(
       "module t;\n"
@@ -339,7 +314,6 @@ TEST(ParserSection6, Sec6_11_IntegerFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInteger);
 }
 
-// Multiple integer types as function parameters with directions.
 TEST(ParserSection6, Sec6_11_MixedIntegerFuncParams) {
   auto r = Parse(
       "module t;\n"
@@ -359,7 +333,6 @@ TEST(ParserSection6, Sec6_11_MixedIntegerFuncParams) {
   EXPECT_EQ(item->func_args[2].direction, Direction::kOutput);
 }
 
-// time type with unpacked dimensions.
 TEST(ParserSection6, Sec6_11_TimeUnpackedArray) {
   auto r = Parse(
       "module t;\n"
@@ -374,16 +347,13 @@ TEST(ParserSection6, Sec6_11_TimeUnpackedArray) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-// =========================================================================
-// §6.3: Value set — 4-state vs 2-state type queries
-// =========================================================================
 TEST(ParserSection6, ValueSet_IntegerIs4State) {
-  // §6.3: integer is a 4-state type.
+
   EXPECT_TRUE(Is4stateType(DataTypeKind::kInteger));
 }
 
 TEST(ParserSection6, ValueSet_IntIs2State) {
-  // §6.3: int is a 2-state type.
+
   EXPECT_FALSE(Is4stateType(DataTypeKind::kInt));
 }
 TEST(ParserSection6, ByteVarDecl) {
@@ -408,10 +378,6 @@ TEST(ParserSection6, LongintVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
 }
 
-// =============================================================================
-// LRM section 6.11 -- Integer data types
-// =============================================================================
-// --- 2-state integer types ---
 TEST(ParserSection6, IntegerTypeByteDecl) {
   auto r = Parse(
       "module m;\n"
@@ -425,4 +391,4 @@ TEST(ParserSection6, IntegerTypeByteDecl) {
   EXPECT_EQ(item->name, "b");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §32.4: Mapping of SDF constructs to SystemVerilog
-
 #include <gtest/gtest.h>
 
 #include "simulator/sdf_parser.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// SDF annotation to SpecifyManager
-// =============================================================================
 TEST(SdfParser, AnnotatePathDelays) {
   SdfFile file;
   SdfCell cell;
@@ -299,4 +294,4 @@ TEST(SdfParser, ParseMinTypMaxDelay_FallValues) {
   EXPECT_EQ(io.fall.max_val, 6u);
 }
 
-}  // namespace
+}

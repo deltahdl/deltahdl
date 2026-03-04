@@ -1,5 +1,3 @@
-// §19.7.1: Covergroup type options
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -15,4 +13,4 @@ TEST(ParserA211, CoverageOption_TypeOption) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

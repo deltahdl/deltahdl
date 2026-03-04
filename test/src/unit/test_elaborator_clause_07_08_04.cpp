@@ -1,5 +1,3 @@
-// §7.8.4: Integral index
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -18,7 +16,6 @@ TEST(ParserA25, AssocDimElaboratesIndexWidth) {
   EXPECT_EQ(mod->variables[0].assoc_index_width, 8u);
 }
 
-// §7.9.8: Assoc array index width propagated to RtlirVariable.
 TEST(Elaboration, AssocArrayByteIndexWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,4 +46,4 @@ TEST(Elaboration, AssocArrayIntIndexWidth) {
   EXPECT_EQ(vars[0].assoc_index_width, 32u);
 }
 
-}  // namespace
+}

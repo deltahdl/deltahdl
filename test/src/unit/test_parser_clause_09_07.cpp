@@ -1,5 +1,3 @@
-// §9.7: Fine-grain process control
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,11 +5,8 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex G - Std package: process class (§G.1)
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexGProcessMethodCalls) {
-  // Process method calls (.status, .kill, etc.) parse as member-access calls.
+
   auto* unit = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -30,8 +25,7 @@ TEST_F(AnnexHParseTest, AnnexGProcessMethodCalls) {
 }
 
 TEST_F(AnnexHParseTest, AnnexGProcessScopeResolution) {
-  // process::self() uses scope-resolution syntax at the module-item level.
-  // The parser handles pkg::type as a named type with scope prefix.
+
   auto* unit = Parse(
       "module m;\n"
       "  process::state_e st;\n"
@@ -45,12 +39,8 @@ TEST_F(AnnexHParseTest, AnnexGProcessScopeResolution) {
   EXPECT_EQ(items[0]->data_type.type_name, "state_e");
 }
 
-// =============================================================================
-// LRM section 9.7 -- Fine-grain process control
-// The process class: self(), status(), kill(), await(), suspend(), resume().
-// =============================================================================
 TEST(ParserSection9c, ProcessSelfAssignment) {
-  // process p = process::self(); is valid usage.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -76,9 +66,6 @@ TEST(ParserSection9c, ProcessKillCall) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// Annex G -- Std package classes (process, semaphore, mailbox)
-// =============================================================================
 TEST(ParserAnnexG, AnnexGProcessDecl) {
   auto r = Parse(
       "module m;\n"
@@ -102,4 +89,4 @@ TEST(ParserSection9c, ProcessStatusCheck) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

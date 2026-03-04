@@ -1,5 +1,3 @@
-// §6.20.2: Value parameters
-
 #include "fixture_elaborator.h"
 #include "helpers_parser_verify.h"
 
@@ -31,10 +29,6 @@ TEST(ParserA24, ParamAssignmentWithUnpackedDim) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-// =============================================================================
-// A.8.3 Expressions — constant_param_expression / param_expression
-// =============================================================================
-// § constant_param_expression ::= constant_mintypmax_expression | data_type | $
 TEST(ParserA83, ParamExprLiteralValue) {
   auto r = Parse(
       "module m #(parameter int P = 10);\n"
@@ -45,7 +39,6 @@ TEST(ParserA83, ParamExprLiteralValue) {
             ExprKind::kIntegerLiteral);
 }
 
-// §13.8: Parameter with string type default.
 TEST(ParserSection13, Sec13_8_StringTypeParam) {
   EXPECT_TRUE(
       ParseOk("virtual class Logger#(parameter string PREFIX = \"LOG\");\n"
@@ -55,8 +48,6 @@ TEST(ParserSection13, Sec13_8_StringTypeParam) {
               "endclass\n"));
 }
 
-// --- Test helpers ---
-// §13.8: Parameter of type int explicitly typed.
 TEST(ParserSection13, Sec13_8_ExplicitlyTypedParam) {
   auto r = Parse(
       "virtual class Buffer#(parameter int SIZE = 256);\n"
@@ -68,7 +59,6 @@ TEST(ParserSection13, Sec13_8_ExplicitlyTypedParam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Step 1c: localparam implicit type (fixes 6.20.4)
 TEST(ParserSection6, ParamDecl_ImplicitType) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
@@ -77,7 +67,6 @@ TEST(ParserSection6, ParamDecl_ImplicitType) {
                "endmodule\n"));
 }
 
-// Step 1c: parameter unpacked dims (fixes 6.20.2)
 TEST(ParserSection6, ParamDecl_UnpackedDims) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
@@ -85,4 +74,4 @@ TEST(ParserSection6, ParamDecl_UnpackedDims) {
                "endmodule\n"));
 }
 
-}  // namespace
+}

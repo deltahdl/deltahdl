@@ -1,21 +1,9 @@
-// §10.6.1: The assign and deassign procedural statements
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.6.2 Production: procedural_continuous_assignment
-// procedural_continuous_assignment ::=
-//   assign variable_assignment
-//   | deassign variable_lvalue
-//   | force variable_assignment
-//   | force net_assignment
-//   | release variable_lvalue
-//   | release net_lvalue
-// =============================================================================
 TEST(ParserA602, ProceduralAssign_Basic) {
   auto r = Parse(
       "module m;\n"
@@ -56,7 +44,6 @@ TEST(ParserA602, ProceduralAssign_WithBitSelect) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-// --- 28. Assign in task body ---
 TEST(ParserSection10, Sec10_6_1_AssignInTaskBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -69,7 +56,7 @@ TEST(ParserSection10, Sec10_6_1_AssignInTaskBody) {
               "  endtask\n"
               "endmodule\n"));
 }
-// --- 29. Assign/deassign interleaved with nonblocking assigns ---
+
 TEST(ParserSection10, Sec10_6_1_InterleavedWithNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -90,7 +77,6 @@ TEST(ParserSection10, Sec10_6_1_InterleavedWithNonblocking) {
   EXPECT_EQ(s3->kind, StmtKind::kNonblockingAssign);
 }
 
-// --- 30. Full D-FF with assign/deassign and always @(posedge) ---
 TEST(ParserSection10, Sec10_6_1_FullDFlipFlopPattern) {
   auto r = Parse(
       "module dff_full(output reg q, input d, clr, pre, clk);\n"
@@ -109,18 +95,16 @@ TEST(ParserSection10, Sec10_6_1_FullDFlipFlopPattern) {
   EXPECT_FALSE(r.has_errors);
   auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->name, "dff_full");
-  // Should have at least two always blocks.
+
   int always_count = 0;
   for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock) always_count++;
   }
   EXPECT_GE(always_count, 2);
 }
-// =============================================================================
-// LRM section 10.6.1 -- Assign/deassign additional patterns
-// =============================================================================
+
 TEST(ParserSection10, AssignInAlwaysBlock) {
-  // LRM example: D-type flip-flop with clear/preset using assign/deassign.
+
   auto r = Parse(
       "module dff(output q, input d, clear, preset, clock);\n"
       "  logic q;\n"
@@ -150,10 +134,6 @@ TEST(ParserSection10, AssignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-// =============================================================================
-// LRM section 10.6.1 -- The assign and deassign procedural statements
-// =============================================================================
-// --- 1. Basic assign in initial block ---
 TEST(ParserSection10, Sec10_6_1_AssignInInitialBlock) {
   auto r = Parse(
       "module m;\n"
@@ -172,7 +152,6 @@ TEST(ParserSection10, Sec10_6_1_AssignInInitialBlock) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-// --- 2. Basic deassign in initial block ---
 TEST(ParserSection10, Sec10_6_1_DeassignInInitialBlock) {
   auto r = Parse(
       "module m;\n"
@@ -191,7 +170,6 @@ TEST(ParserSection10, Sec10_6_1_DeassignInInitialBlock) {
   EXPECT_EQ(stmt->rhs, nullptr);
 }
 
-// --- 3. Assign with expression RHS (a + b) ---
 TEST(ParserSection10, Sec10_6_1_AssignExpressionRhs) {
   auto r = Parse(
       "module m;\n"
@@ -209,7 +187,6 @@ TEST(ParserSection10, Sec10_6_1_AssignExpressionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-// --- 4. Assign with concatenation RHS ---
 TEST(ParserSection10, Sec10_6_1_AssignConcatenationRhs) {
   auto r = Parse(
       "module m;\n"
@@ -228,7 +205,6 @@ TEST(ParserSection10, Sec10_6_1_AssignConcatenationRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
 }
 
-// --- 5. Assign to bit-select ---
 TEST(ParserSection10, Sec10_6_1_AssignBitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -247,7 +223,6 @@ TEST(ParserSection10, Sec10_6_1_AssignBitSelect) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-// --- 6. Assign to part-select ---
 TEST(ParserSection10, Sec10_6_1_AssignPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -266,7 +241,6 @@ TEST(ParserSection10, Sec10_6_1_AssignPartSelect) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-// --- 7. Assign to concatenation LHS (new pattern: three regs) ---
 TEST(ParserSection10, Sec10_6_1_AssignConcatLhsThreeRegs) {
   auto r = Parse(
       "module m;\n"
@@ -285,7 +259,6 @@ TEST(ParserSection10, Sec10_6_1_AssignConcatLhsThreeRegs) {
   EXPECT_EQ(stmt->lhs->elements.size(), 3u);
 }
 
-// --- 8. Deassign concatenation LHS (three regs) ---
 TEST(ParserSection10, Sec10_6_1_DeassignConcatLhsThreeRegs) {
   auto r = Parse(
       "module m;\n"
@@ -304,7 +277,6 @@ TEST(ParserSection10, Sec10_6_1_DeassignConcatLhsThreeRegs) {
   EXPECT_EQ(stmt->lhs->elements.size(), 3u);
 }
 
-// --- 9. Assign in if-else branch ---
 TEST(ParserSection10, Sec10_6_1_AssignInIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -327,7 +299,6 @@ TEST(ParserSection10, Sec10_6_1_AssignInIfElse) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kAssign);
 }
 
-// --- 10. Assign in case statement ---
 TEST(ParserSection10, Sec10_6_1_AssignInCase) {
   auto r = Parse(
       "module m;\n"
@@ -352,7 +323,6 @@ TEST(ParserSection10, Sec10_6_1_AssignInCase) {
   EXPECT_EQ(stmt->case_items[2].body->kind, StmtKind::kDeassign);
 }
 
-// §10.6.1: procedural_continuous_assignment (assign)
 TEST(ParserA604, StmtItemProceduralContinuousAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -367,7 +337,6 @@ TEST(ParserA604, StmtItemProceduralContinuousAssignment) {
   EXPECT_EQ(stmt->kind, StmtKind::kAssign);
 }
 
-// --- 11. Assign in always block with event control ---
 TEST(ParserSection10, Sec10_6_1_AssignInAlwaysWithEvent) {
   auto r = Parse(
       "module m;\n"
@@ -379,7 +348,7 @@ TEST(ParserSection10, Sec10_6_1_AssignInAlwaysWithEvent) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* mod = r.cu->modules[0];
-  // Find the always block.
+
   ModuleItem* always_item = nullptr;
   for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kAlwaysBlock) {
@@ -390,7 +359,7 @@ TEST(ParserSection10, Sec10_6_1_AssignInAlwaysWithEvent) {
   ASSERT_NE(always_item, nullptr);
   ASSERT_NE(always_item->body, nullptr);
 }
-// --- 12. Multiple assigns to different vars in same block ---
+
 TEST(ParserSection10, Sec10_6_1_MultipleAssignsDifferentVars) {
   auto r = Parse(
       "module m;\n"
@@ -417,7 +386,6 @@ TEST(ParserSection10, Sec10_6_1_MultipleAssignsDifferentVars) {
   EXPECT_EQ(s2->lhs->text, "c");
 }
 
-// --- 13. Deassign then normal procedural assign ---
 TEST(ParserSection10, Sec10_6_1_DeassignThenProceduralAssign) {
   auto r = Parse(
       "module m;\n"
@@ -437,7 +405,6 @@ TEST(ParserSection10, Sec10_6_1_DeassignThenProceduralAssign) {
   EXPECT_EQ(s1->kind, StmtKind::kBlockingAssign);
 }
 
-// --- 14. Assign with ternary expression RHS ---
 TEST(ParserSection10, Sec10_6_1_AssignTernaryRhs) {
   auto r = Parse(
       "module m;\n"
@@ -455,7 +422,6 @@ TEST(ParserSection10, Sec10_6_1_AssignTernaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-// --- 15. Assign with function call RHS ---
 TEST(ParserSection10, Sec10_6_1_AssignFunctionCallRhs) {
   auto r = Parse(
       "module m;\n"
@@ -473,7 +439,6 @@ TEST(ParserSection10, Sec10_6_1_AssignFunctionCallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-// --- 16. Assign with unary operator RHS ---
 TEST(ParserSection10, Sec10_6_1_AssignUnaryRhs) {
   auto r = Parse(
       "module m;\n"
@@ -491,7 +456,6 @@ TEST(ParserSection10, Sec10_6_1_AssignUnaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kUnary);
 }
 
-// --- 17. Assign inside for loop ---
 TEST(ParserSection10, Sec10_6_1_AssignInsideForLoop) {
   auto r = Parse(
       "module m;\n"
@@ -510,7 +474,6 @@ TEST(ParserSection10, Sec10_6_1_AssignInsideForLoop) {
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kAssign);
 }
 
-// --- 18. D-FF with clear/preset pattern (LRM example) ---
 TEST(ParserSection10, Sec10_6_1_DFlipFlopClearPreset) {
   EXPECT_TRUE(
       ParseOk("module dff_cp(output reg q, input d, clear, preset, clock);\n"
@@ -526,7 +489,6 @@ TEST(ParserSection10, Sec10_6_1_DFlipFlopClearPreset) {
               "endmodule\n"));
 }
 
-// --- 19. Assign in named block ---
 TEST(ParserSection10, Sec10_6_1_AssignInNamedBlock) {
   auto r = Parse(
       "module m;\n"
@@ -542,7 +504,6 @@ TEST(ParserSection10, Sec10_6_1_AssignInNamedBlock) {
   EXPECT_EQ(stmt->kind, StmtKind::kAssign);
 }
 
-// --- 20. Assign in fork-join ---
 TEST(ParserSection10, Sec10_6_1_AssignInForkJoin) {
   auto r = Parse(
       "module m;\n"
@@ -564,7 +525,6 @@ TEST(ParserSection10, Sec10_6_1_AssignInForkJoin) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kAssign);
 }
 
-// §10.6.1: procedural deassign
 TEST(ParserA604, StmtItemProceduralDeassign) {
   auto r = Parse(
       "module m;\n"
@@ -595,7 +555,6 @@ TEST(ParserSection10, DeassignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-// --- 21. Assign with system function RHS ---
 TEST(ParserSection10, Sec10_6_1_AssignSystemFuncRhs) {
   auto r = Parse(
       "module m;\n"
@@ -613,7 +572,6 @@ TEST(ParserSection10, Sec10_6_1_AssignSystemFuncRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-// --- 22. Multiple sequential assigns to same variable ---
 TEST(ParserSection10, Sec10_6_1_MultipleAssignsSameVar) {
   auto r = Parse(
       "module m;\n"
@@ -635,7 +593,6 @@ TEST(ParserSection10, Sec10_6_1_MultipleAssignsSameVar) {
   EXPECT_EQ(s1->lhs->text, "q");
 }
 
-// --- 23. Deassign multiple variables in sequence ---
 TEST(ParserSection10, Sec10_6_1_DeassignMultipleVars) {
   auto r = Parse(
       "module m;\n"
@@ -662,7 +619,6 @@ TEST(ParserSection10, Sec10_6_1_DeassignMultipleVars) {
   EXPECT_EQ(s2->lhs->text, "c");
 }
 
-// --- 24. Assign with delay before it ---
 TEST(ParserSection10, Sec10_6_1_DelayBeforeAssign) {
   auto r = Parse(
       "module m;\n"
@@ -675,7 +631,6 @@ TEST(ParserSection10, Sec10_6_1_DelayBeforeAssign) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- 25. Assign inside nested if-else ---
 TEST(ParserSection10, Sec10_6_1_AssignNestedIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -695,18 +650,17 @@ TEST(ParserSection10, Sec10_6_1_AssignNestedIfElse) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // Outer then-branch is another if.
+
   ASSERT_NE(stmt->then_branch, nullptr);
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kIf);
-  // Inner then/else are both assigns.
+
   EXPECT_EQ(stmt->then_branch->then_branch->kind, StmtKind::kAssign);
   EXPECT_EQ(stmt->then_branch->else_branch->kind, StmtKind::kAssign);
-  // Outer else-branch is deassign.
+
   ASSERT_NE(stmt->else_branch, nullptr);
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kDeassign);
 }
 
-// --- 26. Assign with reduction operator RHS ---
 TEST(ParserSection10, Sec10_6_1_AssignReductionRhs) {
   auto r = Parse(
       "module m;\n"
@@ -725,7 +679,6 @@ TEST(ParserSection10, Sec10_6_1_AssignReductionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kUnary);
 }
 
-// --- 27. Assign to vector variable ---
 TEST(ParserSection10, Sec10_6_1_AssignToVector) {
   auto r = Parse(
       "module m;\n"
@@ -744,4 +697,4 @@ TEST(ParserSection10, Sec10_6_1_AssignToVector) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}  // namespace
+}

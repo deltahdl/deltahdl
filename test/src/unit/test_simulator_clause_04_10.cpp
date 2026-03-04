@@ -9,7 +9,6 @@
 
 using namespace delta;
 
-// Schedule an Active event whose callback pushes "active" and schedules an NBA.
 static void ScheduleActiveWithNba(Scheduler& sched,
                                   std::vector<std::string>& order) {
   auto* active = sched.GetEventPool().Acquire();
@@ -24,7 +23,6 @@ static void ScheduleActiveWithNba(Scheduler& sched,
   sched.ScheduleEvent({0}, Region::kActive, active);
 }
 
-// Schedule an Active event whose callback pushes "active".
 static void ScheduleActiveEvent(Scheduler& sched,
                                 std::vector<std::string>& order) {
   auto* active = sched.GetEventPool().Acquire();
@@ -33,28 +31,19 @@ static void ScheduleActiveEvent(Scheduler& sched,
   sched.ScheduleEvent({0}, Region::kActive, active);
 }
 
-// ===========================================================================
-// §4.10 PLI callback control points
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.10 — Immediate-execution PLI callback
-// ---------------------------------------------------------------------------
 TEST(SimCh410, ImmediateExecutionCallback) {
   Arena arena;
   Scheduler sched(arena);
   bool callback_fired = false;
   bool activity_occurred = false;
 
-  // Model: A PLI callback that fires immediately when an activity occurs.
-  // The callback executes synchronously within the triggering event.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     activity_occurred = true;
-    // Immediate PLI callback — fires synchronously during the activity.
+
     callback_fired = true;
-    // Both flags are true at this point — no scheduling delay.
+
     EXPECT_TRUE(activity_occurred);
     EXPECT_TRUE(callback_fired);
   };
@@ -65,43 +54,31 @@ TEST(SimCh410, ImmediateExecutionCallback) {
   EXPECT_TRUE(callback_fired);
 }
 
-// ---------------------------------------------------------------------------
-// §4.10 — One-shot evaluation event callback
-// ---------------------------------------------------------------------------
 TEST(SimCh410, OneShotEvaluationEvent) {
   Arena arena;
   Scheduler sched(arena);
   int fire_count = 0;
 
-  // Model: A one-shot PLI callback registered in Pre-Active.
-  // It executes exactly once when the Pre-Active region is processed.
   auto* oneshot = sched.GetEventPool().Acquire();
   oneshot->kind = EventKind::kEvaluation;
   oneshot->callback = [&]() { fire_count++; };
   sched.ScheduleEvent({0}, Region::kPreActive, oneshot);
 
   sched.Run();
-  // One-shot: fires exactly once.
+
   EXPECT_EQ(fire_count, 1);
 }
 
-// ---------------------------------------------------------------------------
-// Table 4-1: cbAfterDelay → Pre-Active
-// A cbAfterDelay callback is scheduled in the Pre-Active region. It executes
-// before Active-region events at the target time step.
-// ---------------------------------------------------------------------------
 TEST(SimCh410, CbAfterDelayInPreActive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Model: cbAfterDelay registered at time 5 → Pre-Active.
   auto* cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("pre_active_cb"); };
   sched.ScheduleEvent({5}, Region::kPreActive, cb);
 
-  // An Active event at the same time.
   auto* active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kEvaluation;
   active->callback = [&]() { order.push_back("active_event"); };
@@ -113,17 +90,11 @@ TEST(SimCh410, CbAfterDelayInPreActive) {
   EXPECT_EQ(order[1], "active_event");
 }
 
-// ---------------------------------------------------------------------------
-// Table 4-1: cbNextSimTime → Pre-Active
-// A cbNextSimTime callback is also scheduled in the Pre-Active region.
-// It fires before Active events when the next simulation time step begins.
-// ---------------------------------------------------------------------------
 TEST(SimCh410, CbNextSimTimeInPreActive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Model: cbNextSimTime fires at time 10 (next sim time) → Pre-Active.
   auto* cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("pre_active_nextsim"); };
@@ -140,17 +111,11 @@ TEST(SimCh410, CbNextSimTimeInPreActive) {
   EXPECT_EQ(order[1], "active_event");
 }
 
-// ---------------------------------------------------------------------------
-// Table 4-1: cbAtStartOfSimTime → Pre-Active
-// A cbAtStartOfSimTime callback fires in the Pre-Active region, before any
-// Active events at the beginning of the time step.
-// ---------------------------------------------------------------------------
 TEST(SimCh410, CbAtStartOfSimTimeInPreActive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Model: cbAtStartOfSimTime → Pre-Active at time 0.
   auto* cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("pre_active_start"); };
@@ -167,20 +132,13 @@ TEST(SimCh410, CbAtStartOfSimTimeInPreActive) {
   EXPECT_EQ(order[1], "active_event");
 }
 
-// ---------------------------------------------------------------------------
-// Table 4-1: cbNBASynch → Pre-NBA
-// A cbNBASynch callback fires in the Pre-NBA region, after Active/Inactive
-// events and before NBA events.
-// ---------------------------------------------------------------------------
 TEST(SimCh410, CbNbaSynchInPreNba) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Schedule Active, Pre-NBA, and NBA events to verify ordering.
   ScheduleActiveWithNba(sched, order);
 
-  // cbNBASynch → Pre-NBA.
   auto* cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("pre_nba_cb"); };
@@ -193,26 +151,18 @@ TEST(SimCh410, CbNbaSynchInPreNba) {
   EXPECT_EQ(order[2], "nba");
 }
 
-// ---------------------------------------------------------------------------
-// Table 4-1: cbReadWriteSynch → Pre-NBA or Post-NBA
-// A cbReadWriteSynch callback fires in either Pre-NBA or Post-NBA. This test
-// verifies both placements execute at the correct points relative to NBA.
-// ---------------------------------------------------------------------------
 TEST(SimCh410, CbReadWriteSynchInPreNbaOrPostNba) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Active event that schedules an NBA.
   ScheduleActiveWithNba(sched, order);
 
-  // cbReadWriteSynch in Pre-NBA.
   auto* pre = sched.GetEventPool().Acquire();
   pre->kind = EventKind::kEvaluation;
   pre->callback = [&]() { order.push_back("pre_nba_rw"); };
   sched.ScheduleEvent({0}, Region::kPreNBA, pre);
 
-  // cbReadWriteSynch in Post-NBA.
   auto* post = sched.GetEventPool().Acquire();
   post->kind = EventKind::kEvaluation;
   post->callback = [&]() { order.push_back("post_nba_rw"); };
@@ -226,11 +176,6 @@ TEST(SimCh410, CbReadWriteSynchInPreNbaOrPostNba) {
   EXPECT_EQ(order[3], "post_nba_rw");
 }
 
-// ---------------------------------------------------------------------------
-// Table 4-1: cbAtEndOfSimTime → Pre-Postponed
-// A cbAtEndOfSimTime callback fires in the Pre-Postponed region, after all
-// iterative regions (Active through ReNBA) and before the Postponed region.
-// ---------------------------------------------------------------------------
 TEST(SimCh410, CbAtEndOfSimTimeInPrePostponed) {
   Arena arena;
   Scheduler sched(arena);
@@ -238,13 +183,11 @@ TEST(SimCh410, CbAtEndOfSimTimeInPrePostponed) {
 
   ScheduleActiveEvent(sched, order);
 
-  // cbAtEndOfSimTime → Pre-Postponed.
   auto* cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("pre_postponed_cb"); };
   sched.ScheduleEvent({0}, Region::kPrePostponed, cb);
 
-  // A Postponed event for comparison.
   auto* postponed = sched.GetEventPool().Acquire();
   postponed->kind = EventKind::kEvaluation;
   postponed->callback = [&]() { order.push_back("postponed"); };
@@ -257,12 +200,6 @@ TEST(SimCh410, CbAtEndOfSimTimeInPrePostponed) {
   EXPECT_EQ(order[2], "postponed");
 }
 
-// ---------------------------------------------------------------------------
-// Table 4-1: cbReadOnlySynch → Postponed
-// A cbReadOnlySynch callback fires in the Postponed region, the very last
-// region in a time step. This region is read-only — no new events may be
-// scheduled that would cause the current time step to iterate.
-// ---------------------------------------------------------------------------
 TEST(SimCh410, CbReadOnlySynchInPostponed) {
   Arena arena;
   Scheduler sched(arena);
@@ -270,7 +207,6 @@ TEST(SimCh410, CbReadOnlySynchInPostponed) {
 
   ScheduleActiveEvent(sched, order);
 
-  // cbReadOnlySynch → Postponed.
   auto* cb = sched.GetEventPool().Acquire();
   cb->kind = EventKind::kEvaluation;
   cb->callback = [&]() { order.push_back("postponed_cb"); };
@@ -282,7 +218,6 @@ TEST(SimCh410, CbReadOnlySynchInPostponed) {
   EXPECT_EQ(order[1], "postponed_cb");
 }
 
-// Helper: schedule an evaluation event that appends a label to an order log.
 static void ScheduleOrderEvent(Scheduler& sched, SimTime time, Region region,
                                std::vector<std::string>& order,
                                const std::string& label) {
@@ -292,22 +227,14 @@ static void ScheduleOrderEvent(Scheduler& sched, SimTime time, Region region,
   sched.ScheduleEvent(time, region, ev);
 }
 
-// ---------------------------------------------------------------------------
-// §4.10 Table 4-1: Full region ordering of PLI callbacks
-// Verifies the complete ordering of all PLI callback regions within a single
-// time step: Pre-Active → Active → Pre-NBA → NBA → Post-NBA →
-// Pre-Postponed → Postponed.
-// ---------------------------------------------------------------------------
 TEST(SimCh410, FullPliCallbackRegionOrdering) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Pre-Active (cbAfterDelay / cbNextSimTime / cbAtStartOfSimTime).
   ScheduleOrderEvent(sched, SimTime{0}, Region::kPreActive, order,
                      "pre_active");
 
-  // Active (user logic) — schedules NBA from within its callback.
   auto* active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kEvaluation;
   active->callback = [&]() {
@@ -319,14 +246,13 @@ TEST(SimCh410, FullPliCallbackRegionOrdering) {
   };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
-  // Pre-NBA (cbNBASynch / cbReadWriteSynch).
   ScheduleOrderEvent(sched, SimTime{0}, Region::kPreNBA, order, "pre_nba");
-  // Post-NBA (cbReadWriteSynch).
+
   ScheduleOrderEvent(sched, SimTime{0}, Region::kPostNBA, order, "post_nba");
-  // Pre-Postponed (cbAtEndOfSimTime).
+
   ScheduleOrderEvent(sched, SimTime{0}, Region::kPrePostponed, order,
                      "pre_postponed");
-  // Postponed (cbReadOnlySynch).
+
   ScheduleOrderEvent(sched, SimTime{0}, Region::kPostponed, order, "postponed");
 
   sched.Run();

@@ -1,14 +1,9 @@
-// §31.4.6: $nochange
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.2 Elab — mintypmax timing check limits ($nochange offsets)
-// =============================================================================
 TEST(ElabA70502, NochangeMinTypMaxOffsetsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,4 +17,4 @@ TEST(ElabA70502, NochangeMinTypMaxOffsetsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

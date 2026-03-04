@@ -1,5 +1,3 @@
-// §33.4.1.1: Design statement
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// design_statement: multiple cells, with and without library qualifier
 TEST(SourceText, ConfigDesignMultipleCells) {
   auto r = Parse(
       "config cfg4;\n"
@@ -24,14 +21,11 @@ TEST(SourceText, ConfigDesignMultipleCells) {
   EXPECT_EQ(c->design_cells[0].second, "top");
   EXPECT_EQ(c->design_cells[1].first, "lib2");
   EXPECT_EQ(c->design_cells[1].second, "sub");
-  // Unqualified cell: lib is empty
+
   EXPECT_EQ(c->design_cells[2].first, "");
   EXPECT_EQ(c->design_cells[2].second, "cellonly");
 }
 
-// =============================================================================
-// §33.4.1.1 Design statement
-// =============================================================================
 TEST_F(ConfigTest, DesignStatementParsed) {
   auto* unit = Parse(R"(
     config cfg;
@@ -74,4 +68,4 @@ TEST_F(ConfigTest, DesignStatementMultipleTopCells) {
   EXPECT_EQ(cfg->design_cells[1].second, "top2");
 }
 
-}  // namespace
+}

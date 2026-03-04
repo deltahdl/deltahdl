@@ -1,5 +1,3 @@
-// §5.7.1: Integer literal constants
-
 #include "fixture_parser.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § octal_digit — 0 through 7
 TEST(ParserA87, OctalDigitAll) {
   auto r =
       Parse("module m; logic [23:0] x; initial x = 24'o01234567; endmodule\n");
@@ -20,7 +17,6 @@ TEST(ParserA87, OctalDigitAll) {
   EXPECT_EQ(rhs->int_val, 01234567u);
 }
 
-// § hex_digit — 0-9, a-f, A-F
 TEST(ParserA87, HexDigitLowercase) {
   auto r =
       Parse("module m; logic [23:0] x; initial x = 24'habcdef; endmodule\n");
@@ -41,7 +37,6 @@ TEST(ParserA87, HexDigitUppercase) {
   EXPECT_EQ(rhs->int_val, 0xABCDEFu);
 }
 
-// § x_digit — x
 TEST(ParserA87, XDigitLower) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'hx; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -51,8 +46,6 @@ TEST(ParserA87, XDigitLower) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// --- §5.12 Attributes ---
-// From test_parser_clause_05b.cpp
 TEST(ParserCh50701, IntLiteral_UnsizedDecimal) {
   auto r = Parse(
       "module m;\n"
@@ -68,7 +61,7 @@ TEST(ParserCh50701, IntLiteral_UnsizedDecimal) {
 }
 
 TEST(ParserCh50701, IntLiteral_SizedBinary) {
-  // 4'b1001 is a 4-bit binary number.
+
   auto r = Parse(
       "module m;\n"
       "  initial x = 4'b1001;\n"
@@ -82,7 +75,6 @@ TEST(ParserCh50701, IntLiteral_SizedBinary) {
   EXPECT_EQ(rhs->int_val, 0b1001u);
 }
 
-// § z_digit — Z
 TEST(ParserA87, ZDigitUpper) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'hZ; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -107,11 +99,10 @@ TEST(ParserCh50701, IntLiteral_SizedHex) {
 }
 
 TEST(ParserCh50701, IntLiteral_UnsizedHex) {
-  // 'h 837FF -- unsized hexadecimal.
+
   EXPECT_TRUE(ParseOk("module m; initial x = 'h837FF; endmodule"));
 }
 
-// § z_digit — ?
 TEST(ParserA87, ZDigitQuestion) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'b?; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -125,7 +116,6 @@ TEST(ParserCh50701, IntLiteral_SizedOctal) {
   EXPECT_TRUE(ParseOk("module m; initial x = 8'o77; endmodule"));
 }
 
-// § unbased_unsized_literal — '0
 TEST(ParserA87, UnbasedUnsizedZero) {
   auto r = Parse("module m; logic x; initial x = '0; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -136,11 +126,10 @@ TEST(ParserA87, UnbasedUnsizedZero) {
 }
 
 TEST(ParserCh50701, IntLiteral_SignedLiteral) {
-  // 4'shf is a signed 4-bit number (value -1 in two's complement).
+
   EXPECT_TRUE(ParseOk("module m; initial x = 4'shf; endmodule"));
 }
 
-// § unbased_unsized_literal — '1
 TEST(ParserA87, UnbasedUnsizedOne) {
   auto r = Parse("module m; logic x; initial x = '1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -151,7 +140,7 @@ TEST(ParserA87, UnbasedUnsizedOne) {
 }
 
 TEST(ParserCh50701, IntLiteral_UnbasedUnsized_One) {
-  // '1 sets all bits to 1.
+
   auto r = Parse(
       "module m;\n"
       "  initial x = '1;\n"
@@ -164,7 +153,6 @@ TEST(ParserCh50701, IntLiteral_UnbasedUnsized_One) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-// § unbased_unsized_literal — 'x (z_or_x)
 TEST(ParserA87, UnbasedUnsizedX) {
   auto r = Parse("module m; logic x; initial x = 'x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -175,11 +163,10 @@ TEST(ParserA87, UnbasedUnsizedX) {
 }
 
 TEST(ParserCh50701, IntLiteral_UnbasedUnsized_Zero) {
-  // '0 sets all bits to 0.
+
   EXPECT_TRUE(ParseOk("module m; initial x = '0; endmodule"));
 }
 
-// § unbased_unsized_literal — 'z (z_or_x)
 TEST(ParserA87, UnbasedUnsizedZ) {
   auto r = Parse("module m; logic x; initial x = 'z; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -190,40 +177,36 @@ TEST(ParserA87, UnbasedUnsizedZ) {
 }
 
 TEST(ParserCh50701, IntLiteral_Underscore) {
-  // Underscores are legal anywhere except as first character.
+
   EXPECT_TRUE(
       ParseOk("module m; initial x = 16'b0011_0101_0001_1111; endmodule"));
 }
 
 TEST(ParserCh50701, IntLiteral_XValue) {
-  // 12'hx -- 12-bit unknown.
+
   EXPECT_TRUE(ParseOk("module m; initial x = 12'hx; endmodule"));
 }
 
 TEST(ParserCh50701, IntLiteral_ZValue) {
-  // 16'hz -- 16-bit high-impedance.
+
   EXPECT_TRUE(ParseOk("module m; initial x = 16'hz; endmodule"));
 }
 
 TEST(ParserCh50701, IntLiteral_QuestionMark) {
-  // ? is an alternative for z in literal constants.
+
   EXPECT_TRUE(ParseOk("module m; initial x = 16'sd?; endmodule"));
 }
 
 TEST(ParserCh50701, IntLiteral_NegativeUnsized) {
-  // -8'd6 defines the two's-complement of 6 held in 8 bits.
+
   EXPECT_TRUE(ParseOk("module m; initial x = -8'd6; endmodule"));
 }
 
 TEST(ParserCh50701, IntLiteral_SizedDecimal) {
-  // 5'D 3 is a 5-bit decimal number.
+
   EXPECT_TRUE(ParseOk("module m; initial x = 5'D3; endmodule"));
 }
 
-// =============================================================================
-// A.8.4 Primaries — primary_literal
-// =============================================================================
-// § primary_literal — number (decimal)
 TEST(ParserA84, PrimaryLiteralDecimalNumber) {
   auto r = Parse("module m; initial x = 100; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -234,11 +217,10 @@ TEST(ParserA84, PrimaryLiteralDecimalNumber) {
 }
 
 TEST(ParserCh50701, IntLiteral_SpaceBetweenBaseAndDigits) {
-  // Space between base format and unsigned number is legal.
+
   EXPECT_TRUE(ParseOk("module m; initial x = 32 'h 12ab_f001; endmodule"));
 }
 
-// § primary_literal — number (hex)
 TEST(ParserA84, PrimaryLiteralHexNumber) {
   auto r = Parse("module m; initial x = 16'hDEAD; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -249,7 +231,7 @@ TEST(ParserA84, PrimaryLiteralHexNumber) {
 }
 
 TEST(ParserCh50701, IntLiteral_LargeUnsized) {
-  // 'h7_0000_0000 requires at least 35 bits.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [63:0] big;\n"
@@ -257,7 +239,6 @@ TEST(ParserCh50701, IntLiteral_LargeUnsized) {
               "endmodule"));
 }
 
-// § primary_literal — number (octal)
 TEST(ParserA84, PrimaryLiteralOctalNumber) {
   auto r = Parse("module m; initial x = 8'o77; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -267,7 +248,6 @@ TEST(ParserA84, PrimaryLiteralOctalNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// § primary_literal — number (binary)
 TEST(ParserA84, PrimaryLiteralBinaryNumber) {
   auto r = Parse("module m; initial x = 4'b1010; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -277,7 +257,6 @@ TEST(ParserA84, PrimaryLiteralBinaryNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// § primary_literal — unbased_unsized_literal
 TEST(ParserA84, PrimaryLiteralUnbasedUnsized) {
   auto r = Parse("module m; initial x = '0; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -296,10 +275,6 @@ TEST(ParserAnnexA, A8IntegerLiterals) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.8.4 Primaries — constant_primary
-// =============================================================================
-// § constant_primary — primary_literal (integer)
 TEST(ParserA84, ConstantPrimaryIntegerLiteral) {
   auto r = Parse("module m; parameter int P = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -310,7 +285,6 @@ TEST(ParserA84, ConstantPrimaryIntegerLiteral) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kIntegerLiteral);
 }
 
-// § constant_primary — unbased_unsized_literal
 TEST(ParserA84, ConstantPrimaryUnbasedUnsizedLiteral) {
   auto r = Parse(
       "module m;\n"
@@ -324,10 +298,6 @@ TEST(ParserA84, ConstantPrimaryUnbasedUnsizedLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-// =============================================================================
-// A.8.4 Primaries — primary
-// =============================================================================
-// § primary — primary_literal (integer)
 TEST(ParserA84, PrimaryIntegerLiteral) {
   auto r = Parse("module m; initial x = 8'hFF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -337,10 +307,6 @@ TEST(ParserA84, PrimaryIntegerLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// =============================================================================
-// A.8.7 Numbers — Parser
-// =============================================================================
-// § number — integral_number
 TEST(ParserA87, NumberIntegral) {
   auto r = Parse("module m; logic [7:0] x; initial x = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -350,7 +316,6 @@ TEST(ParserA87, NumberIntegral) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// § integral_number — decimal_number (unsized)
 TEST(ParserA87, IntegralDecimal) {
   auto r = Parse("module m; int x; initial x = 255; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -361,7 +326,6 @@ TEST(ParserA87, IntegralDecimal) {
   EXPECT_EQ(rhs->int_val, 255u);
 }
 
-// § integral_number — octal_number
 TEST(ParserA87, IntegralOctal) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'o77; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -372,7 +336,6 @@ TEST(ParserA87, IntegralOctal) {
   EXPECT_EQ(rhs->int_val, 077u);
 }
 
-// § integral_number — binary_number
 TEST(ParserA87, IntegralBinary) {
   auto r =
       Parse("module m; logic [7:0] x; initial x = 8'b10101010; endmodule\n");
@@ -384,7 +347,6 @@ TEST(ParserA87, IntegralBinary) {
   EXPECT_EQ(rhs->int_val, 0xAAu);
 }
 
-// § integral_number — hex_number
 TEST(ParserA87, IntegralHex) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'hFF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -395,7 +357,6 @@ TEST(ParserA87, IntegralHex) {
   EXPECT_EQ(rhs->int_val, 0xFFu);
 }
 
-// § decimal_number — unsigned_number
 TEST(ParserA87, DecimalUnsigned) {
   auto r = Parse("module m; int x; initial x = 0; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -406,7 +367,6 @@ TEST(ParserA87, DecimalUnsigned) {
   EXPECT_EQ(rhs->int_val, 0u);
 }
 
-// § decimal_number — [size] decimal_base unsigned_number
 TEST(ParserA87, DecimalSizedBase) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'd200; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -417,7 +377,6 @@ TEST(ParserA87, DecimalSizedBase) {
   EXPECT_EQ(rhs->int_val, 200u);
 }
 
-// § decimal_number — [size] decimal_base x_digit
 TEST(ParserA87, DecimalXDigit) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'dx; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -427,7 +386,6 @@ TEST(ParserA87, DecimalXDigit) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// § decimal_number — [size] decimal_base z_digit
 TEST(ParserA87, DecimalZDigit) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'dz; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -437,7 +395,6 @@ TEST(ParserA87, DecimalZDigit) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// § binary_number — [size] binary_base binary_value
 TEST(ParserA87, BinaryNumber) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'b1100; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -448,7 +405,6 @@ TEST(ParserA87, BinaryNumber) {
   EXPECT_EQ(rhs->int_val, 0xCu);
 }
 
-// § octal_number — [size] octal_base octal_value
 TEST(ParserA87, OctalNumber) {
   auto r = Parse("module m; logic [11:0] x; initial x = 12'o7654; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -459,7 +415,6 @@ TEST(ParserA87, OctalNumber) {
   EXPECT_EQ(rhs->int_val, 07654u);
 }
 
-// § hex_number — [size] hex_base hex_value
 TEST(ParserA87, HexNumber) {
   auto r = Parse("module m; logic [15:0] x; initial x = 16'hABCD; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -470,7 +425,6 @@ TEST(ParserA87, HexNumber) {
   EXPECT_EQ(rhs->int_val, 0xABCDu);
 }
 
-// § size — unsigned_number (various widths)
 TEST(ParserA87, Size1Bit) {
   auto r = Parse("module m; logic x; initial x = 1'b1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -491,7 +445,6 @@ TEST(ParserA87, Size32Bit) {
   EXPECT_EQ(rhs->int_val, 100u);
 }
 
-// § unsigned_number — decimal_digit { _ | decimal_digit }
 TEST(ParserA87, UnsignedNumberWithUnderscores) {
   auto r = Parse("module m; int x; initial x = 1_000_000; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -502,7 +455,6 @@ TEST(ParserA87, UnsignedNumberWithUnderscores) {
   EXPECT_EQ(rhs->int_val, 1000000u);
 }
 
-// § binary_value — binary_digit { _ | binary_digit }
 TEST(ParserA87, BinaryValueWithUnderscores) {
   auto r =
       Parse("module m; logic [7:0] x; initial x = 8'b1010_1010; endmodule\n");
@@ -514,7 +466,6 @@ TEST(ParserA87, BinaryValueWithUnderscores) {
   EXPECT_EQ(rhs->int_val, 0xAAu);
 }
 
-// § octal_value — octal_digit { _ | octal_digit }
 TEST(ParserA87, OctalValueWithUnderscores) {
   auto r =
       Parse("module m; logic [11:0] x; initial x = 12'o77_77; endmodule\n");
@@ -526,7 +477,6 @@ TEST(ParserA87, OctalValueWithUnderscores) {
   EXPECT_EQ(rhs->int_val, 07777u);
 }
 
-// § hex_value — hex_digit { _ | hex_digit }
 TEST(ParserA87, HexValueWithUnderscores) {
   auto r =
       Parse("module m; logic [15:0] x; initial x = 16'hAB_CD; endmodule\n");
@@ -538,7 +488,6 @@ TEST(ParserA87, HexValueWithUnderscores) {
   EXPECT_EQ(rhs->int_val, 0xABCDu);
 }
 
-// § decimal_base — 'd
 TEST(ParserA87, DecimalBaseLower) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'd99; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -548,7 +497,6 @@ TEST(ParserA87, DecimalBaseLower) {
   EXPECT_EQ(rhs->int_val, 99u);
 }
 
-// § decimal_base — 'D
 TEST(ParserA87, DecimalBaseUpper) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'D99; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -558,7 +506,6 @@ TEST(ParserA87, DecimalBaseUpper) {
   EXPECT_EQ(rhs->int_val, 99u);
 }
 
-// § decimal_base — 'sd (signed)
 TEST(ParserA87, DecimalBaseSignedLower) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'sd99; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -568,7 +515,6 @@ TEST(ParserA87, DecimalBaseSignedLower) {
   EXPECT_EQ(rhs->int_val, 99u);
 }
 
-// § decimal_base — 'SD
 TEST(ParserA87, DecimalBaseSignedUpper) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'SD99; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -578,7 +524,6 @@ TEST(ParserA87, DecimalBaseSignedUpper) {
   EXPECT_EQ(rhs->int_val, 99u);
 }
 
-// § binary_base — 'b
 TEST(ParserA87, BinaryBaseLower) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'b1111; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -588,7 +533,6 @@ TEST(ParserA87, BinaryBaseLower) {
   EXPECT_EQ(rhs->int_val, 0xFu);
 }
 
-// § binary_base — 'B
 TEST(ParserA87, BinaryBaseUpper) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'B1111; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -598,7 +542,6 @@ TEST(ParserA87, BinaryBaseUpper) {
   EXPECT_EQ(rhs->int_val, 0xFu);
 }
 
-// § binary_base — 'sb (signed)
 TEST(ParserA87, BinaryBaseSignedLower) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'sb1111; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -608,7 +551,6 @@ TEST(ParserA87, BinaryBaseSignedLower) {
   EXPECT_EQ(rhs->int_val, 0xFu);
 }
 
-// § binary_base — 'SB
 TEST(ParserA87, BinaryBaseSignedUpper) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'SB1111; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -618,7 +560,6 @@ TEST(ParserA87, BinaryBaseSignedUpper) {
   EXPECT_EQ(rhs->int_val, 0xFu);
 }
 
-// § octal_base — 'o
 TEST(ParserA87, OctalBaseLower) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'o77; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -628,7 +569,6 @@ TEST(ParserA87, OctalBaseLower) {
   EXPECT_EQ(rhs->int_val, 077u);
 }
 
-// § octal_base — 'O
 TEST(ParserA87, OctalBaseUpper) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'O77; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -638,7 +578,6 @@ TEST(ParserA87, OctalBaseUpper) {
   EXPECT_EQ(rhs->int_val, 077u);
 }
 
-// § octal_base — 'so (signed)
 TEST(ParserA87, OctalBaseSignedLower) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'so77; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -648,7 +587,6 @@ TEST(ParserA87, OctalBaseSignedLower) {
   EXPECT_EQ(rhs->int_val, 077u);
 }
 
-// § octal_base — 'SO
 TEST(ParserA87, OctalBaseSignedUpper) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'SO77; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -658,7 +596,6 @@ TEST(ParserA87, OctalBaseSignedUpper) {
   EXPECT_EQ(rhs->int_val, 077u);
 }
 
-// § hex_base — 'h
 TEST(ParserA87, HexBaseLower) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'hAB; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -668,7 +605,6 @@ TEST(ParserA87, HexBaseLower) {
   EXPECT_EQ(rhs->int_val, 0xABu);
 }
 
-// § hex_base — 'H
 TEST(ParserA87, HexBaseUpper) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'HAB; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -678,7 +614,6 @@ TEST(ParserA87, HexBaseUpper) {
   EXPECT_EQ(rhs->int_val, 0xABu);
 }
 
-// § hex_base — 'sh (signed)
 TEST(ParserA87, HexBaseSignedLower) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'shAB; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -688,7 +623,6 @@ TEST(ParserA87, HexBaseSignedLower) {
   EXPECT_EQ(rhs->int_val, 0xABu);
 }
 
-// § hex_base — 'SH
 TEST(ParserA87, HexBaseSignedUpper) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'SHAB; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -698,7 +632,6 @@ TEST(ParserA87, HexBaseSignedUpper) {
   EXPECT_EQ(rhs->int_val, 0xABu);
 }
 
-// § decimal_digit — 0 through 9
 TEST(ParserA87, DecimalDigitAll) {
   auto r = Parse("module m; int x; initial x = 1234567890; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -708,7 +641,6 @@ TEST(ParserA87, DecimalDigitAll) {
   EXPECT_EQ(rhs->int_val, 1234567890u);
 }
 
-// § binary_digit — 0 and 1
 TEST(ParserA87, BinaryDigitZeroOne) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'b0101; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -735,7 +667,6 @@ static ParseDiag50701 ParseWithDiag(const std::string& src) {
   return result;
 }
 
-// From test_parser_clause_05.cpp
 TEST(ParserCh50701, SizedLiteral_NoOverflow) {
   auto r = ParseWithDiag(
       "module t;\n"
@@ -779,4 +710,4 @@ TEST(Eval, IntegerLiteral) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}  // namespace
+}

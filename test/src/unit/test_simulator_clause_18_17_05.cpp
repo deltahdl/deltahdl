@@ -1,5 +1,3 @@
-// §18.17.5: Interleaving productions—rand join
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Rand join: both productions execute (order may vary)
 TEST(SimA612, RandJoinBothExecute) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,4 +30,4 @@ TEST(SimA612, RandJoinBothExecute) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-}  // namespace
+}

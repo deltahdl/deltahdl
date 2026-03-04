@@ -1,5 +1,3 @@
-// §25.7.3: Example of exporting tasks and functions
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -34,7 +32,6 @@ TEST(ParserA29, ExportMultipleIdentifiers) {
   EXPECT_EQ(mp->ports[1].name, "Write");
 }
 
-// modport_tf_port ::= method_prototype (task prototype)
 TEST(ParserA29, ImportTaskPrototype) {
   auto r = Parse(
       "interface bus;\n"
@@ -102,4 +99,4 @@ TEST(ParserA29, ImportMultiplePrototypes) {
   EXPECT_EQ(mp->ports[1].prototype->name, "Write");
 }
 
-}  // namespace
+}

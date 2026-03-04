@@ -1,18 +1,10 @@
-// §14.13: Input sampling
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// =============================================================================
-// LRM section 14.13 -- Input sampling
-// =============================================================================
-// §14.13: input sampled at clocking event (basic pattern from LRM).
-// Validates: clocking cb @(negedge clk); input v; endclocking
 TEST(ParserSection14, InputSamplingBasic) {
   auto r = Parse(
       "module m;\n"
@@ -28,7 +20,6 @@ TEST(ParserSection14, InputSamplingBasic) {
   EXPECT_EQ(item->clocking_signals[0].skew_delay, nullptr);
 }
 
-// §14.13: input with explicit #0 skew (samples in the Observed region).
 TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
   auto r = Parse(
       "module m;\n"
@@ -45,7 +36,6 @@ TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
-// Access clocking block signal via dot notation (cb.v) in always block.
 TEST(ParserSection19, ClockingBlockEvent_DotAccess) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -56,4 +46,4 @@ TEST(ParserSection19, ClockingBlockEvent_DotAccess) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

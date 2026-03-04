@@ -1,6 +1,3 @@
-// §6.8: on variable initialization). This is roughly equivalent to a C
-// automatic variable.
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -9,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, VarBareNoType) {
-  // §6.8: "var v;" — no type at all implies logic.
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  var v;\n"
@@ -21,7 +18,7 @@ TEST(ParserSection6, VarBareNoType) {
 }
 
 TEST(ParserSection6, VarWithInitializer) {
-  // §6.8: Variable with initializer "int i = 0;"
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  int i = 0;\n"
@@ -35,7 +32,7 @@ TEST(ParserSection6, VarWithInitializer) {
 }
 
 TEST(ParserSection6, MultipleVarDeclsSameStmt) {
-  // §6.8: "shortint s1, s2[0:9];" — multiple instances in one decl.
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  shortint s1, s2;\n"
@@ -46,4 +43,4 @@ TEST(ParserSection6, MultipleVarDeclsSameStmt) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->name, "s2");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §5.9: String literals
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// § primary_literal — string_literal
 TEST(ParserA84, PrimaryLiteralStringLiteral) {
   auto r = Parse("module m; initial x = \"world\"; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -17,7 +14,6 @@ TEST(ParserA84, PrimaryLiteralStringLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-// --- §5.12 Attributes ---
 TEST(ParserCh509, StringLiteral_Basic) {
   auto r = Parse(
       "module m;\n"
@@ -33,7 +29,7 @@ TEST(ParserCh509, StringLiteral_Basic) {
 }
 
 TEST(ParserCh509, StringLiteral_Assignment) {
-  // A string literal can be assigned to an integral type.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  byte c1;\n"
@@ -42,7 +38,7 @@ TEST(ParserCh509, StringLiteral_Assignment) {
 }
 
 TEST(ParserCh509, StringLiteral_PackedArray) {
-  // Storing a string in a packed array, per LRM Section 5.9.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  bit [8*12:1] stringvar = \"Hello world\\n\";\n"
@@ -50,14 +46,13 @@ TEST(ParserCh509, StringLiteral_PackedArray) {
 }
 
 TEST(ParserCh509, StringLiteral_InConcatenation) {
-  // String concatenation using system task.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial $display({\"A\", \"B\"});\n"
               "endmodule"));
 }
 
-// § constant_primary — primary_literal (string)
 TEST(ParserA84, ConstantPrimaryStringLiteral) {
   auto r = Parse("module m; parameter string S = \"hello\"; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -67,7 +62,6 @@ TEST(ParserA84, ConstantPrimaryStringLiteral) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kStringLiteral);
 }
 
-// § primary — primary_literal (string)
 TEST(ParserA84, PrimaryStringLiteral) {
   auto r = Parse("module m; initial x = \"hello\"; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -77,4 +71,4 @@ TEST(ParserA84, PrimaryStringLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-}  // namespace
+}

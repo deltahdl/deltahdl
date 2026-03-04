@@ -1,5 +1,3 @@
-// §16.14.3: Cover statement
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -19,12 +17,6 @@ TEST(ParserA210, ConcurrentAssertionItem_CoverProperty) {
   ASSERT_NE(item, nullptr);
 }
 
-// =============================================================================
-// §A.2.10 Production #7: cover_sequence_statement
-// cover_sequence_statement ::=
-//     cover sequence ( [clocking_event] [disable iff (expr)] sequence_expr )
-//     statement_or_null
-// =============================================================================
 TEST(ParserA210, CoverSequence_Basic) {
   auto r = Parse(
       "module m;\n"
@@ -68,9 +60,6 @@ TEST(ParserA210, CoverSequence_Kind) {
   EXPECT_EQ(item->kind, ModuleItemKind::kCoverSequence);
 }
 
-// =============================================================================
-// §A.2.10 Production #5: cover_property_statement
-// =============================================================================
 TEST(ParserA210, CoverProperty_WithPassStmt) {
   auto r = Parse(
       "module m;\n"
@@ -96,10 +85,6 @@ TEST(ParserA210, CoverSequence_HasAssertExpr) {
   EXPECT_NE(item->assert_expr, nullptr);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.5 Concurrent — cover property
-// =============================================================================
 TEST(ParserSection16, CoverPropertyModuleLevel) {
   auto r = Parse(
       "module m;\n"
@@ -116,10 +101,6 @@ TEST(ParserSection16, CoverPropertyModuleLevel) {
 }
 using VerifyParseTest = ProgramTestParse;
 
-// =============================================================================
-// Section 16.5.1 -- Concurrent assertion statements: cover property
-// =============================================================================
-// Cover property with a simple clocked property.
 TEST(ParserSection16, Sec16_5_1_CoverPropertySimple) {
   auto r = Parse(
       "module m;\n"
@@ -133,7 +114,6 @@ TEST(ParserSection16, Sec16_5_1_CoverPropertySimple) {
   EXPECT_NE(cp->assert_expr, nullptr);
 }
 
-// Cover property with a clocked sequence delay.
 TEST(ParserSection16, Sec16_5_1_CoverPropertyClocked) {
   auto r = Parse(
       "module m;\n"
@@ -147,7 +127,6 @@ TEST(ParserSection16, Sec16_5_1_CoverPropertyClocked) {
   EXPECT_NE(cp->assert_expr, nullptr);
 }
 
-// Cover property with a pass action (cover has no else branch per LRM).
 TEST(ParserSection16, Sec16_5_1_CoverPropertyPassAction) {
   auto r = Parse(
       "module m;\n"
@@ -162,11 +141,6 @@ TEST(ParserSection16, Sec16_5_1_CoverPropertyPassAction) {
   EXPECT_NE(cp->assert_pass_stmt, nullptr);
 }
 
-// =============================================================================
-// Section 16.5.1 -- Concurrent assertion statements: cover sequence
-// The parser routes cover sequence through cover property (kCoverProperty).
-// =============================================================================
-// Cover sequence-like pattern with pass action via cover property.
 TEST(ParserSection16, Sec16_5_1_CoverSequenceWithPassAction) {
   auto r = Parse(
       "module m;\n"
@@ -215,7 +189,7 @@ using DpiParseTest = ProgramTestParse;
 using ApiParseTest = ProgramTestParse;
 
 TEST(ParserSection39, CoverPropertyStatement) {
-  // cover property is used for coverage callbacks
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, a, b;
@@ -225,7 +199,7 @@ TEST(ParserSection39, CoverPropertyStatement) {
 }
 
 TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
-  // cover property -- target of vpiAssertAttemptCovered/vpiAssertSuccessCovered
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, a, b;
@@ -234,7 +208,6 @@ TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
   )"));
 }
 
-// cover_property_statement
 TEST(ParserA610, CoverPropertyModule) {
   auto r = Parse(
       "module m;\n"
@@ -246,7 +219,6 @@ TEST(ParserA610, CoverPropertyModule) {
   ASSERT_NE(item, nullptr);
 }
 
-// cover_sequence_statement
 TEST(ParserA610, CoverSequenceModule) {
   auto r = Parse(
       "module m;\n"
@@ -258,7 +230,6 @@ TEST(ParserA610, CoverSequenceModule) {
   ASSERT_NE(item, nullptr);
 }
 
-// cover property with pass action only (no else)
 TEST(ParserA610, CoverPropertyPassAction) {
   auto r = Parse(
       "module m;\n"
@@ -271,4 +242,4 @@ TEST(ParserA610, CoverPropertyPassAction) {
   ASSERT_NE(item->assert_pass_stmt, nullptr);
 }
 
-}  // namespace
+}

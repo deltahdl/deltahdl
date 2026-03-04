@@ -1,5 +1,3 @@
-// §31.4.4: $width
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// system_timing_check ::= $width_timing_check
 TEST(ParserA705, SystemTimingCheckWidth) {
   auto r = Parse(
       "module m;\n"
@@ -23,11 +20,6 @@ TEST(ParserA705, SystemTimingCheckWidth) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
 }
 
-// =============================================================================
-// A.7.5.1 $width_timing_check
-// =============================================================================
-// $width ( controlled_reference_event , timing_check_limit , threshold [ , [
-// notifier ] ] )
 TEST(ParserA70501, WidthWithThreshold) {
   auto r = Parse(
       "module m;\n"
@@ -76,7 +68,6 @@ TEST(ParserSection28, Sec28_12_TimingCheckWidth) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-// $width uses controlled_timing_check_event (mandatory edge)
 TEST(ParserA70503, ControlledTimingCheckEventWidth) {
   auto r = Parse(
       "module m;\n"
@@ -91,4 +82,4 @@ TEST(ParserA70503, ControlledTimingCheckEventWidth) {
   EXPECT_EQ(tc->ref_terminal.name, "rst");
 }
 
-}  // namespace
+}

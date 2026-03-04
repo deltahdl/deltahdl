@@ -1,5 +1,3 @@
-// §12.5.3: unique-case, unique0-case, and priority-case
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §12.5.3: unique case qualifier stored
 TEST(SimA607, UniqueCaseQualifier) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +29,6 @@ TEST(SimA607, UniqueCaseQualifier) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.5.3: priority case — selects first match
 TEST(SimA607, PriorityCaseFirstMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -57,4 +53,4 @@ TEST(SimA607, PriorityCaseFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

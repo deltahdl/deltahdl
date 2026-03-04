@@ -1,5 +1,3 @@
-// §3.12.1: Compilation units
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -13,12 +11,8 @@ using namespace delta;
 
 namespace {
 
-// 9. $unit:: scope resolution operator — used for disambiguation.
-// $unit is lexed as a system identifier; $unit::name is the syntax.
 TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
-  // The LRM example: b = 5 + $unit::b;
-  // $unit is a kSystemIdentifier token; :: is kColonColon.
-  // This tests that the lexer correctly produces these tokens.
+
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -34,4 +28,4 @@ TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
   EXPECT_EQ(t3.text, "b");
 }
 
-}  // namespace
+}

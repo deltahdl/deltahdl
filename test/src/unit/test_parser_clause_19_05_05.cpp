@@ -1,5 +1,3 @@
-// §19.5.5: Excluding coverage point values or transitions
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -17,4 +15,4 @@ TEST(ParserA211, BinsKeyword_IgnoreBins) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

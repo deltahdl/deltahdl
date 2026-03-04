@@ -1,5 +1,3 @@
-// §16.12.5: Conjunction property
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -14,7 +12,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.11: Property and ---
 TEST(ParserAnnexF, AnnexFPropertyAnd) {
   auto r = Parse(
       "module m;\n"
@@ -26,7 +23,6 @@ TEST(ParserAnnexF, AnnexFPropertyAnd) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// --- Test helpers ---
 TEST(ParserSection16, PropertyConjunction) {
   auto r = Parse(
       "module m;\n"
@@ -37,4 +33,4 @@ TEST(ParserSection16, PropertyConjunction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

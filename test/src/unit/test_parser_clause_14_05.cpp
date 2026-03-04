@@ -1,5 +1,3 @@
-// §14.5: Hierarchical expressions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.11 clocking_decl_assign — signal_identifier = expression
-// =============================================================================
 TEST(ParserA611, ClockingDeclAssignWithHierExpr) {
   auto r = Parse(
       "module m;\n"
@@ -26,9 +21,6 @@ TEST(ParserA611, ClockingDeclAssignWithHierExpr) {
   EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
 
-// =============================================================================
-// A.6.11 clocking_decl_assign — multiple with mixed hier_expr
-// =============================================================================
 TEST(ParserA611, ClockingDeclAssignMultipleMixed) {
   auto r = Parse(
       "module m;\n"
@@ -45,7 +37,7 @@ TEST(ParserA611, ClockingDeclAssignMultipleMixed) {
   EXPECT_NE(item->clocking_signals[1].hier_expr, nullptr);
   EXPECT_EQ(item->clocking_signals[2].hier_expr, nullptr);
 }
-// Hierarchical expression assignment to a clocking signal.
+
 TEST(ParserSection19, ClockingBlock_HierarchicalExpr) {
   auto r = Parse(
       "module t;\n"
@@ -59,9 +51,7 @@ TEST(ParserSection19, ClockingBlock_HierarchicalExpr) {
   EXPECT_EQ(item->clocking_signals[0].name, "enable");
   ASSERT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
-// =============================================================================
-// §14.5 — Hierarchical expression assignment
-// =============================================================================
+
 TEST(ParserSection14, HierarchicalExpression) {
   auto r = Parse(
       "module m;\n"
@@ -77,4 +67,4 @@ TEST(ParserSection14, HierarchicalExpression) {
   ASSERT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
 
-}  // namespace
+}

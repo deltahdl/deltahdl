@@ -1,5 +1,3 @@
-// §non-lrm:func_prototype
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -18,11 +16,6 @@ TEST(ParserA26, FuncPrototypeExternVoid) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-// ---------------------------------------------------------------------------
-// task_prototype ::=
-//   task [ dynamic_override_specifiers ] task_identifier
-//     [ ( [ tf_port_list ] ) ]
-// ---------------------------------------------------------------------------
 TEST(ParserA27, TaskPrototypeExtern) {
   auto r = Parse(
       "module m;\n"
@@ -48,4 +41,4 @@ TEST(ParserA27, TaskPrototypeExternNoPorts) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
-}  // namespace
+}

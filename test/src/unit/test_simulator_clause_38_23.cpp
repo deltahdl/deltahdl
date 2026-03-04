@@ -23,8 +23,6 @@ class VpiClause3823Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.23: vpi_iterate / §38.40: vpi_scan
-
 TEST_F(VpiClause3823Test, IterateModuleChildPorts) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
@@ -59,5 +57,5 @@ TEST_F(VpiClause3823Test, ScanNullIteratorReturnsNull) {
   EXPECT_EQ(vpi_scan(nullptr), nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

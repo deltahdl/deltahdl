@@ -1,19 +1,9 @@
-// §13.4.4: Background processes spawned by function calls
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
-// Elab test fixture
 namespace {
 
-// =============================================================================
-// A.6.3 Parallel and sequential blocks — Elaboration
-// =============================================================================
-// ---------------------------------------------------------------------------
-// Elaboration: §13.4 fork restrictions inside functions
-// ---------------------------------------------------------------------------
-// §13.4.4: fork/join_none is permitted inside a function
 TEST(ElabA603, ForkJoinNoneAllowedInFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -29,7 +19,6 @@ TEST(ElabA603, ForkJoinNoneAllowedInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.4: fork/join_any is illegal inside a function
 TEST(ElabA603, ForkJoinAnyIllegalInFunction) {
   ElabFixture f;
   ElaborateSrc(
@@ -44,4 +33,4 @@ TEST(ElabA603, ForkJoinAnyIllegalInFunction) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

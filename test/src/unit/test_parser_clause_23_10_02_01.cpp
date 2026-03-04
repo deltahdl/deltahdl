@@ -1,5 +1,3 @@
-// §23.10.2.1: Parameter value assignment by ordered list
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -73,4 +71,4 @@ TEST(ParserSection23, ModuleInstanceWithParameters) {
   ASSERT_EQ(item->inst_params.size(), 2);
 }
 
-}  // namespace
+}

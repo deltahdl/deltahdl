@@ -1,5 +1,3 @@
-// §31.3.3: $setuphold
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 $setuphold_timing_check
-// =============================================================================
-// $setuphold with two limits
 TEST(ParserA70501, SetupholdTwoLimits) {
   auto r = Parse(
       "module m;\n"
@@ -27,7 +21,6 @@ TEST(ParserA70501, SetupholdTwoLimits) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-// $setuphold with all 9 arguments
 TEST(ParserA70501, SetupholdFullArgs) {
   auto r = Parse(
       "module m;\n"
@@ -44,9 +37,6 @@ TEST(ParserA70501, SetupholdFullArgs) {
   EXPECT_EQ(tc->delayed_data, "dDATA");
 }
 
-// =============================================================================
-// A.7.5.2 timestamp_condition / timecheck_condition ::= mintypmax_expression
-// =============================================================================
 TEST(ParserA70502, TimestampCondMinTypMax) {
   auto r = Parse(
       "module m;\n"
@@ -75,10 +65,6 @@ TEST(ParserA70502, TimecheckCondMinTypMax) {
   EXPECT_EQ(tc->timecheck_cond->kind, ExprKind::kMinTypMax);
 }
 
-// =============================================================================
-// A.7.5.2 delayed_reference / delayed_data
-// =============================================================================
-// Simple delayed_reference / delayed_data (identifier only)
 TEST(ParserA70502, DelayedRefDataSimple) {
   auto r = Parse(
       "module m;\n"
@@ -125,7 +111,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckSetuphold) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "d");
   ASSERT_EQ(si->timing_check.limits.size(), 2u);
 }
-// system_timing_check ::= $setuphold_timing_check
+
 TEST(ParserA705, SystemTimingCheckSetuphold) {
   auto r = Parse(
       "module m;\n"
@@ -139,4 +125,4 @@ TEST(ParserA705, SystemTimingCheckSetuphold) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetuphold);
 }
 
-}  // namespace
+}

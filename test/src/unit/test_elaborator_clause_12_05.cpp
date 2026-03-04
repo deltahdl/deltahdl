@@ -1,5 +1,3 @@
-// §12.5: Case statement
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// 9. always_comb case with default branch.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombCaseDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -36,9 +31,6 @@ TEST(SimCh9, AlwaysCombCaseDefault) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 9. always_comb case statement: matching branch.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombCaseMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -69,7 +61,6 @@ TEST(SimCh9b, AlwaysCombCaseMatch) {
   EXPECT_EQ(y->value.ToUint64(), 0x30u);
 }
 
-// 9. Incomplete case with matching selector assigns value.
 TEST(SimCh9c, IncompleteCaseMatchAssigns) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -95,7 +86,6 @@ TEST(SimCh9c, IncompleteCaseMatchAssigns) {
   EXPECT_EQ(q->value.ToUint64(), 0xAAu);
 }
 
-// 10. Incomplete case matching second arm.
 TEST(SimCh9c, IncompleteCaseSecondArm) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -121,9 +111,6 @@ TEST(SimCh9c, IncompleteCaseSecondArm) {
   EXPECT_EQ(q->value.ToUint64(), 0xBBu);
 }
 
-// ---------------------------------------------------------------------------
-// 10. Blocking assignment in case statement.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignCase) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -152,4 +139,4 @@ TEST(SimCh10, BlockingAssignCase) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-}  // namespace
+}

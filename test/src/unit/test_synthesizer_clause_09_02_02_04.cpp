@@ -1,5 +1,3 @@
-// §9.2.2.4: Sequential logic always_ff procedure
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -26,4 +24,4 @@ TEST(SynthLower, AlwaysFFRegistersLatch) {
   EXPECT_FALSE(aig->latches.empty());
 }
 
-}  // namespace
+}

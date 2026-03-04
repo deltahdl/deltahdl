@@ -1,5 +1,3 @@
-// Annex H.12.2: Array querying functions
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -12,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// DpiRuntime: open array support (S35.5.6)
-// =============================================================================
 TEST(DpiRuntime, OpenArrayHandleOperations) {
   SvOpenArrayHandle h;
   h.data = nullptr;
@@ -37,4 +32,4 @@ TEST(DpiRuntime, OpenArrayEmptyHandle) {
   EXPECT_EQ(DpiRuntime::SvSize(h), 0u);
 }
 
-}  // namespace
+}

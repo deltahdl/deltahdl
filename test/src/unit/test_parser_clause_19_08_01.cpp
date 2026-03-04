@@ -1,5 +1,3 @@
-// §19.8.1: Overriding the built-in sample method
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -50,4 +48,4 @@ TEST(ParserA211, CoverGroup_SampleFunctionASTVerification) {
   EXPECT_EQ(item->name, "sampled_cg");
 }
 
-}  // namespace
+}

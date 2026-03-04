@@ -1,5 +1,3 @@
-// §18.4: Random variables
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.3: rand variable modifier
-// =============================================================================
 TEST(Constraint, RandVariableBasic) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -50,9 +45,6 @@ TEST(Constraint, RandVariableMultiple) {
   }
 }
 
-// =============================================================================
-// §18.4: randc cyclic random
-// =============================================================================
 TEST(Constraint, RandcCyclic) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -94,4 +86,4 @@ TEST(Constraint, RandcCycleResets) {
   EXPECT_EQ(cycle2.size(), 2u);
 }
 
-}  // namespace
+}

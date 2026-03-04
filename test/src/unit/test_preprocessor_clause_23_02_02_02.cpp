@@ -1,5 +1,3 @@
-// §23.2.2.2: ANSI style list of port declarations
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Module with both parameters and ports
 TEST(SourceText, ParamsAndPorts) {
   auto r = ParseWithPreprocessor(
       "module m #(parameter int W = 8)(input logic [W-1:0] data,\n"
@@ -47,7 +44,6 @@ TEST(Parser, ModuleWithPorts) {
   }
 }
 
-// Module with ANSI header (list_of_port_declarations).
 TEST(SourceText, ModuleAnsiHeader) {
   auto r = ParseWithPreprocessor(
       "module m(input logic a, output logic b); endmodule\n");
@@ -56,8 +52,6 @@ TEST(SourceText, ModuleAnsiHeader) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
-// port_declaration: all 4 directions (port_direction ::=
-// input|output|inout|ref)
 TEST(SourceText, PortDirectionAllFour) {
   auto r = ParseWithPreprocessor(
       "module m(input logic a, output logic b,\n"
@@ -73,7 +67,6 @@ TEST(SourceText, PortDirectionAllFour) {
   EXPECT_EQ(ports[3].direction, Direction::kRef);
 }
 
-// net_port_header: [port_direction] net_port_type — inout wire
 TEST(SourceText, NetPortHeader) {
   auto r =
       ParseWithPreprocessor("module m(inout wire [7:0] data); endmodule\n");
@@ -84,7 +77,6 @@ TEST(SourceText, NetPortHeader) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "data");
 }
 
-// variable_port_header: [port_direction] variable_port_type — input logic
 TEST(SourceText, VariablePortHeader) {
   auto r =
       ParseWithPreprocessor("module m(input logic [3:0] sel); endmodule\n");
@@ -112,17 +104,13 @@ TEST(ParserAnnexA, A1ModulePortDirections) {
 }
 
 TEST(ParserA212, InputVariablePortTypeVar) {
-  // variable_port_type ::= var_data_type
-  // var_data_type ::= var data_type_or_implicit
+
   auto r = ParseWithPreprocessor("module m(input var logic d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
 }
 
-// --- output_declaration ---
-// output net_port_type list_of_port_identifiers
-// | output variable_port_type list_of_variable_port_identifiers
 TEST(ParserA212, OutputNetPortType) {
   auto r = ParseWithPreprocessor("module m(output wire q); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -137,8 +125,6 @@ TEST(ParserA212, OutputVariablePortTypeReg) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
 }
 
-// --- ref_declaration ---
-// ref variable_port_type list_of_variable_identifiers
 TEST(ParserA212, RefDeclaration) {
   auto r = ParseWithPreprocessor("module m(ref logic [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -146,8 +132,6 @@ TEST(ParserA212, RefDeclaration) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kRef);
 }
 
-// --- net_port_type ---
-// [ net_type ] data_type_or_implicit | interconnect implicit_data_type
 TEST(ParserA212, NetPortTypeTriType) {
   auto r = ParseWithPreprocessor("module m(inout tri [7:0] bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -155,10 +139,8 @@ TEST(ParserA212, NetPortTypeTriType) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "bus");
 }
 
-// --- variable_port_type ---
-// var_data_type ::= data_type | var data_type_or_implicit
 TEST(ParserA212, VarDataTypeExplicit) {
-  // var_data_type: data_type (integer_vector_type)
+
   auto r = ParseWithPreprocessor(
       "module m(input logic signed [15:0] val); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -167,16 +149,13 @@ TEST(ParserA212, VarDataTypeExplicit) {
 }
 
 TEST(ParserA212, VarDataTypeInt) {
-  // var_data_type: data_type (integer_atom_type)
+
   auto r = ParseWithPreprocessor("module m(input int count); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
 }
 
-// --- list_of_port_identifiers ---
-// port_identifier { unpacked_dimension }
-//     { , port_identifier { unpacked_dimension } }
 TEST(ParserA23, ListOfPortIdentifiersSingle) {
   auto r = ParseWithPreprocessor("module m(inout wire a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -229,4 +208,4 @@ TEST(ParserA25, PortWithPackedDim) {
   ASSERT_NE(r.cu->modules[0]->ports[0].data_type.packed_dim_left, nullptr);
 }
 
-}  // namespace
+}

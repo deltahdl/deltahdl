@@ -1,5 +1,3 @@
-// §9.3.4: Block names
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,13 +5,12 @@ using namespace delta;
 
 namespace {
 
-// Checker with end label.
 TEST(SourceText, CheckerEndLabel) {
   auto r = Parse("checker chk; endchecker : chk\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// §9.3.4: Named sequential block
+
 TEST(ParserA603, SeqBlockNamed) {
   auto r = Parse(
       "module m;\n"
@@ -29,7 +26,6 @@ TEST(ParserA603, SeqBlockNamed) {
   EXPECT_EQ(body->label, "my_block");
 }
 
-// §9.3.4: Named sequential block with matching end label
 TEST(ParserA603, SeqBlockNamedWithEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -45,7 +41,6 @@ TEST(ParserA603, SeqBlockNamedWithEndLabel) {
   EXPECT_EQ(body->label, "blockB");
 }
 
-// §9.3.4: Named fork block
 TEST(ParserA603, ForkNamed) {
   auto r = Parse(
       "module m;\n"
@@ -63,7 +58,6 @@ TEST(ParserA603, ForkNamed) {
   EXPECT_EQ(stmt->label, "my_fork");
 }
 
-// §9.3.4: Named fork block with matching end label
 TEST(ParserA603, ForkNamedWithEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -80,7 +74,6 @@ TEST(ParserA603, ForkNamedWithEndLabel) {
   EXPECT_EQ(stmt->label, "my_fork");
 }
 
-// §9.3.4: Named fork with join_any and end label
 TEST(ParserA603, ForkNamedJoinAnyWithEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -98,7 +91,6 @@ TEST(ParserA603, ForkNamedJoinAnyWithEndLabel) {
   EXPECT_EQ(stmt->label, "f1");
 }
 
-// §9.3.4: Named fork with join_none and end label
 TEST(ParserA603, ForkNamedJoinNoneWithEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -130,9 +122,7 @@ TEST(ParserSection9c, SequentialBlockNamedWithDecls) {
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "my_block");
 }
-// =============================================================================
-// §4.6: Named begin-end block for deterministic scoping
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
   auto r = Parse(
       "module m;\n"
@@ -148,9 +138,7 @@ TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "seq_blk");
 }
-// =============================================================================
-// LRM section 9.3.1 -- Sequential blocks (additional tests)
-// =============================================================================
+
 TEST(ParserSection9, SequentialBlockNamedBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -166,7 +154,7 @@ TEST(ParserSection9, SequentialBlockNamedBeginEnd) {
   EXPECT_EQ(item->body->label, "my_seq");
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
-// 3. Named begin-end block creating a subscope
+
 TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -186,7 +174,6 @@ TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
   EXPECT_EQ(item->body->label, "my_block");
 }
 
-// 4. Nested named begin-end blocks
 TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -206,9 +193,6 @@ TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
   EXPECT_EQ(item->body->stmts[0]->label, "inner");
 }
 
-// =============================================================================
-// LRM section 12.6 -- Named blocks / block labels
-// =============================================================================
 TEST(ParserSection12, NamedBeginEnd) {
   auto r = Parse(
       "module t;\n"
@@ -223,7 +207,6 @@ TEST(ParserSection12, NamedBeginEnd) {
   EXPECT_EQ(body->label, "my_block");
 }
 
-// 25. begin-end with no name (anonymous block)
 TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -237,7 +220,7 @@ TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
   auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  // Anonymous blocks have an empty label.
+
   EXPECT_TRUE(item->body->label.empty());
 }
 
@@ -255,7 +238,6 @@ TEST(ParserSection12, NamedBeginEndNoEndLabel) {
   EXPECT_EQ(body->label, "blk");
 }
 
-// 26. Multiple named blocks at same level
 TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
   auto r = Parse(
       "module m;\n"
@@ -278,9 +260,7 @@ TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
   EXPECT_EQ(body->stmts[0]->label, "block_a");
   EXPECT_EQ(body->stmts[1]->label, "block_b");
 }
-// ---------------------------------------------------------------------------
-// 5. Named fork-join with matching end labels
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_3_2_NamedForkJoinMatchingLabels) {
   auto r = Parse(
       "module m;\n"
@@ -314,10 +294,6 @@ TEST(ParserSection12, NamedForkJoin) {
   EXPECT_EQ(body->label, "my_fork");
 }
 
-// =============================================================================
-// LRM section 9.3.1 -- Sequential blocks (additional)
-// Nested blocks with names, and automatic variable lifetime in blocks.
-// =============================================================================
 TEST(ParserSection9c, NestedNamedSequentialBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -358,9 +334,6 @@ TEST(ParserSection23, EndLabelInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "myif");
 }
 
-// ---------------------------------------------------------------------------
-// 7. Named fork-join_none
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_NamedForkJoinNone) {
   auto r = Parse(
       "module m;\n"
@@ -400,7 +373,6 @@ TEST(ParserSection23, EndLabelProgram) {
   EXPECT_EQ(r.cu->programs[0]->name, "myprog");
 }
 
-// 24. Named fork-join blocks
 TEST(ParserClause03, Cl3_13_NamedForkJoinBlock) {
   auto r = Parse(
       "module m;\n"
@@ -436,7 +408,6 @@ TEST(ParserSection9, Sec9_3_1_NamedBeginEndMatchingLabel) {
   EXPECT_EQ(body->stmts.size(), 1u);
 }
 
-// Named block with declarations
 TEST(ParserA28, NamedBlockWithDecls) {
   auto r = Parse(
       "module m;\n"
@@ -485,9 +456,7 @@ TEST(ParserSection12, NestedNamedBlocks) {
   ASSERT_GE(body->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->label, "inner");
 }
-// =============================================================================
-// LRM section 9.3.2 -- Parallel blocks (additional tests)
-// =============================================================================
+
 TEST(ParserSection9, ParallelBlockNamedForkJoin) {
   auto r = Parse(
       "module m;\n"
@@ -506,4 +475,4 @@ TEST(ParserSection9, ParallelBlockNamedForkJoin) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
 }
 
-}  // namespace
+}

@@ -1,15 +1,9 @@
-// §16.3: Immediate assertions
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.10 Assertion statements — Elaboration
-// =============================================================================
-// simple_immediate_assert_statement elaborates
 TEST(ElabA610, SimpleAssertElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,7 +15,6 @@ TEST(ElabA610, SimpleAssertElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// simple_immediate_assume_statement elaborates
 TEST(ElabA610, SimpleAssumeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +26,6 @@ TEST(ElabA610, SimpleAssumeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// simple_immediate_cover_statement elaborates
 TEST(ElabA610, SimpleCoverElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -45,7 +37,6 @@ TEST(ElabA610, SimpleCoverElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// multiple assertion types in same module elaborate
 TEST(ElabA610, MixedAssertionsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -61,4 +52,4 @@ TEST(ElabA610, MixedAssertionsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

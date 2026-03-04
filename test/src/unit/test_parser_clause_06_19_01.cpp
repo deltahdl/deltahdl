@@ -1,5 +1,3 @@
-// §6.19.1: Defining new data types as enumerated types
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -25,7 +23,7 @@ TEST(ParserA213, TypedefEnum) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
 }
-// Typedef enum used as a named type for variable declarations.
+
 TEST(ParserSection8, EnumTypedefUsage) {
   auto r = Parse(
       "module m;\n"
@@ -55,7 +53,6 @@ TEST(Parser, EnumWithValues) {
   }
 }
 
-// 23. Enum in module scope
 TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
   auto r = Parse(
       "module m;\n"
@@ -74,7 +71,7 @@ TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
   }
   EXPECT_TRUE(found_typedef);
 }
-// Typedef of enum with named type for reuse.
+
 TEST(ParserSection8, TypedefEnumWithMembers) {
   auto r = Parse(
       "module m;\n"
@@ -87,9 +84,7 @@ TEST(ParserSection8, TypedefEnumWithMembers) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kTypedef);
   EXPECT_EQ(items[0]->typedef_type.kind, DataTypeKind::kEnum);
 }
-// =========================================================================
-// §6.19: Enumerations
-// =========================================================================
+
 TEST(ParserSection6, EnumBasic) {
   auto r = Parse(
       "module t;\n"
@@ -103,4 +98,4 @@ TEST(ParserSection6, EnumBasic) {
   EXPECT_EQ(item->typedef_type.enum_members.size(), 3u);
 }
 
-}  // namespace
+}

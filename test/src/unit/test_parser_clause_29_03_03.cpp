@@ -1,5 +1,3 @@
-// §29.3.3: Sequential UDP initial statement
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- udp_declaration: sequential with initial statement ---
 TEST(ParserAnnexA051, SequentialWithInitial) {
   auto r = Parse(
       "primitive srff(output reg q, input s, input r);\n"
@@ -29,7 +26,6 @@ TEST(ParserAnnexA051, SequentialWithInitial) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-// --- udp_declaration: sequential with initial value x ---
 TEST(ParserAnnexA051, SequentialInitialX) {
   auto r = Parse(
       "primitive dff_x(output reg q, input d, input clk);\n"
@@ -46,7 +42,6 @@ TEST(ParserAnnexA051, SequentialInitialX) {
   EXPECT_EQ(udp->initial_value, 'x');
 }
 
-// --- Sequential UDP evaluation with initial value ---
 TEST(ParserAnnexA051, SimSequentialWithInitial) {
   auto r = Parse(
       "primitive latch(output reg q, input d, input en);\n"
@@ -74,7 +69,6 @@ TEST(ParserAnnexA051, SimSequentialWithInitial) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-// Sequential body with initial statement
 TEST(ParserAnnexA053, SeqBody_WithInitial) {
   auto r = Parse(
       "primitive latch_init(output reg q, input d, en);\n"
@@ -94,7 +88,6 @@ TEST(ParserAnnexA053, SeqBody_WithInitial) {
   EXPECT_EQ(udp->table.size(), 3);
 }
 
-// Simulation: initial value is used at construction
 TEST(ParserAnnexA053, SeqBody_SimInitialValue) {
   auto r = Parse(
       "primitive latch_init(output reg q, input d, en);\n"
@@ -108,14 +101,13 @@ TEST(ParserAnnexA053, SeqBody_SimInitialValue) {
   ASSERT_NE(r.cu, nullptr);
   auto* udp = r.cu->udps[0];
   UdpEvalState eval(*udp);
-  // Initial value is 1
+
   EXPECT_EQ(eval.GetOutput(), '1');
-  // Enable low -> no change -> stays at 1
+
   eval.Evaluate({'0', '0'});
   EXPECT_EQ(eval.GetOutput(), '1');
 }
 
-// Initial statement with value 1
 TEST(ParserAnnexA053, InitStmt_ValueOne) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -131,11 +123,6 @@ TEST(ParserAnnexA053, InitStmt_ValueOne) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-// ---------------------------------------------------------------------------
-// Production 6: init_val ::= 1'b0 | 1'b1 | 1'bx | 1'bX | 1'B0 | 1'B1 |
-//               1'Bx | 1'BX | 1 | 0
-// ---------------------------------------------------------------------------
-// init_val = 1'b0
 TEST(ParserAnnexA053, InitVal_1b0) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -148,7 +135,6 @@ TEST(ParserAnnexA053, InitVal_1b0) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '0');
 }
 
-// init_val = 1'b1
 TEST(ParserAnnexA053, InitVal_1b1) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -161,7 +147,6 @@ TEST(ParserAnnexA053, InitVal_1b1) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
-// init_val = 1'bx
 TEST(ParserAnnexA053, InitVal_1bx) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -174,7 +159,6 @@ TEST(ParserAnnexA053, InitVal_1bx) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-// init_val = 1'bX (uppercase)
 TEST(ParserAnnexA053, InitVal_1bX) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -187,7 +171,6 @@ TEST(ParserAnnexA053, InitVal_1bX) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-// init_val = 1'B0 (uppercase B)
 TEST(ParserAnnexA053, InitVal_1B0) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -200,7 +183,6 @@ TEST(ParserAnnexA053, InitVal_1B0) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '0');
 }
 
-// init_val = 1'B1 (uppercase B)
 TEST(ParserAnnexA053, InitVal_1B1) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -213,7 +195,6 @@ TEST(ParserAnnexA053, InitVal_1B1) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
-// init_val = 1'Bx (uppercase B, lowercase x)
 TEST(ParserAnnexA053, InitVal_1Bx) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -226,7 +207,6 @@ TEST(ParserAnnexA053, InitVal_1Bx) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-// init_val = 1'BX (uppercase B, uppercase X)
 TEST(ParserAnnexA053, InitVal_1BX) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -239,7 +219,6 @@ TEST(ParserAnnexA053, InitVal_1BX) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-// init_val = bare 0
 TEST(ParserAnnexA053, InitVal_Bare0) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -252,7 +231,6 @@ TEST(ParserAnnexA053, InitVal_Bare0) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '0');
 }
 
-// init_val = bare 1
 TEST(ParserAnnexA053, InitVal_Bare1) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -265,8 +243,6 @@ TEST(ParserAnnexA053, InitVal_Bare1) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
-// §3.7: Sequential UDP with initial statement — timing-accurate modeling
-//        for sequential gate-level circuits.
 TEST(ParserClause03, Cl3_7_SequentialUdp) {
   auto r = Parse(
       "primitive udp_latch (output reg q, input d, en);\n"
@@ -286,7 +262,7 @@ TEST(ParserClause03, Cl3_7_SequentialUdp) {
   EXPECT_TRUE(udp->has_initial);
   EXPECT_EQ(udp->initial_value, '0');
   ASSERT_EQ(udp->table.size(), 3u);
-  // Sequential rows have current_state field
+
   EXPECT_EQ(udp->table[0].current_state, '?');
   EXPECT_EQ(udp->table[0].output, '1');
   EXPECT_EQ(udp->table[2].output, '-');
@@ -309,4 +285,4 @@ TEST(ParserSection29, SequentialUdpInitial) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-}  // namespace
+}

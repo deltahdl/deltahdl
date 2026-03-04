@@ -1,5 +1,3 @@
-// §18.17.5: Interleaving productions—rand join
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// rand join production list
 TEST(ParserA612, RsProductionListRandJoin) {
   auto r = Parse(
       "module m;\n"
@@ -23,7 +20,6 @@ TEST(ParserA612, RsProductionListRandJoin) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// rand join ( expression ) with bias
 TEST(ParserA612, RsProductionListRandJoinWithExpr) {
   auto r = Parse(
       "module m;\n"
@@ -40,4 +36,4 @@ TEST(ParserA612, RsProductionListRandJoinWithExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

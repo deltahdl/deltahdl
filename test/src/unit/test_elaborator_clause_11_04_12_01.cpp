@@ -1,5 +1,3 @@
-// §11.4.12.1: Replication operator
-
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "helpers_eval_op.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § multiple_concatenation (replication)
 TEST(SimA81, ReplicationBasic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -41,11 +38,10 @@ TEST(SimA81, ReplicationFour) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // 2'b10 replicated 4 times = 8'b10101010 = 0xAA
+
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-// § multiple_concatenation with multiple inner elements
 TEST(SimA81, ReplicationMultipleInner) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -60,11 +56,10 @@ TEST(SimA81, ReplicationMultipleInner) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // {A,5} replicated 2 times = A5A5
+
   EXPECT_EQ(var->value.ToUint64(), 0xA5A5u);
 }
 
-// § multiple_concatenation (replication) in continuous assignment
 TEST(ElabA81, ReplicationInContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -78,7 +73,6 @@ TEST(ElabA81, ReplicationInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § replication in initial block elaborates
 TEST(ElabA81, ReplicateInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -92,7 +86,6 @@ TEST(ElabA81, ReplicateInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § constant_multiple_concatenation in parameter
 TEST(ElabA81, ConstantMultipleConcatInParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -104,4 +97,4 @@ TEST(ElabA81, ConstantMultipleConcatInParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

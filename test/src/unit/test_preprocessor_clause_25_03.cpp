@@ -1,16 +1,9 @@
-// §25.3: Interface syntax
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM §3.5 — Interfaces
-// =============================================================================
-// §3.5 LRM example: simple_bus interface definition.
-// Also covers end label (endinterface : simple_bus) and interface port.
 TEST(ParserClause03, Cl3_5_LrmExample) {
   auto r = ParseWithPreprocessor(
       "interface simple_bus(input logic clk);\n"
@@ -29,4 +22,4 @@ TEST(ParserClause03, Cl3_5_LrmExample) {
   EXPECT_GE(r.cu->interfaces[0]->items.size(), 5u);
 }
 
-}  // namespace
+}

@@ -23,13 +23,11 @@ class VpiClause3838Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.38: vpi_release_handle (vpi_free_object deprecated per §C.2.4)
-
 TEST_F(VpiClause3838Test, FreeObjectReturnsZero) {
   auto* mod = vpi_ctx_.CreateModule("tmp", "tmp");
   int result = vpi_free_object(mod);
   EXPECT_EQ(result, 0);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

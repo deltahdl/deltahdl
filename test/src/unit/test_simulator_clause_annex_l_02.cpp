@@ -1,5 +1,3 @@
-// §annex_l.2
-
 #include <gtest/gtest.h>
 
 #include "simulator/vpi_compatibility.h"
@@ -18,4 +16,4 @@ TEST(VpiCompatL2, VersionChaining2023Implies2012) {
 #endif
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §11.4.11: Conditional operator
-
 #include "fixture_parser.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -31,9 +29,7 @@ TEST(Eval, Ternary) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
 }
-// =========================================================================
-// Section 11.4.11 -- Conditional operator
-// =========================================================================
+
 TEST(ParserSection11, ConditionalTernary) {
   auto r = Parse(
       "module t;\n"
@@ -44,7 +40,4 @@ TEST(ParserSection11, ConditionalTernary) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
-}  // namespace
+}

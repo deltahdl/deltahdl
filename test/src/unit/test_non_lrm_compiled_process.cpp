@@ -1,5 +1,3 @@
-// §non-lrm:compiled_process
-
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
@@ -13,13 +11,10 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// CompiledProcess
-// =============================================================================
 TEST(CompiledSim, ValidCompiledProcess) {
   bool executed = false;
   CompiledProcess proc(1,
-                       [&executed](SimContext& /*ctx*/) { executed = true; });
+                       [&executed](SimContext& ) { executed = true; });
   EXPECT_EQ(proc.Id(), 1u);
   EXPECT_TRUE(proc.IsValid());
 }
@@ -29,9 +24,6 @@ TEST(CompiledSim, InvalidCompiledProcess) {
   EXPECT_FALSE(proc.IsValid());
 }
 
-// =============================================================================
-// ProcessCompiler::IsCompilable
-// =============================================================================
 TEST(CompiledSim, PureCombinationalIsCompilable) {
   Arena arena;
   auto* assign = arena.Create<Stmt>();
@@ -94,4 +86,4 @@ TEST(CompiledSim, CompileReturnsValidForCombinational) {
   EXPECT_EQ(compiled.Id(), 42u);
 }
 
-}  // namespace
+}

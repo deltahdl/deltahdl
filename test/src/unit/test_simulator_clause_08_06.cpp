@@ -1,5 +1,3 @@
-// §8.6: Object methods
-
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -10,11 +8,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// AST helper: make a binary expression.
 static Expr* MkBin(Arena& a, TokenKind op, Expr* l, Expr* r) {
   auto* e = a.Create<Expr>();
   e->kind = ExprKind::kBinary;
@@ -24,20 +17,12 @@ static Expr* MkBin(Arena& a, TokenKind op, Expr* l, Expr* r) {
   return e;
 }
 
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
-
 namespace {
 
-// =============================================================================
-// §8.24: Method calls
-// =============================================================================
 TEST(ClassSim, SimpleMethodCall) {
   SimFixture f;
   auto* type = MakeClassType(f, "Counter", {"count"});
 
-  // Method: function int get_count(); return count; endfunction
   auto* method = f.arena.Create<ModuleItem>();
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "get_count";
@@ -57,7 +42,6 @@ TEST(ClassSim, MethodWithArgs) {
   SimFixture f;
   auto* type = MakeClassType(f, "Adder", {"total"});
 
-  // function void add(input int v); total = total + v; endfunction
   auto* method = f.arena.Create<ModuleItem>();
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "add";
@@ -82,4 +66,4 @@ TEST(ClassSim, MethodNotFound) {
   EXPECT_EQ(resolved, nullptr);
 }
 
-}  // namespace
+}

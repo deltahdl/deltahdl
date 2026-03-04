@@ -1,5 +1,3 @@
-// §10.10: Unpacked array concatenation
-
 #include "builders_ast.h"
 #include "fixture_enum_methods.h"
 #include "fixture_evaluator.h"
@@ -12,7 +10,6 @@ using namespace delta;
 
 namespace {
 
-// § empty_unpacked_array_concatenation elaborates
 TEST(ElabA81, EmptyUnpackedArrayConcatElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -25,4 +22,4 @@ TEST(ElabA81, EmptyUnpackedArrayConcatElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

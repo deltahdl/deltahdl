@@ -1,5 +1,3 @@
-// §9.4.5: Intra-assignment timing controls
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -39,4 +37,4 @@ TEST(TimingControl, RepeatCountNegativeUnsignedExecutes) {
   EXPECT_GT(result, 0u);
 }
 
-}  // namespace
+}

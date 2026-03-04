@@ -1,5 +1,3 @@
-// §29.8: UDP instances
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,18 +7,6 @@
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.5.4 Production #1: udp_instantiation
-// udp_instantiation ::=
-//   udp_identifier [ drive_strength ] [ delay2 ]
-//   udp_instance { , udp_instance } ;
-//
-// A.5.4 Production #2: udp_instance
-// udp_instance ::=
-//   [ name_of_instance ] ( output_terminal , input_terminal
-//                          { , input_terminal } )
-// =============================================================================
-// --- Basic named UDP instance ---
 TEST(ParserA504, UdpInst_BasicNamed) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -41,7 +27,6 @@ TEST(ParserA504, UdpInst_BasicNamed) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 3u);
 }
 
-// --- Unnamed UDP instance ---
 TEST(ParserA504, UdpInst_Unnamed) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -62,7 +47,6 @@ TEST(ParserA504, UdpInst_Unnamed) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 3u);
 }
 
-// --- Drive strength ---
 TEST(ParserA504, UdpInst_DriveStrength) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -101,7 +85,6 @@ TEST(ParserA504, UdpInst_DriveStrengthReversed) {
   EXPECT_NE(insts[0]->drive_strength1, 0);
 }
 
-// --- Delay2 ---
 TEST(ParserA504, UdpInst_DelaySingle) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -142,7 +125,6 @@ TEST(ParserA504, UdpInst_DelayRiseFall) {
   EXPECT_EQ(insts[0]->gate_delay_decay, nullptr);
 }
 
-// --- Drive strength AND delay2 ---
 TEST(ParserA504, UdpInst_StrengthAndDelay) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -163,7 +145,6 @@ TEST(ParserA504, UdpInst_StrengthAndDelay) {
   EXPECT_NE(insts[0]->gate_delay, nullptr);
 }
 
-// --- Multiple instances per statement ---
 TEST(ParserA504, UdpInst_MultipleInstances) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -198,14 +179,13 @@ TEST(ParserA504, UdpInst_MultipleWithStrengthDelay) {
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
   ASSERT_EQ(insts.size(), 2u);
-  // Both share same strength and delay
+
   EXPECT_NE(insts[0]->drive_strength0, 0);
   EXPECT_NE(insts[1]->drive_strength0, 0);
   EXPECT_NE(insts[0]->gate_delay, nullptr);
   EXPECT_NE(insts[1]->gate_delay, nullptr);
 }
 
-// --- Instance arrays ---
 TEST(ParserA504, UdpInst_InstanceArray) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -226,7 +206,6 @@ TEST(ParserA504, UdpInst_InstanceArray) {
   EXPECT_NE(insts[0]->inst_range_right, nullptr);
 }
 
-// --- Multiple input terminals ---
 TEST(ParserA504, UdpInst_SingleInput) {
   auto r = Parse(
       "primitive my_buf(output y, input a);\n"
@@ -263,7 +242,6 @@ TEST(ParserA504, UdpInst_ManyInputs) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 5u);
 }
 
-// --- Attributes ---
 TEST(ParserA504, UdpInst_WithAttributes) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -313,4 +291,4 @@ TEST(ParserSection29, UdpInstance) {
   EXPECT_TRUE(FindModuleInst(r.cu->modules[0]->items, "inv", "u1"));
 }
 
-}  // namespace
+}

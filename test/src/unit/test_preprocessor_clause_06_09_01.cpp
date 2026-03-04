@@ -1,5 +1,3 @@
-// §6.9.1: Specifying vectors
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,11 +5,8 @@
 using namespace delta;
 namespace {
 
-// =========================================================================
-// §6.9: Vector declarations
-// =========================================================================
 TEST(ParserSection6, VectorBigEndian) {
-  // §6.9: Vector [msb:lsb] with msb > lsb (big-endian).
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [31:0] wide;\n"
@@ -26,7 +21,7 @@ TEST(ParserSection6, VectorBigEndian) {
 }
 
 TEST(ParserSection6, VectorLittleEndian) {
-  // §6.9: Vector [lsb:msb] with lsb < msb (little-endian).
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [0:7] le;\n"
@@ -40,11 +35,8 @@ TEST(ParserSection6, VectorLittleEndian) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 7u);
 }
 
-// =========================================================================
-// §6.9: Vector declarations — signed vectors
-// =========================================================================
 TEST(ParserSection6, VectorUnsignedExplicit) {
-  // §6.9: Explicit unsigned qualifier on a vector.
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic unsigned [7:0] uv;\n"
@@ -56,4 +48,4 @@ TEST(ParserSection6, VectorUnsignedExplicit) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-}  // namespace
+}

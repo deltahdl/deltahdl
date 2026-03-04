@@ -1,5 +1,3 @@
-// §23.2.2.3: Rules for determining port kind, data type, and direction
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -15,15 +13,8 @@ TEST(ParserA212, InoutImplicitType) {
   EXPECT_EQ(port.direction, Direction::kInout);
 }
 
-// --- interface_port_declaration ---
-// interface_identifier list_of_interface_identifiers
-// | interface_identifier . modport_identifier list_of_interface_identifiers
-// Note: Interface ports without direction keyword in ANSI port lists are
-// lexically ambiguous with non-ANSI identifier-only port lists. The parser
-// treats identifier-only port lists as non-ANSI; semantic analysis resolves
-// interface types. This tests the non-ANSI parsing path.
 TEST(ParserA212, InterfacePortParsedAsNonAnsi) {
-  // Without direction keyword, interface ports parse as non-ANSI port names.
+
   auto r = Parse("module m(a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -40,7 +31,7 @@ TEST(ParserA212, RefUnpackedDim) {
   EXPECT_EQ(port.direction, Direction::kRef);
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
-// 27. Net as input port.
+
 TEST(ParserSection6, Sec6_5_NetAsInputPort) {
   auto r = Parse(
       "module t(input wire [7:0] data_in);\n"
@@ -57,7 +48,6 @@ TEST(ParserSection6, Sec6_5_NetAsInputPort) {
   EXPECT_EQ(ports[0].data_type.packed_dim_left->int_val, 7u);
 }
 
-// 28. Variable as output port.
 TEST(ParserSection6, Sec6_5_VarAsOutputPort) {
   auto r = Parse(
       "module t(output logic [15:0] result);\n"
@@ -72,7 +62,7 @@ TEST(ParserSection6, Sec6_5_VarAsOutputPort) {
   ASSERT_NE(ports[0].data_type.packed_dim_left, nullptr);
   EXPECT_EQ(ports[0].data_type.packed_dim_left->int_val, 15u);
 }
-// Step 1b: implicit port types (fixes 6.10)
+
 TEST(ParserSection6, ParsePortDecl_ImplicitType) {
   auto r = Parse("module m(input [3:0] a, output [7:0] b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -95,10 +85,7 @@ TEST(ParserSection23, AnsiPortsWithDefaultType) {
   EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
   EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
 }
-// =============================================================================
-// LRM section 6.11 -- Integer types as port declarations
-// =============================================================================
-// 30. Integer types as module port declarations.
+
 TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
   auto r = Parse(
       "module m(input int a, output byte b);\n"
@@ -116,7 +103,6 @@ TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
   EXPECT_EQ(ports[1].name, "b");
 }
 
-// 30b. More integer types as ports: longint and shortint.
 TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
   auto r = Parse(
       "module m(input longint addr, output shortint result);\n"
@@ -131,7 +117,6 @@ TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
   EXPECT_EQ(ports[1].name, "result");
 }
 
-// 30c. Integer type port with packed dimensions.
 TEST(ParserSection6, Sec6_11_LogicPackedDimsAsPort) {
   auto r = Parse(
       "module m(input logic [7:0] data, output logic [15:0] addr);\n"
@@ -148,7 +133,6 @@ TEST(ParserSection6, Sec6_11_LogicPackedDimsAsPort) {
   EXPECT_EQ(ports[1].data_type.packed_dim_left->int_val, 15u);
 }
 
-// integer (4-state) as port declaration.
 TEST(ParserSection6, Sec6_11_IntegerAsPort) {
   auto r = Parse(
       "module m(input integer idx);\n"
@@ -162,14 +146,14 @@ TEST(ParserSection6, Sec6_11_IntegerAsPort) {
 }
 
 TEST(ParserSection6, VarImplicitInPort) {
-  // §6.8: "input var [7:0] data_in;" in port list.
+
   EXPECT_TRUE(
       ParseOk("module t(input var [7:0] data_in);\n"
               "endmodule\n"));
 }
 
 TEST(ParserSection6, ShortrealInPort) {
-  // shortreal as port type (LRM 23.2.2)
+
   EXPECT_TRUE(
       ParseOk("module m (input var shortreal in_val,\n"
               "          output var shortreal out_val);\n"
@@ -177,4 +161,4 @@ TEST(ParserSection6, ShortrealInPort) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

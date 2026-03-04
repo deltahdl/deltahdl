@@ -1,5 +1,3 @@
-// §25.2: Overview
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §3.5: "an interface can also contain processes (i.e., initial or always
-//        procedures) and continuous assignments"
 TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
   auto r = ParseWithPreprocessor(
       "interface ifc;\n"
@@ -27,4 +23,4 @@ TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
 }
 
-}  // namespace
+}

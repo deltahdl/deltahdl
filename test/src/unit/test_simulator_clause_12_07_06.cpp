@@ -1,5 +1,3 @@
-// §12.7.6: The forever-loop
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Simulation tests — A.6.8 Looping statements
-// =============================================================================
-// --- forever ---
-// §12.7.7: forever loop — exits via break
 TEST(SimA608, ForeverBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -36,4 +29,4 @@ TEST(SimA608, ForeverBreak) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-}  // namespace
+}

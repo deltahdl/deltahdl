@@ -1,5 +1,3 @@
-// §31.5: Edge-control specifiers
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,11 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.3 edge_control_specifier
-// =============================================================================
-// edge_control_specifier ::= edge [ edge_descriptor { , edge_descriptor } ]
-// edge_descriptor ::= 01 | 10
 TEST(ParserA70503, EdgeControlSpecifier01_10) {
   auto r = Parse(
       "module m;\n"
@@ -30,7 +23,6 @@ TEST(ParserA70503, EdgeControlSpecifier01_10) {
   EXPECT_EQ(tc->data_edge_descriptors[1].second, '0');
 }
 
-// Single edge descriptor
 TEST(ParserA70503, EdgeControlSpecifierSingle01) {
   auto r = Parse(
       "module m;\n"
@@ -47,7 +39,6 @@ TEST(ParserA70503, EdgeControlSpecifierSingle01) {
   EXPECT_EQ(tc->data_edge_descriptors[0].second, '1');
 }
 
-// edge_descriptor ::= z_or_x zero_or_one (x0, x1)
 TEST(ParserA70503, EdgeControlSpecifierXTransitions) {
   auto r = Parse(
       "module m;\n"
@@ -65,7 +56,6 @@ TEST(ParserA70503, EdgeControlSpecifierXTransitions) {
   EXPECT_EQ(tc->data_edge_descriptors[1].second, '1');
 }
 
-// edge_descriptor ::= z_or_x zero_or_one (z0, z1)
 TEST(ParserA70503, EdgeControlSpecifierZTransitions) {
   auto r = Parse(
       "module m;\n"
@@ -83,7 +73,6 @@ TEST(ParserA70503, EdgeControlSpecifierZTransitions) {
   EXPECT_EQ(tc->ref_edge_descriptors[1].second, '1');
 }
 
-// edge_descriptor ::= zero_or_one z_or_x (0x, 1x)
 TEST(ParserA70503, EdgeControlSpecifierToXTransitions) {
   auto r = Parse(
       "module m;\n"
@@ -101,7 +90,6 @@ TEST(ParserA70503, EdgeControlSpecifierToXTransitions) {
   EXPECT_EQ(tc->data_edge_descriptors[1].second, 'x');
 }
 
-// edge without bracket list — no descriptors stored
 TEST(ParserA70503, EdgeKeywordWithoutBrackets) {
   auto r = Parse(
       "module m;\n"
@@ -116,7 +104,6 @@ TEST(ParserA70503, EdgeKeywordWithoutBrackets) {
   EXPECT_TRUE(tc->data_edge_descriptors.empty());
 }
 
-// edge_control_specifier on ref event
 TEST(ParserA70503, EdgeControlSpecifierOnRefEvent) {
   auto r = Parse(
       "module m;\n"
@@ -133,4 +120,4 @@ TEST(ParserA70503, EdgeControlSpecifierOnRefEvent) {
   EXPECT_EQ(tc->ref_edge_descriptors[0].second, '1');
 }
 
-}  // namespace
+}

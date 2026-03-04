@@ -1,5 +1,3 @@
-// §18.17.4: Repeat production statements
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Repeat production: code block executes N times
 TEST(SimA612, RepeatProduction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,4 +29,4 @@ TEST(SimA612, RepeatProduction) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-}  // namespace
+}

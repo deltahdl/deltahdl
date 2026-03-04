@@ -1,4 +1,3 @@
-
 #include <cstring>
 
 #include "fixture_simulator.h"
@@ -7,9 +6,6 @@
 
 using namespace delta;
 
-// §5.12 Attributes
-
-// §5.12: Attribute on variable declaration (LRM Example 5).
 TEST(SimCh512, AttrOnVarDecl) {
   std::string src =
       "module m;\n"
@@ -24,7 +20,6 @@ TEST(SimCh512, AttrOnVarDecl) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0xAB);
 }
 
-// §5.12: Attribute with explicit value on declaration (LRM Example 5).
 TEST(SimCh512, AttrWithValueOnDecl) {
   std::string src =
       "module m;\n"
@@ -39,7 +34,6 @@ TEST(SimCh512, AttrWithValueOnDecl) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 0xCD);
 }
 
-// §5.12: Multiple attribute specs in one instance.
 TEST(SimCh512, AttrMultipleSpecs) {
   std::string src =
       "module m;\n"
@@ -54,7 +48,6 @@ TEST(SimCh512, AttrMultipleSpecs) {
   EXPECT_EQ(f.ctx.FindVariable("z")->value.ToUint64(), 0xEF);
 }
 
-// §5.12: Multiple separate attribute instances (LRM Example 1 alt).
 TEST(SimCh512, AttrMultipleInstances) {
   std::string src =
       "module m;\n"
@@ -71,7 +64,6 @@ TEST(SimCh512, AttrMultipleInstances) {
   EXPECT_EQ(f.ctx.FindVariable("w")->value.ToUint64(), 0x77);
 }
 
-// §5.12: Attribute on initial block statement.
 TEST(SimCh512, AttrOnInitialBlock) {
   std::string src =
       "module m;\n"
@@ -89,7 +81,6 @@ TEST(SimCh512, AttrOnInitialBlock) {
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0x55);
 }
 
-// §5.12: Attribute on assignment statement inside initial block.
 TEST(SimCh512, AttrOnAssignStmt) {
   std::string src =
       "module m;\n"
@@ -107,7 +98,6 @@ TEST(SimCh512, AttrOnAssignStmt) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xDD);
 }
 
-// §5.12: Attribute on if statement.
 TEST(SimCh512, AttrOnIfStmt) {
   std::string src =
       "module m;\n"
@@ -126,7 +116,6 @@ TEST(SimCh512, AttrOnIfStmt) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0xAA);
 }
 
-// §5.12: Attribute on case statement (LRM Example 1).
 TEST(SimCh512, AttrOnCaseStmt) {
   std::string src =
       "module m;\n"
@@ -149,7 +138,6 @@ TEST(SimCh512, AttrOnCaseStmt) {
   EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 0x22);
 }
 
-// §5.12: Attribute on for loop statement.
 TEST(SimCh512, AttrOnForLoop) {
   std::string src =
       "module m;\n"
@@ -169,7 +157,6 @@ TEST(SimCh512, AttrOnForLoop) {
   EXPECT_EQ(f.ctx.FindVariable("e")->value.ToUint64(), 3);
 }
 
-// §5.12: Attribute with string value (LRM Example 6).
 TEST(SimCh512, AttrWithStringValue) {
   std::string src =
       "module m;\n"

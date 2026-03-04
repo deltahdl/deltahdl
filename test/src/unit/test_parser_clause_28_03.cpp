@@ -1,5 +1,3 @@
-// §28.3: Gate and switch declaration syntax
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -102,9 +100,6 @@ TEST(ParserA301, GateInst_PullupMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
-// =============================================================================
-// Combined: all 7 productions in a single module
-// =============================================================================
 TEST(ParserA304, AllGateAndSwitchTypes) {
   auto r = Parse(
       "module m;\n"
@@ -142,7 +137,6 @@ TEST(ParserA304, AllGateAndSwitchTypes) {
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
 
-  // Verify all 24 gate kinds are present
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos), nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos), nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0),
@@ -177,4 +171,4 @@ TEST(ParserA304, AllGateAndSwitchTypes) {
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRtran), nullptr);
 }
 
-}  // namespace
+}

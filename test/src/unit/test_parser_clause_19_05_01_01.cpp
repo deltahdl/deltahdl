@@ -1,5 +1,3 @@
-// §19.5.1.1: Coverpoint bin with covergroup expressions
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -17,9 +15,6 @@ TEST(ParserA211, BinsOrOptions_WithWithClause) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #29: with_covergroup_expression
-// =============================================================================
 TEST(ParserA211, WithCovergroupExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -42,4 +37,4 @@ TEST(ParserA211, CoverGroup_BinsWithCoverPointRef) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

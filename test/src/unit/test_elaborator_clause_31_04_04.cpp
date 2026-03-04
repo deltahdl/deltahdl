@@ -1,14 +1,9 @@
-// §31.4.4: $width
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 $width_timing_check — threshold argument
-// =============================================================================
 TEST(ElabA70501, WidthWithThresholdElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,4 +17,4 @@ TEST(ElabA70501, WidthWithThresholdElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §20.13: Coverage system functions
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -49,9 +47,6 @@ TEST(SysTask, CoverageSaveReturnsZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// =============================================================================
-// S19.9: $get_coverage system function
-// =============================================================================
 TEST(Coverage, GlobalCoverageSingleGroup) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -65,4 +60,4 @@ TEST(Coverage, GlobalCoverageSingleGroup) {
   EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 100.0);
 }
 
-}  // namespace
+}

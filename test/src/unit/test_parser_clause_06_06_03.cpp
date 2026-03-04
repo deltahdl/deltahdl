@@ -1,5 +1,3 @@
-// §6.6.3: Wired nets
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,7 +5,6 @@
 using namespace delta;
 namespace {
 
-// §6.7.1: Wand net declaration.
 TEST(ParserSection6, Sec6_7_1_WandDecl) {
   auto r = Parse(
       "module t;\n"
@@ -23,7 +20,6 @@ TEST(ParserSection6, Sec6_7_1_WandDecl) {
   EXPECT_EQ(item->name, "w");
 }
 
-// §6.7.1: Wor net declaration.
 TEST(ParserSection6, Sec6_7_1_WorDecl) {
   auto r = Parse(
       "module t;\n"
@@ -39,7 +35,6 @@ TEST(ParserSection6, Sec6_7_1_WorDecl) {
   EXPECT_EQ(item->name, "w");
 }
 
-// §6.7.1: Triand net declaration.
 TEST(ParserSection6, Sec6_7_1_TriandDecl) {
   auto r = Parse(
       "module t;\n"
@@ -54,7 +49,6 @@ TEST(ParserSection6, Sec6_7_1_TriandDecl) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-// §6.7.1: Trior net declaration.
 TEST(ParserSection6, Sec6_7_1_TriorDecl) {
   auto r = Parse(
       "module t;\n"
@@ -69,4 +63,4 @@ TEST(ParserSection6, Sec6_7_1_TriorDecl) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-}  // namespace
+}

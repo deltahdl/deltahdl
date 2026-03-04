@@ -1,5 +1,3 @@
-// §5.7.1: Integer literal constants
-
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "simulator/eval.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § primary — unbased_unsized_literal elaborates
 TEST(ElabA84, PrimaryUnbasedUnsizedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,10 +18,6 @@ TEST(ElabA84, PrimaryUnbasedUnsizedElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// =============================================================================
-// A.8.7 Numbers — Elaboration
-// =============================================================================
-// § number — integral_number elaborates
 TEST(ElabA87, NumberIntegralElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +30,6 @@ TEST(ElabA87, NumberIntegralElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § integral_number — decimal_number (unsized) elaborates
 TEST(ElabA87, DecimalUnsizedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,7 +41,6 @@ TEST(ElabA87, DecimalUnsizedElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § integral_number — binary_number elaborates
 TEST(ElabA87, BinaryNumberElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,7 +53,6 @@ TEST(ElabA87, BinaryNumberElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § integral_number — octal_number elaborates
 TEST(ElabA87, OctalNumberElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -75,7 +65,6 @@ TEST(ElabA87, OctalNumberElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § integral_number — hex_number elaborates
 TEST(ElabA87, HexNumberElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -88,7 +77,6 @@ TEST(ElabA87, HexNumberElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § decimal_number — sized with decimal_base elaborates
 TEST(ElabA87, DecimalSizedBaseElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -101,7 +89,6 @@ TEST(ElabA87, DecimalSizedBaseElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § decimal_number — x_digit elaborates
 TEST(ElabA87, DecimalXDigitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -114,7 +101,6 @@ TEST(ElabA87, DecimalXDigitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § decimal_number — z_digit elaborates
 TEST(ElabA87, DecimalZDigitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -127,7 +113,6 @@ TEST(ElabA87, DecimalZDigitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § signed bases elaborate — 'sd, 'sb, 'so, 'sh
 TEST(ElabA87, SignedDecimalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -176,7 +161,6 @@ TEST(ElabA87, SignedHexElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § unbased_unsized_literal — '0, '1, 'x, 'z elaborate
 TEST(ElabA87, UnbasedUnsizedZeroElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -225,7 +209,6 @@ TEST(ElabA87, UnbasedUnsizedZElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § decimal_number — [size] decimal_base x_digit (all x)
 TEST(SimA87, DecimalXDigitAllBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -240,11 +223,10 @@ TEST(SimA87, DecimalXDigitAllBits) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // x fills all bits — check bval is set (four-state x)
+
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-// § octal_value — with underscores
 TEST(SimA87, OctalValueUnderscores) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -262,7 +244,6 @@ TEST(SimA87, OctalValueUnderscores) {
   EXPECT_EQ(var->value.ToUint64(), 07777u);
 }
 
-// § hex_value — with underscores
 TEST(SimA87, HexValueUnderscores) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -280,7 +261,6 @@ TEST(SimA87, HexValueUnderscores) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-// § unsigned_number — underscored decimal elaborates
 TEST(ElabA87, UnderscoredDecimalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -293,11 +273,8 @@ TEST(ElabA87, UnderscoredDecimalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// 17. Hex digits case insensitive
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, HexDigitsCaseInsensitive) {
-  // §5.7.1: Hex digits a-f are case insensitive.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -320,11 +297,8 @@ TEST(SimCh50701, HexDigitsCaseInsensitive) {
   EXPECT_EQ(va->value.ToUint64(), 0xABCDu);
 }
 
-// ---------------------------------------------------------------------------
-// 18. Underscore in numbers
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, UnderscoreInNumber) {
-  // §5.7.1: Underscores are legal anywhere in a number except as first char.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -351,11 +325,8 @@ TEST(SimCh50701, UnderscoreInNumber) {
   EXPECT_EQ(vc->value.ToUint64(), 0x12ABF001u);
 }
 
-// ---------------------------------------------------------------------------
-// 21. X value in hex literal
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, XValueInHexLiteral) {
-  // §5.7.1: x sets 4 bits to unknown in hex base.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -372,11 +343,8 @@ TEST(SimCh50701, XValueInHexLiteral) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-// ---------------------------------------------------------------------------
-// 22. Z value in hex literal
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, ZValueInHexLiteral) {
-  // §5.7.1: z sets 4 bits to high-impedance in hex base.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -390,17 +358,14 @@ TEST(SimCh50701, ZValueInHexLiteral) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // z encoding: aval=0, bval=1 per bit; left-padded to full width.
+
   uint16_t mask = 0xFFFF;
   EXPECT_EQ(var->value.words[0].aval & mask, 0u);
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-// ---------------------------------------------------------------------------
-// 23. X in binary literal (1 bit)
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, XInBinaryLiteral) {
-  // §5.7.1: x sets 1 bit to unknown in binary base.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -414,7 +379,7 @@ TEST(SimCh50701, XInBinaryLiteral) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // x encoding: aval=1, bval=1 per bit.
+
   EXPECT_EQ(var->value.words[0].aval & 0x7, 0b011u);
   EXPECT_EQ(var->value.words[0].bval & 0x7, 0b001u);
 }
@@ -432,11 +397,8 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
   EXPECT_EQ(va->value.words[0].bval & mask, vb->value.words[0].bval & mask);
 }
 
-// ---------------------------------------------------------------------------
-// 24. Question mark as z alternative
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, QuestionMarkAsZ) {
-  // §5.7.1: ? is an alternative for the z character.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -451,11 +413,8 @@ TEST(SimCh50701, QuestionMarkAsZ) {
   LowerRunAndCompareBitPatterns(f, design, 0xF);
 }
 
-// ---------------------------------------------------------------------------
-// 25. Unbased unsized literal '0 and '1
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, UnbasedUnsizedLiteral01) {
-  // §5.7.1: Unbased unsized literals — all bits set to specified value.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -478,11 +437,8 @@ TEST(SimCh50701, UnbasedUnsizedLiteral01) {
   EXPECT_EQ(vb->value.ToUint64(), 0xFFFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 26. Unbased unsized literal 'x and 'z
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
-  // §5.7.1: Unbased unsized x and z set all bits to x or z.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -501,7 +457,7 @@ TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
   auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
-  // x: aval=1, bval=1; z: aval=0, bval=1. All bits filled.
+
   uint16_t mask = 0xFFFF;
   EXPECT_EQ(va->value.words[0].aval & mask, mask);
   EXPECT_EQ(va->value.words[0].bval & mask, mask);
@@ -509,11 +465,8 @@ TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
   EXPECT_EQ(vb->value.words[0].bval & mask, mask);
 }
 
-// ---------------------------------------------------------------------------
-// 27. Left padding with x when leftmost bit is x
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, LeftPadWithX) {
-  // §5.7.1: Leftmost x causes x-padding to the left.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -527,17 +480,14 @@ TEST(SimCh50701, LeftPadWithX) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // x encoding: aval=1, bval=1 per bit; left-padded to full width.
+
   uint16_t mask = 0xFFF;
   EXPECT_EQ(var->value.words[0].aval & mask, mask);
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-// ---------------------------------------------------------------------------
-// 28. Left padding with z when leftmost bit is z
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, LeftPadWithZ) {
-  // §5.7.1: Leftmost z causes z-padding to the left.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -551,17 +501,14 @@ TEST(SimCh50701, LeftPadWithZ) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // z encoding: aval=0, bval=1 per bit; left-padded to full width.
+
   uint16_t mask = 0xFFF;
   EXPECT_EQ(var->value.words[0].aval & mask, 0u);
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-// ---------------------------------------------------------------------------
-// 30. Signed designator does not affect bit pattern
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, SignedDesignatorBitPattern) {
-  // §5.7.1: The s designator affects interpretation, not the bit pattern.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -578,11 +525,8 @@ TEST(SimCh50701, SignedDesignatorBitPattern) {
   EXPECT_EQ(va->value.words[0].aval & 0xF, 0xFu);
 }
 
-// ---------------------------------------------------------------------------
-// 31. X and z case insensitive in values
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, XZCaseInsensitive) {
-  // §5.7.1: x and z are case insensitive in number values.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -597,11 +541,8 @@ TEST(SimCh50701, XZCaseInsensitive) {
   LowerRunAndCompareBitPatterns(f, design, 0xF);
 }
 
-// ---------------------------------------------------------------------------
-// 32. X in octal literal (sets 3 bits)
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, XInOctalLiteral) {
-  // §5.7.1: x sets 3 bits to unknown in octal base.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -619,11 +560,8 @@ TEST(SimCh50701, XInOctalLiteral) {
   EXPECT_EQ(var->value.words[0].bval & 0x07, 0x07u);
 }
 
-// ---------------------------------------------------------------------------
-// 33. Base format case insensitive
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, BaseFormatCaseInsensitive) {
-  // §5.7.1: Base format letter is case insensitive.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -654,11 +592,8 @@ TEST(SimCh50701, BaseFormatCaseInsensitive) {
   EXPECT_EQ(vd->value.ToUint64(), 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 35. Left padding: known value (0x3x -> yields 03x)
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, LeftPadKnownHex) {
-  // §5.7.1: Known value with x in low nibble — yields 03x.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -672,17 +607,14 @@ TEST(SimCh50701, LeftPadKnownHex) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // x: aval=1, bval=1. Lower nibble = x, middle = 3, upper = 0-pad.
+
   EXPECT_EQ(var->value.words[0].aval & 0xFFF, 0x03Fu);
   EXPECT_EQ(var->value.words[0].bval & 0x00F, 0x00Fu);
   EXPECT_EQ(var->value.words[0].bval & 0xF00, 0x000u);
 }
 
-// ---------------------------------------------------------------------------
-// 36. Decimal single-digit x
-// ---------------------------------------------------------------------------
 TEST(SimCh50701, DecimalSingleDigitX) {
-  // §5.7.1: Decimal literal allows single x/z/? digit only.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -700,7 +632,6 @@ TEST(SimCh50701, DecimalSingleDigitX) {
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-// Shared fixture for advanced expression evaluation tests (§11 phases 22+).
 static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
                               uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -712,7 +643,7 @@ static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
 
 TEST(EvalAdv, SignedBaseLiteralIsSigned) {
   SimFixture f;
-  // §11.3.3: 4'sd3 should produce is_signed=true on the Logic4Vec.
+
   auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
   auto result = EvalExpr(lit, f.ctx, f.arena);
   EXPECT_TRUE(result.is_signed);
@@ -722,7 +653,7 @@ TEST(EvalAdv, SignedBaseLiteralIsSigned) {
 
 TEST(EvalAdv, UnsignedBaseLiteralNotSigned) {
   SimFixture f;
-  // 4'd3 should produce is_signed=false.
+
   auto* lit = MakeSizedLiteral(f.arena, "4'd3", 3);
   auto result = EvalExpr(lit, f.ctx, f.arena);
   EXPECT_FALSE(result.is_signed);
@@ -732,7 +663,7 @@ TEST(EvalAdv, UnsignedBaseLiteralNotSigned) {
 
 TEST(EvalAdv, SignedHexLiteralIsSigned) {
   SimFixture f;
-  // 8'shFF should produce is_signed=true.
+
   auto* lit = MakeSizedLiteral(f.arena, "8'shFF", 0xFF);
   auto result = EvalExpr(lit, f.ctx, f.arena);
   EXPECT_TRUE(result.is_signed);
@@ -740,4 +671,4 @@ TEST(EvalAdv, SignedHexLiteralIsSigned) {
   EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
-}  // namespace
+}

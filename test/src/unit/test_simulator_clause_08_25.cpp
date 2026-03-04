@@ -1,5 +1,3 @@
-// §8.25: Parameterized classes
-
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "parser/ast.h"
@@ -8,27 +6,16 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
-
 namespace {
 
-// =============================================================================
-// §8.25: Parameterized classes (basic cases)
-// =============================================================================
 TEST(ClassSim, ParameterizedClassDifferentWidths) {
   SimFixture f;
 
-  // Simulate Stack#(8) — 8-bit data property.
   auto* type8 = f.arena.Create<ClassTypeInfo>();
   type8->name = "Stack_8";
   type8->properties.push_back({"data", 8, false});
   f.ctx.RegisterClassType("Stack_8", type8);
 
-  // Simulate Stack#(32) — 32-bit data property.
   auto* type32 = f.arena.Create<ClassTypeInfo>();
   type32->name = "Stack_32";
   type32->properties.push_back({"data", 32, false});
@@ -58,4 +45,4 @@ TEST(ClassSim, ParameterizedClassInstantiation) {
   EXPECT_EQ(obj->GetProperty("second", f.arena).ToUint64(), 20u);
 }
 
-}  // namespace
+}

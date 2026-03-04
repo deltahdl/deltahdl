@@ -1,5 +1,3 @@
-// Annex A.9.1: Attributes
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -14,4 +12,4 @@ TEST(ParserA212, LetPortItem_AttributeWithValue) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

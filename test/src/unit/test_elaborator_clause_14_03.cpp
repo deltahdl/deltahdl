@@ -1,5 +1,3 @@
-// §14.3: Clocking block declaration
-
 #include "fixture_elaborator.h"
 #include "fixture_program.h"
 #include "fixture_simulator.h"
@@ -8,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.11 Clocking block — Elaboration
-// =============================================================================
-// Plain clocking block declaration elaborates
 TEST(ElabA611, PlainClockingBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -26,7 +20,6 @@ TEST(ElabA611, PlainClockingBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Clocking block with multiple direction groups elaborates
 TEST(ElabA611, MultipleDirectionGroupsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -42,7 +35,6 @@ TEST(ElabA611, MultipleDirectionGroupsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Clocking block with default skew elaborates
 TEST(ElabA611, DefaultSkewElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -57,7 +49,6 @@ TEST(ElabA611, DefaultSkewElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Multiple clocking blocks in same module elaborate
 TEST(ElabA611, MultipleClockingBlocksElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -74,7 +65,6 @@ TEST(ElabA611, MultipleClockingBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Clocking block with assertion_item_declaration elaborates
 TEST(ElabA611, AssertionItemDeclElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -94,4 +84,4 @@ TEST(ElabA611, AssertionItemDeclElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

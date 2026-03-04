@@ -1,5 +1,3 @@
-// §6.7: Net declarations
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -10,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================
-// §6.7: Net declarations
-// =============================================================
-// --- Charge strength (§6.7, footnote 16) ---
-// §6.7:
 TEST(NetDecl, ChargeStrengthOnlyWithTrireg) {
   NetDeclInfo info;
   info.type = NetType::kTrireg;
@@ -22,9 +15,6 @@ TEST(NetDecl, ChargeStrengthOnlyWithTrireg) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-// --- vectored/scalared (§6.7, footnote 16) ---
-// §6.7: "When the vectored or scalared keyword is used, there shall be
-//  at least one packed dimension."
 TEST(NetDecl, VectoredRequiresPackedDimension) {
   NetDeclInfo info;
   info.is_vectored = true;
@@ -39,4 +29,4 @@ TEST(NetDecl, ScalaredRequiresPackedDimension) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §30.4: Module path declarations
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.2 Multiple path declarations in one specify block
-// =============================================================================
 TEST(ParserA702, MultiplePathDeclarations) {
   auto r = Parse(
       "module m;\n"
@@ -26,10 +21,10 @@ TEST(ParserA702, MultiplePathDeclarations) {
   auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 5u);
-  // All should be path declarations
+
   for (auto* si : spec->specify_items) {
     EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
   }
 }
 
-}  // namespace
+}

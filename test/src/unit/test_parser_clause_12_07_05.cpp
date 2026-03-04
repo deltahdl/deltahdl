@@ -1,5 +1,3 @@
-// §12.7.5: The do...while-loop
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -21,7 +19,7 @@ TEST(Parser, DoWhileStatement) {
   EXPECT_NE(stmt->body, nullptr);
   EXPECT_NE(stmt->condition, nullptr);
 }
-// Do-while with complex condition.
+
 TEST(ParserSection12, DoWhileComplexCondition) {
   auto r = Parse(
       "module t;\n"
@@ -40,7 +38,6 @@ TEST(ParserSection12, DoWhileComplexCondition) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-// --- do statement_or_null while ( expression ) ; ---
 TEST(ParserA608, DoWhileLoop) {
   auto r = Parse(
       "module m;\n"
@@ -99,4 +96,4 @@ TEST(ParserSection12, DoWhileLoopWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

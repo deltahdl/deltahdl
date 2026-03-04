@@ -1,16 +1,9 @@
-// §10.4.2: Nonblocking procedural assignments
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.6.2 Production: nonblocking_assignment
-// nonblocking_assignment ::= variable_lvalue <= [delay_or_event_control]
-// expression
-// =============================================================================
 TEST(ParserA602, NonblockingAssignment_Simple) {
   auto r = Parse(
       "module m;\n"
@@ -26,7 +19,7 @@ TEST(ParserA602, NonblockingAssignment_Simple) {
 }
 
 TEST(ParserA602, NonblockingAssignment_WithIntraDelay) {
-  // Nonblocking with intra-assignment delay
+
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= #5 d; end\n"
@@ -41,7 +34,7 @@ TEST(ParserA602, NonblockingAssignment_WithIntraDelay) {
 }
 
 TEST(ParserA602, NonblockingAssignment_WithIntraEvent) {
-  // Nonblocking with intra-assignment event control
+
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= @(posedge clk) d; end\n"
@@ -92,7 +85,7 @@ TEST(ParserA602, NonblockingAssignment_ParenthesizedIntraDelay) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmt->delay, nullptr);
 }
-// --- 9. Nonblocking to concatenation LHS: {q1, q2} <= {d1, d2} ---
+
 TEST(ParserSection10, Sec10_4_2_ConcatenationLhsRhs) {
   auto r = Parse(
       "module m;\n"
@@ -114,7 +107,6 @@ TEST(ParserSection10, Sec10_4_2_ConcatenationLhsRhs) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-// --- 10. Nonblocking with ternary RHS: q <= sel ? a : b ---
 TEST(ParserSection10, Sec10_4_2_TernaryRhs) {
   auto r = Parse(
       "module m;\n"
@@ -132,7 +124,6 @@ TEST(ParserSection10, Sec10_4_2_TernaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-// --- 11. Nonblocking in begin-end block ---
 TEST(ParserSection10, Sec10_4_2_InBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -150,7 +141,6 @@ TEST(ParserSection10, Sec10_4_2_InBeginEndBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
 }
 
-// --- 12. Nonblocking in if-else branches (mux pattern) ---
 TEST(ParserSection10, Sec10_4_2_IfElseMuxPattern) {
   auto r = Parse(
       "module m;\n"
@@ -172,9 +162,7 @@ TEST(ParserSection10, Sec10_4_2_IfElseMuxPattern) {
   ASSERT_NE(stmt->else_branch, nullptr);
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNonblockingAssign);
 }
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with nonblocking assignments.
-// =============================================================================
+
 TEST(ParserSection9, Sec9_3_1_BlockWithNonblockingAssigns) {
   auto r = Parse(
       "module m;\n"
@@ -194,7 +182,6 @@ TEST(ParserSection9, Sec9_3_1_BlockWithNonblockingAssigns) {
   }
 }
 
-// --- 14. Multiple nonblocking assignments in same block ---
 TEST(ParserSection10, Sec10_4_2_MultipleInSameBlock) {
   auto r = Parse(
       "module m;\n"
@@ -221,7 +208,6 @@ TEST(ParserSection10, Sec10_4_2_MultipleInSameBlock) {
   EXPECT_EQ(s2->lhs->text, "b");
 }
 
-// --- 15. Nonblocking with function call RHS ---
 TEST(ParserSection10, Sec10_4_2_FunctionCallRhs) {
   auto r = Parse(
       "module m;\n"
@@ -239,7 +225,6 @@ TEST(ParserSection10, Sec10_4_2_FunctionCallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-// --- 16. Nonblocking with system call RHS ---
 TEST(ParserSection10, Sec10_4_2_SystemCallRhs) {
   auto r = Parse(
       "module m;\n"
@@ -256,9 +241,7 @@ TEST(ParserSection10, Sec10_4_2_SystemCallRhs) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
-// =============================================================================
-// §4.6: Non-blocking assignment ordering
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_NonblockingAssignOrdering) {
   auto r = Parse(
       "module m;\n"
@@ -276,10 +259,7 @@ TEST(ParserSection4, Sec4_6_NonblockingAssignOrdering) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
-// Returns the first always_* item from the first module.
-// ---------------------------------------------------------------------------
-// 2. Non-blocking assignment in always block (NBA region)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_NonblockingAssignInAlways) {
   auto r = Parse(
       "module m;\n"
@@ -296,7 +276,6 @@ TEST(ParserSection4, Sec4_5_NonblockingAssignInAlways) {
   EXPECT_NE(item->body->rhs, nullptr);
 }
 
-// --- 17. Nonblocking to struct member: s.field <= val ---
 TEST(ParserSection10, Sec10_4_2_StructMemberLhs) {
   auto r = Parse(
       "module m;\n"
@@ -314,7 +293,6 @@ TEST(ParserSection10, Sec10_4_2_StructMemberLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-// --- 18. Nonblocking to array element: mem[idx] <= data ---
 TEST(ParserSection10, Sec10_4_2_ArrayElementLhs) {
   auto r = Parse(
       "module m;\n"
@@ -333,7 +311,6 @@ TEST(ParserSection10, Sec10_4_2_ArrayElementLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-// --- 19. Nonblocking with replication RHS ---
 TEST(ParserSection10, Sec10_4_2_ReplicationRhs) {
   auto r = Parse(
       "module m;\n"
@@ -351,7 +328,6 @@ TEST(ParserSection10, Sec10_4_2_ReplicationRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
 }
 
-// --- 22. Nonblocking mixed with blocking in same module (different blocks) ---
 TEST(ParserSection10, Sec10_4_2_MixedBlockingNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -387,9 +363,6 @@ static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKind(r, ModuleItemKind::kInitialBlock);
 }
 
-// ---------------------------------------------------------------------------
-// 6. Multiple non-blocking assignments in sequence
-// ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_MultipleNonblockingAssigns) {
   auto r = Parse(
       "module m;\n"
@@ -410,7 +383,6 @@ TEST(ParserSection4, Sec4_5_MultipleNonblockingAssigns) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-// --- 25. Nonblocking with complex expression (shift and mask) ---
 TEST(ParserSection10, Sec10_4_2_ComplexExpressionRhs) {
   auto r = Parse(
       "module m;\n"
@@ -427,7 +399,7 @@ TEST(ParserSection10, Sec10_4_2_ComplexExpressionRhs) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
-// --- Bit-select on LHS of nonblocking assignment ---
+
 TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsNonblocking) {
   auto r = Parse(
       "module t;\n"
@@ -444,7 +416,6 @@ TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsNonblocking) {
   EXPECT_EQ(stmt->lhs->index_end, nullptr);
 }
 
-// --- 26. Nonblocking to indexed part-select (q[base +: width]) ---
 TEST(ParserSection10, Sec10_4_2_IndexedPartSelectLhs) {
   auto r = Parse(
       "module m;\n"
@@ -463,7 +434,6 @@ TEST(ParserSection10, Sec10_4_2_IndexedPartSelectLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-// --- 27. Nonblocking in named begin-end block ---
 TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -482,7 +452,6 @@ TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
 }
 
-// --- 28. Pipeline pattern with multiple nonblocking assignments ---
 TEST(ParserSection10, Sec10_4_2_PipelinePattern) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -495,7 +464,6 @@ TEST(ParserSection10, Sec10_4_2_PipelinePattern) {
               "endmodule\n"));
 }
 
-// --- 29. Nonblocking swap pattern ---
 TEST(ParserSection10, Sec10_4_2_SwapPattern) {
   auto r = Parse(
       "module m;\n"
@@ -519,7 +487,6 @@ TEST(ParserSection10, Sec10_4_2_SwapPattern) {
   EXPECT_EQ(s1->rhs->text, "a");
 }
 
-// §10.4.2: nonblocking_assignment ;
 TEST(ParserA604, StmtItemNonblockingAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -533,10 +500,7 @@ TEST(ParserA604, StmtItemNonblockingAssignment) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
-// =============================================================================
-// LRM section 10.4.2 -- Nonblocking procedural assignments
-// =============================================================================
-// --- 1. Simple nonblocking assignment: q <= d ---
+
 TEST(ParserSection10, Sec10_4_2_SimpleNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -558,7 +522,6 @@ TEST(ParserSection10, Sec10_4_2_SimpleNonblocking) {
   EXPECT_EQ(stmt->rhs->text, "d");
 }
 
-// --- 2. Nonblocking with intra-assignment delay: q <= #10 d ---
 TEST(ParserSection10, Sec10_4_2_IntraAssignDelay) {
   auto r = Parse(
       "module m;\n"
@@ -585,7 +548,6 @@ static Stmt* FirstAlwaysStmt(ParseResult& r) {
   return item->body;
 }
 
-// --- 4. Nonblocking in always_ff: always_ff @(posedge clk) q <= d ---
 TEST(ParserSection10, Sec10_4_2_AlwaysFFNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -603,7 +565,6 @@ TEST(ParserSection10, Sec10_4_2_AlwaysFFNonblocking) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-// § variable_lvalue — nonblocking assignment LHS
 TEST(ParserA85, VarLvalueNonblocking) {
   auto r = Parse("module m; logic x; initial x <= 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -615,7 +576,6 @@ TEST(ParserA85, VarLvalueNonblocking) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
 }
 
-// --- 30. Full register file pattern with nonblocking in always_ff ---
 TEST(ParserSection10, Sec10_4_2_RegisterFilePattern) {
   auto r = Parse(
       "module m;\n"
@@ -640,7 +600,6 @@ TEST(ParserSection10, Sec10_4_2_RegisterFilePattern) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
 }
 
-// --- 5. Nonblocking in always @(posedge clk) ---
 TEST(ParserSection10, Sec10_4_2_AlwaysPosedgeNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -660,7 +619,6 @@ TEST(ParserSection10, Sec10_4_2_AlwaysPosedgeNonblocking) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-// --- 6. Nonblocking with binary expression RHS: q <= a + b ---
 TEST(ParserSection10, Sec10_4_2_ExpressionRhs) {
   auto r = Parse(
       "module m;\n"
@@ -678,7 +636,6 @@ TEST(ParserSection10, Sec10_4_2_ExpressionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-// --- 7. Nonblocking to bit-select: q[3] <= 1 ---
 TEST(ParserSection10, Sec10_4_2_BitSelectLhs) {
   auto r = Parse(
       "module m;\n"
@@ -697,7 +654,6 @@ TEST(ParserSection10, Sec10_4_2_BitSelectLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-// --- 8. Nonblocking to part-select: q[7:4] <= 4'hF ---
 TEST(ParserSection10, Sec10_4_2_PartSelectLhs) {
   auto r = Parse(
       "module m;\n"
@@ -715,9 +671,7 @@ TEST(ParserSection10, Sec10_4_2_PartSelectLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
   ASSERT_NE(stmt->rhs, nullptr);
 }
-// =============================================================================
-// §10.4.2 -- Nonblocking procedural assignments
-// =============================================================================
+
 TEST(ParserSection9b, NonblockingAssignSimple) {
   auto r = Parse(
       "module m;\n"
@@ -745,4 +699,4 @@ TEST(ParserSection9b, NonblockingAssignMultiple) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-}  // namespace
+}

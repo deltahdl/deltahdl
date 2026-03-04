@@ -1,10 +1,8 @@
-// §7.10.2.5: Pop_back()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-// --- Test helpers ---
+
 namespace {
 
 TEST(ParserSection7, QueuePopBack) {
@@ -20,4 +18,4 @@ TEST(ParserSection7, QueuePopBack) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}  // namespace
+}

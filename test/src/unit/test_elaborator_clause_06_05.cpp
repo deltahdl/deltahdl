@@ -1,5 +1,3 @@
-// §6.5: for more details.
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §6.5: Variable constraints ---
 TEST(Elaboration, VarRedeclare_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -35,4 +32,4 @@ TEST(Elaboration, VarMixedAssign_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

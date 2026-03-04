@@ -1,5 +1,3 @@
-// §6.19.3: Type checking
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §6.19.3: Enum strict type checking ---
 TEST(Elaboration, EnumStrictTypeCheck_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -25,4 +22,4 @@ TEST(Elaboration, EnumStrictTypeCheck_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

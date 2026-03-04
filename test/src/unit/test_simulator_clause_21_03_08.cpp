@@ -1,5 +1,3 @@
-// §21.3.8: Detecting EOF
-
 #include <cstdio>
 #include <fstream>
 
@@ -44,4 +42,4 @@ TEST(SysTask, FeofAtEnd) {
   std::remove(tmp.c_str());
 }
 
-}  // namespace
+}

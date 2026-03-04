@@ -1,12 +1,9 @@
-// §6.6.4: Trireg net
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// 21. Trireg net declaration.
 TEST(ParserSection6, Sec6_5_TriregDecl) {
   auto r = Parse(
       "module t;\n"
@@ -22,4 +19,4 @@ TEST(ParserSection6, Sec6_5_TriregDecl) {
   EXPECT_EQ(item->name, "cap");
 }
 
-}  // namespace
+}

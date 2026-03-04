@@ -1,16 +1,10 @@
-// §15.4.9: Parameterized mailboxes
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// =============================================================================
-// §15.4 — Parameterized mailbox: mailbox #(type)
-// =============================================================================
 TEST(ParserSection15, MailboxParameterized) {
   auto r = Parse(
       "module m;\n"
@@ -18,13 +12,12 @@ TEST(ParserSection15, MailboxParameterized) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  // Should parse without errors — mailbox #(string) is a parameterized type
+
   auto& items = r.cu->modules[0]->items;
   ASSERT_FALSE(items.empty());
   EXPECT_EQ(items[0]->name, "m_box");
 }
 
-// §15.4.1: parameterized mailbox #(type) with new().
 TEST(ParserSection15, MailboxNewParameterizedString) {
   auto r = Parse(
       "module m;\n"
@@ -38,7 +31,6 @@ TEST(ParserSection15, MailboxNewParameterizedString) {
   ASSERT_FALSE(r.cu->modules[0]->items.empty());
 }
 
-// §15.4.1: parameterized mailbox #(int) with bounded new(5).
 TEST(ParserSection15, MailboxNewParameterizedInt) {
   auto r = Parse(
       "module m;\n"
@@ -63,4 +55,4 @@ TEST(ParserAnnexG, AnnexGMailboxUsage) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

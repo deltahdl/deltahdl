@@ -1,5 +1,3 @@
-// §7.8.2: String index
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -18,4 +16,4 @@ TEST(ParserA25, AssocDimElaboratesStringIndex) {
   EXPECT_TRUE(mod->variables[0].is_string_index);
 }
 
-}  // namespace
+}

@@ -1,12 +1,9 @@
-// §5.8: Time literals
-
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- §5.12 Attributes ---
 namespace {
 
 TEST(ParserCh508, TimeLiteral_IntegerNs) {
@@ -20,7 +17,6 @@ TEST(ParserCh508, TimeLiteral_IntegerNs) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-// § primary_literal — time_literal
 TEST(ParserA84, PrimaryLiteralTimeLiteral) {
   auto r = Parse("module m; initial #10ns; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -28,7 +24,7 @@ TEST(ParserA84, PrimaryLiteralTimeLiteral) {
 }
 
 TEST(ParserCh508, TimeLiteral_FixedPointNs) {
-  // 2.1ns -- a time literal with a fixed-point value.
+
   EXPECT_TRUE(ParseOk("module m; initial #2.1ns; endmodule"));
 }
 
@@ -40,10 +36,6 @@ TEST(ParserCh508, TimeLiteral_Us) {
   EXPECT_TRUE(ParseOk("module m; initial #100us; endmodule"));
 }
 
-// =============================================================================
-// A.8.4 Primaries — time_literal and time_unit
-// =============================================================================
-// § time_literal — unsigned_number time_unit (ns)
 TEST(ParserA84, TimeLiteralNs) {
   auto r = Parse("module m; initial #5ns; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -58,28 +50,24 @@ TEST(ParserCh508, TimeLiteral_Fs) {
   EXPECT_TRUE(ParseOk("module m; initial #500fs; endmodule"));
 }
 
-// § time_literal — unsigned_number time_unit (us)
 TEST(ParserA84, TimeLiteralUs) {
   auto r = Parse("module m; initial #1us; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// § time_literal — unsigned_number time_unit (ms)
 TEST(ParserA84, TimeLiteralMs) {
   auto r = Parse("module m; initial #2ms; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// § time_literal — unsigned_number time_unit (s)
 TEST(ParserA84, TimeLiteralS) {
   auto r = Parse("module m; initial #1s; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// Time literal variants in delay: fs, ps, ns, us, ms, s.
 TEST(ParserA223, DelayValueAllTimeLiterals) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -92,29 +80,24 @@ TEST(ParserA223, DelayValueAllTimeLiterals) {
               "endmodule"));
 }
 
-// § time_literal — unsigned_number time_unit (ps)
 TEST(ParserA84, TimeLiteralPs) {
   auto r = Parse("module m; initial #100ps; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// § time_literal — unsigned_number time_unit (fs)
 TEST(ParserA84, TimeLiteralFs) {
   auto r = Parse("module m; initial #50fs; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// § time_literal — fixed_point_number time_unit
 TEST(ParserA84, TimeLiteralFixedPoint) {
   auto r = Parse("module m; initial #1.5ns; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// 54. All six time units are accepted as time literals for timeunit.
-// §3.14.2.2 / §5.8: time literals can use s, ms, us, ns, ps, fs.
 TEST(ParserClause03, Cl3_14_2_2_AllSixUnitsAccepted) {
   EXPECT_EQ(ParseTimescale31402("module m; timeunit 1s; endmodule")
                 .cu->modules[0]
@@ -142,4 +125,4 @@ TEST(ParserClause03, Cl3_14_2_2_AllSixUnitsAccepted) {
             TimeUnit::kFs);
 }
 
-}  // namespace
+}

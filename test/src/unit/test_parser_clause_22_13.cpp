@@ -1,5 +1,3 @@
-// §22.13: `__FILE__ and `__LINE__
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -30,9 +28,6 @@ TEST(ParserSection22, FileDirectiveInStringConcat) {
               "endmodule\n"));
 }
 
-// ============================================================================
-// LRM section 22.13 -- `__FILE__ and `__LINE__
-// ============================================================================
 TEST(ParserSection22, FileDirectiveInDisplay) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -47,4 +42,4 @@ TEST(ParserSection22, LineDirectiveInDisplay) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

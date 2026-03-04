@@ -1,5 +1,3 @@
-// §21.2.1.5: Hierarchical name format
-
 #include <gtest/gtest.h>
 
 #include <cstring>
@@ -19,4 +17,4 @@ TEST(SysTask, FormatModule_m) {
   EXPECT_FALSE(out.empty());
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §8.6: Object methods
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.9 — method_call
-// =============================================================================
-// method_call: method_call_root . method_call_body (no args)
 TEST(ParserA609, MethodCallNoArgs) {
   auto r = Parse(
       "module m;\n"
@@ -25,12 +19,6 @@ TEST(ParserA609, MethodCallNoArgs) {
   EXPECT_EQ(expr->lhs->kind, ExprKind::kMemberAccess);
 }
 
-// =============================================================================
-// A.8.2 Subroutine calls — method_call
-// =============================================================================
-// § method_call ::= method_call_root . method_call_body
-// § method_call_root ::= primary | implicit_class_handle
-// Basic method call on identifier
 TEST(ParserA82, MethodCallBasic) {
   auto r = Parse(
       "module m;\n"
@@ -59,8 +47,6 @@ TEST(Parser, ClassWithMethod) {
   EXPECT_NE(cls->members[0]->method, nullptr);
 }
 
-// class_method ::= { method_qualifier } function_declaration
-//                | { method_qualifier } task_declaration
 TEST(SourceText, ClassMethods) {
   auto r = Parse(
       "class C;\n"
@@ -81,7 +67,6 @@ TEST(SourceText, ClassMethods) {
   EXPECT_TRUE(members[3]->is_virtual);
 }
 
-// 13. Class with methods sharing scope with member variables
 TEST(ParserClause03, Cl3_13_ClassMethodsAndProperties) {
   auto r = Parse(
       "class my_cls;\n"
@@ -107,7 +92,6 @@ TEST(ParserClause03, Cl3_13_ClassMethodsAndProperties) {
   EXPECT_EQ(cls->members[2]->method->name, "reset");
 }
 
-// Returns the first class member of kind kMethod, or nullptr if not found.
 static ClassMember* FindMethodMember(ClassDecl* cls) {
   for (auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kMethod) {
@@ -131,4 +115,4 @@ TEST(ParserSection8, ClassWithTask) {
   EXPECT_EQ(m->method->kind, ModuleItemKind::kTaskDecl);
 }
 
-}  // namespace
+}

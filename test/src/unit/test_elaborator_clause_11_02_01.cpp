@@ -1,5 +1,3 @@
-// §11.2.1: Constant expressions
-
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_expression — ternary in parameter elaborates
 TEST(ElabA83, ConstantTernaryInParamElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -25,4 +22,4 @@ TEST(ConstEval, ScopedUnresolved) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("UNKNOWN", f), scope), std::nullopt);
 }
 
-}  // namespace
+}

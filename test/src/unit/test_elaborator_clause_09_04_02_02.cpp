@@ -1,5 +1,3 @@
-// §9.4.2.2: Implicit event_expression list
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// 1. always @* with simple combinational AND gate: y = a & b.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarSimpleAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -36,9 +31,6 @@ TEST(SimCh9d, AlwaysStarSimpleAnd) {
   EXPECT_EQ(y->value.ToUint64(), 0x30u);
 }
 
-// ---------------------------------------------------------------------------
-// 2. always @* with if-else selects the true branch.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarIfElseTrueBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -67,9 +59,6 @@ TEST(SimCh9d, AlwaysStarIfElseTrueBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xAAu);
 }
 
-// ---------------------------------------------------------------------------
-// 3. always @* with case statement selects the correct arm.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarCaseStatement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -100,9 +89,6 @@ TEST(SimCh9d, AlwaysStarCaseStatement) {
   EXPECT_EQ(y->value.ToUint64(), 0x30u);
 }
 
-// ---------------------------------------------------------------------------
-// 4. always @* sensitivity includes all RHS signals (a, b, c).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarAllRhsSensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -125,13 +111,10 @@ TEST(SimCh9d, AlwaysStarAllRhsSensitive) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // 0x10 + 0x20 + 0x03 = 0x33.
+
   EXPECT_EQ(y->value.ToUint64(), 0x33u);
 }
 
-// ---------------------------------------------------------------------------
-// 5. always @* does NOT include LHS signal 'y' in sensitivity.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarLhsNotSensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -152,13 +135,10 @@ TEST(SimCh9d, AlwaysStarLhsNotSensitive) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // y = 0x09 + 1 = 0x0A. No infinite loop from self-triggering.
+
   EXPECT_EQ(y->value.ToUint64(), 0x0Au);
 }
 
-// ---------------------------------------------------------------------------
-// 6. always @(*) form (with parentheses) is equivalent to @*.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarParenForm) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -183,9 +163,6 @@ TEST(SimCh9d, AlwaysStarParenForm) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 7. always @* with ternary operator: sel ? a : b.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarTernaryOp) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -212,9 +189,6 @@ TEST(SimCh9d, AlwaysStarTernaryOp) {
   EXPECT_EQ(y->value.ToUint64(), 0xADu);
 }
 
-// ---------------------------------------------------------------------------
-// 8. always @* with concatenation -- all parts are sensitive.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarConcatenation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -240,9 +214,6 @@ TEST(SimCh9d, AlwaysStarConcatenation) {
   EXPECT_EQ(y->value.ToUint64(), 0xC3u);
 }
 
-// ---------------------------------------------------------------------------
-// 9. always @* with bit-select -- reading a single bit from a vector.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarBitSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -271,9 +242,6 @@ TEST(SimCh9d, AlwaysStarBitSelect) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 10. always @* with part-select -- extracting a sub-range from a vector.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarPartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -299,13 +267,10 @@ TEST(SimCh9d, AlwaysStarPartSelect) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // data[3:0] of 0xBE = 0xE.
+
   EXPECT_EQ(y->value.ToUint64(), 0xEu);
 }
 
-// ---------------------------------------------------------------------------
-// 11. always @* with function call -- function arguments are sensitive.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -329,13 +294,10 @@ TEST(SimCh9d, AlwaysStarFunctionCall) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // 0x10 + 3 = 0x13.
+
   EXPECT_EQ(y->value.ToUint64(), 0x13u);
 }
 
-// ---------------------------------------------------------------------------
-// 12. always @* with nested expressions -- all leaf signals are sensitive.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarNestedExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -358,13 +320,10 @@ TEST(SimCh9d, AlwaysStarNestedExpr) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // (0xFF & 0x0F) | 0xF0 = 0x0F | 0xF0 = 0xFF.
+
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 13. always @* with multiple statements -- all read signals are sensitive.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarMultipleStmts) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -384,9 +343,6 @@ TEST(SimCh9d, AlwaysStarMultipleStmts) {
   LowerRunAndCheck(f, design, {{"x", 0x11u}, {"y", 0x22u}});
 }
 
-// ---------------------------------------------------------------------------
-// 14. always @* with arithmetic operators (+, -, *, /).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarArithmetic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -408,13 +364,10 @@ TEST(SimCh9d, AlwaysStarArithmetic) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // (10 + 5) * 2 = 30.
+
   EXPECT_EQ(y->value.ToUint64(), 30u);
 }
 
-// ---------------------------------------------------------------------------
-// 15. always @* with bitwise operators (&, |, ^).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarBitwiseOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -437,13 +390,10 @@ TEST(SimCh9d, AlwaysStarBitwiseOps) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // (0xFF & 0xAA) ^ 0x55 = 0xAA ^ 0x55 = 0xFF.
+
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 16. always @* with comparison operators (==, <).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarComparison) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -466,13 +416,10 @@ TEST(SimCh9d, AlwaysStarComparison) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // 0x20 > 0x10 is true = 1.
+
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 17. always @* with logical operators (&&, ||).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarLogicalOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -497,9 +444,6 @@ TEST(SimCh9d, AlwaysStarLogicalOps) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 18. always @* with unary operators (~, !).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarUnaryOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -520,13 +464,10 @@ TEST(SimCh9d, AlwaysStarUnaryOps) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // ~0xA5 = 0x5A in the low 8 bits; mask to declared width.
+
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x5Au);
 }
 
-// ---------------------------------------------------------------------------
-// 19. always @* with multiple outputs computed from same inputs.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarMultipleOutputs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -557,9 +498,6 @@ TEST(SimCh9d, AlwaysStarMultipleOutputs) {
   EXPECT_EQ(diff->value.ToUint64(), 0x20u);
 }
 
-// ---------------------------------------------------------------------------
-// 20. always @* with local variable (not in sensitivity).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarLocalVar) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -588,9 +526,6 @@ TEST(SimCh9d, AlwaysStarLocalVar) {
   EXPECT_EQ(y->value.ToUint64(), 0x33u);
 }
 
-// ---------------------------------------------------------------------------
-// 21. always @* with begin-end block and sequential assignments.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -621,9 +556,6 @@ TEST(SimCh9d, AlwaysStarBeginEnd) {
   EXPECT_EQ(y->value.ToUint64(), 0x05u);
 }
 
-// ---------------------------------------------------------------------------
-// 22. always @* with nested if-else (priority encoder using full-signal reads).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarPriorityEncoder) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -650,13 +582,10 @@ TEST(SimCh9d, AlwaysStarPriorityEncoder) {
 
   auto* grant = f.ctx.FindVariable("grant");
   ASSERT_NE(grant, nullptr);
-  // req = 3 >= 2, so grant = 2'b01 = 1.
+
   EXPECT_EQ(grant->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 23. always @* with case decode (address decoder pattern).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarCaseDecode) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -684,13 +613,10 @@ TEST(SimCh9d, AlwaysStarCaseDecode) {
 
   auto* sel = f.ctx.FindVariable("sel");
   ASSERT_NE(sel, nullptr);
-  // addr = 2'b11, so sel = 4'b1000 = 8.
+
   EXPECT_EQ(sel->value.ToUint64(), 8u);
 }
 
-// ---------------------------------------------------------------------------
-// 24. Multiple always @* blocks have independent sensitivity and outputs.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, MultipleAlwaysStarIndependent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -721,9 +647,6 @@ TEST(SimCh9d, MultipleAlwaysStarIndependent) {
   EXPECT_EQ(y->value.ToUint64(), 0xA5u);
 }
 
-// ---------------------------------------------------------------------------
-// 27. Verify correctness of combinational output set via initial block.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarCombOutputFromInitial) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -748,9 +671,6 @@ TEST(SimCh9d, AlwaysStarCombOutputFromInitial) {
   EXPECT_EQ(y->value.ToUint64(), 0x5555u);
 }
 
-// ---------------------------------------------------------------------------
-// 28. Verify .width and .ToUint64() on always @* results (8-bit output).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarResultWidthAndValue8) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -775,9 +695,6 @@ TEST(SimCh9d, AlwaysStarResultWidthAndValue8) {
   EXPECT_EQ(y->value.ToUint64(), 0xABu);
 }
 
-// ---------------------------------------------------------------------------
-// 29. Verify .width and .ToUint64() on always @(*) results (32-bit output).
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarParenResultWidth32) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -802,4 +719,4 @@ TEST(SimCh9d, AlwaysStarParenResultWidth32) {
   EXPECT_EQ(y->value.ToUint64(), 0xDEADBEEFu);
 }
 
-}  // namespace
+}

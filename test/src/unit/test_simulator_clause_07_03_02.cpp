@@ -1,5 +1,3 @@
-// §7.3.2: Tagged unions
-
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
@@ -18,4 +16,4 @@ TEST(TaggedUnion, ChangeTag) {
   EXPECT_EQ(f.ctx.GetVariableTag("u"), "b");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §8.26.2: Extends versus implements
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Class with implements clause.
 TEST(SourceText, ClassWithImplements) {
   auto r = Parse("class C implements I; endclass\n");
   ASSERT_NE(r.cu, nullptr);
@@ -16,7 +13,6 @@ TEST(SourceText, ClassWithImplements) {
   EXPECT_EQ(r.cu->classes[0]->name, "C");
 }
 
-// Class implementing multiple interface classes.
 TEST(ParserSection8, ClassImplementsMultipleInterfaces) {
   EXPECT_TRUE(
       ParseOk("interface class A;\n"
@@ -32,7 +28,7 @@ TEST(ParserSection8, ClassImplementsMultipleInterfaces) {
               "  endfunction\n"
               "endclass\n"));
 }
-// §8.26 — Class implements interface class
+
 TEST(ParserSection8, ClassImplementsInterface) {
   auto r = Parse(
       "interface class PutIf;\n"
@@ -47,7 +43,6 @@ TEST(ParserSection8, ClassImplementsInterface) {
   EXPECT_EQ(r.cu->classes[1]->name, "Fifo");
 }
 
-// §8.26 — Interface class extends multiple interfaces
 TEST(ParserSection8, InterfaceClassExtendsMultiple) {
   auto r = Parse(
       "interface class A;\n"
@@ -65,7 +60,6 @@ TEST(ParserSection8, InterfaceClassExtendsMultiple) {
   EXPECT_EQ(r.cu->classes[2]->base_class, "A");
 }
 
-// §8.26.2 — Extends and implements together
 TEST(ParserSection8, ExtendsAndImplements) {
   auto r = Parse(
       "interface class Iface;\n"
@@ -82,4 +76,4 @@ TEST(ParserSection8, ExtendsAndImplements) {
   EXPECT_EQ(r.cu->classes[2]->base_class, "Base");
 }
 
-}  // namespace
+}

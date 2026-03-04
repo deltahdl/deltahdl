@@ -1,5 +1,3 @@
-// §17.2: Checker declaration
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §17.1 Basic checker declaration
-// =============================================================================
 TEST_F(CheckerParseTest, EmptyChecker) {
   auto* unit = Parse("checker my_check; endchecker");
   ASSERT_EQ(unit->checkers.size(), 1u);
@@ -20,9 +15,6 @@ TEST_F(CheckerParseTest, EmptyChecker) {
   EXPECT_TRUE(unit->checkers[0]->items.empty());
 }
 
-// =============================================================================
-// §17.2 Checker ports
-// =============================================================================
 TEST_F(CheckerParseTest, CheckerWithInputPorts) {
   auto* unit = Parse(R"(
     checker port_check(input logic clk, input logic rst);
@@ -65,9 +57,6 @@ TEST_F(CheckerParseTest, CheckerWithEmptyParenPorts) {
   EXPECT_TRUE(unit->checkers[0]->ports.empty());
 }
 
-// =============================================================================
-// §17.3 Checker body with properties and sequences
-// =============================================================================
 TEST_F(CheckerParseTest, CheckerWithPropertyDecl) {
   auto* unit = Parse(R"(
     checker prop_check(input logic clk, input logic a, input logic b);
@@ -96,9 +85,6 @@ TEST_F(CheckerParseTest, CheckerWithSequenceDecl) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kSequenceDecl));
 }
 
-// =============================================================================
-// §17.8 Checker coexists with module and program
-// =============================================================================
 TEST_F(CheckerParseTest, CheckerCoexistsWithModuleAndProgram) {
   auto* unit = Parse(R"(
     module m; endmodule
@@ -110,9 +96,6 @@ TEST_F(CheckerParseTest, CheckerCoexistsWithModuleAndProgram) {
   EXPECT_EQ(unit->checkers.size(), 1u);
 }
 
-// =============================================================================
-// §17.9 Checker with assert property
-// =============================================================================
 TEST_F(CheckerParseTest, CheckerWithAssertProperty) {
   auto* unit = Parse(R"(
     checker assert_check(input logic clk, input logic a, input logic b);
@@ -124,9 +107,6 @@ TEST_F(CheckerParseTest, CheckerWithAssertProperty) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kAssertProperty));
 }
 
-// =============================================================================
-// §17.13 Checker with continuous assignment
-// =============================================================================
 TEST_F(CheckerParseTest, CheckerWithContAssign) {
   auto* unit = Parse(R"(
     checker assign_check;
@@ -139,10 +119,6 @@ TEST_F(CheckerParseTest, CheckerWithContAssign) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kContAssign));
 }
 
-// =============================================================================
-// A.1.8 Checker items
-// =============================================================================
-// checker_port_list / checker_port_item / checker_port_direction
 TEST(SourceText, CheckerPortList) {
   auto r = Parse(
       "checker chk(input logic clk, output bit valid);\n"
@@ -160,7 +136,6 @@ TEST(SourceText, CheckerPortList) {
   EXPECT_EQ(chk->ports[1].name, "valid");
 }
 
-// checker_port_item with default value (= property_actual_arg)
 TEST(SourceText, CheckerPortDefaultValue) {
   auto r = Parse(
       "checker chk(input logic clk = 1'b0);\n"
@@ -174,7 +149,6 @@ TEST(SourceText, CheckerPortDefaultValue) {
   EXPECT_NE(r.cu->checkers[0]->ports[0].default_value, nullptr);
 }
 
-// checker_or_generate_item ::= continuous_assign
 TEST(SourceText, CheckerContinuousAssign) {
   auto r = Parse(
       "checker chk;\n"
@@ -187,8 +161,6 @@ TEST(SourceText, CheckerContinuousAssign) {
   EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kContAssign);
 }
 
-// checker_or_generate_item ::= initial_construct | always_construct |
-// final_construct
 TEST(SourceText, CheckerInitialAlwaysFinal) {
   auto r = Parse(
       "checker chk;\n"
@@ -206,7 +178,6 @@ TEST(SourceText, CheckerInitialAlwaysFinal) {
   EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kFinalBlock));
 }
 
-// checker_or_generate_item ::= assertion_item
 TEST(SourceText, CheckerAssertionItem) {
   auto r = Parse(
       "checker chk;\n"
@@ -219,7 +190,6 @@ TEST(SourceText, CheckerAssertionItem) {
   EXPECT_EQ(r.cu->checkers[0]->items[0]->kind, ModuleItemKind::kAssertProperty);
 }
 
-// checker_or_generate_item_declaration ::= checker_declaration (nested)
 TEST(SourceText, CheckerNestedChecker) {
   auto r = Parse(
       "checker outer;\n"
@@ -233,7 +203,6 @@ TEST(SourceText, CheckerNestedChecker) {
   EXPECT_EQ(r.cu->checkers[0]->name, "outer");
 }
 
-// checker_or_generate_item_declaration ::= genvar_declaration
 TEST(SourceText, CheckerGenvarDecl) {
   auto r = Parse(
       "checker chk;\n"
@@ -247,7 +216,6 @@ TEST(SourceText, CheckerGenvarDecl) {
   EXPECT_EQ(r.cu->checkers[0]->items[0]->name, "i");
 }
 
-// checker_generate_item ::= loop | conditional | generate_region | elab task
 TEST(SourceText, CheckerGenerateItems) {
   auto r = Parse(
       "checker chk;\n"
@@ -265,7 +233,6 @@ TEST(SourceText, CheckerGenerateItems) {
   EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kElabSystemTask));
 }
 
-// Combined: checker with multiple A.1.8 item types.
 TEST(SourceText, CheckerMultipleItemTypes) {
   auto r = Parse(
       "checker chk(input logic clk, output bit ok);\n"
@@ -296,7 +263,6 @@ TEST(SourceText, CheckerMultipleItemTypes) {
   EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kElabSystemTask));
 }
 
-// description: checker_declaration
 TEST(SourceText, DescriptionChecker) {
   auto r = Parse("checker chk; endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -313,7 +279,6 @@ TEST(ParserAnnexA, A1CheckerDecl) {
   EXPECT_EQ(r.cu->checkers[0]->name, "chk");
 }
 
-// checker_or_generate_item_declaration ::= [rand] data_declaration
 TEST(SourceText, CheckerRandDataDecl) {
   auto r = Parse(
       "checker chk;\n"
@@ -330,9 +295,6 @@ TEST(SourceText, CheckerRandDataDecl) {
   EXPECT_FALSE(r.cu->checkers[0]->items[1]->is_rand);
 }
 
-// =============================================================================
-// §17.10 Checker with function/task declarations
-// =============================================================================
 TEST_F(CheckerParseTest, CheckerWithFunctionDecl) {
   auto* unit = Parse(R"(
     checker func_check;
@@ -346,7 +308,6 @@ TEST_F(CheckerParseTest, CheckerWithFunctionDecl) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
-// checker_or_generate_item_declaration ::= function_declaration
 TEST(SourceText, CheckerFunctionDecl) {
   auto r = Parse(
       "checker chk;\n"
@@ -362,9 +323,6 @@ TEST(SourceText, CheckerFunctionDecl) {
   EXPECT_EQ(r.cu->checkers[0]->items[0]->name, "add");
 }
 
-// =============================================================================
-// §17 Checker declarations
-// =============================================================================
 TEST_F(VerifyParseTest, BasicChecker) {
   auto* unit = Parse(R"(
     checker my_check;
@@ -426,9 +384,6 @@ TEST_F(VerifyParseTest, CheckerCoexistsWithModule) {
   EXPECT_EQ(unit->checkers.size(), 1u);
 }
 
-// =============================================================================
-// §17.3 Checker declarations (additional)
-// =============================================================================
 TEST_F(VerifyParseTest, CheckerWithOutputPort) {
   auto* unit = Parse(R"(
     checker mutex(logic [31:0] sig, event clock, output bit failure);
@@ -471,9 +426,6 @@ TEST_F(VerifyParseTest, CheckerWithAlwaysFF) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-// =============================================================================
-// §17.7.2 Checker with clocking and assume-based randomization
-// =============================================================================
 TEST_F(VerifyParseTest, CheckerWithDefaultClocking) {
   auto* unit = Parse(R"(
     checker clocked_check(bit clk);
@@ -487,4 +439,4 @@ TEST_F(VerifyParseTest, CheckerWithDefaultClocking) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+}

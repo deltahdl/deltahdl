@@ -1,5 +1,3 @@
-// §29.3.1: UDP header
-
 #include "fixture_parser.h"
 #include "simulator/udp_eval.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- udp_declaration: wildcard port form primitive id ( .* ) ---
 TEST(ParserAnnexA051, WildcardPort) {
   auto r = Parse(
       "primitive inv(.*);\n"
@@ -29,7 +26,6 @@ TEST(ParserAnnexA051, WildcardPort) {
   ASSERT_EQ(udp->table.size(), 2u);
 }
 
-// --- udp_nonansi_declaration: non-ANSI with separate port declarations ---
 TEST(ParserAnnexA051, NonAnsiWithPortDecls) {
   auto r = Parse(
       "primitive inv(out, in);\n"
@@ -50,37 +46,6 @@ TEST(ParserAnnexA051, NonAnsiWithPortDecls) {
   EXPECT_EQ(udp->input_names[0], "in");
 }
 
-// =============================================================================
-// A.5.2 -- UDP ports
-//
-// udp_port_list ::=
-//   output_port_identifier , input_port_identifier
-//     { , input_port_identifier }
-//
-// udp_declaration_port_list ::=
-//   udp_output_declaration , udp_input_declaration
-//     { , udp_input_declaration }
-//
-// udp_port_declaration ::=
-//   udp_output_declaration ;
-//   | udp_input_declaration ;
-//   | udp_reg_declaration ;
-//
-// udp_output_declaration ::=
-//   { attribute_instance } output port_identifier
-//   | { attribute_instance } output reg port_identifier
-//       [ = constant_expression ]
-//
-// udp_input_declaration ::=
-//   { attribute_instance } input list_of_udp_port_identifiers
-//
-// udp_reg_declaration ::=
-//   { attribute_instance } reg variable_identifier
-// =============================================================================
-// ---------------------------------------------------------------------------
-// udp_port_list (non-ANSI identifier list)
-// ---------------------------------------------------------------------------
-// Non-ANSI port list with two inputs
 TEST(ParserAnnexA052, NonAnsiPortList_TwoInputs) {
   auto r = Parse(
       "primitive and_gate(out, a, b);\n"
@@ -106,7 +71,6 @@ TEST(ParserAnnexA052, NonAnsiPortList_TwoInputs) {
   ASSERT_EQ(udp->table.size(), 4u);
 }
 
-// Non-ANSI port list with five inputs
 TEST(ParserAnnexA052, NonAnsiPortList_FiveInputs) {
   auto r = Parse(
       "primitive gate5(out, a, b, c, d, e);\n"
@@ -128,4 +92,4 @@ TEST(ParserAnnexA052, NonAnsiPortList_FiveInputs) {
   EXPECT_EQ(udp->input_names[4], "e");
 }
 
-}  // namespace
+}

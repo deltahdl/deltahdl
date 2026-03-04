@@ -1,5 +1,3 @@
-// §7.5.2: Size()
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -13,12 +11,9 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// DynArray
-// =============================================================================
 TEST(AdvSim, DynArrayDefaultEmpty) {
   DynArray arr;
   EXPECT_EQ(arr.Size(), 0u);
 }
 
-}  // namespace
+}

@@ -1,12 +1,9 @@
-// §11.11: Minimum, typical, and maximum delay expressions
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// delay2: mintypmax expression in parenthesized form.
 TEST(ParserA223, Delay2MintypMaxSingleValue) {
   auto r = Parse(
       "module m;\n"
@@ -20,11 +17,6 @@ TEST(ParserA223, Delay2MintypMaxSingleValue) {
   EXPECT_EQ(item->assign_delay->kind, ExprKind::kMinTypMax);
 }
 
-// =============================================================================
-// A.8.3 Expressions — constant_mintypmax_expression
-// =============================================================================
-// § constant_mintypmax_expression ::= constant_expression :
-// constant_expression : constant_expression
 TEST(ParserA83, ConstantMinTypMaxInSpecparam) {
   auto r = Parse(
       "module m;\n"
@@ -36,10 +28,6 @@ TEST(ParserA83, ConstantMinTypMaxInSpecparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.8.3 Expressions — mintypmax_expression
-// =============================================================================
-// § mintypmax_expression ::= expression : expression : expression
 TEST(ParserA83, MinTypMaxInDelay) {
   auto r = Parse(
       "module m;\n"
@@ -50,7 +38,6 @@ TEST(ParserA83, MinTypMaxInDelay) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § mintypmax_expression ::= expression (single form)
 TEST(ParserA83, MinTypMaxSingleExpr) {
   auto r = Parse(
       "module m;\n"
@@ -61,7 +48,6 @@ TEST(ParserA83, MinTypMaxSingleExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § constant_primary — parenthesized constant_mintypmax_expression
 TEST(ParserA84, ConstantPrimaryParenthesized) {
   auto r = Parse("module m; parameter int P = (1 + 2); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -71,9 +57,6 @@ TEST(ParserA84, ConstantPrimaryParenthesized) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kBinary);
 }
 
-// =========================================================================
-// Section 11.7 -- Minimum, typical, and maximum delay expressions
-// =========================================================================
 TEST(ParserSection11, MinTypMaxInGateDelay) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -91,4 +74,4 @@ TEST(ParserSection11, MinTypMaxInSpecparam) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

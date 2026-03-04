@@ -1,5 +1,3 @@
-// §6.6.7: User-defined nettypes
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -18,7 +16,6 @@ static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
 
 namespace {
 
-// §6.6.7: User-defined nettype creates a net with correct width.
 TEST(SimCh6, NettypeCreatesNet) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -30,7 +27,6 @@ TEST(SimCh6, NettypeCreatesNet) {
       f);
   ASSERT_NE(design, nullptr);
 
-  // Check RTLIR: x should be in mod->nets, not mod->variables.
   ASSERT_FALSE(design->top_modules.empty());
   auto* mod = design->top_modules[0];
   bool found_net = false;
@@ -45,7 +41,6 @@ TEST(SimCh6, NettypeCreatesNet) {
   ASSERT_NE(net, nullptr);
 }
 
-// §6.6.7: Nettype with 16-bit type creates correctly-sized net.
 TEST(SimCh6, NettypeWideNet) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -64,4 +59,4 @@ TEST(SimCh6, NettypeWideNet) {
   EXPECT_TRUE(found_net) << "y should be elaborated as a net";
 }
 
-}  // namespace
+}

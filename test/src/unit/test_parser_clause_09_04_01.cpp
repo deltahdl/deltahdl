@@ -1,5 +1,3 @@
-// §9.4.1: Delay control
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,17 +5,13 @@ using namespace delta;
 
 namespace {
 
-// Statement delay: #delay_value in procedural context.
 TEST(ParserA223, DelayValueInStatement) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial #10 $display(\"hello\");\n"
               "endmodule"));
 }
-// =============================================================================
-// LRM section 9.4 -- Procedural timing controls
-// Zero-delay, chained delays, delay expressions.
-// =============================================================================
+
 TEST(ParserSection9c, ZeroDelayControl) {
   auto r = Parse(
       "module m;\n"
@@ -66,9 +60,7 @@ TEST(ParserSection9c, DelayWithExpression) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
 }
-// ---------------------------------------------------------------------------
-// 4. #0 delay control (Inactive region)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_ZeroDelayControl) {
   auto r = Parse(
       "module m;\n"
@@ -86,9 +78,6 @@ TEST(ParserSection4, Sec4_5_ZeroDelayControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 5. #1 delay control with blocking assign
-// ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_UnitDelayControl) {
   auto r = Parse(
       "module m;\n"
@@ -105,9 +94,7 @@ TEST(ParserSection4, Sec4_5_UnitDelayControl) {
   EXPECT_NE(stmt->delay, nullptr);
   EXPECT_NE(stmt->body, nullptr);
 }
-// =============================================================================
-// LRM section 9.4 -- Procedural timing controls (additional coverage)
-// =============================================================================
+
 TEST(ParserSection9, DelayControlReal) {
   auto r = Parse(
       "module m;\n"
@@ -134,9 +121,6 @@ static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKindFromResult(r, ModuleItemKind::kInitialBlock);
 }
 
-// ---------------------------------------------------------------------------
-// 22. initial block with delays
-// ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_InitialBlockWithDelays) {
   auto r = Parse(
       "module m;\n"
@@ -157,7 +141,6 @@ TEST(ParserSection4, Sec4_5_InitialBlockWithDelays) {
   EXPECT_EQ(init_item->body->stmts[1]->kind, StmtKind::kDelay);
 }
 
-// §9.4: procedural_timing_control_statement (delay)
 TEST(ParserA604, StmtItemProceduralTimingControlDelay) {
   auto r = Parse(
       "module m;\n"
@@ -172,14 +155,6 @@ TEST(ParserA604, StmtItemProceduralTimingControlDelay) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-// =============================================================================
-// A.6.5 Timing control statements
-// =============================================================================
-// ---------------------------------------------------------------------------
-// procedural_timing_control_statement ::=
-//   procedural_timing_control statement_or_null
-// ---------------------------------------------------------------------------
-// §9.4: delay control followed by statement
 TEST(ParserA605, ProceduralTimingControlDelay) {
   auto r = Parse(
       "module m;\n"
@@ -197,7 +172,6 @@ TEST(ParserA605, ProceduralTimingControlDelay) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlockingAssign);
 }
 
-// §9.4: delay control followed by null statement
 TEST(ParserA605, ProceduralTimingControlDelayNull) {
   auto r = Parse(
       "module m;\n"
@@ -214,10 +188,6 @@ TEST(ParserA605, ProceduralTimingControlDelayNull) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
 }
 
-// ---------------------------------------------------------------------------
-// delay_control ::= # delay_value | # ( mintypmax_expression )
-// ---------------------------------------------------------------------------
-// §9.4.1: simple numeric delay
 TEST(ParserA605, DelayControlNumeric) {
   auto r = Parse(
       "module m;\n"
@@ -233,7 +203,6 @@ TEST(ParserA605, DelayControlNumeric) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-// §9.4.1: identifier-based delay
 TEST(ParserA605, DelayControlIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -250,7 +219,6 @@ TEST(ParserA605, DelayControlIdentifier) {
   EXPECT_EQ(stmt->delay->kind, ExprKind::kIdentifier);
 }
 
-// §9.4.1: parenthesized delay expression
 TEST(ParserA605, DelayControlParenthesized) {
   auto r = Parse(
       "module m;\n"
@@ -266,7 +234,6 @@ TEST(ParserA605, DelayControlParenthesized) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-// §9.4.1/§11.11: parenthesized mintypmax delay
 TEST(ParserA605, DelayControlMintypmax) {
   auto r = Parse(
       "module m;\n"
@@ -283,11 +250,6 @@ TEST(ParserA605, DelayControlMintypmax) {
   EXPECT_EQ(stmt->delay->kind, ExprKind::kMinTypMax);
 }
 
-// ---------------------------------------------------------------------------
-// procedural_timing_control ::=
-//   delay_control | event_control | cycle_delay
-// ---------------------------------------------------------------------------
-// §9.4: procedural_timing_control with delay_control
 TEST(ParserA605, ProceduralTimingControlDelayControl) {
   auto r = Parse(
       "module m;\n"
@@ -302,9 +264,6 @@ TEST(ParserA605, ProceduralTimingControlDelayControl) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with timing controls.
-// =============================================================================
 TEST(ParserSection9, Sec9_3_1_BlockWithDelayControl) {
   auto r = Parse(
       "module m;\n"
@@ -321,9 +280,7 @@ TEST(ParserSection9, Sec9_3_1_BlockWithDelayControl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDelay);
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDelay);
 }
-// =============================================================================
-// LRM section 9.4.1 -- Delay control (#)
-// =============================================================================
+
 TEST(ParserSection9, DelayControl) {
   auto r = Parse(
       "module m;\n"
@@ -339,4 +296,4 @@ TEST(ParserSection9, DelayControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-}  // namespace
+}

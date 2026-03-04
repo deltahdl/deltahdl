@@ -1,15 +1,9 @@
-// Annex A.8.6: Operators
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.6 Operators — binary_module_path_operator
-// =============================================================================
-// § binary_module_path_operator — == in specify path condition
 TEST(ParserA86, BinaryModulePathEq) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -21,7 +15,6 @@ TEST(ParserA86, BinaryModulePathEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § binary_module_path_operator — | in specify path condition
 TEST(ParserA86, BinaryModulePathBitwiseOr) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -33,7 +26,6 @@ TEST(ParserA86, BinaryModulePathBitwiseOr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § binary_module_path_operator — ^ in specify path condition
 TEST(ParserA86, BinaryModulePathXor) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -45,7 +37,6 @@ TEST(ParserA86, BinaryModulePathXor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § binary_module_path_operator — ^~ in specify path condition
 TEST(ParserA86, BinaryModulePathXnor) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -57,4 +48,4 @@ TEST(ParserA86, BinaryModulePathXnor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

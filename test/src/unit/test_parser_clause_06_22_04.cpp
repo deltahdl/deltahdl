@@ -1,5 +1,3 @@
-// §6.22.4: Cast compatible
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -8,11 +6,8 @@ using namespace delta;
 
 namespace {
 
-// =========================================================================
-// §6.22: Cast compatibility
-// =========================================================================
 TEST(ParserSection6, CastCompatibleRealToIntType) {
-  // §6.22.4: real and int are cast compatible.
+
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -21,7 +16,7 @@ TEST(ParserSection6, CastCompatibleRealToIntType) {
 }
 
 TEST(ParserSection6, CastCompatibleEnumToInt) {
-  // §6.22.4: enum and int are cast compatible.
+
   DataType a;
   a.kind = DataTypeKind::kEnum;
   DataType b;
@@ -30,7 +25,7 @@ TEST(ParserSection6, CastCompatibleEnumToInt) {
 }
 
 TEST(ParserSection6, CastCompatibleIntToEnum) {
-  // §6.22.4: integral → enum requires cast (cast compatible).
+
   DataType a;
   a.kind = DataTypeKind::kInt;
   DataType b;
@@ -38,4 +33,4 @@ TEST(ParserSection6, CastCompatibleIntToEnum) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-}  // namespace
+}

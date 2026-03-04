@@ -1,5 +1,3 @@
-// §7.8.4: Integral index
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -64,7 +62,7 @@ TEST(ParserSection7, AssocArrayIntegerIndex_DimExpr) {
   ASSERT_NE(item->unpacked_dims[0], nullptr);
   EXPECT_EQ(item->unpacked_dims[0]->text, "integer");
 }
-// --- Test helpers ---
+
 TEST(ParserSection7, AssociativeArrayIntIndex) {
   auto r = Parse(
       "module t;\n"
@@ -76,4 +74,4 @@ TEST(ParserSection7, AssociativeArrayIntIndex) {
   EXPECT_EQ(item->name, "names");
 }
 
-}  // namespace
+}

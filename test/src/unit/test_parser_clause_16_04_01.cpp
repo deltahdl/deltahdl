@@ -1,16 +1,10 @@
-// §16.4.1: Deferred assertion reporting
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// =============================================================================
-// §16.4.1 Deferred assertion reporting
-// =============================================================================
 TEST(ParserSection16, DeferredAssertHash0PassAndFail) {
   auto r = Parse(
       "module m;\n"
@@ -27,7 +21,6 @@ TEST(ParserSection16, DeferredAssertHash0PassAndFail) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// assert #0 ( expression ) pass else fail ;
 TEST(ParserA610, DeferredAssertHash0ActionBlock) {
   auto r = Parse(
       "module m;\n"
@@ -43,4 +36,4 @@ TEST(ParserA610, DeferredAssertHash0ActionBlock) {
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-}  // namespace
+}

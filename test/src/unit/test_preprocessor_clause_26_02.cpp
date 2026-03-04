@@ -1,5 +1,3 @@
-// §26.2: Package declarations
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,11 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM §3.9 — Packages
-// =============================================================================
-// §3.9: "Packages provide a declaration space, which can be shared by other
-//        building blocks." Package with typedef, functions, and end label.
 TEST(ParserClause03, Cl3_9_PackageDeclarationsAndEndLabel) {
   auto r = ParseWithPreprocessor(
       "package ComplexPkg;\n"
@@ -28,7 +21,6 @@ TEST(ParserClause03, Cl3_9_PackageDeclarationsAndEndLabel) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
-// package_item: timeunits_declaration (footnote 3)
 TEST(SourceText, PackageItemTimeunitsDecl) {
   auto r = ParseWithPreprocessor(
       "package pkg;\n"
@@ -40,4 +32,4 @@ TEST(SourceText, PackageItemTimeunitsDecl) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-}  // namespace
+}

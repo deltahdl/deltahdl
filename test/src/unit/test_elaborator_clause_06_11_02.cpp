@@ -1,5 +1,3 @@
-// §6.11.2: 2-state (two-value) and 4-state (four-value) data types
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// 27. Verify .width and .ToUint64() for 32-bit int.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, VerifyWidthAndToUint64_32bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -34,4 +29,4 @@ TEST(SimCh10, VerifyWidthAndToUint64_32bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §6.19: Enumerations
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- enum_base_type ---
-// integer_atom_type [signing] | integer_vector_type [signing] [packed_dim]
-// | type_identifier [packed_dimension]
 TEST(ParserA221, EnumBaseAtomType) {
   auto r = Parse("module m; enum int {A, B} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -18,18 +13,13 @@ TEST(ParserA221, EnumBaseAtomType) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
 }
 
-// --- enum_name_declaration ---
-// enum_id [ [ integral_number [ : integral_number ] ] ] [ = const_expr ]
 TEST(ParserA221, EnumNameBasic) {
   auto r = Parse("module m; enum {RED, GREEN, BLUE} color; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.enum_members.size(), 3u);
 }
-// =============================================================================
-// Section 8.25 -- Enums
-// =============================================================================
-// Anonymous enum variable declaration with member inspection.
+
 TEST(ParserSection8, EnumAnonymousDeclMembers) {
   auto r = Parse(
       "module m;\n"
@@ -46,7 +36,6 @@ TEST(ParserSection8, EnumAnonymousDeclMembers) {
   EXPECT_EQ(item->data_type.enum_members[2].name, "DONE");
 }
 
-// Enum with explicit base type and value assignments.
 TEST(ParserSection8, EnumExplicitBaseTypeValues) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -67,7 +56,6 @@ TEST(Parser, InlineEnumVar) {
   ASSERT_EQ(item->data_type.enum_members.size(), 2);
 }
 
-// enum [enum_base_type] { ... } {packed_dimension}
 TEST(ParserA221, DataTypeEnum) {
   auto r = Parse("module m; enum logic [1:0] {A, B, C} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -84,7 +72,7 @@ TEST(ParserA221, EnumBaseVectorWithDim) {
 }
 
 TEST(ParserA221, EnumBaseTypeIdentifier) {
-  // enum type_identifier { ... }
+
   auto r = Parse(
       "module m;\n"
       "  typedef logic [3:0] nibble_t;\n"
@@ -94,4 +82,4 @@ TEST(ParserA221, EnumBaseTypeIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

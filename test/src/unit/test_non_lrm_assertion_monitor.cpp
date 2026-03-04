@@ -1,5 +1,3 @@
-// §non-lrm:assertion_monitor
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -20,7 +18,7 @@ TEST(Assertion, CustomCheckFunction) {
   prop.name = "p_custom";
   prop.kind = SvaPropertyKind::kCustom;
   prop.signal_name = "sig";
-  // Custom: current must be greater than previous.
+
   prop.custom_check = [](uint64_t cur, uint64_t prev) { return cur > prev; };
   monitor.AddProperty(prop);
 
@@ -36,4 +34,4 @@ TEST(Assertion, CustomCheckFunction) {
   EXPECT_EQ(r2, AssertionResult::kFail);
 }
 
-}  // namespace
+}

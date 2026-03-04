@@ -1,5 +1,3 @@
-// §21.3: File input/output system tasks and system functions
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -21,4 +19,4 @@ TEST(ParserSection21, FileIOSequence) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

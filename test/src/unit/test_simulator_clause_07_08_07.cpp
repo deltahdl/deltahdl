@@ -1,5 +1,3 @@
-// §7.8.7: Allocating associative array elements
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -13,9 +11,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// AssocArray
-// =============================================================================
 TEST(AdvSim, AssocArrayInsertAndLookup) {
   AssocArray arr;
   arr.Insert("key1", 100);
@@ -25,4 +20,4 @@ TEST(AdvSim, AssocArrayInsertAndLookup) {
   EXPECT_EQ(arr.Lookup("key2"), 200u);
 }
 
-}  // namespace
+}

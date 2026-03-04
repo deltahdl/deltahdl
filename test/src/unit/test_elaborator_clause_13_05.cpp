@@ -1,15 +1,9 @@
-// §13.5: Subroutine calls and argument passing
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.9 Subroutine call statements — Elaboration
-// =============================================================================
-// tf_call: task call elaborates without error
 TEST(ElabA609, TfCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -25,7 +19,6 @@ TEST(ElabA609, TfCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § primary — function call elaborates
 TEST(ElabA84, PrimaryFunctionCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -39,4 +32,4 @@ TEST(ElabA84, PrimaryFunctionCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

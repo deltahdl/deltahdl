@@ -1,5 +1,3 @@
-// §14.3: Clocking block declaration
-
 #include <cstdint>
 
 #include "common/types.h"
@@ -13,10 +11,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Simulation tests — A.6.11 Clocking block
-// =============================================================================
-// --- clocking_declaration: register and find ---
 TEST(SimA611, RegisterClockingBlock) {
   ClockingManager cmgr;
   ClockingBlock block;
@@ -33,7 +27,6 @@ TEST(SimA611, RegisterClockingBlock) {
   EXPECT_EQ(found->clock_edge, Edge::kPosedge);
 }
 
-// --- default_skew: default skew applied to signals ---
 TEST(SimA611, DefaultSkewApplied) {
   ClockingManager cmgr;
   ClockingBlock block;
@@ -53,7 +46,6 @@ TEST(SimA611, DefaultSkewApplied) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "other").ticks, 5u);
 }
 
-// --- clocking_direction: inout signal has both input and output skew ---
 TEST(SimA611, InoutSignalSkew) {
   ClockingManager cmgr;
   ClockingBlock block;
@@ -73,7 +65,6 @@ TEST(SimA611, InoutSignalSkew) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "bidir").ticks, 4u);
 }
 
-// --- multiple clocking blocks ---
 TEST(SimA611, MultipleClockingBlocks) {
   ClockingManager cmgr;
 
@@ -98,12 +89,6 @@ TEST(SimA611, MultipleClockingBlocks) {
   EXPECT_NE(cmgr.Find("cb_slow"), nullptr);
 }
 
-// Helper fixture for clocking simulation tests.
-// Schedule posedge at a given time through the scheduler.
-// Schedule negedge at a given time through the scheduler.
-// =============================================================================
-// 1. Clocking block declaration with clock event (S14.3)
-// =============================================================================
 TEST(ClockingSim, DeclareWithClockEvent) {
   ClockingSimFixture f;
   ClockingManager cmgr;
@@ -122,18 +107,12 @@ TEST(ClockingSim, DeclareWithClockEvent) {
   EXPECT_EQ(found->clock_edge, Edge::kPosedge);
 }
 
-// =============================================================================
-// 16. Negedge clock event
-// =============================================================================
 TEST(ClockingSim, NegedgeClockEvent) {
   ClockingSimFixture f;
   ClockingManager cmgr;
   TestNegedgeSampling(f, cmgr);
 }
 
-// =============================================================================
-// 20. SimContext clocking manager integration
-// =============================================================================
 TEST(ClockingSim, SimContextClockingManagerAccess) {
   ClockingSimFixture f;
   ClockingManager cmgr;
@@ -150,9 +129,6 @@ TEST(ClockingSim, SimContextClockingManagerAccess) {
   EXPECT_EQ(f.ctx.GetClockingManager(), &cmgr);
 }
 
-// =============================================================================
-// ClockingBlock registration
-// =============================================================================
 TEST(Clocking, RegisterAndFind) {
   ClockingManager mgr;
   ClockingBlock block;
@@ -175,9 +151,6 @@ TEST(Clocking, FindNonexistent) {
   EXPECT_EQ(mgr.Find("nonexistent"), nullptr);
 }
 
-// =============================================================================
-// 4. Default clocking skew (S14.5)
-// =============================================================================
 TEST(ClockingSim, DefaultSkewAppliedToAllSignals) {
   ClockingManager cmgr;
   ClockingBlock block;
@@ -203,9 +176,6 @@ TEST(ClockingSim, DefaultSkewAppliedToAllSignals) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "b").ticks, 7u);
 }
 
-// =============================================================================
-// Skew resolution
-// =============================================================================
 TEST(Clocking, DefaultInputSkew) {
   ClockingManager mgr;
   ClockingBlock block;
@@ -215,7 +185,6 @@ TEST(Clocking, DefaultInputSkew) {
   block.default_output_skew = SimTime{10};
   mgr.Register(block);
 
-  // No per-signal skew, should return default.
   auto skew = mgr.GetInputSkew("cb", "data_in");
   EXPECT_EQ(skew.ticks, 5u);
 }
@@ -233,4 +202,4 @@ TEST(Clocking, OutputSkew) {
   EXPECT_EQ(skew.ticks, 3u);
 }
 
-}  // namespace
+}

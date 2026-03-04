@@ -1,5 +1,3 @@
-// Annex A.8.7: Numbers
-
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
 #include "simulator/lowerer.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § integral_number — octal_number
 TEST(SimA87, OctalNumber) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -27,7 +24,6 @@ TEST(SimA87, OctalNumber) {
   EXPECT_EQ(var->value.ToUint64(), 077u);
 }
 
-// § size — 1-bit literal
 TEST(SimA87, Size1Bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -45,7 +41,6 @@ TEST(SimA87, Size1Bit) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § real_number — fixed_point_number simulates
 TEST(SimA87, FixedPointNumber) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -63,7 +58,6 @@ TEST(SimA87, FixedPointNumber) {
   EXPECT_DOUBLE_EQ(ToDouble(var), 2.718);
 }
 
-// § hex_digit — lowercase a-f
 TEST(SimA87, HexDigitLowercase) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -81,7 +75,6 @@ TEST(SimA87, HexDigitLowercase) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDEFu);
 }
 
-// § binary_digit — x in binary
 TEST(SimA87, BinaryXDigit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -96,9 +89,9 @@ TEST(SimA87, BinaryXDigit) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // Bit 1 is x: aval bit 1 and bval bit 1 set
+
   uint64_t bval = var->value.words[0].bval;
   EXPECT_NE(bval & 0x2u, 0u);
 }
 
-}  // namespace
+}

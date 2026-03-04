@@ -1,5 +1,3 @@
-// §16.8: Declaring sequences
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -21,14 +19,6 @@ TEST(ParserA210, AssertionItemDecl_SequenceDecl) {
   EXPECT_EQ(item->name, "s_handshake");
 }
 
-// =============================================================================
-// §A.2.10 Production #21: sequence_declaration
-// sequence_declaration ::=
-//     sequence sequence_identifier [ ( [sequence_port_list] ) ] ;
-//     { assertion_variable_declaration }
-//     sequence_expr [ ; ]
-//     endsequence [ : sequence_identifier ]
-// =============================================================================
 TEST(ParserA210, SequenceDecl_WithEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -66,9 +56,6 @@ TEST(ParserA210, SequenceDecl_SourceLoc) {
   EXPECT_TRUE(item->loc.IsValid());
 }
 
-// =============================================================================
-// §A.2.10 Production #31: sequence_list_of_arguments
-// =============================================================================
 TEST(ParserA210, SequenceListOfArguments_Positional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -77,10 +64,6 @@ TEST(ParserA210, SequenceListOfArguments_Positional) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #32: sequence_actual_arg
-// sequence_actual_arg ::= event_expression | sequence_expr | $
-// =============================================================================
 TEST(ParserA210, SequenceActualArg_Dollar) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -89,7 +72,6 @@ TEST(ParserA210, SequenceActualArg_Dollar) {
               "endmodule\n"));
 }
 
-// sequence_list_of_arguments — named arguments
 TEST(ParserA210, SequenceListOfArguments_Named) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -98,7 +80,6 @@ TEST(ParserA210, SequenceListOfArguments_Named) {
               "endmodule\n"));
 }
 
-// sequence_port_item with default value
 TEST(ParserA210, SequencePortItem_DefaultValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -108,10 +89,6 @@ TEST(ParserA210, SequencePortItem_DefaultValue) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.8 Sequence declarations
-// =============================================================================
 TEST(ParserSection16, SequenceDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -130,9 +107,6 @@ TEST(ParserSection16, SequenceDeclaration) {
   EXPECT_TRUE(found);
 }
 
-// =============================================================================
-// A.6.11 clocking_item — assertion_item_declaration (sequence_declaration)
-// =============================================================================
 TEST(ParserA611, ClockingItemSequenceDecl) {
   auto r = Parse(
       "module m;\n"
@@ -180,4 +154,4 @@ TEST(ParserSection16, SequenceWithFormalArgsDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

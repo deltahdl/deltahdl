@@ -1,5 +1,3 @@
-// §6.3.2.1: Charge strength
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -24,4 +22,4 @@ TEST(NetDecl, ChargeStrengthOnWandIsError) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-}  // namespace
+}

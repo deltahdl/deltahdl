@@ -1,5 +1,3 @@
-// §6.7.3: Initialization of nets with user-defined nettypes
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -12,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §6.7.3: "The resolution function for any net of a user-defined nettype
-//  shall be activated at time zero at least once."
 TEST(NetDecl, UserDefinedResolutionActivatedAtTimeZero) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -33,7 +29,6 @@ TEST(NetDecl, UserDefinedResolutionActivatedAtTimeZero) {
   EXPECT_TRUE(activated);
 }
 
-// §6.7.3:
 TEST(NetDecl, UserDefinedResolutionAtTimeZeroEvenNoDrivers) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -41,7 +36,6 @@ TEST(NetDecl, UserDefinedResolutionAtTimeZeroEvenNoDrivers) {
   Net net;
   net.type = NetType::kWire;
   net.resolved = var;
-  // No drivers added.
 
   bool activated = false;
   UserNettype nt;
@@ -56,9 +50,6 @@ TEST(NetDecl, UserDefinedResolutionAtTimeZeroEvenNoDrivers) {
   EXPECT_TRUE(activated);
 }
 
-// §6.7.3: "The default initialization value for a net with a user-defined
-//  nettype shall be the default value defined by the data type."
-// NOTE: default for logic is x, not z.
 TEST(NetDecl, UserDefinedNettypeDefaultIsDataTypeDefault) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -69,9 +60,8 @@ TEST(NetDecl, UserDefinedNettypeDefaultIsDataTypeDefault) {
 
   UserNettype nt;
   SetUserNettypeInitialValue(net, nt, arena);
-  // logic default is x (aval=1, bval=1 → x in VPI convention... actually
-  // let me just check the bits).
+
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §34.5.2: end
-
 #include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
@@ -30,4 +28,4 @@ TEST_F(ProtectedTest, PragmaProtectEndConsumed) {
   EXPECT_EQ(result.find("pragma"), std::string::npos);
 }
 
-}  // namespace
+}

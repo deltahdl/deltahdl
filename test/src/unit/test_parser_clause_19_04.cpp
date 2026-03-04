@@ -1,5 +1,3 @@
-// §19.4: Using covergroups in classes
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -15,7 +13,7 @@ TEST(ParserA211, CovergroupDecl_InClass) {
               "  endgroup\n"
               "endclass\n"));
 }
-// §8.3 — Covergroup inside class
+
 TEST(ParserSection8, CovergroupInClass) {
   auto r = Parse(
       "class CoveredClass;\n"
@@ -28,4 +26,4 @@ TEST(ParserSection8, CovergroupInClass) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

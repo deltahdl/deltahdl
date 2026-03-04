@@ -1,5 +1,3 @@
-// §5.6: Identifiers, keywords, and system names
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -12,9 +10,8 @@ using namespace delta;
 
 namespace {
 
-// --- §5.6: Identifiers, keywords, and system names ---
 TEST(LexerCh506, IdentifierMaxLengthError) {
-  // §5.6: Limit shall be at least 1024; error if exceeded.
+
   std::string id(1025, 'a');
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -25,7 +22,7 @@ TEST(LexerCh506, IdentifierMaxLengthError) {
 }
 
 TEST(LexerCh506, EscapedIdentifierMaxLengthError) {
-  // §5.6: Length limit applies to escaped identifiers too.
+
   std::string id = "\\" + std::string(1025, 'a') + " ";
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -35,4 +32,4 @@ TEST(LexerCh506, EscapedIdentifierMaxLengthError) {
   EXPECT_TRUE(diag.HasErrors());
 }
 
-}  // namespace
+}

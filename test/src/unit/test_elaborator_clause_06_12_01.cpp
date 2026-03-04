@@ -1,5 +1,3 @@
-// §6.12.1: Conversion
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.12.1: real→int cast rounds to nearest, ties away from zero.
 TEST(SimCh6, CastRealToInt_RoundUp) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,11 +26,10 @@ TEST(SimCh6, CastRealToInt_RoundUp) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // 2.5 rounds to 3 (ties away from zero).
+
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §6.12.1: real→int cast rounds negative half away from zero.
 TEST(SimCh6, CastRealToInt_NegRound) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,12 +50,11 @@ TEST(SimCh6, CastRealToInt_NegRound) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // -1.5 rounds to -2 (ties away from zero). As uint64: 0xFFFFFFFE.
+
   auto neg2_32bit = static_cast<uint32_t>(-2);
   EXPECT_EQ(var->value.ToUint64(), neg2_32bit);
 }
 
-// §6.12.1: real→int cast truncates fractional part toward zero.
 TEST(SimCh6, CastRealToInt_Truncate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -80,8 +75,8 @@ TEST(SimCh6, CastRealToInt_Truncate) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // 2.4 rounds to 2.
+
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

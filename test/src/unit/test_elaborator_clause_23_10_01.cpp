@@ -1,5 +1,3 @@
-// §23.10.1: defparam statement
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- Defparam tests ---
 TEST(Elaboration, Defparam_OverridesDefault) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -59,4 +56,4 @@ TEST(Elaboration, Defparam_NotFoundWarns) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-}  // namespace
+}

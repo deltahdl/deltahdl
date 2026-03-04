@@ -1,5 +1,3 @@
-// §6.16.9: Atoi(), atohex(), atooct(), atobin()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.9: atoi() / atohex() / atooct() / atobin()
-// =============================================================================
 TEST(StringMethods, Atoi) {
   StringFixture f;
   f.CreateStringVar("s", "42");
@@ -43,4 +38,4 @@ TEST(StringMethods, Atobin) {
   EXPECT_EQ(result.ToUint64(), 0b1010u);
 }
 
-}  // namespace
+}

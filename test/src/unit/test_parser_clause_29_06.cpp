@@ -1,5 +1,3 @@
-// §29.6: Edge-sensitive sequential UDPs
-
 #include "fixture_parser.h"
 #include "simulator/udp_eval.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- Sequential UDP edge-sensitive evaluation ---
 TEST(ParserAnnexA051, SimSequentialEdgeSensitive) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -40,11 +37,6 @@ TEST(ParserAnnexA051, SimSequentialEdgeSensitive) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-// ---------------------------------------------------------------------------
-// Production 11: edge_indicator ::= ( level_symbol level_symbol ) |
-//                edge_symbol
-// ---------------------------------------------------------------------------
-// edge_indicator as edge_symbol
 TEST(ParserAnnexA053, EdgeIndicator_EdgeSymbol) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -59,7 +51,6 @@ TEST(ParserAnnexA053, EdgeIndicator_EdgeSymbol) {
   EXPECT_EQ(udp->table[0].inputs[1], 'r');
 }
 
-// Simulation: parenthesized edge (01) behaves as rising edge
 TEST(ParserAnnexA053, EdgeIndicator_SimParen01) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -76,14 +67,14 @@ TEST(ParserAnnexA053, EdgeIndicator_SimParen01) {
   auto* udp = r.cu->udps[0];
   UdpEvalState eval(*udp);
   EXPECT_EQ(eval.GetOutput(), '0');
-  // Rising edge with d=1 -> output=1
+
   eval.SetInputs({'1', '0'});
   EXPECT_EQ(eval.EvaluateWithEdge({'1', '1'}, 1, '0'), '1');
-  // Falling edge -> no change
+
   EXPECT_EQ(eval.EvaluateWithEdge({'1', '0'}, 1, '1'), '1');
-  // Rising edge with d=0 -> output=0
+
   eval.SetInputs({'0', '0'});
   EXPECT_EQ(eval.EvaluateWithEdge({'0', '1'}, 1, '0'), '0');
 }
 
-}  // namespace
+}

@@ -1,15 +1,9 @@
-// §31.4.5: $period
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.3 Elab — controlled_timing_check_event
-// =============================================================================
-// $period with controlled_timing_check_event elaborates
 TEST(ElabA70503, ControlledTimingCheckEventPeriodElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -23,4 +17,4 @@ TEST(ElabA70503, ControlledTimingCheckEventPeriodElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

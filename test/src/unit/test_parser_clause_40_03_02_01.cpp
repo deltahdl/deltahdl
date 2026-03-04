@@ -1,5 +1,3 @@
-// §40.3.2.1: $coverage_control
-
 #include "fixture_program.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §40 Coverage control system functions
-// =============================================================================
 TEST_F(ApiParseTest, CoverageControlSystemCall) {
   auto* unit = Parse(R"(
     module m;
@@ -21,7 +16,7 @@ TEST_F(ApiParseTest, CoverageControlSystemCall) {
 }
 
 TEST(ParserSection40, CoverageControlInAlwaysBlock) {
-  // Coverage control calls within procedural context
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, reset;
@@ -34,4 +29,4 @@ TEST(ParserSection40, CoverageControlInAlwaysBlock) {
   )"));
 }
 
-}  // namespace
+}

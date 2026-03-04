@@ -1,5 +1,3 @@
-// §8.7: Constructors
-
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -10,26 +8,12 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
-
 namespace {
 
-// =============================================================================
-// §8.7: Class constructors with arguments
-// =============================================================================
 TEST(ClassSim, ConstructorMethodRegistered) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"header", "payload"});
 
-  // function new(input int h, input int p);
-  //   header = h; payload = p;
-  // endfunction
   auto* ctor = f.arena.Create<ModuleItem>();
   ctor->kind = ModuleItemKind::kFunctionDecl;
   ctor->name = "new";
@@ -62,7 +46,6 @@ TEST(ClassSim, ConstructorBodyExecutesStatements) {
       MakeAssign(f.arena, "val", MkId(f.arena, "v")));
   type->methods["new"] = ctor;
 
-  // Simulate constructor execution manually.
   auto [handle, obj] = MakeObj(f, type);
   f.ctx.PushThis(obj);
   f.ctx.PushScope();
@@ -72,11 +55,9 @@ TEST(ClassSim, ConstructorBodyExecutesStatements) {
   auto* val_var = f.ctx.CreateLocalVariable("val", 32);
   val_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // Execute: val = v
   auto rhs_val = EvalExpr(MkId(f.arena, "v"), f.ctx, f.arena);
   val_var->value = rhs_val;
 
-  // Writeback to object property.
   obj->SetProperty("val", val_var->value);
   f.ctx.PopScope();
   f.ctx.PopThis();
@@ -84,4 +65,4 @@ TEST(ClassSim, ConstructorBodyExecutesStatements) {
   EXPECT_EQ(obj->GetProperty("val", f.arena).ToUint64(), 77u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §15.4.2: Num()
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -15,9 +13,6 @@
 
 namespace {
 
-// =============================================================================
-// 21. Mailbox: Num reflects current state
-// =============================================================================
 TEST(IpcSync, MailboxNumReflectsState) {
   MailboxObject mb;
   EXPECT_EQ(mb.Num(), 0);
@@ -32,4 +27,4 @@ TEST(IpcSync, MailboxNumReflectsState) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.4.3: Level-sensitive event control
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -24,9 +22,7 @@ TEST(ParserSection9, WaitStatementWithBlock) {
   ASSERT_NE(stmt->body, nullptr);
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
-// ---------------------------------------------------------------------------
-// 15. wait statement for level-sensitive control
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_WaitStatement) {
   auto r = Parse(
       "module m;\n"
@@ -44,10 +40,6 @@ TEST(ParserSection4, Sec4_5_WaitStatement) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §15.5 — Wait on event
-// =============================================================================
 TEST(ParserSection15, WaitOnEvent) {
   auto r = Parse(
       "module m;\n"
@@ -61,9 +53,6 @@ TEST(ParserSection15, WaitOnEvent) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-// =============================================================================
-// §9.4.3 / §9.4.2.4 -- Wait statement
-// =============================================================================
 TEST(ParserSection9b, WaitStatementBasic) {
   auto r = Parse(
       "module m;\n"
@@ -93,7 +82,6 @@ TEST(ParserSection9b, WaitStatementExpression) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-// §9.4.3: wait_statement
 TEST(ParserA604, StmtItemWaitStatement) {
   auto r = Parse(
       "module m;\n"
@@ -108,14 +96,6 @@ TEST(ParserA604, StmtItemWaitStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-// ---------------------------------------------------------------------------
-// wait_statement ::=
-//   wait ( expression ) statement_or_null
-//   | wait fork ;
-//   | wait_order ( hierarchical_identifier { , hierarchical_identifier } )
-//     action_block
-// ---------------------------------------------------------------------------
-// §9.4.3: wait (condition) statement
 TEST(ParserA605, WaitConditionStatement) {
   auto r = Parse(
       "module m;\n"
@@ -132,7 +112,6 @@ TEST(ParserA605, WaitConditionStatement) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// §9.4.3: wait (condition) null statement
 TEST(ParserA605, WaitConditionNull) {
   auto r = Parse(
       "module m;\n"
@@ -176,4 +155,4 @@ TEST(ParserSection9, WaitExprStillWorks) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-}  // namespace
+}

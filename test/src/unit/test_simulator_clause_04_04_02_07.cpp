@@ -10,21 +10,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.4.2.7 Re-Inactive events region
-//
-// Figure 4-1 shows:
-//   region_Reactive    -> region_ReInactive    (forward from Reactive)
-//   region_ReInactive  -> region_Reactive      (feedback -- iteration)
-//   region_ReInactive  -> pli_region_PreReNBA  (forward to PreReNBA PLI)
-//
-// The Re-Inactive region is part of the reactive region set (§4.4.1).
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.4.2.7 Re-Inactive region event execution
-// Basic: events scheduled in the Re-Inactive region are executed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveRegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
@@ -38,19 +23,11 @@ TEST(SimCh4427, ReInactiveRegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.7 Re-Inactive executes after Reactive
-// Re-Inactive events execute only after Reactive events have drained.
-// ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveExecutesAfterReactive) {
   VerifyTwoRegionOrder({Region::kReactive, "reactive"},
                        {Region::kReInactive, "reinactive"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.7 All Reactive events complete before Re-Inactive
-// Multiple Reactive events all complete before any Re-Inactive event starts.
-// ---------------------------------------------------------------------------
 TEST(SimCh4427, AllReactiveEventsCompleteBeforeReInactive) {
   Arena arena;
   Scheduler sched(arena);
@@ -70,15 +47,10 @@ TEST(SimCh4427, AllReactiveEventsCompleteBeforeReInactive) {
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);
-  // All three reactive events come before reinactive.
+
   EXPECT_EQ(order[3], "reinactive");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.7 #0 delay schedules into Re-Inactive
-// Simulating #0: a Reactive callback schedules into Re-Inactive at the
-// same time.
-// ---------------------------------------------------------------------------
 TEST(SimCh4427, ZeroDelaySchedulesIntoReInactive) {
   Arena arena;
   Scheduler sched(arena);
@@ -87,7 +59,7 @@ TEST(SimCh4427, ZeroDelaySchedulesIntoReInactive) {
   auto* reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() {
     order.push_back("reactive");
-    // #0 delay: schedule into Re-Inactive at current time.
+
     auto* delayed = sched.GetEventPool().Acquire();
     delayed->callback = [&order]() { order.push_back("after_zero_delay"); };
     sched.ScheduleEvent({0}, Region::kReInactive, delayed);
@@ -100,25 +72,18 @@ TEST(SimCh4427, ZeroDelaySchedulesIntoReInactive) {
   EXPECT_EQ(order[1], "after_zero_delay");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.7 Re-Inactive-to-Reactive iteration
-// Figure 4-1: region_ReInactive -> region_Reactive (feedback edge).
-// A Re-Inactive callback that schedules a new Reactive event triggers
-// re-iteration of the reactive region set.
-// ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveToReactiveIteration) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Initial Reactive event schedules into Re-Inactive (#0).
   auto* react1 = sched.GetEventPool().Acquire();
   react1->callback = [&]() {
     order.push_back("reactive1");
     auto* reinact = sched.GetEventPool().Acquire();
     reinact->callback = [&]() {
       order.push_back("reinactive");
-      // Re-Inactive schedules new Reactive event -> triggers re-iteration.
+
       auto* react2 = sched.GetEventPool().Acquire();
       react2->callback = [&order]() { order.push_back("reactive2"); };
       sched.ScheduleEvent({0}, Region::kReactive, react2);
@@ -134,17 +99,11 @@ TEST(SimCh4427, ReInactiveToReactiveIteration) {
   EXPECT_EQ(order[2], "reactive2");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.7 Multiple #0 delays: chained zero-delay scheduling.
-// Reactive -> Re-Inactive -> Reactive -> Re-Inactive demonstrates
-// repeated iteration (dual of Active -> Inactive chaining).
-// ---------------------------------------------------------------------------
 TEST(SimCh4427, ChainedZeroDelayIteration) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Inner chain: reactive2 -> reinactive2.
   auto log_reinactive2 = [&order]() { order.push_back("reinactive2"); };
   auto do_reactive2 = [&]() {
     order.push_back("reactive2");
@@ -152,7 +111,7 @@ TEST(SimCh4427, ChainedZeroDelayIteration) {
     reinact2->callback = log_reinactive2;
     sched.ScheduleEvent({0}, Region::kReInactive, reinact2);
   };
-  // Outer chain: reactive1 -> reinactive1 -> (inner chain).
+
   auto do_reinactive1 = [&]() {
     order.push_back("reinactive1");
     auto* react2 = sched.GetEventPool().Acquire();
@@ -175,10 +134,6 @@ TEST(SimCh4427, ChainedZeroDelayIteration) {
   EXPECT_EQ(order, expected);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.7 Re-Inactive is part of the reactive region set (§4.4.1).
-// Its ordinal lies between Reactive and PrePostponed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveIsWithinReactiveRegionSet) {
   auto reinactive_ord = static_cast<int>(Region::kReInactive);
   auto reactive_ord = static_cast<int>(Region::kReactive);
@@ -187,27 +142,15 @@ TEST(SimCh4427, ReInactiveIsWithinReactiveRegionSet) {
   EXPECT_LT(reinactive_ord, pre_postponed_ord);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.7 Figure 4-1: region_ReInactive -> pli_region_PreReNBA.
-// After Re-Inactive drains and no feedback to Reactive, the flow proceeds
-// to PreReNBA/ReNBA.  This test verifies Re-Inactive executes before ReNBA.
-// ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveExecutesBeforeReNBA) {
   VerifyTwoRegionOrder({Region::kReInactive, "reinactive"},
                        {Region::kReNBA, "renba"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.7 Re-Inactive events across multiple time slots.
-// Each time slot has its own Re-Inactive region evaluation.
-// ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kReInactive);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.7 Multiple Re-Inactive events coexist and all execute.
-// ---------------------------------------------------------------------------
 TEST(SimCh4427, ReInactiveRegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);

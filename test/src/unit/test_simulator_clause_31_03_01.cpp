@@ -1,5 +1,3 @@
-// §31.3.1: $setup
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5 Runtime — TimingCheckEntry kind for each system_timing_check type
-// =============================================================================
-// Runtime TimingCheckEntry correctly stores each of the 12 kinds
 TEST(SimA705, RuntimeTimingCheckEntrySetup) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -25,10 +19,6 @@ TEST(SimA705, RuntimeTimingCheckEntrySetup) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].kind, TimingCheckKind::kSetup);
 }
 
-// =============================================================================
-// A.7.5 End-to-end simulation — timing checks do not interfere
-// =============================================================================
-// Module with $setup timing check simulates correctly
 TEST(SimA705, SetupTimingCheckSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -49,7 +39,6 @@ TEST(SimA705, SetupTimingCheckSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// Module with timing checks and path delays simulates correctly
 TEST(SimA705, TimingChecksWithPathsSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -71,4 +60,4 @@ TEST(SimA705, TimingChecksWithPathsSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}  // namespace
+}

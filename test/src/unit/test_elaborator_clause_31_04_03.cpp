@@ -1,14 +1,9 @@
-// §31.4.3: $fullskew
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 $fullskew_timing_check — with flags
-// =============================================================================
 TEST(ElabA70501, FullskewWithFlagsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,4 +17,4 @@ TEST(ElabA70501, FullskewWithFlagsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

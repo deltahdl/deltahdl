@@ -1,5 +1,3 @@
-// §8.8: Typed constructor calls
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- class_new ---
-// [ class_scope ] new [ ( list_of_arguments ) ]
-// | new expression
 TEST(ParserA24, ClassNewNoArgs) {
   auto r = Parse(
       "class C;\n"
@@ -20,7 +15,7 @@ TEST(ParserA24, ClassNewNoArgs) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// §8.8 — Typed constructor with parameterized scope: ClassName#(params)::new
+
 TEST(ParserSection8, ParameterizedClassScopeNew) {
   auto r = Parse(
       "module m;\n"
@@ -39,4 +34,4 @@ TEST(ParserSection8, ParameterizedClassScopeNew) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

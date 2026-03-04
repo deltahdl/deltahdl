@@ -1,5 +1,3 @@
-// §35.7: Exported functions
-
 #include <cstdint>
 #include <vector>
 
@@ -25,9 +23,6 @@ TEST(Dpi, RegisterExport) {
   EXPECT_FALSE(ctx.HasExport("missing"));
 }
 
-// =============================================================================
-// DpiRuntime: export registration and invocation
-// =============================================================================
 TEST(DpiRuntime, RegisterExportAndCall) {
   DpiRuntime rt;
   DpiRtExport exp;
@@ -51,4 +46,4 @@ TEST(DpiRuntime, CallMissingExportReturnsZero) {
   EXPECT_EQ(result.AsInt(), 0);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §18.17.6: Aborting productions—break and return
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Break in code block terminates randsequence
 TEST(SimA612, BreakTerminatesRandsequence) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,4 +30,4 @@ TEST(SimA612, BreakTerminatesRandsequence) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

@@ -1,14 +1,10 @@
-// §15.5.2: Waiting for an event
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// §15.5.2: @ event wait followed by a statement body.
 TEST(ParserSection15, WaitForEventWithBody) {
   auto r = Parse(
       "module m;\n"
@@ -24,7 +20,6 @@ TEST(ParserSection15, WaitForEventWithBody) {
   ASSERT_NE(stmt->body, nullptr);
 }
 
-// §15.5.2: event wait with hierarchical event identifier.
 TEST(ParserSection15, WaitForEventHierarchical) {
   auto r = Parse(
       "module m;\n"
@@ -38,4 +33,4 @@ TEST(ParserSection15, WaitForEventHierarchical) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
-}  // namespace
+}

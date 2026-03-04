@@ -1,5 +1,3 @@
-// §6.24.1: Cast operator
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § primary — cast (int cast)
 TEST(SimA84, PrimaryCast) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -26,4 +23,4 @@ TEST(SimA84, PrimaryCast) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-}  // namespace
+}

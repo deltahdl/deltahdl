@@ -1,5 +1,3 @@
-// §10.3.2: The continuous assignment statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §3.3 Continuous assignments
 TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -63,4 +60,4 @@ TEST(ParserSection10, ContinuousAssignBasic) {
   ASSERT_NE(ca->assign_rhs, nullptr);
 }
 
-}  // namespace
+}

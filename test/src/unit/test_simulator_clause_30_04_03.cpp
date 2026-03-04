@@ -1,5 +1,3 @@
-// §30.4.3: Edge-sensitive paths
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Module with edge-sensitive path simulates correctly
 TEST(SimA702, EdgeSensitivePathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,4 +26,4 @@ TEST(SimA702, EdgeSensitivePathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-}  // namespace
+}

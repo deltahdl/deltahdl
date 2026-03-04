@@ -1,5 +1,3 @@
-// §9.6.3: Disable fork statement
-
 #include <cstdint>
 #include <string_view>
 
@@ -17,17 +15,8 @@
 
 using namespace delta;
 
-// Helper to create a blocking assignment statement: lhs = rhs_val.
-
-// Driver coroutine that co_awaits an ExecTask and stores its result.
-
-// Helper to run ExecStmt synchronously (for non-suspending statements).
-// Creates a wrapper coroutine, resumes it, and returns the result.
 namespace {
 
-// =============================================================================
-// 4. Disable fork (StmtKind::kDisableFork)
-// =============================================================================
 TEST(StmtExec, DisableForkReturnsKDone) {
   StmtFixture f;
   auto* stmt = f.arena.Create<Stmt>();
@@ -37,4 +26,4 @@ TEST(StmtExec, DisableForkReturnsKDone) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-}  // namespace
+}

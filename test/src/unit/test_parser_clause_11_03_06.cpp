@@ -1,14 +1,9 @@
-// §11.3.6: Assignment within an expression
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =========================================================================
-// Compound assignment operators within expressions (parenthesized)
-// =========================================================================
 TEST(ParserSection11, AssignInExprParenthesized) {
   auto r = Parse(
       "module t;\n"
@@ -27,4 +22,4 @@ TEST(ParserSection11, CompoundAssignInExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

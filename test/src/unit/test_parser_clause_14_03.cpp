@@ -1,5 +1,3 @@
-// §14.3: Clocking block declaration
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.11 clocking_direction — output
-// =============================================================================
 TEST(ParserA611, ClockingDirectionOutput) {
   auto r = Parse(
       "module m;\n"
@@ -26,8 +21,6 @@ TEST(ParserA611, ClockingDirectionOutput) {
   EXPECT_EQ(item->clocking_signals[0].name, "ack");
 }
 
-// --- Test helpers ---
-// §14.1 overview: clocking block with multiple direction groups.
 TEST(ParserSection14, OverviewMixedDirectionSignals) {
   auto r = Parse(
       "module m;\n"
@@ -58,9 +51,6 @@ TEST(ParserSection14, OverviewMixedDirectionSignals) {
   }
 }
 
-// =============================================================================
-// A.6.11 clocking_direction — inout
-// =============================================================================
 TEST(ParserA611, ClockingDirectionInout) {
   auto r = Parse(
       "module m;\n"
@@ -77,7 +67,6 @@ TEST(ParserA611, ClockingDirectionInout) {
   EXPECT_EQ(item->clocking_signals[0].name, "bidir");
 }
 
-// §14.1 overview: clocking block with negedge event.
 TEST(ParserSection14, OverviewNegedgeClockEvent) {
   auto r = Parse(
       "module m;\n"
@@ -91,9 +80,6 @@ TEST(ParserSection14, OverviewNegedgeClockEvent) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
 }
 
-// =============================================================================
-// A.6.11 list_of_clocking_decl_assign — single signal
-// =============================================================================
 TEST(ParserA611, ListOfClockingDeclAssignSingle) {
   auto r = Parse(
       "module m;\n"
@@ -108,8 +94,7 @@ TEST(ParserA611, ListOfClockingDeclAssignSingle) {
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
-// Full LRM example: bus clocking block with default skew,
-// hierarchical expression, per-signal overrides, and 1step.
+
 TEST(ParserSection19, FullExample_BusClockingBlock) {
   auto r = Parse(
       "module t;\n"
@@ -123,7 +108,7 @@ TEST(ParserSection19, FullExample_BusClockingBlock) {
   ModuleItem* item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
   EXPECT_EQ(item->name, "bus");
-  // Note: default skew is parsed but not stored in the AST.
+
   ASSERT_EQ(item->clocking_signals.size(), 5u);
 
   EXPECT_EQ(item->clocking_signals[0].name, "data");
@@ -140,9 +125,6 @@ TEST(ParserSection19, FullExample_BusClockingBlock) {
   EXPECT_EQ(item->clocking_signals[4].direction, Direction::kInput);
 }
 
-// =============================================================================
-// A.6.11 list_of_clocking_decl_assign — multiple comma-separated signals
-// =============================================================================
 TEST(ParserA611, ListOfClockingDeclAssignMultiple) {
   auto r = Parse(
       "module m;\n"
@@ -160,9 +142,6 @@ TEST(ParserA611, ListOfClockingDeclAssignMultiple) {
   EXPECT_EQ(item->clocking_signals[2].name, "c");
 }
 
-// =============================================================================
-// A.6.11 clocking_decl_assign — signal_identifier only
-// =============================================================================
 TEST(ParserA611, ClockingDeclAssignBare) {
   auto r = Parse(
       "module m;\n"
@@ -179,7 +158,6 @@ TEST(ParserA611, ClockingDeclAssignBare) {
   EXPECT_EQ(item->clocking_signals[0].hier_expr, nullptr);
 }
 
-// §14.13: inout signals are also sampled as inputs at the clocking event.
 TEST(ParserSection14, InputSamplingInoutSignal) {
   auto r = Parse(
       "module m;\n"
@@ -194,7 +172,6 @@ TEST(ParserSection14, InputSamplingInoutSignal) {
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
-// §14.13: multiple inputs with same skew declaration.
 TEST(ParserSection14, InputSamplingMultipleSignals) {
   auto r = Parse(
       "module m;\n"
@@ -211,10 +188,7 @@ TEST(ParserSection14, InputSamplingMultipleSignals) {
     ASSERT_NE(item->clocking_signals[i].skew_delay, nullptr) << "signal " << i;
   }
 }
-// =============================================================================
-// LRM section 19.4 -- Clocking blocks
-// =============================================================================
-// Basic clocking block with posedge event, input and output signals.
+
 TEST(ParserSection19, ClockingBlock_BasicDecl) {
   auto r = Parse(
       "module t;\n"
@@ -237,9 +211,6 @@ TEST(ParserSection19, ClockingBlock_BasicDecl) {
   EXPECT_EQ(item->clocking_signals[1].name, "b");
 }
 
-// =============================================================================
-// A.6.11 clocking_declaration — multiple direction groups
-// =============================================================================
 TEST(ParserA611, MultipleDirectionGroups) {
   auto r = Parse(
       "module m;\n"
@@ -261,7 +232,6 @@ TEST(ParserA611, MultipleDirectionGroups) {
   EXPECT_EQ(item->clocking_signals[3].direction, Direction::kInout);
 }
 
-// Clocking block with negedge event.
 TEST(ParserSection19, ClockingBlock_NegedgeEvent) {
   auto r = Parse(
       "module t;\n"
@@ -275,7 +245,6 @@ TEST(ParserSection19, ClockingBlock_NegedgeEvent) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
 }
 
-// Clocking block with bare identifier event (no edge).
 TEST(ParserSection19, ClockingBlock_BareIdentifierEvent) {
   auto r = Parse(
       "module t;\n"
@@ -289,7 +258,6 @@ TEST(ParserSection19, ClockingBlock_BareIdentifierEvent) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
 }
 
-// Clocking block with all three signal directions: input, output, inout.
 TEST(ParserSection19, ClockingBlock_AllDirections) {
   auto r = Parse(
       "module t;\n"
@@ -309,7 +277,6 @@ TEST(ParserSection19, ClockingBlock_AllDirections) {
                                        });
 }
 
-// Multiple signals in a single direction group, comma-separated.
 TEST(ParserSection19, ClockingBlock_MultipleSignalsSameDirection) {
   auto r = Parse(
       "module t;\n"
@@ -329,9 +296,6 @@ TEST(ParserSection19, ClockingBlock_MultipleSignalsSameDirection) {
   }
 }
 
-// =============================================================================
-// A.6.11 clocking_item — assertion_item_declaration (property_declaration)
-// =============================================================================
 TEST(ParserA611, ClockingItemPropertyDecl) {
   auto r = Parse(
       "module m;\n"
@@ -349,9 +313,6 @@ TEST(ParserA611, ClockingItemPropertyDecl) {
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 }
 
-// =============================================================================
-// A.6.11 clocking_item — assertion_item_declaration (let_declaration)
-// =============================================================================
 TEST(ParserA611, ClockingItemLetDecl) {
   auto r = Parse(
       "module m;\n"
@@ -366,9 +327,7 @@ TEST(ParserA611, ClockingItemLetDecl) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 }
-// =============================================================================
-// A.6.11 clocking_declaration — plain clocking block
-// =============================================================================
+
 TEST(ParserA611, ClockingDeclPlain) {
   auto r = Parse(
       "module m;\n"
@@ -386,9 +345,6 @@ TEST(ParserA611, ClockingDeclPlain) {
   EXPECT_FALSE(item->is_global_clocking);
 }
 
-// =============================================================================
-// A.6.11 clocking_declaration — end label
-// =============================================================================
 TEST(ParserA611, ClockingDeclEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -403,9 +359,6 @@ TEST(ParserA611, ClockingDeclEndLabel) {
   EXPECT_EQ(item->name, "cb");
 }
 
-// =============================================================================
-// A.6.11 clocking_declaration — clocking_event as @identifier
-// =============================================================================
 TEST(ParserA611, ClockingEventBareIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -421,9 +374,6 @@ TEST(ParserA611, ClockingEventBareIdentifier) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
 }
 
-// =============================================================================
-// A.6.11 clocking_declaration — clocking_event as @(event_expression)
-// =============================================================================
 TEST(ParserA611, ClockingEventParenExpr) {
   auto r = Parse(
       "module m;\n"
@@ -439,9 +389,6 @@ TEST(ParserA611, ClockingEventParenExpr) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
 }
 
-// =============================================================================
-// A.6.11 clocking_item — default default_skew (input)
-// =============================================================================
 TEST(ParserA611, ClockingItemDefaultSkewInput) {
   auto r = Parse(
       "module m;\n"
@@ -458,9 +405,6 @@ TEST(ParserA611, ClockingItemDefaultSkewInput) {
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
-// =============================================================================
-// A.6.11 clocking_item — default default_skew (output)
-// =============================================================================
 TEST(ParserA611, ClockingItemDefaultSkewOutput) {
   auto r = Parse(
       "module m;\n"
@@ -477,9 +421,6 @@ TEST(ParserA611, ClockingItemDefaultSkewOutput) {
   EXPECT_EQ(item->clocking_signals[0].name, "ack");
 }
 
-// =============================================================================
-// A.6.11 clocking_item — default default_skew (input + output)
-// =============================================================================
 TEST(ParserA611, ClockingItemDefaultSkewInputOutput) {
   auto r = Parse(
       "module m;\n"
@@ -495,9 +436,6 @@ TEST(ParserA611, ClockingItemDefaultSkewInputOutput) {
   ASSERT_GE(item->clocking_signals.size(), 1u);
 }
 
-// =============================================================================
-// A.6.11 clocking_direction — input
-// =============================================================================
 TEST(ParserA611, ClockingDirectionInput) {
   auto r = Parse(
       "module m;\n"
@@ -514,7 +452,6 @@ TEST(ParserA611, ClockingDirectionInput) {
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
-// Multiple clocking blocks in the same module (different clocks).
 TEST(ParserSection19, ClockingBlockScope_MultipleBlocks) {
   auto r = Parse(
       "module t;\n"
@@ -536,10 +473,6 @@ TEST(ParserSection19, ClockingBlockScope_MultipleBlocks) {
   EXPECT_EQ(cb2->name, "cd2");
 }
 
-// =============================================================================
-// LRM section 19.6.1.2 -- Default skew
-// =============================================================================
-// Default input and output skews with time-unit literals.
 TEST(ParserSection19, DefaultSkew_InputOutputTimeUnits) {
   auto r = Parse(
       "module t;\n"
@@ -551,11 +484,10 @@ TEST(ParserSection19, DefaultSkew_InputOutputTimeUnits) {
       "endmodule\n");
   ModuleItem* item = nullptr;
   ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  // Note: default skew is parsed but not stored in the AST.
+
   ASSERT_GE(item->clocking_signals.size(), 3u);
 }
 
-// Default input skew only (no output skew specified).
 TEST(ParserSection19, DefaultSkew_InputOnly) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -567,7 +499,6 @@ TEST(ParserSection19, DefaultSkew_InputOnly) {
               "endmodule\n"));
 }
 
-// Default output skew only (no input skew specified).
 TEST(ParserSection19, DefaultSkew_OutputOnly) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -579,7 +510,6 @@ TEST(ParserSection19, DefaultSkew_OutputOnly) {
               "endmodule\n"));
 }
 
-// Default input #1step with output negedge.
 TEST(ParserSection19, DefaultSkew_1StepInputNegedgeOutput) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -591,7 +521,6 @@ TEST(ParserSection19, DefaultSkew_1StepInputNegedgeOutput) {
               "endmodule\n"));
 }
 
-// Default skew with per-signal override: addr overrides input to #1step.
 TEST(ParserSection19, DefaultSkew_PerSignalOverride) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -604,7 +533,6 @@ TEST(ParserSection19, DefaultSkew_PerSignalOverride) {
               "endmodule\n"));
 }
 
-// Default skew on a clocking block with no edge in the event.
 TEST(ParserSection19, DefaultSkew_NoEdgeEvent) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -616,7 +544,6 @@ TEST(ParserSection19, DefaultSkew_NoEdgeEvent) {
               "endmodule\n"));
 }
 
-// Default skew with numeric literals (no time-unit suffix).
 TEST(ParserSection19, DefaultSkew_NumericLiterals) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -628,10 +555,6 @@ TEST(ParserSection19, DefaultSkew_NumericLiterals) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// Additional cross-cutting tests
-// =============================================================================
-// End label on clocking block.
 TEST(ParserSection19, ClockingBlock_EndLabel) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -640,9 +563,7 @@ TEST(ParserSection19, ClockingBlock_EndLabel) {
               "  endclocking : cb\n"
               "endmodule\n"));
 }
-// =============================================================================
-// §14.3 — Basic clocking block declaration
-// =============================================================================
+
 TEST(ParserSection14, BasicClockingBlock) {
   auto r = Parse(
       "module m;\n"
@@ -656,7 +577,6 @@ TEST(ParserSection14, BasicClockingBlock) {
   ASSERT_EQ(item->clocking_event.size(), 1u);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 
-  // Validate properties, event, and signal via loop.
   struct {
     bool ok;
     const char* label;
@@ -674,9 +594,6 @@ TEST(ParserSection14, BasicClockingBlock) {
   }
 }
 
-// =============================================================================
-// §14.3 — Default clocking
-// =============================================================================
 TEST(ParserSection14, DefaultClocking) {
   auto r = Parse(
       "module m;\n"
@@ -708,9 +625,6 @@ TEST(ParserSection14, DefaultClocking) {
   }
 }
 
-// =============================================================================
-// §14.3 — Signal directions: input, output, inout
-// =============================================================================
 TEST(ParserSection14, SignalDirections) {
   auto r = Parse(
       "module m;\n"
@@ -730,9 +644,6 @@ TEST(ParserSection14, SignalDirections) {
                                        });
 }
 
-// =============================================================================
-// §14.3 — Output skew with edge
-// =============================================================================
 TEST(ParserSection14, OutputSkewEdge) {
   auto r = Parse(
       "module m;\n"
@@ -749,9 +660,6 @@ TEST(ParserSection14, OutputSkewEdge) {
   EXPECT_EQ(sig.skew_edge, Edge::kNegedge);
 }
 
-// =============================================================================
-// §14.3 — Multiple signals in one direction group
-// =============================================================================
 TEST(ParserSection14, MultipleSignalsSameDirection) {
   auto r = Parse(
       "module m;\n"
@@ -772,9 +680,6 @@ TEST(ParserSection14, MultipleSignalsSameDirection) {
   }
 }
 
-// =============================================================================
-// §14.3 — Clocking block in module context alongside other items
-// =============================================================================
 TEST(ParserSection14, ClockingBlockAmongOtherItems) {
   auto r = Parse(
       "module m;\n"
@@ -791,13 +696,10 @@ TEST(ParserSection14, ClockingBlockAmongOtherItems) {
   auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "cb");
-  // Also check the other items parsed.
+
   ASSERT_GE(r.cu->modules[0]->items.size(), 4u);
 }
 
-// =============================================================================
-// §14.3 — Unnamed default clocking block
-// =============================================================================
 TEST(ParserSection14, UnnamedDefaultClocking) {
   auto r = Parse(
       "module m;\n"
@@ -812,9 +714,6 @@ TEST(ParserSection14, UnnamedDefaultClocking) {
   EXPECT_TRUE(item->name.empty());
 }
 
-// =============================================================================
-// §14.8 — Multiple clocking blocks
-// =============================================================================
 TEST(ParserSection14, MultipleClockingBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -834,11 +733,6 @@ TEST(ParserSection14, MultipleClockingBlocks) {
   EXPECT_EQ(cb2->name, "cd2");
 }
 
-// =============================================================================
-// LRM section 14.1 -- Clocking block overview
-// =============================================================================
-// §14.1 introduces clocking blocks as grouping clock-synchronous signals.
-// A minimal clocking block with a single input validates the core construct.
 TEST(ParserSection14, OverviewMinimalClockingBlock) {
   auto r = Parse(
       "module m;\n"
@@ -857,4 +751,4 @@ TEST(ParserSection14, OverviewMinimalClockingBlock) {
   EXPECT_EQ(item->clocking_signals[0].name, "addr");
 }
 
-}  // namespace
+}

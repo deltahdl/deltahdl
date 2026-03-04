@@ -1,5 +1,3 @@
-// §30.4.7.1: Unknown polarity
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// ( input => output ) — no polarity (default)
 TEST(ParserA702, ParallelPathNoPolarity) {
   auto r = Parse(
       "module m;\n"
@@ -22,7 +19,6 @@ TEST(ParserA702, ParallelPathNoPolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
 }
 
-// ( inputs *> outputs ) — no polarity (default)
 TEST(ParserA702, FullPathNoPolarity) {
   auto r = Parse(
       "module m;\n"
@@ -38,4 +34,4 @@ TEST(ParserA702, FullPathNoPolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
 }
 
-}  // namespace
+}

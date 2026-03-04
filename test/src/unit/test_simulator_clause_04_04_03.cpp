@@ -10,39 +10,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.4.3 PLI regions
-//
-// Figure 4-1 PLI region edges (DOT GraphViz at ~/Figure_4_1.gv):
-//   region_Preponed    -> pli_region_PreActive        (line 53)
-//   pli_region_PreActive -> region_Active              (line 36)
-//   region_Inactive    -> pli_region_PreNBA            (line 46)
-//   pli_region_PreNBA  -> region_NBA                   (line 38)
-//   pli_region_PreNBA  -> region_Active                (line 37)
-//   region_NBA         -> pli_region_PostNBA           (line 48)
-//   pli_region_PostNBA -> pli_region_PreObserved       (line 29)
-//   pli_region_PostNBA -> region_Active                (line 30)
-//   pli_region_PreObserved -> region_Observed          (line 39)
-//   region_Observed    -> pli_region_PostObserved      (line 50)
-//   pli_region_PostObserved -> region_Reactive         (line 32)
-//   pli_region_PostObserved -> region_Active           (line 31)
-//   region_ReInactive  -> pli_region_PreReNBA          (line 56)
-//   pli_region_PreReNBA -> region_ReNBA                (line 42)
-//   pli_region_PreReNBA -> region_Reactive             (line 43)
-//   region_ReNBA       -> pli_region_PostReNBA         (line 58)
-//   pli_region_PostReNBA -> pli_region_PrePostponed    (line 33)
-//   pli_region_PostReNBA -> region_Active              (line 34)
-//   pli_region_PostReNBA -> region_Reactive            (line 35)
-//   pli_region_PrePostponed -> region_Postponed        (line 41)
-//   pli_region_PrePostponed -> region_Active           (line 40)
-//
-// The PLI regions are interleaved with the simulation regions per §4.4.2.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.4.3 PLI-specific regions
-// All 9 PLI region enum values exist and are distinct from each other.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PLIRegionEnumsExist) {
   auto preponed = static_cast<int>(Region::kPreponed);
   auto pre_active = static_cast<int>(Region::kPreActive);
@@ -54,7 +21,6 @@ TEST(SimCh443, PLIRegionEnumsExist) {
   auto post_renba = static_cast<int>(Region::kPostReNBA);
   auto pre_postponed = static_cast<int>(Region::kPrePostponed);
 
-  // All 9 PLI regions have distinct ordinals.
   std::vector<int> ordinals = {preponed,  pre_active,   pre_nba,
                                post_nba,  pre_observed, post_observed,
                                pre_renba, post_renba,   pre_postponed};
@@ -65,32 +31,21 @@ TEST(SimCh443, PLIRegionEnumsExist) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 PLI regions of a time slot
-// There are exactly 9 PLI regions.  They are a subset of the full region
-// enum (which also includes simulation regions).
-// ---------------------------------------------------------------------------
 TEST(SimCh443, ExactlyNinePLIRegionsExist) {
-  // The 9 PLI regions enumerated by the LRM.
+
   std::vector<Region> pli_regions = {
       Region::kPreponed, Region::kPreActive,   Region::kPreNBA,
       Region::kPostNBA,  Region::kPreObserved, Region::kPostObserved,
       Region::kPreReNBA, Region::kPostReNBA,   Region::kPrePostponed};
   EXPECT_EQ(pli_regions.size(), 9u);
 
-  // Each PLI region ordinal is within [0, kCOUNT).
   for (auto r : pli_regions) {
     EXPECT_LT(static_cast<int>(r), static_cast<int>(Region::kCOUNT));
   }
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 PLI regions interleaved with simulation regions
-// PLI regions are interleaved with simulation regions: each PLI region's
-// ordinal sits between its neighboring simulation regions.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PLIRegionsAreInterleavedWithSimulationRegions) {
-  // PLI "Pre-" regions precede their associated simulation region.
+
   EXPECT_LT(static_cast<int>(Region::kPreActive),
             static_cast<int>(Region::kActive));
   EXPECT_LT(static_cast<int>(Region::kPreNBA), static_cast<int>(Region::kNBA));
@@ -101,7 +56,6 @@ TEST(SimCh443, PLIRegionsAreInterleavedWithSimulationRegions) {
   EXPECT_LT(static_cast<int>(Region::kPrePostponed),
             static_cast<int>(Region::kPostponed));
 
-  // PLI "Post-" regions follow their associated simulation region.
   EXPECT_GT(static_cast<int>(Region::kPostNBA), static_cast<int>(Region::kNBA));
   EXPECT_GT(static_cast<int>(Region::kPostObserved),
             static_cast<int>(Region::kObserved));
@@ -109,30 +63,17 @@ TEST(SimCh443, PLIRegionsAreInterleavedWithSimulationRegions) {
             static_cast<int>(Region::kReNBA));
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 PLI region execution flow per Figure 4-1
-// Figure 4-1: region_Preponed -> pli_region_PreActive -> region_Active.
-// Pre-Active PLI region executes between Preponed and Active.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PreActiveExecutesBetweenPreponedAndActive) {
   VerifyThreeRegionOrder({Region::kPreponed, "preponed"},
                          {Region::kPreActive, "pre_active"},
                          {Region::kActive, "active"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 Figure 4-1: region_Inactive -> pli_region_PreNBA -> region_NBA.
-// Pre-NBA PLI region executes between Inactive and NBA.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PreNBAExecutesBetweenInactiveAndNBA) {
   VerifyThreeRegionOrder({Region::kInactive, "inactive"},
                          {Region::kPreNBA, "pre_nba"}, {Region::kNBA, "nba"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 Figure 4-1: region_NBA -> pli_region_PostNBA -> ...
-// Post-NBA PLI region executes after NBA.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PostNBAExecutesAfterNBA) {
   Arena arena;
   Scheduler sched(arena);
@@ -147,54 +88,30 @@ TEST(SimCh443, PostNBAExecutesAfterNBA) {
   EXPECT_EQ(order[1], "post_nba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 Figure 4-1: pli_region_PostNBA -> pli_region_PreObserved ->
-// region_Observed.
-// Pre-Observed PLI region executes between Post-NBA and Observed.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PreObservedExecutesBetweenPostNBAAndObserved) {
   VerifyThreeRegionOrder({Region::kPostNBA, "post_nba"},
                          {Region::kPreObserved, "pre_observed"},
                          {Region::kObserved, "observed"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 Figure 4-1: region_Observed -> pli_region_PostObserved ->
-// region_Reactive.
-// Post-Observed PLI region executes between Observed and Reactive.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PostObservedExecutesBetweenObservedAndReactive) {
   VerifyThreeRegionOrder({Region::kObserved, "observed"},
                          {Region::kPostObserved, "post_observed"},
                          {Region::kReactive, "reactive"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 Figure 4-1: region_ReInactive -> pli_region_PreReNBA ->
-// region_ReNBA.
-// Pre-Re-NBA PLI region executes between Re-Inactive and Re-NBA.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PreReNBAExecutesBetweenReInactiveAndReNBA) {
   VerifyThreeRegionOrder({Region::kReInactive, "reinactive"},
                          {Region::kPreReNBA, "pre_renba"},
                          {Region::kReNBA, "renba"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 Figure 4-1: region_ReNBA -> pli_region_PostReNBA ->
-// pli_region_PrePostponed.
-// Post-Re-NBA PLI region executes between Re-NBA and Pre-Postponed.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PostReNBAExecutesBetweenReNBAAndPrePostponed) {
   VerifyThreeRegionOrder({Region::kReNBA, "renba"},
                          {Region::kPostReNBA, "post_renba"},
                          {Region::kPrePostponed, "pre_postponed"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 Figure 4-1: pli_region_PrePostponed -> region_Postponed.
-// Pre-Postponed PLI region executes before Postponed.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PrePostponedExecutesBeforePostponed) {
   Arena arena;
   Scheduler sched(arena);
@@ -209,27 +126,16 @@ TEST(SimCh443, PrePostponedExecutesBeforePostponed) {
   EXPECT_EQ(order[1], "postponed");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 Full PLI region ordering per Figure 4-1
-// Full PLI region ordering: all 9 PLI regions execute in their specified
-// positions relative to each other and the simulation regions.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, FullPLIRegionOrderingPerFigure41) { VerifyAllRegionOrder(); }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 PLI regions execute in their respective positions across multiple
-// time slots, verifying the flow is per-time-slot as specified.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PLIRegionsExecuteAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Time 0: Pre-Active and Active
   ScheduleLabeled(sched, 0, Region::kPreActive, "t0_pre_active", order);
   ScheduleLabeled(sched, 0, Region::kActive, "t0_active", order);
 
-  // Time 1: Pre-NBA and NBA
   ScheduleLabeled(sched, 1, Region::kPreNBA, "t1_pre_nba", order);
   ScheduleLabeled(sched, 1, Region::kNBA, "t1_nba", order);
 
@@ -241,18 +147,11 @@ TEST(SimCh443, PLIRegionsExecuteAcrossMultipleTimeSlots) {
   EXPECT_EQ(order[3], "t1_nba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3 PLI callbacks scheduling into simulation regions
-// PLI regions can schedule events -- a PLI callback (Pre-Active) schedules
-// into the Active simulation region, as Figure 4-1 shows:
-// pli_region_PreActive -> region_Active.
-// ---------------------------------------------------------------------------
 TEST(SimCh443, PLICallbackSchedulesIntoSimulationRegion) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Pre-Active callback schedules an Active event.
   auto* pli_ev = sched.GetEventPool().Acquire();
   pli_ev->callback = [&]() {
     order.push_back("pre_active");

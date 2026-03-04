@@ -1,12 +1,9 @@
-// §28.16.1: min:typ:max delays
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// delay3: mintypmax on gate — #(1:2:3) with min:typ:max expression.
 TEST(ParserA223, Delay3GateMintypmax) {
   auto r = Parse(
       "module m;\n"
@@ -27,4 +24,4 @@ TEST(ParserA301, GateInst_DelayWithMinTypMax) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

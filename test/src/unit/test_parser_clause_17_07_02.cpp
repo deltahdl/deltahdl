@@ -1,5 +1,3 @@
-// §17.7.2: Checker variable randomization with assumptions
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -23,4 +21,4 @@ TEST_F(VerifyParseTest, CheckerWithAssumeProperty) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+}

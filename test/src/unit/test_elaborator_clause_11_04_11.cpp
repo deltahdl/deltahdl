@@ -1,5 +1,3 @@
-// §11.4.11: Conditional operator
-
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
@@ -24,7 +22,6 @@ TEST(ConstEval, ScopedTernary) {
       ConstEvalInt(ParseExprFrom("WIDTH > 8 ? WIDTH : 8", f), scope_small), 8);
 }
 
-// § conditional_expression — ternary in continuous assignment elaborates
 TEST(ElabA83, TernaryInContAssignElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -38,9 +35,6 @@ TEST(ElabA83, TernaryInContAssignElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// 17. Ternary operator in always_comb.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombTernaryTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -62,9 +56,6 @@ TEST(SimCh9, AlwaysCombTernaryTrue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// ---------------------------------------------------------------------------
-// 18. Ternary operator in always_comb (false branch).
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombTernaryFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -86,9 +77,6 @@ TEST(SimCh9, AlwaysCombTernaryFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// ---------------------------------------------------------------------------
-// 29. always_comb with chained ternary (nested conditional).
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombChainedTernary) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -112,10 +100,6 @@ TEST(SimCh9, AlwaysCombChainedTernary) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// =============================================================================
-// §9.2.3: always_latch with ternary operator
-// =============================================================================
-// 20. Ternary operator in always_latch selects first operand.
 TEST(SimCh9c, TernarySelectsFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -142,7 +126,6 @@ TEST(SimCh9c, TernarySelectsFirst) {
   EXPECT_EQ(q->value.ToUint64(), 0xCAu);
 }
 
-// 21. Ternary operator in always_latch selects second operand.
 TEST(SimCh9c, TernarySelectsSecond) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -169,9 +152,6 @@ TEST(SimCh9c, TernarySelectsSecond) {
   EXPECT_EQ(q->value.ToUint64(), 0xFEu);
 }
 
-// ---------------------------------------------------------------------------
-// 8. Blocking assignment with ternary on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTernary) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -194,9 +174,6 @@ TEST(SimCh10, BlockingAssignTernary) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// ---------------------------------------------------------------------------
-// 28. Blocking assignment with ternary false branch.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTernaryFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -219,4 +196,4 @@ TEST(SimCh10, BlockingAssignTernaryFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

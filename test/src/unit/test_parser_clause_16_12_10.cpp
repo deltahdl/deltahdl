@@ -1,12 +1,9 @@
-// §16.12.10: Nexttime property
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// property_expr ::= nexttime property_expr
 TEST(ParserA210, PropertyExpr_Nexttime) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -14,7 +11,6 @@ TEST(ParserA210, PropertyExpr_Nexttime) {
               "endmodule\n"));
 }
 
-// property_expr ::= nexttime [ constant_expression ] property_expr
 TEST(ParserA210, PropertyExpr_NexttimeWithCount) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -22,7 +18,6 @@ TEST(ParserA210, PropertyExpr_NexttimeWithCount) {
               "endmodule\n"));
 }
 
-// property_expr ::= s_nexttime property_expr
 TEST(ParserA210, PropertyExpr_SNexttime) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -30,7 +25,6 @@ TEST(ParserA210, PropertyExpr_SNexttime) {
               "endmodule\n"));
 }
 
-// property_expr ::= s_nexttime [ constant_expression ] property_expr
 TEST(ParserA210, PropertyExpr_SNexttimeWithCount) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -38,4 +32,4 @@ TEST(ParserA210, PropertyExpr_SNexttimeWithCount) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

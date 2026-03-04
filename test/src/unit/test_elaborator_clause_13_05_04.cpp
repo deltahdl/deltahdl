@@ -1,12 +1,9 @@
-// §13.5.4: Argument binding by name
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// named argument call elaborates without error
 TEST(ElabA609, NamedArgCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +17,6 @@ TEST(ElabA609, NamedArgCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § list_of_arguments — named arguments elaborate
 TEST(ElabA82, NamedArgsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,4 +30,4 @@ TEST(ElabA82, NamedArgsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

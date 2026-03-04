@@ -1,5 +1,3 @@
-// §16.14.5: Using concurrent assertion statements outside procedural code
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -18,9 +16,6 @@ TEST(ParserA210, ConcurrentAssertionItem_AssumeProperty) {
   ASSERT_NE(item, nullptr);
 }
 
-// =============================================================================
-// Additional AST verification tests
-// =============================================================================
 TEST(ParserA210, AllFiveConcurrentAssertionTypes) {
   auto r = Parse(
       "module m;\n"
@@ -48,10 +43,6 @@ TEST(ParserA210, AllFiveConcurrentAssertionTypes) {
             nullptr);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// Combination: property used with assert
-// =============================================================================
 TEST(ParserSection16, PropertyDeclAndAssertProperty) {
   auto r = Parse(
       "module m;\n"
@@ -71,4 +62,4 @@ TEST(ParserSection16, PropertyDeclAndAssertProperty) {
   EXPECT_TRUE(found_assert);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §13.4.1: Return values and void functions
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Elaboration: function declaration within module
-// ---------------------------------------------------------------------------
 TEST(ParserA26, ElabFunctionDeclInModule) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -25,13 +20,6 @@ TEST(ParserA26, ElabFunctionDeclInModule) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// =============================================================================
-// A.6.4 Statements — Elaboration
-// =============================================================================
-// ---------------------------------------------------------------------------
-// Elaboration: function_statement context restrictions
-// ---------------------------------------------------------------------------
-// §13.4.4: return with value in void function is an error
 TEST(ElabA604, VoidFunctionReturnWithValueError) {
   ElabFixture f;
   ElaborateSrc(
@@ -44,7 +32,6 @@ TEST(ElabA604, VoidFunctionReturnWithValueError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4: non-void function can return a value
 TEST(ElabA604, NonVoidFunctionReturnWithValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -58,7 +45,6 @@ TEST(ElabA604, NonVoidFunctionReturnWithValue) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// void'(function_subroutine_call) elaborates without error
 TEST(ElabA609, VoidCastElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -71,7 +57,6 @@ TEST(ElabA609, VoidCastElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § tf_call — function call as expression elaborates
 TEST(ElabA82, TfCallAsExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -87,7 +72,6 @@ TEST(ElabA82, TfCallAsExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § subroutine_call — nested function calls elaborate
 TEST(ElabA82, NestedCallsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -124,4 +108,4 @@ TEST(Lowerer, FunctionCallReturnsValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

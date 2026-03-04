@@ -1,5 +1,3 @@
-// §6.11: Integer data types
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// 21. Verify result variable width is 32 bits (int).
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombResultWidth32) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,4 +28,4 @@ TEST(SimCh9, AlwaysCombResultWidth32) {
   EXPECT_EQ(var->value.ToUint64(), 200u);
 }
 
-}  // namespace
+}

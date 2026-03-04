@@ -1,5 +1,3 @@
-// §6.20.5: Specify parameters
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -20,7 +18,6 @@ TEST(ParserA24, SpecparamAssignmentMintypmax) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// specparam_declaration as non_port_module_item (outside specify block).
 TEST(SourceText, SpecparamAsModuleItem) {
   auto r = Parse(
       "module m;\n"
@@ -31,9 +28,7 @@ TEST(SourceText, SpecparamAsModuleItem) {
   ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
 }
-// --- specparam_assignment ---
-// specparam_identifier = constant_mintypmax_expression
-// | pulse_control_specparam
+
 TEST(ParserA24, SpecparamAssignmentBasic) {
   auto r = Parse(
       "module m;\n"
@@ -75,9 +70,6 @@ TEST_F(SpecifyParseTest, MultipleSpecparams) {
   EXPECT_EQ(items[1]->name, "tFALL");
 }
 
-// =============================================================================
-// §30.2 Specparam declarations (inside specify)
-// =============================================================================
 TEST_F(SpecifyTest, SpecparamInsideSpecify) {
   auto* cu = Parse(
       "module m;\n"
@@ -115,4 +107,4 @@ TEST(ParserSection28, SpecifyBlockWithSpecparam) {
   EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kPathDecl));
 }
 
-}  // namespace
+}

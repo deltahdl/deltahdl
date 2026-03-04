@@ -1,5 +1,3 @@
-// §22.14.2: IEEE Std 1364-1995 keywords
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -15,4 +13,4 @@ TEST(ParserSection22, BeginKeywords1364_1995) {
               "`end_keywords\n"));
 }
 
-}  // namespace
+}

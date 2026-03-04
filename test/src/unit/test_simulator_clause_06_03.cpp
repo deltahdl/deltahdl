@@ -1,5 +1,3 @@
-// §6.3: Value set
-
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
@@ -45,4 +43,4 @@ TEST(Types, Logic4VecCreationAndToString) {
   EXPECT_EQ(vec.ToString(), "10100101");
 }
 
-}  // namespace
+}

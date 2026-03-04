@@ -1,5 +1,3 @@
-// §14.16: Synchronous drives
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.11 clocking_drive — clockvar_expression <= expression
-// =============================================================================
 TEST(ParserA611, ClockingDriveSimple) {
   auto r = Parse(
       "module m;\n"
@@ -27,9 +22,6 @@ TEST(ParserA611, ClockingDriveSimple) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-// =============================================================================
-// A.6.11 clocking_drive — clockvar_expression <= cycle_delay expression
-// =============================================================================
 TEST(ParserA611, ClockingDriveWithCycleDelay) {
   auto r = Parse(
       "module m;\n"
@@ -49,9 +41,6 @@ TEST(ParserA611, ClockingDriveWithCycleDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// =============================================================================
-// A.6.11 cycle_delay — ## integral_number
-// =============================================================================
 TEST(ParserA611, CycleDelayNumber) {
   auto r = Parse(
       "module m;\n"
@@ -66,9 +55,6 @@ TEST(ParserA611, CycleDelayNumber) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.6.11 cycle_delay — ## ( expression )
-// =============================================================================
 TEST(ParserA611, CycleDelayParenExpr) {
   auto r = Parse(
       "module m;\n"
@@ -83,9 +69,6 @@ TEST(ParserA611, CycleDelayParenExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.6.11 clockvar / clockvar_expression — hierarchical access
-// =============================================================================
 TEST(ParserA611, ClockvarExpression) {
   auto r = Parse(
       "module m;\n"
@@ -104,4 +87,4 @@ TEST(ParserA611, ClockvarExpression) {
   ASSERT_NE(stmt->lhs, nullptr);
 }
 
-}  // namespace
+}

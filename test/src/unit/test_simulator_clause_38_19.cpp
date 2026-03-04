@@ -23,8 +23,6 @@ class VpiClause3819Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.19: vpi_handle_by_index
-
 TEST_F(VpiClause3819Test, HandleByIndexReturnCorrectChild) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
@@ -46,5 +44,5 @@ TEST_F(VpiClause3819Test, HandleByIndexOutOfRangeReturnsNullptr) {
   EXPECT_EQ(result, nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

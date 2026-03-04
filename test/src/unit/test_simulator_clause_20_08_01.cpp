@@ -1,5 +1,3 @@
-// §20.8.1: Integer math functions
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "simulator/eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// § system_tf_call — $clog2 returns computed value
 TEST(SimA82, SystemTfCallClog2) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -28,7 +25,6 @@ TEST(SimA82, SystemTfCallClog2) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-// § primary — system call ($clog2)
 TEST(SimA84, PrimarySystemCallClog2) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -67,4 +63,4 @@ TEST(Section20, Clog2NonPowerOf2) {
   EXPECT_EQ(result.ToUint64(), 9u);
 }
 
-}  // namespace
+}

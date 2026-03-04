@@ -1,5 +1,3 @@
-// §11.4.14.1: Concatenation of stream_expressions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -17,7 +15,6 @@ TEST(ParserSection11, StreamingRightDetails) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-// § stream_concatenation ::= { stream_expression { , stream_expression } }
 TEST(ParserA81, StreamConcatMultipleElements) {
   auto r = Parse("module m; initial x = {<< {a, b, c}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -28,4 +25,4 @@ TEST(ParserA81, StreamConcatMultipleElements) {
   EXPECT_EQ(stmt->rhs->elements.size(), 3u);
 }
 
-}  // namespace
+}

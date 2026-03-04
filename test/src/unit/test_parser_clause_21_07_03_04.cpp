@@ -1,5 +1,3 @@
-// §21.7.3.4: Limiting size of dump file ($dumpportslimit)
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -13,4 +11,4 @@ TEST(ParserSection21, DumpportslimitCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

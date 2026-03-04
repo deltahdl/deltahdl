@@ -1,14 +1,9 @@
-// §9.4.2.2: Implicit event_expression list
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// ---------------------------------------------------------------------------
-// 7. always @* body is directly on item->body (no event control wrapper).
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarBodyDirectAssign) {
   auto r = Parse(
       "module m;\n"
@@ -22,10 +17,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarBodyDirectAssign) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-// ---------------------------------------------------------------------------
-// event_control ::= clocking_event | @ * | @ ( * )
-// ---------------------------------------------------------------------------
-// §9.4.2.2: @* implicit sensitivity
 TEST(ParserA605, EventControlAtStar) {
   auto r = Parse(
       "module m;\n"
@@ -41,7 +32,6 @@ TEST(ParserA605, EventControlAtStar) {
   EXPECT_TRUE(stmt->is_star_event);
 }
 
-// §9.4.2.2: @(*) implicit sensitivity
 TEST(ParserA605, EventControlAtStarParen) {
   auto r = Parse(
       "module m;\n"
@@ -56,10 +46,7 @@ TEST(ParserA605, EventControlAtStarParen) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   EXPECT_TRUE(stmt->is_star_event);
 }
-// Return the first always-kind module item (any always variant).
-// ---------------------------------------------------------------------------
-// 9. always @* with begin-end block body.
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -78,9 +65,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 10. always @(*) with begin-end block body.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -98,9 +82,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 14. always @* with if-else body.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -119,9 +100,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarIfElse) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 16. always @* with case statement.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarCaseStatement) {
   auto r = Parse(
       "module m;\n"
@@ -142,9 +120,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarCaseStatement) {
   EXPECT_GE(item->body->case_items.size(), 3u);
 }
 
-// ---------------------------------------------------------------------------
-// 18. always @* with complex combinational logic (nested ternary).
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarComplexLogic) {
   auto r = Parse(
       "module m;\n"
@@ -161,11 +136,9 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarComplexLogic) {
   ASSERT_NE(item->body->rhs, nullptr);
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
-// =============================================================================
-// LRM section 9.4.2.2 -- @* and @(*) implicit event list
-// =============================================================================
+
 TEST(ParserSection9, StarEventBareAlways) {
-  // always @* consumes the @* at the always-block level; body is the stmt.
+
   auto r = Parse(
       "module m;\n"
       "  always @* a = b;\n"
@@ -179,7 +152,7 @@ TEST(ParserSection9, StarEventBareAlways) {
 }
 
 TEST(ParserSection9, StarEventParenAlways) {
-  // always @(*) consumes the @(*) at the always-block level.
+
   auto r = Parse(
       "module m;\n"
       "  always @(*) begin a = b; end\n"
@@ -193,7 +166,7 @@ TEST(ParserSection9, StarEventParenAlways) {
 }
 
 TEST(ParserSection9, StarEventBareStmt) {
-  // @* at the statement level produces an kEventControl stmt.
+
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -209,7 +182,7 @@ TEST(ParserSection9, StarEventBareStmt) {
 }
 
 TEST(ParserSection9, StarEventParenStmt) {
-  // @(*) at the statement level produces an kEventControl stmt.
+
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -224,4 +197,4 @@ TEST(ParserSection9, StarEventParenStmt) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-}  // namespace
+}

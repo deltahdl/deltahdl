@@ -1,5 +1,3 @@
-// §18.11: Inline random variable control
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -16,13 +14,6 @@ TEST(ParserA82, RandomizeCallWithVarList) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.8.2 Subroutine calls — variable_identifier_list / identifier_list
-// =============================================================================
-// § variable_identifier_list ::= variable_identifier { , variable_identifier }
-// § identifier_list ::= identifier { , identifier }
-// Tested implicitly via randomize_call with var list above.
-// variable_identifier_list in randomize
 TEST(ParserA82, VariableIdentifierList) {
   auto r = Parse(
       "module m;\n"
@@ -35,4 +26,4 @@ TEST(ParserA82, VariableIdentifierList) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

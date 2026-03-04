@@ -1,5 +1,3 @@
-// §12.7.1: The for-loop
-
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.8 Looping statements — Elaboration
-// =============================================================================
-// §12.7.1: for loop with typed init elaborates without error
 TEST(ElabA608, ForLoopTypedInit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -25,7 +19,6 @@ TEST(ElabA608, ForLoopTypedInit) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.7.1: for loop without typed init elaborates without error
 TEST(ElabA608, ForLoopUntypedInit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -41,7 +34,6 @@ TEST(ElabA608, ForLoopUntypedInit) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Nested loops elaborate without error
 TEST(ElabA608, NestedLoops) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -60,9 +52,6 @@ TEST(ElabA608, NestedLoops) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// 11. Blocking assignment in for loop (accumulate).
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -85,8 +74,8 @@ TEST(SimCh10, BlockingAssignForLoop) {
 
   auto* var = f.ctx.FindVariable("sum");
   ASSERT_NE(var, nullptr);
-  // 1+2+3+4+5 = 15
+
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-}  // namespace
+}

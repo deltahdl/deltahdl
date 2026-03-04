@@ -1,5 +1,3 @@
-// §11.4.5: Equality operators
-
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § binary_operator — equality operators elaborate
 TEST(ElabA86, BinaryCaseEqElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,9 +30,6 @@ TEST(ElabA86, BinaryCaseNeqElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// 25. always_comb with equality comparison.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombEqualityCheck) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -58,13 +52,10 @@ TEST(SimCh9b, AlwaysCombEqualityCheck) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // a == b is true -> y = 1.
+
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 20. Blocking assignment with comparison operators.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignComparisonOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -101,12 +92,12 @@ TEST(SimCh10, BlockingAssignComparisonOps) {
   ASSERT_NE(r_gt, nullptr);
   ASSERT_NE(r_le, nullptr);
   ASSERT_NE(r_ge, nullptr);
-  EXPECT_EQ(r_eq->value.ToUint64(), 0u);  // 10 == 20 -> false
-  EXPECT_EQ(r_ne->value.ToUint64(), 1u);  // 10 != 20 -> true
-  EXPECT_EQ(r_lt->value.ToUint64(), 1u);  // 10 < 20  -> true
-  EXPECT_EQ(r_gt->value.ToUint64(), 0u);  // 10 > 20  -> false
-  EXPECT_EQ(r_le->value.ToUint64(), 1u);  // 10 <= 20 -> true
-  EXPECT_EQ(r_ge->value.ToUint64(), 0u);  // 10 >= 20 -> false
+  EXPECT_EQ(r_eq->value.ToUint64(), 0u);
+  EXPECT_EQ(r_ne->value.ToUint64(), 1u);
+  EXPECT_EQ(r_lt->value.ToUint64(), 1u);
+  EXPECT_EQ(r_gt->value.ToUint64(), 0u);
+  EXPECT_EQ(r_le->value.ToUint64(), 1u);
+  EXPECT_EQ(r_ge->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

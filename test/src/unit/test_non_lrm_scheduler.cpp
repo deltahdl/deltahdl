@@ -1,5 +1,3 @@
-// §non-lrm:scheduler
-
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
@@ -20,7 +18,6 @@ SimCoroutine MakeTestCoroutine() { co_return; }
 
 namespace {
 
-// --- EventPool tests ---
 TEST(EventPool, AcquireCreatesNew) {
   Arena arena;
   EventPool pool(arena);
@@ -59,7 +56,7 @@ TEST(Scheduler, EventPoolIntegration) {
 
   sched.Run();
   EXPECT_TRUE(ran);
-  // After execution, event should be recycled into the pool.
+
   EXPECT_EQ(pool.FreeCount(), 1);
 }
 
@@ -70,7 +67,7 @@ TEST(Process, MoveSemantics) {
   SimCoroutine* pa = &a;
   SimCoroutine b = std::move(a);
   EXPECT_FALSE(b.Done());
-  EXPECT_TRUE(pa->Done());  // Moved-from state check via pre-move pointer.
+  EXPECT_TRUE(pa->Done());
 }
 
 TEST(Process, ProcessIdAssignment) {
@@ -86,7 +83,7 @@ TEST(Process, CoroutineRelease) {
   auto handle = coro.Release();
   EXPECT_TRUE(coro.Done());
   EXPECT_NE(handle, nullptr);
-  // Clean up the released handle.
+
   handle.destroy();
 }
 
@@ -100,21 +97,18 @@ TEST(EventPool, ReleaseAndReuse) {
   EXPECT_EQ(pool.FreeCount(), 1);
 
   Event* reused = pool.Acquire();
-  EXPECT_EQ(reused, ev);               // Same pointer returned
-  EXPECT_EQ(reused->target, nullptr);  // Fields cleared
+  EXPECT_EQ(reused, ev);
+  EXPECT_EQ(reused->target, nullptr);
   EXPECT_EQ(pool.FreeCount(), 0);
 }
 
-// =============================================================================
-// EventCoalescer
-// =============================================================================
 TEST(AdvSim, EventCoalescerMergesDuplicates) {
   EventCoalescer coalescer;
   uint32_t target_id = 42;
   coalescer.Add(target_id, 100);
   coalescer.Add(target_id, 200);
   coalescer.Add(target_id, 300);
-  // Only last value for each target should survive.
+
   auto entries = coalescer.Drain();
   ASSERT_EQ(entries.size(), 1u);
   EXPECT_EQ(entries[0].target_id, target_id);
@@ -130,31 +124,28 @@ TEST(AdvSim, EventCoalescerDrainClearsState) {
   EXPECT_TRUE(second.empty());
 }
 
-// =============================================================================
-// Partitioner
-// =============================================================================
 TEST(MtSim, IndependentProcessesSinglePartition) {
   Partitioner part;
-  // Process 0 reads "a", writes "b".
+
   part.AddDependency({0, {"a"}, {"b"}});
-  // Process 1 reads "c", writes "d".
+
   part.AddDependency({1, {"c"}, {"d"}});
 
   auto partitions = part.BuildPartitions();
-  // No conflicts: both should end up in the same partition.
+
   EXPECT_EQ(partitions.size(), 1u);
   EXPECT_EQ(partitions[0].process_ids.size(), 2u);
 }
 
 TEST(MtSim, ConflictingProcessesSeparatePartitions) {
   Partitioner part;
-  // Process 0 writes "x".
+
   part.AddDependency({0, {}, {"x"}});
-  // Process 1 reads "x".
+
   part.AddDependency({1, {"x"}, {}});
 
   auto partitions = part.BuildPartitions();
-  // Write-read conflict: must be in separate partitions.
+
   EXPECT_EQ(partitions.size(), 2u);
 }
 
@@ -174,9 +165,6 @@ TEST(MtSim, EmptyPartitioner) {
   EXPECT_EQ(part.ProcessCount(), 0u);
 }
 
-// =============================================================================
-// MtScheduler
-// =============================================================================
 TEST(MtSim, MtSchedulerInit) {
   MtScheduler sched(4);
   EXPECT_EQ(sched.NumThreads(), 4u);
@@ -202,7 +190,6 @@ TEST(MtSim, RunTimestepExecutesProcesses) {
   auto* b = f.ctx.CreateVariable("b", 32);
   b->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // Two compiled processes: proc0 sets a=42, proc1 sets b=99.
   std::vector<CompiledProcess> processes;
   processes.emplace_back(0, [](SimContext& ctx) {
     auto* var = ctx.FindVariable("a");
@@ -213,7 +200,6 @@ TEST(MtSim, RunTimestepExecutesProcesses) {
     if (var) var->value.words[0].aval = 99;
   });
 
-  // Two independent partitions.
   std::vector<SimPartition> partitions = {{0, {0}}, {1, {1}}};
 
   MtScheduler sched(2);
@@ -229,13 +215,12 @@ TEST(MtSim, RunTimestepEmptyPartitions) {
   std::vector<CompiledProcess> processes;
   MtScheduler sched(2);
   sched.RunTimestep(f.ctx, processes);
-  // Should not crash.
+
 }
 
 TEST(MtSim, RunTimestepMultipleThreads) {
   MtSimFixture f;
 
-  // Use string literals for stable string_view keys.
   const char* names[] = {"v0", "v1", "v2", "v3"};
   std::vector<Variable*> vars;
   for (int i = 0; i < 4; ++i) {
@@ -244,7 +229,6 @@ TEST(MtSim, RunTimestepMultipleThreads) {
     vars.push_back(var);
   }
 
-  // 4 processes, each incrementing a separate variable.
   std::vector<CompiledProcess> processes;
   processes.reserve(4);
   for (uint32_t i = 0; i < 4; ++i) {
@@ -254,7 +238,6 @@ TEST(MtSim, RunTimestepMultipleThreads) {
     });
   }
 
-  // 4 independent partitions.
   std::vector<SimPartition> partitions;
   partitions.reserve(4);
   for (uint32_t i = 0; i < 4; ++i) {
@@ -278,11 +261,9 @@ TEST(Process, ProcessResumeNullSafe) {
 
 TEST(Process, CoroutineDestroyOnScopeExit) {
   SimCoroutine coro = MakeTestCoroutine();
-  // Immediately destroyed — no leak if sanitizer passes.
+
 }
 
-// 9. SimTime: simulation time is maintained as ticks with comparison
-// and addition operators.
 TEST(ParserClause03, Cl3_14_SimTimeOperations) {
   SimTime t0{0};
   SimTime t1{1000};
@@ -298,4 +279,4 @@ TEST(ParserClause03, Cl3_14_SimTimeOperations) {
   EXPECT_EQ(t3.ticks, 1000u);
 }
 
-}  // namespace
+}

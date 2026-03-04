@@ -1,5 +1,3 @@
-// §6.12: Real, shortreal, and realtime data types
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §6.12: Real type restrictions ---
 TEST(Elaboration, RealBitSelect_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -45,7 +42,6 @@ TEST(Elaboration, RealAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// § number — real_number elaborates
 TEST(ElabA87, NumberRealElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -58,4 +54,4 @@ TEST(ElabA87, NumberRealElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

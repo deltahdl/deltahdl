@@ -1,5 +1,3 @@
-// §9.2.2.2.1: Implicit always_comb sensitivities
-
 #include <unordered_set>
 
 #include "builders_sensitivity.h"
@@ -14,7 +12,6 @@ using namespace delta;
 
 namespace {
 
-// --- Sensitivity inference ---
 TEST(Elaborator, AlwaysCombSensitivityInferred) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -39,7 +36,7 @@ TEST(Elaborator, AlwaysCombSensitivityInferred) {
 }
 
 TEST(Sensitivity, SelectVarIdxUsesLSP) {
-  // a[i] → LSP is "a", sensitivity includes "a" and "i".
+
   Arena arena;
   auto* expr = SensSelect(arena, SensId(arena, "a"), SensId(arena, "i"));
   std::unordered_set<std::string> reads;
@@ -48,23 +45,6 @@ TEST(Sensitivity, SelectVarIdxUsesLSP) {
   EXPECT_TRUE(reads.count("i"));
 }
 
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
-// ---------------------------------------------------------------------------
-// 29. §4.2 Processes are concurrently scheduled elements: always_comb
-//     re-evaluates when any input changes.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, AlwaysCombReEvaluatesOnChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -88,15 +68,12 @@ TEST(SimCh4, AlwaysCombReEvaluatesOnChange) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // After #5, sel=1 so result=b=20.
+
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// ---------------------------------------------------------------------------
-// 19. Function call in always_comb.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -120,9 +97,6 @@ TEST(SimCh9, AlwaysCombFunctionCall) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// ---------------------------------------------------------------------------
-// 23. always_comb with struct field access.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombStructFieldAccess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -148,9 +122,6 @@ TEST(SimCh9, AlwaysCombStructFieldAccess) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-// ---------------------------------------------------------------------------
-// 3. always_comb AND gate: re-evaluates after input is set.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombAndGate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -175,9 +146,6 @@ TEST(SimCh9b, AlwaysCombAndGate) {
   EXPECT_EQ(y->value.ToUint64(), 0x30u);
 }
 
-// ---------------------------------------------------------------------------
-// 4. always_comb OR gate.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombOrGate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -202,9 +170,6 @@ TEST(SimCh9b, AlwaysCombOrGate) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 5. always_comb XOR gate.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombXorGate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -229,9 +194,6 @@ TEST(SimCh9b, AlwaysCombXorGate) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 6. always_comb NOT (bitwise invert).
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombNotGate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -252,13 +214,10 @@ TEST(SimCh9b, AlwaysCombNotGate) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // ~0xA5 = 0x5A in the low 8 bits; mask to declared width.
+
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x5Au);
 }
 
-// ---------------------------------------------------------------------------
-// 7. always_comb if-else mux: select true branch.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombIfElseTrueBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -287,9 +246,6 @@ TEST(SimCh9b, AlwaysCombIfElseTrueBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xAAu);
 }
 
-// ---------------------------------------------------------------------------
-// 8. always_comb if-else mux: select false branch.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombIfElseFalseBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -318,9 +274,6 @@ TEST(SimCh9b, AlwaysCombIfElseFalseBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xBBu);
 }
 
-// ---------------------------------------------------------------------------
-// 14. always_comb with concatenation.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombConcatenation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -346,9 +299,6 @@ TEST(SimCh9b, AlwaysCombConcatenation) {
   EXPECT_EQ(y->value.ToUint64(), 0xA5u);
 }
 
-// ---------------------------------------------------------------------------
-// 19. always_comb re-triggers when input changes.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombRetriggersOnChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -372,9 +322,6 @@ TEST(SimCh9b, AlwaysCombRetriggersOnChange) {
   EXPECT_EQ(y->value.ToUint64(), 11u);
 }
 
-// ---------------------------------------------------------------------------
-// 26. always_comb sensitivity: changes signal 'a', observes result.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombSensitivityRegistered) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -389,9 +336,8 @@ TEST(SimCh9b, AlwaysCombSensitivityRegistered) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
 
-  // Sensitivity map should have signal 'a' mapped.
   const auto& procs = f.ctx.GetSensitiveProcesses("a");
   EXPECT_FALSE(procs.empty());
 }
 
-}  // namespace
+}

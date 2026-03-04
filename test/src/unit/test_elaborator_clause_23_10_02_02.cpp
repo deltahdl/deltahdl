@@ -1,5 +1,3 @@
-// §23.10.2.2: Parameter value assignment by name
-
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- Elaborator resolves program with parameters ---
 TEST(ParserAnnexA0413, ElaborationProgramInstWithParams) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -25,4 +22,4 @@ TEST(ParserAnnexA0413, ElaborationProgramInstWithParams) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
-}  // namespace
+}

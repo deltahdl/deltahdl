@@ -1,5 +1,3 @@
-// §16.9.2.1: Repetition, concatenation, and empty matches
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -18,9 +16,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Edge cases and robustness
-// =============================================================================
 TEST(SvaEngine, RepetitionZeroMin) {
   SvaSequence seq;
   seq.kind = SvaSequenceKind::kConsecutiveRepetition;
@@ -28,10 +23,9 @@ TEST(SvaEngine, RepetitionZeroMin) {
   seq.rep_max = 2;
   seq.expr_check = [](uint64_t v) { return v == 1; };
 
-  // Zero matches is valid when min is 0.
   EXPECT_TRUE(MatchRepetition(seq, {}));
   EXPECT_TRUE(MatchRepetition(seq, {1}));
   EXPECT_TRUE(MatchRepetition(seq, {1, 1}));
 }
 
-}  // namespace
+}

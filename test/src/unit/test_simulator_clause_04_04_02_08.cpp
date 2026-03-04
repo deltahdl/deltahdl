@@ -10,21 +10,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.4.2.8 Re-NBA events region
-//
-// Figure 4-1 shows:
-//   pli_region_PreReNBA -> region_ReNBA    (forward from PreReNBA PLI)
-//   region_ReNBA -> pli_region_PostReNBA   (forward to PostReNBA PLI)
-//   region_ReNBA -> region_Reactive        (feedback -- re-iteration)
-//
-// The Re-NBA region is part of the reactive region set (§4.4.1).
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.4.2.8 Re-NBA region event execution
-// Basic: events scheduled in the Re-NBA region are executed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBARegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
@@ -38,19 +23,11 @@ TEST(SimCh4428, ReNBARegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.8 Re-NBA executes after Re-Inactive
-// Re-NBA events execute only after Re-Inactive events have drained.
-// ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAExecutesAfterReInactive) {
   VerifyTwoRegionOrder({Region::kReInactive, "reinactive"},
                        {Region::kReNBA, "renba"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.8 All Re-Inactive events complete before Re-NBA
-// Multiple Re-Inactive events all complete before any Re-NBA event starts.
-// ---------------------------------------------------------------------------
 TEST(SimCh4428, AllReInactiveEventsCompleteBeforeReNBA) {
   Arena arena;
   Scheduler sched(arena);
@@ -70,14 +47,10 @@ TEST(SimCh4428, AllReInactiveEventsCompleteBeforeReNBA) {
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);
-  // All three Re-Inactive events come before Re-NBA.
+
   EXPECT_EQ(order[3], "renba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.8 Nonblocking assignment schedules Re-NBA at current time
-// A Reactive callback schedules into Re-NBA at the same time (current time).
-// ---------------------------------------------------------------------------
 TEST(SimCh4428, NonblockingAssignmentSchedulesReNBACurrentTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -86,7 +59,7 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBACurrentTime) {
   auto* reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() {
     order.push_back("reactive");
-    // Nonblocking assignment: schedule Re-NBA at current time.
+
     auto* renba = sched.GetEventPool().Acquire();
     renba->callback = [&order]() { order.push_back("renba"); };
     sched.ScheduleEvent({0}, Region::kReNBA, renba);
@@ -99,10 +72,6 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBACurrentTime) {
   EXPECT_EQ(order[1], "renba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.8 Nonblocking assignment schedules Re-NBA at later time
-// A Reactive callback at time 0 schedules a Re-NBA event at time 5.
-// ---------------------------------------------------------------------------
 TEST(SimCh4428, NonblockingAssignmentSchedulesReNBALaterTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -110,7 +79,7 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBALaterTime) {
 
   auto* reactive = sched.GetEventPool().Acquire();
   reactive->callback = [&]() {
-    // Nonblocking assignment with delay: schedule Re-NBA at a later time.
+
     auto* renba = sched.GetEventPool().Acquire();
     renba->callback = [&renba_times, &sched]() {
       renba_times.push_back(sched.CurrentTime().ticks);
@@ -124,29 +93,16 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBALaterTime) {
   EXPECT_EQ(renba_times[0], 5u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.8 + Figure 4-1: region_ReNBA -> region_Reactive (feedback edge).
-// A Re-NBA callback that schedules a new Reactive event triggers
-// re-iteration of the reactive region set.
-// ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAToReactiveIteration) {
   VerifyIterationChain(Region::kReactive, "reactive", Region::kReNBA, "renba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.8 Re-NBA executes after Reactive and Re-Inactive, before
-// PostReNBA.  This confirms its position in the region ordering per §4.4.2.
-// ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAExecutesAfterReactiveAndReInactiveBeforePostReNBA) {
   VerifyFourRegionOrder(
       {Region::kReactive, "reactive"}, {Region::kReInactive, "reinactive"},
       {Region::kReNBA, "renba"}, {Region::kPostReNBA, "post_renba"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.8 Re-NBA is part of the reactive region set (§4.4.1).
-// Its ordinal lies between ReInactive and PostReNBA.
-// ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAIsWithinReactiveRegionSet) {
   auto renba_ord = static_cast<int>(Region::kReNBA);
   auto reinactive_ord = static_cast<int>(Region::kReInactive);
@@ -155,17 +111,10 @@ TEST(SimCh4428, ReNBAIsWithinReactiveRegionSet) {
   EXPECT_LT(renba_ord, post_renba_ord);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.8 Re-NBA events across multiple time slots.
-// Each time slot has its own Re-NBA region evaluation.
-// ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBAEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kReNBA);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.8 Multiple Re-NBA events coexist and all execute.
-// ---------------------------------------------------------------------------
 TEST(SimCh4428, ReNBARegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);

@@ -1,5 +1,3 @@
-// §39.5: Control functions
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -20,7 +18,7 @@ TEST(Api, AssertionSeverityLevels) {
 
   EXPECT_EQ(api.GetSeverity("assert_a"), AssertionSeverity::kWarning);
   EXPECT_EQ(api.GetSeverity("assert_b"), AssertionSeverity::kFatal);
-  // Default for unknown assertion.
+
   EXPECT_EQ(api.GetSeverity("unknown"), AssertionSeverity::kError);
 }
 
@@ -32,7 +30,6 @@ TEST(Api, AssertionActionTypes) {
   api.SetAction("assert_x", AssertionAction::kReset);
   EXPECT_EQ(api.GetAction("assert_x"), AssertionAction::kReset);
 
-  // Default for unknown.
   EXPECT_EQ(api.GetAction("unknown"), AssertionAction::kNone);
 }
 
@@ -57,4 +54,4 @@ TEST(SvVpiUser, RegisterAssertionCbReturnsNull) {
   EXPECT_EQ(result, nullptr);
 }
 
-}  // namespace
+}

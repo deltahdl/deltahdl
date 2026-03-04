@@ -1,5 +1,3 @@
-// §32.8: SDF to SystemVerilog delay value mapping
-
 #include <gtest/gtest.h>
 
 #include "simulator/sdf_parser.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// SDF data structures
-// =============================================================================
 TEST(SdfParser, SdfDelayValueDefault) {
   SdfDelayValue dv;
   EXPECT_EQ(dv.min_val, 0u);
@@ -19,9 +14,6 @@ TEST(SdfParser, SdfDelayValueDefault) {
   EXPECT_EQ(dv.max_val, 0u);
 }
 
-// =============================================================================
-// SDF delay value expansion (Table 32-4)
-// =============================================================================
 TEST(SdfParser, ExpandOneDelay) {
   SdfDelayValue d;
   d.typ_val = 100;
@@ -35,9 +27,9 @@ TEST(SdfParser, ExpandTwoDelays) {
   rise.typ_val = 10;
   fall.typ_val = 20;
   auto expanded = ExpandSdfDelays({rise, fall}, SdfMtm::kTypical);
-  // 2-value: rise, fall -> rise used for positive, fall for negative
-  EXPECT_EQ(expanded[0], 10u);  // 0->1
-  EXPECT_EQ(expanded[1], 20u);  // 1->0
+
+  EXPECT_EQ(expanded[0], 10u);
+  EXPECT_EQ(expanded[1], 20u);
 }
 
 TEST(SdfParser, ExpandThreeDelays) {
@@ -46,9 +38,9 @@ TEST(SdfParser, ExpandThreeDelays) {
   fall.typ_val = 20;
   turnoff.typ_val = 30;
   auto expanded = ExpandSdfDelays({rise, fall, turnoff}, SdfMtm::kTypical);
-  EXPECT_EQ(expanded[0], 10u);  // 0->1
-  EXPECT_EQ(expanded[1], 20u);  // 1->0
-  EXPECT_EQ(expanded[2], 30u);  // 0->z
+  EXPECT_EQ(expanded[0], 10u);
+  EXPECT_EQ(expanded[1], 20u);
+  EXPECT_EQ(expanded[2], 30u);
 }
 
 TEST(SdfParser, MtmSelectMinimum) {
@@ -69,4 +61,4 @@ TEST(SdfParser, MtmSelectMaximum) {
   EXPECT_EQ(expanded[0], 15u);
 }
 
-}  // namespace
+}

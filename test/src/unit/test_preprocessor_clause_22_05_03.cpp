@@ -1,5 +1,3 @@
-// §22.5.3: `undefineall
-
 #include <gtest/gtest.h>
 
 #include "fixture_preprocessor.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- §22.5.3 `undefineall ---
 TEST(Preprocessor, UndefineAll) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -21,4 +18,4 @@ TEST(Preprocessor, UndefineAll) {
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
 
-}  // namespace
+}

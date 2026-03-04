@@ -1,5 +1,3 @@
-// §30.4.4.4: The ifnone condition
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ifnone simple_path_declaration
 TEST(ParserA702, StateDependentIfnoneSimple) {
   auto r = Parse(
       "module m;\n"
@@ -46,7 +43,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
   return spec->specify_items[0];
 }
 
-// path_declaration ::= state_dependent_path_declaration ; (ifnone)
 TEST(ParserA702, PathDeclStateDependentIfnone) {
   auto r = Parse(
       "module m;\n"
@@ -62,7 +58,6 @@ TEST(ParserA702, PathDeclStateDependentIfnone) {
   EXPECT_EQ(si->path.condition, nullptr);
 }
 
-// § module_path_conditional_expression used in specify ifnone
 TEST(ParserA83, ModulePathConditionalInSpecify) {
   auto r = Parse(
       "module m(input a, input en, output y);\n"
@@ -92,4 +87,4 @@ TEST(ParserSection28, Sec28_12_IfnonePath) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-}  // namespace
+}

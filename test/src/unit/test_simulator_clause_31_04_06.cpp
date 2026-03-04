@@ -1,5 +1,3 @@
-// §31.4.6: $nochange
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 Runtime — $nochange stores two offsets
-// =============================================================================
 TEST(SimA70501, NochangeOffsetsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -19,16 +14,13 @@ TEST(SimA70501, NochangeOffsetsStored) {
   tc.ref_signal = "clk";
   tc.ref_edge = SpecifyEdge::kPosedge;
   tc.data_signal = "data";
-  tc.limit = 0;   // start_edge_offset
-  tc.limit2 = 0;  // end_edge_offset
+  tc.limit = 0;
+  tc.limit2 = 0;
   mgr.AddTimingCheck(tc);
   auto& stored = mgr.GetTimingChecks()[0];
   EXPECT_EQ(stored.kind, TimingCheckKind::kNochange);
 }
 
-// =============================================================================
-// A.7.5.2 Sim — $nochange with mintypmax offsets simulates
-// =============================================================================
 TEST(SimA70502, NochangeMinTypMaxOffsetsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -49,4 +41,4 @@ TEST(SimA70502, NochangeMinTypMaxOffsetsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

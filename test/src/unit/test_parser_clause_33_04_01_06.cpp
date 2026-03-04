@@ -1,5 +1,3 @@
-// §33.4.1.6: The use clause
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// config_rule_statement: inst_clause use_clause
 TEST(SourceText, ConfigRuleInstUse) {
   auto r = Parse(
       "config cfg7;\n"
@@ -25,7 +22,6 @@ TEST(SourceText, ConfigRuleInstUse) {
   EXPECT_EQ(rule->use_cell, "alt_cell");
 }
 
-// use_clause: use with named_parameter_assignment
 TEST(SourceText, ConfigUseNamedParams) {
   auto r = Parse(
       "config cfg10;\n"
@@ -41,7 +37,6 @@ TEST(SourceText, ConfigUseNamedParams) {
   EXPECT_EQ(rule->use_params[1].first, "DEPTH");
 }
 
-// use_clause: use [lib.] cell named_parameter_assignment (combined form)
 TEST(SourceText, ConfigUseCellAndParams) {
   auto r = Parse(
       "config cfg11;\n"
@@ -91,9 +86,6 @@ TEST_F(ApiParseTest, ConfigInstanceClauseUseConfig) {
   EXPECT_TRUE(inst_rule->use_config);
 }
 
-// =============================================================================
-// §33.4.1.3/6 Instance clause with use binding
-// =============================================================================
 TEST_F(ConfigTest, InstanceUseClause) {
   auto* unit = Parse(R"(
     config cfg;
@@ -129,7 +121,7 @@ TEST_F(ConfigTest, CellClauseWithLibUse) {
 }
 
 TEST(ParserSection34, ConfigWithUseClause) {
-  // Config with use clause to specify library cell binding
+
   auto r = Parse(R"(
     config map_cfg;
       design work.top;
@@ -142,4 +134,4 @@ TEST(ParserSection34, ConfigWithUseClause) {
   ASSERT_GE(r.cu->configs[0]->rules.size(), 1u);
 }
 
-}  // namespace
+}

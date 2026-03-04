@@ -1,5 +1,3 @@
-// §16.9.7: OR operation
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -38,4 +33,4 @@ TEST(SvaEngine, SequenceOperatorOr) {
   EXPECT_FALSE(EvalSequenceOr(false, false));
 }
 
-}  // namespace
+}

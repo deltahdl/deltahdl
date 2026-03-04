@@ -1,5 +1,3 @@
-// §21.3.8: Detecting EOF
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -20,4 +18,4 @@ TEST(ParserSection21, FeofFerror) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

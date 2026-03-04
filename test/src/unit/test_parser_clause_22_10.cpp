@@ -1,5 +1,3 @@
-// §22.10: `celldefine and `endcelldefine
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -15,4 +13,4 @@ TEST(ParserSection22, CelldefineEndcelldefine) {
               "`endcelldefine\n"));
 }
 
-}  // namespace
+}

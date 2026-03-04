@@ -1,5 +1,3 @@
-// §11.4.2: Increment and decrement operators
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "simulator/eval.h"
@@ -10,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.3 Expressions — Simulation
-// =============================================================================
-// § inc_or_dec_expression — prefix increment
 TEST(SimA83, PrefixIncrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,7 +25,6 @@ TEST(SimA83, PrefixIncrement) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-// § inc_or_dec_expression — prefix decrement
 TEST(SimA83, PrefixDecrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -49,7 +42,6 @@ TEST(SimA83, PrefixDecrement) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-// § inc_or_dec_expression — postfix increment
 TEST(SimA83, PostfixIncrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -67,7 +59,6 @@ TEST(SimA83, PostfixIncrement) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-// § inc_or_dec_expression — postfix decrement
 TEST(SimA83, PostfixDecrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -85,7 +76,6 @@ TEST(SimA83, PostfixDecrement) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-// § variable_lvalue — pre-increment
 TEST(SimA85, VarLvaluePreIncrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -103,7 +93,6 @@ TEST(SimA85, VarLvaluePreIncrement) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-// § variable_lvalue — post-decrement
 TEST(SimA85, VarLvaluePostDecrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -141,7 +130,7 @@ static Variable* MakeRealVarAdv(SimFixture& f, std::string_view name,
 
 TEST(EvalAdv, RealIncrementBy1Point0) {
   SimFixture f;
-  // §11.4.2: ++real_var should increment by 1.0, not by integer 1.
+
   MakeRealVarAdv(f, "rv", 2.5);
   auto* inc = f.arena.Create<Expr>();
   inc->kind = ExprKind::kUnary;
@@ -152,4 +141,4 @@ TEST(EvalAdv, RealIncrementBy1Point0) {
   EXPECT_DOUBLE_EQ(AdvToDouble(result), 3.5);
 }
 
-}  // namespace
+}

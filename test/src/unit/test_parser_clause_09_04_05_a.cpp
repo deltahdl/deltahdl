@@ -1,5 +1,3 @@
-// §9.4.5: Intra-assignment timing controls
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Intra-assignment delay: var = #delay expr.
 TEST(ParserA223, IntraAssignmentDelay) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -16,7 +13,7 @@ TEST(ParserA223, IntraAssignmentDelay) {
               "endmodule"));
 }
 TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
-  // §10.4.2: blocking with intra-assignment event
+
   auto r = Parse(
       "module m;\n"
       "  initial begin a = @(posedge clk) b; end\n"
@@ -31,7 +28,7 @@ TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
 }
 
 TEST(ParserA602, BlockingAssignment_WithRepeatEvent) {
-  // §9.4.5: repeat(N) @(event) intra-assignment timing
+
   auto r = Parse(
       "module m;\n"
       "  initial begin a = repeat(3) @(posedge clk) b; end\n"
@@ -46,7 +43,7 @@ TEST(ParserA602, BlockingAssignment_WithRepeatEvent) {
 }
 
 TEST(ParserA602, BlockingAssignment_ParenthesizedIntraDelay) {
-  // Parenthesized intra-assignment delay with min:typ:max
+
   auto r = Parse(
       "module m;\n"
       "  initial begin a = #(1:2:3) b; end\n"
@@ -60,7 +57,7 @@ TEST(ParserA602, BlockingAssignment_ParenthesizedIntraDelay) {
 }
 
 TEST(ParserA602, NonblockingAssignment_WithRepeatEvent) {
-  // Nonblocking with repeat(N) @(event) intra-assignment timing
+
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= repeat(2) @(posedge clk) d; end\n"
@@ -86,7 +83,7 @@ TEST(ParserSection9, RepeatEventControlNonblocking) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
   EXPECT_FALSE(stmt->events.empty());
 }
-// --- 2. Blocking assignment with intra-assignment delay: a = #10 b ---
+
 TEST(ParserSection10, Sec10_4_1_IntraAssignDelay) {
   auto r = Parse(
       "module m;\n"
@@ -107,7 +104,6 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignDelay) {
   EXPECT_EQ(stmt->rhs->text, "b");
 }
 
-// --- 3. Blocking assignment with intra-assignment event control ---
 TEST(ParserSection10, Sec10_4_1_IntraAssignEvent) {
   auto r = Parse(
       "module m;\n"
@@ -126,10 +122,7 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignEvent) {
   ASSERT_NE(stmt->lhs, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
 }
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event control (blocking)
-// =============================================================================
-// Blocking repeat event with posedge: a = repeat(3) @(posedge clk) b;
+
 TEST(ParserSection9, Sec9_4_5_BlockingRepeatPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -146,10 +139,6 @@ TEST(ParserSection9, Sec9_4_5_BlockingRepeatPosedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event control (nonblocking)
-// =============================================================================
-// Nonblocking repeat event with posedge: a <= repeat(2) @(posedge clk) b;
 TEST(ParserSection9, Sec9_4_5_NonblockingRepeatPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -166,10 +155,6 @@ TEST(ParserSection9, Sec9_4_5_NonblockingRepeatPosedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event with negedge
-// =============================================================================
-// Repeat event with negedge: a = repeat(4) @(negedge clk) b;
 TEST(ParserSection9, Sec9_4_5_RepeatNegedge) {
   auto r = Parse(
       "module m;\n"
@@ -186,10 +171,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatNegedge) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event with bare signal (no edge specifier)
-// =============================================================================
-// Repeat event with bare signal: a = repeat(2) @(clk) b;
 TEST(ParserSection9, Sec9_4_5_RepeatBareSignal) {
   auto r = Parse(
       "module m;\n"
@@ -206,10 +187,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatBareSignal) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat count is a variable
-// =============================================================================
-// Repeat count is a variable: a = repeat(n) @(posedge clk) b;
 TEST(ParserSection9, Sec9_4_5_RepeatCountVariable) {
   auto r = Parse(
       "module m;\n"
@@ -225,7 +202,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountVariable) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
   EXPECT_NE(stmt->rhs, nullptr);
 }
-// --- 21. Nonblocking with repeat event control ---
+
 TEST(ParserSection10, Sec10_4_2_RepeatEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -246,10 +223,6 @@ TEST(ParserSection10, Sec10_4_2_RepeatEventControl) {
   EXPECT_EQ(stmt->rhs->text, "d");
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat count is a constant expression
-// =============================================================================
-// Repeat count is a constant expression: a = repeat(2+1) @(posedge clk) b;
 TEST(ParserSection9, Sec9_4_5_RepeatCountExpression) {
   auto r = Parse(
       "module m;\n"
@@ -264,10 +237,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountExpression) {
   EXPECT_EQ(stmt->repeat_event_count->kind, ExprKind::kBinary);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat count of 1
-// =============================================================================
-// Repeat count of 1: a = repeat(1) @(posedge clk) b;
 TEST(ParserSection9, Sec9_4_5_RepeatCountOne) {
   auto r = Parse(
       "module m;\n"
@@ -284,10 +253,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountOne) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat count of 0 (edge case)
-// =============================================================================
-// Repeat count of 0: a = repeat(0) @(posedge clk) b;
 TEST(ParserSection9, Sec9_4_5_RepeatCountZero) {
   auto r = Parse(
       "module m;\n"
@@ -302,7 +267,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountZero) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
-// --- 24. Nonblocking with negedge intra-assignment event ---
 TEST(ParserSection10, Sec10_4_2_IntraAssignEventNegedge) {
   auto r = Parse(
       "module m;\n"
@@ -321,10 +285,6 @@ TEST(ParserSection10, Sec10_4_2_IntraAssignEventNegedge) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 / 10.4.1 -- Intra-assignment delay (blocking)
-// =============================================================================
-// Blocking intra-assignment delay: a = #10 b;
 TEST(ParserSection9, Sec9_4_5_BlockingIntraDelay) {
   auto r = Parse(
       "module m;\n"
@@ -341,10 +301,6 @@ TEST(ParserSection9, Sec9_4_5_BlockingIntraDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 / 10.4.1 -- Intra-assignment delay (nonblocking)
-// =============================================================================
-// Nonblocking intra-assignment delay: a <= #5 b;
 TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelay) {
   auto r = Parse(
       "module m;\n"
@@ -361,10 +317,6 @@ TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 / 10.4.2 -- Intra-assignment event (blocking posedge)
-// =============================================================================
-// Blocking intra-assignment event: a = @(posedge clk) b;
 TEST(ParserSection9, Sec9_4_5_BlockingIntraEventPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -381,10 +333,6 @@ TEST(ParserSection9, Sec9_4_5_BlockingIntraEventPosedge) {
   EXPECT_EQ(stmt->repeat_event_count, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 / 10.4.2 -- Intra-assignment event (nonblocking negedge)
-// =============================================================================
-// Nonblocking intra-assignment event: a <= @(negedge clk) b;
 TEST(ParserSection9, Sec9_4_5_NonblockingIntraEventNegedge) {
   auto r = Parse(
       "module m;\n"
@@ -401,11 +349,6 @@ TEST(ParserSection9, Sec9_4_5_NonblockingIntraEventNegedge) {
   EXPECT_EQ(stmt->repeat_event_count, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event with multiple events (or)
-// =============================================================================
-// Repeat event with multiple events: a = repeat(3) @(posedge clk or negedge
-// rst) b;
 TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsOr) {
   auto r = Parse(
       "module m;\n"
@@ -423,11 +366,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsOr) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event with multiple events (comma)
-// =============================================================================
-// Repeat event with comma-separated events: a = repeat(2) @(posedge clk,
-// negedge rst) b;
 TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsComma) {
   auto r = Parse(
       "module m;\n"
@@ -455,10 +393,6 @@ static Stmt* FirstAlwaysStmt(ParseResult& r) {
   return nullptr;
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event in always block
-// =============================================================================
-// Repeat event used inside an always block body.
 TEST(ParserSection9, Sec9_4_5_RepeatInAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
@@ -485,10 +419,6 @@ static Stmt* FirstTaskStmt(ParseResult& r) {
   return nullptr;
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event in task
-// =============================================================================
-// Repeat event used in a task body.
 TEST(ParserSection9, Sec9_4_5_RepeatInTask) {
   auto r = Parse(
       "module m;\n"
@@ -506,10 +436,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatInTask) {
   ASSERT_FALSE(stmt->events.empty());
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Intra-assignment delay with expression
-// =============================================================================
-// Intra-assignment delay with parenthesized expression: a = #(x+y) b;
 TEST(ParserSection9, Sec9_4_5_IntraDelayExpression) {
   auto r = Parse(
       "module m;\n"
@@ -526,10 +452,6 @@ TEST(ParserSection9, Sec9_4_5_IntraDelayExpression) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Intra-assignment with real delay
-// =============================================================================
-// Intra-assignment with real-valued delay: a = #3.5 b;
 TEST(ParserSection9, Sec9_4_5_IntraDelayReal) {
   auto r = Parse(
       "module m;\n"
@@ -544,7 +466,6 @@ TEST(ParserSection9, Sec9_4_5_IntraDelayReal) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-// --- 26. Blocking assignment with negedge intra-assignment event ---
 TEST(ParserSection10, Sec10_4_1_IntraAssignNegedgeEvent) {
   auto r = Parse(
       "module m;\n"
@@ -562,10 +483,7 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignNegedgeEvent) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
   ASSERT_NE(stmt->rhs, nullptr);
 }
-// =============================================================================
-// LRM section 9.4.5 -- Multiple intra-assignment statements in sequence
-// =============================================================================
-// Multiple intra-assignment statements in the same begin-end block.
+
 TEST(ParserSection9, Sec9_4_5_MultipleIntraAssignSequence) {
   auto r = Parse(
       "module m;\n"
@@ -587,10 +505,6 @@ TEST(ParserSection9, Sec9_4_5_MultipleIntraAssignSequence) {
   ASSERT_FALSE(s1->events.empty());
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event with concatenation RHS
-// =============================================================================
-// Repeat event control with concatenation on RHS.
 TEST(ParserSection9, Sec9_4_5_RepeatConcatRhs) {
   auto r = Parse(
       "module m;\n"
@@ -608,10 +522,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatConcatRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event with function call on RHS
-// =============================================================================
-// Repeat event control with system function call on RHS.
 TEST(ParserSection9, Sec9_4_5_RepeatFuncCallRhs) {
   auto r = Parse(
       "module m;\n"
@@ -628,10 +538,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatFuncCallRhs) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event with edge keyword
-// =============================================================================
-// Repeat event with the 'edge' keyword: a = repeat(2) @(edge clk) b;
 TEST(ParserSection9, Sec9_4_5_RepeatEdgeKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -648,10 +554,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatEdgeKeyword) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kEdge);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Blocking assign with #0 delay
-// =============================================================================
-// Blocking assign with zero delay: a = #0 b;
 TEST(ParserSection9, Sec9_4_5_BlockingIntraDelayZero) {
   auto r = Parse(
       "module m;\n"
@@ -666,10 +568,6 @@ TEST(ParserSection9, Sec9_4_5_BlockingIntraDelayZero) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Nonblocking assign with #0 delay
-// =============================================================================
-// Nonblocking assign with zero delay: a <= #0 b;
 TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelayZero) {
   auto r = Parse(
       "module m;\n"
@@ -684,10 +582,6 @@ TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelayZero) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event with complex RHS expression
-// =============================================================================
-// Repeat event with a binary expression on the RHS.
 TEST(ParserSection9, Sec9_4_5_RepeatComplexRhs) {
   auto r = Parse(
       "module m;\n"
@@ -705,10 +599,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatComplexRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Intra-assignment event with multiple signals
-// =============================================================================
-// Intra-assignment event with multiple signals separated by 'or'.
 TEST(ParserSection9, Sec9_4_5_IntraEventMultipleSignals) {
   auto r = Parse(
       "module m;\n"
@@ -725,9 +615,7 @@ TEST(ParserSection9, Sec9_4_5_IntraEventMultipleSignals) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
   EXPECT_EQ(stmt->repeat_event_count, nullptr);
 }
-// ---------------------------------------------------------------------------
-// 27. Non-blocking assign with intra-assignment delay (a <= #2 b)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_NonblockingAssignWithDelay) {
   auto r = Parse(
       "module m;\n"
@@ -746,10 +634,6 @@ TEST(ParserSection4, Sec4_5_NonblockingAssignWithDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event in automatic task
-// =============================================================================
-// Repeat event inside an automatic task.
 TEST(ParserSection9, Sec9_4_5_RepeatInAutoTask) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -760,7 +644,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatInAutoTask) {
               "endmodule\n"));
 }
 
-// --- 3. Nonblocking with intra-assignment event: q <= @(posedge clk) d ---
 TEST(ParserSection10, Sec10_4_2_IntraAssignEventPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -780,9 +663,6 @@ TEST(ParserSection10, Sec10_4_2_IntraAssignEventPosedge) {
   EXPECT_EQ(stmt->rhs->text, "d");
 }
 
-// ---------------------------------------------------------------------------
-// 28. Intra-assignment delay on blocking assign (a = #5 b)
-// ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_BlockingIntraAssignDelay) {
   auto r = Parse(
       "module m;\n"
@@ -801,4 +681,4 @@ TEST(ParserSection4, Sec4_5_BlockingIntraAssignDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-}  // namespace
+}

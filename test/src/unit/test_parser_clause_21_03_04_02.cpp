@@ -1,5 +1,3 @@
-// §21.3.4.2: Reading a line at a time
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -18,4 +16,4 @@ TEST(ParserSection21, FgetsCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §7.3.1: Packed unions
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §7.3.1: Packed union validation
-// =============================================================================
 TEST(Elaboration, HardPackedUnion_SameWidth_OK) {
   ElabFixture f;
   ElaborateSrc(
@@ -43,4 +38,4 @@ TEST(Elaboration, HardPackedUnion_DifferentWidth_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

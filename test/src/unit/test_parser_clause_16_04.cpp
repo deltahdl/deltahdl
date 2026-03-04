@@ -1,16 +1,10 @@
-// §16.4: Deferred assertions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// =============================================================================
-// §16.4 Deferred assertions — additional forms
-// =============================================================================
 TEST(ParserSection16, DeferredAssumeHash0WithAction) {
   auto r = Parse(
       "module m;\n"
@@ -22,10 +16,6 @@ TEST(ParserSection16, DeferredAssumeHash0WithAction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// =============================================================================
-// A.6.10 — deferred_immediate_assert_statement
-// =============================================================================
-// assert #0 ( expression ) ;
 TEST(ParserA610, DeferredAssertHash0) {
   auto r = Parse(
       "module m;\n"
@@ -39,7 +29,6 @@ TEST(ParserA610, DeferredAssertHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-// assert final ( expression ) ;
 TEST(ParserA610, DeferredAssertFinal) {
   auto r = Parse(
       "module m;\n"
@@ -53,10 +42,6 @@ TEST(ParserA610, DeferredAssertFinal) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-// =============================================================================
-// A.6.10 — deferred_immediate_assume_statement
-// =============================================================================
-// assume #0 ( expression ) ;
 TEST(ParserA610, DeferredAssumeHash0) {
   auto r = Parse(
       "module m;\n"
@@ -70,7 +55,6 @@ TEST(ParserA610, DeferredAssumeHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-// assume final ( expression ) ;
 TEST(ParserA610, DeferredAssumeFinal) {
   auto r = Parse(
       "module m;\n"
@@ -84,10 +68,6 @@ TEST(ParserA610, DeferredAssumeFinal) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-// =============================================================================
-// A.6.10 — deferred_immediate_cover_statement
-// =============================================================================
-// cover #0 ( expression ) ;
 TEST(ParserA610, DeferredCoverHash0) {
   auto r = Parse(
       "module m;\n"
@@ -101,7 +81,6 @@ TEST(ParserA610, DeferredCoverHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-// cover final ( expression ) ;
 TEST(ParserA610, DeferredCoverFinal) {
   auto r = Parse(
       "module m;\n"
@@ -115,4 +94,4 @@ TEST(ParserA610, DeferredCoverFinal) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-}  // namespace
+}

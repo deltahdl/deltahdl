@@ -1,12 +1,9 @@
-// §28.16.2.2: Delay specification for charge decay time
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// §6.7.1: Trireg with charge strength and delay combined.
 TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithDelay) {
   auto r = Parse(
       "module t;\n"
@@ -50,4 +47,4 @@ TEST(ParserSection6, TriregThreeDelay_FallAndDecay) {
   EXPECT_EQ(item->net_delay_decay->int_val, 50u);
 }
 
-}  // namespace
+}

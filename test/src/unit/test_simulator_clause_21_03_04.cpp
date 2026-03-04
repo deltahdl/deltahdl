@@ -1,5 +1,3 @@
-// §21.3.4: Reading data from a file
-
 #include <cstdio>
 #include <fstream>
 
@@ -153,4 +151,4 @@ TEST(SysTask, FreadReadsBinary) {
   std::remove(tmp.c_str());
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §10.3.2: The continuous assignment statement
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -51,4 +49,4 @@ TEST(SynthLower, AssignConstantZero) {
   EXPECT_EQ(aig->outputs[0], AigGraph::kConstFalse);
 }
 
-}  // namespace
+}

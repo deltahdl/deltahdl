@@ -1,5 +1,3 @@
-// §6.19.5.6: Name()
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,9 +9,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture: sets up SimContext with an enum type and variable
-// =============================================================================
 static std::string ExtractEnumName(const Logic4Vec& result) {
   std::string name_str;
   uint64_t v = result.ToUint64();
@@ -27,14 +22,11 @@ static std::string ExtractEnumName(const Logic4Vec& result) {
 
 namespace {
 
-// =============================================================================
-// §6.19.5.6: name() — returns the string name of the current value
-// =============================================================================
 TEST(EnumMethods, NameReturnsStringRep) {
   EnumFixture f;
   auto* var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 1);  // GREEN
+  var->value = MakeLogic4VecVal(f.arena, 32, 1);
   auto* call = f.MakeEnumMethodCall("color", "name");
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(ExtractEnumName(result), "GREEN");
@@ -44,10 +36,10 @@ TEST(EnumMethods, NameForFirstMember) {
   EnumFixture f;
   auto* var = f.RegisterEnum("color", "color_t",
                              {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);  // RED
+  var->value = MakeLogic4VecVal(f.arena, 32, 0);
   auto* call = f.MakeEnumMethodCall("color", "name");
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(ExtractEnumName(result), "RED");
 }
 
-}  // namespace
+}

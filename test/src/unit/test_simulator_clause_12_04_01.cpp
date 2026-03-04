@@ -1,5 +1,3 @@
-// §12.4.1: if–else–if construct
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §12.4.1: if-else-if chain selects correct branch
 TEST(SimA606, IfElseIfChainSelectsCorrectBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +29,6 @@ TEST(SimA606, IfElseIfChainSelectsCorrectBranch) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// §12.4.1: if-else-if chain falls through to final else
 TEST(SimA606, IfElseIfFallsToElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -55,4 +51,4 @@ TEST(SimA606, IfElseIfFallsToElse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

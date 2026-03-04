@@ -1,5 +1,3 @@
-// §10.4.1: Blocking procedural assignments
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -12,7 +10,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — part select blocking assignment
 TEST(SimA85, VarLvaluePartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -30,7 +27,6 @@ TEST(SimA85, VarLvaluePartSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
 }
 
-// § variable_lvalue — concatenation LHS blocking assignment
 TEST(SimA85, VarLvalueConcatenation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -42,7 +38,6 @@ TEST(SimA85, VarLvalueConcatenation) {
   LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0x5u}});
 }
 
-// § variable_lvalue — multi-dimensional array element
 TEST(SimA85, VarLvalueMultiDimArray) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -60,24 +55,6 @@ TEST(SimA85, VarLvalueMultiDimArray) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// 12. §4.2 Guaranteed ordering: later blocking assignments overwrite earlier
-//     ones in the same begin-end block.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, BlockingOverwriteInOrder) {
   auto result = RunAndGet(
       "module t;\n"
@@ -96,7 +73,6 @@ TEST(CompiledSim, ExecuteBlockingAssign) {
   auto* x_var = f.ctx.CreateVariable("x", 32);
   x_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // Build AST: x = 42
   auto* lhs = f.arena.Create<Expr>();
   lhs->kind = ExprKind::kIdentifier;
   lhs->text = "x";
@@ -118,15 +94,11 @@ TEST(CompiledSim, ExecuteBlockingAssign) {
   EXPECT_EQ(x_var->value.ToUint64(), 42u);
 }
 
-// =============================================================================
-// 24. Blocking assignment to bit-select LHS (§7.4 / §10.3)
-// =============================================================================
 TEST(StmtExec, BlockingAssignBitSelect) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("bs", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0);
 
-  // bs[3] = 1;
   auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeId(f.arena, "bs");
@@ -138,18 +110,14 @@ TEST(StmtExec, BlockingAssignBitSelect) {
   stmt->rhs = MakeInt(f.arena, 1);
 
   RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 0x08u);  // bit 3 set
+  EXPECT_EQ(var->value.ToUint64(), 0x08u);
 }
 
-// =============================================================================
-// 25. Blocking assignment to part-select LHS (§7.4.5 / §10.3)
-// =============================================================================
 TEST(StmtExec, BlockingAssignPartSelect) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("ps", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 0x0F);
 
-  // ps[7:4] = 4'hA;
   auto* sel = f.arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = MakeId(f.arena, "ps");
@@ -162,19 +130,15 @@ TEST(StmtExec, BlockingAssignPartSelect) {
   stmt->rhs = MakeInt(f.arena, 0xA);
 
   RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 0xAFu);  // upper nibble = A, lower = F
+  EXPECT_EQ(var->value.ToUint64(), 0xAFu);
 }
 
-// =============================================================================
-// 26. Blocking assignment to member-access LHS (§7.2 / §10.3)
-// =============================================================================
 TEST(StmtExec, BlockingAssignMemberAccess) {
   StmtFixture f;
-  // Create variable "s.a" to represent a struct member.
+
   auto* var = f.ctx.CreateVariable("s.a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // s.a = 42;
   auto* mem = f.arena.Create<Expr>();
   mem->kind = ExprKind::kMemberAccess;
   mem->lhs = MakeId(f.arena, "s");
@@ -189,4 +153,4 @@ TEST(StmtExec, BlockingAssignMemberAccess) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

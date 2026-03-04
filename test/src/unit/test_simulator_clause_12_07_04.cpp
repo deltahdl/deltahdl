@@ -1,5 +1,3 @@
-// §12.7.4: The while-loop
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- while ---
-// §12.7.4: while loop — accumulate sum
 TEST(SimA608, WhileBasic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -30,7 +26,6 @@ TEST(SimA608, WhileBasic) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §12.7.4: while loop — condition false initially, zero iterations
 TEST(SimA608, WhileZeroIter) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -51,4 +46,4 @@ TEST(SimA608, WhileZeroIter) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

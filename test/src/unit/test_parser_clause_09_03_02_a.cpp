@@ -1,5 +1,3 @@
-// §9.3.2: Parallel blocks
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -27,10 +25,6 @@ TEST(ParserA28, BlockItemInForkJoinNone) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// par_block: fork...join_keyword
-// ---------------------------------------------------------------------------
-// §9.3.2: Basic fork...join
 TEST(ParserA603, ForkJoin) {
   auto r = Parse(
       "module m;\n"
@@ -47,7 +41,6 @@ TEST(ParserA603, ForkJoin) {
   EXPECT_EQ(stmt->fork_stmts.size(), 2u);
 }
 
-// §9.3.2: fork...join_any
 TEST(ParserA603, ForkJoinAny) {
   auto r = Parse(
       "module m;\n"
@@ -61,7 +54,6 @@ TEST(ParserA603, ForkJoinAny) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
 }
 
-// §9.3.2: fork...join_none
 TEST(ParserA603, ForkJoinNone) {
   auto r = Parse(
       "module m;\n"
@@ -75,7 +67,6 @@ TEST(ParserA603, ForkJoinNone) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
 }
 
-// §9.3.2: Empty fork...join
 TEST(ParserA603, ForkJoinEmpty) {
   auto r = Parse(
       "module m;\n"
@@ -91,9 +82,6 @@ TEST(ParserA603, ForkJoinEmpty) {
   EXPECT_EQ(stmt->fork_stmts.size(), 0u);
 }
 
-// ---------------------------------------------------------------------------
-// 26. Fork with for loop as a thread
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkWithForLoop) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -106,9 +94,7 @@ TEST(ParserSection9, Sec9_3_2_ForkWithForLoop) {
               "  end\n"
               "endmodule\n"));
 }
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with fork-join inside.
-// =============================================================================
+
 TEST(ParserSection9, Sec9_3_1_BlockWithForkJoinInside) {
   auto r = Parse(
       "module m;\n"
@@ -128,7 +114,6 @@ TEST(ParserSection9, Sec9_3_1_BlockWithForkJoinInside) {
   EXPECT_GE(stmt->fork_stmts.size(), 2u);
 }
 
-// §9.3.2: Fork with block_item_declaration (variable in fork scope)
 TEST(ParserA603, ForkWithVarDecl) {
   auto r = Parse(
       "module m;\n"
@@ -149,7 +134,6 @@ TEST(ParserA603, ForkWithVarDecl) {
   EXPECT_TRUE(stmt->fork_stmts[0]->var_is_automatic);
 }
 
-// §9.3.2: Fork with multiple concurrent statements
 TEST(ParserA603, ForkMultipleStmts) {
   auto r = Parse(
       "module m;\n"
@@ -168,7 +152,6 @@ TEST(ParserA603, ForkMultipleStmts) {
   EXPECT_EQ(stmt->fork_stmts.size(), 3u);
 }
 
-// §9.3.2: Fork with begin...end sub-blocks (each is one concurrent process)
 TEST(ParserA603, ForkWithBeginEndSubBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -194,9 +177,6 @@ TEST(ParserA603, ForkWithBeginEndSubBlocks) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
 }
 
-// ---------------------------------------------------------------------------
-// 27. Fork-join in program block
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkJoinInProgramBlock) {
   EXPECT_TRUE(
       ParseOk("program p;\n"
@@ -208,9 +188,7 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinInProgramBlock) {
               "  end\n"
               "endprogram\n"));
 }
-// ---------------------------------------------------------------------------
-// 28. Fork with if-else as thread
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_3_2_ForkWithIfElseThread) {
   auto r = Parse(
       "module m;\n"
@@ -230,9 +208,7 @@ TEST(ParserSection9, Sec9_3_2_ForkWithIfElseThread) {
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kDelay);
 }
-// =============================================================================
-// §9.3.1 -- automatic variable declarations in fork blocks
-// =============================================================================
+
 TEST(ParserSection9, AutomaticVarInFork) {
   auto r = Parse(
       "module m;\n"
@@ -251,9 +227,6 @@ TEST(ParserSection9, AutomaticVarInFork) {
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-// ---------------------------------------------------------------------------
-// 30. Fork with assignment and delay in same thread
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkThreadWithDelayedAssign) {
   auto r = Parse(
       "module m;\n"
@@ -278,7 +251,7 @@ TEST(ParserSection9, Sec9_3_2_ForkThreadWithDelayedAssign) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   ASSERT_EQ(stmt->fork_stmts.size(), 2u);
-  // Each thread block should contain assign, delay, assign
+
   for (size_t i = 0; i < 2; ++i) {
     auto* thread = stmt->fork_stmts[i];
     EXPECT_EQ(thread->kind, StmtKind::kBlock);
@@ -286,16 +259,6 @@ TEST(ParserSection9, Sec9_3_2_ForkThreadWithDelayedAssign) {
   }
 }
 
-// =============================================================================
-// LRM section 9.3.2 -- Parallel blocks (fork-join)
-//
-// This file provides extended coverage of fork...join / join_any / join_none
-// parallel block constructs beyond the basics already tested in
-// test_parser_clause09.cpp.
-// =============================================================================
-// ---------------------------------------------------------------------------
-// 1. Basic fork-join with two delay-controlled statements
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkJoinTwoDelayedStmts) {
   auto r = Parse(
       "module m;\n"
@@ -316,9 +279,7 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinTwoDelayedStmts) {
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kDelay);
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kDelay);
 }
-// =============================================================================
-// §4.6: Fork-join ordering — all branches complete
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_ForkJoinAllComplete) {
   auto r = Parse(
       "module m;\n"
@@ -335,9 +296,6 @@ TEST(ParserSection4, Sec4_6_ForkJoinAllComplete) {
   EXPECT_EQ(body->join_kind, TokenKind::kKwJoin);
 }
 
-// ---------------------------------------------------------------------------
-// 2. Fork-join with three parallel threads
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkJoinThreeThreads) {
   auto r = Parse(
       "module m;\n"
@@ -357,9 +315,6 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinThreeThreads) {
   EXPECT_EQ(stmt->fork_stmts.size(), 3u);
 }
 
-// =============================================================================
-// §4.6: Fork-join_any ordering — first branch completes
-// =============================================================================
 TEST(ParserSection4, Sec4_6_ForkJoinAnyFirstComplete) {
   auto r = Parse(
       "module m;\n"
@@ -376,9 +331,6 @@ TEST(ParserSection4, Sec4_6_ForkJoinAnyFirstComplete) {
   EXPECT_EQ(body->join_kind, TokenKind::kKwJoinAny);
 }
 
-// =============================================================================
-// §4.6: Fork-join_none ordering — all branches concurrent
-// =============================================================================
 TEST(ParserSection4, Sec4_6_ForkJoinNoneConcurrent) {
   auto r = Parse(
       "module m;\n"
@@ -395,9 +347,6 @@ TEST(ParserSection4, Sec4_6_ForkJoinNoneConcurrent) {
   EXPECT_EQ(body->join_kind, TokenKind::kKwJoinNone);
 }
 
-// ---------------------------------------------------------------------------
-// 3. Fork-join_any with two threads
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkJoinAnyTwoThreads) {
   auto r = Parse(
       "module m;\n"
@@ -432,9 +381,6 @@ TEST(ParserSection9, ParallelBlockVarDeclInFork) {
   ASSERT_GE(stmt->fork_stmts.size(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 4. Fork-join_none with a single thread
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkJoinNoneSingleThread) {
   auto r = Parse(
       "module m;\n"
@@ -470,9 +416,6 @@ TEST(ParserSection9, ParallelBlockNestedBeginInFork) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
 }
 
-// ---------------------------------------------------------------------------
-// 6. Named fork-join_any
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_NamedForkJoinAny) {
   auto r = Parse(
       "module m;\n"
@@ -492,9 +435,6 @@ TEST(ParserSection9, Sec9_3_2_NamedForkJoinAny) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
 }
 
-// ---------------------------------------------------------------------------
-// 8. Fork with begin-end blocks as threads
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkWithBeginEndThreads) {
   auto r = Parse(
       "module m;\n"
@@ -518,13 +458,10 @@ TEST(ParserSection9, Sec9_3_2_ForkWithBeginEndThreads) {
   ASSERT_EQ(stmt->fork_stmts.size(), 2u);
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlock);
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
-  // First block contains two delay-controlled statements
+
   EXPECT_EQ(stmt->fork_stmts[0]->stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 9. Fork with mixed single statements and begin-end blocks
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkMixedStmtsAndBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -549,9 +486,7 @@ TEST(ParserSection9, Sec9_3_2_ForkMixedStmtsAndBlocks) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kBlock);
   EXPECT_EQ(stmt->fork_stmts[2]->kind, StmtKind::kDelay);
 }
-// ---------------------------------------------------------------------------
-// 16. fork-join block (concurrent scheduling)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_ForkJoin) {
   auto r = Parse(
       "module m;\n"
@@ -572,9 +507,6 @@ TEST(ParserSection4, Sec4_5_ForkJoin) {
   EXPECT_GE(stmt->fork_stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 10. Fork with delay controls in threads
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkDelayControlsInThreads) {
   auto r = Parse(
       "module m;\n"
@@ -591,14 +523,11 @@ TEST(ParserSection9, Sec9_3_2_ForkDelayControlsInThreads) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   ASSERT_EQ(stmt->fork_stmts.size(), 2u);
-  // First thread has two delay controls inside a block
+
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlock);
   EXPECT_GE(stmt->fork_stmts[0]->stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 17. fork-join_any block
-// ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_ForkJoinAny) {
   auto r = Parse(
       "module m;\n"
@@ -618,9 +547,6 @@ TEST(ParserSection4, Sec4_5_ForkJoinAny) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
 }
 
-// ---------------------------------------------------------------------------
-// 11. Fork with event controls in threads
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkEventControlsInThreads) {
   auto r = Parse(
       "module m;\n"
@@ -642,9 +568,6 @@ TEST(ParserSection9, Sec9_3_2_ForkEventControlsInThreads) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kEventControl);
 }
 
-// ---------------------------------------------------------------------------
-// 18. fork-join_none block
-// ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_ForkJoinNone) {
   auto r = Parse(
       "module m;\n"
@@ -664,9 +587,6 @@ TEST(ParserSection4, Sec4_5_ForkJoinNone) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
 }
 
-// ---------------------------------------------------------------------------
-// 12. Nested fork inside fork
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_NestedForkInsideFork) {
   auto r = Parse(
       "module m;\n"
@@ -688,7 +608,7 @@ TEST(ParserSection9, Sec9_3_2_NestedForkInsideFork) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   ASSERT_EQ(stmt->fork_stmts.size(), 2u);
-  // First thread is a block containing a nested fork
+
   auto* inner_block = stmt->fork_stmts[0];
   EXPECT_EQ(inner_block->kind, StmtKind::kBlock);
   ASSERT_GE(inner_block->stmts.size(), 1u);
@@ -696,9 +616,6 @@ TEST(ParserSection9, Sec9_3_2_NestedForkInsideFork) {
   EXPECT_EQ(inner_block->stmts[0]->fork_stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 13. Fork inside begin-end inside fork
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkInBeginInFork) {
   auto r = Parse(
       "module m;\n"
@@ -727,9 +644,6 @@ TEST(ParserSection9, Sec9_3_2_ForkInBeginInFork) {
   EXPECT_EQ(block->stmts[1]->join_kind, TokenKind::kKwJoinNone);
 }
 
-// ---------------------------------------------------------------------------
-// 14. Variable declaration in fork block
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_VarDeclInFork) {
   auto r = Parse(
       "module m;\n"
@@ -749,4 +663,4 @@ TEST(ParserSection9, Sec9_3_2_VarDeclInFork) {
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §23.4: Nested modules
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =========================================================================
-// LRM section 23.4: Nested modules
-// =========================================================================
 TEST(ParserSection23, NestedModuleParsesOk) {
   EXPECT_TRUE(
       ParseOk("module outer;\n"
@@ -37,4 +32,4 @@ TEST(ParserSection23, NestedModuleMultiple) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

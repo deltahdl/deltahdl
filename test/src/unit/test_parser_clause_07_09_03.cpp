@@ -1,5 +1,3 @@
-// §7.9.3: Exists()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -20,4 +18,4 @@ TEST(ParserSection7, AssocArrayExistsMethod) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

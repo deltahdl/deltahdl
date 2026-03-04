@@ -1,5 +1,3 @@
-// Annex A.2.11: Covergroup declarations
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -33,4 +31,4 @@ TEST(ParserA211, HierarchicalBtfIdentifier_Dotted) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

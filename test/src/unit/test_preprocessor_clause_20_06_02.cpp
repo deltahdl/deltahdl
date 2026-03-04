@@ -1,5 +1,3 @@
-// §20.6.2: Expression size system function
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 
@@ -19,4 +17,4 @@ TEST(ParserSection6, TypeRefInBitsCast) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

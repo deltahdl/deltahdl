@@ -1,12 +1,9 @@
-// §14.5: Hierarchical expressions
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Clocking block with hierarchical expression elaborates
 TEST(ElabA611, HierExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,4 +17,4 @@ TEST(ElabA611, HierExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

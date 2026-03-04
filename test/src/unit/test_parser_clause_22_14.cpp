@@ -1,5 +1,3 @@
-// §22.14: `begin_keywords, `end_keywords
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// ============================================================================
-// LRM section 22.14 -- `begin_keywords, `end_keywords
-// ============================================================================
 TEST(ParserSection22, BeginKeywords1800_2023) {
   EXPECT_TRUE(
       ParseOk("`begin_keywords \"1800-2023\"\n"
@@ -36,4 +31,4 @@ TEST(ParserSection22, BeginKeywordsMultipleModules) {
               "`end_keywords\n"));
 }
 
-}  // namespace
+}

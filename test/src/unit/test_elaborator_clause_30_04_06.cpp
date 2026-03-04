@@ -1,12 +1,9 @@
-// §30.4.6: Declaring multiple module paths in a single statement
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Mixed terminal forms together elaborate
 TEST(ElabA703, MixedTerminalFormsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,4 +17,4 @@ TEST(ElabA703, MixedTerminalFormsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

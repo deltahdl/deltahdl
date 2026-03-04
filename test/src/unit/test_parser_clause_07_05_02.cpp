@@ -1,14 +1,10 @@
-// §7.5.2: Size()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- §5.13 Built-in methods ---
 namespace {
 
-// From test_parser_clause_05.cpp
 TEST(ParserCh513, BuiltInMethodCall_Parse) {
   auto r = Parse(
       "module t;\n"
@@ -24,7 +20,7 @@ TEST(ParserCh513, BuiltInMethodCall_Parse) {
 }
 
 TEST(ParserCh513, BuiltInMethodCall_Callee) {
-  // The callee_expr should be the full member-access expression.
+
   auto r = Parse(
       "module t;\n"
       "  initial x = arr.size();\n"
@@ -38,7 +34,6 @@ TEST(ParserCh513, BuiltInMethodCall_Callee) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
 }
 
-// --- Test helpers ---
 TEST(ParserSection7c, DynamicArraySize) {
   auto r = Parse(
       "module m;\n"
@@ -52,9 +47,7 @@ TEST(ParserSection7c, DynamicArraySize) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// =========================================================================
-// §7.5.2/7.5.3: Dynamic array size() and delete()
-// =========================================================================
+
 TEST(ParserSection7, DynamicArraySizeMethod) {
   auto r = Parse(
       "module t;\n"
@@ -69,4 +62,4 @@ TEST(ParserSection7, DynamicArraySizeMethod) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

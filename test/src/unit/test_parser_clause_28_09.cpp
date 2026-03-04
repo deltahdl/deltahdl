@@ -1,5 +1,3 @@
-// §28.9: CMOS switches
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -8,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #1: gate_instantiation (cmos_switchtype alternative)
-// gate_instantiation ::=
-//   cmos_switchtype [delay3] cmos_switch_instance {, cmos_switch_instance} ;
-// =============================================================================
 TEST(ParserA301, GateInst_CmosBasic) {
   auto r = Parse(
       "module m;\n"
@@ -59,12 +52,6 @@ TEST(ParserA301, GateInst_CmosWithDelay3) {
   EXPECT_NE(g->gate_delay_decay, nullptr);
 }
 
-// =============================================================================
-// A.3.1 Production #2: cmos_switch_instance
-// cmos_switch_instance ::= [name_of_instance]
-//   ( output_terminal , input_terminal , ncontrol_terminal , pcontrol_terminal
-//   )
-// =============================================================================
 TEST(ParserA301, CmosSwitchInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
@@ -85,9 +72,6 @@ TEST(ParserA301, GateInst_AllCmosSwitchTypes) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.3.4 Production #1: cmos_switchtype ::= cmos | rcmos
-// =============================================================================
 TEST(ParserA304, CmosSwitchtype_Cmos) {
   auto r = Parse(
       "module m;\n"
@@ -110,4 +94,4 @@ TEST(ParserA304, CmosSwitchtype_Rcmos) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-}  // namespace
+}

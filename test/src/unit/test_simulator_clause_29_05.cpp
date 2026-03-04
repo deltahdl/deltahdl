@@ -1,5 +1,3 @@
-// §29.5: Level-sensitive sequential UDPs
-
 #include <gtest/gtest.h>
 
 #include "builders_udp.h"
@@ -53,4 +51,4 @@ TEST(UdpLevelSeq, NoChange) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-}  // namespace
+}

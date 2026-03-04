@@ -1,5 +1,3 @@
-// §4.2: Execution of a hardware model and its verification environment
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -7,26 +5,8 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
-
 namespace {
 
-// ---------------------------------------------------------------------------
-// 3. §4.2 Parallel processes with sequential bodies: each process has its
-//    own sequential flow, but processes run concurrently.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, ParallelProcessesSequentialBodies) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,9 +34,6 @@ TEST(SimCh4, ParallelProcessesSequentialBodies) {
   EXPECT_EQ(vb->value.ToUint64(), 27u);
 }
 
-// ---------------------------------------------------------------------------
-// 11. §4.2 Parallel processes: three independent initial blocks all complete.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, ThreeParallelInitialBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -76,10 +53,6 @@ TEST(SimCh4, ThreeParallelInitialBlocks) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 33u);
 }
 
-// ---------------------------------------------------------------------------
-// 18. §4.2 Parallel execution with conditional logic: two processes with
-//     independent if-else blocks.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, ParallelConditionalLogic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -103,10 +76,6 @@ TEST(SimCh4, ParallelConditionalLogic) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0u);
 }
 
-// ---------------------------------------------------------------------------
-// 23. §4.2 Processes at varying abstraction levels: initial (behavioral),
-//     assign (dataflow), and always_comb (combinational) all cooperate.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, ThreeAbstractionLevels) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -121,10 +90,10 @@ TEST(SimCh4, ThreeAbstractionLevels) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // a=3, b=6 (shift left), c=7
+
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 3u);
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 6u);
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 7u);
 }
 
-}  // namespace
+}

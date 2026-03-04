@@ -1,5 +1,3 @@
-// §31.9.1: Requirements for accurate simulation
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.2 Sim — delayed_data with bracket index simulates
-// =============================================================================
 TEST(SimA70502, DelayedDataBracketSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,4 +26,4 @@ TEST(SimA70502, DelayedDataBracketSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-}  // namespace
+}

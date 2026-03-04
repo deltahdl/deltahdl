@@ -1,5 +1,3 @@
-// §18.9: Controlling constraints with constraint_mode()
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.9: constraint_mode() enable/disable
-// =============================================================================
 TEST(Constraint, ConstraintModeDisable_ActiveSolve) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -88,4 +83,4 @@ TEST(Constraint, ConstraintModeReEnable) {
   EXPECT_EQ(solver.GetValue("x"), 77);
 }
 
-}  // namespace
+}

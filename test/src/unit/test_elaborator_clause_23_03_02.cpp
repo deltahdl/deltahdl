@@ -1,5 +1,3 @@
-// §23.3.2: Module instantiation syntax
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -24,4 +22,4 @@ TEST(Elaboration, PortBinding_UnknownModule) {
   EXPECT_EQ(mod->children[0].resolved, nullptr);
 }
 
-}  // namespace
+}

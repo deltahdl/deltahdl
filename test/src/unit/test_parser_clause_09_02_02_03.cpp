@@ -1,5 +1,3 @@
-// §9.2.2.3: Latched logic always_latch procedure
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -18,9 +16,7 @@ TEST(ParserA602, AlwaysConstruct_AlwaysLatch) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
 }
-// ---------------------------------------------------------------------------
-// 30. Three always_latch blocks in same module, counting them all.
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_3_ThreeAlwaysLatchBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -53,15 +49,6 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-// =============================================================================
-// LRM section 9.2.3 -- Always_latch procedure
-//
-// The always_latch procedure models latched logic.  It has an implicit
-// sensitivity list (no @(...) clause) and is expected to infer latches.
-// =============================================================================
-// ---------------------------------------------------------------------------
-// 1. Simple if-else latch pattern -- the canonical always_latch usage.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_SimpleIfElseLatch) {
   auto r = Parse(
       "module m;\n"
@@ -82,9 +69,6 @@ TEST(ParserSection9, Sec9_2_3_SimpleIfElseLatch) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 2. always_latch with begin-end block wrapping the body.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_BeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -104,9 +88,6 @@ TEST(ParserSection9, Sec9_2_3_BeginEndBlock) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
 }
 
-// ---------------------------------------------------------------------------
-// 3. if without else -- transparent latch (no else retains state).
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_IfWithoutElse) {
   auto r = Parse(
       "module m;\n"
@@ -125,9 +106,6 @@ TEST(ParserSection9, Sec9_2_3_IfWithoutElse) {
   EXPECT_EQ(item->body->else_branch, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 4. always_latch with case statement body.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_CaseStatement) {
   auto r = Parse(
       "module m;\n"
@@ -150,9 +128,6 @@ TEST(ParserSection9, Sec9_2_3_CaseStatement) {
   EXPECT_GE(item->body->case_items.size(), 3u);
 }
 
-// ---------------------------------------------------------------------------
-// 6. Multiple assignments inside a begin-end block.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_MultipleAssignments) {
   auto r = Parse(
       "module m;\n"
@@ -178,9 +153,6 @@ TEST(ParserSection9, Sec9_2_3_MultipleAssignments) {
   EXPECT_EQ(if_stmt->then_branch->stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 7. Complex conditions (logical operators in if expression).
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_ComplexConditions) {
   auto r = Parse(
       "module m;\n"
@@ -197,9 +169,7 @@ TEST(ParserSection9, Sec9_2_3_ComplexConditions) {
   ASSERT_NE(item->body->condition, nullptr);
   EXPECT_EQ(item->body->condition->kind, ExprKind::kBinary);
 }
-// =============================================================================
-// §4.6: always_latch with if (no else)
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_AlwaysLatchIfNoElse) {
   auto r = Parse(
       "module m;\n"
@@ -217,9 +187,6 @@ TEST(ParserSection4, Sec4_6_AlwaysLatchIfNoElse) {
   EXPECT_EQ(item->body->else_branch, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 8. Bit select on LHS of assignment.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_BitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -241,9 +208,6 @@ TEST(ParserSection9, Sec9_2_3_BitSelect) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
 }
 
-// ---------------------------------------------------------------------------
-// 9. Part select on LHS of assignment.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_PartSelect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -254,9 +218,6 @@ TEST(ParserSection9, Sec9_2_3_PartSelect) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// 10. Struct member access in assignment.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_StructMemberAccess) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -272,9 +233,6 @@ TEST(ParserSection9, Sec9_2_3_StructMemberAccess) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// 11. Function call in RHS expression.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_FunctionCallRHS) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -287,9 +245,7 @@ TEST(ParserSection9, Sec9_2_3_FunctionCallRHS) {
               "    if (en) q <= compute(d);\n"
               "endmodule\n"));
 }
-// =============================================================================
-// §9.2.2.4 -- always_ff procedure
-// =============================================================================
+
 TEST(ParserSection9b, AlwaysLatchMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
@@ -303,10 +259,7 @@ TEST(ParserSection9b, AlwaysLatchMultipleOutputs) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// Returns the first always_* item from the first module.
-// ---------------------------------------------------------------------------
-// 21. always_latch block
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_AlwaysLatch) {
   auto r = Parse(
       "module m;\n"
@@ -323,9 +276,6 @@ TEST(ParserSection4, Sec4_5_AlwaysLatch) {
   ASSERT_NE(item->body, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 17. Verify ModuleItemKind is kAlwaysLatchBlock.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_ModuleItemKindIsAlwaysLatchBlock) {
   auto r = Parse(
       "module m;\n"
@@ -344,9 +294,6 @@ TEST(ParserSection9, Sec9_2_3_ModuleItemKindIsAlwaysLatchBlock) {
   EXPECT_TRUE(found);
 }
 
-// ---------------------------------------------------------------------------
-// 18. always_latch has no sensitivity list (implicit).
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_NoSensitivityList) {
   auto r = Parse(
       "module m;\n"
@@ -372,9 +319,6 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult& r, size_t n) {
   return nullptr;
 }
 
-// ---------------------------------------------------------------------------
-// 19. Multiple always_latch blocks in the same module.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_MultipleAlwaysLatchBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -394,9 +338,6 @@ TEST(ParserSection9, Sec9_2_3_MultipleAlwaysLatchBlocks) {
   EXPECT_EQ(second->kind, ModuleItemKind::kAlwaysLatchBlock);
 }
 
-// ---------------------------------------------------------------------------
-// 22. Body verification: if-statement has correct condition and then branch.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_BodyVerificationIfCondition) {
   auto r = Parse(
       "module m;\n"
@@ -418,9 +359,6 @@ TEST(ParserSection9, Sec9_2_3_BodyVerificationIfCondition) {
   EXPECT_NE(body->then_branch->rhs, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 23. always_latch with blocking assignments (combinational style).
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_BlockingAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -439,9 +377,6 @@ TEST(ParserSection9, Sec9_2_3_BlockingAssignment) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBlockingAssign);
 }
 
-// ---------------------------------------------------------------------------
-// 24. always_latch with ternary in condition.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_TernaryInCondition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -451,9 +386,6 @@ TEST(ParserSection9, Sec9_2_3_TernaryInCondition) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// 25. always_latch with concatenation on LHS.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_ConcatenationLHS) {
   auto r = Parse(
       "module m;\n"
@@ -474,9 +406,6 @@ TEST(ParserSection9, Sec9_2_3_ConcatenationLHS) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kConcatenation);
 }
 
-// ---------------------------------------------------------------------------
-// 27. always_latch with deeply nested if-else-if chain.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_DeepIfElseIfChain) {
   auto r = Parse(
       "module m;\n"
@@ -498,22 +427,19 @@ TEST(ParserSection9, Sec9_2_3_DeepIfElseIfChain) {
   auto* top_if = item->body;
   ASSERT_NE(top_if, nullptr);
   EXPECT_EQ(top_if->kind, StmtKind::kIf);
-  // First else branch is an if.
+
   ASSERT_NE(top_if->else_branch, nullptr);
   EXPECT_EQ(top_if->else_branch->kind, StmtKind::kIf);
-  // Second else branch is also an if.
+
   auto* mid_if = top_if->else_branch;
   ASSERT_NE(mid_if->else_branch, nullptr);
   EXPECT_EQ(mid_if->else_branch->kind, StmtKind::kIf);
-  // Terminal else is a plain assignment.
+
   auto* inner_if = mid_if->else_branch;
   ASSERT_NE(inner_if->else_branch, nullptr);
   EXPECT_EQ(inner_if->else_branch->kind, StmtKind::kNonblockingAssign);
 }
 
-// ---------------------------------------------------------------------------
-// 28. always_latch with system function call in body.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_SystemFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -528,9 +454,6 @@ TEST(ParserSection9, Sec9_2_3_SystemFunctionCall) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// 29. Case with begin-end blocks in items inside always_latch.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_CaseWithBeginEndItems) {
   auto r = Parse(
       "module m;\n"
@@ -561,10 +484,7 @@ TEST(ParserSection9, Sec9_2_3_CaseWithBeginEndItems) {
     EXPECT_EQ(ci.body->kind, StmtKind::kBlock);
   }
 }
-// =============================================================================
-// LRM section 9.2.2.3 -- always_latch procedure
-// Latched logic behavior modeled with always_latch.
-// =============================================================================
+
 TEST(ParserSection9c, AlwaysLatchWithBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -594,9 +514,6 @@ TEST(ParserSection9, AlwaysLatch) {
   ASSERT_NE(item->body, nullptr);
 }
 
-// =============================================================================
-// §4.6: always_latch guarantees latch semantics
-// =============================================================================
 TEST(ParserSection4, Sec4_6_AlwaysLatchLatch) {
   auto r = Parse(
       "module m;\n"
@@ -614,4 +531,4 @@ TEST(ParserSection4, Sec4_6_AlwaysLatchLatch) {
   ASSERT_NE(item->body, nullptr);
 }
 
-}  // namespace
+}

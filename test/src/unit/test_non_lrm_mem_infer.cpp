@@ -1,5 +1,3 @@
-// Non-LRM tests
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Single-port write pattern: mem[addr] <= wdata inside always_ff
-// =============================================================================
 TEST(MemInfer, DetectSinglePortWrite) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -48,9 +43,6 @@ TEST(MemInfer, DetectSinglePortWrite_PortDetails) {
   EXPECT_EQ(memories[0].write_ports[0].clock_edge, Edge::kPosedge);
 }
 
-// =============================================================================
-// Single-port read pattern: rdata <= mem[addr] inside always_ff
-// =============================================================================
 TEST(MemInfer, DetectSinglePortRead) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -87,9 +79,6 @@ TEST(MemInfer, DetectSinglePortRead_PortDetails) {
   EXPECT_EQ(memories[0].read_ports[0].clock_edge, Edge::kPosedge);
 }
 
-// =============================================================================
-// Dual-port (read + write) detection in same always_ff block
-// =============================================================================
 TEST(MemInfer, DetectDualPort) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -112,9 +101,6 @@ TEST(MemInfer, DetectDualPort) {
   EXPECT_EQ(memories[0].write_ports.size(), 1u);
 }
 
-// =============================================================================
-// No memory when no array patterns (scalar assignments only)
-// =============================================================================
 TEST(MemInfer, NoMemoryForScalarAssign) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -129,9 +115,6 @@ TEST(MemInfer, NoMemoryForScalarAssign) {
   EXPECT_TRUE(memories.empty());
 }
 
-// =============================================================================
-// ROM inference: read-only array access (no writes)
-// =============================================================================
 TEST(MemInfer, RomInference) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -151,4 +134,4 @@ TEST(MemInfer, RomInference) {
   EXPECT_TRUE(memories[0].write_ports.empty());
 }
 
-}  // namespace
+}

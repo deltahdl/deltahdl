@@ -1,5 +1,3 @@
-// §23.5: Extern modules
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -7,7 +5,6 @@
 using namespace delta;
 namespace {
 
-// --- Extern module declarations (LRM §23.2.1) ---
 TEST(ParserSection23, ExternModuleHeader) {
   auto r = Parse("extern module foo(input logic a, output logic b);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -40,9 +37,6 @@ TEST(ParserSection23, ExternModuleNoBody) {
   }
 }
 
-// =========================================================================
-// LRM section 23.5: Extern modules
-// =========================================================================
 TEST(ParserSection23, ExternModuleNonAnsiPorts) {
   auto r = Parse("extern module m (a, b, c);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -80,4 +74,4 @@ TEST(ParserSection23, ExternModuleFollowedByDefinition) {
   EXPECT_FALSE(r.cu->modules[1]->is_extern);
 }
 
-}  // namespace
+}

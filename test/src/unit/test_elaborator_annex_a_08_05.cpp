@@ -1,16 +1,8 @@
-// Tests for A.8.5 — Expression left-side values — Elaboration
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
-namespace {}  // namespace
-
-// =============================================================================
-// A.8.5 Expression left-side values — Elaboration
-// =============================================================================
-
-// § net_lvalue — simple net in continuous assignment elaborates
+namespace {}
 
 TEST(ElabA85, NetLvalueSimpleContAssign) {
   ElabFixture f;
@@ -23,8 +15,6 @@ TEST(ElabA85, NetLvalueSimpleContAssign) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// § net_lvalue — bit select in continuous assignment elaborates
 
 TEST(ElabA85, NetLvalueBitSelectContAssign) {
   ElabFixture f;
@@ -39,8 +29,6 @@ TEST(ElabA85, NetLvalueBitSelectContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § net_lvalue — concatenation in continuous assignment elaborates
-
 TEST(ElabA85, NetLvalueConcatContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -54,8 +42,6 @@ TEST(ElabA85, NetLvalueConcatContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § variable_lvalue — simple variable in procedural assignment elaborates
-
 TEST(ElabA85, VarLvalueSimpleProceduralAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -67,8 +53,6 @@ TEST(ElabA85, VarLvalueSimpleProceduralAssign) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// § variable_lvalue — bit select in procedural assignment elaborates
 
 TEST(ElabA85, VarLvalueBitSelectProcedural) {
   ElabFixture f;
@@ -82,8 +66,6 @@ TEST(ElabA85, VarLvalueBitSelectProcedural) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § variable_lvalue — part select in procedural assignment elaborates
-
 TEST(ElabA85, VarLvaluePartSelectProcedural) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -95,8 +77,6 @@ TEST(ElabA85, VarLvaluePartSelectProcedural) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// § variable_lvalue — concatenation in procedural assignment elaborates
 
 TEST(ElabA85, VarLvalueConcatProcedural) {
   ElabFixture f;
@@ -111,8 +91,6 @@ TEST(ElabA85, VarLvalueConcatProcedural) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § variable_lvalue — member access in procedural assignment elaborates
-
 TEST(ElabA85, VarLvalueMemberAccessProcedural) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -126,8 +104,6 @@ TEST(ElabA85, VarLvalueMemberAccessProcedural) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § variable_lvalue — nonblocking assignment elaborates
-
 TEST(ElabA85, VarLvalueNonblockingElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -139,8 +115,6 @@ TEST(ElabA85, VarLvalueNonblockingElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// § variable_lvalue — force/release elaborates
 
 TEST(ElabA85, VarLvalueForceReleaseElaborates) {
   ElabFixture f;
@@ -154,8 +128,6 @@ TEST(ElabA85, VarLvalueForceReleaseElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § variable_lvalue — streaming concatenation LHS elaborates
-
 TEST(ElabA85, VarLvalueStreamingConcatElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -167,8 +139,6 @@ TEST(ElabA85, VarLvalueStreamingConcatElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// § nonrange_variable_lvalue — simple variable elaborates
 
 TEST(ElabA85, NonrangeVarLvalueElaborates) {
   ElabFixture f;

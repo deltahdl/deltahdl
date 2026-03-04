@@ -1,5 +1,3 @@
-// §21.2.1: The display and write tasks
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -15,9 +13,7 @@ TEST(ParserSection21, DisplayInAlwaysBlock) {
               "    $display(\"clock edge at %0t\", $time);\n"
               "endmodule\n"));
 }
-// ---------------------------------------------------------------------------
-// 8. $display system call (Active region)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_DisplaySystemCall) {
   auto r = Parse(
       "module m;\n"
@@ -34,7 +30,7 @@ TEST(ParserSection4, Sec4_5_DisplaySystemCall) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
   EXPECT_EQ(stmt->expr->callee, "$display");
 }
-// --- Empty args in system calls (§20.2/§21.2) ---
+
 TEST(ParserSection11, SystemCallEmptyArgs) {
   auto r = Parse(
       "module t;\n"
@@ -53,9 +49,6 @@ TEST(ParserSection11, SystemCallLeadingEmptyArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// ============================================================================
-// AST-level checks for system calls in initial blocks
-// ============================================================================
 TEST(ParserSection21, DisplayParsesAsSystemCall) {
   auto r = Parse(
       "module t;\n"
@@ -70,9 +63,6 @@ TEST(ParserSection21, DisplayParsesAsSystemCall) {
   ASSERT_NE(item->body, nullptr);
 }
 
-// ============================================================================
-// LRM section 21.1 -- Display system tasks (general I/O overview)
-// ============================================================================
 TEST(ParserSection21, DisplayBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -130,4 +120,4 @@ TEST(ParserSection21, WritebHexOctal) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

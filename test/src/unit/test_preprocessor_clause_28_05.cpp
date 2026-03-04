@@ -1,5 +1,3 @@
-// §28.5: buf and not gates
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -40,4 +38,4 @@ TEST(Parser, GateBufMultiOutput) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
-}  // namespace
+}

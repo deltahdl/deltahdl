@@ -1,5 +1,3 @@
-// §18.7: Inline constraints—randomize() with
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.7.1: Inline constraints (randomize() with {})
-// =============================================================================
 TEST(Constraint, InlineConstraint) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -63,4 +58,4 @@ TEST(Constraint, InlineConstraintWithBlock) {
   EXPECT_LE(val, 60);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §B
-
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §B Table B.1 — every keyword paired with its expected TokenKind.
 struct KwEntry {
   const char* text;
   TokenKind expected;
@@ -268,15 +265,7 @@ static const KwEntry kTableB1[] = {
 
 static constexpr size_t kTableB1Count = sizeof(kTableB1) / sizeof(kTableB1[0]);
 
-// ------------------------------------------------------------------
-// B.1  Completeness — Table B.1 contains exactly 248 keywords
-// ------------------------------------------------------------------
-
 TEST(LexerAnnexB, TableB1CountIs248) { EXPECT_EQ(kTableB1Count, 248u); }
-
-// ------------------------------------------------------------------
-// B.2  Reservation — every Table B.1 keyword lexes as a keyword
-// ------------------------------------------------------------------
 
 TEST(LexerAnnexB, AllKeywordsAreReserved) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
@@ -287,10 +276,6 @@ TEST(LexerAnnexB, AllKeywordsAreReserved) {
   }
 }
 
-// ------------------------------------------------------------------
-// B.3  Specific TokenKind — each keyword maps to its correct token
-// ------------------------------------------------------------------
-
 TEST(LexerAnnexB, EachKeywordMapsToCorrectTokenKind) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
     auto tokens = Lex(kTableB1[i].text);
@@ -299,10 +284,6 @@ TEST(LexerAnnexB, EachKeywordMapsToCorrectTokenKind) {
         << kTableB1[i].text << " mapped to wrong TokenKind";
   }
 }
-
-// ------------------------------------------------------------------
-// B.4  LookupKeyword API — direct table validation (not through lexer)
-// ------------------------------------------------------------------
 
 TEST(LexerAnnexB, LookupKeywordReturnsCorrectTokenKind) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
@@ -313,10 +294,6 @@ TEST(LexerAnnexB, LookupKeywordReturnsCorrectTokenKind) {
         << kTableB1[i].text << " LookupKeyword returned wrong TokenKind";
   }
 }
-
-// ------------------------------------------------------------------
-// B.5  Case sensitivity (§5.6.2) — keywords are lowercase only
-// ------------------------------------------------------------------
 
 TEST(LexerAnnexB, UppercaseIsNotKeyword) {
   const char* const kSamples[] = {
@@ -347,10 +324,6 @@ TEST(LexerAnnexB, MixedCaseIsNotKeyword) {
   }
 }
 
-// ------------------------------------------------------------------
-// B.6  Escape mechanism (§5.6.2) — escaped keywords become identifiers
-// ------------------------------------------------------------------
-
 TEST(LexerAnnexB, EscapedKeywordsAreIdentifiers) {
   const char* const kSamples[] = {
       "module",   "wire",     "reg",        "input",      "output",  "always",
@@ -360,7 +333,7 @@ TEST(LexerAnnexB, EscapedKeywordsAreIdentifiers) {
       "property", "sequence", "covergroup", "constraint", "assert",  "assume",
   };
   for (const char* kw : kSamples) {
-    // Escaped identifiers: backslash + text + whitespace terminator
+
     std::string escaped = std::string("\\") + kw + " ";
     auto tokens = Lex(escaped);
     ASSERT_GE(tokens.size(), 2u) << "escaped: " << kw;
@@ -368,10 +341,6 @@ TEST(LexerAnnexB, EscapedKeywordsAreIdentifiers) {
         << "\\" << kw << " should be an escaped identifier, not a keyword";
   }
 }
-
-// ------------------------------------------------------------------
-// B.7  Non-keywords — words not in Table B.1 are identifiers
-// ------------------------------------------------------------------
 
 TEST(LexerAnnexB, NonKeywordsAreIdentifiers) {
   const char* const kNonKeywords[] = {
@@ -388,10 +357,6 @@ TEST(LexerAnnexB, NonKeywordsAreIdentifiers) {
   }
 }
 
-// ------------------------------------------------------------------
-// B.8  Table B.1 is in alphabetical order
-// ------------------------------------------------------------------
-
 TEST(LexerAnnexB, TableB1IsAlphabetical) {
   for (size_t i = 1; i < kTableB1Count; ++i) {
     EXPECT_LT(std::string_view(kTableB1[i - 1].text),
@@ -400,10 +365,6 @@ TEST(LexerAnnexB, TableB1IsAlphabetical) {
         << ") should precede entry " << i << " (" << kTableB1[i].text << ")";
   }
 }
-
-// ------------------------------------------------------------------
-// B.9  Each keyword produces exactly one token (plus EOF)
-// ------------------------------------------------------------------
 
 TEST(LexerAnnexB, EachKeywordProducesOneToken) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
@@ -415,10 +376,6 @@ TEST(LexerAnnexB, EachKeywordProducesOneToken) {
   }
 }
 
-// ------------------------------------------------------------------
-// B.10 Keyword text preservation — lexer preserves original text
-// ------------------------------------------------------------------
-
 TEST(LexerAnnexB, KeywordTextIsPreserved) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
     auto tokens = Lex(kTableB1[i].text);
@@ -427,10 +384,6 @@ TEST(LexerAnnexB, KeywordTextIsPreserved) {
         << kTableB1[i].text << " text not preserved";
   }
 }
-
-// ------------------------------------------------------------------
-// B.11 No duplicate TokenKind values across Table B.1
-// ------------------------------------------------------------------
 
 TEST(LexerAnnexB, NoDuplicateTokenKinds) {
   std::set<TokenKind> seen;
@@ -441,4 +394,4 @@ TEST(LexerAnnexB, NoDuplicateTokenKinds) {
   EXPECT_EQ(seen.size(), kTableB1Count);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// Annex A.7.3: Specify block terminals
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// list_of_path_outputs — multiple simple output terminals (full path)
 TEST(ParserA703, ListOfPathOutputsMultiple) {
   auto r = Parse(
       "module m;\n"
@@ -25,7 +22,6 @@ TEST(ParserA703, ListOfPathOutputsMultiple) {
   EXPECT_EQ(si->path.dst_ports[2].name, "z");
 }
 
-// Input terminal with part-select range
 TEST(ParserA703, InputTerminalPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -44,10 +40,6 @@ TEST(ParserA703, InputTerminalPartSelect) {
   EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
 }
 
-// =============================================================================
-// A.7.3 specify_output_terminal_descriptor — with constant_range_expression
-// =============================================================================
-// Output terminal with bit-select
 TEST(ParserA703, OutputTerminalBitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -65,10 +57,6 @@ TEST(ParserA703, OutputTerminalBitSelect) {
   EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
 }
 
-// =============================================================================
-// A.7.3 input_identifier / output_identifier — dotted interface.port form
-// =============================================================================
-// Input identifier — interface_identifier.port_identifier
 TEST(ParserA703, InputIdentifierDotted) {
   auto r = Parse(
       "module m;\n"
@@ -85,7 +73,6 @@ TEST(ParserA703, InputIdentifierDotted) {
   EXPECT_EQ(si->path.src_ports[0].name, "sig");
 }
 
-// Dotted input with range
 TEST(ParserA703, DottedInputWithRange) {
   auto r = Parse(
       "module m;\n"
@@ -102,7 +89,6 @@ TEST(ParserA703, DottedInputWithRange) {
   EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-// Dotted output with range
 TEST(ParserA703, DottedOutputWithRange) {
   auto r = Parse(
       "module m;\n"
@@ -119,7 +105,6 @@ TEST(ParserA703, DottedOutputWithRange) {
   EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-// Input terminal with ascending indexed part-select
 TEST(ParserA703, InputTerminalPlusIndexed) {
   auto r = Parse(
       "module m;\n"
@@ -138,7 +123,6 @@ TEST(ParserA703, InputTerminalPlusIndexed) {
   EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
 }
 
-// Input terminal with descending indexed part-select
 TEST(ParserA703, InputTerminalMinusIndexed) {
   auto r = Parse(
       "module m;\n"
@@ -157,7 +141,6 @@ TEST(ParserA703, InputTerminalMinusIndexed) {
   EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
 }
 
-// Terminal descriptor in state-dependent path
 TEST(ParserA703, TerminalInConditionalPath) {
   auto r = Parse(
       "module m;\n"
@@ -176,7 +159,6 @@ TEST(ParserA703, TerminalInConditionalPath) {
   EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
 }
 
-// All dotted terminals in full path
 TEST(ParserA703, AllDottedTerminalsFullPath) {
   auto r = Parse(
       "module m;\n"
@@ -198,7 +180,6 @@ TEST(ParserA703, AllDottedTerminalsFullPath) {
   EXPECT_EQ(si->path.dst_ports[0].name, "c");
 }
 
-// Simple terminal — no range, no interface (baseline)
 TEST(ParserA703, SimpleTerminalNoRange) {
   auto r = Parse(
       "module m;\n"
@@ -218,7 +199,6 @@ TEST(ParserA703, SimpleTerminalNoRange) {
   EXPECT_TRUE(si->path.dst_ports[0].interface_name.empty());
 }
 
-// specify_terminal_descriptor with bit select [expr]
 TEST(ParserA70503, TerminalBitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -234,7 +214,6 @@ TEST(ParserA70503, TerminalBitSelect) {
   EXPECT_NE(tc->ref_terminal.range_left, nullptr);
 }
 
-// specify_terminal_descriptor with bit select on data signal
 TEST(ParserA70503, TerminalBitSelectOnDataSignal) {
   auto r = Parse(
       "module m;\n"
@@ -249,4 +228,4 @@ TEST(ParserA70503, TerminalBitSelectOnDataSignal) {
   EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kBitSelect);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §21.7.1.2: Specifying variables to be dumped ($dumpvars)
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -34,9 +32,6 @@ TEST(ParserSection21, DumpvarsMultipleScopes) {
               "endmodule\n"));
 }
 
-// ============================================================================
-// LRM section 21.7.1.2 -- Specifying variables to be dumped ($dumpvars)
-// ============================================================================
 TEST(ParserSection21, DumpvarsLevelOneModule) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -76,4 +71,4 @@ TEST(ParserSection21, DumpvarsInsideBeginEnd) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
-}  // namespace
+}

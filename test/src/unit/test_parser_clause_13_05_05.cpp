@@ -1,5 +1,3 @@
-// §13.5.5: Optional argument list
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,11 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.9 Subroutine call statements — subroutine_call_statement
-// =============================================================================
-// --- subroutine_call_statement: subroutine_call ; ---
-// tf_call with empty parentheses
 TEST(ParserA609, TfCallEmptyParens) {
   auto r = Parse(
       "module m;\n"
@@ -27,4 +20,4 @@ TEST(ParserA609, TfCallEmptyParens) {
   EXPECT_TRUE(expr->args.empty());
 }
 
-}  // namespace
+}

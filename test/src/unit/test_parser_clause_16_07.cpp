@@ -1,5 +1,3 @@
-// §16.7: Sequences
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Production #26: sequence_expr — many alternatives
-// =============================================================================
-// sequence_expr ::= cycle_delay_range sequence_expr ...
 TEST(ParserA210, SequenceExpr_CycleDelay) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -19,7 +13,6 @@ TEST(ParserA210, SequenceExpr_CycleDelay) {
               "endmodule\n"));
 }
 
-// sequence_expr ::= sequence_expr cycle_delay_range sequence_expr ...
 TEST(ParserA210, SequenceExpr_Concatenation) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -27,7 +20,6 @@ TEST(ParserA210, SequenceExpr_Concatenation) {
               "endmodule\n"));
 }
 
-// sequence_expr ::= clocking_event sequence_expr
 TEST(ParserA210, SequenceExpr_ClockingEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -35,14 +27,6 @@ TEST(ParserA210, SequenceExpr_ClockingEvent) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #27: cycle_delay_range
-// cycle_delay_range ::=
-//     ## constant_primary
-//   | ## [ cycle_delay_const_range_expression ]
-//   | ##[*]
-//   | ##[+]
-// =============================================================================
 TEST(ParserA210, CycleDelayRange_Constant) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -85,12 +69,6 @@ TEST(ParserA210, CycleDelayRange_Zero) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #39: cycle_delay_const_range_expression
-// cycle_delay_const_range_expression ::=
-//     constant_expression : constant_expression
-//   | constant_expression : $
-// =============================================================================
 TEST(ParserA210, CycleDelayConstRange_FiniteRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -105,7 +83,6 @@ TEST(ParserA210, CycleDelayConstRange_OpenEnd) {
               "endmodule\n"));
 }
 
-// sequence_list_of_arguments — mixed positional + named
 TEST(ParserA210, SequenceListOfArguments_Mixed) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -114,7 +91,6 @@ TEST(ParserA210, SequenceListOfArguments_Mixed) {
               "endmodule\n"));
 }
 
-// sequence_expr ::= ( sequence_expr {, sequence_match_item} ) [sequence_abbrev]
 TEST(ParserA210, SequenceExpr_ParenWithMatchItems) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -123,10 +99,6 @@ TEST(ParserA210, SequenceExpr_ParenWithMatchItems) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// Section 16.5.1 -- Sequence operators in concurrent assertions
-// =============================================================================
-// Assert property with ## cycle delay operator.
 TEST(ParserSection16, Sec16_5_1_SequenceDelayOperator) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -134,10 +106,6 @@ TEST(ParserSection16, Sec16_5_1_SequenceDelayOperator) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.7 Sequences — concatenation and delay
-// =============================================================================
 TEST(ParserSection16, SequenceConcatDelay1) {
   auto r = Parse(
       "module m;\n"
@@ -172,7 +140,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.1: Sequence concatenation with ## delay ---
 TEST(ParserAnnexF, AnnexFSequenceConcatDelay) {
   auto r = Parse(
       "module m;\n"
@@ -183,7 +150,6 @@ TEST(ParserAnnexF, AnnexFSequenceConcatDelay) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// --- F.5: Ranged repetition [*min:max] ---
 TEST(ParserAnnexF, AnnexFRangedRepetition) {
   auto r = Parse(
       "module m;\n"
@@ -194,7 +160,6 @@ TEST(ParserAnnexF, AnnexFRangedRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// --- F.17: Sequence with chained concatenation ---
 TEST(ParserAnnexF, AnnexFChainedConcat) {
   auto r = Parse(
       "module m;\n"
@@ -207,7 +172,6 @@ TEST(ParserAnnexF, AnnexFChainedConcat) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kSequenceDecl));
 }
 
-// --- F.20: Unbounded delay range ##[0:$] ---
 TEST(ParserAnnexF, AnnexFUnboundedDelayRange) {
   auto r = Parse(
       "module m;\n"
@@ -218,9 +182,6 @@ TEST(ParserAnnexF, AnnexFUnboundedDelayRange) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// =============================================================================
-// §16.12 -- Declaring sequences (additional tests)
-// =============================================================================
 TEST(ParserSection16, SequenceWithRangeDelay) {
   auto r = Parse(
       "module m;\n"
@@ -240,4 +201,4 @@ TEST(ParserSection16, SequenceWithRangeDelay) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

@@ -1,14 +1,9 @@
-// §9.3.5: Statement labels
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// §9.3.5 -- Statement labels
-// =============================================================================
 TEST(ParserSection9, StatementLabelOnBeginBlock) {
   auto r = Parse(
       "module m;\n"
@@ -38,10 +33,7 @@ TEST(ParserSection9, StatementLabelOnForkBlock) {
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->label, "name");
 }
-// =============================================================================
-// LRM section 9.3.5 -- Statement labels (additional)
-// Labels on while loops, case statements, and disabling labeled stmts.
-// =============================================================================
+
 TEST(ParserSection9c, StatementLabelOnWhile) {
   auto r = Parse(
       "module m;\n"
@@ -75,7 +67,6 @@ TEST(ParserSection9c, StatementLabelOnCase) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
 
-// §9.3.5: Statement label on begin-end block
 TEST(ParserA603, SeqBlockWithStatementLabel) {
   auto r = Parse(
       "module m;\n"
@@ -93,9 +84,6 @@ TEST(ParserA603, SeqBlockWithStatementLabel) {
   EXPECT_EQ(stmt->label, "labelA");
 }
 
-// =============================================================================
-// §9.3.5 -- Statement labels (additional tests)
-// =============================================================================
 TEST(ParserSection9, StatementLabelOnAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -122,7 +110,6 @@ TEST(ParserSection9, StatementLabelOnIf) {
   EXPECT_EQ(stmt->label, "check");
 }
 
-// §9.3.5: Statement label on fork-join block
 TEST(ParserA603, ForkWithStatementLabel) {
   auto r = Parse(
       "module m;\n"
@@ -153,10 +140,6 @@ TEST(ParserSection9, StatementLabelOnForLoop) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
 
-// ---------------------------------------------------------------------------
-// statement ::= [ block_identifier : ] { attribute_instance } statement_item
-// ---------------------------------------------------------------------------
-// §9.3.5: statement with block_identifier label
 TEST(ParserA604, StatementWithLabel) {
   auto r = Parse(
       "module m;\n"
@@ -172,9 +155,6 @@ TEST(ParserA604, StatementWithLabel) {
   EXPECT_EQ(stmt->label, "my_label");
 }
 
-// =============================================================================
-// LRM section 12.8 -- Block names and statement labels (additional tests)
-// =============================================================================
 TEST(ParserSection12, StatementLabelOnAssign) {
   auto r = Parse(
       "module t;\n"
@@ -201,4 +181,4 @@ TEST(ParserSection12, StatementLabelOnForever) {
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
 
-}  // namespace
+}

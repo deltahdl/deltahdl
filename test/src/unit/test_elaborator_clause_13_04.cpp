@@ -1,5 +1,3 @@
-// §13.4: Functions
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § function_subroutine_call — in continuous assignment
 TEST(ElabA82, FunctionCallInContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,8 +21,6 @@ TEST(ElabA82, FunctionCallInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Elab test fixture
-// §13.4.4: fork/join is illegal inside a function
 TEST(ElabA603, ForkJoinIllegalInFunction) {
   ElabFixture f;
   ElaborateSrc(
@@ -40,4 +35,4 @@ TEST(ElabA603, ForkJoinIllegalInFunction) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §16.15: Disable iff resolution
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -31,17 +26,14 @@ struct SvaFixture {
 
 namespace {
 
-// =============================================================================
-// Concurrent assertion disable iff (section 16.12.5)
-// =============================================================================
 TEST(SvaEngine, DisableIffTrue) {
-  // When disable condition is true, assertion is vacuously passed.
+
   PropertyResult result = EvalWithDisableIff(true, PropertyResult::kFail);
   EXPECT_EQ(result, PropertyResult::kVacuousPass);
 }
 
 TEST(SvaEngine, DisableIffFalse) {
-  // When disable condition is false, assertion result is unchanged.
+
   PropertyResult result = EvalWithDisableIff(false, PropertyResult::kFail);
   EXPECT_EQ(result, PropertyResult::kFail);
 }
@@ -51,4 +43,4 @@ TEST(SvaEngine, DisableIffFalsePass) {
   EXPECT_EQ(result, PropertyResult::kPass);
 }
 
-}  // namespace
+}

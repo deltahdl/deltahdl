@@ -1,5 +1,3 @@
-// Annex A.1.3: Module parameters and ports
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -17,4 +15,4 @@ TEST(ParserAnnexA, A1ModuleWithParams) {
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 1u);
 }
 
-}  // namespace
+}

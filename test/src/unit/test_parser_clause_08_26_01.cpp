@@ -1,5 +1,3 @@
-// §8.26.1: Interface class syntax
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// interface_class_item ::= type_declaration | interface_class_method | params
 TEST(SourceText, InterfaceClassItems) {
   auto r = Parse(
       "interface class IC;\n"
@@ -28,7 +25,6 @@ TEST(SourceText, InterfaceClassItems) {
   EXPECT_EQ(members[3]->kind, ClassMemberKind::kProperty);
 }
 
-// interface_class_declaration: interface class.
 TEST(SourceText, InterfaceClassDecl) {
   auto r = Parse("interface class IC; endclass\n");
   ASSERT_NE(r.cu, nullptr);
@@ -37,4 +33,4 @@ TEST(SourceText, InterfaceClassDecl) {
   EXPECT_EQ(r.cu->classes[0]->name, "IC");
 }
 
-}  // namespace
+}

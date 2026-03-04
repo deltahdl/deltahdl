@@ -1,5 +1,3 @@
-// §17.4: Context inference
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §17.4 Context inference
-// =============================================================================
 TEST_F(VerifyParseTest, CheckerContextInferenceDefaults) {
   auto* unit = Parse(R"(
     checker check_in_context(logic test_sig,
@@ -45,4 +40,4 @@ TEST_F(VerifyParseTest, CheckerContextInferenceInstantiation) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

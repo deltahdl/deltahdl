@@ -1,10 +1,8 @@
-// §7.10.2.6: Push_front()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-// --- Test helpers ---
+
 namespace {
 
 TEST(ParserSection7, QueuePushFront) {
@@ -19,4 +17,4 @@ TEST(ParserSection7, QueuePushFront) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}  // namespace
+}

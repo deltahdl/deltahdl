@@ -1,12 +1,9 @@
-// §18.17.1: Random production weights
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Randsequence with weighted alternatives elaborates
 TEST(ElabA612, WeightedAlternativesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,4 +21,4 @@ TEST(ElabA612, WeightedAlternativesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

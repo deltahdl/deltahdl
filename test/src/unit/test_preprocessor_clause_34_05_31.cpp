@@ -1,5 +1,3 @@
-// §34.5.31: reset
-
 #include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
@@ -24,9 +22,6 @@ struct ProtectedTest : ::testing::Test {
 
 namespace {
 
-// =============================================================================
-// §34.5 Reset directive
-// =============================================================================
 TEST_F(ProtectedTest, ResetDirective) {
   auto result = Preprocess(
       "`pragma protect begin\n"
@@ -36,9 +31,9 @@ TEST_F(ProtectedTest, ResetDirective) {
       "module m;\n"
       "endmodule\n");
   EXPECT_FALSE(diag_.HasErrors());
-  // All pragma lines consumed. `pragma reset protect is also consumed.
+
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_NE(result.find("module m;"), std::string::npos);
 }
 
-}  // namespace
+}

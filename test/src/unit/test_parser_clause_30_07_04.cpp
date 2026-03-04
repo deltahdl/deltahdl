@@ -1,14 +1,9 @@
-// §30.7.4: Detailed pulse control capabilities
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.7.1 pulsestyle and showcancelled together
-// =============================================================================
 TEST(ParserA701, PulsestyleAndShowcancelledTogether) {
   auto r = Parse(
       "module m;\n"
@@ -28,4 +23,4 @@ TEST(ParserA701, PulsestyleAndShowcancelledTogether) {
   EXPECT_FALSE(spec->specify_items[1]->is_noshowcancelled);
 }
 
-}  // namespace
+}

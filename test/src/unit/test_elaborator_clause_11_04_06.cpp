@@ -1,5 +1,3 @@
-// §11.4.6: Wildcard equality operators
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -30,4 +28,4 @@ TEST(ElabA86, BinaryWildcardNeqElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

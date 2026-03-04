@@ -1,5 +1,3 @@
-// §9.3.1: Sequential blocks
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -7,16 +5,8 @@
 
 using namespace delta;
 
-// Sim test fixture
 namespace {
 
-// =============================================================================
-// A.6.3 Parallel and sequential blocks — Simulation
-// =============================================================================
-// ---------------------------------------------------------------------------
-// Simulation: §9.3.1 sequential block execution order
-// ---------------------------------------------------------------------------
-// Sequential statements execute in order (second overrides first)
 TEST(SimA603, SeqBlockExecutionOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +27,6 @@ TEST(SimA603, SeqBlockExecutionOrder) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// Sequential block: value from first assignment used in second
 TEST(SimA603, SeqBlockValuePropagation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -58,24 +47,6 @@ TEST(SimA603, SeqBlockValuePropagation) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// 2. §4.2 Sequential ordering within a begin-end block (§4.6 guarantee).
-//    Statements execute in source order within a single process.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, SequentialWithinBeginEnd) {
   auto result = RunAndGet(
       "module t;\n"
@@ -90,4 +61,4 @@ TEST(SimCh4, SequentialWithinBeginEnd) {
   EXPECT_EQ(result, 3u);
 }
 
-}  // namespace
+}

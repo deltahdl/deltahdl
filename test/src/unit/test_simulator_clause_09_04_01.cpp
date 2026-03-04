@@ -1,5 +1,3 @@
-// §9.4.1: Delay control
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -9,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Simulation: timing control execution
-// =============================================================================
-// §9.4.1: delay control advances simulation time
 TEST(SimA605, DelayControlAdvancesTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +26,6 @@ TEST(SimA605, DelayControlAdvancesTime) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §9.4.1: chained delays accumulate
 TEST(SimA605, DelayControlChained) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -52,24 +45,6 @@ TEST(SimA605, DelayControlChained) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
 }
 
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// 7. §4.2 Simulation time advances: a delay causes execution at a later
-//    simulation time.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, SimulationTimeAdvances) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -117,4 +92,4 @@ TEST(TimingControl, ZeroDelayIsZero) {
   EXPECT_EQ(EvaluateDelay(0, false, false), 0u);
 }
 
-}  // namespace
+}

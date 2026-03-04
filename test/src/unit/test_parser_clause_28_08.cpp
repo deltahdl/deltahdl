@@ -1,5 +1,3 @@
-// §28.8: Bidirectional pass switches
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -8,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #1: gate_instantiation (pass_en_switchtype alternative)
-// gate_instantiation ::=
-//   pass_en_switchtype [delay2] pass_enable_switch_instance
-//                      {, pass_enable_switch_instance} ;
-// =============================================================================
 TEST(ParserA301, GateInst_Tranif0Basic) {
   auto r = Parse(
       "module m;\n"
@@ -57,11 +49,6 @@ TEST(ParserA301, GateInst_PassEnWithDelay) {
   EXPECT_NE(g->gate_delay, nullptr);
 }
 
-// =============================================================================
-// A.3.1 Production #1: gate_instantiation (pass_switchtype alternative)
-// gate_instantiation ::=
-//   pass_switchtype pass_switch_instance {, pass_switch_instance} ;
-// =============================================================================
 TEST(ParserA301, GateInst_TranBasic) {
   auto r = Parse(
       "module m;\n"
@@ -80,11 +67,6 @@ TEST(ParserA301, GateInst_RtranBasic) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.3.1 Production #7: pass_switch_instance
-// pass_switch_instance ::= [name_of_instance] ( inout_terminal , inout_terminal
-// )
-// =============================================================================
 TEST(ParserA301, PassSwitchInst_TranNamed) {
   auto r = Parse(
       "module m;\n"
@@ -119,11 +101,6 @@ TEST(ParserA301, PassSwitchInst_Unnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
-// =============================================================================
-// A.3.1 Production #8: pass_enable_switch_instance
-// pass_enable_switch_instance ::= [name_of_instance]
-//   ( inout_terminal , inout_terminal , enable_terminal )
-// =============================================================================
 TEST(ParserA301, PassEnSwitchInst_Tranif0Named) {
   auto r = Parse(
       "module m;\n"
@@ -198,11 +175,6 @@ TEST(ParserA301, GateInst_AllPassEnSwitchTypes) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.3.3 Production #2: inout_terminal ::= net_lvalue
-// Exercised via pass switches (tran/rtran) and
-// pass enable switches (tranif0/tranif1/rtranif0/rtranif1).
-// =============================================================================
 TEST(ParserA303, InoutTerminal_SimpleIdent) {
   auto r = Parse(
       "module m;\n"
@@ -225,10 +197,6 @@ TEST(ParserA303, InoutTerminal_RtranBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-// =============================================================================
-// A.3.4 Production #6: pass_en_switchtype ::= tranif0 | tranif1 | rtranif1 |
-// rtranif0
-// =============================================================================
 TEST(ParserA304, PassEnSwitchtype_Tranif0) {
   auto r = Parse(
       "module m;\n"
@@ -273,9 +241,6 @@ TEST(ParserA304, PassEnSwitchtype_Rtranif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-// =============================================================================
-// A.3.4 Production #7: pass_switchtype ::= tran | rtran
-// =============================================================================
 TEST(ParserA304, PassSwitchtype_Tran) {
   auto r = Parse(
       "module m;\n"
@@ -298,4 +263,4 @@ TEST(ParserA304, PassSwitchtype_Rtran) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-}  // namespace
+}

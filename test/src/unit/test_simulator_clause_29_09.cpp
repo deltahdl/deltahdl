@@ -1,5 +1,3 @@
-// §29.9: Mixing level-sensitive and edge-sensitive descriptions
-
 #include <gtest/gtest.h>
 
 #include "builders_udp.h"
@@ -30,4 +28,4 @@ TEST(UdpMixed, EdgeOnlyNoLevelOverride) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-}  // namespace
+}

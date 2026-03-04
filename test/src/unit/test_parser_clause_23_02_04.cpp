@@ -1,12 +1,9 @@
-// §23.2.4: Module contents
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// §8.3 — Class inside module
 TEST(ParserSection8, ClassInsideModule) {
   auto r = Parse(
       "module m;\n"
@@ -52,4 +49,4 @@ TEST(ParserSection9c, MixedProcedureTypes) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kFinalBlock));
 }
 
-}  // namespace
+}

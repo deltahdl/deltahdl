@@ -1,5 +1,3 @@
-// §11.4.14.2: Re-ordering of the generic stream
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -19,7 +17,6 @@ TEST(ParserSection11, StreamingLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
 }
 
-// § slice_size ::= simple_type | constant_expression
 TEST(ParserA81, StreamingWithTypeSliceSize) {
   auto r = Parse("module m; initial x = {<< byte {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -50,7 +47,6 @@ TEST(ParserA81, StreamingWithExprSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
-// § variable_lvalue — streaming_concatenation with slice_size
 TEST(ParserA85, VarLvalueStreamingConcatSliceSize) {
   auto r = Parse(
       "module m; logic [31:0] a, b;\n"
@@ -64,7 +60,6 @@ TEST(ParserA85, VarLvalueStreamingConcatSliceSize) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
 }
 
-// --- Streaming operator with type-sized slice (§11.4.14) ---
 TEST(ParserSection11, StreamingWithTypedSlice) {
   auto r = Parse(
       "module t;\n"
@@ -76,4 +71,4 @@ TEST(ParserSection11, StreamingWithTypedSlice) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

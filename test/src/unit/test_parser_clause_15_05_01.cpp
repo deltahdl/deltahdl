@@ -1,5 +1,3 @@
-// §15.5.1: Triggering an event
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,13 +5,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// event_trigger ::=
-//   -> hierarchical_event_identifier nonrange_select ;
-//   | ->> [ delay_or_event_control ] hierarchical_event_identifier
-//     nonrange_select ;
-// ---------------------------------------------------------------------------
-// §15.5.1: blocking event trigger
 TEST(ParserA605, EventTriggerBlocking) {
   auto r = Parse(
       "module m;\n"
@@ -29,7 +20,6 @@ TEST(ParserA605, EventTriggerBlocking) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-// §15.5.1: nonblocking event trigger
 TEST(ParserA605, EventTriggerNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -45,10 +35,6 @@ TEST(ParserA605, EventTriggerNonblocking) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §15.5.1 — Nonblocking event trigger (->>)
-// =============================================================================
 TEST(ParserSection15, NonblockingEventTrigger) {
   auto r = Parse(
       "module m;\n"
@@ -74,9 +60,6 @@ TEST(ParserSection15, NonblockingEventTriggerHierarchical) {
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
 
-// =============================================================================
-// §15.5.1 — Event trigger and wait (existing support, comprehensive test)
-// =============================================================================
 TEST(ParserSection15, EventTriggerAndWait) {
   auto r = Parse(
       "module m;\n"
@@ -91,7 +74,6 @@ TEST(ParserSection15, EventTriggerAndWait) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
 
-// §15.5.1: event_trigger (->)
 TEST(ParserA604, StmtItemEventTrigger) {
   auto r = Parse(
       "module m;\n"
@@ -106,7 +88,6 @@ TEST(ParserA604, StmtItemEventTrigger) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
 
-// §15.5.1: nonblocking event trigger (->>)
 TEST(ParserA604, StmtItemNonblockingEventTrigger) {
   auto r = Parse(
       "module m;\n"
@@ -121,9 +102,6 @@ TEST(ParserA604, StmtItemNonblockingEventTrigger) {
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
 
-// =============================================================================
-// LRM section 12.9 -- Event trigger (->)
-// =============================================================================
 TEST(ParserSection12, EventTrigger) {
   auto r = Parse(
       "module t;\n"
@@ -138,4 +116,4 @@ TEST(ParserSection12, EventTrigger) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-}  // namespace
+}

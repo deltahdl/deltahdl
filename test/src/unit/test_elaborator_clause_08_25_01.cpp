@@ -1,5 +1,3 @@
-// §8.25.1: Class scope resolution operator for parameterized classes
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -11,7 +9,7 @@ using namespace delta;
 namespace {
 
 TEST(Elaboration, ParameterizedType_Vector) {
-  // §6.25: C#(logic [7:0])::my_type resolves to logic [7:0] (width 8).
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "class C #(type T = int);\n"
@@ -29,4 +27,4 @@ TEST(Elaboration, ParameterizedType_Vector) {
   EXPECT_EQ(mod->variables[0].width, 8);
 }
 
-}  // namespace
+}

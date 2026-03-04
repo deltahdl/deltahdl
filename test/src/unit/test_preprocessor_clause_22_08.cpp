@@ -25,7 +25,7 @@ TEST(Preprocessor, DefaultNettype_None) {
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_nettype none\n", f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
-  // §22.8: "none" forbids implicit net declarations.
+
   EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
 }
 
@@ -37,7 +37,6 @@ TEST(Preprocessor, DefaultNettype_Tri) {
   EXPECT_EQ(pp.DefaultNetType(), NetType::kTri);
 }
 
-// §22.8: `default_nettype trireg
 TEST(Preprocessor, DefaultNettypeTrireg) {
   PreprocFixture f;
   Preprocess("`default_nettype trireg\n", f);
@@ -53,9 +52,6 @@ TEST(ParserSection6, DefaultNettypeAffectsImplicit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// ============================================================================
-// AST-level checks for `default_nettype
-// ============================================================================
 TEST(ParserSection22, DefaultNettypeModuleCount) {
   auto r = ParseWithPreprocessor(
       "`default_nettype wire\n"
@@ -70,11 +66,8 @@ TEST(ParserSection22, DefaultNettypeModuleCount) {
   EXPECT_EQ(r.cu->modules[1]->name, "m2");
 }
 
-// =========================================================================
-// §6.10: Implicit declarations — `default_nettype directive
-// =========================================================================
 TEST(ParserSection6, DefaultNettypeWire) {
-  // §6.10: Default nettype is wire; implicit nets are wire.
+
   auto r = ParseWithPreprocessor(
       "`default_nettype wire\n"
       "module t;\n"
@@ -84,7 +77,7 @@ TEST(ParserSection6, DefaultNettypeWire) {
   EXPECT_EQ(r.cu->default_nettype, NetType::kWire);
 }
 TEST(ParserSection6, DefaultNettypeNone) {
-  // §6.10: `default_nettype none disables implicit declarations.
+
   auto r = ParseWithPreprocessor(
       "`default_nettype none\n"
       "module t;\n"

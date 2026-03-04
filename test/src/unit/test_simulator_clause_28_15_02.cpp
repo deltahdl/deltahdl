@@ -1,18 +1,9 @@
-// §28.15.2: trireg strength
-
-// --- Local types for net type strengths (§28.15) ---
 #include <gtest/gtest.h>
 
 #include "model_net_default.h"
 
 namespace {
 
-// =============================================================
-// §28.15.2: trireg strength
-// =============================================================
-// §28.15.2: "The strength of the drive resulting from a trireg net
-//  that is in the charge storage state ... shall be one of these
-//  three strengths: large, medium, or small."
 TEST(NetStrengths, TriregLargeStrength) {
   EXPECT_EQ(GetTriregChargeStrength(ChargeStrength::kLarge),
             StrengthLevel::kLarge);
@@ -28,9 +19,8 @@ TEST(NetStrengths, TriregSmallStrength) {
             StrengthLevel::kSmall);
 }
 
-// §28.15.2:
 TEST(NetStrengths, TriregDefaultIsMedium) {
   EXPECT_EQ(GetTriregDefaultChargeStrength(), ChargeStrength::kMedium);
 }
 
-}  // namespace
+}

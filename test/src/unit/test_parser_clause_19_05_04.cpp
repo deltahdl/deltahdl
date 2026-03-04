@@ -1,5 +1,3 @@
-// §19.5.4: Wildcard specification of coverage point bins
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -17,4 +15,4 @@ TEST(ParserA211, BinsOrOptions_WildcardBins) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §29.3.2: UDP port declarations
-
 #include "fixture_parser.h"
 #include "simulator/udp_eval.h"
 
@@ -21,7 +19,6 @@ TEST(ParserA23, ListOfUdpPortIdentifiersMultiple) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- udp_ansi_declaration: sequential (output reg) ---
 TEST(ParserAnnexA051, AnsiSequential) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -41,7 +38,6 @@ TEST(ParserAnnexA051, AnsiSequential) {
   ASSERT_EQ(udp->table.size(), 2u);
 }
 
-// --- udp_ansi_declaration: multiple inputs with shared input keyword ---
 TEST(ParserAnnexA051, AnsiSharedInputKeyword) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
@@ -62,7 +58,6 @@ TEST(ParserAnnexA051, AnsiSharedInputKeyword) {
   EXPECT_EQ(udp->input_names[2], "sel");
 }
 
-// --- udp_nonansi_declaration: non-ANSI sequential with reg declaration ---
 TEST(ParserAnnexA051, NonAnsiSequentialWithReg) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -86,10 +81,6 @@ TEST(ParserAnnexA051, NonAnsiSequentialWithReg) {
   EXPECT_EQ(udp->input_names[1], "clk");
 }
 
-// ---------------------------------------------------------------------------
-// udp_declaration_port_list (ANSI port declarations)
-// ---------------------------------------------------------------------------
-// ANSI port list with single input
 TEST(ParserAnnexA052, AnsiPortList_SingleInput) {
   auto r = Parse(
       "primitive inv(output out, input a);\n"
@@ -106,7 +97,6 @@ TEST(ParserAnnexA052, AnsiPortList_SingleInput) {
   EXPECT_EQ(udp->input_names[0], "a");
 }
 
-// udp_input_declaration ; (comma-separated list)
 TEST(ParserAnnexA052, PortDecl_InputList) {
   auto r = Parse(
       "primitive gate(out, a, b, c);\n"
@@ -126,7 +116,6 @@ TEST(ParserAnnexA052, PortDecl_InputList) {
   EXPECT_EQ(udp->input_names[2], "c");
 }
 
-// udp_reg_declaration ; (standalone reg after output)
 TEST(ParserAnnexA052, PortDecl_RegStandalone) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -142,11 +131,10 @@ TEST(ParserAnnexA052, PortDecl_RegStandalone) {
   EXPECT_FALSE(r.has_errors);
   auto* udp = r.cu->udps[0];
   EXPECT_EQ(udp->output_name, "q");
-  // The separate 'reg q;' declaration should make this sequential
+
   EXPECT_TRUE(udp->is_sequential);
 }
 
-// ANSI form: output reg q = 1'b1
 TEST(ParserAnnexA052, OutputDeclAnsi_RegInitOne) {
   auto r = Parse(
       "primitive dff(output reg q = 1'b1, input d, input clk);\n"
@@ -162,7 +150,6 @@ TEST(ParserAnnexA052, OutputDeclAnsi_RegInitOne) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-// ANSI form: output reg q = 1'bx
 TEST(ParserAnnexA052, OutputDeclAnsi_RegInitX) {
   auto r = Parse(
       "primitive dff(output reg q = 1'bx, input d, input clk);\n"
@@ -178,7 +165,6 @@ TEST(ParserAnnexA052, OutputDeclAnsi_RegInitX) {
   EXPECT_EQ(udp->initial_value, 'x');
 }
 
-// Non-ANSI form: output reg q = 1'b0 ; (in port declaration)
 TEST(ParserAnnexA052, OutputDeclNonAnsi_RegInitZero) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -197,7 +183,6 @@ TEST(ParserAnnexA052, OutputDeclNonAnsi_RegInitZero) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-// Non-ANSI form: output reg q = 1'b1 ; (in port declaration)
 TEST(ParserAnnexA052, OutputDeclNonAnsi_RegInitOne) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -215,7 +200,6 @@ TEST(ParserAnnexA052, OutputDeclNonAnsi_RegInitOne) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-// Wildcard form: output reg q = 1'b0 ; (in port declaration after .*)
 TEST(ParserAnnexA052, OutputDeclWildcard_RegInit) {
   auto r = Parse(
       "primitive dff(.*);\n"
@@ -234,7 +218,6 @@ TEST(ParserAnnexA052, OutputDeclWildcard_RegInit) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-// Multiple separate input declarations
 TEST(ParserAnnexA052, InputDecl_SeparateDecls) {
   auto r = Parse(
       "primitive gate(out, a, b, c);\n"
@@ -256,10 +239,6 @@ TEST(ParserAnnexA052, InputDecl_SeparateDecls) {
   EXPECT_EQ(udp->input_names[2], "c");
 }
 
-// ---------------------------------------------------------------------------
-// udp_reg_declaration (standalone reg)
-// ---------------------------------------------------------------------------
-// Standalone reg declaration after output (no 'reg' on output line)
 TEST(ParserAnnexA052, RegDecl_AfterOutput) {
   auto r = Parse(
       "primitive latch(q, d, en);\n"
@@ -280,7 +259,6 @@ TEST(ParserAnnexA052, RegDecl_AfterOutput) {
   ASSERT_EQ(udp->input_names.size(), 2u);
 }
 
-// Standalone reg declaration after inputs
 TEST(ParserAnnexA052, RegDecl_AfterInputs) {
   auto r = Parse(
       "primitive latch(q, d, en);\n"
@@ -299,7 +277,6 @@ TEST(ParserAnnexA052, RegDecl_AfterInputs) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-// Attribute on input declaration
 TEST(ParserAnnexA052, AttrOnInputDecl) {
   auto r = Parse(
       "primitive inv(out, a);\n"
@@ -317,10 +294,6 @@ TEST(ParserAnnexA052, AttrOnInputDecl) {
   EXPECT_EQ(udp->input_names[0], "a");
 }
 
-// ---------------------------------------------------------------------------
-// Simulation — port-level initial value semantics
-// ---------------------------------------------------------------------------
-// Port-level initialization via output reg q = 1'b0 should work like initial
 TEST(ParserAnnexA052, SimPortLevelInit) {
   auto r = Parse(
       "primitive latch(output reg q = 1'b0, input d, input en);\n"
@@ -346,7 +319,6 @@ TEST(ParserAnnexA052, SimPortLevelInit) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-// Non-ANSI port-level initialization should also work for simulation
 TEST(ParserAnnexA052, SimNonAnsiPortLevelInit) {
   auto r = Parse(
       "primitive latch(q, d, en);\n"
@@ -371,7 +343,6 @@ TEST(ParserAnnexA052, SimNonAnsiPortLevelInit) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-// Standalone reg declaration should make UDP sequential for simulation
 TEST(ParserAnnexA052, SimStandaloneRegSequential) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -401,4 +372,4 @@ TEST(ParserAnnexA052, SimStandaloneRegSequential) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-}  // namespace
+}

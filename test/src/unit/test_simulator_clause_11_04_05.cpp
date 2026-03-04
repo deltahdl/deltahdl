@@ -1,5 +1,3 @@
-// §11.4.5: Equality operators
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
@@ -11,12 +9,9 @@ using namespace delta;
 
 namespace {
 
-// ==========================================================================
-// Equality X/Z propagation — §11.4.5, §11.4.6
-// ==========================================================================
 TEST(EvalOpXZ, LogicalEqX) {
   SimFixture f;
-  // 4'b1x00 == 4'b1100 → x
+
   MakeVar4(f, "el", 4, 0b1000, 0b0100);
   auto* b = f.ctx.CreateVariable("er", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
@@ -28,7 +23,7 @@ TEST(EvalOpXZ, LogicalEqX) {
 
 TEST(EvalOpXZ, LogicalNeqX) {
   SimFixture f;
-  // 4'b1x00 != 4'b1100 → x
+
   MakeVar4(f, "nl", 4, 0b1000, 0b0100);
   auto* b = f.ctx.CreateVariable("nr", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
@@ -40,7 +35,7 @@ TEST(EvalOpXZ, LogicalNeqX) {
 
 TEST(EvalOpXZ, CaseEqStillExact) {
   SimFixture f;
-  // === still compares aval+bval exactly, no X propagation
+
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeInt(f.arena, 5),
                           MakeInt(f.arena, 5));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -48,7 +43,6 @@ TEST(EvalOpXZ, CaseEqStillExact) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-// § expression — equality comparison
 TEST(SimA83, EqualityTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -66,7 +60,6 @@ TEST(SimA83, EqualityTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § expression — inequality comparison
 TEST(SimA83, InequalityTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -84,10 +77,6 @@ TEST(SimA83, InequalityTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (equality) — Simulation
-// =============================================================================
-// § binary_operator — == (true)
 TEST(SimA86, BinaryEqTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -105,7 +94,6 @@ TEST(SimA86, BinaryEqTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § binary_operator — != (true)
 TEST(SimA86, BinaryNeqTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -123,7 +111,6 @@ TEST(SimA86, BinaryNeqTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § binary_operator — === (case equality)
 TEST(SimA86, BinaryCaseEq) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -141,7 +128,6 @@ TEST(SimA86, BinaryCaseEq) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § binary_operator — !== (case inequality)
 TEST(SimA86, BinaryCaseNeq) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -161,7 +147,7 @@ TEST(SimA86, BinaryCaseNeq) {
 
 TEST(EvalAdv, PackedStructEqualitySameValue) {
   SimFixture f;
-  // Two 16-bit packed struct vars with same value → == is 1.
+
   StructTypeInfo sinfo;
   sinfo.type_name = "my_struct";
   sinfo.total_width = 16;
@@ -181,7 +167,7 @@ TEST(EvalAdv, PackedStructEqualitySameValue) {
 
 TEST(EvalAdv, PackedStructEqualityDiffValue) {
   SimFixture f;
-  // Two 16-bit packed struct vars with different values → == is 0.
+
   StructTypeInfo sinfo;
   sinfo.type_name = "my_struct";
   sinfo.total_width = 16;
@@ -228,4 +214,4 @@ TEST(EvalAdv, SignedEqNeg) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-}  // namespace
+}

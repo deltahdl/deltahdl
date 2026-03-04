@@ -1,12 +1,9 @@
-// Annex A.7.5.3: System timing check event definitions
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Terminal with interface.port form elaborates
 TEST(ElabA70503, TerminalInterfaceDotPortElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +17,6 @@ TEST(ElabA70503, TerminalInterfaceDotPortElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// timing_check_event with negedge elaborates
 TEST(ElabA70503, TimingCheckEventNegedgeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,4 +30,4 @@ TEST(ElabA70503, TimingCheckEventNegedgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

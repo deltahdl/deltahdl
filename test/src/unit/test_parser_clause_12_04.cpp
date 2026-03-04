@@ -1,5 +1,3 @@
-// §12.4: Conditional if–else statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -19,7 +17,7 @@ TEST(ParserSection12, NestedIfElse) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // Else associates with the inner if
+
   EXPECT_EQ(stmt->else_branch, nullptr);
   ASSERT_NE(stmt->then_branch, nullptr);
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kIf);
@@ -49,16 +47,6 @@ TEST(ParserSection12, IfWithBlockBody) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
 }
 
-// =============================================================================
-// A.6.6 Conditional statements
-// =============================================================================
-// ---------------------------------------------------------------------------
-// conditional_statement ::=
-//   [ unique_priority ] if ( cond_predicate ) statement_or_null
-//   { else if ( cond_predicate ) statement_or_null }
-//   [ else statement_or_null ]
-// ---------------------------------------------------------------------------
-// §12.4: basic if statement — true branch only, no else
 TEST(ParserA606, IfOnly) {
   auto r = Parse(
       "module m;\n"
@@ -74,7 +62,6 @@ TEST(ParserA606, IfOnly) {
   EXPECT_EQ(stmt->else_branch, nullptr);
 }
 
-// §12.4: if-else statement
 TEST(ParserA606, IfElse) {
   auto r = Parse(
       "module m;\n"
@@ -91,10 +78,6 @@ TEST(ParserA606, IfElse) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-// =============================================================================
-// LRM section 12.4 -- Conditional if-else statement
-// =============================================================================
-// Basic if without else -- verifies condition/branch pointers.
 TEST(ParserSection12, IfNoElseConditionAndBranches) {
   auto r = Parse(
       "module t;\n"
@@ -111,7 +94,6 @@ TEST(ParserSection12, IfNoElseConditionAndBranches) {
   EXPECT_EQ(stmt->else_branch, nullptr);
 }
 
-// §12.4: if with null statement_or_null (semicolon) for then branch
 TEST(ParserA606, IfNullThen) {
   auto r = Parse(
       "module m;\n"
@@ -127,7 +109,6 @@ TEST(ParserA606, IfNullThen) {
   ASSERT_NE(stmt->else_branch, nullptr);
 }
 
-// If-else with both branches.
 TEST(ParserSection12, IfWithElse) {
   auto r = Parse(
       "module t;\n"
@@ -144,7 +125,6 @@ TEST(ParserSection12, IfWithElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-// §12.4: if with null else branch
 TEST(ParserA606, IfNullElse) {
   auto r = Parse(
       "module m;\n"
@@ -159,7 +139,6 @@ TEST(ParserA606, IfNullElse) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNull);
 }
 
-// §12.4: if with begin-end block in both branches
 TEST(ParserA606, IfElseWithBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -184,7 +163,6 @@ TEST(ParserA606, IfElseWithBlocks) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
 }
 
-// If with begin-end block body (then-only).
 TEST(ParserSection12, IfBlockBodyThenOnly) {
   auto r = Parse(
       "module t;\n"
@@ -203,7 +181,6 @@ TEST(ParserSection12, IfBlockBodyThenOnly) {
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
 }
 
-// §12.4: dangling else associates with closest if
 TEST(ParserA606, DanglingElse) {
   auto r = Parse(
       "module m;\n"
@@ -218,15 +195,14 @@ TEST(ParserA606, DanglingElse) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // outer if has no else — the else belongs to the inner if
+
   EXPECT_EQ(stmt->else_branch, nullptr);
-  // then_branch is the inner if, which has an else
+
   ASSERT_NE(stmt->then_branch, nullptr);
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kIf);
   EXPECT_NE(stmt->then_branch->else_branch, nullptr);
 }
 
-// §12.4: forced else association with begin-end
 TEST(ParserA606, ForcedElseWithBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -242,15 +218,14 @@ TEST(ParserA606, ForcedElseWithBeginEnd) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // outer if now has else (because begin-end blocks inner if)
+
   ASSERT_NE(stmt->else_branch, nullptr);
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
-  // then_branch is a block containing inner if with no else
+
   ASSERT_NE(stmt->then_branch, nullptr);
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
 }
 
-// Plain if (no qualifier) has kNone qualifier.
 TEST(ParserSection12, PlainIfHasNoQualifier) {
   auto r = Parse(
       "module t;\n"
@@ -266,10 +241,6 @@ TEST(ParserSection12, PlainIfHasNoQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
 }
 
-// ---------------------------------------------------------------------------
-// Structural tests: nested conditionals, complex conditions
-// ---------------------------------------------------------------------------
-// §12.4: nested if inside begin-end
 TEST(ParserA606, NestedIfInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -287,12 +258,11 @@ TEST(ParserA606, NestedIfInBlock) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // both branches are blocks
+
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
 }
 
-// §12.4: complex condition expression
 TEST(ParserA606, ComplexCondExpression) {
   auto r = Parse(
       "module m;\n"
@@ -308,7 +278,6 @@ TEST(ParserA606, ComplexCondExpression) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-// §12.4: if condition with function call
 TEST(ParserA606, IfCondFunctionCall) {
   auto r = Parse(
       "module m;\n"
@@ -322,7 +291,7 @@ TEST(ParserA606, IfCondFunctionCall) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
-// --- 28. Blocking assignment in nested if-else with expressions ---
+
 TEST(ParserSection10, Sec10_4_1_NestedIfElseWithExpressions) {
   auto r = Parse(
       "module m;\n"
@@ -353,7 +322,6 @@ TEST(ParserSection10, Sec10_4_1_NestedIfElseWithExpressions) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-// §12.4: conditional_statement (if-else)
 TEST(ParserA604, StmtItemConditionalStatement) {
   auto r = Parse(
       "module m;\n"
@@ -368,9 +336,6 @@ TEST(ParserA604, StmtItemConditionalStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
 
-// =============================================================================
-// LRM section 12.4 -- Conditional if-else statement
-// =============================================================================
 TEST(ParserSection12, BasicIfElse) {
   auto r = Parse(
       "module t;\n"
@@ -402,9 +367,7 @@ TEST(ParserSection12, IfWithoutElse) {
   EXPECT_NE(stmt->then_branch, nullptr);
   EXPECT_EQ(stmt->else_branch, nullptr);
 }
-// ---------------------------------------------------------------------------
-// 3. always_comb with if-else statement
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_IfElse) {
   auto r = Parse(
       "module m;\n"
@@ -425,9 +388,7 @@ TEST(ParserSection9, Sec9_2_2_IfElse) {
   EXPECT_NE(stmt->then_branch, nullptr);
   EXPECT_NE(stmt->else_branch, nullptr);
 }
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with control flow statements.
-// =============================================================================
+
 TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -448,4 +409,4 @@ TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-}  // namespace
+}

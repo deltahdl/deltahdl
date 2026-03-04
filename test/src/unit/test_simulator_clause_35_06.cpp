@@ -1,5 +1,3 @@
-// §35.6: Calling imported functions
-
 #include <cstdint>
 #include <vector>
 
@@ -35,7 +33,6 @@ TEST(Dpi, CallMissingReturnsZero) {
 TEST(Dpi, EvalExprDispatchesToDpiImport) {
   DpiSimFixture f;
 
-  // Register DPI import: sv_add(a, b) -> a + b.
   DpiContext dpi_ctx;
   DpiFunction func;
   func.c_name = "c_add";
@@ -46,7 +43,6 @@ TEST(Dpi, EvalExprDispatchesToDpiImport) {
   dpi_ctx.RegisterImport(func);
   f.ctx.SetDpiContext(&dpi_ctx);
 
-  // Build call expression: sv_add(10, 20)
   auto* arg0 = f.arena.Create<Expr>();
   arg0->kind = ExprKind::kIntegerLiteral;
   arg0->int_val = 10;
@@ -96,4 +92,4 @@ TEST(Dpi, EvalExprDpiMultipleArgs) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}  // namespace
+}

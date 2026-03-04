@@ -1,14 +1,10 @@
-// §16.4.3: Deferred assertions outside procedural code
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// --- Deferred immediate assertions at module level (§16.4) ---
 TEST(ParserSection16, DeferredAssertModuleLevel) {
   auto r = Parse(
       "module top();\n"
@@ -53,10 +49,6 @@ TEST(ParserSection16, AssertFinalModuleLevel) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-// =============================================================================
-// A.6.10 — deferred_immediate_assertion_item (module-level)
-// =============================================================================
-// assert #0 at module level
 TEST(ParserA610, DeferredAssertHash0Module) {
   auto r = Parse(
       "module m;\n"
@@ -67,7 +59,6 @@ TEST(ParserA610, DeferredAssertHash0Module) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// assert final at module level
 TEST(ParserA610, DeferredAssertFinalModule) {
   auto r = Parse(
       "module m;\n"
@@ -78,4 +69,4 @@ TEST(ParserA610, DeferredAssertFinalModule) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

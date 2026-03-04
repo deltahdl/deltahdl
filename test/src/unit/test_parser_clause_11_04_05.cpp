@@ -1,5 +1,3 @@
-// §11.4.5: Equality operators
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (equality)
-// =============================================================================
-// § binary_operator ::= ==
 TEST(ParserA86, BinaryEq) {
   auto r = Parse("module m; initial x = (a == b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -21,7 +15,6 @@ TEST(ParserA86, BinaryEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
 
-// § binary_operator ::= !=
 TEST(ParserA86, BinaryNeq) {
   auto r = Parse("module m; initial x = (a != b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -32,7 +25,6 @@ TEST(ParserA86, BinaryNeq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEq);
 }
 
-// § binary_operator ::= ===
 TEST(ParserA86, BinaryCaseEq) {
   auto r = Parse("module m; initial x = (a === b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -43,7 +35,6 @@ TEST(ParserA86, BinaryCaseEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
 }
 
-// § binary_operator ::= !==
 TEST(ParserA86, BinaryCaseNeq) {
   auto r = Parse("module m; initial x = (a !== b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -53,9 +44,7 @@ TEST(ParserA86, BinaryCaseNeq) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kBangEqEq);
 }
-// =========================================================================
-// Section 11.3.5 -- Equality operators
-// =========================================================================
+
 TEST(ParserSection11, EqualityInComplexExpr) {
   auto r = Parse(
       "module t;\n"
@@ -79,9 +68,7 @@ TEST(ParserSection11, CaseEqualityInAssign) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
-// =========================================================================
-// Section 11.4.5 -- Equality operators
-// =========================================================================
+
 TEST(ParserSection11, EqualityEq) {
   auto r = Parse(
       "module t;\n"
@@ -122,7 +109,6 @@ TEST(ParserSection11, CaseEqualityNeq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEqEq);
 }
 
-// Comparison operators
 TEST(ParserA83, ExprEquality) {
   auto r = Parse("module m; initial x = (a == b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -143,11 +129,8 @@ TEST(ParserA83, ExprCaseEquality) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
 TEST(ParserCh505, Operator_CaseEquality) {
-  // === is the case equality operator.
+
   auto r = Parse(
       "module m;\n"
       "  initial x = (a === b);\n"
@@ -162,8 +145,8 @@ TEST(ParserCh505, Operator_CaseEquality) {
 }
 
 TEST(ParserCh505, Operator_CaseInequality) {
-  // !== is the case inequality operator.
+
   EXPECT_TRUE(ParseOk("module m; initial x = (a !== b); endmodule"));
 }
 
-}  // namespace
+}

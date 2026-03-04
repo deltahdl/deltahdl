@@ -1,5 +1,3 @@
-// §19.6.1: Defining cross coverage bins
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -32,9 +30,6 @@ TEST(ParserA211, CrossBody_WithItems) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #21: cross_body_item
-// =============================================================================
 TEST(ParserA211, CrossBodyItem_BinsSelection) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -61,9 +56,6 @@ TEST(ParserA211, BinsSelectionOrOption_BinsSelection) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #23: bins_selection
-// =============================================================================
 TEST(ParserA211, BinsSelection_Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -90,9 +82,6 @@ TEST(ParserA211, BinsSelection_WithIff) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #24: select_expression
-// =============================================================================
 TEST(ParserA211, SelectExpression_SelectCondition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -158,9 +147,6 @@ TEST(ParserA211, SelectExpression_Parenthesized) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #25: select_condition
-// =============================================================================
 TEST(ParserA211, SelectCondition_Binsof) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -187,9 +173,6 @@ TEST(ParserA211, SelectCondition_BinsofIntersect) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #26: bins_expression
-// =============================================================================
 TEST(ParserA211, BinsExpression_Variable) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -232,4 +215,4 @@ TEST(ParserA211, CoverGroup_CrossWithBinsSelection) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

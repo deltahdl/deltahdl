@@ -1,5 +1,3 @@
-// §3.12.1: Compilation units
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// description: { attribute_instance } package_item (file-scope task)
 TEST(SourceText, DescriptionPackageItemTask) {
   auto r = Parse("task my_task; endtask\n");
   ASSERT_NE(r.cu, nullptr);
@@ -16,13 +13,8 @@ TEST(SourceText, DescriptionPackageItemTask) {
   ASSERT_EQ(r.cu->cu_items.size(), 1u);
 }
 
-// 10. No forward references in CU scope (except task/function names).
-// The LRM says references shall only be made to names already defined.
-// This is a semantic rule; the parser accepts the code but elaboration
-// would reject it.  We test that parsing succeeds (syntax is valid).
 TEST(ParserClause03, Cl3_12_1_ForwardRefSyntaxValid) {
-  // This is valid syntax even though semantically 'b' is referenced
-  // before its declaration at CU scope.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire w;\n"
@@ -51,7 +43,6 @@ TEST(ParserSection23, MultipleModuleDefinitions) {
   EXPECT_EQ(r.cu->modules[2]->name, "c");
 }
 
-// --- Top-level function declaration (§13) ---
 TEST(ParserSection18, TopLevelFunction) {
   auto r = Parse(
       "function int my_func(int x);\n"
@@ -63,4 +54,4 @@ TEST(ParserSection18, TopLevelFunction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

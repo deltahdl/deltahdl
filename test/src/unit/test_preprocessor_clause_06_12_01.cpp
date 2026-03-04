@@ -1,5 +1,3 @@
-// §6.12.1: Conversion
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 
@@ -17,4 +15,4 @@ TEST(ParserSection6, AssignCompatibleRealToInt) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

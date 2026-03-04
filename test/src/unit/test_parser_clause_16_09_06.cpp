@@ -1,12 +1,9 @@
-// §16.9.6: Intersection (AND with length restriction)
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// sequence_expr ::= sequence_expr intersect sequence_expr
 TEST(ParserA210, SequenceExpr_Intersect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -22,7 +19,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.9: intersect ---
 TEST(ParserAnnexF, AnnexFIntersect) {
   auto r = Parse(
       "module m;\n"
@@ -34,4 +30,4 @@ TEST(ParserAnnexF, AnnexFIntersect) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}  // namespace
+}

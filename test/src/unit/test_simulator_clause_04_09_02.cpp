@@ -10,24 +10,10 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.9.2 Procedural continuous assignment
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.9.2 Procedural continuous assignment corresponds to a process.
-// The assign/force statement is modeled as a scheduler process (Event with
-// callback), not as a one-shot operation.
-// ---------------------------------------------------------------------------
 TEST(SimCh4092, ProceduralContinuousAssignmentCorrespondsToProcess) {
   VerifyCACorrespondsToProcess();
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.2 The assign statement overrides procedural assignment.
-// The procedural 'assign' statement overrides the normal procedural
-// assignment to a variable, creating a continuous driver.
-// ---------------------------------------------------------------------------
 TEST(SimCh4092, AssignStatementOverridesProceduralAssignment) {
   Arena arena;
   Scheduler sched(arena);
@@ -35,13 +21,11 @@ TEST(SimCh4092, AssignStatementOverridesProceduralAssignment) {
   int assign_src = 0;
   bool assign_active = false;
 
-  // Time 0: procedural assignment reg_val = 5;
   auto* proc = sched.GetEventPool().Acquire();
   proc->kind = EventKind::kEvaluation;
   proc->callback = [&]() { reg_val = 5; };
   sched.ScheduleEvent({0}, Region::kActive, proc);
 
-  // Time 1: assign reg_val = assign_src; → overrides procedural value.
   auto* assign_stmt = sched.GetEventPool().Acquire();
   assign_stmt->kind = EventKind::kEvaluation;
   assign_stmt->callback = [&]() {
@@ -61,11 +45,6 @@ TEST(SimCh4092, AssignStatementOverridesProceduralAssignment) {
   EXPECT_EQ(reg_val, 99);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.2 The force statement overrides all drivers.
-// The procedural 'force' statement overrides all other drivers on a net
-// or variable, creating a forced continuous driver.
-// ---------------------------------------------------------------------------
 TEST(SimCh4092, ForceStatementOverridesAllDrivers) {
   Arena arena;
   Scheduler sched(arena);
@@ -73,7 +52,6 @@ TEST(SimCh4092, ForceStatementOverridesAllDrivers) {
   int force_src = 0;
   bool force_active = false;
 
-  // Time 0: normal continuous assignment drives net_val = 10.
   auto* cont = sched.GetEventPool().Acquire();
   cont->kind = EventKind::kEvaluation;
   cont->callback = [&]() {
@@ -86,7 +64,6 @@ TEST(SimCh4092, ForceStatementOverridesAllDrivers) {
   };
   sched.ScheduleEvent({0}, Region::kActive, cont);
 
-  // Time 1: force net_val = force_src; → overrides all drivers.
   auto* force_stmt = sched.GetEventPool().Acquire();
   force_stmt->kind = EventKind::kEvaluation;
   force_stmt->callback = [&]() {
@@ -104,11 +81,6 @@ TEST(SimCh4092, ForceStatementOverridesAllDrivers) {
   EXPECT_EQ(net_val, 77);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.2 Sensitive to source elements in the expression.
-// The procedural continuous assignment process only triggers when a source
-// element in its RHS expression changes.
-// ---------------------------------------------------------------------------
 TEST(SimCh4092, SensitiveToSourceElements) {
   Arena arena;
   Scheduler sched(arena);
@@ -117,8 +89,6 @@ TEST(SimCh4092, SensitiveToSourceElements) {
   int dst = 0;
   int eval_count = 0;
 
-  // Model: assign dst = a + b;
-  // Time 0: a changes → process triggers.
   auto* change_a = sched.GetEventPool().Acquire();
   change_a->kind = EventKind::kEvaluation;
   change_a->callback = [&]() {
@@ -131,7 +101,6 @@ TEST(SimCh4092, SensitiveToSourceElements) {
   };
   sched.ScheduleEvent({0}, Region::kActive, change_a);
 
-  // Time 1: b changes → process triggers again.
   auto* change_b = sched.GetEventPool().Acquire();
   change_b->kind = EventKind::kEvaluation;
   change_b->callback = [&]() {
@@ -149,20 +118,10 @@ TEST(SimCh4092, SensitiveToSourceElements) {
   EXPECT_EQ(dst, 7);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.2 Schedules an active update event.
-// The update event from a procedural continuous assignment is scheduled in
-// the Active region.
-// ---------------------------------------------------------------------------
 TEST(SimCh4092, SchedulesActiveUpdateEvent) {
   VerifyCASchedulesActiveUpdateEvent();
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.2 Uses current values to determine the target.
-// The target of the procedural continuous assignment is determined using
-// values at the time the update executes.
-// ---------------------------------------------------------------------------
 TEST(SimCh4092, UsesCurrentValuesToDetermineTarget) {
   Arena arena;
   Scheduler sched(arena);
@@ -170,7 +129,6 @@ TEST(SimCh4092, UsesCurrentValuesToDetermineTarget) {
   int target_a = 0;
   int target_b = 0;
 
-  // Time 0: select=0, so assign targets target_a.
   auto* eval0 = sched.GetEventPool().Acquire();
   eval0->kind = EventKind::kEvaluation;
   eval0->callback = [&]() {
@@ -187,7 +145,6 @@ TEST(SimCh4092, UsesCurrentValuesToDetermineTarget) {
   };
   sched.ScheduleEvent({0}, Region::kActive, eval0);
 
-  // Time 1: select=1, so assign targets target_b.
   auto* change_sel = sched.GetEventPool().Acquire();
   change_sel->kind = EventKind::kEvaluation;
   change_sel->callback = [&]() {
@@ -210,11 +167,6 @@ TEST(SimCh4092, UsesCurrentValuesToDetermineTarget) {
   EXPECT_EQ(target_b, 2);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.2 Deassign deactivates the corresponding assign.
-// After deassign, the procedural continuous assignment process is
-// deactivated: further source changes no longer drive the target.
-// ---------------------------------------------------------------------------
 TEST(SimCh4092, DeassignDeactivatesAssign) {
   Arena arena;
   Scheduler sched(arena);
@@ -222,7 +174,6 @@ TEST(SimCh4092, DeassignDeactivatesAssign) {
   int reg_val = 0;
   bool assign_active = false;
 
-  // Time 0: assign reg_val = src; activates the proc cont assign.
   auto* assign_stmt = sched.GetEventPool().Acquire();
   assign_stmt->kind = EventKind::kEvaluation;
   assign_stmt->callback = [&]() {
@@ -237,13 +188,11 @@ TEST(SimCh4092, DeassignDeactivatesAssign) {
   };
   sched.ScheduleEvent({0}, Region::kActive, assign_stmt);
 
-  // Time 1: deassign reg_val; → deactivates the assign.
   auto* deassign_stmt = sched.GetEventPool().Acquire();
   deassign_stmt->kind = EventKind::kEvaluation;
   deassign_stmt->callback = [&]() { assign_active = false; };
   sched.ScheduleEvent({1}, Region::kActive, deassign_stmt);
 
-  // Time 2: src changes, but assign is deactivated → reg_val not driven.
   auto* change_src = sched.GetEventPool().Acquire();
   change_src->kind = EventKind::kEvaluation;
   change_src->callback = [&]() {
@@ -258,16 +207,11 @@ TEST(SimCh4092, DeassignDeactivatesAssign) {
   sched.ScheduleEvent({2}, Region::kActive, change_src);
 
   sched.Run();
-  // reg_val should remain at 10 from time 0; time 2 update is gated off.
+
   EXPECT_EQ(reg_val, 10);
   EXPECT_FALSE(assign_active);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.2 Release deactivates the corresponding force.
-// After release, the force process is deactivated and the underlying
-// drivers resume control.
-// ---------------------------------------------------------------------------
 TEST(SimCh4092, ReleaseDeactivatesForce) {
   Arena arena;
   Scheduler sched(arena);
@@ -276,7 +220,6 @@ TEST(SimCh4092, ReleaseDeactivatesForce) {
   int force_src = 0;
   bool force_active = false;
 
-  // Time 0: normal driver → net_val = 5.
   auto* norm = sched.GetEventPool().Acquire();
   norm->kind = EventKind::kEvaluation;
   norm->callback = [&]() {
@@ -290,7 +233,6 @@ TEST(SimCh4092, ReleaseDeactivatesForce) {
   };
   sched.ScheduleEvent({0}, Region::kActive, norm);
 
-  // Time 1: force net_val = 88;
   auto* force_stmt = sched.GetEventPool().Acquire();
   force_stmt->kind = EventKind::kEvaluation;
   force_stmt->callback = [&]() {
@@ -303,12 +245,11 @@ TEST(SimCh4092, ReleaseDeactivatesForce) {
   };
   sched.ScheduleEvent({1}, Region::kActive, force_stmt);
 
-  // Time 2: release net_val; → force deactivated, normal driver resumes.
   auto* release_stmt = sched.GetEventPool().Acquire();
   release_stmt->kind = EventKind::kEvaluation;
   release_stmt->callback = [&]() {
     force_active = false;
-    // After release, the underlying driver reasserts.
+
     auto* update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { net_val = normal_driver; };
@@ -321,18 +262,12 @@ TEST(SimCh4092, ReleaseDeactivatesForce) {
   EXPECT_EQ(net_val, 5);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.2 Deassign allows subsequent procedural assignment.
-// After deassign, a subsequent procedural assignment can take effect,
-// proving the assign override is removed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4092, DeassignAllowsSubsequentProceduralAssignment) {
   Arena arena;
   Scheduler sched(arena);
   int reg_val = 0;
   bool assign_active = false;
 
-  // Time 0: assign reg_val = 30; (procedural continuous)
   auto* assign_stmt = sched.GetEventPool().Acquire();
   assign_stmt->kind = EventKind::kEvaluation;
   assign_stmt->callback = [&]() {
@@ -346,13 +281,11 @@ TEST(SimCh4092, DeassignAllowsSubsequentProceduralAssignment) {
   };
   sched.ScheduleEvent({0}, Region::kActive, assign_stmt);
 
-  // Time 1: deassign reg_val;
   auto* deassign_stmt = sched.GetEventPool().Acquire();
   deassign_stmt->kind = EventKind::kEvaluation;
   deassign_stmt->callback = [&]() { assign_active = false; };
   sched.ScheduleEvent({1}, Region::kActive, deassign_stmt);
 
-  // Time 2: reg_val = 42; (normal procedural assignment, no longer blocked).
   auto* proc_assign = sched.GetEventPool().Acquire();
   proc_assign->kind = EventKind::kEvaluation;
   proc_assign->callback = [&]() { reg_val = 42; };
@@ -363,11 +296,6 @@ TEST(SimCh4092, DeassignAllowsSubsequentProceduralAssignment) {
   EXPECT_EQ(reg_val, 42);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.2 Re-evaluates on each source change.
-// The procedural continuous assignment process re-evaluates on each
-// source change, scheduling a new active update event each time.
-// ---------------------------------------------------------------------------
 TEST(SimCh4092, ReEvaluatesOnEachSourceChange) {
   Arena arena;
   Scheduler sched(arena);
@@ -375,8 +303,6 @@ TEST(SimCh4092, ReEvaluatesOnEachSourceChange) {
   int dst = 0;
   int update_count = 0;
 
-  // Model: assign dst = src;
-  // Source changes at time 0, 1, and 2.
   for (uint64_t t = 0; t < 3; ++t) {
     auto* eval = sched.GetEventPool().Acquire();
     eval->kind = EventKind::kEvaluation;

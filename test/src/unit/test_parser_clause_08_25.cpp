@@ -1,12 +1,9 @@
-// §8.25: Parameterized classes
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// §8.5 — Parameterized classes
 TEST(ParserSection8, ParameterizedClass) {
   auto r = Parse(
       "class stack #(parameter int DEPTH = 8);\n"
@@ -44,7 +41,6 @@ TEST(ParserSection8, ParameterizedClassTypeParam) {
   EXPECT_EQ(cls->params[0].first, "T");
 }
 
-// §8.5 — Parameterized class with extends
 TEST(ParserSection8, ParameterizedClassExtendsName) {
   auto r = Parse(
       "class Base;\n"
@@ -75,7 +71,6 @@ TEST(ParserSection8, ParameterizedClassExtendsParams) {
   EXPECT_EQ(cls->params[0].first, "N");
 }
 
-// §8.5 — Parameterized class inside module (the sv-tests TIMEOUT case)
 TEST(ParserSection8, ParameterizedClassInsideModuleName) {
   auto r = Parse(
       "module class_tb;\n"
@@ -104,8 +99,6 @@ TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
   EXPECT_EQ(cls->class_decl->params[0].first, "a");
 }
 
-// --- Test helpers ---
-// §13.8: Multiple parameters with defaults.
 TEST(ParserSection13, Sec13_8_MultipleParamsWithDefaults) {
   auto r = Parse(
       "virtual class Codec#(parameter IN_W = 8,\n"
@@ -123,7 +116,6 @@ TEST(ParserSection13, Sec13_8_MultipleParamsWithDefaults) {
   EXPECT_EQ(r.cu->classes[0]->params[1].first, "OUT_W");
 }
 
-// §13.8: Three parameters with complex expressions.
 TEST(ParserSection13, Sec13_8_ThreeParams) {
   auto r = Parse(
       "virtual class Xform#(parameter IN_W = 8,\n"
@@ -139,7 +131,6 @@ TEST(ParserSection13, Sec13_8_ThreeParams) {
   ASSERT_EQ(r.cu->classes[0]->params.size(), 3u);
 }
 
-// §13.8: Parameterized class with no default parameter value.
 TEST(ParserSection13, Sec13_8_NoDefaultParam) {
   auto r = Parse(
       "virtual class Shifter#(parameter int AMOUNT);\n"
@@ -152,7 +143,6 @@ TEST(ParserSection13, Sec13_8_NoDefaultParam) {
   ASSERT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
-// §13.8: Parameterized class extending another class.
 TEST(ParserSection13, Sec13_8_ClassExtends) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
@@ -166,9 +156,6 @@ TEST(ParserSection13, Sec13_8_ClassExtends) {
               "endclass\n"));
 }
 
-// =============================================================================
-// §8.25 -- Parameterized classes (additional tests)
-// =============================================================================
 TEST(ParserSection8, ParameterizedClassSpecialization) {
   auto r = Parse(
       "class vector #(int size = 1);\n"
@@ -209,7 +196,6 @@ TEST(ParserSection8, ParameterizedClassDefaultInstantiation) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// Class with type parameter used as member type.
 TEST(ParserSection8, TypeParameterClassMember) {
   auto r = Parse(
       "class container #(type T = int);\n"
@@ -222,7 +208,6 @@ TEST(ParserSection8, TypeParameterClassMember) {
   EXPECT_EQ(cls->params[0].first, "T");
 }
 
-// Class with parameters.
 TEST(SourceText, ClassWithParams) {
   auto r = Parse("class C #(type T = int); endclass\n");
   ASSERT_NE(r.cu, nullptr);
@@ -231,4 +216,4 @@ TEST(SourceText, ClassWithParams) {
   EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
-}  // namespace
+}

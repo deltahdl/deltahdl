@@ -1,5 +1,3 @@
-// §18.5.1: External constraint blocks
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// package_or_generate_item_declaration: extern_constraint_declaration
 TEST(SourceText, PackageItemExternConstraint) {
   auto r = Parse(
       "package pkg;\n"
@@ -19,10 +16,6 @@ TEST(SourceText, PackageItemExternConstraint) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// constraint_prototype ::=
-//   [constraint_prototype_qualifier] [static] constraint
-//   [dynamic_override_specifiers] constraint_identifier ;
-// constraint_prototype_qualifier ::= extern | pure
 TEST(SourceText, ConstraintPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -44,9 +37,6 @@ TEST(SourceText, ConstraintPrototype) {
   EXPECT_EQ(members[4]->name, "c4");
 }
 
-// extern_constraint_declaration ::=
-//   [static] constraint [dynamic_override_specifiers] class_scope
-//   constraint_identifier constraint_block
 TEST(SourceText, ExternConstraintDeclaration) {
   auto r = Parse(
       "class C;\n"
@@ -69,7 +59,6 @@ TEST(ParserSection18, ImplicitExternConstraintDecl) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// --- Out-of-block constraint declaration (§18.5.1) ---
 TEST(ParserSection18, OutOfBlockConstraint) {
   auto r = Parse(
       "class a;\n"
@@ -81,7 +70,7 @@ TEST(ParserSection18, OutOfBlockConstraint) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
-// §8.18 — Extern constraint declaration
+
 TEST(ParserSection8, ExternConstraintDecl) {
   auto r = Parse(
       "class A;\n"
@@ -99,4 +88,4 @@ TEST(ParserSection8, ExternConstraintDecl) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

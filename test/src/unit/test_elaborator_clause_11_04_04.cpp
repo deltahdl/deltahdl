@@ -1,5 +1,3 @@
-// §11.4.4: Relational operators
-
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
@@ -29,9 +27,6 @@ TEST(ConstEval, Comparison) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 27. always_comb with comparison producing boolean.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombComparison) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -56,4 +51,4 @@ TEST(SimCh9, AlwaysCombComparison) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

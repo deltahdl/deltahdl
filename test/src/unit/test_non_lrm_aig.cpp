@@ -1,5 +1,3 @@
-// §non-lrm:aig
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -202,4 +200,4 @@ TEST(SynthLower, PortInputsMappedToAigInputs) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}  // namespace
+}

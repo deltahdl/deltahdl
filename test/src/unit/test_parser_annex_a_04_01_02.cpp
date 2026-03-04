@@ -1,5 +1,3 @@
-// Annex A.4.1.2: Interface instantiation
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- interface_instantiation: multiple hierarchical_instance ---
 TEST(ParserAnnexA0412, MultipleInterfaceInstances) {
   auto r = Parse("module m; my_if u0(.a(a)), u1(.a(b)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -21,7 +18,6 @@ TEST(ParserAnnexA0412, MultipleInterfaceInstances) {
   EXPECT_EQ(i1->inst_name, "u1");
 }
 
-// --- interface_instantiation: empty port list ---
 TEST(ParserAnnexA0412, InterfaceInstEmptyPorts) {
   auto r = Parse("module m; my_if u0(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -31,7 +27,6 @@ TEST(ParserAnnexA0412, InterfaceInstEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-// --- interface_instantiation: interface instantiated inside interface ---
 TEST(ParserAnnexA0412, InterfaceInstInsideInterface) {
   auto r = Parse(
       "interface outer_if;\n"
@@ -47,4 +42,4 @@ TEST(ParserAnnexA0412, InterfaceInstInsideInterface) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-}  // namespace
+}

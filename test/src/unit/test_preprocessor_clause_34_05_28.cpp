@@ -1,5 +1,3 @@
-// §34.5.28: decrypt_license
-
 #include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
@@ -34,4 +32,4 @@ TEST_F(ProtectedTest, DecryptLicensePragma) {
   EXPECT_EQ(result.find("decrypt_license"), std::string::npos);
 }
 
-}  // namespace
+}

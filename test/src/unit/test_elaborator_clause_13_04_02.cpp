@@ -1,5 +1,3 @@
-// §13.4.2: Static and automatic functions
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -22,4 +20,4 @@ TEST(ParserA26, ElabFunctionAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

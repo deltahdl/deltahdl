@@ -1,5 +1,3 @@
-// §16.13.2: Multiclocked properties
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// property_expr ::= clocking_event property_expr
 TEST(ParserA210, PropertyExpr_ClockingEventPropertyExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -16,10 +13,6 @@ TEST(ParserA210, PropertyExpr_ClockingEventPropertyExpr) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.14.6.2 -- Multiclock support
-// =============================================================================
 TEST(ParserSection16, MultichannelAssertPropertyInline) {
   auto r = Parse(
       "module m;\n"
@@ -42,4 +35,4 @@ TEST(ParserSection16, MulticlockPropertyDeclImplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

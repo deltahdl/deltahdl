@@ -1,5 +1,3 @@
-// §6.21: Scope and lifetime
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- lifetime ---
-// static | automatic
 TEST(ParserA213, LifetimeStaticInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -61,7 +57,7 @@ TEST(ParserA28, DataDeclStaticInBlock) {
   ASSERT_GE(body->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->var_is_static, true);
 }
-// §6.21: Sequential block with automatic lifetime variable
+
 TEST(ParserA603, SeqBlockWithAutomaticVar) {
   auto r = Parse(
       "module m;\n"
@@ -79,12 +75,6 @@ TEST(ParserA603, SeqBlockWithAutomaticVar) {
   EXPECT_TRUE(body->stmts[0]->var_is_automatic);
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
-// =============================================================================
-// 26. Variable declaration with assignment in block
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_VarDeclWithAssignInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -100,13 +90,10 @@ TEST(ParserSection4, Sec4_9_4_VarDeclWithAssignInBlock) {
   EXPECT_TRUE(stmt->var_is_automatic);
   EXPECT_EQ(stmt->var_name, "val");
   ASSERT_NE(stmt->var_init, nullptr);
-  // The initializer should be a binary expression (2 + 3).
+
   EXPECT_EQ(stmt->var_init->kind, ExprKind::kBinary);
 }
 
-// =============================================================================
-// 27. Static var with complex initializer expression
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticVarComplexInit) {
   auto r = Parse(
       "module m;\n"
@@ -128,9 +115,6 @@ TEST(ParserSection4, Sec4_9_4_StaticVarComplexInit) {
   EXPECT_EQ(var_stmt->var_init->kind, ExprKind::kBinary);
 }
 
-// =============================================================================
-// 29. Block-level var decl without explicit lifetime (plain int in block)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_BlockVarDeclNoLifetime) {
   auto r = Parse(
       "module m;\n"
@@ -149,11 +133,9 @@ TEST(ParserSection4, Sec4_9_4_BlockVarDeclNoLifetime) {
   EXPECT_EQ(stmt->var_name, "plain_var");
   EXPECT_NE(stmt->var_init, nullptr);
 }
-// =============================================================================
-// LRM section 6.21 -- Scope and lifetime (automatic/static)
-// =============================================================================
+
 TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
-  // Module lifetime qualifiers
+
   EXPECT_TRUE(ParseOk("module automatic m; endmodule\n"));
   EXPECT_TRUE(ParseOk("module static m; endmodule\n"));
   auto fa = Parse(
@@ -180,7 +162,7 @@ TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
   ASSERT_NE(ts.cu, nullptr);
   EXPECT_FALSE(ts.has_errors);
   EXPECT_TRUE(ts.cu->modules[0]->items[0]->is_static);
-  // Top-level function with automatic lifetime
+
   auto tl = Parse(
       "function automatic int foo(int x);\n"
       "  return x + 1;\n"
@@ -191,21 +173,19 @@ TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
   EXPECT_EQ(tl.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(tl.cu->cu_items[0]->is_automatic);
   EXPECT_EQ(tl.cu->cu_items[0]->name, "foo");
-  // Top-level task in compilation-unit scope
+
   auto tt = Parse("task automatic my_task(input int x); endtask\n");
   ASSERT_NE(tt.cu, nullptr);
   EXPECT_FALSE(tt.has_errors);
   ASSERT_GE(tt.cu->cu_items.size(), 1u);
   EXPECT_EQ(tt.cu->cu_items[0]->kind, ModuleItemKind::kTaskDecl);
-  // Program with automatic lifetime
+
   EXPECT_TRUE(
       ParseOk("program automatic test_prog;\n"
               "  initial begin $display(\"hello\"); end\n"
               "endprogram\n"));
 }
-// =============================================================================
-// LRM section 9.3.1 -- Automatic and static variable declarations in blocks.
-// =============================================================================
+
 TEST(ParserSection9, Sec9_3_1_AutomaticVarDeclInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -225,9 +205,7 @@ TEST(ParserSection9, Sec9_3_1_AutomaticVarDeclInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "k");
   EXPECT_NE(body->stmts[0]->var_init, nullptr);
 }
-// =============================================================================
-// §4.6: Automatic variable initialization per entry
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_AutomaticVarInitPerEntry) {
   auto r = Parse(
       "module m;\n"
@@ -259,9 +237,7 @@ TEST(ParserSection9c, AutomaticVarDeclInBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(body->stmts[0]->var_is_automatic);
 }
-// =============================================================================
-// 7. Static variable in begin-end block (initial block)
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_4_StaticVarInBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -280,9 +256,6 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInBeginEnd) {
   EXPECT_EQ(stmt->var_name, "counter");
 }
 
-// =============================================================================
-// 8. Automatic variable in begin-end block (initial block)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoVarInBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -301,16 +274,13 @@ TEST(ParserSection4, Sec4_9_4_AutoVarInBeginEnd) {
   EXPECT_NE(stmt->var_init, nullptr);
 }
 
-// =============================================================================
-// §24.5 Program lifetime qualifier
-// =============================================================================
 TEST_F(ProgramParseTest, ProgramWithAutomaticLifetime) {
   auto* unit = Parse("program automatic p; endprogram");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
-// 20. Static lifetime qualifier with integer type.
+
 TEST(ParserSection6, Sec6_11_StaticLifetimeInt) {
   auto r = Parse(
       "module t;\n"
@@ -324,7 +294,6 @@ TEST(ParserSection6, Sec6_11_StaticLifetimeInt) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 21. Automatic lifetime qualifier with integer type.
 TEST(ParserSection6, Sec6_11_AutomaticLifetimeInt) {
   auto r = Parse(
       "module t;\n"
@@ -336,9 +305,7 @@ TEST(ParserSection6, Sec6_11_AutomaticLifetimeInt) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// =========================================================================
-// §6.21: Scope and lifetime — block-level automatic/static qualifiers
-// =========================================================================
+
 TEST(ParserSection6, BlockVarDecl_Automatic) {
   auto r = Parse(
       "module t;\n"
@@ -418,9 +385,7 @@ TEST(ParserSection6, BlockVarDecl_StaticVar) {
                "  end\n"
                "endmodule\n"));
 }
-// =========================================================================
-// §6.21: Scope and lifetime
-// =========================================================================
+
 TEST(ParserSection6, AutomaticVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -435,9 +400,6 @@ TEST(ParserSection6, AutomaticVarDecl) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-// =============================================================================
-// 11. Static variable in initial block (no function)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticVarInInitialBlock) {
   auto r = Parse(
       "module m;\n"
@@ -455,9 +417,6 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInInitialBlock) {
   EXPECT_NE(stmt->var_init, nullptr);
 }
 
-// =============================================================================
-// 12. Variable in program block (automatic by default)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_ProgramBlockVarAutoDefault) {
   auto r = Parse(
       "program p;\n"
@@ -473,7 +432,6 @@ TEST(ParserSection4, Sec4_9_4_ProgramBlockVarAutoDefault) {
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-// Returns the first function or task declaration from the first module.
 static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   for (auto* item : r.cu->modules[0]->items) {
@@ -484,9 +442,6 @@ static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   return nullptr;
 }
 
-// =============================================================================
-// 13. Multiple static vars in same function
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_MultipleStaticVarsInFunc) {
   auto r = Parse(
       "module m;\n"
@@ -504,7 +459,7 @@ TEST(ParserSection4, Sec4_9_4_MultipleStaticVarsInFunc) {
   auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   EXPECT_TRUE(fn->is_automatic);
-  // First three statements should be static variable declarations.
+
   ASSERT_GE(fn->func_body_stmts.size(), 3u);
   EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(fn->func_body_stmts[1]->kind, StmtKind::kVarDecl);
@@ -517,9 +472,6 @@ TEST(ParserSection4, Sec4_9_4_MultipleStaticVarsInFunc) {
   EXPECT_EQ(fn->func_body_stmts[2]->var_name, "c");
 }
 
-// =============================================================================
-// 14. Multiple automatic vars in same function
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_MultipleAutoVarsInFunc) {
   auto r = Parse(
       "module m;\n"
@@ -543,9 +495,6 @@ TEST(ParserSection4, Sec4_9_4_MultipleAutoVarsInFunc) {
   EXPECT_EQ(fn->func_body_stmts[1]->var_name, "q");
 }
 
-// =============================================================================
-// 15. Mixed static and automatic vars in same block
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_MixedStaticAutoInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -568,9 +517,6 @@ TEST(ParserSection4, Sec4_9_4_MixedStaticAutoInBlock) {
   EXPECT_EQ(body->stmts[1]->var_name, "scratch");
 }
 
-// =============================================================================
-// 18. Static variable with packed dimensions
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticVarPackedDims) {
   auto r = Parse(
       "module m;\n"
@@ -589,9 +535,6 @@ TEST(ParserSection4, Sec4_9_4_StaticVarPackedDims) {
   EXPECT_NE(stmt->var_decl_type.packed_dim_right, nullptr);
 }
 
-// =============================================================================
-// 21. Variable in nested begin-end block
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_VarInNestedBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -620,9 +563,6 @@ static ClassMember* FindClassMethod(ParseResult& r) {
   return nullptr;
 }
 
-// =============================================================================
-// 24. Static var in class method
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticVarInClassMethod) {
   auto r = Parse(
       "class Counter;\n"
@@ -645,9 +585,6 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInClassMethod) {
   EXPECT_TRUE(method_member->method->func_body_stmts[0]->var_is_static);
 }
 
-// =============================================================================
-// 25. Automatic var in class method
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoVarInClassMethod) {
   auto r = Parse(
       "class Worker;\n"
@@ -669,16 +606,11 @@ TEST(ParserSection4, Sec4_9_4_AutoVarInClassMethod) {
   EXPECT_EQ(method_member->method->func_body_stmts[0]->var_name, "local_data");
 }
 
-// Returns the first module item from the first module.
-// Returns the first function/task body statement from a ModuleItem.
 static Stmt* FirstBodyStmt(ModuleItem* item) {
   if (!item || item->func_body_stmts.empty()) return nullptr;
   return item->func_body_stmts[0];
 }
 
-// =============================================================================
-// 10. Explicit automatic var in static function
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoVarInStaticFunc) {
   auto r = Parse(
       "module m;\n"
@@ -700,9 +632,6 @@ TEST(ParserSection4, Sec4_9_3_AutoVarInStaticFunc) {
   EXPECT_FALSE(var_stmt->var_is_static);
 }
 
-// =============================================================================
-// 11. Explicit static var in automatic function
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_StaticVarInAutoFunc) {
   auto r = Parse(
       "module m;\n"
@@ -726,4 +655,4 @@ TEST(ParserSection4, Sec4_9_3_StaticVarInAutoFunc) {
   EXPECT_NE(var_stmt->var_init, nullptr);
 }
 
-}  // namespace
+}

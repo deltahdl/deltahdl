@@ -1,5 +1,3 @@
-// §9.2.2.2.1: Implicit always_comb sensitivities
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -7,26 +5,8 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
-
 namespace {
 
-// ---------------------------------------------------------------------------
-// 9. §4.2 Process as concurrently scheduled element: always_comb reacts
-//    to changes from an initial block at a later time.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, AlwaysCombReactsToDelayedChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -48,4 +28,4 @@ TEST(SimCh4, AlwaysCombReactsToDelayedChange) {
   EXPECT_EQ(var->value.ToUint64(), 14u);
 }
 
-}  // namespace
+}

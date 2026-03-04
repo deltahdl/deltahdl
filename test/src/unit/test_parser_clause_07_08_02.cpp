@@ -1,5 +1,3 @@
-// §7.8.2: String index
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -50,7 +48,7 @@ TEST(ParserSection7, AssocArrayStringIndex_DimExpr) {
   EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIdentifier);
   EXPECT_EQ(item->unpacked_dims[0]->text, "string");
 }
-// --- Test helpers ---
+
 TEST(ParserSection7, AssociativeArrayTypedIndex) {
   auto r = Parse(
       "module t;\n"
@@ -62,4 +60,4 @@ TEST(ParserSection7, AssociativeArrayTypedIndex) {
   EXPECT_EQ(item->name, "aa");
 }
 
-}  // namespace
+}

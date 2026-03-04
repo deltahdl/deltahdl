@@ -4,7 +4,6 @@
 
 using namespace delta;
 
-// §22.3: `resetall shall not affect text macros
 TEST(Preprocessor, ResetAll_PreservesTextMacros) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -16,7 +15,6 @@ TEST(Preprocessor, ResetAll_PreservesTextMacros) {
   EXPECT_NE(result.find("bar"), std::string::npos);
 }
 
-// §3.2 + §22.3: `resetall is illegal inside ALL 7 design element types.
 TEST(Preprocessor, ResetAll_IllegalInsideModule) {
   PreprocFixture f;
   Preprocess("module m;\n`resetall\nendmodule\n", f);

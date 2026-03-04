@@ -1,17 +1,11 @@
-// §5.6.2: Keywords
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// =========================================================================
-// Keywords are reserved words
-// =========================================================================
 TEST(ParserCh501, Sec5_1_KeywordsAreReserved) {
-  // module, endmodule, wire, logic, assign, initial, begin, end, if, else
-  // are all reserved keywords that parse correctly.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire w;\n"
@@ -25,8 +19,8 @@ TEST(ParserCh501, Sec5_1_KeywordsAreReserved) {
 }
 
 TEST(ParserCh50602, Keyword_AllLowercase) {
-  // Keywords are lowercase only; MODULE is not a keyword, so this fails.
+
   EXPECT_FALSE(ParseOk("MODULE m; endmodule"));
 }
 
-}  // namespace
+}

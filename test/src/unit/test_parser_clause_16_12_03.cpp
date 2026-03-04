@@ -1,5 +1,3 @@
-// §16.12.3: Negation property
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// property_expr ::= not property_expr
 TEST(ParserA210, PropertyExpr_Not) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -16,10 +13,6 @@ TEST(ParserA210, PropertyExpr_Not) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// Section 16.5.1 -- Property operators in concurrent assertions
-// =============================================================================
-// Assert property with not (property negation).
 TEST(ParserSection16, Sec16_5_1_PropertyNot) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -34,7 +27,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.10: Property not ---
 TEST(ParserAnnexF, AnnexFPropertyNot) {
   auto r = Parse(
       "module m;\n"
@@ -45,10 +37,6 @@ TEST(ParserAnnexF, AnnexFPropertyNot) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.14.7 Property negation
-// =============================================================================
 TEST(ParserSection16, PropertyNegation) {
   auto r = Parse(
       "module m;\n"
@@ -67,4 +55,4 @@ TEST(ParserSection16, PropertyNegationStrong) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

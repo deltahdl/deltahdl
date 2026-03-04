@@ -1,5 +1,3 @@
-// §21.5: Writing memory array data to a file
-
 #include "fixture_program.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -34,4 +32,4 @@ TEST(ParserSection21, WritemembCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

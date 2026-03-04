@@ -1,14 +1,9 @@
-// §10.10: Unpacked array concatenation
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// LRM section 10.10 -- Unpacked array concatenation
-// =============================================================================
 TEST(ParserSection10, UnpackedArrayConcat) {
   auto r = Parse(
       "module m;\n"
@@ -46,7 +41,7 @@ TEST(ParserSection10, UnpackedArrayConcatNested) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
 }
-// --- Test helpers ---
+
 TEST(ParserSection7, EmptyConcatClearQueue_Rhs) {
   auto r = Parse(
       "module t;\n"
@@ -61,7 +56,6 @@ TEST(ParserSection7, EmptyConcatClearQueue_Rhs) {
   EXPECT_TRUE(stmt->rhs->elements.empty());
 }
 
-// § empty_unpacked_array_concatenation ::= { }
 TEST(ParserA81, EmptyUnpackedArrayConcatenation) {
   auto r = Parse("module m; initial x = {}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -72,4 +66,4 @@ TEST(ParserA81, EmptyUnpackedArrayConcatenation) {
   EXPECT_TRUE(stmt->rhs->elements.empty());
 }
 
-}  // namespace
+}

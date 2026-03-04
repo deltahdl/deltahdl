@@ -1,5 +1,3 @@
-// §26.6: Exporting imported names from packages
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -8,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA213, PackageExportMultipleItems) {
-  // BNF: export package_import_item { , package_import_item } ;
+
   auto r = Parse(
       "package pkg;\n"
       "  export p1::a, p2::b;\n"
@@ -22,9 +20,6 @@ TEST(ParserA213, PackageExportMultipleItems) {
   EXPECT_GE(export_count, 2);
 }
 
-// =============================================================================
-// LRM section 26.6 -- Exporting from packages
-// =============================================================================
 TEST(ParserSection26, PackageExportWildcard) {
   auto r = Parse(
       "package p;\n"
@@ -44,7 +39,7 @@ TEST(ParserSection26, PackageExportSpecific) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
-// --- Package export declarations (LRM section 26.6) ---
+
 TEST(ParserSection23, ExportDecl) {
   auto r = Parse(
       "package p;\n"
@@ -71,7 +66,6 @@ TEST(ParserSection23, ExportWildcardAll) {
   EXPECT_TRUE(pkg->items[0]->import_item.is_wildcard);
 }
 
-// package_item: package_export_declaration — export pkg::item
 TEST(SourceText, PackageExportNamed) {
   auto r = Parse(
       "package pkg;\n"
@@ -97,4 +91,4 @@ TEST(ParserA213, PackageExportSingleItem) {
   EXPECT_EQ(item->import_item.item_name, "some_func");
 }
 
-}  // namespace
+}

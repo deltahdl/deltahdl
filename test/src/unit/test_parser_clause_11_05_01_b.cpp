@@ -1,12 +1,9 @@
-// §11.5.1: Vector bit-select and part-select addressing
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// --- Multiple bit-selects in concatenation ---
 TEST(ParserSection11, Sec11_4_1_BitSelectsInConcatenation) {
   auto r = Parse(
       "module t;\n"
@@ -25,7 +22,6 @@ TEST(ParserSection11, Sec11_4_1_BitSelectsInConcatenation) {
   }
 }
 
-// --- Indexed part-select with parameter width ---
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectParamWidth) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -35,7 +31,6 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectParamWidth) {
               "endmodule\n"));
 }
 
-// --- Ternary with part-select operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithPartSelectOperands) {
   auto r = Parse(
       "module t;\n"
@@ -70,7 +65,6 @@ TEST(ParserSection11, IndexedPartSelectVariableBase) {
   EXPECT_TRUE(rhs->is_part_select_plus);
 }
 
-// --- Bit-select ---
 TEST(ParserSection11, Sec11_1_BitSelectIndex) {
   auto r = Parse(
       "module t;\n"
@@ -86,7 +80,6 @@ TEST(ParserSection11, Sec11_1_BitSelectIndex) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-// --- Part-select ---
 TEST(ParserSection11, Sec11_1_PartSelectIndexAndEnd) {
   auto r = Parse(
       "module t;\n"
@@ -101,7 +94,6 @@ TEST(ParserSection11, Sec11_1_PartSelectIndexAndEnd) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-// --- Indexed part-select +: and -: ---
 TEST(ParserSection11, Sec11_1_IndexedPartSelectPlusFlag) {
   auto r = Parse(
       "module t;\n"
@@ -127,9 +119,7 @@ TEST(ParserSection11, Sec11_1_IndexedPartSelectMinusFlag) {
   EXPECT_TRUE(rhs->is_part_select_minus);
   EXPECT_FALSE(rhs->is_part_select_plus);
 }
-// =========================================================================
-// Section 11.5.1 -- Bit-select and part-select
-// =========================================================================
+
 TEST(ParserSection11, BitSelect) {
   auto r = Parse(
       "module t;\n"
@@ -149,7 +139,7 @@ TEST(ParserSection11, PartSelectConstant) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
-// --- Packed struct indexed part-select minus ---
+
 TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectMinus) {
   auto r = Parse(
       "module t;\n"
@@ -170,4 +160,4 @@ TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectMinus) {
   EXPECT_TRUE(stmt->rhs->is_part_select_minus);
 }
 
-}  // namespace
+}

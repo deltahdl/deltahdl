@@ -1,14 +1,9 @@
-// §18.13.4: get_randstate()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// §18.13.4 get_randstate()
-// =============================================================================
 TEST(ParserSection18, GetRandstateCall) {
   auto r = Parse(
       "class C;\n"
@@ -50,4 +45,4 @@ TEST(ParserSection18, GetRandstateInFunction) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

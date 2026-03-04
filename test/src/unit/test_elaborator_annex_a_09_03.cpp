@@ -1,7 +1,3 @@
-// §A.9.3 Identifiers — elaboration-level semantic tests
-// Tests scope resolution, hierarchical path elaboration, package scope
-// resolution, and semantic validation of identifier usage.
-
 #include "fixture_elaborator.h"
 #include "parser/ast.h"
 
@@ -16,12 +12,8 @@ static CompilationUnit* ParseSrc(const std::string& src, ElabFixture& f) {
   return parser.Parse();
 }
 
-// ===========================================================================
-// §A.9.3: Identifier scope resolution in elaboration
-// ===========================================================================
-
 TEST(ElabA93, SimpleIdentResolvesInModule) {
-  // §A.9.3: variable_identifier resolves to a declared variable.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -34,7 +26,7 @@ TEST(ElabA93, SimpleIdentResolvesInModule) {
 }
 
 TEST(ElabA93, IdentCaseSensitiveElaboration) {
-  // §5.6 / §A.9.3: Identifiers are case-sensitive. 'x' and 'X' are different.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -51,9 +43,7 @@ TEST(ElabA93, IdentCaseSensitiveElaboration) {
 }
 
 TEST(ElabA93, EscapedIdentEquivalence) {
-  // §5.6.1: An escaped identifier with only [a-zA-Z0-9_$] chars after the \
-  // is treated the same as the simple identifier with those chars.
-  // E.g., \data and data refer to the same identifier.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -66,7 +56,7 @@ TEST(ElabA93, EscapedIdentEquivalence) {
 }
 
 TEST(ElabA93, EscapedIdentWithKeywordName) {
-  // §5.6.1: Escaped identifier \module is NOT the keyword 'module'.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -78,13 +68,8 @@ TEST(ElabA93, EscapedIdentWithKeywordName) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ===========================================================================
-// §A.9.3: package_scope ::= package_identifier :: | $unit ::
-// Elaboration: resolve identifiers across package scope.
-// ===========================================================================
-
 TEST(ElabA93, PackageScopeParamResolution) {
-  // §A.9.3: ps_parameter_identifier in elaboration context.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "package pkg;\n"
@@ -99,7 +84,7 @@ TEST(ElabA93, PackageScopeParamResolution) {
 }
 
 TEST(ElabA93, PackageScopeTypeResolution) {
-  // §A.9.3: ps_type_identifier — package-scoped type usage.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "package pkg;\n"
@@ -114,7 +99,7 @@ TEST(ElabA93, PackageScopeTypeResolution) {
 }
 
 TEST(ElabA93, PackageImportIdentAccess) {
-  // §A.9.3: After import, package members accessible as simple identifiers.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "package pkg;\n"
@@ -129,12 +114,8 @@ TEST(ElabA93, PackageImportIdentAccess) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ===========================================================================
-// §A.9.3: hierarchical_identifier elaboration — path traversal
-// ===========================================================================
-
 TEST(ElabA93, HierarchicalIdentInContAssign) {
-  // §A.9.3: hierarchical_identifier in continuous assignment.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module sub(input a, output b);\n"
@@ -150,7 +131,7 @@ TEST(ElabA93, HierarchicalIdentInContAssign) {
 }
 
 TEST(ElabA93, InstanceNameIsIdentifier) {
-  // §A.9.3: instance_identifier in module instantiation.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module sub; endmodule\n"
@@ -165,12 +146,8 @@ TEST(ElabA93, InstanceNameIsIdentifier) {
   EXPECT_EQ(mod->children[0].inst_name, "my_instance");
 }
 
-// ===========================================================================
-// §A.9.3: Identifier roles in elaboration — generate, parameter, etc.
-// ===========================================================================
-
 TEST(ElabA93, GenvarIdentifier) {
-  // §A.9.3: genvar_identifier ::= identifier — genvar used in generate.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -183,7 +160,7 @@ TEST(ElabA93, GenvarIdentifier) {
 }
 
 TEST(ElabA93, ParamIdentInExpression) {
-  // §A.9.3: parameter_identifier used in constant expressions.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -197,7 +174,7 @@ TEST(ElabA93, ParamIdentInExpression) {
 }
 
 TEST(ElabA93, FunctionCallIdentResolution) {
-  // §A.9.3: function_identifier resolves in expression context.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -212,12 +189,8 @@ TEST(ElabA93, FunctionCallIdentResolution) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ===========================================================================
-// §A.9.3: system_tf_identifier55 — elaboration of system calls
-// ===========================================================================
-
 TEST(ElabA93, SystemCallElaboration) {
-  // §A.9.3 / Footnote 55: system_tf_identifier in procedural context.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -231,12 +204,8 @@ TEST(ElabA93, SystemCallElaboration) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ===========================================================================
-// §A.9.3 / §35: DPI c_identifier elaboration
-// ===========================================================================
-
 TEST(ElabA93, DpiImportElaboration) {
-  // §A.9.3: c_identifier used in DPI import elaborates correctly.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -251,7 +220,7 @@ TEST(ElabA93, DpiImportElaboration) {
 }
 
 TEST(ElabA93, DpiExportElaboration) {
-  // §A.9.3: c_identifier in DPI export context.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -263,12 +232,8 @@ TEST(ElabA93, DpiExportElaboration) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ===========================================================================
-// §A.9.3: Multiple identifier forms within single module
-// ===========================================================================
-
 TEST(ElabA93, MixedIdentifierForms) {
-  // §A.9.3: Multiple identifier types coexisting in one module.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -284,4 +249,4 @@ TEST(ElabA93, MixedIdentifierForms) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

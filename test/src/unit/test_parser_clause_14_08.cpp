@@ -1,5 +1,3 @@
-// §14.8: Multiple clocking blocks example
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Clocking block in a program with initial block accessing signals.
 TEST(ParserSection19, ClockingBlockScope_ProgramAccess) {
   EXPECT_TRUE(
       ParseOk("program test_prog(\n"
@@ -29,4 +26,4 @@ TEST(ParserSection19, ClockingBlockScope_ProgramAccess) {
               "endprogram\n"));
 }
 
-}  // namespace
+}

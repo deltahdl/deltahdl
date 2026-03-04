@@ -26,8 +26,6 @@ class VpiClause3804Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.4: vpi_control
-
 TEST_F(VpiClause3804Test, ControlFinish) {
   EXPECT_FALSE(vpi_ctx_.FinishRequested());
   int result = VpiControlC(vpiFinish, 0);
@@ -47,5 +45,5 @@ TEST_F(VpiClause3804Test, ControlUnknownOpReturnsZero) {
   EXPECT_EQ(result, 0);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

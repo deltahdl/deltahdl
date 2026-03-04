@@ -1,5 +1,3 @@
-// §8.5: Object properties and object parameter data
-
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "parser/ast.h"
@@ -8,19 +6,8 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
-
 namespace {
 
-// =============================================================================
-// §8.3-8.5: Property access and assignment
-// =============================================================================
 TEST(ClassSim, PropertySetAndGet) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"data"});
@@ -52,4 +39,4 @@ TEST(ClassSim, UndefinedPropertyReturnsZero) {
   EXPECT_EQ(obj->GetProperty("nonexistent", f.arena).ToUint64(), 0u);
 }
 
-}  // namespace
+}

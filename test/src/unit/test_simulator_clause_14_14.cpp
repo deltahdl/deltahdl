@@ -1,5 +1,3 @@
-// §14.14: Global clocking
-
 #include <cstdint>
 #include <string_view>
 
@@ -12,16 +10,8 @@
 
 using namespace delta;
 
-// Helper fixture for clocking simulation tests.
-// Schedule posedge at a given time through the scheduler.
-
-// Schedule negedge at a given time through the scheduler.
-
 namespace {
 
-// =============================================================================
-// 9. Global clocking (S14.13)
-// =============================================================================
 TEST(ClockingSim, GlobalClockingBlock) {
   ClockingManager cmgr;
   EXPECT_TRUE(cmgr.GetGlobalClocking().empty());
@@ -39,7 +29,6 @@ TEST(ClockingSim, GlobalClockingBlock) {
   EXPECT_EQ(cmgr.GetGlobalClocking(), "gclk");
 }
 
-// --- clocking_declaration: global clocking ---
 TEST(SimA611, GlobalClocking) {
   ClockingManager cmgr;
   ClockingBlock block;
@@ -56,4 +45,4 @@ TEST(SimA611, GlobalClocking) {
   EXPECT_TRUE(cmgr.Find("gclk")->is_global);
 }
 
-}  // namespace
+}

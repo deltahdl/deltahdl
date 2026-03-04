@@ -1,5 +1,3 @@
-// §6.7.1: Net declarations with built-in net types
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -11,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// --- Strength information (§6.7.1) ---
-// §6.7.1: "each bit of a net shall have additional strength information."
 TEST(NetDecl, EachBitHasStrengthInformation) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -25,9 +21,6 @@ TEST(NetDecl, EachBitHasStrengthInformation) {
   EXPECT_EQ(net.driver_strengths.size(), 1u);
 }
 
-// --- Default initialization (§6.7.1) ---
-// §6.7.1: "The default initialization value for a net shall be the
-//  value z."
 TEST(NetDecl, DefaultInitializationIsZ) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -39,8 +32,6 @@ TEST(NetDecl, DefaultInitializationIsZ) {
   EXPECT_EQ(ValOf(*var), kValZ);
 }
 
-// §6.7.1: "Nets with drivers shall assume the output value of their
-//  drivers."
 TEST(NetDecl, NetsWithDriversAssumeDriverValue) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -53,8 +44,6 @@ TEST(NetDecl, NetsWithDriversAssumeDriverValue) {
   EXPECT_EQ(ValOf(*var), kVal1);
 }
 
-// §6.7.1: "The trireg net shall default to the value x, with the
-//  strength specified in the net declaration."
 TEST(NetDecl, TriregDefaultsToXSmall) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -88,4 +77,4 @@ TEST(NetDecl, TriregDefaultsToXLarge) {
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §13.3.1: Static and automatic tasks
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -21,4 +19,4 @@ TEST(ParserA27, ElabTaskAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

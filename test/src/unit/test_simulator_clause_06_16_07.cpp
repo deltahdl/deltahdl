@@ -1,5 +1,3 @@
-// §6.16.7: Icompare()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.7: icompare(s) -- case-insensitive compare
-// =============================================================================
 TEST(StringMethods, IcompareEqual) {
   StringFixture f;
   f.CreateStringVar("s", "Hello");
@@ -23,4 +18,4 @@ TEST(StringMethods, IcompareEqual) {
   EXPECT_EQ(static_cast<int64_t>(result.ToUint64()), 0);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §16.9.2: Repetition in sequences
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// sequence_expr ::= expression_or_dist [ boolean_abbrev ]
 TEST(ParserA210, SequenceExpr_ExprWithBooleanAbbrev) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -16,15 +13,6 @@ TEST(ParserA210, SequenceExpr_ExprWithBooleanAbbrev) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #33: boolean_abbrev
-// boolean_abbrev ::=
-//     consecutive_repetition | nonconsecutive_repetition | goto_repetition
-// =============================================================================
-// §A.2.10 Production #34: sequence_abbrev
-// sequence_abbrev ::= consecutive_repetition
-// §A.2.10 Production #35: consecutive_repetition
-// consecutive_repetition ::= [* const_or_range_expression ] | [*] | [+]
 TEST(ParserA210, ConsecutiveRepetition_Exact) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -53,10 +41,6 @@ TEST(ParserA210, ConsecutiveRepetition_Plus) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #36: nonconsecutive_repetition
-// nonconsecutive_repetition ::= [= const_or_range_expression ]
-// =============================================================================
 TEST(ParserA210, NonconsecutiveRepetition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -71,10 +55,6 @@ TEST(ParserA210, NonconsecutiveRepetition_Range) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #37: goto_repetition
-// goto_repetition ::= [-> const_or_range_expression ]
-// =============================================================================
 TEST(ParserA210, GotoRepetition_Exact) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -89,11 +69,6 @@ TEST(ParserA210, GotoRepetition_Range) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #38: const_or_range_expression
-// const_or_range_expression ::=
-//     constant_expression | cycle_delay_const_range_expression
-// =============================================================================
 TEST(ParserA210, ConstOrRangeExpr_Constant) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -108,7 +83,6 @@ TEST(ParserA210, ConstOrRangeExpr_Range) {
               "endmodule\n"));
 }
 
-// sequence_instance with sequence_abbrev
 TEST(ParserA210, SequenceExpr_SequenceInstanceWithAbbrev) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -117,7 +91,6 @@ TEST(ParserA210, SequenceExpr_SequenceInstanceWithAbbrev) {
               "endmodule\n"));
 }
 
-// Assert property with [*N] consecutive repetition.
 TEST(ParserSection16, Sec16_5_1_SequenceConsecutiveRepetition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -125,7 +98,6 @@ TEST(ParserSection16, Sec16_5_1_SequenceConsecutiveRepetition) {
               "endmodule\n"));
 }
 
-// Assert property with [->N] goto repetition.
 TEST(ParserSection16, Sec16_5_1_SequenceGotoRepetition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -133,10 +105,6 @@ TEST(ParserSection16, Sec16_5_1_SequenceGotoRepetition) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.9 Sequence operations — repetition
-// =============================================================================
 TEST(ParserSection16, SequenceConsecutiveRepetition) {
   auto r = Parse(
       "module m;\n"
@@ -171,7 +139,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.2: Sequence repetition [*N] ---
 TEST(ParserAnnexF, AnnexFConsecutiveRepetition) {
   auto r = Parse(
       "module m;\n"
@@ -182,7 +149,6 @@ TEST(ParserAnnexF, AnnexFConsecutiveRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// --- F.3: Goto repetition [->N] ---
 TEST(ParserAnnexF, AnnexFGotoRepetition) {
   auto r = Parse(
       "module m;\n"
@@ -193,7 +159,6 @@ TEST(ParserAnnexF, AnnexFGotoRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// --- F.4: Non-consecutive repetition [=N] ---
 TEST(ParserAnnexF, AnnexFNonconsecutiveRepetition) {
   auto r = Parse(
       "module m;\n"
@@ -204,4 +169,4 @@ TEST(ParserAnnexF, AnnexFNonconsecutiveRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}  // namespace
+}

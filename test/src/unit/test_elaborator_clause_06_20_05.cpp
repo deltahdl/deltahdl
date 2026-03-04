@@ -1,5 +1,3 @@
-// §6.20.5: Specify parameters
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §6.20.5: Specparam restriction ---
 TEST(Elaboration, SpecparamInParam_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -22,4 +19,4 @@ TEST(Elaboration, SpecparamInParam_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

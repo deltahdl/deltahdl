@@ -1,5 +1,3 @@
-// §19.8: Predefined coverage methods
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// S19.8: Coverage methods
-// =============================================================================
 TEST(Coverage, SampleCountIncremented) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -41,7 +36,7 @@ TEST(Coverage, GetCoveragePercentage) {
   CoverageDB::AddBin(cp, b2);
 
   db.Sample(g, {{"x", 0}});
-  // 1 of 2 bins covered.
+
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 50.0);
 }
 
@@ -58,4 +53,4 @@ TEST(Coverage, GetInstCoverageMatchesGetCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetInstCoverage(g), CoverageDB::GetCoverage(g));
 }
 
-}  // namespace
+}

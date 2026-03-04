@@ -1,5 +1,3 @@
-// §18.16: Random weighted case—randcase
-
 #include <cstdint>
 #include <string_view>
 
@@ -17,26 +15,13 @@
 
 using namespace delta;
 
-// Helper to create a blocking assignment statement: lhs = rhs_val.
-
-// Driver coroutine that co_awaits an ExecTask and stores its result.
-
-// Helper to run ExecStmt synchronously (for non-suspending statements).
-// Creates a wrapper coroutine, resumes it, and returns the result.
 namespace {
 
-// =============================================================================
-// 7. Randcase (StmtKind::kRandcase)
-// =============================================================================
 TEST(StmtExec, RandcaseSelectsBranch) {
   StmtFixture f;
   auto* result_var = f.ctx.CreateVariable("r", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // randcase
-  //   1 : r = 10;
-  //   1 : r = 20;
-  // endcase
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kRandcase;
   stmt->randcase_items.push_back(
@@ -79,16 +64,11 @@ TEST(StmtExec, RandcaseSingleBranchAlwaysSelected) {
   EXPECT_EQ(result_var->value.ToUint64(), 42u);
 }
 
-// =============================================================================
-// 16. Randcase weighted selection
-// =============================================================================
 TEST(StmtExec, RandcaseRespectsWeights) {
-  // Use a fixed seed; all branches should have weight > 0.
+
   StmtFixture f;
   auto* result_var = f.ctx.CreateVariable("rw", 32);
 
-  // Run randcase many times and check distribution.
-  // Weight 100 vs weight 0: should always pick first.
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kRandcase;
   stmt->randcase_items.push_back(
@@ -103,4 +83,4 @@ TEST(StmtExec, RandcaseRespectsWeights) {
   }
 }
 
-}  // namespace
+}

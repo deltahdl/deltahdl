@@ -1,5 +1,3 @@
-// §20.12: Sampled value system functions
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -51,4 +49,4 @@ TEST(SysTask, ChangedReturnsZeroOrOne) {
   EXPECT_LE(result.ToUint64(), 1u);
 }
 
-}  // namespace
+}

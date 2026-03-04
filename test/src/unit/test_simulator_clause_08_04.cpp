@@ -1,5 +1,3 @@
-// §8.4: Objects (class instance)
-
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "parser/ast.h"
@@ -8,19 +6,8 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
-
 namespace {
 
-// =============================================================================
-// §8.6-8.8: Class declaration and new() constructor
-// =============================================================================
 TEST(ClassSim, AllocateNewObject) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"header", "payload"});
@@ -49,9 +36,6 @@ TEST(ClassSim, HandleToObjectLookup) {
   EXPECT_EQ(retrieved, obj);
 }
 
-// =============================================================================
-// §8.4: Null object handle checks
-// =============================================================================
 TEST(ClassSim, NullHandleIsZero) { EXPECT_EQ(kNullClassHandle, 0u); }
 
 TEST(ClassSim, GetClassObjectNullReturnsNullptr) {
@@ -87,9 +71,8 @@ TEST(ClassSim, MultipleObjectsSameType) {
   o1->SetProperty("value", MakeLogic4VecVal(f.arena, 32, 100));
   o2->SetProperty("value", MakeLogic4VecVal(f.arena, 32, 200));
 
-  // Each instance has independent properties.
   EXPECT_EQ(o1->GetProperty("value", f.arena).ToUint64(), 100u);
   EXPECT_EQ(o2->GetProperty("value", f.arena).ToUint64(), 200u);
 }
 
-}  // namespace
+}

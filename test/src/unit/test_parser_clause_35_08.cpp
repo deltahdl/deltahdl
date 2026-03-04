@@ -1,5 +1,3 @@
-// §35.8: Exported tasks
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -52,7 +50,7 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportTask) {
 }
 
 TEST(ParserSection38, DpiExportTaskForSystf) {
-  // Export a task for use as a systf callback handler
+
   auto r = Parse(R"(
     module m;
       export "DPI-C" task systf_handler;
@@ -66,4 +64,4 @@ TEST(ParserSection38, DpiExportTaskForSystf) {
   EXPECT_TRUE(items[0]->dpi_is_task);
 }
 
-}  // namespace
+}

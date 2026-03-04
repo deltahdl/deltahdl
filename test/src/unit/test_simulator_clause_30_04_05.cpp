@@ -1,5 +1,3 @@
-// §30.4.5: Full connection and parallel connection paths
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Simulation tests — A.7.2 Specify path declarations
-// =============================================================================
-// Module with simple parallel path simulates correctly
 TEST(SimA702, SimpleParallelPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +26,6 @@ TEST(SimA702, SimpleParallelPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// Module with full path simulates correctly
 TEST(SimA702, SimpleFullPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -53,4 +46,4 @@ TEST(SimA702, SimpleFullPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

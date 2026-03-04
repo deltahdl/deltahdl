@@ -23,8 +23,6 @@ class VpiClause3817Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.17: vpi_get_vlog_info
-
 TEST_F(VpiClause3817Test, GetVlogInfoReturnsProductAndVersion) {
   SVpiVlogInfo info = {};
   vpi_get_vlog_info(&info);
@@ -37,8 +35,8 @@ TEST_F(VpiClause3817Test, GetVlogInfoReturnsProductAndVersion) {
 
 TEST_F(VpiClause3817Test, GetVlogInfoNullDoesNotCrash) {
   vpi_get_vlog_info(nullptr);
-  // Should not crash.
+
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

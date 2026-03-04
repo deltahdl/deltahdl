@@ -1,5 +1,3 @@
-// §10.6: Procedural continuous assignments
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, ProceduralContinuous_AllForms) {
-  // All four procedural continuous assignment forms in one block
+
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -27,4 +25,4 @@ TEST(ParserA602, ProceduralContinuous_AllForms) {
   EXPECT_EQ(stmts[3]->kind, StmtKind::kRelease);
 }
 
-}  // namespace
+}

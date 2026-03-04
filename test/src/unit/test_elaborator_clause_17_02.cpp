@@ -1,5 +1,3 @@
-// §17.2: Checker declaration
-
 #include "fixture_checker_elab.h"
 
 namespace {
@@ -17,4 +15,4 @@ TEST(CheckerElab, ElaborateCheckerWithPorts) {
   EXPECT_EQ(mod->ports[1].name, "rst");
 }
 
-}  // namespace
+}

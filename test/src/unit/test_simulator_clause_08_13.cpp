@@ -1,5 +1,3 @@
-// §8.13: Inheritance and subclasses
-
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -10,19 +8,8 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
-
 namespace {
 
-// =============================================================================
-// §8.13: Inheritance with `extends`
-// =============================================================================
 TEST(ClassSim, InheritanceParentLink) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {"x"});
@@ -47,7 +34,7 @@ TEST(ClassSim, InheritedMethodResolution) {
   derived->parent = base;
 
   auto [handle, obj] = MakeObj(f, derived);
-  // Should find get_x from base class.
+
   auto* resolved = obj->ResolveMethod("get_x");
   EXPECT_NE(resolved, nullptr);
   EXPECT_EQ(resolved->name, "get_x");
@@ -79,7 +66,6 @@ TEST(ClassSim, MethodResolutionWalksChain) {
   auto* leaf = MakeClassType(f, "Leaf", {});
   leaf->parent = mid;
 
-  // Only base defines the method.
   auto* m = f.arena.Create<ModuleItem>();
   m->kind = ModuleItemKind::kFunctionDecl;
   m->name = "deep_method";
@@ -90,4 +76,4 @@ TEST(ClassSim, MethodResolutionWalksChain) {
   EXPECT_EQ(resolved, m);
 }
 
-}  // namespace
+}

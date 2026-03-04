@@ -1,5 +1,3 @@
-// §15.3.2: Put()
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -15,9 +13,6 @@
 
 namespace {
 
-// =============================================================================
-// 2. Semaphore: put() adds keys (section 15.3.2)
-// =============================================================================
 TEST(IpcSync, SemaphorePutAddsKeys) {
   SemaphoreObject sem(0);
   sem.Put(3);
@@ -32,19 +27,14 @@ TEST(IpcSync, SemaphorePutDefaultAddsOne) {
   EXPECT_EQ(sem.key_count, 1);
 }
 
-// =============================================================================
-// 5. Semaphore: put() wakes waiters
-// =============================================================================
 TEST(IpcSync, SemaphorePutWakesWaiters) {
   SemaphoreObject sem(0);
   bool woken = false;
-  // Simulate a waiting coroutine by adding a waiter manually.
-  // We cannot create a real coroutine here, but we can verify the
-  // waiter queue management.
-  EXPECT_EQ(sem.TryGet(1), 0);  // No keys available.
+
+  EXPECT_EQ(sem.TryGet(1), 0);
   sem.Put(1);
-  EXPECT_EQ(sem.key_count, 1);  // Key added, no waiters to wake.
+  EXPECT_EQ(sem.key_count, 1);
   (void)woken;
 }
 
-}  // namespace
+}

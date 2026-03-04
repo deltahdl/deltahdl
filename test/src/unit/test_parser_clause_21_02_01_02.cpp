@@ -1,5 +1,3 @@
-// §21.2.1.2: Size of displayed data
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -17,4 +15,4 @@ TEST(ParserSection21, DisplayWithFormatSpecifiers) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

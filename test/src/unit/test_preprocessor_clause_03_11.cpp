@@ -1,5 +1,3 @@
-// §3.11: Overview of hierarchy
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM §3.11 — Overview of hierarchy
-// =============================================================================
-// §3.11 Hierarchy through instantiation, primitives as leaves, multiple tops
 TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
@@ -26,19 +20,19 @@ TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
       "endmodule : mux2to1\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // Multiple top-level blocks
+
   ASSERT_EQ(r.cu->modules.size(), 2u);
   EXPECT_EQ(r.cu->modules[0]->name, "top");
   EXPECT_EQ(r.cu->modules[1]->name, "mux2to1");
-  // Hierarchy through instantiation with port connections for communication
+
   auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
   ASSERT_NE(inst, nullptr);
   EXPECT_EQ(inst->inst_module, "mux2to1");
   EXPECT_EQ(inst->inst_name, "m1");
   EXPECT_EQ(inst->inst_ports.size(), 4u);
-  // Primitives as leaves: gate primitives (not, and, or)
+
   EXPECT_EQ(
       CountItemsByKind(r.cu->modules[1]->items, ModuleItemKind::kGateInst), 4);
 }
 
-}  // namespace
+}

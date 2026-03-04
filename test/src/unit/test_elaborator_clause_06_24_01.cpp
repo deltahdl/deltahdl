@@ -1,5 +1,3 @@
-// §6.24.1: Cast operator
-
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_primary — cast elaborates
 TEST(ElabA84, ConstantPrimaryCastElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +16,6 @@ TEST(ElabA84, ConstantPrimaryCastElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § primary — cast in initial elaborates
 TEST(ElabA84, PrimaryCastInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +29,6 @@ TEST(ElabA84, PrimaryCastInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.24.1: signed'(x) sets is_signed flag.
 TEST(SimCh6, CastSigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,11 +49,10 @@ TEST(SimCh6, CastSigned) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // 8'hFF sign-extended to 32 bits = 0xFFFFFFFF (-1 as unsigned).
+
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-// §6.24.1: unsigned'(x) clears is_signed flag.
 TEST(SimCh6, CastUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -79,11 +73,10 @@ TEST(SimCh6, CastUnsigned) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // unsigned'(-1) on 32-bit = 0xFFFFFFFF.
+
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-// §6.24.1: shortint'(x) casts to 16-bit width.
 TEST(SimCh6, CastShortint) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -104,11 +97,10 @@ TEST(SimCh6, CastShortint) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // shortint'(32'h1234ABCD) truncates to 16 bits = 0xABCD.
+
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-// 15. type() with packed struct member type via intermediate int.
 TEST(SimCh6b, TypeOpStructMemberWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -136,9 +128,6 @@ TEST(SimCh6b, TypeOpStructMemberWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-// ---------------------------------------------------------------------------
-// 26. always @* with type cast (signed').
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarTypeCast) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -160,13 +149,10 @@ TEST(SimCh9d, AlwaysStarTypeCast) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // 8'hFF sign-extended to 32 bits = 0xFFFFFFFF.
+
   EXPECT_EQ(y->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 24. Blocking assignment with type cast (signed').
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTypeCast) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -187,8 +173,8 @@ TEST(SimCh10, BlockingAssignTypeCast) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // 8'hFF sign-extended to 32 bits = 0xFFFFFFFF.
+
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-}  // namespace
+}

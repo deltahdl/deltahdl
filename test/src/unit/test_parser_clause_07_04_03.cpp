@@ -1,5 +1,3 @@
-// §7.4.3: Memories
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Combined / edge cases
-// ---------------------------------------------------------------------------
 TEST(ParserA25, PackedAndUnpackedDims) {
   auto r = Parse("module m; logic [7:0] mem [0:255]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -20,7 +15,7 @@ TEST(ParserA25, PackedAndUnpackedDims) {
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
-// 3b. Unpacked dimensions on logic with packed dims (memory array).
+
 TEST(ParserSection6, Sec6_11_LogicPackedAndUnpackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -36,7 +31,6 @@ TEST(ParserSection6, Sec6_11_LogicPackedAndUnpackedDims) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-// 4. Combined packed + unpacked dims with range notation.
 TEST(ParserSection6, Sec6_11_PackedAndUnpackedWithRange) {
   auto r = Parse(
       "module t;\n"
@@ -52,7 +46,7 @@ TEST(ParserSection6, Sec6_11_PackedAndUnpackedWithRange) {
   EXPECT_FALSE(item->unpacked_dims.empty());
   EXPECT_EQ(item->name, "mem");
 }
-// --- Test helpers ---
+
 TEST(ParserSection7, PackedArrayWithUnpacked) {
   auto r = Parse(
       "module t;\n"
@@ -64,9 +58,7 @@ TEST(ParserSection7, PackedArrayWithUnpacked) {
   EXPECT_EQ(item->name, "mem");
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
-// =========================================================================
-// §7.4.3: Memories
-// =========================================================================
+
 TEST(ParserSection7, MemoryDeclaration_Type) {
   auto r = Parse(
       "module t;\n"
@@ -106,4 +98,4 @@ TEST(ParserSection6, VectorWithMultipleDims) {
   EXPECT_EQ(item->name, "mem");
 }
 
-}  // namespace
+}

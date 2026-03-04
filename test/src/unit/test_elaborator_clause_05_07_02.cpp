@@ -1,12 +1,9 @@
-// §5.7.2: Real literal constants
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// § real_number — fixed_point_number elaborates
 TEST(ElabA87, FixedPointElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +16,6 @@ TEST(ElabA87, FixedPointElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § real_number — scientific notation elaborates
 TEST(ElabA87, ScientificNotationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -32,4 +28,4 @@ TEST(ElabA87, ScientificNotationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

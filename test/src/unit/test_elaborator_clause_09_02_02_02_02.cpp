@@ -1,5 +1,3 @@
-// §9.2.2.2.2: always_comb compared to always @*
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// 1. always_comb executes at time 0 (initial evaluation).
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombExecutesAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,13 +24,10 @@ TEST(SimCh9, AlwaysCombExecutesAtTimeZero) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // a is explicitly 0, so result = 0 + 1 = 1.
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 2. always_comb AND gate: result = a & b.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombAndGate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -59,9 +51,6 @@ TEST(SimCh9, AlwaysCombAndGate) {
   EXPECT_EQ(var->value.ToUint64(), 0x30u);
 }
 
-// ---------------------------------------------------------------------------
-// 3. always_comb OR gate: result = a | b.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombOrGate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -85,9 +74,6 @@ TEST(SimCh9, AlwaysCombOrGate) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 4. always_comb XOR gate: result = a ^ b.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombXorGate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -111,9 +97,6 @@ TEST(SimCh9, AlwaysCombXorGate) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 5. always_comb NOT gate: result = ~a & mask.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombNotGate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -137,9 +120,6 @@ TEST(SimCh9, AlwaysCombNotGate) {
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
 }
 
-// ---------------------------------------------------------------------------
-// 6. always_comb 2-to-1 mux using if-else.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombMuxIfElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -168,9 +148,6 @@ TEST(SimCh9, AlwaysCombMuxIfElse) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// ---------------------------------------------------------------------------
-// 7. always_comb if-else selects the else branch.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombIfElseBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -199,9 +176,6 @@ TEST(SimCh9, AlwaysCombIfElseBranch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// ---------------------------------------------------------------------------
-// 8. always_comb case statement decode.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombCaseDecode) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -228,24 +202,6 @@ TEST(SimCh9, AlwaysCombCaseDecode) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// =============================================================================
-// IEEE 1800 LRM section 9.2.2.2 -- always_comb compared with always @*
-//
-// Key behavioral properties of always_comb:
-//   - Executes once at time 0 automatically (initial evaluation).
-//   - Automatically infers a complete sensitivity list from signals read.
-//   - Re-triggers whenever any read signal changes.
-//   - No blocking timing controls allowed inside.
-//   - Produces combinational logic: AND, OR, XOR, if-else, case, etc.
-//
-// Contrast with always @*:
-//   - Does NOT execute at time 0; waits for the first event.
-//   - The @* is consumed by the parser; in this implementation, always @*
-//     maps to a plain always loop (no implicit suspension).
-// =============================================================================
-// ---------------------------------------------------------------------------
-// 1. always_comb with constant assignment executes at time 0.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombConstAssignTime0) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -266,9 +222,6 @@ TEST(SimCh9b, AlwaysCombConstAssignTime0) {
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-// ---------------------------------------------------------------------------
-// 2. always_comb with zero assignment executes at time 0.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombZeroAssignTime0) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -289,9 +242,6 @@ TEST(SimCh9b, AlwaysCombZeroAssignTime0) {
   EXPECT_EQ(y->value.ToUint64(), 0u);
 }
 
-// ---------------------------------------------------------------------------
-// 12. always_comb output available in initial block after scheduler run.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombOutputAfterRun) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -312,9 +262,6 @@ TEST(SimCh9b, AlwaysCombOutputAfterRun) {
   EXPECT_EQ(result->value.ToUint64(), 100u);
 }
 
-// ---------------------------------------------------------------------------
-// 25. always @* equivalent to always_comb for simple combinational logic.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
   SimFixture f_star;
   auto* d_star = ElaborateSrc(
@@ -359,4 +306,4 @@ TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
   EXPECT_EQ(y_star->value.ToUint64(), y_comb->value.ToUint64());
 }
 
-}  // namespace
+}

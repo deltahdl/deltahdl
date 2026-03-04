@@ -1,12 +1,9 @@
-// §16.9.10: Sequence contained within another sequence
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// sequence_expr ::= sequence_expr within sequence_expr
 TEST(ParserA210, SequenceExpr_Within) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -22,7 +19,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.8: within ---
 TEST(ParserAnnexF, AnnexFWithin) {
   auto r = Parse(
       "module m;\n"
@@ -34,4 +30,4 @@ TEST(ParserAnnexF, AnnexFWithin) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §15.4.6: Try_get()
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -15,9 +13,6 @@
 
 namespace {
 
-// =============================================================================
-// 8. Mailbox: try_get() (section 15.4.4)
-// =============================================================================
 TEST(IpcSync, MailboxTryGetSuccess) {
   MailboxObject mb;
   mb.TryPut(42);
@@ -33,4 +28,4 @@ TEST(IpcSync, MailboxTryGetEmpty) {
   EXPECT_EQ(mb.TryGet(msg), -1);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §16.12.8: Implies and iff properties
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -31,9 +26,6 @@ struct SvaFixture {
 
 namespace {
 
-// =============================================================================
-// Property temporal operators: not, and, or (section 16.12.8-10)
-// =============================================================================
 TEST(SvaEngine, PropertyNot) {
   EXPECT_EQ(EvalPropertyNot(PropertyResult::kPass), PropertyResult::kFail);
   EXPECT_EQ(EvalPropertyNot(PropertyResult::kFail), PropertyResult::kPass);
@@ -41,4 +33,4 @@ TEST(SvaEngine, PropertyNot) {
             PropertyResult::kFail);
 }
 
-}  // namespace
+}

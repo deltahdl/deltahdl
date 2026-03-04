@@ -1,5 +1,3 @@
-// §8.4: Objects (class instance)
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -29,7 +27,7 @@ TEST(ParserSection6, ClassVarDecl_VarType) {
   EXPECT_EQ(var_item->data_type.kind, DataTypeKind::kNamed);
   EXPECT_EQ(var_item->data_type.type_name, "MyClass");
 }
-// §8.4 — Null comparison
+
 TEST(ParserSection8, NullExpression) {
   auto r = Parse(
       "module m;\n"
@@ -45,4 +43,4 @@ TEST(ParserSection8, NullExpression) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

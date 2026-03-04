@@ -1,5 +1,3 @@
-// §6.16.4: Toupper()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.4: toupper() -- returns uppercased copy
-// =============================================================================
 TEST(StringMethods, Toupper) {
   StringFixture f;
   f.CreateStringVar("s", "hello");
@@ -19,4 +14,4 @@ TEST(StringMethods, Toupper) {
   EXPECT_EQ(VecToString(result), "HELLO");
 }
 
-}  // namespace
+}

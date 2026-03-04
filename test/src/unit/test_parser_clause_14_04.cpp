@@ -1,5 +1,3 @@
-// §14.4: Input and output skews
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// delay_value: 1step — special keyword in clocking context.
 TEST(ParserA223, DelayValue1step) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -17,9 +14,6 @@ TEST(ParserA223, DelayValue1step) {
               "endmodule"));
 }
 
-// =============================================================================
-// A.6.11 clocking_direction — input [skew] output [skew]
-// =============================================================================
 TEST(ParserA611, ClockingDirectionInputOutput) {
   auto r = Parse(
       "module m;\n"
@@ -39,8 +33,6 @@ TEST(ParserA611, ClockingDirectionInputOutput) {
   EXPECT_NE(sig.out_skew_delay, nullptr);
 }
 
-// --- Test helpers ---
-// §14.1 overview: clocking block with input skew and output skew together.
 TEST(ParserSection14, OverviewInputOutputSkews) {
   auto r = Parse(
       "module m;\n"
@@ -57,8 +49,7 @@ TEST(ParserSection14, OverviewInputOutputSkews) {
   EXPECT_EQ(item->clocking_signals[1].direction, Direction::kOutput);
   ASSERT_NE(item->clocking_signals[1].skew_delay, nullptr);
 }
-// 27. 1step is parsed as a special delay in clocking blocks (§14.4).
-//     Verify parsing succeeds and the text is "1step".
+
 TEST(ParserClause03, Cl3_14_3_1StepParsedInClockingBlock) {
   auto r = Parse(
       "module m;\n"
@@ -69,7 +60,7 @@ TEST(ParserClause03, Cl3_14_3_1StepParsedInClockingBlock) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   auto* mod = r.cu->modules[0];
-  // Find the clocking declaration.
+
   ModuleItem* clk_item = nullptr;
   for (auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kClockingBlock) {
@@ -80,7 +71,6 @@ TEST(ParserClause03, Cl3_14_3_1StepParsedInClockingBlock) {
   ASSERT_NE(clk_item, nullptr);
 }
 
-// §14.10: clocking block with output negedge skew (from LRM example).
 TEST(ParserSection14, ClockingBlockEventOutputNegedgeSkew) {
   auto r = Parse(
       "module foo(input phi1, input [7:0] data);\n"
@@ -99,9 +89,6 @@ TEST(ParserSection14, ClockingBlockEventOutputNegedgeSkew) {
   ASSERT_NE(out_sig.skew_delay, nullptr);
 }
 
-// =============================================================================
-// A.6.11 clocking_skew — edge_identifier only (posedge)
-// =============================================================================
 TEST(ParserA611, ClockingSkewEdgeOnly) {
   auto r = Parse(
       "module m;\n"
@@ -119,9 +106,6 @@ TEST(ParserA611, ClockingSkewEdgeOnly) {
   EXPECT_EQ(sig.skew_delay, nullptr);
 }
 
-// =============================================================================
-// A.6.11 clocking_skew — delay_control only
-// =============================================================================
 TEST(ParserA611, ClockingSkewDelayOnly) {
   auto r = Parse(
       "module m;\n"
@@ -140,9 +124,6 @@ TEST(ParserA611, ClockingSkewDelayOnly) {
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
-// =============================================================================
-// A.6.11 clocking_skew — edge_identifier + delay_control
-// =============================================================================
 TEST(ParserA611, ClockingSkewEdgeAndDelay) {
   auto r = Parse(
       "module m;\n"
@@ -160,9 +141,6 @@ TEST(ParserA611, ClockingSkewEdgeAndDelay) {
   ASSERT_NE(sig.skew_delay, nullptr);
 }
 
-// =============================================================================
-// A.6.11 clocking_skew — #1step special form
-// =============================================================================
 TEST(ParserA611, ClockingSkew1step) {
   auto r = Parse(
       "module m;\n"
@@ -180,7 +158,6 @@ TEST(ParserA611, ClockingSkew1step) {
   EXPECT_EQ(sig.skew_delay->text, "1step");
 }
 
-// §14.13: input with nonzero skew samples from a prior time step.
 TEST(ParserSection14, InputSamplingNonzeroSkew) {
   auto r = Parse(
       "module m;\n"
@@ -198,9 +175,6 @@ TEST(ParserSection14, InputSamplingNonzeroSkew) {
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
-// =============================================================================
-// A.6.11 clocking_direction — input with skew, no output
-// =============================================================================
 TEST(ParserA611, InputWithSkewNoOutput) {
   auto r = Parse(
       "module m;\n"
@@ -218,10 +192,7 @@ TEST(ParserA611, InputWithSkewNoOutput) {
   EXPECT_EQ(sig.skew_edge, Edge::kPosedge);
   ASSERT_NE(sig.skew_delay, nullptr);
 }
-// =============================================================================
-// LRM section 19.6.1 -- Input and output skews
-// =============================================================================
-// Input skew with numeric delay.
+
 TEST(ParserSection19, InputOutputSkew_InputNumeric) {
   auto r = Parse(
       "module t;\n"
@@ -239,7 +210,6 @@ TEST(ParserSection19, InputOutputSkew_InputNumeric) {
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
-// Output skew with edge qualifier.
 TEST(ParserSection19, InputOutputSkew_OutputEdge) {
   auto r = Parse(
       "module t;\n"
@@ -256,7 +226,6 @@ TEST(ParserSection19, InputOutputSkew_OutputEdge) {
   EXPECT_EQ(sig.skew_edge, Edge::kNegedge);
 }
 
-// Combined input and output skews on a single signal.
 TEST(ParserSection19, InputOutputSkew_CombinedInputOutput) {
   auto r = Parse(
       "module t;\n"
@@ -274,7 +243,6 @@ TEST(ParserSection19, InputOutputSkew_CombinedInputOutput) {
   EXPECT_NE(sig.out_skew_delay, nullptr);
 }
 
-// Input skew with time-unit suffix (e.g., #1ps).
 TEST(ParserSection19, InputOutputSkew_TimeUnitSuffix) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -285,7 +253,6 @@ TEST(ParserSection19, InputOutputSkew_TimeUnitSuffix) {
               "endmodule\n"));
 }
 
-// Input skew of #1step (special 1step literal).
 TEST(ParserSection19, InputOutputSkew_OneStep) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -295,7 +262,6 @@ TEST(ParserSection19, InputOutputSkew_OneStep) {
               "endmodule\n"));
 }
 
-// Output skew with negedge and numeric delay combined.
 TEST(ParserSection19, InputOutputSkew_OutputNegedgeWithDelay) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -305,7 +271,6 @@ TEST(ParserSection19, InputOutputSkew_OutputNegedgeWithDelay) {
               "endmodule\n"));
 }
 
-// Input skew with explicit #0 (Observed region sampling).
 TEST(ParserSection19, InputOutputSkew_ExplicitZero) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -315,7 +280,6 @@ TEST(ParserSection19, InputOutputSkew_ExplicitZero) {
               "endmodule\n"));
 }
 
-// Combined input/output with time-unit suffix on output (#4ps).
 TEST(ParserSection19, InputOutputSkew_MixedUnitSuffix) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -325,9 +289,7 @@ TEST(ParserSection19, InputOutputSkew_MixedUnitSuffix) {
               "  endclocking\n"
               "endmodule\n"));
 }
-// =============================================================================
-// §14.3 — Input skew with delay
-// =============================================================================
+
 TEST(ParserSection14, InputSkewDelay) {
   auto r = Parse(
       "module m;\n"
@@ -354,9 +316,6 @@ TEST(ParserSection14, InputSkewDelay) {
   }
 }
 
-// =============================================================================
-// §14.3 — Combined input/output skews
-// =============================================================================
 TEST(ParserSection14, CombinedInputOutputSkew) {
   auto r = Parse(
       "module m;\n"
@@ -377,4 +336,4 @@ TEST(ParserSection14, CombinedInputOutputSkew) {
   }
 }
 
-}  // namespace
+}

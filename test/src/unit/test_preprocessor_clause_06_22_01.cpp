@@ -1,5 +1,3 @@
-// §6.22.1: Matching types
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 
@@ -19,4 +17,4 @@ TEST(ParserSection6, CompatibleTypesNamedType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

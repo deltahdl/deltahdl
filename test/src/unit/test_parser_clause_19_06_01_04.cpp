@@ -1,5 +1,3 @@
-// §19.6.1.4: Cross bin set expression
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -21,9 +19,6 @@ TEST(ParserA211, CrossBodyItem_FunctionDecl) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #32: cross_set_expression
-// =============================================================================
 TEST(ParserA211, CrossSetExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -37,4 +32,4 @@ TEST(ParserA211, CrossSetExpression) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.2.2.2: Combinational logic always_comb procedure
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -28,4 +26,4 @@ TEST(SynthLower, AlwaysCombIfElse) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}  // namespace
+}

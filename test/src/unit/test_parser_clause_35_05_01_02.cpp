@@ -1,5 +1,3 @@
-// §35.5.1.2: input, output, and inout arguments
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex H - DPI import with output/inout arguments
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiImportOutputArgs) {
   auto* unit = Parse(
       "module m;\n"
@@ -33,4 +28,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportOutputArgs) {
   EXPECT_EQ(items[0]->func_args[2].name, "status");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.3.2: Parallel blocks
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -11,7 +9,7 @@ using namespace delta;
 namespace {
 
 TEST(Lowerer, ForkJoinNone) {
-  // fork/join_none: parent continues immediately.
+
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +27,7 @@ TEST(Lowerer, ForkJoinNone) {
 }
 
 TEST(Lowerer, ForkJoin) {
-  // fork/join: parent waits for all children to complete.
+
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -61,11 +59,6 @@ TEST(Lowerer, ForkJoin) {
   }
 }
 
-// Sim test fixture
-// ---------------------------------------------------------------------------
-// Simulation: §9.3.2 parallel block fork/join semantics
-// ---------------------------------------------------------------------------
-// fork/join: all children execute
 TEST(SimA603, ForkJoinAllChildrenExecute) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -82,7 +75,6 @@ TEST(SimA603, ForkJoinAllChildrenExecute) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
-// fork/join_none: all children execute, parent continues immediately
 TEST(SimA603, ForkJoinNoneChildrenExecute) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -100,7 +92,6 @@ TEST(SimA603, ForkJoinNoneChildrenExecute) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
 }
 
-// fork/join_any: all children execute
 TEST(SimA603, ForkJoinAnyChildrenExecute) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -126,7 +117,6 @@ TEST(SimA603, ForkJoinAnyChildrenExecute) {
   EXPECT_EQ(b->value.ToUint64(), 8u);
 }
 
-// fork with single begin-end: executes as single sequential process
 TEST(SimA603, ForkWithSingleBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -151,7 +141,6 @@ TEST(SimA603, ForkWithSingleBeginEnd) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// Empty fork-join completes immediately
 TEST(SimA603, EmptyForkJoin) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -172,4 +161,4 @@ TEST(SimA603, EmptyForkJoin) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

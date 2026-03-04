@@ -1,5 +1,3 @@
-// §30.4.4.3: Edge-sensitive state-dependent paths
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// if (expr) edge_sensitive_path_declaration
 TEST(ParserA702, StateDependentIfEdgeSensitive) {
   auto r = Parse(
       "module m;\n"
@@ -23,4 +20,4 @@ TEST(ParserA702, StateDependentIfEdgeSensitive) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
 }
 
-}  // namespace
+}

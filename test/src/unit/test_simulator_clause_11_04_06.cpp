@@ -1,5 +1,3 @@
-// §11.4.6: Wildcard equality operators
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
@@ -13,17 +11,16 @@ namespace {
 
 TEST(EvalOpXZ, WildcardEqLeftX) {
   SimFixture f;
-  // §11.4.6: 4'bx001 ==? 4'b0001 → x (left X in non-wildcard position)
-  MakeVar4(f, "wl", 4, 0b0001, 0b1000);  // bit3=x
+
+  MakeVar4(f, "wl", 4, 0b0001, 0b1000);
   auto* b = f.ctx.CreateVariable("wr", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 0b0001);
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
                           MakeId(f.arena, "wl"), MakeId(f.arena, "wr"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// § binary_operator — ==? (wildcard equality)
 TEST(SimA86, BinaryWildcardEq) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -41,7 +38,6 @@ TEST(SimA86, BinaryWildcardEq) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § binary_operator — !=? (wildcard inequality)
 TEST(SimA86, BinaryWildcardNeq) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -59,12 +55,9 @@ TEST(SimA86, BinaryWildcardNeq) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// ==========================================================================
-// Wildcard equality (==?, !=?)
-// ==========================================================================
 TEST(EvalOp, WildcardEqMatch) {
   SimFixture f;
-  // 5 ==? 5 = 1 (no X/Z bits, exact match)
+
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
                           MakeInt(f.arena, 5), MakeInt(f.arena, 5));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -73,7 +66,7 @@ TEST(EvalOp, WildcardEqMatch) {
 
 TEST(EvalOp, WildcardEqMismatch) {
   SimFixture f;
-  // 5 ==? 3 = 0
+
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEqQuestion,
                           MakeInt(f.arena, 5), MakeInt(f.arena, 3));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -82,7 +75,7 @@ TEST(EvalOp, WildcardEqMismatch) {
 
 TEST(EvalOp, WildcardNeqMatch) {
   SimFixture f;
-  // 5 !=? 3 = 1
+
   auto* expr = MakeBinary(f.arena, TokenKind::kBangEqQuestion,
                           MakeInt(f.arena, 5), MakeInt(f.arena, 3));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -91,11 +84,11 @@ TEST(EvalOp, WildcardNeqMatch) {
 
 TEST(EvalOp, WildcardNeqSame) {
   SimFixture f;
-  // 5 !=? 5 = 0
+
   auto* expr = MakeBinary(f.arena, TokenKind::kBangEqQuestion,
                           MakeInt(f.arena, 5), MakeInt(f.arena, 5));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+}

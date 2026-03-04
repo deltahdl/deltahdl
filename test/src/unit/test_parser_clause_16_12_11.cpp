@@ -1,12 +1,9 @@
-// §16.12.11: Always property
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// property_expr ::= always property_expr
 TEST(ParserA210, PropertyExpr_Always) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -14,7 +11,6 @@ TEST(ParserA210, PropertyExpr_Always) {
               "endmodule\n"));
 }
 
-// property_expr ::= always [ cycle_delay_const_range_expression ] property_expr
 TEST(ParserA210, PropertyExpr_AlwaysRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -22,7 +18,6 @@ TEST(ParserA210, PropertyExpr_AlwaysRange) {
               "endmodule\n"));
 }
 
-// property_expr ::= s_always [ constant_range ] property_expr
 TEST(ParserA210, PropertyExpr_SAlways) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -30,4 +25,4 @@ TEST(ParserA210, PropertyExpr_SAlways) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

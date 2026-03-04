@@ -1,5 +1,3 @@
-// §25.7.2: Example of using tasks in modports
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -22,4 +20,4 @@ TEST(ParserA29, ImportThenDirectionPorts) {
   EXPECT_EQ(mp->ports[1].name, "data");
 }
 
-}  // namespace
+}

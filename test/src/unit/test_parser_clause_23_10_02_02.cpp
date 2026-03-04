@@ -1,5 +1,3 @@
-// §23.10.2.2: Parameter value assignment by name
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -30,7 +28,6 @@ TEST(ParserAnnexA0411, ElaborationParamOverrideNamed) {
   EXPECT_NE(inst->inst_params[0].second, nullptr);
 }
 
-// --- program_instantiation: with named parameter_value_assignment ---
 TEST(ParserAnnexA0413, ProgramInstWithNamedParams) {
   auto r = Parse(
       "program my_prog #(parameter int W = 8)(input logic [W-1:0] data);\n"
@@ -54,4 +51,4 @@ TEST(ParserSection23, ModuleInstNamedParamOverride) {
   EXPECT_EQ(item->inst_module, "sub");
 }
 
-}  // namespace
+}

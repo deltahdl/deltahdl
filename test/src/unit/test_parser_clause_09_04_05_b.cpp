@@ -1,5 +1,3 @@
-// §9.4.5: Intra-assignment timing controls
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 9.4.5 -- Repeat event signal field populated
-// =============================================================================
-// Verify the signal field of the event expression.
 TEST(ParserSection9, Sec9_4_5_RepeatEventSignalField) {
   auto r = Parse(
       "module m;\n"
@@ -25,10 +19,6 @@ TEST(ParserSection9, Sec9_4_5_RepeatEventSignalField) {
   EXPECT_EQ(stmt->events[0].signal->text, "clk");
 }
 
-// =============================================================================
-// LRM section 9.4.5 -- ParseOk: repeat event parses without errors
-// =============================================================================
-// Validate ParseOk for a complete repeat event control scenario.
 TEST(ParserSection9, Sec9_4_5_ParseOkRepeatEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -39,10 +29,7 @@ TEST(ParserSection9, Sec9_4_5_ParseOkRepeatEvent) {
               "  end\n"
               "endmodule\n"));
 }
-// =============================================================================
-// LRM section 9.4.5 -- Intra-assignment delay no events field set
-// =============================================================================
-// Intra-assignment delay should not set the events field.
+
 TEST(ParserSection9, Sec9_4_5_IntraDelayNoEventsField) {
   auto r = Parse(
       "module m;\n"
@@ -57,12 +44,6 @@ TEST(ParserSection9, Sec9_4_5_IntraDelayNoEventsField) {
   EXPECT_EQ(stmt->repeat_event_count, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// delay_or_event_control ::=
-//   delay_control | event_control | repeat ( expression ) event_control
-// (used in intra-assignment context — §9.4.5)
-// ---------------------------------------------------------------------------
-// §9.4.5: intra-assignment delay in blocking assignment
 TEST(ParserA605, IntraAssignDelayBlocking) {
   auto r = Parse(
       "module m;\n"
@@ -79,7 +60,6 @@ TEST(ParserA605, IntraAssignDelayBlocking) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// §9.4.5: intra-assignment event in blocking assignment
 TEST(ParserA605, IntraAssignEventBlocking) {
   auto r = Parse(
       "module m;\n"
@@ -96,7 +76,6 @@ TEST(ParserA605, IntraAssignEventBlocking) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-// §9.4.5: repeat event control in blocking assignment
 TEST(ParserA605, IntraAssignRepeatEventBlocking) {
   auto r = Parse(
       "module m;\n"
@@ -113,7 +92,6 @@ TEST(ParserA605, IntraAssignRepeatEventBlocking) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-// §9.4.5: intra-assignment delay in nonblocking assignment
 TEST(ParserA605, IntraAssignDelayNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -129,7 +107,6 @@ TEST(ParserA605, IntraAssignDelayNonblocking) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-// §9.4.5: intra-assignment event in nonblocking assignment
 TEST(ParserA605, IntraAssignEventNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -145,7 +122,6 @@ TEST(ParserA605, IntraAssignEventNonblocking) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-// §9.4.5: repeat event control in nonblocking assignment
 TEST(ParserA605, IntraAssignRepeatEventNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -183,9 +159,7 @@ TEST(ParserSection9b, NonblockingAssignWithEventControl) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
-// =============================================================================
-// LRM section 9.4.5 -- repeat event control
-// =============================================================================
+
 TEST(ParserSection9, RepeatEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -200,4 +174,4 @@ TEST(ParserSection9, RepeatEventControl) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-}  // namespace
+}

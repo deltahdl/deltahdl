@@ -1,5 +1,3 @@
-// §12.4: Conditional if–else statement
-
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/compiled_sim.h"
@@ -16,7 +14,6 @@ TEST(CompiledSim, ExecuteIfElse) {
   auto* out = f.ctx.CreateVariable("out", 32);
   out->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // AST: if (sel) out = 1; else out = 0;
   auto* cond = f.arena.Create<Expr>();
   cond->kind = ExprKind::kIdentifier;
   cond->text = "sel";
@@ -57,16 +54,11 @@ TEST(CompiledSim, ExecuteIfElse) {
   compiled.Execute(f.ctx);
   EXPECT_EQ(out->value.ToUint64(), 1u);
 
-  // Change sel to 0, re-execute.
   sel->value = MakeLogic4VecVal(f.arena, 1, 0);
   compiled.Execute(f.ctx);
   EXPECT_EQ(out->value.ToUint64(), 0u);
 }
 
-// =============================================================================
-// Simulation: conditional statement execution
-// =============================================================================
-// §12.4: if true takes then branch
 TEST(SimA606, IfTrueTakesThenBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -87,7 +79,6 @@ TEST(SimA606, IfTrueTakesThenBranch) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.4: if false takes else branch
 TEST(SimA606, IfFalseTakesElseBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -108,7 +99,6 @@ TEST(SimA606, IfFalseTakesElseBranch) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §12.4: if false with no else — no change
 TEST(SimA606, IfFalseNoElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -129,7 +119,6 @@ TEST(SimA606, IfFalseNoElse) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.4: nonzero value is truthy
 TEST(SimA606, IfNonzeroIsTruthy) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -150,7 +139,6 @@ TEST(SimA606, IfNonzeroIsTruthy) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.4: nested if — both levels evaluated
 TEST(SimA606, NestedIfBothLevels) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -175,7 +163,6 @@ TEST(SimA606, NestedIfBothLevels) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §12.4: nested if — outer true, inner false takes inner else
 TEST(SimA606, NestedIfOuterTrueInnerFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -200,7 +187,6 @@ TEST(SimA606, NestedIfOuterTrueInnerFalse) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// §12.4: if inside for loop
 TEST(SimA606, IfInsideForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -220,10 +206,9 @@ TEST(SimA606, IfInsideForLoop) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 2u);  // i=3 and i=4
+  EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §12.4: sequential if statements (not chained)
 TEST(SimA606, SequentialIfStatements) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -243,7 +228,7 @@ TEST(SimA606, SequentialIfStatements) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 3u);  // 0 + 1 + 2 = 3
+  EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
 bool EvaluateWaitCondition(uint64_t value) { return value != 0; }
@@ -252,4 +237,4 @@ TEST(TimingControl, WaitConditionNonzeroIsTrue) {
   EXPECT_TRUE(EvaluateWaitCondition(42));
 }
 
-}  // namespace
+}

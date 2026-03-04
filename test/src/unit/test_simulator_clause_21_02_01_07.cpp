@@ -1,5 +1,3 @@
-// §21.2.1.7: String format
-
 #include <gtest/gtest.h>
 
 #include <cstring>
@@ -24,9 +22,9 @@ TEST(SysTask, FormatString_s) {
 
 TEST(FormatArg, StringFromAscii) {
   Arena arena;
-  // 'A' = 0x41 = 65
+
   auto val = MakeLogic4VecVal(arena, 8, 65);
   EXPECT_EQ(FormatValueAsString(val), "A");
 }
 
-}  // namespace
+}

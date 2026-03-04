@@ -1,5 +1,3 @@
-// §40.3.2.2: $coverage_get_max
-
 #include "fixture_program.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -20,4 +18,4 @@ TEST_F(ApiParseTest, CoverageGetMaxSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

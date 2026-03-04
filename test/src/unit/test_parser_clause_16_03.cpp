@@ -1,5 +1,3 @@
-// §16.3: Immediate assertions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,11 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Gap-filling tests identified by coverage proof
-// =============================================================================
-// concurrent_assertion_item ::= [ block_identifier : ]
-// concurrent_assertion_statement
 TEST(ParserA210, ConcurrentAssertionItem_Labeled) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -21,7 +14,6 @@ TEST(ParserA210, ConcurrentAssertionItem_Labeled) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
 TEST(ParserSection16, ImmediateCoverWithPass) {
   auto r = Parse(
       "module m;\n"
@@ -34,14 +26,10 @@ TEST(ParserSection16, ImmediateCoverWithPass) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCoverImmediate);
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
-  // cover does not have else branch
+
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// action_block: statement_or_null | [statement] else statement_or_null
-// ---------------------------------------------------------------------------
-// §16.3: action_block in immediate assert — pass statement only
 TEST(ParserA603, ActionBlockAssertPassOnly) {
   auto r = Parse(
       "module m;\n"
@@ -58,7 +46,6 @@ TEST(ParserA603, ActionBlockAssertPassOnly) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-// §16.3: action_block in immediate assert — pass and else (fail) statement
 TEST(ParserA603, ActionBlockAssertPassAndFail) {
   auto r = Parse(
       "module m;\n"
@@ -75,7 +62,6 @@ TEST(ParserA603, ActionBlockAssertPassAndFail) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// §16.3: action_block with null pass (semicolon), else fail
 TEST(ParserA603, ActionBlockAssertNullPassElseFail) {
   auto r = Parse(
       "module m;\n"
@@ -91,7 +77,6 @@ TEST(ParserA603, ActionBlockAssertNullPassElseFail) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// §16.3: action_block with null statement (just semicolon, no actions)
 TEST(ParserA603, ActionBlockAssertNullStmt) {
   auto r = Parse(
       "module m;\n"
@@ -106,7 +91,6 @@ TEST(ParserA603, ActionBlockAssertNullStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
 }
 
-// §16.3: action_block in assume statement
 TEST(ParserA603, ActionBlockAssume) {
   auto r = Parse(
       "module m;\n"
@@ -122,9 +106,7 @@ TEST(ParserA603, ActionBlockAssume) {
   EXPECT_NE(stmt->assert_pass_stmt, nullptr);
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with assert immediate.
-// =============================================================================
+
 TEST(ParserSection9, Sec9_3_1_BlockWithAssertImmediate) {
   auto r = Parse(
       "module m;\n"
@@ -143,9 +125,6 @@ TEST(ParserSection9, Sec9_3_1_BlockWithAssertImmediate) {
   EXPECT_NE(body->stmts[1]->assert_expr, nullptr);
 }
 
-// =============================================================================
-// §16.2 Immediate assertions — overview (assert, assume, cover in one module)
-// =============================================================================
 TEST(ParserSection16, OverviewAllThreeImmediateKinds) {
   auto r = Parse(
       "module m;\n"
@@ -169,9 +148,7 @@ TEST(ParserSection16, OverviewAssertWithComplexExpr) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(r.cu, nullptr);
 }
-// ---------------------------------------------------------------------------
-// 25. Assert immediate (Observed region)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_AssertImmediate) {
   auto r = Parse(
       "module m;\n"
@@ -188,10 +165,6 @@ TEST(ParserSection4, Sec4_5_AssertImmediate) {
   EXPECT_NE(stmt->assert_expr, nullptr);
 }
 
-// =============================================================================
-// A.6.10 Assertion statements — simple_immediate_assert_statement
-// =============================================================================
-// assert ( expression ) ;
 TEST(ParserA610, SimpleAssertSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -208,7 +181,6 @@ TEST(ParserA610, SimpleAssertSemicolon) {
   EXPECT_FALSE(stmt->is_deferred);
 }
 
-// §16.3: procedural_assertion_statement (assert)
 TEST(ParserA604, StmtItemProceduralAssertionStatement) {
   auto r = Parse(
       "module m;\n"
@@ -223,7 +195,6 @@ TEST(ParserA604, StmtItemProceduralAssertionStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kAssertImmediate);
 }
 
-// assert ( expression ) pass_stmt ;
 TEST(ParserA610, SimpleAssertPassAction) {
   auto r = Parse(
       "module m;\n"
@@ -238,7 +209,6 @@ TEST(ParserA610, SimpleAssertPassAction) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-// assert ( expression ) pass_stmt else fail_stmt ;
 TEST(ParserA610, SimpleAssertPassElseFail) {
   auto r = Parse(
       "module m;\n"
@@ -253,7 +223,6 @@ TEST(ParserA610, SimpleAssertPassElseFail) {
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// assert ( expression ) else fail_stmt ;
 TEST(ParserA610, SimpleAssertElseOnly) {
   auto r = Parse(
       "module m;\n"
@@ -268,10 +237,6 @@ TEST(ParserA610, SimpleAssertElseOnly) {
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// =============================================================================
-// A.6.10 — simple_immediate_assume_statement
-// =============================================================================
-// assume ( expression ) ;
 TEST(ParserA610, SimpleAssumeSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -286,7 +251,6 @@ TEST(ParserA610, SimpleAssumeSemicolon) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-// assume ( expression ) pass else fail ;
 TEST(ParserA610, SimpleAssumePassElseFail) {
   auto r = Parse(
       "module m;\n"
@@ -301,10 +265,6 @@ TEST(ParserA610, SimpleAssumePassElseFail) {
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// =============================================================================
-// A.6.10 — simple_immediate_cover_statement
-// =============================================================================
-// cover ( expression ) ;
 TEST(ParserA610, SimpleCoverSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -319,7 +279,6 @@ TEST(ParserA610, SimpleCoverSemicolon) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-// cover ( expression ) pass_stmt ;
 TEST(ParserA610, SimpleCoverPassAction) {
   auto r = Parse(
       "module m;\n"
@@ -334,10 +293,6 @@ TEST(ParserA610, SimpleCoverPassAction) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-// =============================================================================
-// A.6.10 — action_block
-// =============================================================================
-// action_block: begin/end block as pass action
 TEST(ParserA610, ActionBlockBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -352,7 +307,6 @@ TEST(ParserA610, ActionBlockBeginEnd) {
   EXPECT_EQ(stmt->assert_pass_stmt->kind, StmtKind::kBlock);
 }
 
-// action_block: [ statement ] else statement_or_null
 TEST(ParserA610, ActionBlockPassFailBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -366,10 +320,6 @@ TEST(ParserA610, ActionBlockPassFailBlocks) {
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.3 Immediate assertions — assert
-// =============================================================================
 TEST(ParserSection16, ImmediateAssertBasicKind) {
   auto r = Parse(
       "module m;\n"
@@ -441,9 +391,6 @@ TEST(ParserSection16, ImmediateAssertPassOnly) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-// =============================================================================
-// §16.3 Immediate assertions — assume
-// =============================================================================
 TEST(ParserSection16, ImmediateAssumeBasic) {
   auto r = Parse(
       "module m;\n"
@@ -473,9 +420,6 @@ TEST(ParserSection16, ImmediateAssumeWithElse) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// =============================================================================
-// §16.3 Immediate assertions — cover
-// =============================================================================
 TEST(ParserSection16, ImmediateCoverBasic) {
   auto r = Parse(
       "module m;\n"
@@ -490,4 +434,4 @@ TEST(ParserSection16, ImmediateCoverBasic) {
   EXPECT_NE(stmt->assert_expr, nullptr);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §22.3: `resetall
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -22,4 +20,4 @@ TEST(ParserSection22, ResetallBeforeMultipleModules) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

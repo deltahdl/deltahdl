@@ -1,5 +1,3 @@
-// §7.4.4: Multidimensional arrays
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -27,9 +25,6 @@ TEST(ParserSection7, MultidimensionalArray) {
   EXPECT_GE(item->unpacked_dims.size(), 2u);
 }
 
-// =========================================================================
-// §7.4.1: Packed arrays (multidimensional packed dims)
-// =========================================================================
 TEST(ParserSection7, MultidimensionalPackedArray) {
   auto r = Parse(
       "module t;\n"
@@ -43,4 +38,4 @@ TEST(ParserSection7, MultidimensionalPackedArray) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-}  // namespace
+}

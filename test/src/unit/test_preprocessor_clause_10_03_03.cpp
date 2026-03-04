@@ -1,5 +1,3 @@
-// §10.3.3: Continuous assignment delays
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -40,9 +38,6 @@ TEST(Lexical, ContAssign_WithParenDelay) {
   EXPECT_TRUE(found);
 }
 
-// =============================================================================
-// LRM section 10.3.3 -- Continuous assignment delays
-// =============================================================================
 TEST(ParserSection10, ContinuousAssignDelay) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -58,4 +53,4 @@ TEST(ParserSection10, ContinuousAssignDelay) {
   }
 }
 
-}  // namespace
+}

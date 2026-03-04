@@ -1,5 +1,3 @@
-// §16.12.1: Property instantiation
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Production #9: property_instance
-// property_instance ::=
-//     ps_or_hierarchical_property_identifier [ ( [property_list_of_arguments] )
-//     ]
-// =============================================================================
 TEST(ParserA210, PropertyInstance_InAssert) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -38,10 +30,6 @@ TEST(ParserA210, PropertyListOfArguments_Named) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #11: property_actual_arg
-// property_actual_arg ::= property_expr | sequence_actual_arg
-// =============================================================================
 TEST(ParserA210, PropertyActualArg_Expr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -50,7 +38,6 @@ TEST(ParserA210, PropertyActualArg_Expr) {
               "endmodule\n"));
 }
 
-// property_expr ::= property_instance
 TEST(ParserA210, PropertyExpr_PropertyInstance) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -59,7 +46,6 @@ TEST(ParserA210, PropertyExpr_PropertyInstance) {
               "endmodule\n"));
 }
 
-// property_list_of_arguments — mixed positional + named
 TEST(ParserA210, PropertyListOfArguments_Mixed) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -75,7 +61,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.18: Property with named property reference ---
 TEST(ParserAnnexF, AnnexFPropertyReference) {
   auto r = Parse(
       "module m;\n"
@@ -90,10 +75,6 @@ TEST(ParserAnnexF, AnnexFPropertyReference) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// =============================================================================
-// Section 16.5.1 -- Assert property with named property instance
-// =============================================================================
-// Assert property referencing a previously declared named property.
 TEST(ParserSection16, Sec16_5_1_AssertWithNamedPropertyInstance) {
   auto r = Parse(
       "module m;\n"
@@ -114,7 +95,6 @@ TEST(ParserSection16, Sec16_5_1_AssertWithNamedPropertyInstance) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-// --- Test helpers ---
 TEST(ParserSection16, PropertyInstanceWithArgs) {
   auto r = Parse(
       "module m;\n"
@@ -127,4 +107,4 @@ TEST(ParserSection16, PropertyInstanceWithArgs) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

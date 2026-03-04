@@ -1,5 +1,3 @@
-// §10.3.3: Continuous assignment delays
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -18,8 +16,6 @@ TEST(ParserAnnexA, A2ContinuousAssignWithDelay) {
   }
 }
 
-// --- delay3 on continuous assignments ---
-// delay3: single value on continuous assign.
 TEST(ParserA223, Delay3AssignSingleValue) {
   auto r = Parse(
       "module m;\n"
@@ -35,7 +31,6 @@ TEST(ParserA223, Delay3AssignSingleValue) {
   EXPECT_EQ(item->assign_delay_decay, nullptr);
 }
 
-// delay3: three values on continuous assign (rise, fall, charge_decay).
 TEST(ParserA223, Delay3AssignThreeValues) {
   auto r = Parse(
       "module m;\n"
@@ -53,7 +48,6 @@ TEST(ParserA223, Delay3AssignThreeValues) {
   EXPECT_EQ(item->assign_delay_decay->int_val, 30u);
 }
 
-// delay2: parenthesized single value — #(expr).
 TEST(ParserA223, Delay2ParenSingleValue) {
   auto r = Parse(
       "module m;\n"
@@ -110,7 +104,7 @@ TEST(ParserA601, ContinuousAssign_DelayRiseFallDecay) {
   EXPECT_NE(cas[0]->assign_delay_fall, nullptr);
   EXPECT_NE(cas[0]->assign_delay_decay, nullptr);
 }
-// §6.7.1: Wire with delay and initializer together.
+
 TEST(ParserSection6, Sec6_7_1_WireDelayWithInit) {
   auto r = Parse(
       "module t;\n"
@@ -145,9 +139,7 @@ static ModuleItem* FindItemByKindFromResult(ParseResult& r,
 static ModuleItem* FindContAssign(ParseResult& r) {
   return FindItemByKindFromResult(r, ModuleItemKind::kContAssign);
 }
-// ---------------------------------------------------------------------------
-// 26. Assign with delay (assign #5 y = a & b)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_ContinuousAssignWithDelay) {
   auto r = Parse(
       "module m;\n"
@@ -166,4 +158,4 @@ TEST(ParserSection4, Sec4_5_ContinuousAssignWithDelay) {
   EXPECT_NE(ca->assign_rhs, nullptr);
 }
 
-}  // namespace
+}

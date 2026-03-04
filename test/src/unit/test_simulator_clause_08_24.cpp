@@ -1,5 +1,3 @@
-// §8.24: Out-of-block declarations
-
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -10,31 +8,18 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
-
 namespace {
 
-// =============================================================================
-// §8.24.1: Extern methods
-// =============================================================================
 TEST(ClassSim, ExternMethodRegisteredSeparately) {
   SimFixture f;
   auto* type = MakeClassType(f, "MyClass", {"val"});
 
-  // Extern method body defined outside class.
   auto* extern_method = f.arena.Create<ModuleItem>();
   extern_method->kind = ModuleItemKind::kFunctionDecl;
   extern_method->name = "get_val";
   extern_method->func_body_stmts.push_back(
       MakeReturn(f.arena, MkId(f.arena, "val")));
 
-  // Register it on the type (as if elaboration resolved the extern).
   type->methods["get_val"] = extern_method;
 
   auto [handle, obj] = MakeObj(f, type);
@@ -43,4 +28,4 @@ TEST(ClassSim, ExternMethodRegisteredSeparately) {
   EXPECT_EQ(resolved->name, "get_val");
 }
 
-}  // namespace
+}

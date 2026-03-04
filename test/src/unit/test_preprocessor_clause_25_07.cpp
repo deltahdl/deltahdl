@@ -1,5 +1,3 @@
-// §25.7: Tasks and functions in interfaces
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// extern_tf_declaration inside a module (interface_or_generate_item applies
-// to modules too via module_or_generate_item).
 TEST(SourceText, ExternFunctionPrototypeInModule) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -24,7 +20,6 @@ TEST(SourceText, ExternFunctionPrototypeInModule) {
   EXPECT_TRUE(mod->items[0]->func_body_stmts.empty());
 }
 
-// §3.5:
 TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
   auto r = ParseWithPreprocessor(
       "interface ifc;\n"
@@ -42,4 +37,4 @@ TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
 }
 
-}  // namespace
+}

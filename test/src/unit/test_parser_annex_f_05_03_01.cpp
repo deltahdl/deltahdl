@@ -1,5 +1,3 @@
-// Annex F.5.3.1: Neutral satisfaction
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex F -- Formal semantics of concurrent assertions
-// =============================================================================
 TEST(ParserAnnexF, AnnexFAssertPropertySimple) {
   auto r = Parse(
       "module m;\n"
@@ -27,4 +22,4 @@ TEST(ParserAnnexF, AnnexFAssertPropertySimple) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §12.5.4: Set membership case statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,12 +5,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// case_statement ::=
-//   [ unique_priority ] case ( case_expression ) inside
-//     case_inside_item { case_inside_item } endcase
-// ---------------------------------------------------------------------------
-// §12.5.4: case-inside variant
 TEST(ParserA607, CaseInsideParse) {
   auto r = Parse(
       "module m;\n"
@@ -32,9 +24,6 @@ TEST(ParserA607, CaseInsideParse) {
   EXPECT_TRUE(stmt->case_inside);
 }
 
-// =============================================================================
-// LRM section 12.5.4 -- case inside
-// =============================================================================
 TEST(ParserSection12, CaseInside) {
   auto r = Parse(
       "module t;\n"
@@ -52,12 +41,6 @@ TEST(ParserSection12, CaseInside) {
   EXPECT_TRUE(stmt->case_inside);
 }
 
-// ---------------------------------------------------------------------------
-// case_inside_item ::=
-//   range_list : statement_or_null
-// range_list ::= value_range { , value_range }
-// ---------------------------------------------------------------------------
-// §12.5.4: case inside with range [lo:hi]
 TEST(ParserA607, CaseInsideRange) {
   auto r = Parse(
       "module m;\n"
@@ -77,7 +60,6 @@ TEST(ParserA607, CaseInsideRange) {
   ASSERT_GE(stmt->case_items.size(), 2u);
 }
 
-// §12.5.4: case inside with multiple value_ranges (comma-separated)
 TEST(ParserA607, CaseInsideMultipleRanges) {
   auto r = Parse(
       "module m;\n"
@@ -96,11 +78,6 @@ TEST(ParserA607, CaseInsideMultipleRanges) {
   EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
 }
 
-// ---------------------------------------------------------------------------
-// value_range ::= expression
-// value_range ::= [ expression : expression ]
-// ---------------------------------------------------------------------------
-// §11.4.13: value_range as simple expression in case-inside
 TEST(ParserA607, ValueRangeExpression) {
   auto r = Parse(
       "module m;\n"
@@ -116,7 +93,6 @@ TEST(ParserA607, ValueRangeExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §11.4.13: value_range with bracket range [lo:hi]
 TEST(ParserA607, ValueRangeBracket) {
   auto r = Parse(
       "module m;\n"
@@ -131,4 +107,4 @@ TEST(ParserA607, ValueRangeBracket) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

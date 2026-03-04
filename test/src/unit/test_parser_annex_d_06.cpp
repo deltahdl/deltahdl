@@ -1,5 +1,3 @@
-// Annex D.6: $list
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -16,4 +14,4 @@ TEST(ParserAnnexD, AnnexDList) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

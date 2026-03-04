@@ -1,12 +1,9 @@
-// §11.4.14.4: Streaming dynamically sized data
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// --- Streaming concatenation with clause (§11.4.14.4) ---
 TEST(ParserSection11, StreamingWithPartSelect) {
   auto r = Parse(
       "module t;\n"
@@ -32,7 +29,6 @@ TEST(ParserSection11, StreamingWithSimpleIndex) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § stream_expression ::= expression [ with [ array_range_expression ] ]
 TEST(ParserA81, StreamExpressionWithArrayRange) {
   auto r = Parse("module m; initial x = {<< {a with [3]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -42,25 +38,22 @@ TEST(ParserA81, StreamExpressionWithArrayRange) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
 
-// § array_range_expression ::= expression : expression
 TEST(ParserA81, StreamExprWithFixedRange) {
   auto r = Parse("module m; initial x = {<< {a with [3:0]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// § array_range_expression ::= expression +: expression
 TEST(ParserA81, StreamExprWithPlusRange) {
   auto r = Parse("module m; initial x = {<< {a with [0+:4]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// § array_range_expression ::= expression -: expression
 TEST(ParserA81, StreamExprWithMinusRange) {
   auto r = Parse("module m; initial x = {<< {a with [7-:4]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §non-lrm:driver_update_pool
-
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- DriverUpdate struct tests ---
 TEST(DriverUpdate, DefaultConstruction_ValueFields) {
   DriverUpdate du;
   EXPECT_EQ(du.value.width, 0);
@@ -26,7 +23,6 @@ TEST(DriverUpdate, DefaultConstruction_StrengthAndIndex) {
   EXPECT_EQ(du.next, nullptr);
 }
 
-// --- DriverUpdatePool tests ---
 TEST(DriverUpdatePool, AcquireCreatesNew) {
   Arena arena;
   DriverUpdatePool pool(arena);
@@ -51,7 +47,6 @@ TEST(DriverUpdatePool, ReleaseAndReuse_SamePointer) {
   DriverUpdatePool pool(arena);
   DriverUpdate* du = pool.Acquire();
 
-  // Modify all fields.
   du->value = MakeLogic4VecVal(arena, 8, 0xFF);
   du->drive_strength_0 = Strength::kWeak;
   du->drive_strength_1 = Strength::kPull;
@@ -61,7 +56,7 @@ TEST(DriverUpdatePool, ReleaseAndReuse_SamePointer) {
   EXPECT_EQ(pool.FreeCount(), 1);
 
   DriverUpdate* reused = pool.Acquire();
-  EXPECT_EQ(reused, du);  // Same pointer returned.
+  EXPECT_EQ(reused, du);
   EXPECT_EQ(pool.FreeCount(), 0);
 }
 
@@ -70,7 +65,6 @@ TEST(DriverUpdatePool, ReleaseAndReuse_FieldsReset) {
   DriverUpdatePool pool(arena);
   DriverUpdate* du = pool.Acquire();
 
-  // Modify all fields.
   du->value = MakeLogic4VecVal(arena, 8, 0xFF);
   du->drive_strength_0 = Strength::kWeak;
   du->drive_strength_1 = Strength::kPull;
@@ -78,7 +72,7 @@ TEST(DriverUpdatePool, ReleaseAndReuse_FieldsReset) {
 
   pool.Release(du);
   DriverUpdate* reused = pool.Acquire();
-  // All fields reset to defaults.
+
   EXPECT_EQ(reused->value.width, 0);
   EXPECT_EQ(reused->drive_strength_0, Strength::kStrong);
   EXPECT_EQ(reused->drive_strength_1, Strength::kStrong);
@@ -105,7 +99,6 @@ TEST(DriverUpdatePool, MultipleAcquireReleaseCycles) {
   Arena arena;
   DriverUpdatePool pool(arena);
 
-  // Acquire several, release all, acquire again.
   constexpr size_t kCount = 10;
   DriverUpdate* updates[kCount];
   for (size_t i = 0; i < kCount; ++i) {
@@ -119,7 +112,6 @@ TEST(DriverUpdatePool, MultipleAcquireReleaseCycles) {
   }
   EXPECT_EQ(pool.FreeCount(), kCount);
 
-  // Re-acquire all — should reuse, no new arena allocation.
   size_t initial_alloc = arena.TotalAllocated();
   for (size_t i = 0; i < kCount; ++i) {
     pool.Acquire();
@@ -136,18 +128,15 @@ TEST(DriverUpdatePool, AcquireAfterPartialRelease) {
   DriverUpdate* du2 = pool.Acquire();
   DriverUpdate* du3 = pool.Acquire();
 
-  // Release du2 only.
   pool.Release(du2);
   EXPECT_EQ(pool.FreeCount(), 1);
 
-  // Next acquire should return du2.
   DriverUpdate* reused = pool.Acquire();
   EXPECT_EQ(reused, du2);
   EXPECT_EQ(pool.FreeCount(), 0);
 
-  // Suppress unused-variable warnings.
   (void)du1;
   (void)du3;
 }
 
-}  // namespace
+}

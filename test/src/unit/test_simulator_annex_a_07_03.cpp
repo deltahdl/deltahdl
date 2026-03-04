@@ -1,5 +1,3 @@
-// Annex A.7.3: Specify block terminals
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Terminal with part-select in specify does not interfere with simulation
 TEST(SimA703, TerminalPartSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,4 +26,4 @@ TEST(SimA703, TerminalPartSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

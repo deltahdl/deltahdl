@@ -1,5 +1,3 @@
-// §33.4.1.2: The default clause
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §33.4.1.2 Default clause (liblist)
-// =============================================================================
 TEST_F(ConfigTest, DefaultLiblist) {
   auto* unit = Parse(R"(
     config cfg;
@@ -45,9 +40,7 @@ TEST_F(ConfigTest, DefaultLiblistSingleLib) {
 }
 
 TEST(ParserSection34, ConfigCoexistsWithModuleAndProtected) {
-  // Ensure config declarations coexist with modules
-  // (In a full flow, protected modules are stripped by preprocessor;
-  //  at parser level, we verify both units parse alongside each other.)
+
   auto r = Parse(R"(
     module protected_ip;
       logic [7:0] data;
@@ -76,4 +69,4 @@ TEST_F(ConfigParseTest, ConfigWithDefaultClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}  // namespace
+}

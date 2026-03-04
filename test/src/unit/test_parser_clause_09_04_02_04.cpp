@@ -1,5 +1,3 @@
-// §9.4.2.4: Sequence events
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -18,9 +16,7 @@ TEST(ParserSection9c, SequenceEventParenthesized) {
               "  end\n"
               "endmodule\n"));
 }
-// =============================================================================
-// §9.4.2.4 -- Sequence events
-// =============================================================================
+
 TEST(ParserSection9b, SequenceEventInEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -33,4 +29,4 @@ TEST(ParserSection9b, SequenceEventInEventControl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

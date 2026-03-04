@@ -1,5 +1,3 @@
-// §35.3: Two layers of DPI
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -12,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Pure vs context function semantics (S35.5.3)
-// =============================================================================
 TEST(DpiRuntime, PureFunctionFlag) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -40,7 +35,7 @@ TEST(DpiRuntime, ContextFunctionFlag) {
   func.sv_name = "sv_ctx";
   func.is_pure = false;
   func.is_context = true;
-  func.impl = [](const std::vector<DpiArgValue>& /*args*/) -> DpiArgValue {
+  func.impl = [](const std::vector<DpiArgValue>& ) -> DpiArgValue {
     return DpiArgValue::FromInt(0);
   };
   rt.RegisterImport(func);
@@ -51,4 +46,4 @@ TEST(DpiRuntime, ContextFunctionFlag) {
   EXPECT_TRUE(found->is_context);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §12.8.2
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §12.7.4: while with continue
 TEST(SimA608, WhileContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,8 +28,8 @@ TEST(SimA608, WhileContinue) {
   f.scheduler.Run();
   auto* count = f.ctx.FindVariable("count");
   ASSERT_NE(count, nullptr);
-  // 6 iterations (x = 1..6), skip x==3 => count = 5
+
   EXPECT_EQ(count->value.ToUint64(), 5u);
 }
 
-}  // namespace
+}

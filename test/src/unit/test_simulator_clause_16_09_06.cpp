@@ -1,5 +1,3 @@
-// §16.9.6: Intersection (AND with length restriction)
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -31,9 +26,6 @@ struct SvaFixture {
 
 namespace {
 
-// =============================================================================
-// Sequence operators: and, or, intersect (section 16.9.6-8)
-// =============================================================================
 TEST(SvaEngine, SequenceOperatorAnd) {
   bool a_matched = true;
   bool b_matched = true;
@@ -43,4 +35,4 @@ TEST(SvaEngine, SequenceOperatorAnd) {
   EXPECT_FALSE(EvalSequenceAnd(false, false));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §23.3.2.2: Connecting module instance ports by name
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -17,7 +15,7 @@ TEST(ParserAnnexA, A4ModuleInstNamed) {
 }
 
 TEST(ParserAnnexA0411, NamedPortEmptyExpression) {
-  // . port_identifier ( ) — unconnected named port
+
   auto r = Parse("module m; sub u0(.clk(clk), .nc()); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -34,9 +32,6 @@ ModuleItem* FindModuleInst(const std::vector<ModuleItem*>& items) {
   return nullptr;
 }
 
-// =============================================================================
-// Elaboration: module instantiation creates hierarchy and binds ports
-// =============================================================================
 TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
   auto r = Parse(
       "module child(input a, output b);\n"
@@ -55,10 +50,7 @@ TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
   EXPECT_EQ(inst->inst_name, "u0");
   EXPECT_EQ(inst->inst_ports.size(), 2u);
 }
-// Returns the first module item from the first module.
-// =============================================================================
-// §4.6: Named port connections — deterministic mapping
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_NamedPortConnections) {
   auto r = Parse(
       "module top;\n"
@@ -74,9 +66,7 @@ TEST(ParserSection4, Sec4_6_NamedPortConnections) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
   EXPECT_EQ(item->inst_ports[2].first, "d");
 }
-// =============================================================================
-// LRM section 23.10 -- Module instantiation / parameter override
-// =============================================================================
+
 TEST(ParserSection23, ModuleInstBasic) {
   auto r = Parse(
       "module top;\n"
@@ -117,9 +107,6 @@ TEST(ParserSection23, PortConnectionEmptyNamed) {
   EXPECT_EQ(item->inst_ports[1].second, nullptr);
 }
 
-// =========================================================================
-// LRM section 23.3: Module instances
-// =========================================================================
 TEST(ParserSection23, SimpleModuleInstance) {
   auto r = Parse(
       "module top;\n"
@@ -132,9 +119,6 @@ TEST(ParserSection23, SimpleModuleInstance) {
   EXPECT_EQ(item->inst_name, "u1");
 }
 
-// =========================================================================
-// LRM section 23.3.2: Port connections
-// =========================================================================
 TEST(ParserSection23, NamedPortConnectionsOrder) {
   auto r = Parse(
       "module top;\n"
@@ -161,9 +145,6 @@ TEST(ParserSection23, NamedPortEmptyConnection) {
   EXPECT_EQ(item->inst_ports[1].second, nullptr);
 }
 
-// =========================================================================
-// LRM section 23.3.3: Port connection rules
-// =========================================================================
 TEST(ParserSection23, PortConnectionRulesNamedMultiple) {
   auto r = Parse(
       "module top;\n"
@@ -191,9 +172,6 @@ TEST(ParserSection23, PortConnectionAllEmpty) {
   }
 }
 
-// =========================================================================
-// LRM section 23.3.3.7.1: Named port connections .name(expr)
-// =========================================================================
 TEST(ParserSection23, NamedPortWithPartSelect) {
   auto r = Parse(
       "module top;\n"
@@ -228,4 +206,4 @@ TEST(ParserCh512, Attribute_OnPortConnection) {
               "endmodule"));
 }
 
-}  // namespace
+}

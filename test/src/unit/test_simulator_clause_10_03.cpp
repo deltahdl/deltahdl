@@ -1,5 +1,3 @@
-// §10.3: Continuous assignments
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -28,4 +26,4 @@ TEST(Lowerer, ContAssignExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

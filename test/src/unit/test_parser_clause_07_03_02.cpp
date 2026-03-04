@@ -1,5 +1,3 @@
-// §7.3.2: Tagged unions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -33,7 +31,7 @@ TEST(ParserSection7, UnionTagged) {
   EXPECT_TRUE(item->typedef_type.is_tagged);
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
-// --- Test helpers ---
+
 TEST(ParserSection7, UnionWithNestedStruct) {
   auto r = Parse(
       "module t;\n"
@@ -52,9 +50,6 @@ TEST(ParserSection7, UnionWithNestedStruct) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
-// =========================================================================
-// §7.3.2: Tagged unions (void members)
-// =========================================================================
 TEST(ParserSection7, TaggedUnionVoidMember) {
   auto r = Parse(
       "module t;\n"
@@ -72,4 +67,4 @@ TEST(ParserSection7, TaggedUnionVoidMember) {
   EXPECT_EQ(item->typedef_type.struct_members[0].name, "Invalid");
 }
 
-}  // namespace
+}

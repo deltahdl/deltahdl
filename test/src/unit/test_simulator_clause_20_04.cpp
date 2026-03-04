@@ -1,5 +1,3 @@
-// §20.4: Timescale system tasks and system functions
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -25,4 +23,4 @@ TEST(SysTask, TimeformatDoesNotCrash) {
   EXPECT_EQ(result.width, 1u);
 }
 
-}  // namespace
+}

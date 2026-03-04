@@ -1,5 +1,3 @@
-// §6.19.4: Enumerated types in numerical expressions
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §6.19.4: Enum arithmetic without cast ---
 TEST(Elaboration, EnumArithNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -26,4 +23,4 @@ TEST(Elaboration, EnumArithNoCast_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -1,15 +1,9 @@
-// §9.2.2: Always procedures
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.6.2 Production: always_keyword
-// always_keyword ::= always | always_comb | always_latch | always_ff
-// =============================================================================
 TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
   auto r = Parse(
       "module m;\n"
@@ -29,4 +23,4 @@ TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
   EXPECT_EQ(blocks[3]->always_kind, AlwaysKind::kAlwaysFF);
 }
 
-}  // namespace
+}

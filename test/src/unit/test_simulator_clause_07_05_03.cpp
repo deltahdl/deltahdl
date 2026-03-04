@@ -1,5 +1,3 @@
-// §7.5.3: Delete()
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -21,4 +19,4 @@ TEST(AdvSim, DynArrayDelete) {
   EXPECT_EQ(arr.Size(), 0u);
 }
 
-}  // namespace
+}

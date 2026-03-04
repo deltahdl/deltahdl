@@ -1,12 +1,9 @@
-// §30.4: Module path declarations
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// All path types together elaborate
 TEST(ElabA702, AllPathTypesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,4 +21,4 @@ TEST(ElabA702, AllPathTypesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

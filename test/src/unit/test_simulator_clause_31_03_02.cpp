@@ -1,5 +1,3 @@
-// §31.3.2: $hold
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -20,4 +18,4 @@ TEST(SimA705, RuntimeTimingCheckEntryHold) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].kind, TimingCheckKind::kHold);
 }
 
-}  // namespace
+}

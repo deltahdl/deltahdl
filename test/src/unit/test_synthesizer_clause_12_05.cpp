@@ -1,5 +1,3 @@
-// §12.5: Case statement
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -31,4 +29,4 @@ TEST(SynthLower, AlwaysCombCaseStmt) {
   EXPECT_EQ(aig->outputs.size(), 2);
 }
 
-}  // namespace
+}

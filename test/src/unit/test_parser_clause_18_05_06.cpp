@@ -1,5 +1,3 @@
-// §18.5.6: if–else constraints
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection18b, DistInsideIfConstraint) {
-  // Distribution inside a conditional constraint block
+
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -26,7 +24,6 @@ TEST(ParserSection18b, DistInsideIfConstraint) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// constraint_set ::= constraint_expression | { { constraint_expression } }
 TEST(SourceText, ConstraintSet) {
   auto r = Parse(
       "class C;\n"
@@ -42,4 +39,4 @@ TEST(SourceText, ConstraintSet) {
   EXPECT_EQ(r.cu->classes[0]->members[2]->name, "cs");
 }
 
-}  // namespace
+}

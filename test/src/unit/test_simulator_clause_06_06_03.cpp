@@ -1,5 +1,3 @@
-// §6.6.3: Wired nets
-
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
@@ -11,9 +9,8 @@ using namespace delta;
 
 namespace {
 
-// --- ResolveWandWord ---
 TEST(NetResolution, WandZeroDominates) {
-  // 0 & 1 = 0
+
   Logic4Word a{0, 0};
   Logic4Word b{1, 0};
   auto r = ResolveWandWord(a, b);
@@ -22,7 +19,7 @@ TEST(NetResolution, WandZeroDominates) {
 }
 
 TEST(NetResolution, WandBothOne) {
-  // 1 & 1 = 1
+
   Logic4Word a{1, 0};
   Logic4Word b{1, 0};
   auto r = ResolveWandWord(a, b);
@@ -31,7 +28,7 @@ TEST(NetResolution, WandBothOne) {
 }
 
 TEST(NetResolution, WandXWithOne) {
-  // x & 1 = x
+
   Logic4Word x{0, 1};
   Logic4Word one{1, 0};
   auto r = ResolveWandWord(x, one);
@@ -40,7 +37,7 @@ TEST(NetResolution, WandXWithOne) {
 }
 
 TEST(NetResolution, WandXWithZero) {
-  // x & 0 = 0 (0 dominates)
+
   Logic4Word x{0, 1};
   Logic4Word zero{0, 0};
   auto r = ResolveWandWord(x, zero);
@@ -48,9 +45,8 @@ TEST(NetResolution, WandXWithZero) {
   EXPECT_EQ(r.bval, 0u);
 }
 
-// --- ResolveWorWord ---
 TEST(NetResolution, WorOneDominates) {
-  // 1 | 0 = 1
+
   Logic4Word a{1, 0};
   Logic4Word b{0, 0};
   auto r = ResolveWorWord(a, b);
@@ -59,7 +55,7 @@ TEST(NetResolution, WorOneDominates) {
 }
 
 TEST(NetResolution, WorBothZero) {
-  // 0 | 0 = 0
+
   Logic4Word a{0, 0};
   Logic4Word b{0, 0};
   auto r = ResolveWorWord(a, b);
@@ -68,7 +64,7 @@ TEST(NetResolution, WorBothZero) {
 }
 
 TEST(NetResolution, WorXWithZero) {
-  // x | 0 = x
+
   Logic4Word x{0, 1};
   Logic4Word zero{0, 0};
   auto r = ResolveWorWord(x, zero);
@@ -77,7 +73,7 @@ TEST(NetResolution, WorXWithZero) {
 }
 
 TEST(NetResolution, WorXWithOne) {
-  // x | 1 = 1 (1 dominates)
+
   Logic4Word x{0, 1};
   Logic4Word one{1, 0};
   auto r = ResolveWorWord(x, one);
@@ -92,7 +88,7 @@ TEST(NetResolution, ResolveWandNet) {
   Net net;
   net.type = NetType::kWand;
   net.resolved = var;
-  // 0xFF AND 0x0F = 0x0F
+
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xFF));
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0x0F));
 
@@ -107,7 +103,7 @@ TEST(NetResolution, ResolveWorNet) {
   Net net;
   net.type = NetType::kWor;
   net.resolved = var;
-  // 0xF0 OR 0x0F = 0xFF
+
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xF0));
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0x0F));
 
@@ -115,4 +111,4 @@ TEST(NetResolution, ResolveWorNet) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-}  // namespace
+}

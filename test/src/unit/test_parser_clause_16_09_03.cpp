@@ -1,16 +1,10 @@
-// §16.9.3: Sampled value functions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// =============================================================================
-// §16.9 -- System functions for assertions ($sampled, $rose, $fell, $stable)
-// =============================================================================
 TEST(ParserSection16, SampledFunctionInAssert) {
   auto r = Parse(
       "module m;\n"
@@ -66,4 +60,4 @@ TEST(ParserSection16, ChangedFunctionInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

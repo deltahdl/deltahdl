@@ -1,5 +1,3 @@
-// §10.6.2: The force and release procedural statements
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, Force_Variable) {
-  // force variable_assignment
+
   auto r = Parse(
       "module m;\n"
       "  initial begin force q = 1; end\n"
@@ -23,7 +21,7 @@ TEST(ParserA602, Force_Variable) {
 }
 
 TEST(ParserA602, Force_Net) {
-  // force net_assignment
+
   auto r = Parse(
       "module m;\n"
       "  initial begin force net_a = 0; end\n"
@@ -115,7 +113,6 @@ TEST(ParserSection10, ReleaseNet) {
   ASSERT_NE(stmt->lhs, nullptr);
 }
 
-// §10.6.2: force statement
 TEST(ParserA604, StmtItemForceStatement) {
   auto r = Parse(
       "module m;\n"
@@ -130,7 +127,6 @@ TEST(ParserA604, StmtItemForceStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kForce);
 }
 
-// §10.6.2: release statement
 TEST(ParserA604, StmtItemReleaseStatement) {
   auto r = Parse(
       "module m;\n"
@@ -167,14 +163,12 @@ TEST(ParserSection38, VpiSystemCallRelease) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § variable_lvalue — force statement LHS
 TEST(ParserA85, VarLvalueForce) {
   auto r = Parse("module m; logic x; initial force x = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// § variable_lvalue — release statement LHS
 TEST(ParserA85, VarLvalueRelease) {
   auto r = Parse(
       "module m; logic x;\n"
@@ -184,4 +178,4 @@ TEST(ParserA85, VarLvalueRelease) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §10.9.2: Structure assignment patterns
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// 16. Array of structs with assignment pattern.
 TEST(ParserSection7, Sec7_2_2_ArrayOfStructsPattern) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -20,7 +17,6 @@ TEST(ParserSection7, Sec7_2_2_ArrayOfStructsPattern) {
               "endmodule\n"));
 }
 
-// §12.6: named assignment pattern
 TEST(ParserA60701, PatternAssignmentNamed) {
   auto r = Parse(
       "module m;\n"
@@ -41,7 +37,7 @@ TEST(ParserSection10, AssignmentPatternStruct) {
   auto* mod = r.cu->modules[0];
   ASSERT_GE(mod->items.size(), 2u);
 }
-// --- Packed struct assigned from assignment pattern ---
+
 TEST(ParserSection7, Sec7_2_1_PackedAssignFromPattern) {
   auto r = Parse(
       "module t;\n"
@@ -61,7 +57,6 @@ TEST(ParserSection7, Sec7_2_1_PackedAssignFromPattern) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-// 24. Struct assigned in for loop body.
 TEST(ParserSection7, Sec7_2_2_AssignInForLoop) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -88,7 +83,6 @@ TEST(ParserCh90301, BlockVarDecl_FullStructReplication) {
               "endmodule\n"));
 }
 
-// §10.9: structure_pattern_key with member identifier and default
 TEST(ParserA60701, StructurePatternKeyMemberAndDefault) {
   auto r = Parse(
       "module m;\n"
@@ -100,7 +94,6 @@ TEST(ParserA60701, StructurePatternKeyMemberAndDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 27. Positional assignment pattern elements count.
 TEST(ParserSection7, Sec7_2_2_PositionalPatternElements) {
   auto r = Parse(
       "module t;\n"
@@ -118,7 +111,6 @@ TEST(ParserSection7, Sec7_2_2_PositionalPatternElements) {
   EXPECT_TRUE(stmt->rhs->pattern_keys.empty());
 }
 
-// 29. Named pattern keys verified for three-member struct.
 TEST(ParserSection7, Sec7_2_2_NamedPatternKeysThreeMembers) {
   auto r = Parse(
       "module t;\n"
@@ -140,7 +132,6 @@ TEST(ParserSection7, Sec7_2_2_NamedPatternKeysThreeMembers) {
   EXPECT_EQ(stmt->rhs->elements[0]->kind, ExprKind::kIntegerLiteral);
 }
 
-// 30. Multiple struct variables with different initializers.
 TEST(ParserSection7, Sec7_2_2_MultipleVarsWithInit) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -151,7 +142,6 @@ TEST(ParserSection7, Sec7_2_2_MultipleVarsWithInit) {
               "endmodule\n"));
 }
 
-// §10.9: named assignment pattern — AST pattern_keys populated
 TEST(ParserA60701, AssignmentPatternKeysPopulated) {
   auto r = Parse(
       "module m;\n"
@@ -171,9 +161,7 @@ TEST(ParserA60701, AssignmentPatternKeysPopulated) {
   EXPECT_EQ(rhs->pattern_keys[1], "b");
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
-// =========================================================================
-// §7.2.2: Assigning to structures
-// =========================================================================
+
 TEST(ParserSection7, StructAssignmentPattern) {
   auto r = Parse(
       "module t;\n"
@@ -190,10 +178,6 @@ TEST(ParserSection7, StructAssignmentPattern) {
   EXPECT_EQ(stmt->var_init->kind, ExprKind::kAssignmentPattern);
 }
 
-// =============================================================================
-// LRM section 7.2.2 -- Assigning to structures
-// =============================================================================
-// 1. Named assignment pattern '{a: 1, b: 2}.
 TEST(ParserSection7, Sec7_2_2_NamedAssignmentPattern) {
   auto r = Parse(
       "module t;\n"
@@ -214,7 +198,6 @@ TEST(ParserSection7, Sec7_2_2_NamedAssignmentPattern) {
   EXPECT_EQ(stmt->rhs->pattern_keys[1], "b");
 }
 
-// 2. Default assignment pattern '{default: 0}.
 TEST(ParserSection7, Sec7_2_2_DefaultAssignmentPattern) {
   auto r = Parse(
       "module t;\n"
@@ -232,7 +215,6 @@ TEST(ParserSection7, Sec7_2_2_DefaultAssignmentPattern) {
   EXPECT_EQ(stmt->rhs->pattern_keys[0], "default");
 }
 
-// 3. Named with default pattern '{a: 1, default: 0}.
 TEST(ParserSection7, Sec7_2_2_NamedWithDefault) {
   auto r = Parse(
       "module t;\n"
@@ -250,7 +232,6 @@ TEST(ParserSection7, Sec7_2_2_NamedWithDefault) {
   EXPECT_EQ(stmt->rhs->pattern_keys.size(), 2u);
 }
 
-// 4. Assignment pattern with replication '{4{8'h00}}.
 TEST(ParserSection7, Sec7_2_2_ReplicationPattern) {
   auto r = Parse(
       "module t;\n"
@@ -266,7 +247,6 @@ TEST(ParserSection7, Sec7_2_2_ReplicationPattern) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
 }
 
-// 10. Struct assigned in initial block with begin/end.
 TEST(ParserSection7, Sec7_2_2_AssignInInitialBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -278,7 +258,6 @@ TEST(ParserSection7, Sec7_2_2_AssignInInitialBlock) {
               "endmodule\n"));
 }
 
-// 15. Nested struct assignment pattern.
 TEST(ParserSection7, Sec7_2_2_NestedStructPattern) {
   auto r = Parse(
       "module t;\n"
@@ -306,7 +285,6 @@ static void VerifyPatternKeys(const Expr* rhs,
   }
 }
 
-// --- §5.12 Attributes ---
 TEST(ParserCh510, AssignmentPatternNamed) {
   auto r = Parse(
       "module t;\n"
@@ -354,9 +332,8 @@ TEST(ParserCh510, AssignmentPattern_DefaultKey) {
               "endmodule"));
 }
 
-// From test_parser_clause_05b.cpp
 TEST(ParserCh510, StructLiteral_Positional) {
-  // c = '{0, 0.0}; -- positional structure literal.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -366,7 +343,7 @@ TEST(ParserCh510, StructLiteral_Positional) {
 }
 
 TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
-  // c = '{a:0, b:0.0}; -- member name and value.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -375,4 +352,4 @@ TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
               "endmodule"));
 }
 
-}  // namespace
+}

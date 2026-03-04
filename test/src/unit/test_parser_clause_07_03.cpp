@@ -1,14 +1,9 @@
-// §7.3: Unions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =========================================================================
-// §7.3: Unions
-// =========================================================================
 TEST(ParserSection7, UnionBasic) {
   auto r = Parse(
       "module t;\n"
@@ -24,4 +19,4 @@ TEST(ParserSection7, UnionBasic) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
-}  // namespace
+}

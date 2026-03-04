@@ -1,12 +1,9 @@
-// §30.4.3: Edge-sensitive paths
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Edge-sensitive path elaborates
 TEST(ElabA702, EdgeSensitivePathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +17,6 @@ TEST(ElabA702, EdgeSensitivePathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Edge-sensitive path with data source elaborates
 TEST(ElabA702, EdgeSensitiveWithDataSourceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,4 +30,4 @@ TEST(ElabA702, EdgeSensitiveWithDataSourceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

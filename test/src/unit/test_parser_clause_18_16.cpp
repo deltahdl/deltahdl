@@ -1,5 +1,3 @@
-// §18.16: Random weighted case—randcase
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// randcase_statement ::= randcase randcase_item { randcase_item } endcase
-// randcase_item ::= expression : statement_or_null
-// ---------------------------------------------------------------------------
-// §18.16: randcase statement
 TEST(ParserA607, RandcaseParse) {
   auto r = Parse(
       "module m;\n"
@@ -32,7 +25,6 @@ TEST(ParserA607, RandcaseParse) {
   EXPECT_EQ(stmt->randcase_items.size(), 3u);
 }
 
-// §18.16: randcase with block bodies
 TEST(ParserA607, RandcaseWithBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -51,7 +43,6 @@ TEST(ParserA607, RandcaseWithBlocks) {
   EXPECT_EQ(stmt->randcase_items.size(), 2u);
 }
 
-// §18.16: randcase_statement
 TEST(ParserA604, StmtItemRandcaseStatement) {
   auto r = Parse(
       "module m;\n"
@@ -69,7 +60,6 @@ TEST(ParserA604, StmtItemRandcaseStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
 }
 
-// --- Randcase statement (§18.16) ---
 TEST(ParserSection18, RandcaseStmt) {
   auto r = Parse(
       "module top;\n"
@@ -86,9 +76,6 @@ TEST(ParserSection18, RandcaseStmt) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// =============================================================================
-// §18 Constrained random — randcase
-// =============================================================================
 TEST_F(VerifyParseTest, RandcaseInModule) {
   auto* unit = Parse(R"(
     module m;
@@ -118,4 +105,4 @@ TEST_F(VerifyParseTest, RandcaseSingleBranch) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

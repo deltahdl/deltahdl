@@ -1,5 +1,3 @@
-// §28.7: MOS switches
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -8,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #1: gate_instantiation (mos_switchtype alternative)
-// gate_instantiation ::=
-//   mos_switchtype [delay3] mos_switch_instance {, mos_switch_instance} ;
-// =============================================================================
 TEST(ParserA301, GateInst_NmosBasic) {
   auto r = Parse(
       "module m;\n"
@@ -61,11 +54,6 @@ TEST(ParserA301, GateInst_MosWithDelay) {
   EXPECT_EQ(g->gate_inst_name, "n1");
 }
 
-// =============================================================================
-// A.3.1 Production #4: mos_switch_instance
-// mos_switch_instance ::= [name_of_instance]
-//   ( output_terminal , input_terminal , enable_terminal )
-// =============================================================================
 TEST(ParserA301, MosSwitchInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
@@ -98,9 +86,6 @@ TEST(ParserA301, GateInst_AllMosSwitchTypes) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.3.4 Production #3: mos_switchtype ::= nmos | pmos | rnmos | rpmos
-// =============================================================================
 TEST(ParserA304, MosSwitchtype_Nmos) {
   auto r = Parse(
       "module m;\n"
@@ -145,4 +130,4 @@ TEST(ParserA304, MosSwitchtype_Rpmos) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-}  // namespace
+}

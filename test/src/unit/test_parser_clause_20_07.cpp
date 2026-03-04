@@ -1,15 +1,10 @@
-// §20.7: Array query functions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-// --- Test helpers ---
+
 namespace {
 
-// =========================================================================
-// §7.11: Array querying functions
-// =========================================================================
 TEST(ParserSection7, ArrayDimensionsQuery) {
   auto r = Parse(
       "module t;\n"
@@ -37,9 +32,7 @@ TEST(ParserSection7, ArraySizeQuery) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
   EXPECT_EQ(stmt->rhs->callee, "$size");
 }
-// =============================================================================
-// LRM section 20.7 -- Array querying functions
-// =============================================================================
+
 TEST(ParserSection20, ArrayLeftFunction) {
   auto r = Parse(
       "module m;\n"
@@ -143,4 +136,4 @@ TEST(ParserSection20, ArrayUnpackedDimensionsFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

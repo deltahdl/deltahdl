@@ -1,12 +1,9 @@
-// §6.6.2: Unresolved nets
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// 22. Uwire net declaration.
 TEST(ParserSection6, Sec6_5_UwireDecl) {
   auto r = Parse(
       "module t;\n"
@@ -21,7 +18,7 @@ TEST(ParserSection6, Sec6_5_UwireDecl) {
   EXPECT_TRUE(item->data_type.is_net);
   EXPECT_EQ(item->name, "single");
 }
-// §6.7.1: Uwire net declaration.
+
 TEST(ParserSection6, Sec6_7_1_UwireDecl) {
   auto r = Parse(
       "module t;\n"
@@ -37,4 +34,4 @@ TEST(ParserSection6, Sec6_7_1_UwireDecl) {
   EXPECT_EQ(item->name, "uw");
 }
 
-}  // namespace
+}

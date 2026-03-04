@@ -1,12 +1,9 @@
-// §6.20.2: Value parameters
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// § constant_expression — binary op in parameter elaborates
 TEST(ElabA83, ConstantBinaryExprInParamElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -18,10 +15,6 @@ TEST(ElabA83, ConstantBinaryExprInParamElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// =============================================================================
-// A.8.4 Primaries — Elaboration
-// =============================================================================
-// § constant_primary — integer literal in parameter elaborates
 TEST(ElabA84, ConstantPrimaryIntegerLiteral) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +26,6 @@ TEST(ElabA84, ConstantPrimaryIntegerLiteral) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § constant_primary — real literal in parameter elaborates
 TEST(ElabA84, ConstantPrimaryRealLiteral) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -45,7 +37,6 @@ TEST(ElabA84, ConstantPrimaryRealLiteral) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § constant_primary — parameter reference elaborates
 TEST(ElabA84, ConstantPrimaryParameterRef) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -58,4 +49,4 @@ TEST(ElabA84, ConstantPrimaryParameterRef) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

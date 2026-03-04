@@ -1,5 +1,3 @@
-// §19.3: Defining the coverage model: covergroup
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// S19.2-19.3: Covergroup definition and instantiation
-// =============================================================================
 TEST(Coverage, CreateGroupAndFind) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg_addr");
@@ -39,4 +34,4 @@ TEST(Coverage, MultipleGroupInstances) {
   EXPECT_EQ(db.FindGroup("cg2")->name, "cg2");
 }
 
-}  // namespace
+}

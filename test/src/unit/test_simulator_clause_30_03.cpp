@@ -1,5 +1,3 @@
-// §30.3: Specify block declaration
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Module with specify block containing all item types simulates correctly
 TEST(SimA701, SpecifyWithAllItemKindsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -34,7 +31,6 @@ TEST(SimA701, SpecifyWithAllItemKindsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// Specify block does not interfere with behavioral initial block execution
 TEST(SimA701, SpecifyBlockDoesNotInterfereBehavioral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,4 +50,4 @@ TEST(SimA701, SpecifyBlockDoesNotInterfereBehavioral) {
   LowerRunAndCheck(f, design, {{"a", 11u}, {"b", 22u}});
 }
 
-}  // namespace
+}

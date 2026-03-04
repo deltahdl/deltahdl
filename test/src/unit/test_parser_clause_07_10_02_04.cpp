@@ -1,5 +1,3 @@
-// §7.10.2.4: Pop_front()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -19,4 +17,4 @@ TEST(ParserSection7, QueuePopFront) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

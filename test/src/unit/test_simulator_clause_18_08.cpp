@@ -1,5 +1,3 @@
-// §18.8: Disabling random variables with rand_mode()
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.8: rand_mode() enable/disable
-// =============================================================================
 TEST(Constraint, RandModeDisable) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -52,4 +47,4 @@ TEST(Constraint, RandModeReEnable) {
   EXPECT_LE(solver.GetValue("x"), 100);
 }
 
-}  // namespace
+}

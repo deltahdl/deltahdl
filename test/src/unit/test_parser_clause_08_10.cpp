@@ -1,14 +1,10 @@
-// §8.10: Static methods
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// §13.8: Virtual class with both static function and static task.
 TEST(ParserSection13, Sec13_8_MixedStaticFuncAndTask) {
   auto r = Parse(
       "virtual class Utils#(parameter N = 4);\n"
@@ -24,7 +20,6 @@ TEST(ParserSection13, Sec13_8_MixedStaticFuncAndTask) {
   ASSERT_EQ(r.cu->classes[0]->members.size(), 2u);
 }
 
-// §13.8: Static method with no arguments.
 TEST(ParserSection13, Sec13_8_StaticMethodNoArgs) {
   auto r = Parse(
       "virtual class Constants#(parameter N = 32);\n"
@@ -37,7 +32,6 @@ TEST(ParserSection13, Sec13_8_StaticMethodNoArgs) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// §13.8: Static method with multiple arguments of parameterized width.
 TEST(ParserSection13, Sec13_8_MultiArgParameterizedWidth) {
   EXPECT_TRUE(
       ParseOk("virtual class Arith#(parameter W = 16);\n"
@@ -49,4 +43,4 @@ TEST(ParserSection13, Sec13_8_MultiArgParameterizedWidth) {
               "endclass\n"));
 }
 
-}  // namespace
+}

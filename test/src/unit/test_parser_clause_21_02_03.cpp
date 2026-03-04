@@ -1,5 +1,3 @@
-// §21.2.3: Continuous monitoring
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -16,9 +14,7 @@ TEST(ParserSection21, MonitorOnOff) {
               "  end\n"
               "endmodule\n"));
 }
-// ---------------------------------------------------------------------------
-// 9. $monitor system call
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_MonitorSystemCall) {
   auto r = Parse(
       "module m;\n"
@@ -55,4 +51,4 @@ TEST(ParserSection21, MonitorbHexOctal) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §16.9.9: Conditions over sequences
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// sequence_expr ::= expression_or_dist throughout sequence_expr
 TEST(ParserA210, SequenceExpr_Throughout) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -17,7 +14,6 @@ TEST(ParserA210, SequenceExpr_Throughout) {
               "endmodule\n"));
 }
 
-// Assert property with throughout operator.
 TEST(ParserSection16, Sec16_5_1_SequenceThroughout) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -26,10 +22,6 @@ TEST(ParserSection16, Sec16_5_1_SequenceThroughout) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.9.4 Sequence throughout
-// =============================================================================
 TEST(ParserSection16, SequenceThroughoutBasic) {
   auto r = Parse(
       "module m;\n"
@@ -47,7 +39,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.7: throughout ---
 TEST(ParserAnnexF, AnnexFThroughout) {
   auto r = Parse(
       "module m;\n"
@@ -73,9 +64,6 @@ TEST(ParserSection16, SequenceThroughoutInSeqDecl) {
   ASSERT_NE(sq, nullptr);
 }
 
-// =============================================================================
-// §16.9.4 -- Sequence throughout (additional tests)
-// =============================================================================
 TEST(ParserSection16, SequenceThroughoutWithImplication) {
   auto r = Parse(
       "module m;\n"
@@ -86,4 +74,4 @@ TEST(ParserSection16, SequenceThroughoutWithImplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

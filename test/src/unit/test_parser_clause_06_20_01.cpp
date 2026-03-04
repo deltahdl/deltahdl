@@ -1,5 +1,3 @@
-// §6.20.1: Parameter declaration syntax
-
 #include "fixture_elaborator.h"
 #include "helpers_parser_verify.h"
 
@@ -15,7 +13,7 @@ TEST(ParserA23, ListOfSpecparamAssignmentsMultiple) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// parameter_port_list: data_type list_of_param_assignments (no keyword)
+
 TEST(SourceText, ParamPortDataTypeForm) {
   auto r = Parse("module m #(int WIDTH = 8); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -24,7 +22,6 @@ TEST(SourceText, ParamPortDataTypeForm) {
   EXPECT_EQ(r.cu->modules[0]->params[0].first, "WIDTH");
 }
 
-// parameter_port_list: mixed forms
 TEST(SourceText, ParamPortMixedForms) {
   auto r = Parse(
       "module m #(parameter int A = 1, localparam int B = 2,\n"
@@ -48,8 +45,6 @@ TEST(ParserA83, ParamExprBinaryOp) {
   EXPECT_EQ(r.cu->modules[0]->params[0].second->kind, ExprKind::kBinary);
 }
 
-// --- list_of_param_assignments ---
-// param_assignment { , param_assignment }
 TEST(ParserA23, ListOfParamAssignmentsSingle) {
   auto r = Parse("module m; parameter int A = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -69,14 +64,12 @@ TEST(ParserA23, ListOfParamAssignmentsMultiple) {
 }
 
 TEST(ParserA24, ParamAssignmentNoDefault) {
-  // Parameter in module header without default
+
   auto r = Parse("module m #(parameter int P); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- type_assignment ---
-// type_identifier [ = data_type_or_incomplete_class_scoped_type ]
 TEST(ParserA24, TypeAssignmentWithDefault) {
   auto r = Parse("module m; parameter type T = int; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -86,8 +79,6 @@ TEST(ParserA24, TypeAssignmentWithDefault) {
   EXPECT_EQ(item->name, "T");
 }
 
-// --- list_of_type_assignments ---
-// type_assignment { , type_assignment }
 TEST(ParserA23, ListOfTypeAssignmentsSingle) {
   auto r = Parse("module m; parameter type T = int; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -95,7 +86,6 @@ TEST(ParserA23, ListOfTypeAssignmentsSingle) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
 }
 
-// parameter_port_list with localparam (parameter_port_declaration form 2)
 TEST(SourceText, ParamPortLocalparam) {
   auto r = Parse("module m #(localparam int X = 5); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -104,4 +94,4 @@ TEST(SourceText, ParamPortLocalparam) {
   EXPECT_EQ(r.cu->modules[0]->params[0].first, "X");
 }
 
-}  // namespace
+}

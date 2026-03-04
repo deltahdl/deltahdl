@@ -1,12 +1,9 @@
-// §11.4.8: Bitwise operators
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// --- 5. Blocking assignment with bitwise AND expression ---
 TEST(ParserSection10, Sec10_4_1_ExprBitwiseAnd) {
   auto r = Parse(
       "module m;\n"
@@ -34,10 +31,6 @@ TEST(ParserSection11, XnorBinaryOperator) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (bitwise)
-// =============================================================================
-// § binary_operator ::= &
 TEST(ParserA86, BinaryBitwiseAnd) {
   auto r = Parse("module m; initial x = a & b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -48,7 +41,6 @@ TEST(ParserA86, BinaryBitwiseAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-// § binary_operator ::= |
 TEST(ParserA86, BinaryBitwiseOr) {
   auto r = Parse("module m; initial x = a | b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -59,7 +51,6 @@ TEST(ParserA86, BinaryBitwiseOr) {
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
 }
 
-// § binary_operator ::= ^
 TEST(ParserA86, BinaryBitwiseXor) {
   auto r = Parse("module m; initial x = a ^ b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -70,7 +61,6 @@ TEST(ParserA86, BinaryBitwiseXor) {
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
 }
 
-// § binary_operator ::= ^~
 TEST(ParserA86, BinaryBitwiseXnor) {
   auto r = Parse("module m; initial x = a ^~ b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -81,7 +71,6 @@ TEST(ParserA86, BinaryBitwiseXnor) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-// § binary_operator ::= ~^
 TEST(ParserA86, BinaryBitwiseXnorAlt) {
   auto r = Parse("module m; initial x = a ~^ b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -92,7 +81,6 @@ TEST(ParserA86, BinaryBitwiseXnorAlt) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
 }
 
-// § expression ::= unary_operator { attribute_instance } primary
 TEST(ParserA83, ExprUnaryOp) {
   auto r = Parse("module m; initial x = ~a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -103,7 +91,6 @@ TEST(ParserA83, ExprUnaryOp) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-// § unary_operator ::= ~
 TEST(ParserA86, UnaryBitwiseNot) {
   auto r = Parse("module m; initial x = ~a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -114,7 +101,6 @@ TEST(ParserA86, UnaryBitwiseNot) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-// --- Unary operators ---
 TEST(ParserSection11, Sec11_1_UnaryBitwiseNot) {
   auto r = Parse(
       "module t;\n"
@@ -126,7 +112,6 @@ TEST(ParserSection11, Sec11_1_UnaryBitwiseNot) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-// --- Binary operators overview ---
 TEST(ParserSection11, Sec11_1_BinaryXnorTildeCaret) {
   auto r = Parse(
       "module t;\n"
@@ -138,7 +123,6 @@ TEST(ParserSection11, Sec11_1_BinaryXnorTildeCaret) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
 }
 
-// --- Expressions in different contexts ---
 TEST(ParserSection11, Sec11_1_ExprInContinuousAssign) {
   auto r = Parse(
       "module t;\n"
@@ -159,9 +143,7 @@ TEST(ParserSection11, Sec11_1_ExprInContinuousAssign) {
   EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(ca->assign_rhs->op, TokenKind::kCaret);
 }
-// =========================================================================
-// Section 11.4.8 -- Bitwise operators
-// =========================================================================
+
 TEST(ParserSection11, BitwiseAnd) {
   auto r = Parse(
       "module t;\n"
@@ -203,9 +185,6 @@ TEST(ParserSection11, BitwiseNot) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
 TEST(ParserCh505, Operator_UnaryBitwiseNegate) {
   auto r = Parse(
       "module m;\n"
@@ -220,4 +199,4 @@ TEST(ParserCh505, Operator_UnaryBitwiseNegate) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-}  // namespace
+}

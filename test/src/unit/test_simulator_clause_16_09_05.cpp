@@ -1,5 +1,3 @@
-// §16.9.5: AND operation
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -31,9 +26,6 @@ struct SvaFixture {
 
 namespace {
 
-// =============================================================================
-// Non-consecutive repetition [=N] (section 16.9.5)
-// =============================================================================
 TEST(SvaEngine, NonConsecutiveRepetition) {
   SvaSequence seq;
   seq.kind = SvaSequenceKind::kNonConsecutiveRepetition;
@@ -41,10 +33,9 @@ TEST(SvaEngine, NonConsecutiveRepetition) {
   seq.rep_max = 2;
   seq.expr_check = [](uint64_t v) { return v == 1; };
 
-  // Two matches scattered: does not need to end at match.
   EXPECT_TRUE(MatchNonConsecutiveRepetition(seq, {0, 1, 0, 1, 0}));
   EXPECT_TRUE(MatchNonConsecutiveRepetition(seq, {1, 0, 1}));
   EXPECT_FALSE(MatchNonConsecutiveRepetition(seq, {1, 0, 0}));
 }
 
-}  // namespace
+}

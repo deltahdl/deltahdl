@@ -1,14 +1,9 @@
-// §12.7.4: The while-loop
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// ---------------------------------------------------------------------------
-// 9. always_comb with while loop
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_WhileLoop) {
   auto r = Parse(
       "module m;\n"
@@ -30,7 +25,7 @@ TEST(ParserSection9, Sec9_2_2_WhileLoop) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kWhile);
 }
-// Nested loops: for inside while.
+
 TEST(ParserSection12, NestedForInsideWhile) {
   auto r = Parse(
       "module t;\n"
@@ -51,7 +46,6 @@ TEST(ParserSection12, NestedForInsideWhile) {
   EXPECT_EQ(stmt->body->stmts[0]->kind, StmtKind::kFor);
 }
 
-// While loop with null body (semicolon).
 TEST(ParserSection12, WhileWithNullBody) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -61,7 +55,6 @@ TEST(ParserSection12, WhileWithNullBody) {
               "endmodule\n"));
 }
 
-// --- while ( expression ) statement_or_null ---
 TEST(ParserA608, WhileLoop) {
   auto r = Parse(
       "module m;\n"
@@ -105,4 +98,4 @@ TEST(ParserSection12, WhileLoopWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

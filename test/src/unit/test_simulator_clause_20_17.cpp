@@ -1,5 +1,3 @@
-// §20.17: Miscellaneous tasks and functions
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -30,4 +28,4 @@ TEST(SysTask, StacktraceDoesNotCrash) {
   EXPECT_EQ(result.width, 1u);
 }
 
-}  // namespace
+}

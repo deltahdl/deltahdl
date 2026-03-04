@@ -1,5 +1,3 @@
-
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -7,15 +5,8 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §5.6 Identifiers, keywords, and system names
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// 1. Simple identifier with dollar sign ($) in name
-// ---------------------------------------------------------------------------
 TEST(SimCh506, IdentifierWithDollarSign) {
-  // §5.6: Simple identifiers may contain letters, digits, $, and _.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] n$657;\n"
@@ -25,11 +16,8 @@ TEST(SimCh506, IdentifierWithDollarSign) {
   EXPECT_EQ(result, 42u);
 }
 
-// ---------------------------------------------------------------------------
-// 2. Identifier starting with underscore
-// ---------------------------------------------------------------------------
 TEST(SimCh506, IdentifierStartingWithUnderscore) {
-  // §5.6: First character must be a letter or underscore (not digit or $).
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] _bus3;\n"
@@ -39,11 +27,8 @@ TEST(SimCh506, IdentifierStartingWithUnderscore) {
   EXPECT_EQ(result, 55u);
 }
 
-// ---------------------------------------------------------------------------
-// 3. Identifiers are case sensitive
-// ---------------------------------------------------------------------------
 TEST(SimCh506, IdentifiersCaseSensitive) {
-  // §5.6: Identifiers are case sensitive.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -70,11 +55,8 @@ TEST(SimCh506, IdentifiersCaseSensitive) {
   EXPECT_EQ(v3->value.ToUint64(), 30u);
 }
 
-// ---------------------------------------------------------------------------
-// 4. Long identifier (1024 characters — the minimum required maximum)
-// ---------------------------------------------------------------------------
 TEST(SimCh506, LongIdentifier1024Chars) {
-  // §5.6: Maximum identifier length is at least 1024 characters.
+
   std::string long_id(1024, 'a');
   auto result = RunAndGet(
       "module t;\n"
@@ -89,11 +71,8 @@ TEST(SimCh506, LongIdentifier1024Chars) {
   EXPECT_EQ(result, 77u);
 }
 
-// ---------------------------------------------------------------------------
-// 5. Identifier with digits (not as first character)
-// ---------------------------------------------------------------------------
 TEST(SimCh506, IdentifierWithDigits) {
-  // §5.6: Simple identifiers can contain digits (not as first character).
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] abc123;\n"
@@ -103,11 +82,8 @@ TEST(SimCh506, IdentifierWithDigits) {
   EXPECT_EQ(result, 88u);
 }
 
-// ---------------------------------------------------------------------------
-// 6. Identifier references an object by name
-// ---------------------------------------------------------------------------
 TEST(SimCh506, IdentifierReferencesObject) {
-  // §5.6: An identifier gives an object a unique name for referencing.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -127,11 +103,8 @@ TEST(SimCh506, IdentifierReferencesObject) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-// ---------------------------------------------------------------------------
-// 7. Multiple identifiers with mixed character classes
-// ---------------------------------------------------------------------------
 TEST(SimCh506, IdentifierMixedCharClasses) {
-  // §5.6: Identifiers use letters, digits, $, _ in combination.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

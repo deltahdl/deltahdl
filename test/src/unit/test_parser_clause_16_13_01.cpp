@@ -1,11 +1,8 @@
-// §16.13.1: Multiclocked sequences
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
 TEST(ParserSection16, MulticlockSequenceDeclTwo) {
@@ -19,4 +16,4 @@ TEST(ParserSection16, MulticlockSequenceDeclTwo) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

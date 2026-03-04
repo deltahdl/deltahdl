@@ -1,5 +1,3 @@
-// §31.3.6: $recrem
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 Runtime — $recrem dual limits stored
-// =============================================================================
 TEST(SimA70501, RecremDualLimitsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -27,4 +22,4 @@ TEST(SimA70501, RecremDualLimitsStored) {
   EXPECT_EQ(stored.limit2, 3u);
 }
 
-}  // namespace
+}

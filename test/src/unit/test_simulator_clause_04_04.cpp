@@ -1,4 +1,3 @@
-
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -8,35 +7,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.4 Stratified event scheduler
-//
-// LRM §4.4 defines the stratified event scheduler data structure:
-//   - A compliant simulator shall maintain a data structure that allows
-//     events to be dynamically scheduled, executed, and removed as the
-//     simulator advances through time.
-//   - The first division is by time: every event has one and only one
-//     simulation execution time (current or future).
-//   - All scheduled events at a specific time define a time slot.
-//   - Simulation proceeds by executing and removing all events in the
-//     current time slot before moving on to the next nonempty time slot,
-//     in time order. This guarantees the simulator never goes backwards.
-//   - A time slot is divided into a set of 17 ordered regions (a–q):
-//     Preponed, Pre-Active, Active, Inactive, Pre-NBA, NBA, Post-NBA,
-//     Pre-Observed, Observed, Post-Observed, Reactive, Re-Inactive,
-//     Pre-Re-NBA, Re-NBA, Post-Re-NBA, Pre-Postponed, Postponed.
-//   - The purpose of dividing a time slot into these ordered regions is
-//     to provide predictable interactions between design and testbench.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.4 "A compliant SystemVerilog simulator shall maintain some form of
-// data structure that allows events to be dynamically scheduled, executed,
-// and removed as the simulator advances through time."
-//
-// The Scheduler and EventPool together form this data structure.
-// Verify that events can be dynamically scheduled and executed.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, EventsDynamicallyScheduledAndExecuted) {
   Arena arena;
   Scheduler sched(arena);
@@ -52,9 +22,6 @@ TEST(SimCh44, EventsDynamicallyScheduledAndExecuted) {
   EXPECT_FALSE(sched.HasEvents());
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 Events are removed after execution — the event pool recycles them.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, EventsRemovedAfterExecution) {
   Arena arena;
   Scheduler sched(arena);
@@ -69,13 +36,6 @@ TEST(SimCh44, EventsRemovedAfterExecution) {
   EXPECT_EQ(pool.FreeCount(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 "The first division is by time. Every event has one and only one
-// simulation execution time, which at any given point during simulation
-// can be the current time or some future time."
-//
-// Events scheduled at different times are separated into distinct time slots.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, FirstDivisionByTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -97,11 +57,6 @@ TEST(SimCh44, FirstDivisionByTime) {
   EXPECT_EQ(exec_times[2], 20u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 "All scheduled events at a specific time define a time slot."
-//
-// Multiple events at the same time are grouped into one time slot.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, AllEventsAtSameTimeFormOneTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
@@ -121,13 +76,6 @@ TEST(SimCh44, AllEventsAtSameTimeFormOneTimeSlot) {
   EXPECT_EQ(event_count, 5);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 "Simulation proceeds by executing and removing all events in the
-// current simulation time slot before moving on to the next nonempty
-// time slot, in time order."
-//
-// All events at time 5 must complete before any event at time 10 starts.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, AllEventsInCurrentSlotBeforeNext) {
   Arena arena;
   Scheduler sched(arena);
@@ -155,13 +103,6 @@ TEST(SimCh44, AllEventsInCurrentSlotBeforeNext) {
   EXPECT_EQ(log[3].first, 10u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 "This procedure guarantees that the simulator never goes backwards
-// in time."
-//
-// Even when events are scheduled in reverse chronological order, they
-// execute in forward time order.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, SimulatorNeverGoesBackwardsInTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -183,10 +124,6 @@ TEST(SimCh44, SimulatorNeverGoesBackwardsInTime) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 Empty time slots are skipped: simulation moves to "next nonempty
-// time slot."
-// ---------------------------------------------------------------------------
 TEST(SimCh44, EmptyTimeSlotsSkipped) {
   Arena arena;
   Scheduler sched(arena);
@@ -208,24 +145,12 @@ TEST(SimCh44, EmptyTimeSlotsSkipped) {
   EXPECT_EQ(times[2], 500u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 "A time slot is divided into a set of ordered regions."
-//
-// There are exactly 17 regions, from Preponed (0) to Postponed (16).
-// ---------------------------------------------------------------------------
 TEST(SimCh44, TimeSlotHas17OrderedRegions) {
   EXPECT_EQ(kRegionCount, 17u);
   EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
   EXPECT_EQ(static_cast<int>(Region::kPostponed), 16);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 Regions a–q: all 17 named regions exist and are ordered correctly.
-// a) Preponed, b) Pre-Active, c) Active, d) Inactive, e) Pre-NBA,
-// f) NBA, g) Post-NBA, h) Pre-Observed, i) Observed, j) Post-Observed,
-// k) Reactive, l) Re-Inactive, m) Pre-Re-NBA, n) Re-NBA,
-// o) Post-Re-NBA, p) Pre-Postponed, q) Postponed
-// ---------------------------------------------------------------------------
 TEST(SimCh44, All17RegionsNamedAndOrdered) {
   EXPECT_LT(static_cast<int>(Region::kPreponed),
             static_cast<int>(Region::kPreActive));
@@ -259,15 +184,8 @@ TEST(SimCh44, All17RegionsNamedAndOrdered) {
             static_cast<int>(Region::kPostponed));
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 All 17 regions execute within a single time slot in the correct
-// monotonically increasing order.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, AllRegionsExecuteInOrder) { VerifyAllRegionsExecuteInOrder(); }
 
-// ---------------------------------------------------------------------------
-// §4.4 TimeSlot data structure: AnyNonemptyIn detects events in a range.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, TimeSlotAnyNonemptyInRange) {
   Arena arena;
   EventPool pool(arena);
@@ -283,10 +201,6 @@ TEST(SimCh44, TimeSlotAnyNonemptyInRange) {
   EXPECT_FALSE(slot.AnyNonemptyIn(Region::kReactive, Region::kReNBA));
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 EventQueue: intrusive linked list maintains FIFO order.
-// This is the data structure subdivision within a region.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, EventQueueFIFOOrder) {
   Arena arena;
   EventPool pool(arena);
@@ -307,9 +221,6 @@ TEST(SimCh44, EventQueueFIFOOrder) {
   EXPECT_TRUE(queue.empty());
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 EventQueue::Clear removes all events from the queue.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, EventQueueClear) {
   Arena arena;
   EventPool pool(arena);
@@ -323,14 +234,6 @@ TEST(SimCh44, EventQueueClear) {
   EXPECT_TRUE(queue.empty());
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 "The purpose of dividing a time slot into these ordered regions is
-// to provide predictable interactions between the design and testbench
-// code."
-//
-// Verify that blocking (Active) and nonblocking (NBA) assignments produce
-// predictable results because of region ordering.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, RegionsPredictableDesignTestbenchInteraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -350,11 +253,6 @@ TEST(SimCh44, RegionsPredictableDesignTestbenchInteraction) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 Region ordering provides predictable interaction: always_comb
-// (Active) sees the NBA update from a nonblocking assignment, allowing
-// testbench and design code to interact predictably.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, PredictableNBAToAlwaysCombInteraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -372,11 +270,6 @@ TEST(SimCh44, PredictableNBAToAlwaysCombInteraction) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 51u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 Time slot completeness: an event that dynamically schedules another
-// event in the same time slot (but later region) still executes within
-// the same time slot.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, DynamicSchedulingWithinSameTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
@@ -398,11 +291,6 @@ TEST(SimCh44, DynamicSchedulingWithinSameTimeSlot) {
   EXPECT_EQ(timestep_count, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 Time slot completeness via simulation: an initial block that uses
-// both blocking and nonblocking assignments has both complete within
-// the same time slot.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -418,10 +306,6 @@ TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 Multiple time slots each contain their own complete set of events.
-// Events at time 5, 10, and 15 each form separate time slots.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, MultipleTimeSlotsFormDistinctSlots) {
   auto result = RunAndGet(
       "module t;\n"
@@ -437,14 +321,6 @@ TEST(SimCh44, MultipleTimeSlotsFormDistinctSlots) {
   EXPECT_EQ(result, 3u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 "The data structure is normally implemented as a time-ordered set
-// of linked lists, which are divided and subdivided in a well-defined
-// manner."
-//
-// Verify that the event_calendar_ (std::map<SimTime, TimeSlot>) provides
-// time-ordered iteration. ScheduleEvent places events correctly.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, EventCalendarTimeOrdered) {
   Arena arena;
   Scheduler sched(arena);
@@ -468,9 +344,6 @@ TEST(SimCh44, EventCalendarTimeOrdered) {
   EXPECT_EQ(times[4], 50u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 Simulation with no events: scheduler has no work, time stays at 0.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, NoEventsNoAdvance) {
   Arena arena;
   Scheduler sched(arena);
@@ -480,11 +353,6 @@ TEST(SimCh44, NoEventsNoAdvance) {
   EXPECT_FALSE(sched.HasEvents());
 }
 
-// ---------------------------------------------------------------------------
-// §4.4 Region ordering across time: regions are ordered within each time
-// slot independently. Active at time 10 runs before NBA at time 10,
-// and both run after all events at time 5.
-// ---------------------------------------------------------------------------
 TEST(SimCh44, RegionOrderingPerTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
@@ -510,24 +378,7 @@ TEST(SimCh44, RegionOrderingPerTimeSlot) {
   EXPECT_EQ(log[2].second, "t10_active");
   EXPECT_EQ(log[3].second, "t10_nba");
 }
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
 
-// ---------------------------------------------------------------------------
-// 6. §4.2 Simulation time: processes scheduled at the same simulation time
-//    execute within the same time slot.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, SameTimeSlotExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -552,10 +403,6 @@ TEST(SimCh4, SameTimeSlotExecution) {
   EXPECT_EQ(vb->value.ToUint64(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 22. §4.2 Simulation never goes backwards in time: after two time steps,
-//     final values reflect the later assignment.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, SimulationNeverGoesBackward) {
   auto result = RunAndGet(
       "module t;\n"

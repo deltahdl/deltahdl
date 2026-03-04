@@ -1,5 +1,3 @@
-// §29.6: Edge-sensitive sequential UDPs
-
 #include <gtest/gtest.h>
 
 #include "builders_udp.h"
@@ -36,4 +34,4 @@ TEST(UdpEdgeSeq, DFlipFlop) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-}  // namespace
+}

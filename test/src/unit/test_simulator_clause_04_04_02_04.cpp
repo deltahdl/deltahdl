@@ -10,21 +10,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.4.2.4 NBA events region
-//
-// Figure 4-1 shows:
-//   pli_region_PreNBA -> region_NBA    (forward from PreNBA PLI)
-//   region_NBA -> pli_region_PostNBA   (forward to PostNBA PLI)
-//   region_NBA -> region_Active        (feedback -- re-iteration)
-//
-// The NBA region is part of the active region set (§4.4.1).
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.4.2.4 NBA region event execution
-// Basic: events scheduled in the NBA region are executed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, NBARegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
@@ -38,18 +23,10 @@ TEST(SimCh4424, NBARegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.4 NBA executes after Inactive
-// NBA events execute only after Inactive events have drained.
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAExecutesAfterInactive) {
   VerifyTwoRegionOrder({Region::kInactive, "inactive"}, {Region::kNBA, "nba"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.4 All Inactive events complete before NBA
-// Multiple Inactive events all complete before any NBA event starts.
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, AllInactiveEventsCompleteBeforeNBA) {
   Arena arena;
   Scheduler sched(arena);
@@ -69,14 +46,10 @@ TEST(SimCh4424, AllInactiveEventsCompleteBeforeNBA) {
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);
-  // All three Inactive events come before NBA.
+
   EXPECT_EQ(order[3], "nba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.4 Nonblocking assignment schedules NBA at current time
-// An Active callback schedules into NBA at the same time (current time).
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, NonblockingAssignmentSchedulesNBACurrentTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -85,7 +58,7 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBACurrentTime) {
   auto* active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     order.push_back("active");
-    // Nonblocking assignment: schedule NBA at current time.
+
     auto* nba = sched.GetEventPool().Acquire();
     nba->callback = [&order]() { order.push_back("nba"); };
     sched.ScheduleEvent({0}, Region::kNBA, nba);
@@ -98,10 +71,6 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBACurrentTime) {
   EXPECT_EQ(order[1], "nba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.4 Nonblocking assignment schedules NBA at later time
-// An Active callback at time 0 schedules an NBA event at time 5.
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, NonblockingAssignmentSchedulesNBALaterTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -109,7 +78,7 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBALaterTime) {
 
   auto* active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
-    // Nonblocking assignment with delay: schedule NBA at a later time.
+
     auto* nba = sched.GetEventPool().Acquire();
     nba->callback = [&nba_times, &sched]() {
       nba_times.push_back(sched.CurrentTime().ticks);
@@ -123,29 +92,16 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBALaterTime) {
   EXPECT_EQ(nba_times[0], 5u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.4 + Figure 4-1: region_NBA -> region_Active (feedback edge).
-// An NBA callback that schedules a new Active event triggers
-// re-iteration of the active region set.
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAToActiveIteration) {
   VerifyIterationChain(Region::kActive, "active", Region::kNBA, "nba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.4 NBA region executes after Active and Inactive, before Observed.
-// This confirms its position in the region ordering per §4.4.2.
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAExecutesAfterActiveAndInactiveBeforeObserved) {
   VerifyFourRegionOrder({Region::kActive, "active"},
                         {Region::kInactive, "inactive"}, {Region::kNBA, "nba"},
                         {Region::kObserved, "observed"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.4 NBA is part of the active region set (§4.4.1).
-// Its ordinal lies between Inactive and PostNBA.
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAIsWithinActiveRegionSet) {
   auto nba_ord = static_cast<int>(Region::kNBA);
   auto inactive_ord = static_cast<int>(Region::kInactive);
@@ -154,22 +110,10 @@ TEST(SimCh4424, NBAIsWithinActiveRegionSet) {
   EXPECT_LT(nba_ord, post_nba_ord);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.4 NBA events across multiple time slots.
-// Each time slot has its own NBA region evaluation.
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kNBA);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.4 Multiple NBA events coexist and all execute.
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// §4.4.2.4 NBA vs Re-NBA ordering
-// NBA in the active context goes to kNBA; in the reactive context it goes
-// to kReNBA.  NBA (active set) executes before Re-NBA (reactive set).
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, NBAExecutesBeforeReNBA) {
   Arena arena;
   Scheduler sched(arena);
@@ -189,9 +133,6 @@ TEST(SimCh4424, NBAExecutesBeforeReNBA) {
   EXPECT_EQ(order[1], 2);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.4 Multiple NBA events coexist and all execute.
-// ---------------------------------------------------------------------------
 TEST(SimCh4424, NBARegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);

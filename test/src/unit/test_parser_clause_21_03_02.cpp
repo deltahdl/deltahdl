@@ -1,5 +1,3 @@
-// §21.3.2: File output system tasks
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -44,4 +42,4 @@ TEST(ParserSection21, FstrobeAndFmonitor) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §8.12: Assignment, renaming, and copying
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -8,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA24, ClassNewCopy) {
-  // new expression (shallow copy)
+
   auto r = Parse(
       "class C;\n"
       "endclass\n"
@@ -19,7 +17,7 @@ TEST(ParserA24, ClassNewCopy) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// §8.12 — Shallow copy with new
+
 TEST(ParserSection8, ShallowCopy) {
   auto r = Parse(
       "module m;\n"
@@ -36,4 +34,4 @@ TEST(ParserSection8, ShallowCopy) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

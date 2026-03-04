@@ -1,5 +1,3 @@
-// §21.3.5: File positioning
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -19,4 +17,4 @@ TEST(ParserSection21, FtellFseek) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

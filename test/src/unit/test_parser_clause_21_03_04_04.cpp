@@ -1,5 +1,3 @@
-// §21.3.4.4: Reading binary data
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -30,4 +28,4 @@ TEST(ParserSection21, FreadWithStartCount) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

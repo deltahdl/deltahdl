@@ -1,5 +1,3 @@
-// §6.16.10: Atoreal()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.10: atoreal() -- convert string to real
-// =============================================================================
 TEST(StringMethods, Atoreal) {
   StringFixture f;
   f.CreateStringVar("s", "3.14");
@@ -22,4 +17,4 @@ TEST(StringMethods, Atoreal) {
   EXPECT_NEAR(d, 3.14, 0.001);
 }
 
-}  // namespace
+}

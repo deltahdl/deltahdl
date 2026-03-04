@@ -1,5 +1,3 @@
-// §28.6: bufif1, bufif0, notif1, and notif0 gates
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -8,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #1: gate_instantiation (enable_gatetype alternative)
-// gate_instantiation ::=
-//   enable_gatetype [drive_strength] [delay3] enable_gate_instance
-//                   {, enable_gate_instance} ;
-// =============================================================================
 TEST(ParserA301, GateInst_Bufif0Basic) {
   auto r = Parse(
       "module m;\n"
@@ -46,11 +38,6 @@ TEST(ParserA301, GateInst_Notif1Basic) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.3.1 Production #3: enable_gate_instance
-// enable_gate_instance ::= [name_of_instance]
-//   ( output_terminal , input_terminal , enable_terminal )
-// =============================================================================
 TEST(ParserA301, EnableGateInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
@@ -85,9 +72,6 @@ TEST(ParserA301, GateInst_AllEnableGateTypes) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.3.4 Production #2: enable_gatetype ::= bufif0 | bufif1 | notif0 | notif1
-// =============================================================================
 TEST(ParserA304, EnableGatetype_Bufif0) {
   auto r = Parse(
       "module m;\n"
@@ -132,4 +116,4 @@ TEST(ParserA304, EnableGatetype_Notif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.4.2.1: Event OR operator
-
 #include <gtest/gtest.h>
 
 #include "helpers_sensitivity.h"
@@ -20,4 +18,4 @@ TEST(TimingControl, CommaSynonymousWithOr) {
   EXPECT_EQ(comma_result, or_result);
 }
 
-}  // namespace
+}

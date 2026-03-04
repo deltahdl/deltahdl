@@ -1,5 +1,3 @@
-// §11.4.12.1: Replication operator
-
 #include "fixture_evaluator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,9 +5,6 @@
 using namespace delta;
 namespace {
 
-// ---------------------------------------------------------------------------
-// 14. always_comb with replication
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_Replication) {
   auto r = Parse(
       "module m;\n"
@@ -27,9 +22,7 @@ TEST(ParserSection9, Sec9_2_2_Replication) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kReplicate);
   EXPECT_NE(item->body->rhs->repeat_count, nullptr);
 }
-// =========================================================================
-// Section 11.4.1 -- Replication operator
-// =========================================================================
+
 TEST(ParserSection11, ReplicationCountAndElements) {
   auto r = Parse(
       "module t;\n"
@@ -75,7 +68,7 @@ TEST(ParserAnnexA, A8Replication) {
   auto* stmt = FirstInitialStmt(r);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
 }
-// --- 24. Blocking assignment with replication: a = {4{b}} ---
+
 TEST(ParserSection10, Sec10_4_1_ReplicationRhs) {
   auto r = Parse(
       "module m;\n"
@@ -96,12 +89,10 @@ TEST(ParserSection10, Sec10_4_1_ReplicationRhs) {
 
 TEST(ConstEval, Replication) {
   EvalFixture f;
-  // {4{1'b1}} = 4'b1111 = 15
+
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4{1'b1}}", f)), 15);
 }
 
-// § constant_multiple_concatenation ::=
-//     { constant_expression constant_concatenation }
 TEST(ParserA81, ConstantMultipleConcatenation) {
   auto r = Parse(
       "module m;\n"
@@ -111,7 +102,6 @@ TEST(ParserA81, ConstantMultipleConcatenation) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § multiple_concatenation ::= { expression concatenation }
 TEST(ParserA81, MultipleConcatenationBasic) {
   auto r = Parse("module m; initial x = {4{a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -141,7 +131,6 @@ TEST(ParserA81, MultipleConcatenationExprCount) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
 }
 
-// § constant_primary — constant_multiple_concatenation
 TEST(ParserA84, ConstantPrimaryMultipleConcatenation) {
   auto r = Parse("module m; parameter int P = {4{4'd1}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -151,7 +140,6 @@ TEST(ParserA84, ConstantPrimaryMultipleConcatenation) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kReplicate);
 }
 
-// § primary — multiple_concatenation
 TEST(ParserA84, PrimaryMultipleConcatenation) {
   auto r = Parse(
       "module m;\n"
@@ -166,7 +154,6 @@ TEST(ParserA84, PrimaryMultipleConcatenation) {
   EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
 }
 
-// --- Replication ---
 TEST(ParserSection11, Sec11_1_ReplicateRepeatCountAndElements) {
   auto r = Parse(
       "module t;\n"
@@ -189,4 +176,4 @@ TEST(ParserSection11, ReplicationOperator) {
   EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
 }
 
-}  // namespace
+}

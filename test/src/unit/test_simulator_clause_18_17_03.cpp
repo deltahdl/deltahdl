@@ -1,5 +1,3 @@
-// §18.17.3: Case production statements
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Case in production: selects matching branch
 TEST(SimA612, CaseProduction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -34,4 +31,4 @@ TEST(SimA612, CaseProduction) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

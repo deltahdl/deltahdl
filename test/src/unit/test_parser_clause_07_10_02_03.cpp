@@ -1,5 +1,3 @@
-// §7.10.2.3: Delete()
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -14,4 +12,4 @@ TEST(ParserCh513, BuiltInMethod_Delete) {
               "endmodule"));
 }
 
-}  // namespace
+}

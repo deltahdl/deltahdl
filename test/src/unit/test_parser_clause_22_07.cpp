@@ -1,5 +1,3 @@
-// §22.7: `timescale
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -64,4 +62,4 @@ TEST(ParserSection22, TimescaleWithDelays) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

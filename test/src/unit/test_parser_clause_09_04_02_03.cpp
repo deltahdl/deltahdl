@@ -1,5 +1,3 @@
-// §9.4.2.3: Conditional event controls
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// iff guard with comma-separated events at statement level
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardCommaStmtLevel) {
   auto r = Parse(
       "module m;\n"
@@ -27,9 +22,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardCommaStmtLevel) {
   EXPECT_EQ(stmt->events[1].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with or-separated events at statement level
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardOrStmtLevel) {
   auto r = Parse(
       "module m;\n"
@@ -47,9 +39,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardOrStmtLevel) {
   EXPECT_EQ(stmt->events[1].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard in always_ff context
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFF) {
   auto r = Parse(
       "module m;\n"
@@ -70,9 +59,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFF) {
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with begin-end body
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -92,9 +78,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardBeginEnd) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// Verify iff_condition field is populated for posedge
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffConditionFieldPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -106,14 +89,11 @@ TEST(ParserSection9, Sec9_4_2_4_IffConditionFieldPosedge) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->sensitivity.size(), 1u);
   const auto& ev = item->sensitivity[0];
-  // The iff_condition should be an equality comparison expression.
+
   ASSERT_NE(ev.iff_condition, nullptr);
   EXPECT_EQ(ev.iff_condition->kind, ExprKind::kBinary);
 }
 
-// ---------------------------------------------------------------------------
-// Verify signal field is populated
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_SignalFieldPopulated) {
   auto r = Parse(
       "module m;\n"
@@ -130,9 +110,6 @@ TEST(ParserSection9, Sec9_4_2_4_SignalFieldPopulated) {
   EXPECT_EQ(ev.signal->text, "clk");
 }
 
-// ---------------------------------------------------------------------------
-// Verify edge field for negedge with iff
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_EdgeFieldNegedge) {
   auto r = Parse(
       "module m;\n"
@@ -148,9 +125,6 @@ TEST(ParserSection9, Sec9_4_2_4_EdgeFieldNegedge) {
   EXPECT_EQ(item->sensitivity[0].signal->text, "rst_n");
 }
 
-// ---------------------------------------------------------------------------
-// Multiple event expressions with mixed iff presence
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_MixedIffPresence) {
   auto r = Parse(
       "module m;\n"
@@ -162,20 +136,17 @@ TEST(ParserSection9, Sec9_4_2_4_MixedIffPresence) {
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->sensitivity.size(), 3u);
-  // First: posedge clk iff en
+
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-  // Second: negedge rst (no iff)
+
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
-  // Third: edge sig iff guard
+
   EXPECT_EQ(item->sensitivity[2].edge, Edge::kEdge);
   EXPECT_NE(item->sensitivity[2].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with logical-or condition expression
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardLogicalOr) {
   auto r = Parse(
       "module m;\n"
@@ -189,9 +160,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardLogicalOr) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with not-equal comparison
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNotEqual) {
   auto r = Parse(
       "module m;\n"
@@ -206,9 +174,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNotEqual) {
   EXPECT_EQ(item->sensitivity[0].iff_condition->kind, ExprKind::kBinary);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard at always_ff level with single posedge (no reset)
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFFSingleEdge) {
   auto r = Parse(
       "module m;\n"
@@ -225,9 +190,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFFSingleEdge) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard on no-edge event at statement level with comparison
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNoEdgeStmtComparison) {
   auto r = Parse(
       "module m;\n"
@@ -245,9 +207,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNoEdgeStmtComparison) {
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with unary negation in guard expression
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardUnaryNegation) {
   auto r = Parse(
       "module m;\n"
@@ -262,9 +221,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardUnaryNegation) {
   EXPECT_EQ(item->sensitivity[0].iff_condition->kind, ExprKind::kUnary);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with bitwise-and in guard expression
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardBitwiseAnd) {
   auto r = Parse(
       "module m;\n"
@@ -278,9 +234,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardBitwiseAnd) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// ParseOk: three events all with iff guards (or-separated)
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardThreeEventsOr) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
@@ -289,9 +242,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardThreeEventsOr) {
       "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// ParseOk: iff guard in always block with nonblocking assignment
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNonblockingAssign) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -300,9 +250,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNonblockingAssign) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// Verify iff condition absent when not specified
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_NoIffConditionWhenAbsent) {
   auto r = Parse(
       "module m;\n"
@@ -317,9 +264,6 @@ TEST(ParserSection9, Sec9_4_2_4_NoIffConditionWhenAbsent) {
   EXPECT_EQ(item->sensitivity[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// Verify body is preserved under iff guard at statement level
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevelBody) {
   auto r = Parse(
       "module m;\n"
@@ -342,12 +286,9 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevelBody) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
   EXPECT_GE(stmt->body->stmts.size(), 2u);
 }
-// =============================================================================
-// LRM section 9.2.2.4 -- always_ff procedure
-// Sequential logic with reset and multiple sensitivity list items.
-// =============================================================================
+
 TEST(ParserSection9c, AlwaysFFWithReset) {
-  // LRM example: always_ff @(posedge clock iff reset == 0 or posedge reset)
+
   auto r = Parse(
       "module m;\n"
       "  logic clock, reset;\n"
@@ -367,17 +308,7 @@ TEST(ParserSection9c, AlwaysFFWithReset) {
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kPosedge);
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
-// =============================================================================
-// LRM section 9.4.2.4 -- Conditional event controls (iff guard)
-//
-// event_expression ::= [ edge_identifier ] expression [ iff expression ]
-//
-// The iff guard filters the event so the associated statement only triggers
-// when the guard condition is true at the moment of the edge.
-// =============================================================================
-// ---------------------------------------------------------------------------
-// Basic iff guard with posedge
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_4_2_4_IffGuardPosedgeBasic) {
   auto r = Parse(
       "module m;\n"
@@ -393,9 +324,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardPosedgeBasic) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with posedge and simple enable signal
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardPosedgeEnable) {
   auto r = Parse(
       "module m;\n"
@@ -410,9 +338,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardPosedgeEnable) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with negedge
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNegedge) {
   auto r = Parse(
       "module m;\n"
@@ -427,9 +352,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardNegedge) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with edge keyword
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardEdgeKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -443,12 +365,9 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardEdgeKeyword) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kEdge);
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
-// =============================================================================
-// LRM section 9.4.2.3 -- Conditional event controls (iff)
-// Additional iff guard tests for stmt-level and always_ff contexts.
-// =============================================================================
+
 TEST(ParserSection9c, IffGuardStmtLevelNoEdge) {
-  // @(a iff enable == 1) - level-sensitive with iff qualifier
+
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -464,9 +383,7 @@ TEST(ParserSection9c, IffGuardStmtLevelNoEdge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
-// =============================================================================
-// §9.4.2.3 -- Conditional event controls (iff)
-// =============================================================================
+
 TEST(ParserSection9b, ConditionalEventIffBasic) {
   auto r = Parse(
       "module m;\n"
@@ -482,7 +399,7 @@ TEST(ParserSection9b, ConditionalEventIffBasic) {
 }
 
 TEST(ParserSection9c, IffGuardAlwaysFF) {
-  // always_ff with iff guard on the sensitivity.
+
   auto r = Parse(
       "module m;\n"
       "  logic clk, en;\n"
@@ -498,9 +415,6 @@ TEST(ParserSection9c, IffGuardAlwaysFF) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with no edge qualifier (level-sensitive)
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardNoEdge) {
   auto r = Parse(
       "module m;\n"
@@ -531,9 +445,6 @@ TEST(ParserSection9b, ConditionalEventIffWithEdge) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with complex parenthesized condition
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardComplexCondition) {
   auto r = Parse(
       "module m;\n"
@@ -561,9 +472,6 @@ TEST(ParserSection9b, ConditionalEventIffMultipleEvents) {
   ASSERT_GE(item->sensitivity.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// Multiple events with iff on first only (or-separated)
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardMultipleOrFirst) {
   auto r = Parse(
       "module m;\n"
@@ -580,9 +488,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardMultipleOrFirst) {
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// Multiple events with iff on second only (or-separated)
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardMultipleOrSecond) {
   auto r = Parse(
       "module m;\n"
@@ -599,9 +504,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardMultipleOrSecond) {
   EXPECT_NE(item->sensitivity[1].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// Multiple events with iff on both (comma-separated)
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardBothComma) {
   auto r = Parse(
       "module m;\n"
@@ -616,9 +518,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardBothComma) {
   EXPECT_NE(item->sensitivity[1].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard with comparison operator
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardComparison) {
   auto r = Parse(
       "module m;\n"
@@ -632,9 +531,6 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardComparison) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// iff guard at always block level populates sensitivity vector
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysSensitivity) {
   auto r = Parse(
       "module m;\n"
@@ -646,16 +542,15 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysSensitivity) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  // The sensitivity list should have two entries.
+
   ASSERT_EQ(item->sensitivity.size(), 2u);
-  // First event has iff guard.
+
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-  // Second event has no iff guard.
+
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kPosedge);
 }
 
-// §9.4.2.3: iff qualifier on event expression
 TEST(ParserA605, EventExprIff) {
   auto r = Parse(
       "module m;\n"
@@ -671,7 +566,6 @@ TEST(ParserA605, EventExprIff) {
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
-// §9.4.2.3: posedge with iff qualifier
 TEST(ParserA605, EventExprPosedgeIff) {
   auto r = Parse(
       "module m;\n"
@@ -687,9 +581,7 @@ TEST(ParserA605, EventExprPosedgeIff) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
-// ---------------------------------------------------------------------------
-// iff guard at statement level inside initial (populates Stmt::events)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevel) {
   auto r = Parse(
       "module m;\n"
@@ -706,9 +598,7 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardStmtLevel) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
-// =============================================================================
-// LRM section 9.4.2 -- iff guards on event expressions
-// =============================================================================
+
 TEST(ParserSection9, IffGuardPosedgeEdge) {
   auto r = Parse(
       "module m;\n"
@@ -718,7 +608,7 @@ TEST(ParserSection9, IffGuardPosedgeEdge) {
   ASSERT_NE(r.cu, nullptr);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  // iff guard goes through always-block sensitivity path.
+
   ASSERT_EQ(item->sensitivity.size(), 1u);
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
@@ -805,4 +695,4 @@ TEST(ParserSection9, IffGuardStmtLevelEvent) {
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
-}  // namespace
+}

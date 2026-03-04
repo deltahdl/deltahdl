@@ -1,5 +1,3 @@
-// §6.9.2: Vector net accessibility
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -18,7 +16,7 @@ TEST(ParserA213, NetDeclScalared) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// 6. wire vectored logic [7:0] v; — vectored with explicit type.
+
 TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
   auto r = Parse(
       "module t;\n"
@@ -34,7 +32,6 @@ TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
   EXPECT_EQ(item->name, "v");
 }
 
-// 7. wire scalared logic [7:0] s; — scalared with explicit type.
 TEST(ParserSection6, Sec6_7_1_ScalaredWithExplicitType) {
   auto r = Parse(
       "module t;\n"
@@ -49,7 +46,7 @@ TEST(ParserSection6, Sec6_7_1_ScalaredWithExplicitType) {
   EXPECT_TRUE(item->data_type.is_scalared);
   EXPECT_EQ(item->name, "s");
 }
-// §6.7.1: Net with vectored qualifier.
+
 TEST(ParserSection6, Sec6_7_1_WireVectoredQualifier) {
   auto r = Parse(
       "module t;\n"
@@ -64,7 +61,6 @@ TEST(ParserSection6, Sec6_7_1_WireVectoredQualifier) {
   EXPECT_EQ(item->name, "v");
 }
 
-// §6.7.1: Net with scalared qualifier.
 TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
   auto r = Parse(
       "module t;\n"
@@ -79,4 +75,4 @@ TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
   EXPECT_EQ(item->name, "sc");
 }
 
-}  // namespace
+}

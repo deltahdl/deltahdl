@@ -1,5 +1,3 @@
-// Annex D.5: $key and $nokey
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- D.4: $key and $nokey ---
 TEST(ParserAnnexD2, AnnexDKeyNokey) {
   auto r = Parse(
       "module m;\n"
@@ -20,4 +17,4 @@ TEST(ParserAnnexD2, AnnexDKeyNokey) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

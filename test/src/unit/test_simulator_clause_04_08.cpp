@@ -9,7 +9,6 @@
 
 using namespace delta;
 
-// Process callback: q = 0, schedule update (p = q), schedule display read.
 static void ScheduleAssignAndDisplay(Scheduler& sched, int& q, int& p,
                                      int& display_out) {
   q = 0;
@@ -24,27 +23,16 @@ static void ScheduleAssignAndDisplay(Scheduler& sched, int& q, int& p,
   sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, display);
 }
 
-// ===========================================================================
-// §4.8 Race conditions
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.8 Expression evaluation and net update events intermingled.
-// Both kEvaluation and kUpdate events in the Active region execute — the
-// scheduler interleaves them.
-// ---------------------------------------------------------------------------
 TEST(SimCh48, EvalAndUpdateEventsIntermingleInActive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // An evaluation event.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() { order.push_back("eval"); };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
-  // An update event.
   auto* update = sched.GetEventPool().Acquire();
   update->kind = EventKind::kUpdate;
   update->callback = [&]() { order.push_back("update"); };
@@ -52,30 +40,22 @@ TEST(SimCh48, EvalAndUpdateEventsIntermingleInActive) {
 
   sched.Run();
   ASSERT_EQ(order.size(), 2u);
-  // Both events executed — order depends on implementation (FIFO here).
+
   EXPECT_TRUE((order[0] == "eval" && order[1] == "update") ||
               (order[0] == "update" && order[1] == "eval"));
 }
 
-// ---------------------------------------------------------------------------
-// §4.8 Blocking assignment triggers continuous assignment update event.
-// A blocking assignment that modifies a variable triggers an update event
-// (continuous assignment). Both the process continuation and the update event
-// are in the Active region.
-// ---------------------------------------------------------------------------
 TEST(SimCh48, BlockingAssignmentTriggersUpdateEvent) {
   Arena arena;
   Scheduler sched(arena);
   int q = 1;
   int p = 1;
 
-  // Simulate: at time 1, q = 0 (blocking assignment).
-  // This triggers an update event for p (continuous assignment: assign p = q).
   auto* assign_q = sched.GetEventPool().Acquire();
   assign_q->kind = EventKind::kEvaluation;
   assign_q->callback = [&]() {
     q = 0;
-    // The continuous assignment "assign p = q" triggers an update event.
+
     auto* update_p = sched.GetEventPool().Acquire();
     update_p->kind = EventKind::kUpdate;
     update_p->callback = [&]() { p = q; };
@@ -85,14 +65,9 @@ TEST(SimCh48, BlockingAssignmentTriggersUpdateEvent) {
 
   sched.Run();
   EXPECT_EQ(q, 0);
-  EXPECT_EQ(p, 0);  // Update event executed, p reflects new q.
+  EXPECT_EQ(p, 0);
 }
 
-// ---------------------------------------------------------------------------
-// §4.8 Update event races with process continuation.
-// The update event and the process continuation (next statement) are both
-// Active events — they race.
-// ---------------------------------------------------------------------------
 TEST(SimCh48, UpdateEventRacesWithProcessContinuation) {
   Arena arena;
   Scheduler sched(arena);
@@ -100,7 +75,6 @@ TEST(SimCh48, UpdateEventRacesWithProcessContinuation) {
   int q = 1;
   int display_value = -1;
 
-  // Process: q = 0 triggers update for p; $display(p) follows.
   auto* process = sched.GetEventPool().Acquire();
   process->kind = EventKind::kEvaluation;
   process->callback = [&]() {
@@ -109,22 +83,16 @@ TEST(SimCh48, UpdateEventRacesWithProcessContinuation) {
   sched.ScheduleEvent({1}, Region::kActive, process);
 
   sched.Run();
-  // Either value is valid per the LRM — depends on execution order.
+
   EXPECT_TRUE(display_value == 0 || display_value == 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.8 Both race outcomes are valid.
-// In our FIFO implementation, the update executes first (it was scheduled
-// first), so display sees the updated value.
-// ---------------------------------------------------------------------------
 TEST(SimCh48, BothRaceOutcomesAreValid) {
   Arena arena;
   Scheduler sched(arena);
   int p = 1;
   std::vector<int> observed_p;
 
-  // Two interleaved events: update p, then read p.
   auto* update_p = sched.GetEventPool().Acquire();
   update_p->kind = EventKind::kUpdate;
   update_p->callback = [&]() { p = 0; };
@@ -137,14 +105,10 @@ TEST(SimCh48, BothRaceOutcomesAreValid) {
 
   sched.Run();
   ASSERT_EQ(observed_p.size(), 1u);
-  // LRM says either old (1) or new (0) is correct.
+
   EXPECT_TRUE(observed_p[0] == 0 || observed_p[0] == 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.8 Full simulation of the assign/display race example.
-// Full simulation of the race condition across two time slots.
-// ---------------------------------------------------------------------------
 TEST(SimCh48, LRMExampleAssignPEqualsQ) {
   Arena arena;
   Scheduler sched(arena);
@@ -152,12 +116,11 @@ TEST(SimCh48, LRMExampleAssignPEqualsQ) {
   int p = 0;
   int display_result = -1;
 
-  // Time 0: q = 1 (initial block starts).
   auto* init_q = sched.GetEventPool().Acquire();
   init_q->kind = EventKind::kEvaluation;
   init_q->callback = [&]() {
     q = 1;
-    // Continuous assignment updates p.
+
     auto* update_p = sched.GetEventPool().Acquire();
     update_p->kind = EventKind::kUpdate;
     update_p->callback = [&]() { p = q; };
@@ -165,7 +128,6 @@ TEST(SimCh48, LRMExampleAssignPEqualsQ) {
   };
   sched.ScheduleEvent({0}, Region::kActive, init_q);
 
-  // Time 1: q = 0 and $display(p) — these race.
   auto* assign_zero = sched.GetEventPool().Acquire();
   assign_zero->kind = EventKind::kEvaluation;
   assign_zero->callback = [&]() {
@@ -174,16 +136,10 @@ TEST(SimCh48, LRMExampleAssignPEqualsQ) {
   sched.ScheduleEvent({1}, Region::kActive, assign_zero);
 
   sched.Run();
-  // At time 0: p should be 1 (q was set to 1, update propagated).
-  // At time 1: display_result is either 0 or 1 — both valid per LRM.
+
   EXPECT_TRUE(display_result == 0 || display_result == 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.8 Multiple update events race with each other.
-// Multiple update events from different continuous assignments all race
-// with each other and with evaluation events.
-// ---------------------------------------------------------------------------
 TEST(SimCh48, MultipleUpdateEventsRaceWithEachOther) {
   Arena arena;
   Scheduler sched(arena);
@@ -191,7 +147,6 @@ TEST(SimCh48, MultipleUpdateEventsRaceWithEachOther) {
   int b = 0;
   int c = 0;
 
-  // Three update events from different continuous assignments, all Active.
   auto* u1 = sched.GetEventPool().Acquire();
   u1->kind = EventKind::kUpdate;
   u1->callback = [&]() { a = 1; };
@@ -208,17 +163,12 @@ TEST(SimCh48, MultipleUpdateEventsRaceWithEachOther) {
   sched.ScheduleEvent({0}, Region::kActive, u3);
 
   sched.Run();
-  // All updates execute (order among them is nondeterministic per LRM).
+
   EXPECT_EQ(a, 1);
   EXPECT_EQ(b, 2);
   EXPECT_EQ(c, 3);
 }
 
-// ---------------------------------------------------------------------------
-// §4.8 Race condition across multiple nets.
-// A process writes to multiple variables with continuous assignments,
-// generating multiple racing update events.
-// ---------------------------------------------------------------------------
 TEST(SimCh48, RaceConditionAcrossMultipleNets) {
   Arena arena;
   Scheduler sched(arena);
@@ -229,7 +179,6 @@ TEST(SimCh48, RaceConditionAcrossMultipleNets) {
   int observed_net_x = -1;
   int observed_net_y = -1;
 
-  // Process: x = 10; y = 20; → triggers updates for net_x and net_y.
   auto* process = sched.GetEventPool().Acquire();
   process->kind = EventKind::kEvaluation;
   process->callback = [&]() {
@@ -246,7 +195,6 @@ TEST(SimCh48, RaceConditionAcrossMultipleNets) {
     uy->callback = [&]() { net_y = y; };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, uy);
 
-    // Observe values — races with the updates.
     auto* observe = sched.GetEventPool().Acquire();
     observe->kind = EventKind::kEvaluation;
     observe->callback = [&]() {
@@ -258,19 +206,14 @@ TEST(SimCh48, RaceConditionAcrossMultipleNets) {
   sched.ScheduleEvent({0}, Region::kActive, process);
 
   sched.Run();
-  // Both nets ultimately have correct values.
+
   EXPECT_EQ(net_x, 10);
   EXPECT_EQ(net_y, 20);
-  // Observed values depend on race — either old or new is valid.
+
   EXPECT_TRUE(observed_net_x == 0 || observed_net_x == 10);
   EXPECT_TRUE(observed_net_y == 0 || observed_net_y == 20);
 }
 
-// ---------------------------------------------------------------------------
-// §4.8 Evaluation and update event kinds are distinct.
-// Both kEvaluation and kUpdate EventKind tags are distinct, and both
-// execute in the Active region — the scheduler dispatches both.
-// ---------------------------------------------------------------------------
 TEST(SimCh48, EvalAndUpdateEventKindsDistinct) {
   Arena arena;
   Scheduler sched(arena);
@@ -288,44 +231,33 @@ TEST(SimCh48, EvalAndUpdateEventKindsDistinct) {
 
   sched.Run();
   ASSERT_EQ(kinds.size(), 2u);
-  // Both kinds executed; they are distinct enum values.
+
   EXPECT_NE(EventKind::kEvaluation, EventKind::kUpdate);
   EXPECT_EQ(kinds[0], EventKind::kEvaluation);
   EXPECT_EQ(kinds[1], EventKind::kUpdate);
 }
 
-// ---------------------------------------------------------------------------
-// §4.8 Race conditions only arise when events are in the SAME region.
-// Events in different regions have deterministic ordering (§4.5) — no race.
-// ---------------------------------------------------------------------------
 TEST(SimCh48, NoRaceBetweenDifferentRegions) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
   int observed = -1;
 
-  // Active region: set value.
   auto* active = sched.GetEventPool().Acquire();
   active->kind = EventKind::kUpdate;
   active->callback = [&]() { value = 42; };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
-  // NBA region: read value — deterministically after Active.
   auto* nba = sched.GetEventPool().Acquire();
   nba->kind = EventKind::kEvaluation;
   nba->callback = [&]() { observed = value; };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
   sched.Run();
-  // No race: NBA always executes after Active (§4.5 region ordering).
+
   EXPECT_EQ(observed, 42);
 }
 
-// ---------------------------------------------------------------------------
-// §4.8 NBAs eliminate Active-region races.
-// Using nonblocking assignments (NBA region) ensures updates happen in a
-// separate phase, eliminating the Active-region race.
-// ---------------------------------------------------------------------------
 TEST(SimCh48, NBAEliminatesActiveRegionRace) {
   Arena arena;
   Scheduler sched(arena);
@@ -333,17 +265,15 @@ TEST(SimCh48, NBAEliminatesActiveRegionRace) {
   int p = 1;
   int display_value = -1;
 
-  // Process in Active: q <= 0 (NBA), then $display(p).
   auto* process = sched.GetEventPool().Acquire();
   process->kind = EventKind::kEvaluation;
   process->callback = [&]() {
-    // Schedule NBA for q.
+
     auto* nba_q = sched.GetEventPool().Acquire();
     nba_q->kind = EventKind::kUpdate;
     nba_q->callback = [&]() {
       q = 0;
-      // Continuous assignment: schedule update for p in Active (next
-      // iteration).
+
       auto* update_p = sched.GetEventPool().Acquire();
       update_p->kind = EventKind::kUpdate;
       update_p->callback = [&]() { p = q; };
@@ -351,15 +281,13 @@ TEST(SimCh48, NBAEliminatesActiveRegionRace) {
     };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba_q);
 
-    // $display(p) in Active — runs before NBA region.
     display_value = p;
   };
   sched.ScheduleEvent({0}, Region::kActive, process);
 
   sched.Run();
-  // $display(p) in Active sees old value of p (1), because NBA hasn't
-  // fired yet. No race — deterministic ordering.
+
   EXPECT_EQ(display_value, 1);
-  // After NBA + re-iteration, p is updated.
+
   EXPECT_EQ(p, 0);
 }

@@ -1,14 +1,9 @@
-// §28.3.3: The delay specification
-
 #include <gtest/gtest.h>
 
 #include "model_gate_declaration.h"
 
 namespace {
 
-// --- §28.3.3: Delay specification ---
-// §28.3.3: "pullup and pulldown instance declarations shall not include
-//  delay specifications."
 TEST(GateDecl, MaxDelaysByGateType) {
   struct {
     GateType gate;
@@ -22,4 +17,4 @@ TEST(GateDecl, MaxDelaysByGateType) {
   }
 }
 
-}  // namespace
+}

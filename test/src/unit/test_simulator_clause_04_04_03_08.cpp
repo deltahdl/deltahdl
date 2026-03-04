@@ -10,20 +10,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.4.3.8 Post-Re-NBA PLI region
-//
-// Figure 4-1 shows:
-//   region_ReNBA -> pli_region_PostReNBA -> pli_region_PrePostponed
-//
-// The Post-Re-NBA region is a read-write PLI callback control point.
-// Post-Re-NBA is part of the reactive region set (§4.4.1 iterative regions).
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.4.3.8 Post-Re-NBA PLI callback control point
-// Basic: events scheduled in the Post-Re-NBA region are executed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBARegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
@@ -37,22 +23,16 @@ TEST(SimCh4438, PostReNBARegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.8 Post-Re-NBA can read values
-// A Post-Re-NBA callback can read state set by an earlier region.
-// ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBACanReadValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
   int sampled = -1;
 
-  // Re-NBA sets value = 42.
   auto* re_nba = sched.GetEventPool().Acquire();
   re_nba->callback = [&]() { value = 42; };
   sched.ScheduleEvent({0}, Region::kReNBA, re_nba);
 
-  // Post-Re-NBA reads value — should see 42.
   auto* ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPostReNBA, ev);
@@ -61,22 +41,16 @@ TEST(SimCh4438, PostReNBACanReadValues) {
   EXPECT_EQ(sampled, 42);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.8 Post-Re-NBA can write values
-// A Post-Re-NBA callback can modify state that later regions will observe.
-// ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBACanWriteValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
   int sampled_in_pre_postponed = -1;
 
-  // Post-Re-NBA writes a value.
   auto* post_re_nba = sched.GetEventPool().Acquire();
   post_re_nba->callback = [&]() { value = 99; };
   sched.ScheduleEvent({0}, Region::kPostReNBA, post_re_nba);
 
-  // Pre-Postponed reads the value — should see 99.
   auto* pre_postponed = sched.GetEventPool().Acquire();
   pre_postponed->callback = [&]() { sampled_in_pre_postponed = value; };
   sched.ScheduleEvent({0}, Region::kPrePostponed, pre_postponed);
@@ -85,10 +59,6 @@ TEST(SimCh4438, PostReNBACanWriteValues) {
   EXPECT_EQ(sampled_in_pre_postponed, 99);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.8 Post-Re-NBA can create events
-// A Post-Re-NBA callback can schedule new events (e.g., into Pre-Postponed).
-// ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBACanCreateEvents) {
   Arena arena;
   Scheduler sched(arena);
@@ -97,7 +67,7 @@ TEST(SimCh4438, PostReNBACanCreateEvents) {
   auto* post_re_nba = sched.GetEventPool().Acquire();
   post_re_nba->callback = [&]() {
     order.push_back("post_re_nba");
-    // Create an event in the Pre-Postponed region from Post-Re-NBA.
+
     auto* new_ev = sched.GetEventPool().Acquire();
     new_ev->callback = [&order]() { order.push_back("created_pre_postponed"); };
     sched.ScheduleEvent({0}, Region::kPrePostponed, new_ev);
@@ -110,16 +80,11 @@ TEST(SimCh4438, PostReNBACanCreateEvents) {
   EXPECT_EQ(order[1], "created_pre_postponed");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.8 Post-Re-NBA executes after Re-NBA
-// Post-Re-NBA executes after Re-NBA in the same time slot.
-// ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBAExecutesAfterReNBA) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Schedule Post-Re-NBA first, then Re-NBA — ordering must still hold.
   auto* post_re_nba = sched.GetEventPool().Acquire();
   post_re_nba->callback = [&]() { order.push_back("post_re_nba"); };
   sched.ScheduleEvent({0}, Region::kPostReNBA, post_re_nba);
@@ -134,20 +99,12 @@ TEST(SimCh4438, PostReNBAExecutesAfterReNBA) {
   EXPECT_EQ(order[1], "post_re_nba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.8 + Figure 4-1: ReNBA -> PostReNBA -> PrePostponed.
-// Post-Re-NBA executes after Re-NBA and before Pre-Postponed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBAExecutesAfterReNBABeforePrePostponed) {
   VerifyThreeRegionOrder({Region::kReNBA, "re_nba"},
                          {Region::kPostReNBA, "post_re_nba"},
                          {Region::kPrePostponed, "pre_postponed"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.8 Post-Re-NBA is part of the reactive region set (§4.4.1).
-// Its ordinal lies between Re-NBA and Pre-Postponed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBAIsWithinReactiveRegionSet) {
   auto post_re_nba_ord = static_cast<int>(Region::kPostReNBA);
   auto re_nba_ord = static_cast<int>(Region::kReNBA);
@@ -156,10 +113,6 @@ TEST(SimCh4438, PostReNBAIsWithinReactiveRegionSet) {
   EXPECT_LT(post_re_nba_ord, pre_postponed_ord);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.8 Multiple Post-Re-NBA callbacks
-// Multiple PLI callbacks coexist in the Post-Re-NBA region and all execute.
-// ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBARegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
@@ -175,10 +128,6 @@ TEST(SimCh4438, PostReNBARegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.8 Post-Re-NBA events across multiple time slots.
-// Each time slot has its own Post-Re-NBA region evaluation.
-// ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBAEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
@@ -199,12 +148,6 @@ TEST(SimCh4438, PostReNBAEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.8 Post-Re-NBA read-write capability
-// Post-Re-NBA is read-write. A Post-Re-NBA callback reads state that Re-NBA
-// set earlier and overwrites it; a later Pre-Postponed callback sees the
-// Post-Re-NBA modification. This verifies read-write capability in context.
-// ---------------------------------------------------------------------------
 TEST(SimCh4438, PostReNBAReadWriteInReactiveRegionSetContext) {
   Arena arena;
   Scheduler sched(arena);
@@ -212,12 +155,10 @@ TEST(SimCh4438, PostReNBAReadWriteInReactiveRegionSetContext) {
   int re_nba_sample = -1;
   int pre_postponed_sample = -1;
 
-  // Re-NBA writes value = 10.
   auto* re_nba = sched.GetEventPool().Acquire();
   re_nba->callback = [&]() { value = 10; };
   sched.ScheduleEvent({0}, Region::kReNBA, re_nba);
 
-  // Post-Re-NBA reads the Re-NBA-set value and overwrites it to 55.
   auto* post_re_nba = sched.GetEventPool().Acquire();
   post_re_nba->callback = [&]() {
     re_nba_sample = value;
@@ -225,7 +166,6 @@ TEST(SimCh4438, PostReNBAReadWriteInReactiveRegionSetContext) {
   };
   sched.ScheduleEvent({0}, Region::kPostReNBA, post_re_nba);
 
-  // Pre-Postponed samples value — should see 55 from Post-Re-NBA.
   auto* pre_postponed = sched.GetEventPool().Acquire();
   pre_postponed->callback = [&]() { pre_postponed_sample = value; };
   sched.ScheduleEvent({0}, Region::kPrePostponed, pre_postponed);

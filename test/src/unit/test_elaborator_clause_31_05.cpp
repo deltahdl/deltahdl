@@ -1,12 +1,9 @@
-// §31.5: Edge-control specifiers
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// edge_control_specifier with x transitions elaborates
 TEST(ElabA70503, EdgeControlSpecifierXTransitionsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,10 +17,6 @@ TEST(ElabA70503, EdgeControlSpecifierXTransitionsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// =============================================================================
-// A.7.5.3 Elab — edge_control_specifier
-// =============================================================================
-// edge_control_specifier with 01, 10 descriptors elaborates
 TEST(ElabA70503, EdgeControlSpecifier01_10Elaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +30,6 @@ TEST(ElabA70503, EdgeControlSpecifier01_10Elaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// timing_check_event with edge keyword elaborates
 TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,4 +43,4 @@ TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

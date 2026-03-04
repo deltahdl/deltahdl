@@ -1,12 +1,10 @@
-// §11.12: Let construct
-
 #include <cstring>
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-#include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -24,7 +22,7 @@ namespace {
 
 TEST(EvalAdv, LetExpandSimple) {
   SimFixture f;
-  // let add1(a) = a + 1;
+
   FunctionArg arg;
   arg.name = "a";
   auto* body = f.arena.Create<Expr>();
@@ -35,7 +33,6 @@ TEST(EvalAdv, LetExpandSimple) {
   auto* decl = MakeLetDecl(f.arena, "add1", body, {arg});
   f.ctx.RegisterLetDecl("add1", decl);
 
-  // add1(5) should return 6.
   auto* call = MakeCall(f.arena, "add1", {MakeInt(f.arena, 5)});
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 6u);
@@ -43,7 +40,7 @@ TEST(EvalAdv, LetExpandSimple) {
 
 TEST(EvalAdv, LetExpandDefaultArg) {
   SimFixture f;
-  // let inc(a, b = 1) = a + b;
+
   FunctionArg arg_a;
   arg_a.name = "a";
   FunctionArg arg_b;
@@ -57,7 +54,6 @@ TEST(EvalAdv, LetExpandDefaultArg) {
   auto* decl = MakeLetDecl(f.arena, "inc", body, {arg_a, arg_b});
   f.ctx.RegisterLetDecl("inc", decl);
 
-  // inc(10) — uses default b=1, should return 11.
   auto* call = MakeCall(f.arena, "inc", {MakeInt(f.arena, 10)});
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 11u);
@@ -65,8 +61,7 @@ TEST(EvalAdv, LetExpandDefaultArg) {
 
 TEST(EvalAdv, LetNoRecursive) {
   SimFixture f;
-  // let bad(a) = bad(a + 1); — recursive, should return X (not infinite
-  // loop).
+
   auto* body_call = MakeCall(f.arena, "bad", {[&]() {
                                auto* e = f.arena.Create<Expr>();
                                e->kind = ExprKind::kBinary;
@@ -82,20 +77,18 @@ TEST(EvalAdv, LetNoRecursive) {
 
   auto* call = MakeCall(f.arena, "bad", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(call, f.ctx, f.arena);
-  // Should not infinite loop; returns X (bval != 0) or 0.
+
   EXPECT_TRUE(result.nwords > 0);
 }
 
 TEST(EvalAdv, LetDeclarativeScope) {
   SimFixture f;
-  // let get_k() = K;
-  // K is set in the outer scope before let registration.
+
   MakeVar(f, "K", 32, 42);
   auto* body = MakeId(f.arena, "K");
   auto* decl = MakeLetDecl(f.arena, "get_k", body);
   f.ctx.RegisterLetDecl("get_k", decl);
 
-  // get_k() should access K=42 from declaration scope.
   auto* call = MakeCall(f.arena, "get_k", {});
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
@@ -139,18 +132,16 @@ static ModuleItem* SLMakeLetDecl(Arena& arena, std::string_view name,
 
 TEST(Assertion, LetWithPastInBody) {
   SampledLetFixture f;
-  // let get_past(x) = $past(x);
+
   FunctionArg arg;
   arg.name = "x";
   auto* body = SLMakeSysCall(f.arena, "$past", {SLMakeId(f.arena, "x")});
   auto* decl = SLMakeLetDecl(f.arena, "get_past", body, {arg});
   f.ctx.RegisterLetDecl("get_past", decl);
 
-  // Create variable sig = 42.
   auto* var = f.ctx.CreateVariable("sig", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 42);
 
-  // get_past(sig) → let expansion → $past(x) with x=42 → stub returns 42.
   auto* call = SLMakeCall(f.arena, "get_past", {SLMakeId(f.arena, "sig")});
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
@@ -158,7 +149,7 @@ TEST(Assertion, LetWithPastInBody) {
 
 TEST(Assertion, LetWithChangedInBody) {
   SampledLetFixture f;
-  // let check_changed(x) = $changed(x);
+
   FunctionArg arg;
   arg.name = "x";
   auto* body = SLMakeSysCall(f.arena, "$changed", {SLMakeId(f.arena, "x")});
@@ -168,8 +159,6 @@ TEST(Assertion, LetWithChangedInBody) {
   auto* var = f.ctx.CreateVariable("sig2", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 5);
 
-  // check_changed(sig2) → let expansion → $changed(x) with x=5 → stub returns
-  // 0.
   auto* call =
       SLMakeCall(f.arena, "check_changed", {SLMakeId(f.arena, "sig2")});
   auto result = EvalExpr(call, f.ctx, f.arena);
@@ -178,7 +167,7 @@ TEST(Assertion, LetWithChangedInBody) {
 
 TEST(Assertion, LetWithSampledInBody) {
   SampledLetFixture f;
-  // let get_sampled(x) = $sampled(x);
+
   FunctionArg arg;
   arg.name = "x";
   auto* body = SLMakeSysCall(f.arena, "$sampled", {SLMakeId(f.arena, "x")});
@@ -188,10 +177,9 @@ TEST(Assertion, LetWithSampledInBody) {
   auto* var = f.ctx.CreateVariable("sig3", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 99);
 
-  // get_sampled(sig3) → let expansion → $sampled(x) with x=99 → returns 99.
   auto* call = SLMakeCall(f.arena, "get_sampled", {SLMakeId(f.arena, "sig3")});
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 99u);
 }
 
-}  // namespace
+}

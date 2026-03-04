@@ -1,12 +1,9 @@
-// §8.19: Constant class properties
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// §8.19 — Constant class properties
 TEST(ParserSection8, ConstProperty) {
   auto r = Parse(
       "class MyClass;\n"
@@ -20,7 +17,6 @@ TEST(ParserSection8, ConstProperty) {
   EXPECT_EQ(cls->members[0]->name, "MAX");
 }
 
-// §8.9 — Static property with const
 TEST(ParserSection8, StaticConstProperty) {
   auto r = Parse(
       "class Config;\n"
@@ -34,7 +30,6 @@ TEST(ParserSection8, StaticConstProperty) {
   EXPECT_TRUE(cls->members[0]->is_const);
 }
 
-// class_property ::= const { class_item_qualifier } data_type id [ = expr ] ;
 TEST(SourceText, ClassConstProperty) {
   auto r = Parse(
       "class C;\n"
@@ -52,4 +47,4 @@ TEST(SourceText, ClassConstProperty) {
   EXPECT_TRUE(members[1]->is_static);
 }
 
-}  // namespace
+}

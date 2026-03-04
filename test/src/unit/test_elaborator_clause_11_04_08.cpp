@@ -1,5 +1,3 @@
-// §11.4.8: Bitwise operators
-
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
@@ -16,7 +14,6 @@ TEST(ConstEval, Bitwise) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("5 ^ 3", f)), 6);
 }
 
-// § expression — unary operator in initial elaborates
 TEST(ElabA83, UnaryExprInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -41,7 +38,6 @@ TEST(ElabA86, UnaryBitwiseNotElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § binary_operator — bitwise operators elaborate
 TEST(ElabA86, BinaryBitwiseXnorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -54,9 +50,6 @@ TEST(ElabA86, BinaryBitwiseXnorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// 14. Part-select via mask in always_comb (lower nibble).
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombPartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -80,9 +73,6 @@ TEST(SimCh9, AlwaysCombPartSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
 }
 
-// ---------------------------------------------------------------------------
-// 29. always_comb with NAND expression (~(a & b)), masked to width.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombNand) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -104,13 +94,10 @@ TEST(SimCh9b, AlwaysCombNand) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // ~(0xFF & 0x0F) = ~0x0F = 0xF0 in the low 8 bits.
+
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xF0u);
 }
 
-// ---------------------------------------------------------------------------
-// 30. always_comb with chained combinational logic: a XOR b, then OR c.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombChainedLogic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -133,13 +120,10 @@ TEST(SimCh9b, AlwaysCombChainedLogic) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // (0xA0 ^ 0x50) | 0x0F = 0xF0 | 0x0F = 0xFF.
+
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// 18. Blocking assignment with bitwise operators (&, |, ^).
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBitwiseOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -159,4 +143,4 @@ TEST(SimCh10, BlockingAssignBitwiseOps) {
                    {{"r_and", 48u}, {"r_or", 252u}, {"r_xor", 204u}});
 }
 
-}  // namespace
+}

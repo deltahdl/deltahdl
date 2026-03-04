@@ -1,5 +1,3 @@
-// §6.23: Type operator
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.23: type(expr) in variable declaration resolves type.
 TEST(SimCh6, TypeRefVarDecl) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,17 +26,11 @@ TEST(SimCh6, TypeRefVarDecl) {
 
   auto* var = f.ctx.FindVariable("b");
   ASSERT_NE(var, nullptr);
-  // type(a) = int → 32-bit width
+
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 100u);
 }
 
-// --------------------------------------------------------------------------
-// §6.11.1: type(expression) used in `var type(expr) name;` declarations.
-// The type operator resolves to the same type, width, and signedness as
-// the referenced expression.
-// --------------------------------------------------------------------------
-// 1. type() with int: resolves to 32-bit signed.
 TEST(SimCh6b, TypeOpInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -65,7 +56,6 @@ TEST(SimCh6b, TypeOpInt) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// 2. type() with logic: resolves to 1-bit unsigned.
 TEST(SimCh6b, TypeOpLogic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -91,7 +81,6 @@ TEST(SimCh6b, TypeOpLogic) {
   EXPECT_FALSE(var->is_signed);
 }
 
-// 3. type() with byte: resolves to 8-bit signed.
 TEST(SimCh6b, TypeOpByte) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -117,7 +106,6 @@ TEST(SimCh6b, TypeOpByte) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// 4. type() with shortint: resolves to 16-bit signed.
 TEST(SimCh6b, TypeOpShortint) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -143,7 +131,6 @@ TEST(SimCh6b, TypeOpShortint) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// 5. type() with longint: resolves to 64-bit signed.
 TEST(SimCh6b, TypeOpLongint) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -169,7 +156,6 @@ TEST(SimCh6b, TypeOpLongint) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// 6. type() with integer: resolves to 32-bit signed (4-state).
 TEST(SimCh6b, TypeOpInteger) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -195,7 +181,6 @@ TEST(SimCh6b, TypeOpInteger) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// 7. type() with real: resolves to 64-bit real variable.
 TEST(SimCh6b, TypeOpReal) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -219,7 +204,6 @@ TEST(SimCh6b, TypeOpReal) {
   EXPECT_EQ(var->value.width, 64u);
 }
 
-// 8. type() preserves signed flag from int source.
 TEST(SimCh6b, TypeOpPreservesSignedInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -238,11 +222,10 @@ TEST(SimCh6b, TypeOpPreservesSignedInt) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->is_signed);
-  // -1 in 32-bit = 0xFFFFFFFF.
+
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-// 9. type() preserves unsigned flag from scalar logic source.
 TEST(SimCh6b, TypeOpPreservesUnsignedLogic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -264,7 +247,6 @@ TEST(SimCh6b, TypeOpPreservesUnsignedLogic) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// 10. type() with shortint source: 16-bit width preserved via type operator.
 TEST(SimCh6b, TypeOpShortintWidth16) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -286,7 +268,6 @@ TEST(SimCh6b, TypeOpShortintWidth16) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-// 11. type() with integer source: 32-bit width preserved via type operator.
 TEST(SimCh6b, TypeOpIntegerWidth32) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -308,7 +289,6 @@ TEST(SimCh6b, TypeOpIntegerWidth32) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-// 12. type() preserves width across assignment — value truncated to type width.
 TEST(SimCh6b, TypeOpWidthTruncation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -327,7 +307,7 @@ TEST(SimCh6b, TypeOpWidthTruncation) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
-  // 0xFFFF truncated to 8 bits = 0xFF.
+
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
@@ -343,7 +323,6 @@ static void LowerRunAndCompareWidths(SimFixture& f, RtlirDesign* design,
   EXPECT_EQ(va_out->value.width, vb_out->value.width);
 }
 
-// 13. type() referencing int, both variables assigned different values.
 TEST(SimCh6b, TypeOpIntDifferentValues) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -365,7 +344,6 @@ TEST(SimCh6b, TypeOpIntDifferentValues) {
   EXPECT_EQ(vb->value.ToUint64(), 2000u);
 }
 
-// 14. type() with signed shortint — verify sign extension on assignment.
 TEST(SimCh6b, TypeOpShortintSignExtension) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -390,11 +368,10 @@ TEST(SimCh6b, TypeOpShortintSignExtension) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 16u);
   EXPECT_TRUE(var->is_signed);
-  // -1 in 16 bits = 0xFFFF.
+
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
 }
 
-// 16. type() used with parameter default value type (parameter type T = int).
 TEST(SimCh6b, TypeOpParameterTypeDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -420,7 +397,6 @@ TEST(SimCh6b, TypeOpParameterTypeDefault) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// 17. type() with enum-typed variable preserves 32-bit enum width.
 TEST(SimCh6b, TypeOpEnumType) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -442,12 +418,11 @@ TEST(SimCh6b, TypeOpEnumType) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // enum default base type is int (32-bit).
+
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// 18. type() referencing byte preserves 8-bit width in computation.
 TEST(SimCh6b, TypeOpByteComputation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -469,11 +444,10 @@ TEST(SimCh6b, TypeOpByteComputation) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
-  // 100 + 50 = 150, which fits in 8 bits.
+
   EXPECT_EQ(var->value.ToUint64(), 150u);
 }
 
-// 19. type() with int preserves width when result overflows.
 TEST(SimCh6b, TypeOpIntOverflow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -492,11 +466,10 @@ TEST(SimCh6b, TypeOpIntOverflow) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
-  // Truncated to 32 bits: 0x12345678.
+
   EXPECT_EQ(var->value.ToUint64(), 0x12345678u);
 }
 
-// 20. type() on int, verify both source and destination have same width.
 TEST(SimCh6b, TypeOpMatchingWidths) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -517,7 +490,6 @@ TEST(SimCh6b, TypeOpMatchingWidths) {
   EXPECT_EQ(va->is_signed, vb->is_signed);
 }
 
-// 21. type() with byte, verify full 8-bit range.
 TEST(SimCh6b, TypeOpByteFullRange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -539,7 +511,6 @@ TEST(SimCh6b, TypeOpByteFullRange) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// 22. type() with longint source: 64-bit value preserved.
 TEST(SimCh6b, TypeOpLongintFullValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -561,7 +532,6 @@ TEST(SimCh6b, TypeOpLongintFullValue) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEDEADBEEFu);
 }
 
-// 24. type() with longint, assign max value.
 TEST(SimCh6b, TypeOpLongintMaxValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -584,7 +554,6 @@ TEST(SimCh6b, TypeOpLongintMaxValue) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// 25. type() with shortint, assign zero.
 TEST(SimCh6b, TypeOpShortintZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -607,7 +576,6 @@ TEST(SimCh6b, TypeOpShortintZero) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// 26. type() with byte preserves signedness in arithmetic context.
 TEST(SimCh6b, TypeOpByteArithmeticSigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -630,11 +598,10 @@ TEST(SimCh6b, TypeOpByteArithmeticSigned) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_TRUE(var->is_signed);
-  // 100 + 55 = 155.
+
   EXPECT_EQ(var->value.ToUint64(), 155u);
 }
 
-// 27. type() with int, chained: type(a) b, type(b) c.
 TEST(SimCh6b, TypeOpChainedTypeRef) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -662,7 +629,6 @@ TEST(SimCh6b, TypeOpChainedTypeRef) {
   EXPECT_TRUE(vc->is_signed);
 }
 
-// 28. type() with int, value preserved after multiple assignments.
 TEST(SimCh6b, TypeOpMultipleAssignments) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -688,7 +654,6 @@ TEST(SimCh6b, TypeOpMultipleAssignments) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// 29. type() with shortint, assign max unsigned 16-bit value.
 TEST(SimCh6b, TypeOpShortintMaxUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -711,7 +676,6 @@ TEST(SimCh6b, TypeOpShortintMaxUnsigned) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// 30. type() from byte, assigned via expression from wider variable.
 TEST(SimCh6b, TypeOpByteFromWiderAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -734,9 +698,9 @@ TEST(SimCh6b, TypeOpByteFromWiderAssignment) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
-  // 0x12345678 truncated to 8 bits = 0x78.
+
   EXPECT_EQ(var->value.ToUint64(), 0x78u);
   EXPECT_TRUE(var->is_signed);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// Annex H.9.3: Working with DPI context tasks and functions in C code
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -25,14 +23,10 @@ TEST(DpiRuntime, SetAndGetScope) {
   rt.PopScope();
   EXPECT_EQ(rt.CurrentScope(), nullptr);
 
-  // Restore scope.
   rt.SetScope(saved);
   EXPECT_EQ(rt.GetScope(), saved);
 }
 
-// =============================================================================
-// DPI scope functions (Annex I)
-// =============================================================================
 TEST(SvDpi, ScopeGetSetRoundTrip) {
   svScope old_scope = svGetScope();
   int dummy = 42;
@@ -43,4 +37,4 @@ TEST(SvDpi, ScopeGetSetRoundTrip) {
   svSetScope(old_scope);
 }
 
-}  // namespace
+}

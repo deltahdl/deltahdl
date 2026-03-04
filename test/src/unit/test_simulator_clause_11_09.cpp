@@ -1,23 +1,18 @@
-// §11.9: Tagged union expressions and member access
-
 #include <cstring>
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-#include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
 namespace {
 
-// ==========================================================================
-// §11.9: Tagged union — tag mismatch returns X
-// ==========================================================================
 TEST(EvalAdv, TaggedUnionMismatchReturnsX) {
   SimFixture f;
-  // Create a tagged union type with members a (8-bit) and b (8-bit).
+
   StructTypeInfo uinfo;
   uinfo.type_name = "tagged_u";
   uinfo.is_union = true;
@@ -27,12 +22,10 @@ TEST(EvalAdv, TaggedUnionMismatchReturnsX) {
   uinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
   f.ctx.RegisterStructType("tagged_u", uinfo);
 
-  // Create variable "u" with value 0x42 and tag "a".
   MakeVar(f, "u", 8, 0x42);
   f.ctx.SetVariableStructType("u", "tagged_u");
   f.ctx.SetVariableTag("u", "a");
 
-  // Access u.a — tag matches, should return 0x42.
   auto* access_a = f.arena.Create<Expr>();
   access_a->kind = ExprKind::kMemberAccess;
   access_a->lhs = MakeId(f.arena, "u");
@@ -40,20 +33,19 @@ TEST(EvalAdv, TaggedUnionMismatchReturnsX) {
   auto result_a = EvalExpr(access_a, f.ctx, f.arena);
   EXPECT_EQ(result_a.ToUint64(), 0x42u);
 
-  // Access u.b — tag mismatch (active tag is "a"), should return X.
   auto* access_b = f.arena.Create<Expr>();
   access_b->kind = ExprKind::kMemberAccess;
   access_b->lhs = MakeId(f.arena, "u");
   access_b->rhs = MakeId(f.arena, "b");
   auto result_b = EvalExpr(access_b, f.ctx, f.arena);
-  // X means bval all-1s.
+
   EXPECT_NE(result_b.nwords, 0u);
   EXPECT_NE(result_b.words[0].bval, 0u);
 }
 
 TEST(EvalAdv, TaggedUnionNoTagSetAccessesNormally) {
   SimFixture f;
-  // Union without a tag set should still allow access.
+
   StructTypeInfo uinfo;
   uinfo.type_name = "simple_u";
   uinfo.is_union = true;
@@ -64,7 +56,7 @@ TEST(EvalAdv, TaggedUnionNoTagSetAccessesNormally) {
 
   MakeVar(f, "v", 8, 0xFF);
   f.ctx.SetVariableStructType("v", "simple_u");
-  // No tag set — access v.x should return the value normally.
+
   auto* access_x = f.arena.Create<Expr>();
   access_x->kind = ExprKind::kMemberAccess;
   access_x->lhs = MakeId(f.arena, "v");
@@ -73,12 +65,9 @@ TEST(EvalAdv, TaggedUnionNoTagSetAccessesNormally) {
   EXPECT_EQ(result_x.ToUint64(), 0xFFu);
 }
 
-// ==========================================================================
-// §11.9: Tagged union expressions
-// ==========================================================================
 TEST(EvalAdv, TaggedExprWithValue) {
   SimFixture f;
-  // tagged Valid 42 → evaluates to 42.
+
   auto* tagged = f.arena.Create<Expr>();
   tagged->kind = ExprKind::kTagged;
   auto* member = f.arena.Create<Expr>();
@@ -92,7 +81,7 @@ TEST(EvalAdv, TaggedExprWithValue) {
 
 TEST(EvalAdv, TaggedExprVoidMember) {
   SimFixture f;
-  // tagged Invalid (void member, no value) → 0.
+
   auto* tagged = f.arena.Create<Expr>();
   tagged->kind = ExprKind::kTagged;
   auto* member = f.arena.Create<Expr>();
@@ -104,12 +93,6 @@ TEST(EvalAdv, TaggedExprVoidMember) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// =============================================================================
-// Helper fixture
-// =============================================================================
-// =============================================================================
-// §11.9 Tagged union — tag tracking
-// =============================================================================
 TEST(TaggedUnion, SetAndGetTag) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("u", 32);
@@ -119,4 +102,4 @@ TEST(TaggedUnion, SetAndGetTag) {
   EXPECT_EQ(f.ctx.GetVariableTag("u"), "field_a");
 }
 
-}  // namespace
+}

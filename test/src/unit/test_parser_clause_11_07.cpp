@@ -1,14 +1,9 @@
-// §11.7: Signed expressions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =========================================================================
-// Section 11.7 -- Signed expressions ($signed, $unsigned)
-// =========================================================================
 TEST(ParserSection11, SignedSystemCall) {
   auto r = Parse(
       "module t;\n"
@@ -35,4 +30,4 @@ TEST(ParserSection11, UnsignedSystemCall) {
   EXPECT_EQ(rhs->callee, "$unsigned");
 }
 
-}  // namespace
+}

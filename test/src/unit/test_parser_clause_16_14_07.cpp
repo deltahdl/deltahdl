@@ -1,5 +1,3 @@
-// §16.14.7: Inferred clocking and disable functions
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -24,10 +22,6 @@ TEST_F(VerifyParseTest, CheckerContextInferenceImplicit) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.14.7 -- Inferred clocking and disable functions
-// =============================================================================
 TEST(ParserSection16, InferredClockInProperty) {
   auto r = Parse(
       "module m;\n"
@@ -65,4 +59,4 @@ TEST(ParserSection16, InferredClockAndDisableTogether) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

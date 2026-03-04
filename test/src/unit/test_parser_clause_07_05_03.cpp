@@ -1,11 +1,8 @@
-// §7.5.3: Delete()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
 TEST(ParserSection7c, DynamicArrayDelete) {
@@ -34,4 +31,4 @@ TEST(ParserSection7, DynamicArrayDeleteMethod) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

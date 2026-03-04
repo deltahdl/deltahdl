@@ -1,5 +1,3 @@
-// §9.2.2.2: Combinational logic always_comb procedure
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// 10. Two always_comb blocks in the same module.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, MultipleAlwaysCombBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -41,9 +36,6 @@ TEST(SimCh9, MultipleAlwaysCombBlocks) {
   EXPECT_EQ(d->value.ToUint64(), 10u);
 }
 
-// ---------------------------------------------------------------------------
-// 12. Multiple outputs from one always_comb block.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombMultipleOutputs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -69,9 +61,6 @@ TEST(SimCh9, AlwaysCombMultipleOutputs) {
   EXPECT_EQ(inc->value.ToUint64(), 26u);
 }
 
-// ---------------------------------------------------------------------------
-// 28. always_comb with explicit zero inputs produces zero output.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombExplicitZeros) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -93,13 +82,10 @@ TEST(SimCh9, AlwaysCombExplicitZeros) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // Both a and b explicitly 0, so result = 0 | 0 = 0.
+
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// ---------------------------------------------------------------------------
-// 11. Multiple always_comb blocks all evaluate at time 0.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, MultipleAlwaysCombTime0) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -113,9 +99,6 @@ TEST(SimCh9b, MultipleAlwaysCombTime0) {
   LowerRunAndCheck(f, design, {{"x", 0x11u}, {"y", 0x22u}});
 }
 
-// ---------------------------------------------------------------------------
-// 20. always_comb with multi-bit addition (16-bit).
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombMultiBitAdd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -140,9 +123,6 @@ TEST(SimCh9b, AlwaysCombMultiBitAdd) {
   EXPECT_EQ(y->value.ToUint64(), 0x5555u);
 }
 
-// ---------------------------------------------------------------------------
-// 21. always_comb with begin-end block and multiple outputs.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombBlockMultipleOutputs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -173,4 +153,4 @@ TEST(SimCh9b, AlwaysCombBlockMultipleOutputs) {
   EXPECT_EQ(diff->value.ToUint64(), 0x1Bu);
 }
 
-}  // namespace
+}

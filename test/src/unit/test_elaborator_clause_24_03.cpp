@@ -1,5 +1,3 @@
-// §24.3: The program construct
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_program.h"
@@ -47,9 +45,6 @@ TEST(ProgramElab, ElaborateProgramWithInitialBlock) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kInitial);
 }
 
-// =============================================================================
-// §24.10 Program instantiation via elaboration
-// =============================================================================
 TEST(ProgramElab, ProgramInstantiatedFromModule) {
   ProgramElabFixture f;
   auto* design = ElaborateSource(
@@ -67,4 +62,4 @@ TEST(ProgramElab, ProgramInstantiatedFromModule) {
   EXPECT_EQ(mod->children[0].resolved->name, "sub_prog");
 }
 
-}  // namespace
+}

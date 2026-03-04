@@ -1,5 +1,3 @@
-// §12.7.6: The forever-loop
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Forever loop wrapping a timing control.
 TEST(ParserSection12, ForeverWithTimingControl) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -20,10 +17,6 @@ TEST(ParserSection12, ForeverWithTimingControl) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.6.8 Looping statements — loop_statement
-// =============================================================================
-// --- forever statement_or_null ---
 TEST(ParserA608, ForeverLoop) {
   auto r = Parse(
       "module m;\n"
@@ -67,4 +60,4 @@ TEST(ParserSection12, ForeverLoopWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

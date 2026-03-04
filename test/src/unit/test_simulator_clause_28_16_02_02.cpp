@@ -1,5 +1,3 @@
-// §28.16.2.2: Delay specification for charge decay time
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -8,12 +6,11 @@
 
 #include "helpers_mintymax.h"
 
-// --- Local types for gate/net delays (§28.16) ---
 struct DelaySpec {
-  uint64_t d1 = 0;    // rise
-  uint64_t d2 = 0;    // fall
-  uint64_t d3 = 0;    // turn-off (z) or charge decay for trireg
-  uint8_t count = 0;  // 0, 1, 2, or 3
+  uint64_t d1 = 0;
+  uint64_t d2 = 0;
+  uint64_t d3 = 0;
+  uint8_t count = 0;
 };
 bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
   return spec.count == 3;
@@ -21,23 +18,11 @@ bool ValidateTriregChargeDecaySpec(const DelaySpec& spec) {
 
 namespace {
 
-// =============================================================
-// §28.16.2: trireg net charge decay
-// =============================================================
-// §28.16.2: "The first two delays shall specify the delay for
-//  transition to the 1 and 0 logic states when the trireg net is
-//  driven to these states by a driver."
-// §28.16.2: "The third delay shall specify the charge decay time
-//  instead of the delay in a transition to the z logic state."
-// §28.16.2.2: "The charge decay time specification in a trireg net
-//  declaration shall be preceded by a rise and a fall delay
-//  specification."
 TEST(TriregChargeDecay, ThreeDelaySpecValid) {
   DelaySpec spec{0, 0, 50, 3};
   EXPECT_TRUE(ValidateTriregChargeDecaySpec(spec));
 }
 
-// §28.16.2.2: One or two delays → no charge decay.
 TEST(TriregChargeDecay, OneDelayHasNoChargeDecay) {
   DelaySpec spec{10, 0, 0, 1};
   EXPECT_FALSE(ValidateTriregChargeDecaySpec(spec));
@@ -48,4 +33,4 @@ TEST(TriregChargeDecay, TwoDelaysHasNoChargeDecay) {
   EXPECT_FALSE(ValidateTriregChargeDecaySpec(spec));
 }
 
-}  // namespace
+}

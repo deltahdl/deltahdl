@@ -1,5 +1,3 @@
-// §29.10: Level-sensitive dominance
-
 #include <gtest/gtest.h>
 
 #include "builders_udp.h"
@@ -45,4 +43,4 @@ TEST(UdpLevelDominance, LevelOverridesEdge) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-}  // namespace
+}

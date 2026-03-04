@@ -1,5 +1,3 @@
-// Non-LRM tests
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -10,14 +8,10 @@
 
 using namespace delta;
 
-// =============================================================================
-// Helper: build a minimal Liberty library for testing
-// =============================================================================
 Liberty MakeTestLib() {
   Liberty lib;
   lib.library_name = "testlib";
 
-  // INV cell: Y = !A
   {
     LibCell cell;
     cell.name = "INV";
@@ -27,7 +21,6 @@ Liberty MakeTestLib() {
     lib.cells.push_back(std::move(cell));
   }
 
-  // AND2 cell: Y = A * B
   {
     LibCell cell;
     cell.name = "AND2";
@@ -38,7 +31,6 @@ Liberty MakeTestLib() {
     lib.cells.push_back(std::move(cell));
   }
 
-  // OR2 cell: Y = A + B
   {
     LibCell cell;
     cell.name = "OR2";
@@ -54,9 +46,6 @@ Liberty MakeTestLib() {
 
 namespace {
 
-// =============================================================================
-// Map single AND gate to AND2 cell
-// =============================================================================
 TEST(CellMap, SingleAndGate) {
   AigGraph g;
   auto a = g.AddInput();
@@ -73,9 +62,6 @@ TEST(CellMap, SingleAndGate) {
   EXPECT_EQ(mapping.instances[0].input_nets.size(), 2);
 }
 
-// =============================================================================
-// Map inverter to INV cell
-// =============================================================================
 TEST(CellMap, InverterGate) {
   AigGraph g;
   auto a = g.AddInput();
@@ -91,9 +77,6 @@ TEST(CellMap, InverterGate) {
   EXPECT_EQ(mapping.instances[0].input_nets.size(), 1);
 }
 
-// =============================================================================
-// Map OR gate (using De Morgan) to OR2 cell
-// =============================================================================
 TEST(CellMap, OrGateMapping) {
   AigGraph g;
   auto a = g.AddInput();
@@ -105,16 +88,11 @@ TEST(CellMap, OrGateMapping) {
   CellMapper mapper(lib);
   auto mapping = mapper.Map(g);
 
-  // OR via De Morgan is ~(~a & ~b). The mapper should recognize the OR
-  // pattern and produce an OR2 cell.
   ASSERT_EQ(mapping.instances.size(), 1);
   EXPECT_EQ(mapping.instances[0].cell_name, "OR2");
   EXPECT_EQ(mapping.instances[0].input_nets.size(), 2);
 }
 
-// =============================================================================
-// Handle no matching cell
-// =============================================================================
 TEST(CellMap, NoMatchingCell) {
   AigGraph g;
   auto a = g.AddInput();
@@ -127,14 +105,9 @@ TEST(CellMap, NoMatchingCell) {
   CellMapper mapper(lib);
   auto mapping = mapper.Map(g);
 
-  // XOR cannot be mapped to a single cell in this library, so the mapper
-  // decomposes it. We just verify it produces some output.
   EXPECT_GE(mapping.instances.size(), 1);
 }
 
-// =============================================================================
-// Map multi-output design
-// =============================================================================
 TEST(CellMap, MultiOutputDesign) {
   AigGraph g;
   auto a = g.AddInput();
@@ -153,4 +126,4 @@ TEST(CellMap, MultiOutputDesign) {
   EXPECT_EQ(mapping.instances[1].cell_name, "INV");
 }
 
-}  // namespace
+}

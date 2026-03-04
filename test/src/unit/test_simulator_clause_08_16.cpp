@@ -1,5 +1,3 @@
-// §8.16: Casting
-
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "parser/ast.h"
@@ -8,17 +6,8 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
 namespace {
 
-// =============================================================================
-// §8.16: $cast for type checking
-// =============================================================================
 TEST(ClassSim, IsASameType) {
   SimFixture f;
   auto* type = MakeClassType(f, "Foo", {});
@@ -57,4 +46,4 @@ TEST(ClassSim, IsAUnrelated) {
   EXPECT_FALSE(type_b->IsA(type_a));
 }
 
-}  // namespace
+}

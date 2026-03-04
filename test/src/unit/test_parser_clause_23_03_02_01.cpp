@@ -1,5 +1,3 @@
-// §23.3.2.1: Connecting module instance ports by ordered list
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.4 -- Instantiations
-// =============================================================================
 TEST(ParserAnnexA, A4ModuleInstPositional) {
   auto r = Parse("module m; sub u0(a, b, c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -20,42 +15,30 @@ TEST(ParserAnnexA, A4ModuleInstPositional) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-// =============================================================================
-// list_of_port_connections34 ::=
-//   ordered_port_connection { , ordered_port_connection }
-//   | named_port_connection { , named_port_connection }
-// ordered_port_connection ::= { attribute_instance } [ expression ]
-// named_port_connection ::=
-//   { attribute_instance } . port_identifier [ ( [ expression ] ) ]
-//   | { attribute_instance } . *
-// A.10 note 34: .* shall appear at most once
-// =============================================================================
 TEST(ParserAnnexA0411, OrderedPortConnections) {
   auto r = Parse("module m; sub u0(a, b, c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->inst_ports.size(), 3u);
-  // Ordered ports have empty name
+
   EXPECT_EQ(item->inst_ports[0].first, "");
   EXPECT_EQ(item->inst_ports[1].first, "");
   EXPECT_EQ(item->inst_ports[2].first, "");
 }
 
 TEST(ParserAnnexA0411, OrderedPortBlankPosition) {
-  // ordered_port_connection ::= { attribute_instance } [ expression ]
-  // A blank position (empty optional expression) is valid
+
   auto r = Parse("module m; sub u0(a, , c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->inst_ports.size(), 3u);
-  EXPECT_NE(item->inst_ports[0].second, nullptr);  // a
-  EXPECT_EQ(item->inst_ports[1].second, nullptr);  // blank
-  EXPECT_NE(item->inst_ports[2].second, nullptr);  // c
+  EXPECT_NE(item->inst_ports[0].second, nullptr);
+  EXPECT_EQ(item->inst_ports[1].second, nullptr);
+  EXPECT_NE(item->inst_ports[2].second, nullptr);
 }
 
-// --- interface_instantiation: ordered port connections ---
 TEST(ParserAnnexA0412, InterfaceInstOrderedPorts) {
   auto r = Parse("module m; my_if u0(a, b, c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -64,7 +47,6 @@ TEST(ParserAnnexA0412, InterfaceInstOrderedPorts) {
   EXPECT_EQ(item->inst_ports.size(), 3u);
 }
 
-// --- program_instantiation: ordered port connections ---
 TEST(ParserAnnexA0413, ProgramInstOrderedPorts) {
   auto r = Parse(
       "program my_prog(input logic a, input logic b, input logic c);\n"
@@ -75,10 +57,7 @@ TEST(ParserAnnexA0413, ProgramInstOrderedPorts) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->inst_ports.size(), 3u);
 }
-// Returns the first module item from the first module.
-// =============================================================================
-// §4.6: Ordered (positional) port connections — deterministic mapping
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_OrderedPortConnections) {
   auto r = Parse(
       "module top;\n"
@@ -90,7 +69,7 @@ TEST(ParserSection4, Sec4_6_OrderedPortConnections) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   ASSERT_EQ(item->inst_ports.size(), 3u);
-  // Positional ports have empty name (first element of pair).
+
   EXPECT_TRUE(item->inst_ports[0].first.empty());
   EXPECT_TRUE(item->inst_ports[1].first.empty());
   EXPECT_TRUE(item->inst_ports[2].first.empty());
@@ -98,9 +77,7 @@ TEST(ParserSection4, Sec4_6_OrderedPortConnections) {
   EXPECT_NE(item->inst_ports[1].second, nullptr);
   EXPECT_NE(item->inst_ports[2].second, nullptr);
 }
-// =============================================================================
-// LRM section 23.10.4 -- Port connection rules (additional)
-// =============================================================================
+
 TEST(ParserSection23, PortConnectionPositional) {
   auto r = Parse(
       "module top;\n"
@@ -113,9 +90,6 @@ TEST(ParserSection23, PortConnectionPositional) {
   ASSERT_EQ(item->inst_ports.size(), 3u);
 }
 
-// =========================================================================
-// LRM section 23.3.1: Module instance ports (positional connections)
-// =========================================================================
 TEST(ParserSection23, PositionalPortConnections) {
   auto r = Parse(
       "module top;\n"
@@ -125,7 +99,7 @@ TEST(ParserSection23, PositionalPortConnections) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   ASSERT_EQ(item->inst_ports.size(), 3);
-  // Positional ports: first element of pair is empty string_view.
+
   for (size_t i = 0; i < 3; ++i) {
     EXPECT_TRUE(item->inst_ports[i].first.empty());
     EXPECT_NE(item->inst_ports[i].second, nullptr);
@@ -144,4 +118,4 @@ TEST(ParserSection23, PositionalPortWithExpression) {
   EXPECT_NE(item->inst_ports[1].second, nullptr);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §31.4.2: $timeskew
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 End-to-end — $timeskew with flags simulates
-// =============================================================================
 TEST(SimA70501, TimeskewWithFlagsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,9 +27,6 @@ TEST(SimA70501, TimeskewWithFlagsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// =============================================================================
-// A.7.5.2 Sim — $timeskew with remain_active_flag mintypmax simulates
-// =============================================================================
 TEST(SimA70502, RemainActiveFlagMinTypMaxSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -55,4 +47,4 @@ TEST(SimA70502, RemainActiveFlagMinTypMaxSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

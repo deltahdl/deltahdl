@@ -1,5 +1,3 @@
-// §23.10.1: defparam statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- Defparam tests ---
 TEST(Parser, DefparamSingle) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
@@ -32,7 +29,6 @@ TEST(Parser, DefparamMultiple) {
   EXPECT_EQ(item->defparam_assigns.size(), 2);
 }
 
-// parameter_override: defparam list_of_defparam_assignments.
 TEST(SourceText, ParameterOverrideDefparam) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -46,11 +42,6 @@ TEST(SourceText, ParameterOverrideDefparam) {
   EXPECT_EQ(dp->defparam_assigns.size(), 2u);
 }
 
-// =============================================================================
-// A.2.3 Declaration lists
-// =============================================================================
-// --- list_of_defparam_assignments ---
-// defparam_assignment { , defparam_assignment }
 TEST(ParserA23, ListOfDefparamAssignmentsSingle) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
@@ -75,11 +66,6 @@ TEST(ParserA23, ListOfDefparamAssignmentsMultiple) {
   EXPECT_EQ(item->defparam_assigns.size(), 2u);
 }
 
-// =============================================================================
-// A.2.4 Declaration assignments
-// =============================================================================
-// --- defparam_assignment ---
-// hierarchical_parameter_identifier = constant_mintypmax_expression
 TEST(ParserA24, DefparamAssignmentHierarchical) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
@@ -90,9 +76,9 @@ TEST(ParserA24, DefparamAssignmentHierarchical) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kDefparam);
   ASSERT_EQ(item->defparam_assigns.size(), 1u);
-  // The path expression should be a hierarchical reference
+
   EXPECT_NE(item->defparam_assigns[0].first, nullptr);
   EXPECT_NE(item->defparam_assigns[0].second, nullptr);
 }
 
-}  // namespace
+}

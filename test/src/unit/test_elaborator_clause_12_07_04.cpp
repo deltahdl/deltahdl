@@ -1,12 +1,9 @@
-// §12.7.4: The while-loop
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// §12.7.4: while loop elaborates without error
 TEST(ElabA608, WhileLoop) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,4 +18,4 @@ TEST(ElabA608, WhileLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

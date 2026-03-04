@@ -1,5 +1,3 @@
-// §37.42: Task and function call
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -18,4 +16,4 @@ TEST_F(AnnexHParseTest, AnnexKVpiSysGetValue) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-}  // namespace
+}

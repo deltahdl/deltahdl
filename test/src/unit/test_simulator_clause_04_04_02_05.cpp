@@ -10,22 +10,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.4.2.5 Observed events region
-//
-// Figure 4-1 shows:
-//   pli_region_PreObserved -> region_Observed  (forward from PreObserved PLI)
-//   region_Observed -> pli_region_PostObserved (forward to PostObserved PLI)
-//   region_Observed -> region_Active           (feedback -- re-iteration)
-//
-// The Observed region is the first region of the reactive region set
-// (§4.4.1) and bridges the active and reactive region sets.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.4.2.5 Observed region event execution
-// Basic: events scheduled in the Observed region are executed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedRegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
@@ -39,10 +23,6 @@ TEST(SimCh4425, ObservedRegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.5 Observed region holds multiple events
-// Multiple property evaluation events coexist and all execute.
-// ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedRegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);
@@ -58,10 +38,6 @@ TEST(SimCh4425, ObservedRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.5 Pass/fail code scheduled into Reactive
-// An Observed callback schedules into Reactive at the same time slot.
-// ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedSchedulesPassFailIntoReactive) {
   Arena arena;
   Scheduler sched(arena);
@@ -70,7 +46,7 @@ TEST(SimCh4425, ObservedSchedulesPassFailIntoReactive) {
   auto* obs = sched.GetEventPool().Acquire();
   obs->callback = [&]() {
     order.push_back("observed");
-    // Property pass/fail action: schedule into Reactive.
+
     auto* reactive = sched.GetEventPool().Acquire();
     reactive->callback = [&order]() { order.push_back("reactive"); };
     sched.ScheduleEvent({0}, Region::kReactive, reactive);
@@ -83,11 +59,6 @@ TEST(SimCh4425, ObservedSchedulesPassFailIntoReactive) {
   EXPECT_EQ(order[1], "reactive");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.5 Multiple pass/fail actions scheduled in Reactive
-// Multiple pass/fail actions from a single Observed event all land in
-// Reactive at the current time slot.
-// ---------------------------------------------------------------------------
 TEST(SimCh4425, MultiplePassFailActionsScheduledInReactive) {
   Arena arena;
   Scheduler sched(arena);
@@ -109,27 +80,18 @@ TEST(SimCh4425, MultiplePassFailActionsScheduledInReactive) {
   sched.Run();
   ASSERT_EQ(order.size(), 4u);
   EXPECT_EQ(order[0], "observed");
-  // All three reactive events execute after observed.
+
   EXPECT_EQ(order[1], "reactive0");
   EXPECT_EQ(order[2], "reactive1");
   EXPECT_EQ(order[3], "reactive2");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.5 Observed executes after NBA (and the entire active region set).
-// This confirms its position in the region ordering per §4.4.2.
-// ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedExecutesAfterActiveRegionSet) {
   VerifyFourRegionOrder({Region::kActive, "active"},
                         {Region::kInactive, "inactive"}, {Region::kNBA, "nba"},
                         {Region::kObserved, "observed"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.5 + Figure 4-1: region_Observed -> region_Active (feedback edge).
-// An Observed callback that schedules a new Active event triggers
-// re-iteration of the active region set before continuing with Reactive.
-// ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedToActiveRestart) {
   Arena arena;
   Scheduler sched(arena);
@@ -138,7 +100,7 @@ TEST(SimCh4425, ObservedToActiveRestart) {
   auto* obs = sched.GetEventPool().Acquire();
   obs->callback = [&]() {
     order.push_back("observed");
-    // Observed schedules a new Active event -> restarts active set.
+
     auto* act = sched.GetEventPool().Acquire();
     act->callback = [&order]() { order.push_back("active_restart"); };
     sched.ScheduleEvent({0}, Region::kActive, act);
@@ -151,10 +113,6 @@ TEST(SimCh4425, ObservedToActiveRestart) {
   EXPECT_EQ(order[1], "active_restart");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.5 Observed region ordinal lies between PostNBA and PostObserved.
-// This verifies the enum ordering matches the LRM region sequence.
-// ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedIsAfterPostNBABeforePostObserved) {
   auto observed_ord = static_cast<int>(Region::kObserved);
   auto post_nba_ord = static_cast<int>(Region::kPostNBA);
@@ -163,10 +121,6 @@ TEST(SimCh4425, ObservedIsAfterPostNBABeforePostObserved) {
   EXPECT_LT(observed_ord, post_observed_ord);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.5 + Figure 4-1: pli_region_PreObserved -> region_Observed.
-// PreObserved PLI region executes before Observed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4425, PreObservedExecutesBeforeObserved) {
   Arena arena;
   Scheduler sched(arena);
@@ -186,10 +140,6 @@ TEST(SimCh4425, PreObservedExecutesBeforeObserved) {
   EXPECT_EQ(order[1], "observed");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.5 + Figure 4-1: region_Observed -> pli_region_PostObserved.
-// Observed region executes before PostObserved PLI region.
-// ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedExecutesBeforePostObserved) {
   Arena arena;
   Scheduler sched(arena);
@@ -209,10 +159,6 @@ TEST(SimCh4425, ObservedExecutesBeforePostObserved) {
   EXPECT_EQ(order[1], "post_observed");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.2.5 Observed events across multiple time slots.
-// Each time slot has its own Observed region evaluation.
-// ---------------------------------------------------------------------------
 TEST(SimCh4425, ObservedEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);

@@ -1,12 +1,9 @@
-// §16.12.13: Eventually property
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// property_expr ::= s_eventually property_expr
 TEST(ParserA210, PropertyExpr_SEventually) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -14,8 +11,6 @@ TEST(ParserA210, PropertyExpr_SEventually) {
               "endmodule\n"));
 }
 
-// property_expr ::= s_eventually [ cycle_delay_const_range_expression ]
-// property_expr
 TEST(ParserA210, PropertyExpr_SEventuallyRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -23,7 +18,6 @@ TEST(ParserA210, PropertyExpr_SEventuallyRange) {
               "endmodule\n"));
 }
 
-// property_expr ::= eventually [ constant_range ] property_expr
 TEST(ParserA210, PropertyExpr_Eventually) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -31,4 +25,4 @@ TEST(ParserA210, PropertyExpr_Eventually) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §18.12.1: Adding constraints to scope variables—std::randomize() with
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -32,7 +30,6 @@ TEST(ParserSection18, StdRandomizeWithMultipleVars) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// § std::randomize_call (subroutine_call alternative)
 TEST(ParserA82, StdRandomizeCall) {
   auto r = Parse(
       "module m;\n"
@@ -42,4 +39,4 @@ TEST(ParserA82, StdRandomizeCall) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// Annex H.13: Time and timescale
-
 #include <gtest/gtest.h>
 
 #include "simulator/svdpi.h"
@@ -20,4 +18,4 @@ TEST(SvDpi, TimeConstants) {
   EXPECT_EQ(sv_sim_time, vpiSimTime);
 }
 
-}  // namespace
+}

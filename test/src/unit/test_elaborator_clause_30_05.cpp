@@ -1,12 +1,9 @@
-// §30.5: Assigning delays to module paths
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Specparam reference in delay elaborates
 TEST(ElabA704, SpecparamDelayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,4 +18,4 @@ TEST(ElabA704, SpecparamDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

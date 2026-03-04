@@ -1,5 +1,3 @@
-// Annex A.4.1.3: Program instantiation
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- program_instantiation: with parameter_value_assignment (ordered) ---
 TEST(ParserAnnexA0413, ProgramInstWithOrderedParams) {
   auto r = Parse(
       "program my_prog #(parameter int W = 8)(input logic [W-1:0] data);\n"
@@ -22,7 +19,6 @@ TEST(ParserAnnexA0413, ProgramInstWithOrderedParams) {
   ASSERT_EQ(item->inst_params.size(), 1u);
 }
 
-// --- program_instantiation: empty port list ---
 TEST(ParserAnnexA0413, ProgramInstEmptyPorts) {
   auto r = Parse(
       "program my_prog;\n"
@@ -35,4 +31,4 @@ TEST(ParserAnnexA0413, ProgramInstEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-}  // namespace
+}

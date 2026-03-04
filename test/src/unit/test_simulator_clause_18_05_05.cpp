@@ -1,5 +1,3 @@
-// §18.5.5: Implication
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.5.5: Unique constraints
-// =============================================================================
 TEST(Constraint, UniqueConstraint) {
   ConstraintSolver solver(42);
   for (int i = 0; i < 3; ++i) {
@@ -45,4 +40,4 @@ TEST(Constraint, UniqueConstraint) {
   EXPECT_NE(v0, v2);
 }
 
-}  // namespace
+}

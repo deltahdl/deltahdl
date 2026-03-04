@@ -1,5 +1,3 @@
-// Annex H.10.1.2: Canonical representation of packed arrays
-
 #include <gtest/gtest.h>
 
 #include "simulator/dpi_runtime.h"
@@ -17,9 +15,6 @@ TEST(SvDpi, LogicVecValLayout) {
   EXPECT_EQ(val.bval, 0xCAFEBABEu);
 }
 
-// =============================================================================
-// Packed array utility macros (Annex I)
-// =============================================================================
 TEST(SvDpi, PackedDataNelems) {
   EXPECT_EQ(SV_PACKED_DATA_NELEMS(1), 1);
   EXPECT_EQ(SV_PACKED_DATA_NELEMS(32), 1);
@@ -33,9 +28,6 @@ TEST(SvDpi, GetUnsignedBits) {
   EXPECT_EQ(SV_GET_UNSIGNED_BITS(0xFFFFFFFF, 32), 0xFFFFFFFFu);
 }
 
-// =============================================================================
-// VPI shared structures (guarded by #ifndef)
-// =============================================================================
 TEST(SvDpi, VpiVecvalSharedStruct) {
   s_vpi_vecval vec;
   vec.aval = 1;
@@ -54,7 +46,7 @@ TEST(DpiRuntime, SvLogicVecValLayout) {
   v.aval = 0xDEADBEEF;
   v.bval = 0;
   EXPECT_EQ(v.aval, 0xDEADBEEFu);
-  EXPECT_TRUE(v.bval == 0);  // Known value.
+  EXPECT_TRUE(v.bval == 0);
 }
 
-}  // namespace
+}

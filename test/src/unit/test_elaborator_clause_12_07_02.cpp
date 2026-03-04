@@ -1,12 +1,9 @@
-// §12.7.2: The repeat loop
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// §12.7.6: repeat loop elaborates without error
 TEST(ElabA608, RepeatLoop) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,4 +18,4 @@ TEST(ElabA608, RepeatLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

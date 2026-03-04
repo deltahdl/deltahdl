@@ -1,5 +1,3 @@
-// Annex G.4: Mailbox
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,12 +5,8 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex G - Std package: mailbox class (§G.3)
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexGMailboxAllMethods) {
-  // Mailbox method calls (put, get, peek, try_get, try_peek, try_put, num)
-  // as member-access call expressions inside an initial block.
+
   auto* unit = Parse(
       "module m;\n"
       "  int val;\n"
@@ -30,4 +24,4 @@ TEST_F(AnnexHParseTest, AnnexGMailboxAllMethods) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-}  // namespace
+}

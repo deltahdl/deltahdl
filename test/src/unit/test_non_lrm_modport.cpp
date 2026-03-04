@@ -1,12 +1,9 @@
-// §non-lrm:modport
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// Empty modport (no ports) should parse
 TEST(ParserA29, EmptyModport) {
   auto r = Parse(
       "interface bus;\n"
@@ -19,4 +16,4 @@ TEST(ParserA29, EmptyModport) {
   EXPECT_EQ(mp->name, "empty");
 }
 
-}  // namespace
+}

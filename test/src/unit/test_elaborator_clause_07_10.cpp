@@ -1,5 +1,3 @@
-// §7.10: Queues
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -18,4 +16,4 @@ TEST(ParserA25, QueueDimElaboratesUnbounded) {
   EXPECT_EQ(mod->variables[0].queue_max_size, -1);
 }
 
-}  // namespace
+}

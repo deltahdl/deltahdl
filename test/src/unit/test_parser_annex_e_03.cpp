@@ -1,5 +1,3 @@
-// Annex E.3: `default_trireg_strength
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex E -- Optional compiler directives
-// =============================================================================
-// --- E.1: `default_trireg_strength ---
 TEST(ParserAnnexE2, AnnexEDefaultTriregStrength) {
   auto r = Parse(
       "`default_trireg_strength 50\n"
@@ -21,4 +15,4 @@ TEST(ParserAnnexE2, AnnexEDefaultTriregStrength) {
   }
 }
 
-}  // namespace
+}

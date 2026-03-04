@@ -1,5 +1,3 @@
-// §16.12.4: Disjunction property
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// property_expr ::= property_expr or property_expr
 TEST(ParserA210, PropertyExpr_Or) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -16,7 +13,6 @@ TEST(ParserA210, PropertyExpr_Or) {
               "endmodule\n"));
 }
 
-// Assert property with or (disjunction).
 TEST(ParserSection16, Sec16_5_1_PropertyOr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -32,7 +28,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.12: Property or ---
 TEST(ParserAnnexF, AnnexFPropertyOr) {
   auto r = Parse(
       "module m;\n"
@@ -44,10 +39,6 @@ TEST(ParserAnnexF, AnnexFPropertyOr) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.14.8 Property disjunction and conjunction
-// =============================================================================
 TEST(ParserSection16, PropertyDisjunction) {
   auto r = Parse(
       "module m;\n"
@@ -69,4 +60,4 @@ TEST(ParserSection16, PropertyDisjunctionAndConjunctionCombined) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

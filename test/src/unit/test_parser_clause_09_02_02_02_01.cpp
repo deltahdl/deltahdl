@@ -1,14 +1,9 @@
-// §9.2.2.2.1: Implicit always_comb sensitivities
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// ---------------------------------------------------------------------------
-// 19. always_comb with variable declarations in begin-end block.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombVarDecls) {
   auto r = Parse(
       "module m;\n"
@@ -20,9 +15,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombVarDecls) {
       "endmodule\n");
   VerifyAlwaysVarDecl(r);
 }
-// ---------------------------------------------------------------------------
-// 11. always_comb with function call
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_FunctionCall) {
   auto r = Parse(
       "module m;\n"
@@ -42,9 +35,6 @@ TEST(ParserSection9, Sec9_2_2_FunctionCall) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kCall);
 }
 
-// ---------------------------------------------------------------------------
-// 21. always_comb with function call in body.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -58,9 +48,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombFunctionCall) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// 22. always_comb has implicit sensitivity (no sensitivity list on item)
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_ImplicitSensitivity) {
   auto r = Parse(
       "module m;\n"
@@ -72,13 +59,11 @@ TEST(ParserSection9, Sec9_2_2_ImplicitSensitivity) {
   auto* item = FirstAlwaysComb(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
-  // always_comb must not have an explicit sensitivity list
+
   EXPECT_TRUE(item->sensitivity.empty());
   ASSERT_NE(item->body, nullptr);
 }
-// =============================================================================
-// §9.2.2 -- always_comb procedure
-// =============================================================================
+
 TEST(ParserSection9b, AlwaysCombWithAssertion) {
   auto r = Parse(
       "module m;\n"
@@ -91,10 +76,6 @@ TEST(ParserSection9b, AlwaysCombWithAssertion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Return the first always-kind module item (any always variant).
-// ---------------------------------------------------------------------------
-// 3. always_comb has empty sensitivity list.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombEmptySensitivity) {
   auto r = Parse(
       "module m;\n"
@@ -120,4 +101,4 @@ TEST(ParserSection9c, AlwaysCombWithFunctionCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

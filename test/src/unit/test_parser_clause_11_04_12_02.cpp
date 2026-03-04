@@ -1,5 +1,3 @@
-// §11.4.12.2: String concatenation and replication
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =========================================================================
-// Section 11.4.12.2 -- Replication (string concatenation and replication)
-// =========================================================================
 TEST(ParserSection11, StringConcatenation) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -34,7 +29,7 @@ TEST(ParserSection11, StringReplication) {
 }
 
 TEST(ParserSection6, StringConcatOp) {
-  // String concatenation using {} operator
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  string a, b, c;\n"
@@ -46,4 +41,4 @@ TEST(ParserSection6, StringConcatOp) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

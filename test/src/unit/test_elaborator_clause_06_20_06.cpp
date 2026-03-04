@@ -1,5 +1,3 @@
-// §6.20.6: Const constants
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,9 +8,8 @@ using namespace delta;
 
 namespace {
 
-// --- §6.20.6: Const constants ---
 TEST(Elaboration, ConstVarNoInit_Error) {
-  // const variable without initializer is an error.
+
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -23,7 +20,7 @@ TEST(Elaboration, ConstVarNoInit_Error) {
 }
 
 TEST(Elaboration, ConstVarWithInit_OK) {
-  // const variable with initializer is fine.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -35,7 +32,7 @@ TEST(Elaboration, ConstVarWithInit_OK) {
 }
 
 TEST(Elaboration, ConstVarReassign_Error) {
-  // Assignment to const variable is an error.
+
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -46,4 +43,4 @@ TEST(Elaboration, ConstVarReassign_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

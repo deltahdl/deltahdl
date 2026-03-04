@@ -1,5 +1,3 @@
-// §18.5.7.1: foreach iterative constraints
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Constraint with foreach and nested constraint_set
 TEST(SourceText, ConstraintForeach) {
   auto r = Parse(
       "class C;\n"
@@ -34,4 +31,4 @@ TEST(ParserSection18, RandArrayInClassWithConstraint) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

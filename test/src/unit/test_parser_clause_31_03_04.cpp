@@ -1,5 +1,3 @@
-// §31.3.4: $removal
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 $removal_timing_check
-// =============================================================================
 TEST(ParserA70501, RemovalTimingCheck) {
   auto r = Parse(
       "module m;\n"
@@ -42,7 +37,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckRemoval) {
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
 }
-// system_timing_check ::= $removal_timing_check
+
 TEST(ParserA705, SystemTimingCheckRemoval) {
   auto r = Parse(
       "module m;\n"
@@ -56,4 +51,4 @@ TEST(ParserA705, SystemTimingCheckRemoval) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRemoval);
 }
 
-}  // namespace
+}

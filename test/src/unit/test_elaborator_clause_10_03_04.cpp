@@ -1,14 +1,9 @@
-// §10.3.4: Continuous assignment strengths
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §10.3.4 Drive strength — validation
-// =============================================================================
 TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz0Highz1) {
   ElabFixture f;
   ElaborateSrc(
@@ -42,4 +37,4 @@ TEST(ElabClause1003, Validate_LegalDriveStrengthHighz0Strong1) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §6.20.6: Const constants
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -8,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA213, DataDeclConstVar) {
-  // [const] data_type list
+
   auto r = Parse("module m; const int MAX = 100; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -48,7 +46,6 @@ TEST(ParserA28, DataDeclConstVarInBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-// const with lifetime in block
 TEST(ParserA28, ConstWithLifetimeInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -57,11 +54,9 @@ TEST(ParserA28, ConstWithLifetimeInBlock) {
               "  end\n"
               "endmodule\n"));
 }
-// =========================================================================
-// §6.20: Constants — const variable
-// =========================================================================
+
 TEST(ParserSection6, ConstRealDecl) {
-  // §6.20.6: const can qualify a real variable.
+
   auto r = Parse(
       "module t;\n"
       "  const real PI = 3.14159;\n"
@@ -74,7 +69,7 @@ TEST(ParserSection6, ConstRealDecl) {
 }
 
 TEST(ParserSection6, ConstStringDecl) {
-  // §6.20.6: const string declaration.
+
   auto r = Parse(
       "module t;\n"
       "  const string GREETING = \"Hi\";\n"
@@ -85,9 +80,7 @@ TEST(ParserSection6, ConstStringDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
   EXPECT_TRUE(item->data_type.is_const);
 }
-// =========================================================================
-// §6.20: Constants
-// =========================================================================
+
 TEST(ParserSection6, ConstVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -124,4 +117,4 @@ TEST(ParserSection6, ConstIntDecl) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-}  // namespace
+}

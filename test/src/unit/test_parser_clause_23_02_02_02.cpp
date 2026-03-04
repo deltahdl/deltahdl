@@ -1,5 +1,3 @@
-// §23.2.2.2: ANSI style list of port declarations
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,12 +6,8 @@ using namespace delta;
 
 namespace {
 
-// --- data_type_or_implicit ---
-// data_type | implicit_data_type
-// --- implicit_data_type ---
-// [signing] {packed_dimension}
 TEST(ParserA221, ImplicitDataType) {
-  // Implicit data type with just packed dimension
+
   auto r = Parse("module m(input [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -22,7 +16,7 @@ TEST(ParserA221, ImplicitDataType) {
 }
 
 TEST(ParserA221, ImplicitDataTypeSigned) {
-  // signed [7:0]
+
   auto r = Parse("module m(input signed [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -48,7 +42,7 @@ TEST(ParserA212, OutputUnpackedDim) {
 }
 
 TEST(ParserA212, InputUnpackedDim) {
-  // list_of_variable_identifiers: variable_identifier { variable_dimension }
+
   auto r = Parse("module m(input logic d [3:0]); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -57,12 +51,8 @@ TEST(ParserA212, InputUnpackedDim) {
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
 
-// =============================================================================
-// LRM section 23.2.2 -- Port declarations
-// =============================================================================
-// --- ANSI style ports ---
 TEST(ParserSection23, Sec23_2_2_AnsiPortDirections) {
-  // All four port directions: input, output, inout, ref
+
   auto r = Parse(
       "module m (input logic a, output logic y,\n"
       "          inout wire [7:0] data, ref logic [3:0] r);\n"
@@ -80,7 +70,6 @@ TEST(ParserSection23, Sec23_2_2_AnsiPortDirections) {
   EXPECT_EQ(r.cu->modules[0]->ports[3].name, "r");
 }
 
-// --- Empty port list ---
 TEST(ParserSection23, Sec23_2_2_EmptyPortsAndMiscVariants) {
   auto r1 = Parse("module m (); endmodule\n");
   ASSERT_NE(r1.cu, nullptr);
@@ -92,11 +81,11 @@ TEST(ParserSection23, Sec23_2_2_EmptyPortsAndMiscVariants) {
   EXPECT_EQ(r2.cu->modules[0]->ports.size(), 0u);
   EXPECT_TRUE(ParseOk("module m (.*); endmodule\n"));
   EXPECT_TRUE(ParseOk("module m (input int x = 10); endmodule\n"));
-  // ANSI port type variants
+
   EXPECT_TRUE(ParseOk("module m (input var int in1); endmodule\n"));
   EXPECT_TRUE(ParseOk("module m (output reg [7:0] q); endmodule\n"));
   EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
-  // macromodule is interchangeable with module (LRM 23.2)
+
   EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
 }
 TEST(ParserSection23, ModuleEmptyPortList) {
@@ -113,9 +102,6 @@ TEST(ParserSection23, ModuleNoPortList) {
   EXPECT_TRUE(r.cu->modules[0]->ports.empty());
 }
 
-// =============================================================================
-// LRM section 23.3 -- Ports (additional)
-// =============================================================================
 TEST(ParserSection23, AnsiPortsInputOutput) {
   auto r = Parse(
       "module m(input logic clk, input logic rst, output logic q);\n"
@@ -140,9 +126,6 @@ TEST(ParserSection23, AnsiPortsInout) {
   EXPECT_EQ(mod->ports[0].name, "data");
 }
 
-// =========================================================================
-// LRM section 23.2: Module declarations (ANSI header style)
-// =========================================================================
 TEST(ParserSection23, AnsiHeaderWithParams) {
   auto r = Parse(
       "module m #(parameter N = 8) (input logic [N-1:0] data);\n"
@@ -164,4 +147,4 @@ TEST(ParserSection23, AnsiHeaderEmptyParenPorts) {
   EXPECT_TRUE(r.cu->modules[0]->ports.empty());
 }
 
-}  // namespace
+}

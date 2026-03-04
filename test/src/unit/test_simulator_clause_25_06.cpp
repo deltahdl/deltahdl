@@ -1,5 +1,3 @@
-// §25.6: Interfaces and specify blocks
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Dotted terminals in specify do not interfere with simulation
 TEST(SimA703, DottedTerminalSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,4 +26,4 @@ TEST(SimA703, DottedTerminalSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-}  // namespace
+}

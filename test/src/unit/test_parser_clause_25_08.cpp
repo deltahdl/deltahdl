@@ -1,5 +1,3 @@
-// §25.8: Parameterized interfaces
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- interface_instantiation: with named parameter_value_assignment ---
 TEST(ParserAnnexA0412, InterfaceInstWithNamedParams) {
   auto r = Parse("module m; my_if #(.W(16)) u0(.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -19,4 +16,4 @@ TEST(ParserAnnexA0412, InterfaceInstWithNamedParams) {
   EXPECT_EQ(item->inst_params[0].first, "W");
 }
 
-}  // namespace
+}

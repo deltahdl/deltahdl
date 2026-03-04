@@ -1,5 +1,3 @@
-// §18.13.1: $urandom
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -16,4 +14,4 @@ TEST(SysTask, UrandomReturns32Bit) {
   EXPECT_EQ(result.width, 32u);
 }
 
-}  // namespace
+}

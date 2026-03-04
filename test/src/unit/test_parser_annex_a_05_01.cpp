@@ -1,5 +1,3 @@
-// Annex A.5.1: UDP declaration
-
 #include "fixture_parser.h"
 #include "simulator/udp_eval.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- udp_declaration: endprimitive with end label ---
 TEST(ParserAnnexA051, EndLabel) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -22,7 +19,6 @@ TEST(ParserAnnexA051, EndLabel) {
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
 }
 
-// Helper: verify parsed extern UDP named "inv" with one input.
 static void VerifyExternInvPrimitive(ParseResult& r) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -35,19 +31,16 @@ static void VerifyExternInvPrimitive(ParseResult& r) {
   EXPECT_TRUE(udp->table.empty());
 }
 
-// --- udp_declaration: extern udp_ansi_declaration ---
 TEST(ParserAnnexA051, ExternAnsi) {
   auto r = Parse("extern primitive inv(output out, input in);\n");
   VerifyExternInvPrimitive(r);
 }
 
-// --- udp_declaration: extern udp_nonansi_declaration ---
 TEST(ParserAnnexA051, ExternNonAnsi) {
   auto r = Parse("extern primitive inv(out, in);\n");
   VerifyExternInvPrimitive(r);
 }
 
-// --- udp_declaration: extern with sequential ANSI ports ---
 TEST(ParserAnnexA051, ExternAnsiSequential) {
   auto r = Parse("extern primitive dff(output reg q, input d, input clk);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -60,7 +53,6 @@ TEST(ParserAnnexA051, ExternAnsiSequential) {
   ASSERT_EQ(udp->input_names.size(), 2u);
 }
 
-// --- udp_declaration: many inputs ---
 TEST(ParserAnnexA051, ManyInputs) {
   auto r = Parse(
       "primitive gate5(output out, input a, b, c, d, e);\n"
@@ -77,7 +69,6 @@ TEST(ParserAnnexA051, ManyInputs) {
   ASSERT_EQ(udp->table[0].inputs.size(), 5u);
 }
 
-// --- udp_declaration: endprimitive with end label on sequential ---
 TEST(ParserAnnexA051, EndLabelSequential) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -93,4 +84,4 @@ TEST(ParserAnnexA051, EndLabelSequential) {
   EXPECT_TRUE(r.cu->udps[0]->is_sequential);
 }
 
-}  // namespace
+}

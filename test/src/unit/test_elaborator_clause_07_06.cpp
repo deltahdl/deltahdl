@@ -1,5 +1,3 @@
-// §7.6: Array assignments
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -16,4 +14,4 @@ TEST(ParserA25, UnsizedDimWithInitInferSize) {
   EXPECT_EQ(mod->variables[0].unpacked_size, 3u);
 }
 
-}  // namespace
+}

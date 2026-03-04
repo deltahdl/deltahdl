@@ -1,5 +1,3 @@
-// §22.8: `default_nettype
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -87,4 +85,4 @@ TEST(ParserSection22, MultipleDefaultNettypeDirectives) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

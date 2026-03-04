@@ -1,5 +1,3 @@
-// §9.6.3: Disable fork statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §9.6.3: disable fork
 TEST(ParserA605, DisableFork) {
   auto r = Parse(
       "module m;\n"
@@ -77,9 +74,7 @@ TEST(ParserSection9b, ForkJoinAnyWithDisableFork) {
   EXPECT_EQ(fork_stmt->kind, StmtKind::kFork);
   EXPECT_EQ(fork_stmt->join_kind, TokenKind::kKwJoinAny);
 }
-// ---------------------------------------------------------------------------
-// 18. Fork-join_none followed by disable fork
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenDisableFork) {
   auto r = Parse(
       "module m;\n"
@@ -101,4 +96,4 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenDisableFork) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisableFork);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.2.2.1: General purpose always procedure
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -7,10 +5,6 @@
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.6.2 Production: always_construct
-// always_construct ::= always_keyword statement
-// =============================================================================
 TEST(ParserA602, AlwaysConstruct_PlainAlways) {
   auto r = Parse(
       "module m;\n"
@@ -23,10 +17,7 @@ TEST(ParserA602, AlwaysConstruct_PlainAlways) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
   ASSERT_NE(item->body, nullptr);
 }
-// =============================================================================
-// LRM section 9.2.2 -- Always blocks (always, always_comb, always_ff,
-// always_latch)
-// =============================================================================
+
 TEST(ParserSection9, AlwaysBlock) {
   auto r = Parse(
       "module m;\n"
@@ -40,4 +31,4 @@ TEST(ParserSection9, AlwaysBlock) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §10.11: Net aliasing
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -13,10 +11,6 @@ static ModuleItem* FindAlias(const std::vector<ModuleItem*>& items) {
 }
 namespace {
 
-// =============================================================================
-// A.6.1 Production: net_alias (parsing)
-// net_alias ::= alias net_lvalue = net_lvalue { = net_lvalue } ;
-// =============================================================================
 TEST(ParserA601, NetAlias_TwoNets) {
   auto r = Parse(
       "module m;\n"
@@ -57,7 +51,7 @@ TEST(ParserA601, NetAlias_FourNets) {
 }
 
 TEST(ParserA601, NetAlias_BitSelect) {
-  // §10.11: alias with bit-selects for byte-swapping
+
   auto r = Parse(
       "module m;\n"
       "  wire [31:0] A, B;\n"
@@ -70,4 +64,4 @@ TEST(ParserA601, NetAlias_BitSelect) {
   ASSERT_EQ(alias->alias_nets.size(), 2u);
 }
 
-}  // namespace
+}

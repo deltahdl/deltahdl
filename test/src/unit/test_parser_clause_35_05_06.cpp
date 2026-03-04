@@ -1,5 +1,3 @@
-// §35.5.6: Types of formal arguments
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,12 +5,8 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex H - DPI import with bit/logic vector arguments
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiImportBitLogicArgs) {
-  // DPI functions can take bit and logic vector arguments corresponding to
-  // SvBitVecVal and SvLogicVecVal on the C side.
+
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function void send_bits(\n"
@@ -31,4 +25,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportBitLogicArgs) {
   EXPECT_EQ(items[0]->func_args[1].name, "ctrl");
 }
 
-}  // namespace
+}

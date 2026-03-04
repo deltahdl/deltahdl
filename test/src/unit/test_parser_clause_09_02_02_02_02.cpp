@@ -1,14 +1,9 @@
-// §9.2.2.2.2: always_comb compared to always @*
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// ---------------------------------------------------------------------------
-// 29. Both always_comb and always @(*) in the same module with blocks.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_BothFormsWithBlocksInModule) {
   auto r = Parse(
       "module m;\n"
@@ -34,10 +29,6 @@ TEST(ParserSection9, Sec9_2_2_2_BothFormsWithBlocksInModule) {
   EXPECT_EQ(star->body->kind, StmtKind::kBlock);
 }
 
-// ---------------------------------------------------------------------------
-// 30. Full combo module: always_comb, always @*, always @(*), with
-//     case, if-else, and variable declarations, verifying all parse OK.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_FullComboModuleParseOk) {
   EXPECT_TRUE(
       ParseOk("module combo_module;\n"
@@ -65,10 +56,7 @@ TEST(ParserSection9, Sec9_2_2_2_FullComboModuleParseOk) {
               "  end\n"
               "endmodule\n"));
 }
-// Return the first always-kind module item (any always variant).
-// ---------------------------------------------------------------------------
-// 2. always @* parses with AlwaysKind::kAlways.
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarAlwaysKind) {
   auto r = Parse(
       "module m;\n"
@@ -81,7 +69,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarAlwaysKind) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
 }
 
-// Return the Nth always-kind module item (0-indexed).
 static ModuleItem* NthAlwaysItem(ParseResult& r, size_t n) {
   size_t count = 0;
   for (auto* item : r.cu->modules[0]->items) {
@@ -93,9 +80,6 @@ static ModuleItem* NthAlwaysItem(ParseResult& r, size_t n) {
   return nullptr;
 }
 
-// ---------------------------------------------------------------------------
-// 11. Side-by-side always_comb and always @* in the same module.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_SideBySideBothForms) {
   auto r = Parse(
       "module m;\n"
@@ -112,9 +96,6 @@ TEST(ParserSection9, Sec9_2_2_2_SideBySideBothForms) {
   EXPECT_EQ(second->always_kind, AlwaysKind::kAlways);
 }
 
-// ---------------------------------------------------------------------------
-// 12. Side-by-side: both have their own body statements.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_SideBySideBodiesExist) {
   auto r = Parse(
       "module m;\n"
@@ -133,4 +114,4 @@ TEST(ParserSection9, Sec9_2_2_2_SideBySideBodiesExist) {
   EXPECT_EQ(second->body->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

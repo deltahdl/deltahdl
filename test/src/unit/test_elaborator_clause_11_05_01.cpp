@@ -1,5 +1,3 @@
-// §11.5.1: Vector bit-select and part-select addressing
-
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// § part_select_range — indexed part select elaborates
 TEST(ElabA83, IndexedPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,7 +18,6 @@ TEST(ElabA83, IndexedPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § constant_range — packed dimension range elaborates
 TEST(ElabA83, ConstantRangePackedDimElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,7 +31,6 @@ TEST(ElabA83, ConstantRangePackedDimElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § primary_literal — part select range elaborates
 TEST(ElabA84, PrimaryPartSelectRangeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,7 +57,6 @@ TEST(Elaboration, RealIndex_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// § primary — hierarchical identifier with select elaborates
 TEST(ElabA84, PrimaryHierIdentSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -76,7 +70,6 @@ TEST(ElabA84, PrimaryHierIdentSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// 15. Bit-select on a different bit position.
 TEST(SimCh9c, BitSelectHighBit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -100,14 +93,10 @@ TEST(SimCh9c, BitSelectHighBit) {
 
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
-  // d = 0xA5 = 0b10100101; d[7] = 1.
+
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-// =============================================================================
-// §9.2.3: always_latch with part-select
-// =============================================================================
-// 16. Part-select extracting lower nibble.
 TEST(SimCh9c, PartSelectLowerNibble) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -132,11 +121,10 @@ TEST(SimCh9c, PartSelectLowerNibble) {
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 4u);
-  // d = 0xAB; d[3:0] = 0xB.
+
   EXPECT_EQ(q->value.ToUint64(), 0xBu);
 }
 
-// 17. Part-select extracting upper nibble.
 TEST(SimCh9c, PartSelectUpperNibble) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -161,13 +149,10 @@ TEST(SimCh9c, PartSelectUpperNibble) {
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 4u);
-  // d = 0xAB; d[7:4] = 0xA.
+
   EXPECT_EQ(q->value.ToUint64(), 0xAu);
 }
 
-// ---------------------------------------------------------------------------
-// 6. Blocking assignment splitting a packed value into parts.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignSplitPacked) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -195,4 +180,4 @@ TEST(SimCh10, BlockingAssignSplitPacked) {
   EXPECT_EQ(lo->value.ToUint64(), 0xADu);
 }
 
-}  // namespace
+}

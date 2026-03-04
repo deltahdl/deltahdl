@@ -1,5 +1,3 @@
-// §13.5.1: Pass by value
-
 #include "fixture_simulator.h"
 #include "simulator/eval.h"
 #include "simulator/lowerer.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Task call with input arguments
 TEST(SimA609, TaskCallWithArgs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +30,6 @@ TEST(SimA609, TaskCallWithArgs) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// § tf_call — task with output argument
 TEST(SimA82, TfCallTaskOutputArg) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -63,7 +59,6 @@ TEST(Eval, NestedFunctionOutputArgs) {
   auto* result_var = f.ctx.CreateVariable("result", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // inner(input int a, output int b): b = a + 100
   auto* inner = f.arena.Create<ModuleItem>();
   inner->kind = ModuleItemKind::kFunctionDecl;
   inner->name = "inner";
@@ -92,7 +87,6 @@ TEST(Eval, NestedFunctionOutputArgs) {
   inner->func_body_stmts.push_back(inner_assign);
   f.ctx.RegisterFunction("inner", inner);
 
-  // outer(input int x, output int y): inner(x, y)
   auto* outer = f.arena.Create<ModuleItem>();
   outer->kind = ModuleItemKind::kFunctionDecl;
   outer->name = "outer";
@@ -116,7 +110,6 @@ TEST(Eval, NestedFunctionOutputArgs) {
   outer->func_body_stmts.push_back(call_stmt);
   f.ctx.RegisterFunction("outer", outer);
 
-  // Call outer(5, result)
   auto* arg0 = f.arena.Create<Expr>();
   arg0->kind = ExprKind::kIntegerLiteral;
   arg0->int_val = 5;
@@ -130,9 +123,7 @@ TEST(Eval, NestedFunctionOutputArgs) {
 
   EvalExpr(call, f.ctx, f.arena);
 
-  // inner sets b = 5 + 100 = 105, which writes back to outer's "y",
-  // which then writes back to caller's "result".
   EXPECT_EQ(result_var->value.ToUint64(), 105u);
 }
 
-}  // namespace
+}

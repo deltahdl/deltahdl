@@ -1,5 +1,3 @@
-// §6.6.7: User-defined nettypes
-
 #include <gtest/gtest.h>
 
 #include <cstdint>

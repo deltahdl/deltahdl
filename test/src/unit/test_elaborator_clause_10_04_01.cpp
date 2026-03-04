@@ -1,5 +1,3 @@
-// §10.4.1: Blocking procedural assignments
-
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "helpers_eval_op.h"
@@ -9,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// assignment_pattern in procedural assignment — simulation
-// ---------------------------------------------------------------------------
-// §10.9: assignment pattern in blocking assignment
 TEST(SimA60701, PatternInBlockingAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -38,9 +32,6 @@ TEST(SimA60701, PatternInBlockingAssignment) {
   EXPECT_EQ(b->value.ToUint64(), 22u);
 }
 
-// ---------------------------------------------------------------------------
-// 1. Simple blocking assignment: a = 5; check a == 5.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, SimpleBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -62,9 +53,6 @@ TEST(SimCh10, SimpleBlockingAssign) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// ---------------------------------------------------------------------------
-// 2. Sequential blocking assignments: value available immediately.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, SequentialBlockingImmediate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -87,9 +75,6 @@ TEST(SimCh10, SequentialBlockingImmediate) {
   EXPECT_EQ(b->value.ToUint64(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 3. Blocking assignment with arithmetic expression.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -111,9 +96,6 @@ TEST(SimCh10, BlockingAssignExpression) {
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
 
-// ---------------------------------------------------------------------------
-// 4. Blocking assignment to bit-select.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignBitSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -136,9 +118,6 @@ TEST(SimCh10, BlockingAssignBitSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0x01u);
 }
 
-// ---------------------------------------------------------------------------
-// 5. Blocking assignment to part-select.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignPartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -161,9 +140,6 @@ TEST(SimCh10, BlockingAssignPartSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-// ---------------------------------------------------------------------------
-// 13. Blocking assignment with function call on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -188,9 +164,6 @@ TEST(SimCh10, BlockingAssignFunctionCall) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// ---------------------------------------------------------------------------
-// 22. Multiple blocking assignments to same variable (last wins).
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignLastWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -214,9 +187,6 @@ TEST(SimCh10, BlockingAssignLastWins) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// ---------------------------------------------------------------------------
-// 23. Blocking assignment chain: a=1; b=a; c=b; check c==1.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignChain) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -232,4 +202,4 @@ TEST(SimCh10, BlockingAssignChain) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}, {"c", 1u}});
 }
 
-}  // namespace
+}

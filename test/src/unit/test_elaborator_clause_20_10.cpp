@@ -1,5 +1,3 @@
-// §20.10: Severity system tasks
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -74,4 +72,4 @@ TEST(Lowerer, WarningContinues) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-}  // namespace
+}

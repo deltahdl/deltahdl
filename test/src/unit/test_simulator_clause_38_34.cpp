@@ -23,8 +23,6 @@ class VpiClause3834Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.34: vpi_put_value
-
 TEST_F(VpiClause3834Test, PutValueNoDelay) {
   auto* var = sim_ctx_.CreateVariable("d", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -54,7 +52,7 @@ TEST_F(VpiClause3834Test, PutValueInertialDelay) {
   time.type = vpiSimTime;
   time.low = 10;
   vpi_put_value(h, &val, &time, vpiInertialDelay);
-  // For now, value is applied immediately regardless of delay mode.
+
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
@@ -113,5 +111,5 @@ TEST_F(VpiClause3834Test, PutValueScalarFormat) {
   EXPECT_EQ(var->value.words[0].bval & 1, 0u);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

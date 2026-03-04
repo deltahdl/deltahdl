@@ -1,5 +1,3 @@
-// §12.7.1: The for-loop
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -9,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- for ---
-// §12.7.1: for loop — basic accumulation
 TEST(SimA608, ForBasic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +28,6 @@ TEST(SimA608, ForBasic) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §12.7.1: for with typed init — variable used in body
 TEST(SimA608, ForTypedInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -51,11 +46,10 @@ TEST(SimA608, ForTypedInit) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("sum");
   ASSERT_NE(var, nullptr);
-  // 1 + 2 + 3 + 4 = 10
+
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.7.1: for with empty init/cond/step — for(;;) with break
 TEST(SimA608, ForAllEmptyWithBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -79,7 +73,6 @@ TEST(SimA608, ForAllEmptyWithBreak) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// §12.7.1: for_step with inc_or_dec_expression (i++)
 TEST(SimA608, ForStepIncrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -101,24 +94,6 @@ TEST(SimA608, ForStepIncrement) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// 27. §4.2 Process with loop: sequential execution within an iterative
-//     construct inside a single process.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, ProcessWithLoop) {
   auto result = RunAndGet(
       "module t;\n"
@@ -131,8 +106,8 @@ TEST(SimCh4, ProcessWithLoop) {
       "  end\n"
       "endmodule\n",
       "sum");
-  // 1+2+3+4+5 = 15
+
   EXPECT_EQ(result, 15u);
 }
 
-}  // namespace
+}

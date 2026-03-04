@@ -1,5 +1,3 @@
-// §9.4.3: Level-sensitive event control
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -10,7 +8,7 @@ using namespace delta;
 namespace {
 
 TEST(Lowerer, WaitConditionTrue) {
-  // wait(expr) when condition is immediately true.
+
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -33,7 +31,7 @@ TEST(Lowerer, WaitConditionTrue) {
 }
 
 TEST(Lowerer, WaitConditionDeferred) {
-  // wait(expr) when condition is initially false, becomes true later.
+
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -59,4 +57,4 @@ TEST(Lowerer, WaitConditionDeferred) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

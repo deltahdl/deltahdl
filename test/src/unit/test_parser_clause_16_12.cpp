@@ -1,5 +1,3 @@
-// §16.12: Declaring properties
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Production #10: property_list_of_arguments
-// property_list_of_arguments ::=
-//     [property_actual_arg] { , [property_actual_arg] }
-//         { , . identifier ( [property_actual_arg] ) }
-//   | . identifier ( [property_actual_arg] )
-//         { , . identifier ( [property_actual_arg] ) }
-// =============================================================================
 TEST(ParserA210, PropertyListOfArguments_Positional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -24,11 +14,6 @@ TEST(ParserA210, PropertyListOfArguments_Positional) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #12: assertion_item_declaration
-// assertion_item_declaration ::=
-//     property_declaration | sequence_declaration | let_declaration
-// =============================================================================
 TEST(ParserA210, AssertionItemDecl_PropertyDecl) {
   auto r = Parse(
       "module m;\n"
@@ -43,14 +28,6 @@ TEST(ParserA210, AssertionItemDecl_PropertyDecl) {
   EXPECT_EQ(item->name, "p_req");
 }
 
-// =============================================================================
-// §A.2.10 Production #13: property_declaration
-// property_declaration ::=
-//     property property_identifier [ ( [property_port_list] ) ] ;
-//     { assertion_variable_declaration }
-//     property_spec [ ; ]
-//     endproperty [ : property_identifier ]
-// =============================================================================
 TEST(ParserA210, PropertyDecl_WithEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -97,11 +74,6 @@ TEST(ParserA210, PropertyPortItem_DefaultValue) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #18: property_spec
-// property_spec ::=
-//     [clocking_event] [disable iff (expression_or_dist)] property_expr
-// =============================================================================
 TEST(ParserA210, PropertySpec_ClockingEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -132,7 +104,6 @@ TEST(ParserA210, PropertySpec_NoClockNoDisable) {
               "endmodule\n"));
 }
 
-// property_port_list — empty port list
 TEST(ParserA210, PropertyPortList_Empty) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -142,10 +113,6 @@ TEST(ParserA210, PropertyPortList_Empty) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.12 Property declarations
-// =============================================================================
 TEST(ParserSection16, PropertyDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -165,10 +132,6 @@ TEST(ParserSection16, PropertyDeclaration) {
 }
 using VerifyParseTest = ProgramTestParse;
 
-// =============================================================================
-// Section 16.5.1 -- disable iff in concurrent assertions
-// =============================================================================
-// Assert property with disable iff.
 TEST(ParserSection16, Sec16_5_1_AssertPropertyDisableIff) {
   auto r = Parse(
       "module m;\n"
@@ -202,9 +165,6 @@ TEST(ParserAnnexF, AnnexFPropertyDecl) {
   EXPECT_TRUE(found);
 }
 
-// =============================================================================
-// §16.12 Property declarations — with formal arguments
-// =============================================================================
 TEST(ParserSection16, PropertyDeclWithFormals) {
   auto r = Parse(
       "module m;\n"
@@ -230,9 +190,6 @@ TEST(ParserSection16, PropertyDeclWithEndLabel) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// =============================================================================
-// §16.13.6 Disable iff
-// =============================================================================
 TEST(ParserSection16, DisableIffInAssertProperty) {
   auto r = Parse(
       "module m;\n"
@@ -266,9 +223,6 @@ TEST(ParserSection16, DisableIffWithComplexExpr) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// =============================================================================
-// §16.14 -- Declaring properties (additional tests)
-// =============================================================================
 TEST(ParserSection16, PropertyWithDisableIffDecl) {
   auto r = Parse(
       "module m;\n"
@@ -292,4 +246,4 @@ TEST(ParserSection16, PropertyWithFormalArgsDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §6.16: String data type
-
 #include <cstdint>
 #include <cstring>
 
@@ -14,9 +12,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// SvString
-// =============================================================================
 TEST(AdvSim, SvStringDefaultEmpty) {
   SvString s;
   EXPECT_EQ(s.Len(), 0u);
@@ -93,9 +88,6 @@ TEST(EvalOpXZ, StringReplicateRuntime) {
   EXPECT_EQ(VecToStr(result), "ababab");
 }
 
-// ==========================================================================
-// §6.16: String data type detection in concatenation/replication
-// ==========================================================================
 TEST(EvalOpXZ, StringConcatSetsIsString) {
   SimFixture f;
   MakeStringVar(f, "sa", "hi");
@@ -140,4 +132,4 @@ TEST(EvalOpXZ, IdentifierStringPropagation) {
   EXPECT_TRUE(result.is_string);
 }
 
-}  // namespace
+}

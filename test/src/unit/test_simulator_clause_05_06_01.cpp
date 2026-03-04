@@ -1,4 +1,3 @@
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "preprocessor/preprocessor.h"
@@ -7,10 +6,8 @@
 
 using namespace delta;
 
-// §5.6.1 Escaped identifiers
-
 TEST(SimCh50601, EscapedIdentAsVariable) {
-  // §5.6.1: Escaped identifiers can name variables.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\myvar ;\n"
@@ -21,7 +18,7 @@ TEST(SimCh50601, EscapedIdentAsVariable) {
 }
 
 TEST(SimCh50601, EscapedIdentSpecialChars) {
-  // §5.6.1: Escaped identifiers may include printable ASCII 33-126.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\data+bus ;\n"
@@ -32,7 +29,7 @@ TEST(SimCh50601, EscapedIdentSpecialChars) {
 }
 
 TEST(SimCh50601, EscapedKeywordAsVariable) {
-  // §5.6.1: An escaped keyword is treated as a user-defined identifier.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\module ;\n"
@@ -43,7 +40,7 @@ TEST(SimCh50601, EscapedKeywordAsVariable) {
 }
 
 TEST(SimCh50601, EscapedIdentMultipleVars) {
-  // §5.6.1: Multiple escaped identifiers in the same module.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -67,7 +64,7 @@ TEST(SimCh50601, EscapedIdentMultipleVars) {
 }
 
 TEST(SimCh50601, EscapedIdentInExpression) {
-  // §5.6.1: Escaped identifiers used in expressions.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

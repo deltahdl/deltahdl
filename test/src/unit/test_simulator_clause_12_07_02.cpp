@@ -1,5 +1,3 @@
-// §12.7.2: The repeat loop
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- repeat ---
-// §12.7.6: repeat(N) executes body exactly N times
 TEST(SimA608, RepeatCount) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -30,7 +26,6 @@ TEST(SimA608, RepeatCount) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §12.7.6: repeat(0) executes body zero times
 TEST(SimA608, RepeatZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -51,4 +46,4 @@ TEST(SimA608, RepeatZero) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

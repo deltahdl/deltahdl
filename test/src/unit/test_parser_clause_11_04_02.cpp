@@ -1,5 +1,3 @@
-// §11.4.2: Increment and decrement operators
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, BlockingAssignment_IncExpression) {
-  // inc_or_dec_expression: i++
+
   auto r = Parse(
       "module m;\n"
       "  initial begin i++; end\n"
@@ -16,13 +14,13 @@ TEST(ParserA602, BlockingAssignment_IncExpression) {
   EXPECT_FALSE(r.has_errors);
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  // i++ parses as expression statement
+
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
   EXPECT_EQ(stmt->expr->kind, ExprKind::kPostfixUnary);
 }
 
 TEST(ParserA602, BlockingAssignment_DecExpression) {
-  // inc_or_dec_expression: j--
+
   auto r = Parse(
       "module m;\n"
       "  initial begin j--; end\n"
@@ -36,7 +34,7 @@ TEST(ParserA602, BlockingAssignment_DecExpression) {
 }
 
 TEST(ParserA602, BlockingAssignment_PrefixInc) {
-  // prefix inc: ++i
+
   auto r = Parse(
       "module m;\n"
       "  initial begin ++i; end\n"
@@ -50,7 +48,7 @@ TEST(ParserA602, BlockingAssignment_PrefixInc) {
 }
 
 TEST(ParserA602, BlockingAssignment_PrefixDec) {
-  // prefix dec: --j
+
   auto r = Parse(
       "module m;\n"
       "  initial begin --j; end\n"
@@ -63,11 +61,6 @@ TEST(ParserA602, BlockingAssignment_PrefixDec) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kUnary);
 }
 
-// =============================================================================
-// A.8.3 Expressions — inc_or_dec_expression
-// =============================================================================
-// § inc_or_dec_expression ::= inc_or_dec_operator { attribute_instance }
-// variable_lvalue
 TEST(ParserA83, PrefixIncrement) {
   auto r = Parse("module m; initial ++x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -88,8 +81,6 @@ TEST(ParserA83, PrefixDecrement) {
   EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
 }
 
-// § inc_or_dec_expression ::= variable_lvalue { attribute_instance }
-// inc_or_dec_operator
 TEST(ParserA83, PostfixIncrement) {
   auto r = Parse("module m; initial x++; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -141,10 +132,6 @@ TEST(ParserSection11, PrefixDecrementInForStep) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.8.6 Operators — inc_or_dec_operator
-// =============================================================================
-// § inc_or_dec_operator ::= ++ (prefix)
 TEST(ParserA86, IncOrDecPrefixIncrement) {
   auto r = Parse("module m; initial ++x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -155,7 +142,6 @@ TEST(ParserA86, IncOrDecPrefixIncrement) {
   EXPECT_EQ(expr->op, TokenKind::kPlusPlus);
 }
 
-// § inc_or_dec_operator ::= -- (prefix)
 TEST(ParserA86, IncOrDecPrefixDecrement) {
   auto r = Parse("module m; initial --x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -166,7 +152,6 @@ TEST(ParserA86, IncOrDecPrefixDecrement) {
   EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
 }
 
-// § inc_or_dec_operator ::= ++ (postfix)
 TEST(ParserA86, IncOrDecPostfixIncrement) {
   auto r = Parse("module m; initial x++; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -177,7 +162,6 @@ TEST(ParserA86, IncOrDecPostfixIncrement) {
   EXPECT_EQ(expr->op, TokenKind::kPlusPlus);
 }
 
-// § inc_or_dec_operator ::= -- (postfix)
 TEST(ParserA86, IncOrDecPostfixDecrement) {
   auto r = Parse("module m; initial x--; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -188,7 +172,6 @@ TEST(ParserA86, IncOrDecPostfixDecrement) {
   EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
 }
 
-// § expression ::= inc_or_dec_expression (as sub-expression)
 TEST(ParserA83, IncDecAsExpression) {
   auto r = Parse("module m; initial x = ++y; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -199,34 +182,30 @@ TEST(ParserA83, IncDecAsExpression) {
   EXPECT_EQ(rhs->op, TokenKind::kPlusPlus);
 }
 
-// § variable_lvalue — pre-increment (++ as lvalue modifier)
 TEST(ParserA85, VarLvaluePreIncrement) {
   auto r = Parse("module m; int x; initial ++x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// § variable_lvalue — post-increment
 TEST(ParserA85, VarLvaluePostIncrement) {
   auto r = Parse("module m; int x; initial x++; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// § variable_lvalue — pre-decrement
 TEST(ParserA85, VarLvaluePreDecrement) {
   auto r = Parse("module m; int x; initial --x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// § variable_lvalue — post-decrement
 TEST(ParserA85, VarLvaluePostDecrement) {
   auto r = Parse("module m; int x; initial x--; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// --- Postfix increment/decrement ---
+
 TEST(ParserSection11, Sec11_1_PostfixIncrementExpression) {
   auto r = Parse(
       "module t;\n"
@@ -299,4 +278,4 @@ TEST(ParserSection11, PostfixDecrementOp) {
   EXPECT_EQ(stmt->expr->op, TokenKind::kMinusMinus);
 }
 
-}  // namespace
+}

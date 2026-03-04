@@ -1,5 +1,3 @@
-// §13.4.1: Return values and void functions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,8 @@ using namespace delta;
 
 namespace {
 
-// --- data_type_or_void ---
-// data_type | void
 TEST(ParserA221, DataTypeOrVoidReturn) {
-  // void as function return type (data_type_or_void)
+
   auto r = Parse(
       "module m;\n"
       "  function void do_nothing; endfunction\n"
@@ -21,13 +17,6 @@ TEST(ParserA221, DataTypeOrVoidReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-// =============================================================================
-// A.2.6 Function declarations
-// =============================================================================
-// ---------------------------------------------------------------------------
-// function_data_type_or_implicit ::=
-//   data_type_or_void | implicit_data_type
-// ---------------------------------------------------------------------------
 TEST(ParserA26, FuncReturnTypeExplicitInt) {
   auto r = Parse(
       "module m;\n  function int foo(); return 0; endfunction\nendmodule\n");
@@ -60,7 +49,6 @@ TEST(ParserA26, FuncReturnTypeLogicPacked) {
   EXPECT_NE(item->return_type.packed_dim_right, nullptr);
 }
 
-// §3.8: Function returning value, void function, all 4 argument directions.
 TEST(ParserClause03, Cl3_8_FunctionReturnAndVoidAndDirections) {
   auto r = Parse(
       "module m;\n"
@@ -86,9 +74,7 @@ TEST(ParserClause03, Cl3_8_FunctionReturnAndVoidAndDirections) {
   EXPECT_EQ(compute->func_args[2].direction, Direction::kInout);
   EXPECT_EQ(compute->func_args[3].direction, Direction::kRef);
 }
-// =============================================================================
-// 17. Automatic function returning void
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_3_AutoFuncReturningVoid) {
   auto r = Parse(
       "module m;\n"
@@ -106,7 +92,7 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncReturningVoid) {
   EXPECT_EQ(item->name, "log_msg");
 }
 TEST(ParserSection6, RealInFunction) {
-  // §6.12: real used as function return type.
+
   auto r = Parse(
       "module t;\n"
       "  function real compute();\n"
@@ -120,7 +106,6 @@ TEST(ParserSection6, RealInFunction) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kReal);
 }
 
-// void cast with system function call
 TEST(ParserA609, VoidCastSystemCall) {
   auto r = Parse(
       "module m;\n"
@@ -136,11 +121,6 @@ TEST(ParserA609, VoidCastSystemCall) {
   EXPECT_EQ(expr->lhs->kind, ExprKind::kSystemCall);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// LRM section 13.4.1 -- Return values and void functions (additional tests)
-// =============================================================================
-// Void function called as a statement (LRM 13.4.1).
 TEST(ParserSection13, VoidFunctionCallAsStatement) {
   auto r = Parse(
       "module m;\n"
@@ -157,7 +137,6 @@ TEST(ParserSection13, VoidFunctionCallAsStatement) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kCall);
 }
 
-// Void function with return type kVoid, verifying no return expr needed.
 TEST(ParserSection13, VoidFunctionReturnTypeKind) {
   auto r = Parse(
       "module m;\n"
@@ -170,10 +149,6 @@ TEST(ParserSection13, VoidFunctionReturnTypeKind) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
 }
 
-// =============================================================================
-// LRM section 13.4.3 -- Function calls as expressions/statements
-// =============================================================================
-// Function call used in a continuous assign expression.
 TEST(ParserSection13, FunctionCallInContAssign) {
   auto r = Parse(
       "module m;\n"
@@ -189,7 +164,6 @@ TEST(ParserSection13, FunctionCallInContAssign) {
   EXPECT_EQ(assign->assign_rhs->kind, ExprKind::kCall);
 }
 
-// Nested function calls: func(func(x)).
 TEST(ParserSection13, NestedFunctionCalls) {
   auto r = Parse(
       "module m;\n"
@@ -206,14 +180,11 @@ TEST(ParserSection13, NestedFunctionCalls) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
-  // The argument to outer inc() is itself a call.
+
   ASSERT_EQ(stmt->rhs->args.size(), 1u);
   EXPECT_EQ(stmt->rhs->args[0]->kind, ExprKind::kCall);
 }
 
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with return statement (inside function).
-// =============================================================================
 TEST(ParserSection9, Sec9_3_1_BlockWithReturnInFunction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -227,7 +198,6 @@ TEST(ParserSection9, Sec9_3_1_BlockWithReturnInFunction) {
               "endmodule\n"));
 }
 
-// --- Packed struct as function return type ---
 TEST(ParserSection7, Sec7_2_1_PackedAsFuncReturn) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -241,7 +211,7 @@ TEST(ParserSection7, Sec7_2_1_PackedAsFuncReturn) {
               "  endfunction\n"
               "endmodule\n"));
 }
-// Return with complex expression.
+
 TEST(ParserSection12, ReturnWithComplexExpr) {
   auto r = Parse(
       "module t;\n"
@@ -254,16 +224,10 @@ TEST(ParserSection12, ReturnWithComplexExpr) {
   ASSERT_NE(ret, nullptr);
   EXPECT_EQ(ret->kind, StmtKind::kReturn);
   ASSERT_NE(ret->expr, nullptr);
-  // The expression is a binary op (a * b + 1).
+
   EXPECT_EQ(ret->expr->kind, ExprKind::kBinary);
 }
 
-// =============================================================================
-// A.8.2 Subroutine calls — tf_call
-// =============================================================================
-// § tf_call ::= ps_or_hierarchical_tf_identifier { attribute_instance }
-//              [ ( list_of_arguments ) ]
-// tf_call as expression (function return value used in RHS)
 TEST(ParserA82, TfCallAsExprInAssign) {
   auto r = Parse(
       "module m;\n"
@@ -279,7 +243,6 @@ TEST(ParserA82, TfCallAsExprInAssign) {
   EXPECT_EQ(stmt->rhs->args.size(), 2u);
 }
 
-// § primary — function_subroutine_call
 TEST(ParserA84, PrimaryFunctionCall) {
   auto r = Parse(
       "module m;\n"
@@ -304,9 +267,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
   return nullptr;
 }
 
-// =============================================================================
-// LRM section 13.4.1 -- Function return type
-// =============================================================================
 TEST(ParserSection13, FunctionReturnTypeInt) {
   auto r = Parse(
       "module m;\n"
@@ -350,7 +310,6 @@ static ModuleItem* NthItem(ParseResult& r, size_t n) {
   return r.cu->modules[0]->items[n];
 }
 
-// 13. Struct as function return value.
 TEST(ParserSection7, Sec7_2_2_FunctionReturnStruct) {
   auto r = Parse(
       "module t;\n"
@@ -376,4 +335,4 @@ TEST(ParserSection6, VoidFunctionInClass) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

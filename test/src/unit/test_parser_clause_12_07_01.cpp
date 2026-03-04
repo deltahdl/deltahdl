@@ -1,14 +1,9 @@
-// §12.7.1: The for-loop
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// LRM section 12.7.1 -- for-loop (additional coverage)
-// =============================================================================
 TEST(ParserSection12, ForLoopPostIncrementStep) {
   auto r = Parse(
       "module t;\n"
@@ -54,7 +49,7 @@ TEST(ParserSection12, ForLoopWithBlockBody) {
   ASSERT_NE(stmt->for_body, nullptr);
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlock);
 }
-// --- 13. Blocking assignment in for loop body ---
+
 TEST(ParserSection10, Sec10_4_1_InForLoopBody) {
   auto r = Parse(
       "module m;\n"
@@ -72,9 +67,7 @@ TEST(ParserSection10, Sec10_4_1_InForLoopBody) {
   ASSERT_NE(stmt->for_body, nullptr);
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlockingAssign);
 }
-// =========================================================================
-// Postfix increment in for-loop step
-// =========================================================================
+
 TEST(ParserSection11, PostfixIncrementInForStep) {
   auto r = Parse(
       "module t;\n"
@@ -87,10 +80,6 @@ TEST(ParserSection11, PostfixIncrementInForStep) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// LRM section 12.7.1 -- For loop with variable declarations (additional cases)
-// =============================================================================
-// For loop with increment expression in step.
 TEST(ParserSection12, ForWithIncrementStep) {
   auto r = Parse(
       "module t;\n"
@@ -107,7 +96,6 @@ TEST(ParserSection12, ForWithIncrementStep) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
-// For loop with byte variable declaration.
 TEST(ParserSection12, ForWithByteDecl) {
   auto r = Parse(
       "module t;\n"
@@ -123,7 +111,6 @@ TEST(ParserSection12, ForWithByteDecl) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kByte);
 }
 
-// For loop with block body.
 TEST(ParserSection12, ForWithBlockBody) {
   auto r = Parse(
       "module t;\n"
@@ -142,7 +129,6 @@ TEST(ParserSection12, ForWithBlockBody) {
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlock);
 }
 
-// If-else inside for loop body.
 TEST(ParserSection12, IfElseInsideForBody) {
   auto r = Parse(
       "module t;\n"
@@ -169,9 +155,6 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-// ---------------------------------------------------------------------------
-// 16. for loop inside always_latch.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_ForLoop) {
   auto r = Parse(
       "module m;\n"
@@ -195,7 +178,6 @@ TEST(ParserSection9, Sec9_2_3_ForLoop) {
   EXPECT_NE(item->body->stmts[0]->for_body, nullptr);
 }
 
-// For loop with decrement.
 TEST(ParserSection12, ForWithDecrement) {
   auto r = Parse(
       "module t;\n"
@@ -212,7 +194,6 @@ TEST(ParserSection12, ForWithDecrement) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
-// §12.7: loop_statement (for)
 TEST(ParserA604, StmtItemLoopStatement) {
   auto r = Parse(
       "module m;\n"
@@ -227,9 +208,6 @@ TEST(ParserA604, StmtItemLoopStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
 
-// =============================================================================
-// LRM section 12.7.1 -- for with variable declaration
-// =============================================================================
 TEST(ParserSection12, ForWithIntDeclParses) {
   auto r = Parse(
       "module t;\n"
@@ -272,9 +250,7 @@ TEST(ParserSection12, ForWithLogicDecl) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
 }
-// =============================================================================
-// 10. For loop variable declaration
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_4_ForLoopVarDecl) {
   auto r = Parse(
       "module m;\n"
@@ -306,7 +282,6 @@ TEST(ParserSection12, ForWithoutDeclStillWorks) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kImplicit);
 }
 
-// --- for ( [for_initialization] ; [expression] ; [for_step] ) stmt_or_null ---
 TEST(ParserA608, ForLoopParse) {
   auto r = Parse(
       "module m;\n"
@@ -365,7 +340,6 @@ TEST(ParserA608, ForLoopUntypedInit) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kImplicit);
 }
 
-// §A.6.8: for_initialization is optional — empty init
 TEST(ParserA608, ForEmptyInit) {
   auto r = Parse(
       "module m;\n"
@@ -381,7 +355,6 @@ TEST(ParserA608, ForEmptyInit) {
   EXPECT_EQ(stmt->for_init, nullptr);
 }
 
-// §A.6.8: expression in for condition is optional — empty cond
 TEST(ParserA608, ForEmptyCond) {
   auto r = Parse(
       "module m;\n"
@@ -399,7 +372,6 @@ TEST(ParserA608, ForEmptyCond) {
   EXPECT_EQ(stmt->for_cond, nullptr);
 }
 
-// §A.6.8: for_step is optional — empty step
 TEST(ParserA608, ForEmptyStep) {
   auto r = Parse(
       "module m;\n"
@@ -417,7 +389,6 @@ TEST(ParserA608, ForEmptyStep) {
   EXPECT_EQ(stmt->for_step, nullptr);
 }
 
-// §A.6.8: all three for parts optional — for (;;)
 TEST(ParserA608, ForAllEmpty) {
   auto r = Parse(
       "module m;\n"
@@ -449,7 +420,6 @@ TEST(ParserA608, ForNullStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
 
-// --- for_variable_declaration: [var] data_type variable_identifier = expr ---
 TEST(ParserA608, ForVarKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -479,7 +449,6 @@ TEST(ParserA608, ForLogicTypeInit) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
 }
 
-// --- for_step_assignment: operator_assignment ---
 TEST(ParserA608, ForStepCompoundAssign) {
   auto r = Parse(
       "module m;\n"
@@ -495,7 +464,6 @@ TEST(ParserA608, ForStepCompoundAssign) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
-// --- for_step_assignment: inc_or_dec_expression ---
 TEST(ParserA608, ForStepPostIncrement) {
   auto r = Parse(
       "module m;\n"
@@ -554,7 +522,6 @@ TEST(ParserSection9, Sec9_3_1_BlockWithForLoop) {
   EXPECT_NE(stmt->for_body, nullptr);
 }
 
-// Returns the first function or task declaration from the first module.
 static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   for (auto* item : r.cu->modules[0]->items) {
@@ -572,9 +539,6 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
   return nullptr;
 }
 
-// =============================================================================
-// 22. For-loop init var in static function
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_ForLoopInitInStaticFunc) {
   auto r = Parse(
       "module m;\n"
@@ -596,9 +560,6 @@ TEST(ParserSection4, Sec4_9_4_ForLoopInitInStaticFunc) {
   EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
-// =============================================================================
-// 23. For-loop init var in automatic function
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_ForLoopInitInAutoFunc) {
   auto r = Parse(
       "module m;\n"
@@ -619,9 +580,6 @@ TEST(ParserSection4, Sec4_9_4_ForLoopInitInAutoFunc) {
   EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
-// =============================================================================
-// 13. Automatic function with for loop variable
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithForLoop) {
   auto r = Parse(
       "module m;\n"
@@ -644,4 +602,4 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithForLoop) {
   EXPECT_NE(for_stmt->for_body, nullptr);
 }
 
-}  // namespace
+}

@@ -1,12 +1,9 @@
-// Annex A.1.8: Checker items
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// --- generate_item: checker_or_generate_item (generate in checker) ---
 TEST(ParserAnnexA042, GenerateItemInChecker) {
   auto r = Parse(
       "checker my_chk;\n"
@@ -23,4 +20,4 @@ TEST(ParserAnnexA042, GenerateItemInChecker) {
   EXPECT_TRUE(found_if);
 }
 
-}  // namespace
+}

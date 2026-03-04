@@ -1,5 +1,3 @@
-// §5.9.1: Special characters in strings
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -27,4 +25,4 @@ TEST(ParserCh50901, StringEscape_Quote) {
               "endmodule"));
 }
 
-}  // namespace
+}

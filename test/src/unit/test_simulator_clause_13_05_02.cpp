@@ -1,5 +1,3 @@
-// §13.5.2: Pass by reference
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
@@ -10,19 +8,12 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §13.5.2 — pass by reference
-// =============================================================================
 TEST(Functions, PassByRef) {
   FuncFixture f;
 
-  // Variable "x" in caller scope
   auto* x_var = f.ctx.CreateVariable("x", 32);
   x_var->value = MakeLogic4VecVal(f.arena, 32, 50);
 
-  // function void add_ten(ref int r);
-  //   r = r + 10;
-  // endfunction
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "add_ten";
@@ -33,7 +24,6 @@ TEST(Functions, PassByRef) {
   func->func_body_stmts.push_back(MakeAssign(f.arena, "r", rhs));
   f.ctx.RegisterFunction("add_ten", func);
 
-  // Call: add_ten(x) — should modify x directly (not via writeback)
   auto* call = MakeCall(f.arena, "add_ten", {MakeId(f.arena, "x")});
   EvalExpr(call, f.ctx, f.arena);
 
@@ -43,13 +33,9 @@ TEST(Functions, PassByRef) {
 TEST(Functions, PassByRefReadsCaller) {
   FuncFixture f;
 
-  // Variable "x" in caller scope
   auto* x_var = f.ctx.CreateVariable("x", 32);
   x_var->value = MakeLogic4VecVal(f.arena, 32, 25);
 
-  // function int read_ref(ref int r);
-  //   return r * 3;
-  // endfunction
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
@@ -63,12 +49,10 @@ TEST(Functions, PassByRefReadsCaller) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 75u);
 }
 
-// Pass q[1] by ref, return it, verify the function reads 20.
 TEST(QueueRef, RefReadsCurrentValue) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
 
-  // function automatic int read_ref(ref int v); return v; endfunction
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
@@ -81,4 +65,4 @@ TEST(QueueRef, RefReadsCurrentValue) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 20u);
 }
 
-}  // namespace
+}

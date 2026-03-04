@@ -1,5 +1,3 @@
-// §33.4.2: Hierarchical configurations
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §33.4.2 Config with nested config references
-// =============================================================================
 TEST_F(ConfigTest, NestedConfigReference) {
   auto* unit = Parse(R"(
     config bot;
@@ -35,4 +30,4 @@ TEST_F(ConfigTest, NestedConfigReference) {
   EXPECT_TRUE(rule->use_config);
 }
 
-}  // namespace
+}

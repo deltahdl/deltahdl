@@ -1,5 +1,3 @@
-// §16.9.9: Conditions over sequences
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -31,11 +26,8 @@ struct SvaFixture {
 
 namespace {
 
-// =============================================================================
-// Sequence throughout (section 16.9.9)
-// =============================================================================
 TEST(SvaEngine, SequenceThroughout) {
-  // expr must hold throughout the entire sequence.
+
   std::vector<uint64_t> values = {1, 1, 1, 1};
   auto check = [](uint64_t v) { return v == 1; };
   EXPECT_TRUE(EvalThroughout(check, values));
@@ -50,4 +42,4 @@ TEST(SvaEngine, SequenceThroughoutEmpty) {
   EXPECT_TRUE(EvalThroughout(check, values));
 }
 
-}  // namespace
+}

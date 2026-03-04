@@ -1,5 +1,3 @@
-// §30.7.4.2: Negative pulse detection
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -23,9 +21,6 @@ TEST(ParserA701, SpecifyItemShowcancelledDecl) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kShowcancelled);
 }
 
-// =============================================================================
-// A.7.1 showcancelled_declaration
-// =============================================================================
 TEST(ParserA701, ShowcancelledSingleOutput) {
   auto r = Parse(
       "module m;\n"
@@ -159,4 +154,4 @@ TEST(ParserA701, ShowcancelledMultipleOutputs) {
   EXPECT_EQ(item->signal_list[2], "out3");
 }
 
-}  // namespace
+}

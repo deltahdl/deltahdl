@@ -1,5 +1,3 @@
-// §21.3.6: Flushing output
-
 #include <cstdio>
 
 #include "builders_systask.h"
@@ -29,4 +27,4 @@ TEST(SysTask, FflushDoesNotCrash) {
   std::remove(tmp.c_str());
 }
 
-}  // namespace
+}

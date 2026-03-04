@@ -1,5 +1,3 @@
-// §19.5.6: Specifying Illegal coverage point values or transitions
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// S19.5.6: Illegal bins
-// =============================================================================
 TEST(Coverage, IllegalBinsNotSampled) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -25,7 +20,7 @@ TEST(Coverage, IllegalBinsNotSampled) {
   CoverageDB::AddBin(cp, ib);
 
   db.Sample(g, {{"addr", 0xFF}});
-  // Illegal bins should not be hit during sampling.
+
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);
 }
 
@@ -46,8 +41,8 @@ TEST(Coverage, IllegalBinsExcludedFromCoverage) {
   CoverageDB::AddBin(cp, bad);
 
   db.Sample(g, {{"x", 1}});
-  // Only the valid bin counts: 1 covered out of 1.
+
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
 }
 
-}  // namespace
+}

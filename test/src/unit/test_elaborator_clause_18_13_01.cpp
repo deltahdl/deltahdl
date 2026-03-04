@@ -1,5 +1,3 @@
-// §18.13.1: $urandom
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -25,8 +23,8 @@ TEST(Lowerer, UrandomReturnsValue) {
 
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // Seed 0 is deterministic; just verify it ran without crash.
+
   EXPECT_NE(var->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

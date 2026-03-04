@@ -1,5 +1,3 @@
-// §10.7: Assignment extension and truncation
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -11,7 +9,6 @@ using namespace delta;
 
 namespace {
 
-// --- Width inference tests ---
 TEST(Elaboration, WidthInference_ContAssignWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -26,9 +23,6 @@ TEST(Elaboration, WidthInference_ContAssignWidth) {
   EXPECT_EQ(mod->assigns[0].width, 8);
 }
 
-// ---------------------------------------------------------------------------
-// 25. Blocking assignment preserving width/truncation.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignTruncation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -47,14 +41,11 @@ TEST(SimCh10, BlockingAssignTruncation) {
 
   auto* var = f.ctx.FindVariable("narrow");
   ASSERT_NE(var, nullptr);
-  // 8'hFF truncated to 4 bits = 0xF.
+
   EXPECT_EQ(var->value.width, 4u);
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with different widths — zero extension.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWidthExtension) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -73,14 +64,11 @@ TEST(SimCh10b, NBAWidthExtension) {
 
   auto* var = f.ctx.FindVariable("wide");
   ASSERT_NE(var, nullptr);
-  // 8'hFF zero-extended to 32 bits = 0x000000FF.
+
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
   EXPECT_EQ(var->value.width, 32u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA preserving width — result width matches LHS declaration.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAPreservesWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -109,4 +97,4 @@ TEST(SimCh10b, NBAPreservesWidth) {
   EXPECT_EQ(b->value.ToUint64(), 0xBEu);
 }
 
-}  // namespace
+}

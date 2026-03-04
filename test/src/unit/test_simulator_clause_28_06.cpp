@@ -1,5 +1,3 @@
-// §28.6: bufif1, bufif0, notif1, and notif0 gates
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -168,4 +166,4 @@ TEST(TristateGates, DelayToLOrHSameAsX) {
   EXPECT_EQ(ComputeTristateDelay(10, 12, 11, Val4Ext::kV0, Val4Ext::kH), 10u);
 }
 
-}  // namespace
+}

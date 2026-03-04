@@ -1,5 +1,3 @@
-// §33.4.3: Setting parameters in configurations
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §33.4.3 Config with parameter override
-// =============================================================================
 TEST_F(ConfigTest, UseClauseWithParams) {
   auto* unit = Parse(R"(
     config cfg;
@@ -45,4 +40,4 @@ TEST_F(ConfigTest, LocalparamInConfig) {
   EXPECT_NE(cfg->local_params[0].second, nullptr);
 }
 
-}  // namespace
+}

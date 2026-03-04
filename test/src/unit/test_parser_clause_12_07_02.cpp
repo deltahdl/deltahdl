@@ -1,15 +1,9 @@
-// §12.7.2: The repeat loop
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// LRM section 12.7 -- Loop statements (additional cases)
-// =============================================================================
-// Repeat loop with expression (not just a literal).
 TEST(ParserSection12, RepeatWithExpression) {
   auto r = Parse(
       "module t;\n"
@@ -28,7 +22,6 @@ TEST(ParserSection12, RepeatWithExpression) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-// --- repeat ( expression ) statement_or_null ---
 TEST(ParserA608, RepeatLoop) {
   auto r = Parse(
       "module m;\n"
@@ -54,4 +47,4 @@ TEST(ParserA608, RepeatNullStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kRepeat);
 }
 
-}  // namespace
+}

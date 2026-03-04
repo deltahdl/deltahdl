@@ -1,5 +1,3 @@
-// §28.6: bufif1, bufif0, notif1, and notif0 gates
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -46,7 +44,6 @@ TEST(ParserSection28, GateWithThreeDelays) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-// delay3: three values on gate (rise, fall, turn-off).
 TEST(ParserA223, Delay3GateThreeValues) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -64,4 +61,4 @@ TEST(ParserA223, Delay3GateThreeValues) {
   EXPECT_EQ(item->gate_delay_decay->int_val, 30u);
 }
 
-}  // namespace
+}

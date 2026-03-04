@@ -1,5 +1,3 @@
-// §13.5.5: Optional argument list
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- tf_call without parentheses (task only, per footnote 42) ---
 TEST(SimA609, TaskCallNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,4 +29,4 @@ TEST(SimA609, TaskCallNoParens) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-}  // namespace
+}

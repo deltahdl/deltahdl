@@ -1,5 +1,3 @@
-// §12.5.4: Set membership case statement
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §12.5.4: case-inside set membership match
 TEST(SimA607, CaseInsideMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,4 +30,4 @@ TEST(SimA607, CaseInsideMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

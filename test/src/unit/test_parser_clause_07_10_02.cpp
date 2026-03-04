@@ -1,5 +1,3 @@
-// §7.10.2: Queue methods
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -21,4 +19,4 @@ TEST(ParserSection7c, QueueInsertAndDelete) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

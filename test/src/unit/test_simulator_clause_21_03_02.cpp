@@ -1,5 +1,3 @@
-// §21.3.2: File output system tasks
-
 #include <fstream>
 
 #include "builders_ast.h"
@@ -11,9 +9,6 @@
 using namespace delta;
 namespace {
 
-// ============================================================================
-// §21.3.3 — $fdisplay, $fwrite
-// ============================================================================
 TEST(Section21, FdisplayToFile) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_fdisplay.txt";
@@ -34,7 +29,6 @@ TEST(Section21, FdisplayToFile) {
       MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd_val.ToUint64())});
   EvalExpr(close_expr, f.ctx, f.arena);
 
-  // Read back and verify.
   std::ifstream ifs(tmp_path);
   std::string contents((std::istreambuf_iterator<char>(ifs)),
                        std::istreambuf_iterator<char>());
@@ -43,4 +37,4 @@ TEST(Section21, FdisplayToFile) {
   std::remove(tmp_path.c_str());
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §35.5.6: Types of formal arguments
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -64,4 +62,4 @@ TEST(DpiRuntime, ImportWithChandleArg) {
   EXPECT_EQ(result.AsChandle(), &dummy);
 }
 
-}  // namespace
+}

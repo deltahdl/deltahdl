@@ -1,5 +1,3 @@
-// §9.2.1: Initial procedures
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -19,4 +17,4 @@ TEST(SynthLower, RejectInitialBlock) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

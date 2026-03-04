@@ -1,5 +1,3 @@
-// §11.4.7: Logical operators
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
@@ -47,12 +45,9 @@ TEST(EvalOp, CaretEq) {
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
 }
 
-// ==========================================================================
-// Logical operator X/Z — §11.4.7
-// ==========================================================================
 TEST(EvalOpXZ, LogicalNotX) {
   SimFixture f;
-  // !4'b1x00 → x
+
   MakeVar4(f, "ln", 4, 0b1000, 0b0100);
   auto* expr = MakeUnary(f.arena, TokenKind::kBang, MakeId(f.arena, "ln"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -61,7 +56,7 @@ TEST(EvalOpXZ, LogicalNotX) {
 
 TEST(EvalOpXZ, LogicalAndZeroX) {
   SimFixture f;
-  // 0 && x → 0 (short-circuit: lhs known-0 → result 0)
+
   MakeVar4(f, "lx", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kAmpAmp, MakeInt(f.arena, 0),
                           MakeId(f.arena, "lx"));
@@ -72,7 +67,7 @@ TEST(EvalOpXZ, LogicalAndZeroX) {
 
 TEST(EvalOpXZ, LogicalAndXZero) {
   SimFixture f;
-  // x && 0 → 0 (rhs known-0 → result 0 despite lhs unknown)
+
   MakeVar4(f, "ax", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kAmpAmp, MakeId(f.arena, "ax"),
                           MakeInt(f.arena, 0));
@@ -83,7 +78,7 @@ TEST(EvalOpXZ, LogicalAndXZero) {
 
 TEST(EvalOpXZ, LogicalAndXX) {
   SimFixture f;
-  // x && 1 → x
+
   MakeVar4(f, "bx", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kAmpAmp, MakeId(f.arena, "bx"),
                           MakeInt(f.arena, 1));
@@ -93,7 +88,7 @@ TEST(EvalOpXZ, LogicalAndXX) {
 
 TEST(EvalOpXZ, LogicalOrOneX) {
   SimFixture f;
-  // 1 || x → 1 (short-circuit: lhs known-1 → result 1)
+
   MakeVar4(f, "ox", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kPipePipe, MakeInt(f.arena, 1),
                           MakeId(f.arena, "ox"));
@@ -104,7 +99,7 @@ TEST(EvalOpXZ, LogicalOrOneX) {
 
 TEST(EvalOpXZ, LogicalOrXOne) {
   SimFixture f;
-  // x || 1 → 1
+
   MakeVar4(f, "px", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kPipePipe, MakeId(f.arena, "px"),
                           MakeInt(f.arena, 1));
@@ -115,7 +110,7 @@ TEST(EvalOpXZ, LogicalOrXOne) {
 
 TEST(EvalOpXZ, LogicalOrXX) {
   SimFixture f;
-  // x || 0 → x
+
   MakeVar4(f, "qx", 4, 0b0000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kPipePipe, MakeId(f.arena, "qx"),
                           MakeInt(f.arena, 0));
@@ -123,14 +118,9 @@ TEST(EvalOpXZ, LogicalOrXX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// Signed comparison, signed arithmetic, expression type rules
-// moved to test_eval_advanced.cpp
-// ==========================================================================
-// Logical implication (->) and equivalence (<->) — §11.4.7
-// ==========================================================================
 TEST(EvalOpXZ, ImplTT) {
   SimFixture f;
-  // 1 -> 1 = 1
+
   MakeVar4(f, "it1", 1, 1, 0);
   MakeVar4(f, "it2", 1, 1, 0);
   auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "it1"),
@@ -142,7 +132,7 @@ TEST(EvalOpXZ, ImplTT) {
 
 TEST(EvalOpXZ, ImplTF) {
   SimFixture f;
-  // 1 -> 0 = 0
+
   MakeVar4(f, "it1", 1, 1, 0);
   MakeVar4(f, "it2", 1, 0, 0);
   auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "it1"),
@@ -153,7 +143,7 @@ TEST(EvalOpXZ, ImplTF) {
 
 TEST(EvalOpXZ, ImplFT) {
   SimFixture f;
-  // 0 -> 1 = 1 (vacuous truth)
+
   MakeVar4(f, "it1", 1, 0, 0);
   MakeVar4(f, "it2", 1, 1, 0);
   auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "it1"),
@@ -164,7 +154,7 @@ TEST(EvalOpXZ, ImplFT) {
 
 TEST(EvalOpXZ, ImplFF) {
   SimFixture f;
-  // 0 -> 0 = 1 (vacuous truth)
+
   MakeVar4(f, "it1", 1, 0, 0);
   MakeVar4(f, "it2", 1, 0, 0);
   auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "it1"),
@@ -175,8 +165,8 @@ TEST(EvalOpXZ, ImplFF) {
 
 TEST(EvalOpXZ, ImplXT) {
   SimFixture f;
-  // x -> 1 = 1 (since !x || 1 = 1 regardless of x)
-  MakeVar4(f, "ix1", 1, 0, 1);  // 1'bx
+
+  MakeVar4(f, "ix1", 1, 0, 1);
   MakeVar4(f, "ix2", 1, 1, 0);
   auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "ix1"),
                           MakeId(f.arena, "ix2"));
@@ -187,18 +177,18 @@ TEST(EvalOpXZ, ImplXT) {
 
 TEST(EvalOpXZ, ImplXF) {
   SimFixture f;
-  // x -> 0 = x (since !x || 0 = !x, and !x is x when x is unknown)
-  MakeVar4(f, "ix1", 1, 0, 1);  // 1'bx
+
+  MakeVar4(f, "ix1", 1, 0, 1);
   MakeVar4(f, "ix2", 1, 0, 0);
   auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeId(f.arena, "ix1"),
                           MakeId(f.arena, "ix2"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is x
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
 TEST(EvalOpXZ, EquivSame) {
   SimFixture f;
-  // 1 <-> 1 = 1
+
   MakeVar4(f, "eq1", 1, 1, 0);
   MakeVar4(f, "eq2", 1, 1, 0);
   auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "eq1"),
@@ -209,7 +199,7 @@ TEST(EvalOpXZ, EquivSame) {
 
 TEST(EvalOpXZ, EquivDiff) {
   SimFixture f;
-  // 1 <-> 0 = 0
+
   MakeVar4(f, "eq1", 1, 1, 0);
   MakeVar4(f, "eq2", 1, 0, 0);
   auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "eq1"),
@@ -220,16 +210,15 @@ TEST(EvalOpXZ, EquivDiff) {
 
 TEST(EvalOpXZ, EquivX) {
   SimFixture f;
-  // x <-> 1 = x
-  MakeVar4(f, "ex1", 1, 0, 1);  // 1'bx
+
+  MakeVar4(f, "ex1", 1, 0, 1);
   MakeVar4(f, "ex2", 1, 1, 0);
   auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "ex1"),
                           MakeId(f.arena, "ex2"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is x
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// § expression — logical AND
 TEST(SimA83, LogicalAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -247,7 +236,6 @@ TEST(SimA83, LogicalAnd) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § expression — logical OR
 TEST(SimA83, LogicalOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -265,7 +253,6 @@ TEST(SimA83, LogicalOr) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § unary_operator — logical NOT
 TEST(SimA86, UnaryLogicalNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -283,10 +270,6 @@ TEST(SimA86, UnaryLogicalNot) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (logical) — Simulation
-// =============================================================================
-// § binary_operator — && (logical AND)
 TEST(SimA86, BinaryLogicalAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -304,7 +287,6 @@ TEST(SimA86, BinaryLogicalAnd) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § binary_operator — || (logical OR)
 TEST(SimA86, BinaryLogicalOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -322,10 +304,6 @@ TEST(SimA86, BinaryLogicalOr) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (implication) — Simulation
-// =============================================================================
-// § binary_operator — -> (implication: 0->x is always 1)
 TEST(SimA86, BinaryImplication) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -343,7 +321,6 @@ TEST(SimA86, BinaryImplication) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § binary_operator — <-> (equivalence: same values => 1)
 TEST(SimA86, BinaryEquivalence) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -361,4 +338,4 @@ TEST(SimA86, BinaryEquivalence) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

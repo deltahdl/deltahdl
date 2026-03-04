@@ -1,5 +1,3 @@
-// §26.4: Using packages in module headers
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -17,4 +15,4 @@ TEST(ParserSection23, ModuleHeaderMultipleImportsSecond) {
   EXPECT_EQ(mod->items[1]->import_item.item_name, "foo");
 }
 
-}  // namespace
+}

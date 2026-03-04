@@ -1,5 +1,3 @@
-// §10.4.2: Nonblocking procedural assignments
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -27,13 +25,9 @@ TEST(Lowerer, NbaDefersUpdate) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  // NBA update deferred, but scheduler drains NBA after Active,
-  // so after Run() completes the NBA has been applied.
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // x was read as 0 (from X init), then NBA applied 42.
-  // The blocking assign `x = x` reads 0 and writes 0.
-  // Then NBA applies 42. Final value: 42.
+
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
@@ -51,9 +45,6 @@ TEST(Lowerer, NbaAppliesToValue) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: Simple nonblocking assignment — value updates after scheduler run.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, SimpleNBA) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -75,10 +66,6 @@ TEST(SimCh10b, SimpleNBA) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA does NOT take effect immediately — uses NBA region scheduling.
-// The RHS is sampled in the Active region but the LHS update is deferred.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBADeferredUpdate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -102,15 +89,12 @@ TEST(SimCh10b, NBADeferredUpdate) {
   auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
-  // b captures a's value before the NBA takes effect.
+
   EXPECT_EQ(b->value.ToUint64(), 10u);
-  // a is updated in the NBA region.
+
   EXPECT_EQ(a->value.ToUint64(), 20u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: Multiple NBAs to same variable — last one wins in NBA region.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, MultipleNBASameVarLastWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -134,9 +118,6 @@ TEST(SimCh10b, MultipleNBASameVarLastWins) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA swap pattern — a <= b; b <= a; both capture old values.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBASwapPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -161,14 +142,11 @@ TEST(SimCh10b, NBASwapPattern) {
   auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
-  // Both RHS values are sampled before either NBA takes effect.
+
   EXPECT_EQ(a->value.ToUint64(), 20u);
   EXPECT_EQ(b->value.ToUint64(), 10u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with expression on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAExpressionRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -192,9 +170,6 @@ TEST(SimCh10b, NBAExpressionRHS) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with bit-select on LHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBABitSelectLHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -214,13 +189,10 @@ TEST(SimCh10b, NBABitSelectLHS) {
 
   auto* var = f.ctx.FindVariable("a");
   ASSERT_NE(var, nullptr);
-  // Bit 3 set: 0000_1000 = 8.
+
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with part-select on LHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAPartSelectLHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -240,13 +212,10 @@ TEST(SimCh10b, NBAPartSelectLHS) {
 
   auto* var = f.ctx.FindVariable("a");
   ASSERT_NE(var, nullptr);
-  // Lower nibble set to 0xF: 0x0F = 15.
+
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with concatenation on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAConcatenationRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -272,9 +241,6 @@ TEST(SimCh10b, NBAConcatenationRHS) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with ternary operator on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBATernaryRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -298,9 +264,6 @@ TEST(SimCh10b, NBATernaryRHS) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA in always_ff block (canonical use for sequential logic).
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAInAlwaysFF) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -329,9 +292,6 @@ TEST(SimCh10b, NBAInAlwaysFF) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA in initial block.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAInInitialBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -353,9 +313,6 @@ TEST(SimCh10b, NBAInInitialBlock) {
   EXPECT_EQ(var->value.ToUint64(), 123u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with if-else control flow.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWithIfElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -387,15 +344,12 @@ TEST(SimCh10b, NBAWithIfElse) {
   auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
-  // cond==0 → else branch for a.
+
   EXPECT_EQ(a->value.ToUint64(), 200u);
-  // cond==1 → if branch for b.
+
   EXPECT_EQ(b->value.ToUint64(), 300u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with case statement.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWithCase) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -424,9 +378,6 @@ TEST(SimCh10b, NBAWithCase) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA in for loop.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAInForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -448,14 +399,10 @@ TEST(SimCh10b, NBAInForLoop) {
 
   auto* var = f.ctx.FindVariable("acc");
   ASSERT_NE(var, nullptr);
-  // All 5 iterations read acc's blocking value (0) and schedule NBA.
-  // The last NBA wins: acc <= 0 + 1 = 1.
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with function call on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAFunctionCallRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -480,10 +427,6 @@ TEST(SimCh10b, NBAFunctionCallRHS) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA pipeline pattern — both stages use old values.
-// stage2 <= stage1; stage1 <= in; (simulates a two-stage pipeline)
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAPipelinePattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -510,14 +453,11 @@ TEST(SimCh10b, NBAPipelinePattern) {
   auto* s2 = f.ctx.FindVariable("stage2");
   ASSERT_NE(s1, nullptr);
   ASSERT_NE(s2, nullptr);
-  // Both RHS values are sampled from old values.
-  EXPECT_EQ(s2->value.ToUint64(), 55u);  // Old stage1.
-  EXPECT_EQ(s1->value.ToUint64(), 99u);  // Old in_val.
+
+  EXPECT_EQ(s2->value.ToUint64(), 55u);
+  EXPECT_EQ(s1->value.ToUint64(), 99u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with different widths — truncation.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWidthTruncation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -536,13 +476,10 @@ TEST(SimCh10b, NBAWidthTruncation) {
 
   auto* var = f.ctx.FindVariable("narrow");
   ASSERT_NE(var, nullptr);
-  // 0xABCD truncated to 8 bits = 0xCD.
+
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with arithmetic expression on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAArithmeticExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -568,9 +505,6 @@ TEST(SimCh10b, NBAArithmeticExpression) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with bitwise operators on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBABitwiseOperators) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -593,9 +527,6 @@ TEST(SimCh10b, NBABitwiseOperators) {
                    {{"r_and", 0x30u}, {"r_or", 0xFCu}, {"r_xor", 0xCCu}});
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with shift operators on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAShiftOperators) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -620,15 +551,12 @@ TEST(SimCh10b, NBAShiftOperators) {
   auto* r_shr = f.ctx.FindVariable("r_shr");
   ASSERT_NE(r_shl, nullptr);
   ASSERT_NE(r_shr, nullptr);
-  // 0x0F << 2 = 0x3C (truncated to 8 bits).
+
   EXPECT_EQ(r_shl->value.ToUint64(), 0x3Cu);
-  // 0x0F >> 1 = 0x07.
+
   EXPECT_EQ(r_shr->value.ToUint64(), 0x07u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with comparison result on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAComparisonResult) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -664,9 +592,6 @@ TEST(SimCh10b, NBAComparisonResult) {
   EXPECT_EQ(r_gt->value.ToUint64(), 0u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: Mixed blocking and nonblocking in same block — blocking first.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, MixedBlockingAndNBA) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -683,9 +608,6 @@ TEST(SimCh10b, MixedBlockingAndNBA) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 6u}});
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: Multiple NBAs in sequence — each captures current blocking state.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, MultipleNBAsInSequence) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -711,14 +633,11 @@ TEST(SimCh10b, MultipleNBAsInSequence) {
   auto* c = f.ctx.FindVariable("c");
   ASSERT_NE(b, nullptr);
   ASSERT_NE(c, nullptr);
-  // b <= a when a==1, c <= a when a==2.
+
   EXPECT_EQ(b->value.ToUint64(), 1u);
   EXPECT_EQ(c->value.ToUint64(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA register file pattern — array elements via indexed NBA.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBARegisterFilePattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -752,9 +671,6 @@ TEST(SimCh10b, NBARegisterFilePattern) {
   EXPECT_EQ(r3->value.ToUint64(), 400u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: Verify .width and .ToUint64() on NBA results.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAWidthAndToUint64) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -789,9 +705,6 @@ TEST(SimCh10b, NBAWidthAndToUint64) {
   EXPECT_EQ(word->value.ToUint64(), 0xDEADCAFEu);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA case default branch.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBACaseDefaultBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -819,9 +732,6 @@ TEST(SimCh10b, NBACaseDefaultBranch) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with bitwise NOT on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBABitwiseNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -842,13 +752,10 @@ TEST(SimCh10b, NBABitwiseNot) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // ~0xF0 = 0x0F (in 8 bits).
+
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-// ---------------------------------------------------------------------------
-// §10.4.2: NBA with replication on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10b, NBAReplicationRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -867,8 +774,8 @@ TEST(SimCh10b, NBAReplicationRHS) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // {4{2'b10}} = 8'b10101010 = 0xAA.
+
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-}  // namespace
+}

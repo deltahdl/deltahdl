@@ -1,5 +1,3 @@
-// §9.2.1: Initial procedures
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -57,29 +55,10 @@ TEST(Lowerer, SensitivityMapEmpty) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
 
-  // Initial blocks don't contribute to sensitivity map.
   const auto& procs = f.ctx.GetSensitiveProcesses("x");
   EXPECT_TRUE(procs.empty());
 }
 
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// 1. §4.2 Parallel processes: Multiple initial blocks execute concurrently.
-//    Both blocks write to separate variables; both should complete.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, ParallelInitialBlocks) {
   auto a = RunAndGet(
       "module t;\n"
@@ -112,10 +91,6 @@ TEST(SimCh4, ParallelInitialBlocksBothComplete) {
   EXPECT_EQ(vb->value.ToUint64(), 99u);
 }
 
-// ---------------------------------------------------------------------------
-// 24. §4.2 Empty processes: an initial block with no statements does not
-//     interfere with concurrent processes.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, EmptyProcessNoInterference) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -132,10 +107,6 @@ TEST(SimCh4, EmptyProcessNoInterference) {
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 77u);
 }
 
-// ---------------------------------------------------------------------------
-// 25. §4.2 Many parallel processes: stress test with five independent
-//     initial blocks.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, FiveParallelInitialBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -152,4 +123,4 @@ TEST(SimCh4, FiveParallelInitialBlocks) {
                    {{"a", 1u}, {"b", 2u}, {"c", 3u}, {"d", 4u}, {"e", 5u}});
 }
 
-}  // namespace
+}

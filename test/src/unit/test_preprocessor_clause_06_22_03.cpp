@@ -1,5 +1,3 @@
-// §6.22.3: Assignment compatible
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 
@@ -18,9 +16,6 @@ TEST(ParserSection6, CompatibleTypesIntToLogic) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// LRM section 6.22.3 -- Assignment compatible types
-// =============================================================================
 TEST(ParserSection6, AssignCompatibleIntToReal) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -31,4 +26,4 @@ TEST(ParserSection6, AssignCompatibleIntToReal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §14.14: Global clocking
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -7,7 +5,6 @@
 using namespace delta;
 namespace {
 
-// Global clocking block (no signals allowed inside).
 TEST(ParserSection19, GlobalClocking_Basic) {
   auto r = Parse(
       "module t;\n"
@@ -22,7 +19,6 @@ TEST(ParserSection19, GlobalClocking_Basic) {
   EXPECT_TRUE(item->clocking_signals.empty());
 }
 
-// Global clocking with compound event expression (or).
 TEST(ParserSection19, GlobalClocking_CompoundEvent) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -31,7 +27,6 @@ TEST(ParserSection19, GlobalClocking_CompoundEvent) {
               "endmodule\n"));
 }
 
-// Global clocking with end label.
 TEST(ParserSection19, GlobalClocking_EndLabel) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -40,8 +35,6 @@ TEST(ParserSection19, GlobalClocking_EndLabel) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
-// §14.14: global clocking with end label.
 TEST(ParserSection14, GlobalClockingEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -54,7 +47,6 @@ TEST(ParserSection14, GlobalClockingEndLabel) {
   EXPECT_EQ(item->name, "gclk");
 }
 
-// §14.14: global clocking has no signal declarations (shall be empty body).
 TEST(ParserSection14, GlobalClockingNoSignals) {
   auto r = Parse(
       "module m;\n"
@@ -68,7 +60,6 @@ TEST(ParserSection14, GlobalClockingNoSignals) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
 }
 
-// §14.14: global clocking in subsystem pattern (from LRM hierarchical example).
 TEST(ParserSection14, GlobalClockingSubsystemPattern) {
   auto r = Parse(
       "module subsystem1;\n"
@@ -83,9 +74,6 @@ TEST(ParserSection14, GlobalClockingSubsystemPattern) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
 }
 
-// =============================================================================
-// A.6.11 global clocking — unnamed with negedge
-// =============================================================================
 TEST(ParserA611, GlobalClockingUnnamed) {
   auto r = Parse(
       "module m;\n"
@@ -101,9 +89,6 @@ TEST(ParserA611, GlobalClockingUnnamed) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
 }
 
-// =============================================================================
-// A.6.11 global clocking — compound event expression
-// =============================================================================
 TEST(ParserA611, GlobalClockingCompoundEvent) {
   auto r = Parse(
       "module m;\n"
@@ -116,9 +101,7 @@ TEST(ParserA611, GlobalClockingCompoundEvent) {
   EXPECT_TRUE(item->is_global_clocking);
   EXPECT_GE(item->clocking_event.size(), 2u);
 }
-// =============================================================================
-// A.6.11 clocking_declaration — global clocking
-// =============================================================================
+
 TEST(ParserA611, ClockingDeclGlobal) {
   auto r = Parse(
       "module m;\n"
@@ -134,9 +117,7 @@ TEST(ParserA611, ClockingDeclGlobal) {
   EXPECT_EQ(item->name, "gclk");
   EXPECT_TRUE(item->clocking_signals.empty());
 }
-// =============================================================================
-// §14.14 — Global clocking
-// =============================================================================
+
 TEST(ParserSection14, GlobalClocking) {
   auto r = Parse(
       "module m;\n"
@@ -151,4 +132,4 @@ TEST(ParserSection14, GlobalClocking) {
   EXPECT_TRUE(item->clocking_signals.empty());
 }
 
-}  // namespace
+}

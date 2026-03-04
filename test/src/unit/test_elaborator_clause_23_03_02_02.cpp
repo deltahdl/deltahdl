@@ -1,5 +1,3 @@
-// §23.3.2.2: Connecting module instance ports by name
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- Port binding tests ---
 TEST(Elaboration, PortBinding_ResolvesChild) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -73,11 +70,11 @@ TEST(Elaboration, PortBinding_PortMismatch) {
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
-  // Port binding still created, but with warning.
+
   EXPECT_EQ(mod->children[0].port_bindings.size(), 1);
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
-// --- Elaborator resolves interface instantiation with port bindings ---
+
 TEST(ParserAnnexA0412, ElaborationInterfaceInstPortBindings) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -95,4 +92,4 @@ TEST(ParserAnnexA0412, ElaborationInterfaceInstPortBindings) {
   EXPECT_EQ(top->children[0].port_bindings[0].port_name, "data");
 }
 
-}  // namespace
+}

@@ -9,15 +9,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.9.3 Blocking assignment
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.9.3 RHS computed using current values at execution time.
-// The RHS of a blocking assignment is evaluated using the values at the time
-// the statement executes, not at the time the assignment completes.
-// ---------------------------------------------------------------------------
 TEST(SimCh4093, ComputesRhsUsingCurrentValues) {
   Arena arena;
   Scheduler sched(arena);
@@ -25,15 +16,12 @@ TEST(SimCh4093, ComputesRhsUsingCurrentValues) {
   int captured_rhs = 0;
   int dst = 0;
 
-  // Model: dst = #5 src;
-  // At time 0, src=10 → capture RHS=10. At time 5, assign dst=10 even if
-  // src has changed by then.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    // Compute RHS using current values.
+
     captured_rhs = src;
-    // Schedule future assignment at time 5.
+
     auto* future = sched.GetEventPool().Acquire();
     future->kind = EventKind::kUpdate;
     future->callback = [&, captured_rhs]() { dst = captured_rhs; };
@@ -41,35 +29,27 @@ TEST(SimCh4093, ComputesRhsUsingCurrentValues) {
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
-  // Change src at time 2, before the delayed assignment completes.
   auto* change_src = sched.GetEventPool().Acquire();
   change_src->kind = EventKind::kEvaluation;
   change_src->callback = [&]() { src = 99; };
   sched.ScheduleEvent({2}, Region::kActive, change_src);
 
   sched.Run();
-  // dst should be 10 (captured at time 0), not 99.
+
   EXPECT_EQ(dst, 10);
   EXPECT_EQ(captured_rhs, 10);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.3 Process suspended and scheduled as future event.
-// An intra-assignment delay suspends the process until the specified future
-// time, when the assignment completes.
-// ---------------------------------------------------------------------------
 TEST(SimCh4093, SuspendsProcessAndSchedulesFutureEvent) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Model: dst = #10 src; followed by next_statement;
-  // The process suspends at the delay and resumes at time 10.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     order.push_back("rhs_computed_t0");
-    // Schedule the assignment completion at time 10.
+
     auto* resume = sched.GetEventPool().Acquire();
     resume->kind = EventKind::kUpdate;
     resume->callback = [&]() { order.push_back("assign_complete_t10"); };
@@ -77,7 +57,6 @@ TEST(SimCh4093, SuspendsProcessAndSchedulesFutureEvent) {
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
-  // Another event at time 5 to show the process was suspended during it.
   auto* mid = sched.GetEventPool().Acquire();
   mid->kind = EventKind::kEvaluation;
   mid->callback = [&]() { order.push_back("other_event_t5"); };
@@ -90,23 +69,16 @@ TEST(SimCh4093, SuspendsProcessAndSchedulesFutureEvent) {
   EXPECT_EQ(order[2], "assign_complete_t10");
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.3 Zero delay schedules an Inactive event for current time.
-// A blocking assignment with #0 delay schedules the process in the Inactive
-// region of the current time step, not the Active region.
-// ---------------------------------------------------------------------------
 TEST(SimCh4093, ZeroDelaySchedulesInactiveEvent) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Model: dst = #0 src;
-  // The assignment is scheduled in the Inactive region of the current time.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
     order.push_back("active_eval");
-    // #0 delay → schedule in Inactive region.
+
     auto* inactive_assign = sched.GetEventPool().Acquire();
     inactive_assign->kind = EventKind::kUpdate;
     inactive_assign->callback = [&]() { order.push_back("inactive_assign"); };
@@ -115,34 +87,27 @@ TEST(SimCh4093, ZeroDelaySchedulesInactiveEvent) {
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
-  // Another Active event at same time to show Inactive executes after Active.
   auto* active2 = sched.GetEventPool().Acquire();
   active2->kind = EventKind::kEvaluation;
   active2->callback = [&]() { order.push_back("active_other"); };
   sched.ScheduleEvent({0}, Region::kActive, active2);
 
   sched.Run();
-  // Both Active events execute before the Inactive assignment.
+
   ASSERT_GE(order.size(), 3u);
   EXPECT_EQ(order.back(), "inactive_assign");
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.3 Zero delay from Reactive region schedules Re-Inactive event.
-// When the blocking assignment with #0 originates in the Reactive region,
-// the process goes to Re-Inactive instead of Inactive.
-// ---------------------------------------------------------------------------
 TEST(SimCh4093, ZeroDelayFromReactiveSchedulesReInactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // A Reactive-region process executing a #0 blocking assignment.
   auto* reactive_proc = sched.GetEventPool().Acquire();
   reactive_proc->kind = EventKind::kEvaluation;
   reactive_proc->callback = [&]() {
     order.push_back("reactive_eval");
-    // #0 delay from Reactive → Re-Inactive.
+
     auto* reinactive = sched.GetEventPool().Acquire();
     reinactive->kind = EventKind::kUpdate;
     reinactive->callback = [&]() { order.push_back("reinactive_assign"); };
@@ -156,25 +121,18 @@ TEST(SimCh4093, ZeroDelayFromReactiveSchedulesReInactive) {
   EXPECT_EQ(order[1], "reinactive_assign");
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.3 No delay means immediate assignment without suspension.
-// A blocking assignment without an intra-assignment delay performs the
-// assignment immediately — the process is not suspended.
-// ---------------------------------------------------------------------------
 TEST(SimCh4093, NoDelayAssignsImmediately) {
   Arena arena;
   Scheduler sched(arena);
   int dst = 0;
   bool next_stmt_executed = false;
 
-  // Model: dst = 42; next_stmt;
-  // No delay → assignment completes immediately, execution continues.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    // Immediate blocking assignment.
+
     dst = 42;
-    // Next sequential statement executes immediately after.
+
     next_stmt_executed = true;
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
@@ -184,17 +142,11 @@ TEST(SimCh4093, NoDelayAssignsImmediately) {
   EXPECT_TRUE(next_stmt_executed);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.3 Assignment to LHS after delay completes.
-// After the delay, the captured RHS value is assigned to the LHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh4093, PerformsAssignmentToLhs) {
   Arena arena;
   Scheduler sched(arena);
   int dst = -1;
 
-  // Model: dst = #3 77;
-  // RHS=77 captured, assigned to dst at time 3.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
@@ -210,18 +162,12 @@ TEST(SimCh4093, PerformsAssignmentToLhs) {
   EXPECT_EQ(dst, 77);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.3 LHS update enables dependent events.
-// When the blocking assignment completes and updates the LHS, any processes
-// sensitive to the LHS are triggered.
-// ---------------------------------------------------------------------------
 TEST(SimCh4093, EnablesEventsOnLhsUpdate) {
   Arena arena;
   Scheduler sched(arena);
   int sig = 0;
   bool sensitive_triggered = false;
 
-  // Model: sig = #2 5; and a process sensitive to sig.
   auto* blocking = sched.GetEventPool().Acquire();
   blocking->kind = EventKind::kEvaluation;
   blocking->callback = [&]() {
@@ -230,7 +176,7 @@ TEST(SimCh4093, EnablesEventsOnLhsUpdate) {
     assign->kind = EventKind::kUpdate;
     assign->callback = [&, rhs_val]() {
       sig = rhs_val;
-      // The update triggers events sensitive to sig.
+
       auto* sensitive = sched.GetEventPool().Acquire();
       sensitive->kind = EventKind::kEvaluation;
       sensitive->callback = [&]() { sensitive_triggered = true; };
@@ -245,11 +191,6 @@ TEST(SimCh4093, EnablesEventsOnLhsUpdate) {
   EXPECT_TRUE(sensitive_triggered);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.3 Target determined at resume time, not schedule time.
-// For a blocking assignment with delay where the LHS target depends on
-// some variable, the target is determined at resume time, not schedule time.
-// ---------------------------------------------------------------------------
 TEST(SimCh4093, TargetDeterminedAtResumeTime) {
   Arena arena;
   Scheduler sched(arena);
@@ -257,9 +198,6 @@ TEST(SimCh4093, TargetDeterminedAtResumeTime) {
   int dst_a = 0;
   int dst_b = 0;
 
-  // Model: (select ? dst_b : dst_a) = #5 1;
-  // At time 0, select=0 → would target dst_a. But select changes at time 3.
-  // At resume time 5, select=1 → targets dst_b instead.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
@@ -267,7 +205,7 @@ TEST(SimCh4093, TargetDeterminedAtResumeTime) {
     auto* assign = sched.GetEventPool().Acquire();
     assign->kind = EventKind::kUpdate;
     assign->callback = [&, rhs_val]() {
-      // Target determined at resume time using current select value.
+
       if (select == 0) {
         dst_a = rhs_val;
       } else {
@@ -278,7 +216,6 @@ TEST(SimCh4093, TargetDeterminedAtResumeTime) {
   };
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
-  // Change select at time 3.
   auto* change_sel = sched.GetEventPool().Acquire();
   change_sel->kind = EventKind::kEvaluation;
   change_sel->callback = [&]() { select = 1; };
@@ -289,18 +226,11 @@ TEST(SimCh4093, TargetDeterminedAtResumeTime) {
   EXPECT_EQ(dst_b, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.3 Execution continues with next sequential statement.
-// After the blocking assignment completes (with or without delay), the next
-// sequential statement in the process executes.
-// ---------------------------------------------------------------------------
 TEST(SimCh4093, ContinuesWithNextSequentialStatement) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Model: begin dst = #2 val; next_stmt; end
-  // After the delayed assignment at time 2, the next statement runs.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
@@ -309,7 +239,7 @@ TEST(SimCh4093, ContinuesWithNextSequentialStatement) {
     resume->kind = EventKind::kUpdate;
     resume->callback = [&]() {
       order.push_back("assign_complete");
-      // Next sequential statement after blocking assignment.
+
       order.push_back("next_statement");
     };
     sched.ScheduleEvent({2}, Region::kActive, resume);
@@ -323,18 +253,11 @@ TEST(SimCh4093, ContinuesWithNextSequentialStatement) {
   EXPECT_EQ(order[2], "next_statement");
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.3 Continues with other Active or Reactive events.
-// After a blocking assignment completes, other events in the same region
-// may execute (the scheduler continues processing the region).
-// ---------------------------------------------------------------------------
 TEST(SimCh4093, ContinuesWithOtherActiveEvents) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Two processes at time 2: the resumed blocking assignment and another
-  // independent Active event. Both execute in the Active region.
   auto* blocking = sched.GetEventPool().Acquire();
   blocking->kind = EventKind::kEvaluation;
   blocking->callback = [&]() {
@@ -352,8 +275,7 @@ TEST(SimCh4093, ContinuesWithOtherActiveEvents) {
 
   sched.Run();
   ASSERT_EQ(order.size(), 2u);
-  // Both events execute at time 2 in Active region (order is nondeterministic
-  // per §4.7, but both must execute).
+
   bool has_blocking = false;
   bool has_other = false;
   for (const auto& s : order) {

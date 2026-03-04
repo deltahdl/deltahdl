@@ -1,5 +1,3 @@
-// §16.12.6: If-else property
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// property_expr ::= if (...) property_expr [else property_expr]
 TEST(ParserA210, PropertyExpr_IfElse) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -25,7 +22,6 @@ TEST(ParserA210, PropertyExpr_IfNoElse) {
               "endmodule\n"));
 }
 
-// Assert property with if-else inside property expression.
 TEST(ParserSection16, Sec16_5_1_PropertyIfElse) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -43,7 +39,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.15: Property if-else ---
 TEST(ParserAnnexF, AnnexFPropertyIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -56,10 +51,6 @@ TEST(ParserAnnexF, AnnexFPropertyIfElse) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.14.6.2 Property if-else
-// =============================================================================
 TEST(ParserSection16, PropertyIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -98,4 +89,4 @@ TEST(ParserSection16, PropertyIfElseInDecl) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

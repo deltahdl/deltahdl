@@ -1,5 +1,3 @@
-// §40.3.2.3: $coverage_get
-
 #include "fixture_program.h"
 #include "fixture_simulator.h"
 
@@ -8,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection40, CoverageGetSystemCall) {
-  // $coverage_get returns current coverage count
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial begin
@@ -19,4 +17,4 @@ TEST(ParserSection40, CoverageGetSystemCall) {
   )"));
 }
 
-}  // namespace
+}

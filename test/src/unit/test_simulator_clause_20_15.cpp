@@ -1,5 +1,3 @@
-// §20.15: Stochastic analysis tasks and functions
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -25,4 +23,4 @@ TEST(SysTask, QFullReturnsZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §31.6: Notifiers: user-defined responses to timing violations
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.2 notifier ::= variable_identifier
-// =============================================================================
 TEST(ParserA70502, NotifierVariable) {
   auto r = Parse(
       "module m;\n"
@@ -52,4 +47,4 @@ TEST(ParserSection28, Sec28_12_TimingCheckWithNotifier) {
   EXPECT_EQ(sp.sole_item->timing_check.notifier, "notif_reg");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §6.11.3: Signed and unsigned integer types
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// integer_atom_type [signing]
 TEST(ParserA221, DataTypeIntegerAtom) {
   auto r = Parse("module m; int unsigned x; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -25,8 +22,6 @@ TEST(ParserA221, SigningUnsigned) {
   EXPECT_FALSE(r.cu->modules[0]->items[0]->data_type.is_signed);
 }
 
-// --- data_type --- (12 alternatives)
-// integer_vector_type [signing] {packed_dimension}
 TEST(ParserA221, DataTypeIntegerVector) {
   auto r = Parse("module m; logic signed [7:0] a; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -36,7 +31,7 @@ TEST(ParserA221, DataTypeIntegerVector) {
   EXPECT_TRUE(item->data_type.is_signed);
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
-// 5. Signed with packed dims: logic signed [15:0].
+
 TEST(ParserSection6, Sec6_11_LogicSignedWithPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -54,7 +49,6 @@ TEST(ParserSection6, Sec6_11_LogicSignedWithPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-// 5b. Unsigned with packed dims: bit unsigned [7:0].
 TEST(ParserSection6, Sec6_11_BitUnsignedWithPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -70,7 +64,6 @@ TEST(ParserSection6, Sec6_11_BitUnsignedWithPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
 }
 
-// 6. byte signed explicitly (redundant but valid).
 TEST(ParserSection6, Sec6_11_ByteSignedExplicit) {
   auto r = Parse(
       "module t;\n"
@@ -85,7 +78,6 @@ TEST(ParserSection6, Sec6_11_ByteSignedExplicit) {
   EXPECT_EQ(item->name, "bs");
 }
 
-// 7. byte unsigned override.
 TEST(ParserSection6, Sec6_11_ByteUnsignedOverride) {
   auto r = Parse(
       "module t;\n"
@@ -100,7 +92,6 @@ TEST(ParserSection6, Sec6_11_ByteUnsignedOverride) {
   EXPECT_EQ(item->name, "bu");
 }
 
-// 8. shortint unsigned override.
 TEST(ParserSection6, Sec6_11_ShortintUnsignedOverride) {
   auto r = Parse(
       "module t;\n"
@@ -115,7 +106,6 @@ TEST(ParserSection6, Sec6_11_ShortintUnsignedOverride) {
   EXPECT_EQ(item->name, "su");
 }
 
-// 9. longint unsigned override.
 TEST(ParserSection6, Sec6_11_LongintUnsignedOverride) {
   auto r = Parse(
       "module t;\n"
@@ -130,7 +120,6 @@ TEST(ParserSection6, Sec6_11_LongintUnsignedOverride) {
   EXPECT_EQ(item->name, "lu");
 }
 
-// 10. integer unsigned override.
 TEST(ParserSection6, Sec6_11_IntegerUnsignedOverride) {
   auto r = Parse(
       "module t;\n"
@@ -145,7 +134,6 @@ TEST(ParserSection6, Sec6_11_IntegerUnsignedOverride) {
   EXPECT_EQ(item->name, "iu");
 }
 
-// 11. time signed override.
 TEST(ParserSection6, Sec6_11_TimeSignedOverride) {
   auto r = Parse(
       "module t;\n"
@@ -160,7 +148,6 @@ TEST(ParserSection6, Sec6_11_TimeSignedOverride) {
   EXPECT_EQ(item->name, "ts");
 }
 
-// 12. bit signed override.
 TEST(ParserSection6, Sec6_11_BitSignedOverride) {
   auto r = Parse(
       "module t;\n"
@@ -174,9 +161,9 @@ TEST(ParserSection6, Sec6_11_BitSignedOverride) {
   EXPECT_TRUE(item->data_type.is_signed);
   EXPECT_EQ(item->name, "bs");
 }
-// --- Signed and unsigned qualifiers (LRM 6.11.3) ---
+
 TEST(ParserSection6, IntUnsignedDecl) {
-  // int unsigned -- explicit unsigned override (LRM 6.11.3)
+
   auto r = Parse(
       "module m;\n"
       "  int unsigned ui;\n"
@@ -191,7 +178,7 @@ TEST(ParserSection6, IntUnsignedDecl) {
 }
 
 TEST(ParserSection6, IntSignedDecl) {
-  // int signed -- explicit signed (default for int)
+
   auto r = Parse(
       "module m;\n"
       "  int signed si;\n"
@@ -205,7 +192,7 @@ TEST(ParserSection6, IntSignedDecl) {
 }
 
 TEST(ParserSection6, LogicSignedDecl) {
-  // logic signed -- unsigned by default, override to signed
+
   auto r = Parse(
       "module m;\n"
       "  logic signed [7:0] sv;\n"
@@ -231,7 +218,6 @@ TEST(ParserSection6, RegUnsignedDecl) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-// --- int unsigned return type and variable decl (§18.13) ---
 TEST(ParserSection18, IntUnsignedFunctionReturnType) {
   auto r = Parse(
       "class C;\n"
@@ -247,7 +233,6 @@ TEST(ParserSection18, IntUnsignedFunctionReturnType) {
   EXPECT_GE(r.cu->classes[0]->members.size(), 1u);
 }
 
-// 24. reg with signed qualifier.
 TEST(ParserSection6, Sec6_11_2_RegSignedQualifier) {
   auto r = Parse(
       "module t;\n"
@@ -263,10 +248,6 @@ TEST(ParserSection6, Sec6_11_2_RegSignedQualifier) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
 }
 
-// =============================================================================
-// LRM section 6.11 -- Comprehensive signed/unsigned qualifiers
-// =============================================================================
-// 29. All integer types with explicit signed/unsigned qualifiers.
 TEST(ParserSection6, Sec6_11_AllTypesExplicitSignedness) {
   auto r = Parse(
       "module t;\n"
@@ -293,36 +274,35 @@ TEST(ParserSection6, Sec6_11_AllTypesExplicitSignedness) {
   EXPECT_FALSE(r.has_errors);
   auto& items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 18u);
-  // byte signed / byte unsigned
+
   EXPECT_TRUE(items[0]->data_type.is_signed);
   EXPECT_FALSE(items[1]->data_type.is_signed);
-  // shortint signed / shortint unsigned
+
   EXPECT_TRUE(items[2]->data_type.is_signed);
   EXPECT_FALSE(items[3]->data_type.is_signed);
-  // int signed / int unsigned
+
   EXPECT_TRUE(items[4]->data_type.is_signed);
   EXPECT_FALSE(items[5]->data_type.is_signed);
-  // longint signed / longint unsigned
+
   EXPECT_TRUE(items[6]->data_type.is_signed);
   EXPECT_FALSE(items[7]->data_type.is_signed);
-  // integer signed / integer unsigned
+
   EXPECT_TRUE(items[8]->data_type.is_signed);
   EXPECT_FALSE(items[9]->data_type.is_signed);
-  // time signed / time unsigned
+
   EXPECT_TRUE(items[10]->data_type.is_signed);
   EXPECT_FALSE(items[11]->data_type.is_signed);
-  // logic signed / logic unsigned
+
   EXPECT_TRUE(items[12]->data_type.is_signed);
   EXPECT_FALSE(items[13]->data_type.is_signed);
-  // bit signed / bit unsigned
+
   EXPECT_TRUE(items[14]->data_type.is_signed);
   EXPECT_FALSE(items[15]->data_type.is_signed);
-  // reg signed / reg unsigned
+
   EXPECT_TRUE(items[16]->data_type.is_signed);
   EXPECT_FALSE(items[17]->data_type.is_signed);
 }
 
-// reg unsigned override.
 TEST(ParserSection6, Sec6_11_2_RegUnsignedExplicit) {
   auto r = Parse(
       "module t;\n"
@@ -336,9 +316,7 @@ TEST(ParserSection6, Sec6_11_2_RegUnsignedExplicit) {
   EXPECT_FALSE(item->data_type.is_signed);
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
 }
-// =========================================================================
-// §6.11.3: Default signedness per Table 6-8
-// =========================================================================
+
 TEST(ParserSection6, IntDefaultSigned) {
   auto r = Parse(
       "module t;\n"
@@ -459,4 +437,4 @@ TEST(ParserSection6, RegDefaultUnsigned) {
   EXPECT_FALSE(item->data_type.is_signed) << "reg is unsigned by default";
 }
 
-}  // namespace
+}

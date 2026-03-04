@@ -1,15 +1,9 @@
-// §12.5.1: Case statement with do-not-cares
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// LRM section 12.5.1 -- casex / casez (additional cases)
-// =============================================================================
-// casez with wildcard question-mark pattern.
 TEST(ParserSection12, CasezWithQuestionMark) {
   auto r = Parse(
       "module t;\n"
@@ -30,7 +24,6 @@ TEST(ParserSection12, CasezWithQuestionMark) {
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
 
-// casex with multiple case items and expressions.
 TEST(ParserSection12, CasexMultipleItemsWithExpressions) {
   auto r = Parse(
       "module t;\n"
@@ -51,10 +44,6 @@ TEST(ParserSection12, CasexMultipleItemsWithExpressions) {
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
 
-// ---------------------------------------------------------------------------
-// case_keyword ::= case | casez | casex
-// ---------------------------------------------------------------------------
-// §12.5.1: casez keyword
 TEST(ParserA607, CasezKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -69,7 +58,6 @@ TEST(ParserA607, CasezKeyword) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
 }
 
-// §12.5.1: casex keyword
 TEST(ParserA607, CasexKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -84,7 +72,6 @@ TEST(ParserA607, CasexKeyword) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
 }
 
-// Casez inside always_ff.
 TEST(ParserSection12, CasezInsideAlwaysFF) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -107,9 +94,6 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-// ---------------------------------------------------------------------------
-// 20. casex inside always_latch.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_CasexStatement) {
   auto r = Parse(
       "module m;\n"
@@ -130,9 +114,6 @@ TEST(ParserSection9, Sec9_2_3_CasexStatement) {
   EXPECT_EQ(item->body->case_kind, TokenKind::kKwCasex);
 }
 
-// ---------------------------------------------------------------------------
-// 21. casez inside always_latch.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_CasezStatement) {
   auto r = Parse(
       "module m;\n"
@@ -153,9 +134,6 @@ TEST(ParserSection9, Sec9_2_3_CasezStatement) {
   EXPECT_EQ(item->body->case_kind, TokenKind::kKwCasez);
 }
 
-// =============================================================================
-// LRM section 12.5.1 -- casex / casez
-// =============================================================================
 TEST(ParserSection12, CasexStatement) {
   auto r = Parse(
       "module t;\n"
@@ -191,9 +169,7 @@ TEST(ParserSection12, CasezStatement) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
   ASSERT_EQ(stmt->case_items.size(), 2u);
 }
-// ---------------------------------------------------------------------------
-// 5. always_comb with casex statement
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_CasexStatement) {
   auto r = Parse(
       "module m;\n"
@@ -216,9 +192,6 @@ TEST(ParserSection9, Sec9_2_2_CasexStatement) {
   ASSERT_EQ(stmt->case_items.size(), 3u);
 }
 
-// ---------------------------------------------------------------------------
-// 6. always_comb with casez statement
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_CasezStatement) {
   auto r = Parse(
       "module m;\n"
@@ -243,4 +216,4 @@ TEST(ParserSection9, Sec9_2_2_CasezStatement) {
   ASSERT_EQ(stmt->case_items.size(), 5u);
 }
 
-}  // namespace
+}

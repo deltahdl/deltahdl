@@ -1,5 +1,3 @@
-// §13.4.1: Return values and void functions
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -10,13 +8,9 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §13.4.1 — void functions
-// =============================================================================
 TEST(Functions, VoidFunctionReturnsZero) {
   FuncFixture f;
 
-  // function void set_val(input int a); endfunction
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "set_val";
@@ -26,12 +20,10 @@ TEST(Functions, VoidFunctionReturnsZero) {
 
   auto* call = MakeCall(f.arena, "set_val", {MakeInt(f.arena, 42)});
   auto result = EvalExpr(call, f.ctx, f.arena);
-  // Void function should return 0.
+
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// Sim test fixture
-// §13: function_statement execution via function call
 TEST(SimA604, FunctionStatementExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,7 +46,6 @@ TEST(SimA604, FunctionStatementExecution) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §12.8: return exits function with value
 TEST(SimA605, JumpReturnFromFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -77,7 +68,6 @@ TEST(SimA605, JumpReturnFromFunction) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// --- tf_call: function call as expression statement ---
 TEST(SimA609, FunctionCallAsStatement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -101,7 +91,6 @@ TEST(SimA609, FunctionCallAsStatement) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// --- function return value used in expression ---
 TEST(SimA609, FunctionReturnValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -124,10 +113,6 @@ TEST(SimA609, FunctionReturnValue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// =============================================================================
-// A.8.2 Subroutine calls — Simulation
-// =============================================================================
-// § tf_call — function returning value used in expression
 TEST(SimA82, TfCallReturnValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -148,7 +133,6 @@ TEST(SimA82, TfCallReturnValue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// § function_subroutine_call — nested function calls
 TEST(SimA82, NestedFunctionCalls) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -172,7 +156,6 @@ TEST(SimA82, NestedFunctionCalls) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-// § void'(function_subroutine_call) — side effect executes, return discarded
 TEST(SimA82, VoidCastFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -194,11 +177,9 @@ TEST(SimA82, VoidCastFunctionCall) {
 TEST(Functions, VoidFunctionSideEffect) {
   FuncFixture f;
 
-  // Global variable "g" that the function modifies via output arg.
   auto* g_var = f.ctx.CreateVariable("g", 32);
   g_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // function void store(output int out); out = 99; endfunction
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "store";
@@ -214,4 +195,4 @@ TEST(Functions, VoidFunctionSideEffect) {
   EXPECT_EQ(g_var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §30.4.4: State-dependent paths
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// § binary_module_path_operator — && in specify path condition
 TEST(ParserA86, BinaryModulePathLogicalAnd) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -25,10 +22,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
   return spec->specify_items[0];
 }
 
-// =============================================================================
-// A.7.2 state_dependent_path_declaration
-// =============================================================================
-// if (expr) simple_path_declaration — parallel
 TEST(ParserA702, StateDependentIfSimpleParallel) {
   auto r = Parse(
       "module m;\n"
@@ -45,4 +38,4 @@ TEST(ParserA702, StateDependentIfSimpleParallel) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §6.11.3: Signed and unsigned integer types
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, VectorSignedBitType) {
-  // §6.9: bit type with signed qualifier.
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  bit signed [15:0] sb;\n"
@@ -20,4 +18,4 @@ TEST(ParserSection6, VectorSignedBitType) {
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §6.16.2: Putc()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.2: putc(i, c) -- replace byte at index i
-// =============================================================================
 TEST(StringMethods, Putc) {
   StringFixture f;
   auto* var = f.CreateStringVar("s", "hello");
@@ -20,4 +15,4 @@ TEST(StringMethods, Putc) {
   EXPECT_EQ(VecToString(var->value), "Hello");
 }
 
-}  // namespace
+}

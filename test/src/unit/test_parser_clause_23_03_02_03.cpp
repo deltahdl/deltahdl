@@ -1,6 +1,3 @@
-// §23.3.2.3: Connecting module instance using implicit named port connections
-// (.name)
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -9,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserAnnexA0411, NamedPortWithoutParens) {
-  // . port_identifier — no (expr), implicit connection shorthand
+
   auto r = Parse("module m; sub u0(.clk, .data); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -19,7 +16,6 @@ TEST(ParserAnnexA0411, NamedPortWithoutParens) {
   EXPECT_EQ(item->inst_ports[1].first, "data");
 }
 
-// --- interface_instantiation: named port without parentheses ---
 TEST(ParserAnnexA0412, InterfaceInstNamedPortNoParens) {
   auto r = Parse("module m; my_if u0(.clk, .rst); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -30,7 +26,6 @@ TEST(ParserAnnexA0412, InterfaceInstNamedPortNoParens) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-// --- program_instantiation: named port without parentheses ---
 TEST(ParserAnnexA0413, ProgramInstNamedPortNoParens) {
   auto r = Parse(
       "program my_prog(input logic clk, input logic rst);\n"
@@ -44,4 +39,4 @@ TEST(ParserAnnexA0413, ProgramInstNamedPortNoParens) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-}  // namespace
+}

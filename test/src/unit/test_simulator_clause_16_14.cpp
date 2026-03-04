@@ -1,5 +1,3 @@
-// §16.14: Concurrent assertions
-
 #include <cstdint>
 
 #include "fixture_simulator.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// AssertionMonitor basics
-// =============================================================================
 TEST(Assertion, AddPropertyAndCount) {
   AssertionMonitor monitor;
   SvaProperty prop;
@@ -36,7 +31,6 @@ TEST(Assertion, AttachEvaluatesOnSignalChange) {
 
   monitor.Attach(f.ctx, f.scheduler);
 
-  // Schedule: at t=0 set sig=0 (init), at t=10 set sig=1.
   auto* ev0 = f.scheduler.GetEventPool().Acquire();
   ev0->callback = [&sig, &f]() {
     sig->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -53,7 +47,6 @@ TEST(Assertion, AttachEvaluatesOnSignalChange) {
 
   f.scheduler.Run();
 
-  // The $rose assertion should have detected 0→1.
   EXPECT_GE(monitor.PassCount(), 1u);
 }
 
@@ -90,4 +83,4 @@ TEST(Assertion, AttachDetectsFailure) {
   EXPECT_GE(monitor.FailCount(), 1u);
 }
 
-}  // namespace
+}

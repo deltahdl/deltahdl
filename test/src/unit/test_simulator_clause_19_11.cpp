@@ -1,5 +1,3 @@
-// §19.11: Coverage computation
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -19,7 +17,6 @@ TEST(Coverage, AutoBinSampleAndCoverage) {
   cp->auto_bin_count = 4;
   CoverageDB::AutoCreateBins(cp, 0, 3);
 
-  // Hit all bins.
   db.Sample(g, {{"x", 0}});
   db.Sample(g, {{"x", 1}});
   db.Sample(g, {{"x", 2}});
@@ -28,9 +25,6 @@ TEST(Coverage, AutoBinSampleAndCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
 }
 
-// =============================================================================
-// Edge case: empty covergroup coverage
-// =============================================================================
 TEST(Coverage, EmptyGroupCoverageIsZero) {
   CoverageDB db;
   auto* g = db.CreateGroup("empty");
@@ -43,9 +37,6 @@ TEST(Coverage, PointCoverageWithNoBinsIs100) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(&cp), 100.0);
 }
 
-// =============================================================================
-// Multiple coverpoints in one group
-// =============================================================================
 TEST(Coverage, MultipleCoverpointsAveraged) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -62,10 +53,9 @@ TEST(Coverage, MultipleCoverpointsAveraged) {
   b2.values = {0};
   CoverageDB::AddBin(cp2, b2);
 
-  // Only cover "a", not "b".
   db.Sample(g, {{"a", 0}, {"b", 99}});
-  // a=100%, b=0% => average = 50%.
+
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 50.0);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §6.24.2: $cast dynamic casting
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -8,11 +6,8 @@ using namespace delta;
 
 namespace {
 
-// =========================================================================
-// §6.24.2: Dynamic casting — $cast
-// =========================================================================
 TEST(ParserSection6, DynamicCastTask) {
-  // §6.24.2: $cast as a task call.
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef enum { A, B, C } abc_t;\n"
@@ -24,7 +19,7 @@ TEST(ParserSection6, DynamicCastTask) {
 }
 
 TEST(ParserSection6, DynamicCastFunction) {
-  // §6.24.2: $cast as a function returns int.
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef enum { X, Y, Z } xyz_t;\n"
@@ -35,12 +30,7 @@ TEST(ParserSection6, DynamicCastFunction) {
               "  end\n"
               "endmodule\n"));
 }
-// =========================================================================
-// §6.24.1 -- Static casting (additional tests)
-// =========================================================================
-// =========================================================================
-// §6.24.2 -- Dynamic casting ($cast)
-// =========================================================================
+
 TEST(ParserSection6, DynamicCastCall) {
   auto r = Parse(
       "module t;\n"
@@ -82,4 +72,4 @@ TEST(ParserSection6, DynamicCastAssignResult) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

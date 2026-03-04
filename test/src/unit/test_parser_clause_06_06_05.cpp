@@ -1,5 +1,3 @@
-// §6.6.5: Tri0 and tri1 nets
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,7 +5,6 @@
 using namespace delta;
 namespace {
 
-// §6.7.1: Tri0 net declaration.
 TEST(ParserSection6, Sec6_7_1_Tri0Decl) {
   auto r = Parse(
       "module t;\n"
@@ -22,7 +19,6 @@ TEST(ParserSection6, Sec6_7_1_Tri0Decl) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-// §6.7.1: Tri1 net declaration.
 TEST(ParserSection6, Sec6_7_1_Tri1Decl) {
   auto r = Parse(
       "module t;\n"
@@ -37,4 +33,4 @@ TEST(ParserSection6, Sec6_7_1_Tri1Decl) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-}  // namespace
+}

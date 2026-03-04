@@ -1,5 +1,3 @@
-// §18.5.3: Distribution
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.5.3: Set membership (inside)
-// =============================================================================
 TEST(Constraint, InsideSetMembership) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -61,4 +56,4 @@ TEST(Constraint, InsideSetSingleValue) {
   EXPECT_EQ(solver.GetValue("x"), 77);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §11.4.3: Arithmetic operators
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
@@ -12,13 +10,10 @@ using namespace delta;
 
 namespace {
 
-// ==========================================================================
-// Arithmetic X/Z propagation — §11.4.3
-// ==========================================================================
 TEST(EvalOpXZ, ArithAddX) {
   SimFixture f;
-  // 4'b1x00 + 4'b0001 → all-X (any X/Z operand)
-  MakeVar4(f, "ax", 4, 0b1000, 0b0100);  // 4'b1x00
+
+  MakeVar4(f, "ax", 4, 0b1000, 0b0100);
   auto* b = f.ctx.CreateVariable("a1", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 1);
 
@@ -30,7 +25,7 @@ TEST(EvalOpXZ, ArithAddX) {
 
 TEST(EvalOpXZ, DivByZeroReturnsX) {
   SimFixture f;
-  // 10 / 0 → all-X (not 0)
+
   auto* expr = MakeBinary(f.arena, TokenKind::kSlash, MakeInt(f.arena, 10),
                           MakeInt(f.arena, 0));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -39,7 +34,7 @@ TEST(EvalOpXZ, DivByZeroReturnsX) {
 
 TEST(EvalOpXZ, ModByZeroReturnsX) {
   SimFixture f;
-  // 10 % 0 → all-X (not 0)
+
   auto* expr = MakeBinary(f.arena, TokenKind::kPercent, MakeInt(f.arena, 10),
                           MakeInt(f.arena, 0));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -59,7 +54,7 @@ TEST(EvalOpXZ, RealArithResult) {
 
 TEST(EvalOpXZ, MixedRealIntArith) {
   SimFixture f;
-  // If either operand is real, both are converted to real.
+
   MakeRealVar(f, "re", 2.5);
   auto* vi = f.ctx.CreateVariable("ri", 32);
   vi->value = MakeLogic4VecVal(f.arena, 32, 3);
@@ -70,12 +65,9 @@ TEST(EvalOpXZ, MixedRealIntArith) {
   EXPECT_DOUBLE_EQ(ToDouble(result), 7.5);
 }
 
-// ==========================================================================
-// Arithmetic X/Z — §11.4.3 (subtraction, multiply, power with X/Z)
-// ==========================================================================
 TEST(EvalOpXZ, ArithSubX) {
   SimFixture f;
-  // 4'b1x00 - 1 → all-X (X/Z operand in subtraction)
+
   MakeVar4(f, "sx", 4, 0b1000, 0b0100);
   auto* b = f.ctx.CreateVariable("s1", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 1);
@@ -87,8 +79,8 @@ TEST(EvalOpXZ, ArithSubX) {
 
 TEST(EvalOpXZ, ArithMulZ) {
   SimFixture f;
-  // 4'b10z0 * 3 → all-X (Z operand in multiply)
-  MakeVar4(f, "mz", 4, 0b1000, 0b0010);  // bit1=z (aval=0,bval=1)
+
+  MakeVar4(f, "mz", 4, 0b1000, 0b0010);
   auto* b = f.ctx.CreateVariable("m3", 4);
   b->value = MakeLogic4VecVal(f.arena, 4, 3);
   auto* expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "mz"),
@@ -99,7 +91,7 @@ TEST(EvalOpXZ, ArithMulZ) {
 
 TEST(EvalOpXZ, ArithPowX) {
   SimFixture f;
-  // 2 ** 4'b1x00 → all-X (X in exponent)
+
   MakeVar4(f, "px", 4, 0b1000, 0b0100);
   auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 2),
                           MakeId(f.arena, "px"));
@@ -107,7 +99,6 @@ TEST(EvalOpXZ, ArithPowX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// § expression — binary addition
 TEST(SimA83, BinaryAddition) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -125,7 +116,6 @@ TEST(SimA83, BinaryAddition) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// § expression — binary subtraction
 TEST(SimA83, BinarySubtraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -143,7 +133,6 @@ TEST(SimA83, BinarySubtraction) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// § expression — binary multiplication
 TEST(SimA83, BinaryMultiplication) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -161,7 +150,6 @@ TEST(SimA83, BinaryMultiplication) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// § expression — unary bitwise NOT
 TEST(SimA83, UnaryNegate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -179,10 +167,6 @@ TEST(SimA83, UnaryNegate) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// =============================================================================
-// A.8.6 Operators — unary_operator — Simulation
-// =============================================================================
-// § unary_operator — unary plus (identity)
 TEST(SimA86, UnaryPlus) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -200,7 +184,6 @@ TEST(SimA86, UnaryPlus) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// § unary_operator — unary minus (negate)
 TEST(SimA86, UnaryMinus) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -218,10 +201,6 @@ TEST(SimA86, UnaryMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (arithmetic) — Simulation
-// =============================================================================
-// § binary_operator — addition
 TEST(SimA86, BinaryAdd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -239,7 +218,6 @@ TEST(SimA86, BinaryAdd) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// § binary_operator — subtraction
 TEST(SimA86, BinarySub) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -257,7 +235,6 @@ TEST(SimA86, BinarySub) {
   EXPECT_EQ(var->value.ToUint64(), 18u);
 }
 
-// § binary_operator — multiplication
 TEST(SimA86, BinaryMul) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -275,7 +252,6 @@ TEST(SimA86, BinaryMul) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// § binary_operator — division
 TEST(SimA86, BinaryDiv) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -293,7 +269,6 @@ TEST(SimA86, BinaryDiv) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// § binary_operator — modulo
 TEST(SimA86, BinaryMod) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -311,7 +286,6 @@ TEST(SimA86, BinaryMod) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// § binary_operator — power
 TEST(SimA86, BinaryPower) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -338,7 +312,6 @@ TEST(CompiledSim, ExecuteExpressionEval) {
   auto* c_var = f.ctx.CreateVariable("c", 32);
   c_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // AST: c = a + b
   auto* lhs = f.arena.Create<Expr>();
   lhs->kind = ExprKind::kIdentifier;
   lhs->text = "c";
@@ -369,7 +342,7 @@ TEST(CompiledSim, ExecuteExpressionEval) {
 
 TEST(EvalAdv, PowZeroExp) {
   SimFixture f;
-  // a ** 0 = 1 for any a (Table 11-4).
+
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
   expr->op = TokenKind::kPower;
@@ -381,9 +354,9 @@ TEST(EvalAdv, PowZeroExp) {
 
 TEST(EvalAdv, PowNegExpInt) {
   SimFixture f;
-  // 3 ** (-2) = 0 for integer (Table 11-4: |base|>1, negative exp → 0).
+
   MakeSignedVarAdv(f, "pb", 8, 3);
-  // -2 in 8-bit signed = 0xFE
+
   MakeSignedVarAdv(f, "pe", 8, 0xFE);
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
@@ -396,22 +369,22 @@ TEST(EvalAdv, PowNegExpInt) {
 
 TEST(EvalAdv, PowZeroBaseNegExp) {
   SimFixture f;
-  // 0 ** (-1) = X (Table 11-4: zero base, negative exp → X).
+
   MakeSignedVarAdv(f, "zb", 8, 0);
-  MakeSignedVarAdv(f, "ze", 8, 0xFF);  // -1 in 8-bit
+  MakeSignedVarAdv(f, "ze", 8, 0xFF);
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
   expr->op = TokenKind::kPower;
   expr->lhs = MakeId(f.arena, "zb");
   expr->rhs = MakeId(f.arena, "ze");
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
 TEST(EvalAdv, PowNeg1OddExp) {
   SimFixture f;
-  // (-1) ** 3 = -1 (Table 11-4: base -1, odd exp).
-  MakeSignedVarAdv(f, "n1", 8, 0xFF);  // -1 in 8-bit
+
+  MakeSignedVarAdv(f, "n1", 8, 0xFF);
   MakeSignedVarAdv(f, "n3", 8, 3);
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
@@ -419,14 +392,14 @@ TEST(EvalAdv, PowNeg1OddExp) {
   expr->lhs = MakeId(f.arena, "n1");
   expr->rhs = MakeId(f.arena, "n3");
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFFu);  // -1 in 8-bit
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFFu);
   EXPECT_TRUE(result.is_signed);
 }
 
 TEST(EvalAdv, PowNeg1EvenExp) {
   SimFixture f;
-  // (-1) ** 4 = 1 (Table 11-4: base -1, even exp).
-  MakeSignedVarAdv(f, "n1", 8, 0xFF);  // -1 in 8-bit
+
+  MakeSignedVarAdv(f, "n1", 8, 0xFF);
   MakeSignedVarAdv(f, "n4", 8, 4);
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kBinary;
@@ -438,9 +411,6 @@ TEST(EvalAdv, PowNeg1EvenExp) {
   EXPECT_TRUE(result.is_signed);
 }
 
-// ==========================================================================
-// Signed arithmetic — §11.4.3, §11.4.3.1
-// ==========================================================================
 TEST(EvalAdv, SignedDivTruncToZero) {
   SimFixture f;
   MakeSignedVarAdv(f, "sd", 8, 0xF9);
@@ -474,12 +444,9 @@ TEST(EvalAdv, SignedMulNeg) {
   EXPECT_TRUE(result.is_signed);
 }
 
-// ==========================================================================
-// Power operator (**)
-// ==========================================================================
 TEST(EvalOp, PowerBasic) {
   SimFixture f;
-  // 2 ** 10 = 1024
+
   auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 2),
                           MakeInt(f.arena, 10));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -488,7 +455,7 @@ TEST(EvalOp, PowerBasic) {
 
 TEST(EvalOp, PowerZeroExponent) {
   SimFixture f;
-  // 5 ** 0 = 1
+
   auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 5),
                           MakeInt(f.arena, 0));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -497,11 +464,11 @@ TEST(EvalOp, PowerZeroExponent) {
 
 TEST(EvalOp, PowerOneExponent) {
   SimFixture f;
-  // 7 ** 1 = 7
+
   auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 7),
                           MakeInt(f.arena, 1));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 7u);
 }
 
-}  // namespace
+}

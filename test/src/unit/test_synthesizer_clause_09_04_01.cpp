@@ -1,5 +1,3 @@
-// §9.4.1: Delay control
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -23,4 +21,4 @@ TEST(SynthLower, RejectDelay) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

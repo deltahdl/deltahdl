@@ -1,5 +1,3 @@
-// §6.16.8: Substr()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.8: substr(i, j) -- extract substring from index i to j
-// =============================================================================
 TEST(StringMethods, Substr) {
   StringFixture f;
   f.CreateStringVar("s", "hello world");
@@ -20,4 +15,4 @@ TEST(StringMethods, Substr) {
   EXPECT_EQ(VecToString(result), "world");
 }
 
-}  // namespace
+}

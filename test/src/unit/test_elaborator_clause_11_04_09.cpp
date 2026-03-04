@@ -1,5 +1,3 @@
-// §11.4.9: Reduction operators
-
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 
@@ -98,9 +96,6 @@ TEST(ElabA86, UnaryReductionXnorAltElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// 30. always_comb with reduction operator and width check.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombReductionAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -123,9 +118,6 @@ TEST(SimCh9, AlwaysCombReductionAnd) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 18. always_comb with reduction OR.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombReductionOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -147,8 +139,8 @@ TEST(SimCh9b, AlwaysCombReductionOr) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // |8'h01 = 1 (at least one bit set).
+
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

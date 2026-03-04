@@ -1,5 +1,3 @@
-// Annex A.7.5.2: System timing check command arguments
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// delayed_data ::= terminal_identifier [ constant_mintypmax_expression ]
 TEST(ParserA70502, DelayedDataWithBracketExpr) {
   auto r = Parse(
       "module m;\n"
@@ -22,7 +19,6 @@ TEST(ParserA70502, DelayedDataWithBracketExpr) {
   EXPECT_NE(tc->delayed_data_expr, nullptr);
 }
 
-// delayed_reference ::= terminal_identifier [ constant_mintypmax_expression ]
 TEST(ParserA70502, DelayedReferenceWithBracketExpr) {
   auto r = Parse(
       "module m;\n"
@@ -38,9 +34,6 @@ TEST(ParserA70502, DelayedReferenceWithBracketExpr) {
   EXPECT_EQ(tc->delayed_ref_expr->kind, ExprKind::kMinTypMax);
 }
 
-// =============================================================================
-// A.7.5.2 threshold ::= constant_expression
-// =============================================================================
 TEST(ParserA70502, ThresholdExpression) {
   auto r = Parse(
       "module m;\n"
@@ -54,4 +47,4 @@ TEST(ParserA70502, ThresholdExpression) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-}  // namespace
+}

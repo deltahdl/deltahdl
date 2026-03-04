@@ -1,5 +1,3 @@
-// §10.5: Variable declaration assignment (variable initialization)
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -17,8 +15,7 @@ TEST(ParserA24, VarDeclAssignmentWithInit) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 TEST(ParserSection6, VariableInitialization) {
-  // §6.5: Assignment as part of variable declaration is an initialization,
-  // not a continuous assignment.
+
   auto r = Parse(
       "module t;\n"
       "  logic v = 1'b1;\n"
@@ -28,10 +25,7 @@ TEST(ParserSection6, VariableInitialization) {
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->init_expr, nullptr);
 }
-// Returns the first module item from the first module.
-// =============================================================================
-// §4.6: Variable initialization at declaration — static lifetime determinism
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_VarInitAtDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -59,4 +53,4 @@ TEST(ParserCh90301, BlockVarDecl_WithInit) {
   EXPECT_NE(blk->stmts[0]->var_init, nullptr);
 }
 
-}  // namespace
+}

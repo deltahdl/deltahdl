@@ -1,5 +1,3 @@
-// §31.2: Overview
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Multiple system_timing_check in one specify block
 TEST(ParserA705, MultipleTimingChecks) {
   auto r = Parse(
       "module m;\n"
@@ -29,4 +26,4 @@ TEST(ParserA705, MultipleTimingChecks) {
             TimingCheckKind::kPeriod);
 }
 
-}  // namespace
+}

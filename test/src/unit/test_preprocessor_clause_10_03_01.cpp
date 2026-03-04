@@ -1,5 +1,3 @@
-// §10.3.1: The net declaration assignment
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -19,4 +17,4 @@ TEST(ParserSection10, NetDeclAssignment) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

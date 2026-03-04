@@ -1,5 +1,3 @@
-// §8.14: Overridden members
-
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -9,14 +7,6 @@
 #include "simulator/eval.h"
 
 using namespace delta;
-
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
 
 namespace {
 
@@ -43,9 +33,9 @@ TEST(ClassSim, ChildMethodOverridesParent) {
   auto [handle, obj] = MakeObj(f, derived);
   auto* resolved = obj->ResolveMethod("greet");
   EXPECT_NE(resolved, nullptr);
-  // Should find derived's version first.
+
   EXPECT_NE(resolved, base_method);
   EXPECT_EQ(resolved, child_method);
 }
 
-}  // namespace
+}

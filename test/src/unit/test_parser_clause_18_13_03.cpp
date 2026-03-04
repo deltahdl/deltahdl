@@ -1,14 +1,9 @@
-// §18.13.3: srandom()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// §18.13.3 srandom() -- random stability and process
-// =============================================================================
 TEST(ParserSection18, SrandomMethodCall) {
   auto r = Parse(
       "class C;\n"
@@ -49,4 +44,4 @@ TEST(ParserSection18, SrandomWithExpression) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

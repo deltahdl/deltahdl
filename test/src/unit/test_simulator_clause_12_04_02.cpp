@@ -1,5 +1,3 @@
-// §12.4.2: unique-if, unique0-if, and priority-if
-
 #include <cstdint>
 #include <string_view>
 
@@ -18,23 +16,13 @@
 
 using namespace delta;
 
-// Helper to create a blocking assignment statement: lhs = rhs_val.
-
-// Driver coroutine that co_awaits an ExecTask and stores its result.
-
-// Helper to run ExecStmt synchronously (for non-suspending statements).
-// Creates a wrapper coroutine, resumes it, and returns the result.
 namespace {
 
-// =============================================================================
-// 11. Unique if / Priority if
-// =============================================================================
 TEST(StmtExec, UniqueIfMatchingBranch) {
   StmtFixture f;
   auto* result_var = f.ctx.CreateVariable("ui", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // unique if (1) ui = 10; else ui = 20;
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->qualifier = CaseQualifier::kUnique;
@@ -51,7 +39,6 @@ TEST(StmtExec, PriorityIfFirstMatchTaken) {
   auto* result_var = f.ctx.CreateVariable("pi", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // priority if (1) pi = 30;
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->qualifier = CaseQualifier::kPriority;
@@ -67,8 +54,6 @@ TEST(StmtExec, PriorityIfNoMatchNoElseWarning) {
   auto* result_var = f.ctx.CreateVariable("piw", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // priority if (0) piw = 30;
-  // No else branch => should emit warning but not crash.
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->qualifier = CaseQualifier::kPriority;
@@ -76,13 +61,12 @@ TEST(StmtExec, PriorityIfNoMatchNoElseWarning) {
   stmt->then_branch = MakeBlockAssign(f.arena, "piw", 30);
 
   RunStmt(stmt, f.ctx, f.arena);
-  // Value should remain 0 since condition is false and no else.
+
   EXPECT_EQ(result_var->value.ToUint64(), 0u);
-  // DiagEngine should have emitted a warning.
+
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.4.2: unique if — qualifier stored on AST
 TEST(SimA606, UniqueIfQualifierStored) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -105,7 +89,6 @@ TEST(SimA606, UniqueIfQualifierStored) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.4.2: priority if — executes first matching branch
 TEST(SimA606, PriorityIfFirstMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -127,4 +110,4 @@ TEST(SimA606, PriorityIfFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

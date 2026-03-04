@@ -1,12 +1,9 @@
-// §30.4.5: Full connection and parallel connection paths
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Simple full path elaborates
 TEST(ElabA702, SimpleFullPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,4 +17,4 @@ TEST(ElabA702, SimpleFullPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

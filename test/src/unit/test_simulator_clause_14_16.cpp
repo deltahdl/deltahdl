@@ -1,5 +1,3 @@
-// §14.16: Synchronous drives
-
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "helpers_eval_op.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- clocking_direction: output driving with skew ---
 TEST(SimA611, OutputDrivingWithSkew) {
   SimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -36,4 +33,4 @@ TEST(SimA611, OutputDrivingWithSkew) {
   EXPECT_EQ(out->value.ToUint64(), 0x55u);
 }
 
-}  // namespace
+}

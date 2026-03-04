@@ -1,5 +1,3 @@
-// §11.4.9: Reduction operators
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -17,7 +15,6 @@ TEST(ParserSection11, ReductionOnParenthesizedExpr) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-// Unary reduction operators
 TEST(ParserA83, UnaryReductionAnd) {
   auto r = Parse("module m; initial x = &a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -48,7 +45,6 @@ TEST(ParserA83, UnaryReductionXor) {
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
 }
 
-// § unary_operator ::= ~&
 TEST(ParserA86, UnaryReductionNand) {
   auto r = Parse("module m; initial x = ~&a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -59,7 +55,6 @@ TEST(ParserA86, UnaryReductionNand) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeAmp);
 }
 
-// § unary_operator ::= ~|
 TEST(ParserA86, UnaryReductionNor) {
   auto r = Parse("module m; initial x = ~|a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -70,7 +65,6 @@ TEST(ParserA86, UnaryReductionNor) {
   EXPECT_EQ(rhs->op, TokenKind::kTildePipe);
 }
 
-// § unary_operator ::= ~^
 TEST(ParserA86, UnaryReductionXnor) {
   auto r = Parse("module m; initial x = ~^a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -81,7 +75,6 @@ TEST(ParserA86, UnaryReductionXnor) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
 }
 
-// § unary_operator ::= ^~
 TEST(ParserA86, UnaryReductionXnorAlt) {
   auto r = Parse("module m; initial x = ^~a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -92,9 +85,6 @@ TEST(ParserA86, UnaryReductionXnorAlt) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-// =========================================================================
-// Section 11.4.3.1 -- Unary reduction operators
-// =========================================================================
 TEST(ParserSection11, ReductionXnorCaretTilde) {
   auto r = Parse(
       "module t;\n"
@@ -149,9 +139,7 @@ TEST(ParserSection11, Sec11_1_UnaryReductionXnorCaretTilde) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
-// =========================================================================
-// Section 11.4.9 -- Reduction operators
-// =========================================================================
+
 TEST(ParserSection11, ReductionAnd) {
   auto r = Parse(
       "module t;\n"
@@ -218,9 +206,6 @@ TEST(ParserSection11, ReductionXnor) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
 TEST(ParserCh505, Operator_ReductionAnd) {
   auto r = Parse(
       "module m;\n"
@@ -239,4 +224,4 @@ TEST(ParserCh505, Operator_ReductionXnor) {
   EXPECT_TRUE(ParseOk("module m; initial x = ~^y; endmodule"));
 }
 
-}  // namespace
+}

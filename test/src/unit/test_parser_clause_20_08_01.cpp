@@ -1,5 +1,3 @@
-// §20.8.1: Integer math functions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -8,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh50603, SystemFunction_InExpression) {
-  // A system function like $clog2 used inside an expression.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter W = $clog2(256);\n"
@@ -24,13 +22,6 @@ TEST(ParserSection11, ConstExprSystemFuncInParam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.8.2 Subroutine calls — system_tf_call
-// =============================================================================
-// § system_tf_call ::= system_tf_identifier [ ( list_of_arguments ) ]
-//   | system_tf_identifier ( data_type [ , expression ] )
-//   | system_tf_identifier ( expression { , [ expression ] } ... )
-// system_tf_call as expression ($clog2 returns a value)
 TEST(ParserA82, SystemTfCallAsExpr) {
   auto r = Parse(
       "module m;\n"
@@ -46,10 +37,6 @@ TEST(ParserA82, SystemTfCallAsExpr) {
   EXPECT_EQ(stmt->rhs->args.size(), 1u);
 }
 
-// =============================================================================
-// A.8.4 Primaries — system calls as primary
-// =============================================================================
-// § primary — system function call
 TEST(ParserA84, PrimarySystemCall) {
   auto r = Parse("module m; initial x = $clog2(16); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -59,4 +46,4 @@ TEST(ParserA84, PrimarySystemCall) {
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

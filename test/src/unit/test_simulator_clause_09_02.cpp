@@ -1,21 +1,15 @@
-// §9.2: Structured procedures
-
 #include <gtest/gtest.h>
 
 #include "simulator/process.h"
 
 using namespace delta;
 
-// A real coroutine that produces a SimCoroutine.
 SimCoroutine MakeTestCoroutine() { co_return; }
 
 namespace {
 
-// ============================================================================
-// §9.5 Process execution threads
-// ============================================================================
 TEST(Process, ProcessKindEnum) {
-  // §9.2: All process kinds are defined.
+
   struct {
     ProcessKind kind;
     uint8_t expected;
@@ -30,4 +24,4 @@ TEST(Process, ProcessKindEnum) {
   }
 }
 
-}  // namespace
+}

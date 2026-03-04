@@ -1,5 +1,3 @@
-// §5.5: Operators
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,11 +5,8 @@ using namespace delta;
 
 namespace {
 
-// =========================================================================
-// All two-char operators
-// =========================================================================
 TEST(ParserCh501, Sec5_1_TwoCharOperators) {
-  // Exercise ==, !=, <=, >=, &&, ||, <<, >>, +=, -=, *=, /=, etc.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -31,11 +26,8 @@ TEST(ParserCh501, Sec5_1_TwoCharOperators) {
               "endmodule\n"));
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
 TEST(ParserCh501, Sec5_1_TwoCharOperatorTokenKinds) {
-  // Verify the specific TokenKind for == in an expression.
+
   auto r = Parse(
       "module m;\n"
       "  initial x = (a == b);\n"
@@ -49,11 +41,8 @@ TEST(ParserCh501, Sec5_1_TwoCharOperatorTokenKinds) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
 
-// =========================================================================
-// All three-char operators
-// =========================================================================
 TEST(ParserCh501, Sec5_1_ThreeCharOperators) {
-  // ===, !==, <<<, >>>, ==?, !=?
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -67,4 +56,4 @@ TEST(ParserCh501, Sec5_1_ThreeCharOperators) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

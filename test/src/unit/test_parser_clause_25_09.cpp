@@ -1,13 +1,9 @@
-// §25.9: Virtual interfaces
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// virtual [interface] interface_identifier [parameter_value_assignment]
-//   [. modport_identifier]
 TEST(ParserA221, DataTypeVirtualInterface) {
   auto r = Parse(
       "interface my_ifc; endinterface\n"
@@ -19,7 +15,6 @@ TEST(ParserA221, DataTypeVirtualInterface) {
   EXPECT_EQ(item->data_type.type_name, "my_ifc");
 }
 
-// --- Virtual interface (LRM §25.9) ---
 TEST(ParserSection25, VirtualInterfaceDecl) {
   auto r = Parse(
       "module top;\n"
@@ -69,7 +64,6 @@ TEST(ParserSection25, VirtualInterfaceWithModportNames) {
   EXPECT_EQ(item->data_type.modport_name, "target");
 }
 
-// --- Virtual interface with parameter (LRM §25.9) ---
 TEST(ParserSection25, VirtualInterfaceAssignment) {
   auto r = Parse(
       "module top;\n"
@@ -99,4 +93,4 @@ TEST(ParserSection25, VirtualInterfaceMultipleDecls) {
   EXPECT_EQ(mod->items[1]->name, "b_if");
 }
 
-}  // namespace
+}

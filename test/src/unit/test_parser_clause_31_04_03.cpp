@@ -1,5 +1,3 @@
-// §31.4.3: $fullskew
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// system_timing_check ::= $fullskew_timing_check
 TEST(ParserA705, SystemTimingCheckFullskew) {
   auto r = Parse(
       "module m;\n"
@@ -23,10 +20,6 @@ TEST(ParserA705, SystemTimingCheckFullskew) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
 }
 
-// =============================================================================
-// A.7.5.1 $fullskew_timing_check
-// =============================================================================
-// $fullskew with two limits, event_based_flag and remain_active_flag
 TEST(ParserA70501, FullskewWithFlags) {
   auto r = Parse(
       "module m;\n"
@@ -60,4 +53,4 @@ TEST_F(SpecifyTest, FullskewTimingCheck) {
   ASSERT_GE(tc.limits.size(), 2u);
 }
 
-}  // namespace
+}

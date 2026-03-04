@@ -1,12 +1,9 @@
-// §8.24: Out-of-block declarations
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// §8.24 — Out-of-block method with scoped name
 TEST(ParserSection8, OutOfBlockMethod) {
   auto r = Parse(
       "module m;\n"
@@ -22,11 +19,6 @@ TEST(ParserSection8, OutOfBlockMethod) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// function_prototype ::=
-//   function [ dynamic_override_specifiers ] data_type_or_void
-//     function_identifier [ ( [ tf_port_list ] ) ]
-// ---------------------------------------------------------------------------
 TEST(ParserA26, FuncPrototypeExtern) {
   auto r = Parse(
       "module m;\n"
@@ -41,7 +33,6 @@ TEST(ParserA26, FuncPrototypeExtern) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-// method_prototype ::= task_prototype | function_prototype
 TEST(SourceText, ClassMethodPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -56,9 +47,6 @@ TEST(SourceText, ClassMethodPrototype) {
   EXPECT_EQ(members[1]->method->name, "do_work");
 }
 
-// ---------------------------------------------------------------------------
-// function_body_declaration (scope qualifiers)
-// ---------------------------------------------------------------------------
 TEST(ParserA26, FuncBodyClassScope) {
   auto r = Parse(
       "class C;\n"
@@ -82,9 +70,6 @@ TEST(ParserA26, FuncBodyOutOfBlockConstructor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// task_body_declaration (scope qualifiers)
-// ---------------------------------------------------------------------------
 TEST(ParserA27, TaskBodyClassScope) {
   auto r = Parse(
       "class C;\n"
@@ -108,4 +93,4 @@ TEST(ParserA27, TaskBodyOutOfBlockMethod) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

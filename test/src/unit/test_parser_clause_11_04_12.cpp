@@ -1,5 +1,3 @@
-// §11.4.12: Concatenation operators
-
 #include "fixture_evaluator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,9 +5,6 @@
 using namespace delta;
 namespace {
 
-// ---------------------------------------------------------------------------
-// 13. always_comb with concatenation
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_Concatenation) {
   auto r = Parse(
       "module m;\n"
@@ -27,9 +22,7 @@ TEST(ParserSection9, Sec9_2_2_Concatenation) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(item->body->rhs->elements.size(), 2u);
 }
-// =========================================================================
-// Section 11.4.12 -- Concatenation operators
-// =========================================================================
+
 TEST(ParserSection11, ConcatWithPartSelects) {
   auto r = Parse(
       "module t;\n"
@@ -53,9 +46,6 @@ TEST(ParserAnnexA, A8Concatenation) {
   EXPECT_EQ(stmt->rhs->elements.size(), 3u);
 }
 
-// ---------------------------------------------------------------------------
-// 27. always_comb with concatenation on LHS
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_ConcatenationLHS) {
   auto r = Parse(
       "module m;\n"
@@ -81,9 +71,6 @@ TEST(ParserSection11, ConcatOnLhsOfAssign) {
               "endmodule\n"));
 }
 
-// =========================================================================
-// Section 11.4.12.1 -- Concatenation
-// =========================================================================
 TEST(ParserSection11, ConcatPartSelectPostfix) {
   auto r = Parse(
       "module t;\n"
@@ -105,7 +92,7 @@ TEST(ParserSection11, ConcatSingleElement) {
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(rhs->elements.size(), 1u);
 }
-// --- Select on concatenation result ({a,b}[i]) ---
+
 TEST(ParserSection11, Sec11_4_1_SelectOnConcatenation) {
   auto r = Parse(
       "module t;\n"
@@ -121,10 +108,6 @@ TEST(ParserSection11, Sec11_4_1_SelectOnConcatenation) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-// =============================================================================
-// A.8.1 Concatenations — Parser
-// =============================================================================
-// § concatenation ::= { expression { , expression } }
 TEST(ParserA81, ConcatenationSingleElement) {
   auto r = Parse("module m; initial x = {a}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -169,12 +152,10 @@ TEST(ParserA81, ConcatenationNested) {
 
 TEST(ConstEval, Concatenation) {
   EvalFixture f;
-  // {4'd3, 4'd5} = 8'h35 = 53
+
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4'd3, 4'd5}", f)), 0x35);
 }
 
-// § constant_concatenation ::= { constant_expression { , constant_expression }
-// }
 TEST(ParserA81, ConstantConcatenation) {
   auto r = Parse(
       "module m;\n"
@@ -184,7 +165,6 @@ TEST(ParserA81, ConstantConcatenation) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § Postfix select on concatenation (§11.4.12)
 TEST(ParserA81, ConcatenationPostfixBitSelect) {
   auto r = Parse("module m; initial x = {a, b}[3]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -203,7 +183,6 @@ TEST(ParserA81, ConcatenationPostfixPartSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-// § constant_primary — constant_concatenation
 TEST(ParserA84, ConstantPrimaryConcatenation) {
   auto r = Parse("module m; parameter int P = {4'd1, 4'd2}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -213,7 +192,6 @@ TEST(ParserA84, ConstantPrimaryConcatenation) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kConcatenation);
 }
 
-// § primary — concatenation
 TEST(ParserA84, PrimaryConcatenation) {
   auto r = Parse(
       "module m;\n"
@@ -228,7 +206,6 @@ TEST(ParserA84, PrimaryConcatenation) {
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
 }
 
-// § variable_lvalue — nonblocking assignment with concatenation LHS
 TEST(ParserA85, VarLvalueNonblockingConcat) {
   auto r = Parse(
       "module m; logic [3:0] a, b;\n"
@@ -243,7 +220,6 @@ TEST(ParserA85, VarLvalueNonblockingConcat) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-// --- Concatenation ---
 TEST(ParserSection11, Sec11_1_ConcatenationElements) {
   auto r = Parse(
       "module t;\n"
@@ -256,9 +232,7 @@ TEST(ParserSection11, Sec11_1_ConcatenationElements) {
   EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kIdentifier);
   EXPECT_EQ(rhs->elements[2]->kind, ExprKind::kIntegerLiteral);
 }
-// =========================================================================
-// Section 11.4.12 -- Concatenation operators
-// =========================================================================
+
 TEST(ParserSection11, ConcatenationBasic) {
   auto r = Parse(
       "module t;\n"
@@ -270,4 +244,4 @@ TEST(ParserSection11, ConcatenationBasic) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-}  // namespace
+}

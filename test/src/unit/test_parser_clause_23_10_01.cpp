@@ -1,5 +1,3 @@
-// §23.10.1: defparam statement
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -28,4 +26,4 @@ TEST(ParserAnnexA, A9DefparamDecl) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

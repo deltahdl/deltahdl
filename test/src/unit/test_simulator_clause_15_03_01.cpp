@@ -1,5 +1,3 @@
-// §15.3.1: New()
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -15,9 +13,6 @@
 
 namespace {
 
-// =============================================================================
-// 1. Semaphore: Constructor with key count (section 15.3)
-// =============================================================================
 TEST(IpcSync, SemaphoreNewDefaultKeys) {
   SemaphoreObject sem;
   EXPECT_EQ(sem.key_count, 0);
@@ -28,4 +23,4 @@ TEST(IpcSync, SemaphoreNewWithKeys) {
   EXPECT_EQ(sem.key_count, 5);
 }
 
-}  // namespace
+}

@@ -1,20 +1,11 @@
-// §13.5.2: Pass by reference
-
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
 
 using namespace delta;
 
-// ============================================================================
-// Test fixture
-// ============================================================================
 namespace {
 
-// ============================================================================
-// A4: §6.21 — ValidateRefLifetime
-// ============================================================================
-// A static function with ref arg should produce a diagnostic error.
 TEST(QueueRef, RejectRefInStaticFunc) {
   SimFixture f;
 
@@ -29,7 +20,6 @@ TEST(QueueRef, RejectRefInStaticFunc) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// An automatic function with ref arg should be accepted.
 TEST(QueueRef, AcceptRefInAutoFunc) {
   SimFixture f;
 
@@ -43,4 +33,4 @@ TEST(QueueRef, AcceptRefInAutoFunc) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

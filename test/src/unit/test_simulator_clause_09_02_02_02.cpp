@@ -1,5 +1,3 @@
-// §9.2.2.2: Combinational logic always_comb procedure
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -34,7 +32,7 @@ TEST(Lowerer, AlwaysCombRetrigger) {
 }
 
 TEST(Lowerer, AlwaysCombAutoTriggerTimeZero) {
-  // IEEE §9.2: always_comb auto-triggers once at time zero.
+
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -67,29 +65,10 @@ TEST(Lowerer, SensitivityMapPopulated) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
 
-  // Sensitivity map should have signal 'a' mapped to a process.
   const auto& procs = f.ctx.GetSensitiveProcesses("a");
   EXPECT_FALSE(procs.empty());
 }
 
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// 4. §4.2 Multiple process types execute concurrently: initial + always_comb.
-//    An initial block sets a value; always_comb reacts to produce output.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -108,10 +87,6 @@ TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-// ---------------------------------------------------------------------------
-// 10. §4.2 Varying abstraction levels: combinational logic (always_comb)
-//     and sequential logic (initial with delays) work together.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, CombAndSequentialAbstractions) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -133,10 +108,6 @@ TEST(SimCh4, CombAndSequentialAbstractions) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// ---------------------------------------------------------------------------
-// 16. §4.2 Concurrent always_comb blocks: two independent always_comb
-//     blocks compute results from a shared input.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, ConcurrentAlwaysCombBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -155,10 +126,6 @@ TEST(SimCh4, ConcurrentAlwaysCombBlocks) {
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 12u);
 }
 
-// ---------------------------------------------------------------------------
-// 21. §4.2 always_comb with begin-end block: combinational logic with
-//     multiple output statements.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, AlwaysCombWithBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -175,9 +142,9 @@ TEST(SimCh4, AlwaysCombWithBeginEnd) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // a=5, r1=6, r2=7
+
   EXPECT_EQ(f.ctx.FindVariable("r1")->value.ToUint64(), 6u);
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 7u);
 }
 
-}  // namespace
+}

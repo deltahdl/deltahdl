@@ -1,5 +1,3 @@
-// §16.13.6: Sequence methods
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Production #28: sequence_method_call
-// sequence_method_call ::= sequence_instance . method_identifier
-// =============================================================================
 TEST(ParserA210, SequenceMethodCall_Triggered) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -42,10 +36,6 @@ TEST(ParserSection9, WaitSequenceTriggeredIfCheck) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// =============================================================================
-// Section 16.5.1 -- Assert property with sequence methods
-// =============================================================================
-// Sequence .triggered method used in a sequence declaration.
 TEST(ParserSection16, Sec16_5_1_SequenceTriggeredMethod) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -58,7 +48,6 @@ TEST(ParserSection16, Sec16_5_1_SequenceTriggeredMethod) {
               "endmodule\n"));
 }
 
-// Sequence .matched method used across clock domains.
 TEST(ParserSection16, Sec16_5_1_SequenceMatchedMethod) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -71,10 +60,6 @@ TEST(ParserSection16, Sec16_5_1_SequenceMatchedMethod) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.9.11 Sequence methods — triggered
-// =============================================================================
 TEST(ParserSection16, SequenceTriggeredMethod) {
   auto r = Parse(
       "module m;\n"
@@ -103,4 +88,4 @@ TEST(ParserSection16, SequenceMatchedMethod) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.4.2.2: Implicit event_expression list
-
 #include <gtest/gtest.h>
 
 #include "helpers_sensitivity.h"
@@ -79,7 +77,7 @@ TEST(TimingControl, ImplicitSensitivityMixedRoles) {
       {"e", ExprRole::kLHSIndex},
   };
   auto result = ComputeImplicitSensitivity(refs);
-  EXPECT_EQ(result.size(), 3u);  // a, b, e
+  EXPECT_EQ(result.size(), 3u);
 }
 
-}  // namespace
+}

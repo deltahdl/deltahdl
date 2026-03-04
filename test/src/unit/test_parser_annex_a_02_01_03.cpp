@@ -1,5 +1,3 @@
-// Annex A.2.1.3: Type declarations
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -7,7 +5,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA213, DataDeclTypeDeclaration) {
-  // type_declaration alternative
+
   auto r = Parse("module m; typedef int my_int_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -25,9 +23,6 @@ TEST(ParserA213, PackageImportWildcard) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
-// --- package_import_item ---
-// package_identifier :: identifier
-// | package_identifier :: *
 TEST(ParserA213, PackageImportItemNamed) {
   auto r = Parse(
       "package pkg; endpackage\n"
@@ -40,8 +35,6 @@ TEST(ParserA213, PackageImportItemNamed) {
   EXPECT_FALSE(item->import_item.is_wildcard);
 }
 
-// --- genvar_declaration ---
-// genvar list_of_genvar_identifiers ;
 TEST(ParserA213, GenvarDeclSingle) {
   auto r = Parse("module m; genvar i; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -50,4 +43,4 @@ TEST(ParserA213, GenvarDeclSingle) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
 }
 
-}  // namespace
+}

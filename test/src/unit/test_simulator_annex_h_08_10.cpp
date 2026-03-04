@@ -1,5 +1,3 @@
-// Annex H.8.10: String arguments
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -28,4 +26,4 @@ TEST(DpiRuntime, ImportWithStringArg) {
   EXPECT_EQ(result.AsInt(), 5);
 }
 
-}  // namespace
+}

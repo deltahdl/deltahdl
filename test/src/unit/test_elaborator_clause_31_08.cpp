@@ -1,12 +1,9 @@
-// §31.8: Vector signals in timing checks
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Terminal with part select elaborates
 TEST(ElabA70503, TerminalPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,4 +17,4 @@ TEST(ElabA70503, TerminalPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §20.6.2: Expression size system function
-
 #include "builders_ast.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
@@ -12,12 +10,11 @@ namespace {
 
 TEST(ConstEval, BitsExpr) {
   EvalFixture f;
-  // §20.6.2: $bits(8'hFF) should return 8 (width of expression).
+
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(8'hFF)", f)), 8);
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(16'h0)", f)), 16);
 }
 
-// § system_tf_call — $bits with expression argument
 TEST(ElabA82, SystemTfCallBitsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -31,9 +28,6 @@ TEST(ElabA82, SystemTfCallBitsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ============================================================================
-// §20.6.2 — $bits
-// ============================================================================
 TEST(Section20, BitsOf32BitValue) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$bits", {MakeInt(f.arena, 42)});
@@ -41,4 +35,4 @@ TEST(Section20, BitsOf32BitValue) {
   EXPECT_EQ(result.ToUint64(), 32u);
 }
 
-}  // namespace
+}

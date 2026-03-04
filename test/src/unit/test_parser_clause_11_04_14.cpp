@@ -1,5 +1,3 @@
-// §11.4.14: Streaming operators (pack/unpack)
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// § primary — streaming_concatenation
 TEST(ParserA84, PrimaryStreamingConcat) {
   auto r = Parse(
       "module m;\n"
@@ -21,9 +18,7 @@ TEST(ParserA84, PrimaryStreamingConcat) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
 }
-// =========================================================================
-// Section 11.4.14 -- Streaming operators
-// =========================================================================
+
 TEST(ParserSection11, StreamingRight) {
   auto r = Parse(
       "module t;\n"
@@ -46,11 +41,9 @@ TEST(ParserSection11, StreamingWithSliceSize) {
   auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
-  EXPECT_NE(rhs->lhs, nullptr);  // slice_size
+  EXPECT_NE(rhs->lhs, nullptr);
 }
 
-// § streaming_concatenation ::=
-//     { stream_operator [ slice_size ] stream_concatenation }
 TEST(ParserA81, StreamingConcatLeftShift) {
   auto r = Parse("module m; initial x = {<< {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -70,7 +63,7 @@ TEST(ParserA81, StreamingConcatRightShift) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
   EXPECT_EQ(stmt->rhs->op, TokenKind::kGtGt);
 }
-// --- Streaming concatenation ---
+
 TEST(ParserSection11, Sec11_1_StreamingConcatLeftShift) {
   auto r = Parse(
       "module t;\n"
@@ -94,4 +87,4 @@ TEST(ParserSection6, BitStreamCastStreaming) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

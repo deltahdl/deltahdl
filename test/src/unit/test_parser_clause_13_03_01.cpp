@@ -1,5 +1,3 @@
-// §13.3.1: Static and automatic tasks
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -21,13 +19,6 @@ TEST(ParserAnnexA, A2TaskDecl) {
   EXPECT_EQ(item->name, "drive");
 }
 
-// =============================================================================
-// A.2.7 Task declarations
-// =============================================================================
-// ---------------------------------------------------------------------------
-// task_declaration ::=
-//   task [ dynamic_override_specifiers ] [ lifetime ] task_body_declaration
-// ---------------------------------------------------------------------------
 TEST(ParserA27, TaskLifetimeAutomatic) {
   auto r = Parse(
       "module m;\n"
@@ -67,9 +58,7 @@ TEST(ParserA27, TaskLifetimeDefault) {
   EXPECT_FALSE(item->is_automatic);
   EXPECT_FALSE(item->is_static);
 }
-// =============================================================================
-// 19. Automatic task with delay control
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
   auto r = Parse(
       "module m;\n"
@@ -88,9 +77,6 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kDelay);
 }
 
-// =============================================================================
-// 24. Automatic task with event control
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoTaskWithEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -111,9 +97,6 @@ TEST(ParserSection4, Sec4_9_3_AutoTaskWithEventControl) {
   EXPECT_EQ(item->func_body_stmts[0]->events[0].edge, Edge::kPosedge);
 }
 
-// =============================================================================
-// 26. Task without explicit lifetime (implicit static in module)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_TaskNoLifetimeQualifier) {
   auto r = Parse(
       "module m;\n"
@@ -129,10 +112,7 @@ TEST(ParserSection4, Sec4_9_3_TaskNoLifetimeQualifier) {
   EXPECT_FALSE(item->is_automatic);
   EXPECT_FALSE(item->is_static);
 }
-// Returns the first module item from the first module.
-// =============================================================================
-// 3. Automatic task declaration
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_3_AutomaticTaskDecl) {
   auto r = Parse(
       "module m;\n"
@@ -150,9 +130,6 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskDecl) {
   EXPECT_EQ(item->name, "do_work");
 }
 
-// =============================================================================
-// 4. Static task declaration
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_StaticTaskDecl) {
   auto r = Parse(
       "module m;\n"
@@ -193,9 +170,7 @@ TEST(ParserSection13, StaticTask) {
   EXPECT_TRUE(tk->is_static);
   EXPECT_FALSE(tk->is_automatic);
 }
-// =========================================================================
-// §6.21: Scope and lifetime (additional tests)
-// =========================================================================
+
 TEST(ParserSection6, AutomaticTaskDecl) {
   auto r = Parse(
       "module t;\n"
@@ -222,7 +197,6 @@ TEST(ParserSection6, StaticTaskDecl) {
   EXPECT_TRUE(item->is_static);
 }
 
-// Returns the first function or task declaration from the first module.
 static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   for (auto* item : r.cu->modules[0]->items) {
@@ -233,9 +207,6 @@ static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   return nullptr;
 }
 
-// =============================================================================
-// 16. Static task declaration
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticTaskDecl) {
   auto r = Parse(
       "module m;\n"
@@ -253,9 +224,6 @@ TEST(ParserSection4, Sec4_9_4_StaticTaskDecl) {
   EXPECT_EQ(t->name, "log_event");
 }
 
-// =============================================================================
-// 17. Automatic task with automatic local vars (different types)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoTaskWithVariousTypes) {
   auto r = Parse(
       "module m;\n"
@@ -275,7 +243,7 @@ TEST(ParserSection4, Sec4_9_4_AutoTaskWithVariousTypes) {
   EXPECT_EQ(t->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(t->is_automatic);
   EXPECT_EQ(t->name, "process");
-  // The local variable declarations should be present as func_body_stmts.
+
   ASSERT_GE(t->func_body_stmts.size(), 3u);
   EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(t->func_body_stmts[0]->var_decl_type.kind, DataTypeKind::kInt);
@@ -285,9 +253,6 @@ TEST(ParserSection4, Sec4_9_4_AutoTaskWithVariousTypes) {
   EXPECT_EQ(t->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
 }
 
-// =============================================================================
-// 20. Automatic task with explicit automatic local vars
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoTaskExplicitAutoLocals) {
   auto r = Parse(
       "module m;\n"
@@ -308,4 +273,4 @@ TEST(ParserSection4, Sec4_9_4_AutoTaskExplicitAutoLocals) {
   EXPECT_NE(t->func_body_stmts[0]->var_init, nullptr);
 }
 
-}  // namespace
+}

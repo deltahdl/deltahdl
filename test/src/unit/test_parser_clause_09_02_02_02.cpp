@@ -1,5 +1,3 @@
-// §9.2.2.2: Combinational logic always_comb procedure
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -18,9 +16,7 @@ TEST(ParserA602, AlwaysConstruct_AlwaysComb) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
 }
-// ---------------------------------------------------------------------------
-// 7. always_comb with nested if-else and case
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_NestedIfElseAndCase) {
   auto r = Parse(
       "module m;\n"
@@ -46,15 +42,12 @@ TEST(ParserSection9, Sec9_2_2_NestedIfElseAndCase) {
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_NE(stmt->then_branch, nullptr);
   EXPECT_NE(stmt->else_branch, nullptr);
-  // The then branch should be a block containing a case statement
+
   ASSERT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
   ASSERT_GE(stmt->then_branch->stmts.size(), 1u);
   EXPECT_EQ(stmt->then_branch->stmts[0]->kind, StmtKind::kCase);
 }
 
-// ---------------------------------------------------------------------------
-// 8. always_comb with for loop
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_ForLoop) {
   auto r = Parse(
       "module m;\n"
@@ -73,9 +66,7 @@ TEST(ParserSection9, Sec9_2_2_ForLoop) {
   EXPECT_NE(stmt->for_cond, nullptr);
   EXPECT_NE(stmt->for_body, nullptr);
 }
-// =============================================================================
-// LRM section 9.3.1 -- Blocks in various procedural contexts.
-// =============================================================================
+
 TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
   auto r = Parse(
       "module m;\n"
@@ -93,9 +84,7 @@ TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
-// ---------------------------------------------------------------------------
-// 23. always_comb with multiple assignment statements.
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombMultipleAssigns) {
   auto r = Parse(
       "module m;\n"
@@ -108,9 +97,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombMultipleAssigns) {
   VerifyAlwaysMultiAssigns(r);
 }
 
-// ---------------------------------------------------------------------------
-// 15. always_comb with multiple variable assignments
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_MultipleAssignments) {
   auto r = Parse(
       "module m;\n"
@@ -132,9 +118,7 @@ TEST(ParserSection9, Sec9_2_2_MultipleAssignments) {
     EXPECT_EQ(item->body->stmts[i]->kind, StmtKind::kBlockingAssign);
   }
 }
-// ---------------------------------------------------------------------------
-// 27. always_comb with nested if-else inside begin-end.
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombNestedIfElseInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -148,9 +132,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombNestedIfElseInBlock) {
       "endmodule\n");
   VerifyAlwaysNestedIfElse(r);
 }
-// =============================================================================
-// §4.6: always_comb with case inside
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_AlwaysCombWithCaseInside) {
   auto r = Parse(
       "module m;\n"
@@ -176,9 +158,6 @@ TEST(ParserSection4, Sec4_6_AlwaysCombWithCaseInside) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kCase);
 }
 
-// ---------------------------------------------------------------------------
-// 24. Multiple always_comb blocks in the same module
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_MultipleAlwaysCombBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -198,9 +177,6 @@ TEST(ParserSection9, Sec9_2_2_MultipleAlwaysCombBlocks) {
   ASSERT_NE(second->body, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 25. always_comb with array indexing
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_ArrayIndexing) {
   auto r = Parse(
       "module m;\n"
@@ -218,7 +194,7 @@ TEST(ParserSection9, Sec9_2_2_ArrayIndexing) {
   ASSERT_NE(item->body->rhs, nullptr);
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kSelect);
 }
-// 14. Variable driven by always_comb.
+
 TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysComb) {
   auto r = Parse(
       "module t;\n"
@@ -238,9 +214,6 @@ TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysComb) {
   EXPECT_TRUE(found_comb);
 }
 
-// =============================================================================
-// §4.6: always_comb with multiple outputs
-// =============================================================================
 TEST(ParserSection4, Sec4_6_AlwaysCombMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
@@ -260,9 +233,6 @@ TEST(ParserSection4, Sec4_6_AlwaysCombMultipleOutputs) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 30. always_comb ParseOk smoke test for full mux with for loop and array
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_ParseOkComplexMuxPattern) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -279,19 +249,6 @@ TEST(ParserSection9, Sec9_2_2_ParseOkComplexMuxPattern) {
               "endmodule\n"));
 }
 
-// Return the first always-kind module item (any always variant).
-// =============================================================================
-// LRM section 9.2.2.2 -- always_comb compared with always @*
-//
-// Both always_comb and always @* describe combinational logic. The parser
-// produces AlwaysKind::kAlwaysComb for always_comb and AlwaysKind::kAlways
-// for always @*. For always @*, the parser consumes the @* at the
-// module-item level (not as a statement-level event control), so both
-// forms have the body directly on item->body with empty sensitivity.
-// =============================================================================
-// ---------------------------------------------------------------------------
-// 1. always_comb parses with AlwaysKind::kAlwaysComb.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombAlwaysKind) {
   auto r = Parse(
       "module m;\n"
@@ -303,10 +260,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombAlwaysKind) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
 }
-// Returns the first always_* item from the first module.
-// ---------------------------------------------------------------------------
-// 19. always_comb block (scheduling semantics)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_AlwaysComb) {
   auto r = Parse(
       "module m;\n"
@@ -322,9 +276,6 @@ TEST(ParserSection4, Sec4_5_AlwaysComb) {
   ASSERT_NE(item->body, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 6. always_comb body is directly on item->body (single assignment).
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBodyDirectAssign) {
   auto r = Parse(
       "module m;\n"
@@ -338,9 +289,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBodyDirectAssign) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-// ---------------------------------------------------------------------------
-// 8. always_comb with begin-end block body.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -359,9 +307,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 23. always_comb with complex combinational logic (priority encoder)
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_PriorityEncoderPattern) {
   auto r = Parse(
       "module m;\n"
@@ -392,16 +337,13 @@ TEST(ParserSection9, Sec9_2_2_PriorityEncoderPattern) {
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  // Two default assignments plus an if-else-if chain
+
   ASSERT_GE(item->body->stmts.size(), 3u);
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(item->body->stmts[2]->kind, StmtKind::kIf);
 }
 
-// ---------------------------------------------------------------------------
-// 13. always_comb with if-else body.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -420,9 +362,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombIfElse) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// 15. always_comb with case statement.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombCaseStatement) {
   auto r = Parse(
       "module m;\n"
@@ -443,9 +382,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombCaseStatement) {
   EXPECT_GE(item->body->case_items.size(), 3u);
 }
 
-// ---------------------------------------------------------------------------
-// 17. always_comb with complex combinational logic (nested ternary).
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysCombComplexLogic) {
   auto r = Parse(
       "module m;\n"
@@ -462,17 +398,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombComplexLogic) {
   ASSERT_NE(item->body->rhs, nullptr);
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
-// =============================================================================
-// LRM section 9.2.2 -- Always_comb procedure
-//
-// The always_comb procedure is a combinational logic process with an
-// implicit sensitivity list. It executes once at time zero and then
-// re-executes whenever any of its input signals change. No explicit
-// sensitivity list is permitted.
-// =============================================================================
-// ---------------------------------------------------------------------------
-// 1. Simple blocking assignment in always_comb
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_SimpleBlockingAssign) {
   auto r = Parse(
       "module m;\n"
@@ -489,9 +415,6 @@ TEST(ParserSection9, Sec9_2_2_SimpleBlockingAssign) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-// ---------------------------------------------------------------------------
-// 2. always_comb with begin-end block containing multiple assignments
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_BeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -512,10 +435,7 @@ TEST(ParserSection9, Sec9_2_2_BeginEndBlock) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlockingAssign);
 }
-// =============================================================================
-// LRM section 9.2.2.2 -- always_comb procedure
-// Combinational logic with begin/end block and multiple statements.
-// =============================================================================
+
 TEST(ParserSection9c, AlwaysCombBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -589,7 +509,6 @@ static ModuleItem* NthItem(ParseResult& r, size_t n) {
   return r.cu->modules[0]->items[n];
 }
 
-// 11. Struct assigned in always_comb block.
 TEST(ParserSection7, Sec7_2_2_AssignInAlwaysComb) {
   auto r = Parse(
       "module t;\n"
@@ -610,9 +529,6 @@ TEST(ParserSection7, Sec7_2_2_AssignInAlwaysComb) {
   EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
 }
 
-// =============================================================================
-// §4.6: always_comb guarantees combinational semantics
-// =============================================================================
 TEST(ParserSection4, Sec4_6_AlwaysCombCombinational) {
   auto r = Parse(
       "module m;\n"
@@ -631,4 +547,4 @@ TEST(ParserSection4, Sec4_6_AlwaysCombCombinational) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

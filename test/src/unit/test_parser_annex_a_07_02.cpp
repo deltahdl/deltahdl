@@ -1,5 +1,3 @@
-// Annex A.7.2: Specify path declarations
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.2 polarity_operator — combined forms
-// =============================================================================
-// Polarity with edge-sensitive full path
 TEST(ParserA702, PolarityWithEdgeFullPath) {
   auto r = Parse(
       "module m;\n"
@@ -28,10 +22,6 @@ TEST(ParserA702, PolarityWithEdgeFullPath) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// =============================================================================
-// A.7.2 full_path_description — polarity_operator
-// =============================================================================
-// ( inputs + *> outputs ) — positive polarity, full
 TEST(ParserA702, FullPathPositivePolarity) {
   auto r = Parse(
       "module m;\n"
@@ -47,4 +37,4 @@ TEST(ParserA702, FullPathPositivePolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
 }
 
-}  // namespace
+}

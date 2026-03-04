@@ -1,5 +1,3 @@
-// §18.5: Constraint blocks
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -18,7 +16,6 @@ TEST(ParserAnnexA, A2ClassWithConstraint) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// class_item ::= { attribute_instance } class_constraint
 TEST(SourceText, ClassConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -36,12 +33,6 @@ TEST(SourceText, ClassConstraint) {
   EXPECT_EQ(members[2]->name, "c2");
 }
 
-// =============================================================================
-// A.1.10 Constraints
-// =============================================================================
-// constraint_declaration ::=
-//   [static] constraint [dynamic_override_specifiers] constraint_identifier
-//   constraint_block
 TEST(SourceText, ConstraintDeclaration) {
   auto r = Parse(
       "class C;\n"
@@ -61,8 +52,6 @@ TEST(SourceText, ConstraintDeclaration) {
   EXPECT_TRUE(members[2]->is_static);
 }
 
-// constraint_block ::= { { constraint_block_item } }
-// constraint_block_item ::= solve ... before ... ; | constraint_expression
 TEST(SourceText, ConstraintBlockItems) {
   auto r = Parse(
       "class C;\n"
@@ -108,4 +97,4 @@ TEST(ParserSection8, ClassWithConstraint) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

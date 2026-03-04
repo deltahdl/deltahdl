@@ -1,5 +1,3 @@
-// §8.11: This
-
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "parser/ast.h"
@@ -8,19 +6,8 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
-
 namespace {
 
-// =============================================================================
-// §8.11: `this` keyword reference
-// =============================================================================
 TEST(ClassSim, ThisPushPop) {
   SimFixture f;
   auto* type = MakeClassType(f, "Foo", {"x"});
@@ -49,4 +36,4 @@ TEST(ClassSim, NestedThisScoping) {
   EXPECT_EQ(f.ctx.CurrentThis(), nullptr);
 }
 
-}  // namespace
+}

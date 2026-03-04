@@ -1,15 +1,9 @@
-// §21.3.4.1: Reading a character at a time
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// ============================================================================
-// LRM section 21.3.4 -- Reading data from a file ($fgetc, $ungetc, $fgets,
-//                        $fscanf, $sscanf, $fread)
-// ============================================================================
 TEST(ParserSection21, FgetcCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -32,4 +26,4 @@ TEST(ParserSection21, UngetcCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

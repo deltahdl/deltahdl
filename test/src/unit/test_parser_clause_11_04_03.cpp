@@ -1,5 +1,3 @@
-// §11.4.3: Arithmetic operators
-
 #include "fixture_parser.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § binary_operator ::= /
 TEST(ParserA86, BinaryDiv) {
   auto r = Parse("module m; initial x = a / b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -20,7 +17,6 @@ TEST(ParserA86, BinaryDiv) {
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
 }
 
-// § binary_operator ::= %
 TEST(ParserA86, BinaryMod) {
   auto r = Parse("module m; initial x = a % b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -31,7 +27,6 @@ TEST(ParserA86, BinaryMod) {
   EXPECT_EQ(rhs->op, TokenKind::kPercent);
 }
 
-// § binary_operator ::= **
 TEST(ParserA86, BinaryPower) {
   auto r = Parse("module m; initial x = a ** b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -48,9 +43,7 @@ TEST(ParserSection11, ComplexMixedExpressionParses) {
               "  initial x = (a + b) * c - d / e % f;\n"
               "endmodule\n"));
 }
-// =========================================================================
-// Section 11.3 -- Operators (general syntax and unary +)
-// =========================================================================
+
 TEST(ParserSection11, UnaryPlusOperator) {
   auto r = Parse(
       "module t;\n"
@@ -62,9 +55,6 @@ TEST(ParserSection11, UnaryPlusOperator) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-// =========================================================================
-// Section 11.3.1 -- Arithmetic operators with real operands
-// =========================================================================
 TEST(ParserSection11, RealLiteralAddition) {
   auto r = Parse(
       "module t;\n"
@@ -90,9 +80,7 @@ TEST(ParserSection11, RealMultiplication) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
-// =========================================================================
-// Section 11.4.3 -- Arithmetic operators
-// =========================================================================
+
 TEST(ParserSection11, ArithmeticAdd) {
   auto r = Parse(
       "module t;\n"
@@ -157,7 +145,6 @@ TEST(ParserSection11, UnaryNegation) {
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
 
-// § expression ::= expression binary_operator { attribute_instance } expression
 TEST(ParserA83, ExprBinaryAdd) {
   auto r = Parse("module m; initial x = a + b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -168,10 +155,6 @@ TEST(ParserA83, ExprBinaryAdd) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-// =============================================================================
-// A.8.6 Operators — unary_operator
-// =============================================================================
-// § unary_operator ::= +
 TEST(ParserA86, UnaryPlus) {
   auto r = Parse("module m; initial x = +a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -182,7 +165,6 @@ TEST(ParserA86, UnaryPlus) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-// § unary_operator ::= -
 TEST(ParserA86, UnaryMinus) {
   auto r = Parse("module m; initial x = -a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -193,10 +175,6 @@ TEST(ParserA86, UnaryMinus) {
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (arithmetic)
-// =============================================================================
-// § binary_operator ::= +
 TEST(ParserA86, BinaryAdd) {
   auto r = Parse("module m; initial x = a + b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -207,7 +185,6 @@ TEST(ParserA86, BinaryAdd) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-// § binary_operator ::= -
 TEST(ParserA86, BinarySub) {
   auto r = Parse("module m; initial x = a - b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -218,7 +195,6 @@ TEST(ParserA86, BinarySub) {
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
 
-// § binary_operator ::= *
 TEST(ParserA86, BinaryMul) {
   auto r = Parse("module m; initial x = a * b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -255,7 +231,7 @@ TEST(ParserSection11, ArithmeticDiv) {
 }
 
 TEST(ParserSection6, RealInExpression) {
-  // Real values in arithmetic expressions
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real a, b, c;\n"
@@ -267,9 +243,6 @@ TEST(ParserSection6, RealInExpression) {
               "endmodule\n"));
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
 TEST(ParserCh505, Operator_BinaryAdd) {
   auto r = Parse(
       "module m;\n"
@@ -295,4 +268,4 @@ TEST(Eval, Addition) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §30.5.1: Specifying transition delays on module paths
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.4 Simulation — path delays do not interfere
-// =============================================================================
-// Module with 6-delay path simulates correctly
 TEST(SimA704, SixDelayPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +27,6 @@ TEST(SimA704, SixDelayPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// Module with 12-delay path simulates correctly
 TEST(SimA704, TwelveDelayPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,7 +47,6 @@ TEST(SimA704, TwelveDelayPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// Module with min:typ:max delay simulates correctly
 TEST(SimA704, MinTypMaxDelaySimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -75,22 +67,18 @@ TEST(SimA704, MinTypMaxDelaySimulates) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// =============================================================================
-// A.7.4 Runtime PathDelay with delay_count
-// =============================================================================
-// PathDelay with delay_count=6 stores 6 transition delays
 TEST(SimA704, RuntimePathDelaySixDelays) {
   SpecifyManager mgr;
   PathDelay pd;
   pd.src_port = "a";
   pd.dst_port = "b";
   pd.delay_count = 6;
-  pd.delays[0] = 1;  // t01
-  pd.delays[1] = 2;  // t10
-  pd.delays[2] = 3;  // t0z
-  pd.delays[3] = 4;  // tz1
-  pd.delays[4] = 5;  // t1z
-  pd.delays[5] = 6;  // tz0
+  pd.delays[0] = 1;
+  pd.delays[1] = 2;
+  pd.delays[2] = 3;
+  pd.delays[3] = 4;
+  pd.delays[4] = 5;
+  pd.delays[5] = 6;
   mgr.AddPathDelay(pd);
 
   EXPECT_TRUE(mgr.HasPathDelay("a", "b"));
@@ -105,7 +93,6 @@ TEST(SimA704, RuntimePathDelaySixDelays) {
   EXPECT_EQ(delays[0].delays[5], 6u);
 }
 
-// PathDelay with delay_count=12 stores 12 transition delays
 TEST(SimA704, RuntimePathDelayTwelveDelays) {
   SpecifyManager mgr;
   PathDelay pd;
@@ -126,7 +113,6 @@ TEST(SimA704, RuntimePathDelayTwelveDelays) {
   }
 }
 
-// Backward compatibility: delay_count=1 with single delay in delays[0]
 TEST(SimA704, RuntimePathDelaySingleDelay) {
   SpecifyManager mgr;
   PathDelay pd;
@@ -139,4 +125,4 @@ TEST(SimA704, RuntimePathDelaySingleDelay) {
   EXPECT_EQ(mgr.GetPathDelay("a", "b"), 10u);
 }
 
-}  // namespace
+}

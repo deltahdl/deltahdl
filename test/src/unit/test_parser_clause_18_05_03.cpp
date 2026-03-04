@@ -1,5 +1,3 @@
-// §18.5.3: Distribution
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -7,9 +5,6 @@
 using namespace delta;
 namespace {
 
-// =============================================================================
-// §18.5.3 Distribution constraints
-// =============================================================================
 TEST(ParserSection18, DistConstraintEqualWeight) {
   auto r = Parse(
       "class C;\n"
@@ -54,9 +49,6 @@ TEST(ParserSection18, DistConstraintWithDefault) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// =============================================================================
-// LRM section 18.5.3 -- Distribution constraints (additional tests)
-// =============================================================================
 TEST(ParserSection18b, DistEqualWeightSingleValue) {
   auto r = Parse(
       "class C;\n"
@@ -91,7 +83,7 @@ TEST(ParserSection18b, DistWithRangeAndEqualWeight) {
 }
 
 TEST(ParserSection18b, DistWithMixedWeightTypes) {
-  // Mix of := and :/ in the same distribution
+
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -114,7 +106,7 @@ TEST(ParserSection18b, DistWithDefaultWeight) {
 }
 
 TEST(ParserSection18b, DistWithExpressionWeights) {
-  // Weights can be arbitrary constant expressions
+
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -137,7 +129,7 @@ TEST(ParserSection18b, DistWithNegativeValues) {
 }
 
 TEST(ParserSection18b, DistMultipleConstraints) {
-  // Multiple dist constraints in one class
+
   auto r = Parse(
       "class C;\n"
       "  rand int x, y;\n"
@@ -149,11 +141,6 @@ TEST(ParserSection18b, DistMultipleConstraints) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// constraint_expression ::= expression_or_dist ;
-// expression_or_dist ::= expression [ dist { dist_list } ]
-// dist_list ::= dist_item { , dist_item }
-// dist_item ::= value_range [ dist_weight ] | default :/ expression
-// dist_weight ::= := expression | :/ expression
 TEST(SourceText, ConstraintExpressionOrDist) {
   auto r = Parse(
       "class C;\n"
@@ -167,4 +154,4 @@ TEST(SourceText, ConstraintExpressionOrDist) {
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "dist_c");
 }
 
-}  // namespace
+}

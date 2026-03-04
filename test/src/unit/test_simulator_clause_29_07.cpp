@@ -1,5 +1,3 @@
-// §29.7: Sequential UDP initialization
-
 #include <gtest/gtest.h>
 
 #include "parser/ast.h"
@@ -40,4 +38,4 @@ TEST(UdpInit, InitialValueOne) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-}  // namespace
+}

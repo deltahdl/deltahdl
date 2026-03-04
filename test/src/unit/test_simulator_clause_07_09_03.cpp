@@ -1,5 +1,3 @@
-// §7.9.3: Exists()
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -23,4 +21,4 @@ TEST(AdvSim, AssocArrayExistsAndErase) {
   EXPECT_EQ(arr.Size(), 0u);
 }
 
-}  // namespace
+}

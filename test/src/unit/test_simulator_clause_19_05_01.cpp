@@ -1,5 +1,3 @@
-// §19.5.1: Specifying bins for values
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// S19.5.1-19.5.3: Explicit bins
-// =============================================================================
 TEST(Coverage, ExplicitBinCreation) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -28,9 +23,6 @@ TEST(Coverage, ExplicitBinCreation) {
   EXPECT_EQ(b->values.size(), 4u);
 }
 
-// =============================================================================
-// S19.5.1-19.5.3: Explicit bins
-// =============================================================================
 TEST(Coverage, SampleHitsExplicitBin) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -44,15 +36,12 @@ TEST(Coverage, SampleHitsExplicitBin) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
 
   db.Sample(g, {{"val", 2}});
-  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);  // No change.
+  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
 
   db.Sample(g, {{"val", 1}});
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 2u);
 }
 
-// =============================================================================
-// S19.5.1-19.5.3: Auto bins
-// =============================================================================
 TEST(Coverage, AutoBinCreation) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -61,7 +50,6 @@ TEST(Coverage, AutoBinCreation) {
   CoverageDB::AutoCreateBins(cp, 0, 7);
   EXPECT_EQ(cp->bins.size(), 4u);
 
-  // Each bin should cover 2 values: [0,1], [2,3], [4,5], [6,7].
   struct {
     size_t bin_idx;
     size_t val_idx;
@@ -84,10 +72,10 @@ TEST(Coverage, AutoBinSmallRange) {
   auto* cp = CoverageDB::AddCoverPoint(g, "x");
   cp->auto_bin_count = 64;
   CoverageDB::AutoCreateBins(cp, 0, 3);
-  // Range is 4, smaller than auto_bin_count=64, so only 4 bins.
+
   EXPECT_EQ(cp->bins.size(), 4u);
   EXPECT_EQ(cp->bins[0].values.size(), 1u);
   EXPECT_EQ(cp->bins[0].values[0], 0);
 }
 
-}  // namespace
+}

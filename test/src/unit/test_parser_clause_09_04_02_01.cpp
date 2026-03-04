@@ -1,5 +1,3 @@
-// §9.4.2.1: Event OR operator
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -37,10 +35,7 @@ TEST(ParserSection9c, EventControlMixedEdgesComma) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
   EXPECT_EQ(stmt->events[2].edge, Edge::kNone);
 }
-// Returns the first always_* item from the first module.
-// ---------------------------------------------------------------------------
-// 29. Multiple event control in always block
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_MultipleEventControlInAlways) {
   auto r = Parse(
       "module m;\n"
@@ -61,7 +56,6 @@ TEST(ParserSection4, Sec4_5_MultipleEventControlInAlways) {
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
 }
 
-// §9.4.2.1: or-separated event list
 TEST(ParserA605, EventExprOr) {
   auto r = Parse(
       "module m;\n"
@@ -78,7 +72,6 @@ TEST(ParserA605, EventExprOr) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kPosedge);
 }
 
-// §9.4.2.1: comma-separated event list
 TEST(ParserA605, EventExprComma) {
   auto r = Parse(
       "module m;\n"
@@ -93,7 +86,6 @@ TEST(ParserA605, EventExprComma) {
   ASSERT_EQ(stmt->events.size(), 3u);
 }
 
-// §9.4.2.1: mixed or and comma
 TEST(ParserA605, EventExprMixedOrComma) {
   auto r = Parse(
       "module m;\n"
@@ -108,7 +100,6 @@ TEST(ParserA605, EventExprMixedOrComma) {
   ASSERT_EQ(stmt->events.size(), 3u);
 }
 
-// §9.4.2.1: posedge with comma
 TEST(ParserA605, EventExprPosedgeComma) {
   auto r = Parse(
       "module m;\n"
@@ -126,8 +117,6 @@ TEST(ParserA605, EventExprPosedgeComma) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
 }
 
-// --- Test helpers ---
-// §15.5.2: @ event wait with 'or' event expression (multiple events).
 TEST(ParserSection15, WaitForEventOrExpr) {
   auto r = Parse(
       "module m;\n"
@@ -174,4 +163,4 @@ TEST(ParserSection9, EventControlComma) {
   ASSERT_GE(stmt->events.size(), 2u);
 }
 
-}  // namespace
+}

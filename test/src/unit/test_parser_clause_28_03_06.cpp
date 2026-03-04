@@ -1,5 +1,3 @@
-// §28.3.6: Primitive instance connection list
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -14,4 +12,4 @@ TEST(ParserA301, GateInst_ComplexTerminalExpressions) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

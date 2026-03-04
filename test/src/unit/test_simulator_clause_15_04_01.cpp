@@ -1,5 +1,3 @@
-// §15.4.1: New()
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -15,9 +13,6 @@
 
 namespace {
 
-// =============================================================================
-// 6. Mailbox: Constructor (section 15.4)
-// =============================================================================
 TEST(IpcSync, MailboxNewUnbounded) {
   MailboxObject mb;
   EXPECT_EQ(mb.bound, 0);
@@ -30,4 +25,4 @@ TEST(IpcSync, MailboxNewBounded) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-}  // namespace
+}

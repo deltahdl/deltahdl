@@ -1,5 +1,3 @@
-// §20.8.1: Integer math functions
-
 #include "builders_ast.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
@@ -17,7 +15,6 @@ TEST(ConstEval, Clog2) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(5)", f)), 3);
 }
 
-// § system_tf_call — $clog2 as expression elaborates
 TEST(ElabA82, SystemTfCallAsExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -30,7 +27,6 @@ TEST(ElabA82, SystemTfCallAsExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § primary — system call elaborates
 TEST(ElabA84, PrimarySystemCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -42,9 +38,6 @@ TEST(ElabA84, PrimarySystemCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ============================================================================
-// §20.8.1 — $clog2
-// ============================================================================
 TEST(Section20, Clog2Zero) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 0)});
@@ -66,9 +59,6 @@ TEST(Section20, Clog2Three) {
   EXPECT_EQ(result.ToUint64(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 14. Blocking assignment with system function ($clog2) on RHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignSysClog2) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -87,8 +77,8 @@ TEST(SimCh10, BlockingAssignSysClog2) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // $clog2(256) = 8
+
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-}  // namespace
+}

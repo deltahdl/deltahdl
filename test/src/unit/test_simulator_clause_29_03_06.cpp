@@ -1,5 +1,3 @@
-// §29.3.6: Summary of symbols
-
 #include <gtest/gtest.h>
 
 #include "parser/ast.h"
@@ -102,4 +100,4 @@ TEST(UdpSymbols, StarMatchesAnyChange) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.3.2: Parallel blocks
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// 9. Automatic variable in fork block
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoVarInForkBlock) {
   auto r = Parse(
       "module m;\n"
@@ -30,7 +25,7 @@ TEST(ParserSection4, Sec4_9_4_AutoVarInForkBlock) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   ASSERT_GE(stmt->fork_stmts.size(), 2u);
-  // First fork branch: begin-end block with automatic var decl.
+
   auto* branch0 = stmt->fork_stmts[0];
   ASSERT_EQ(branch0->kind, StmtKind::kBlock);
   ASSERT_GE(branch0->stmts.size(), 1u);
@@ -38,7 +33,6 @@ TEST(ParserSection4, Sec4_9_4_AutoVarInForkBlock) {
   EXPECT_TRUE(branch0->stmts[0]->var_is_automatic);
 }
 
-// §9.3.2: par_block (fork-join)
 TEST(ParserA604, StmtItemParBlock) {
   auto r = Parse(
       "module m;\n"
@@ -54,9 +48,7 @@ TEST(ParserA604, StmtItemParBlock) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
 }
-// ---------------------------------------------------------------------------
-// 19. Empty fork-join block
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_3_2_EmptyForkJoin) {
   auto r = Parse(
       "module m;\n"
@@ -74,9 +66,6 @@ TEST(ParserSection9, Sec9_3_2_EmptyForkJoin) {
   EXPECT_TRUE(stmt->fork_stmts.empty());
 }
 
-// ---------------------------------------------------------------------------
-// 20. Fork in task body
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkInTaskBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -90,9 +79,6 @@ TEST(ParserSection9, Sec9_3_2_ForkInTaskBody) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// 21. Fork in always block
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkInAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
@@ -114,9 +100,6 @@ TEST(ParserSection9, Sec9_3_2_ForkInAlwaysBlock) {
   EXPECT_EQ(item->body->stmts[0]->join_kind, TokenKind::kKwJoinNone);
 }
 
-// ---------------------------------------------------------------------------
-// 22. Fork with nonblocking assignments
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkWithNonblockingAssigns) {
   auto r = Parse(
       "module m;\n"
@@ -137,9 +120,6 @@ TEST(ParserSection9, Sec9_3_2_ForkWithNonblockingAssigns) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-// ---------------------------------------------------------------------------
-// 23. Multiple sequential fork blocks
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_MultipleSequentialForks) {
   auto r = Parse(
       "module m;\n"
@@ -168,9 +148,6 @@ TEST(ParserSection9, Sec9_3_2_MultipleSequentialForks) {
   EXPECT_EQ(body->stmts[2]->join_kind, TokenKind::kKwJoinAny);
 }
 
-// ---------------------------------------------------------------------------
-// 24. Fork with system calls ($display, $finish)
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkWithSystemCalls) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -183,9 +160,6 @@ TEST(ParserSection9, Sec9_3_2_ForkWithSystemCalls) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// 25. Fork-join with single begin-end thread
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_ForkJoinSingleBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -208,10 +182,7 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinSingleBeginEnd) {
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kBlock);
   EXPECT_EQ(stmt->fork_stmts[0]->stmts.size(), 3u);
 }
-// Returns the first module item from the first module.
-// =============================================================================
-// 12. Automatic task with fork-join
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithForkJoin) {
   auto r = Parse(
       "module m;\n"
@@ -234,7 +205,7 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithForkJoin) {
   EXPECT_EQ(fork_stmt->join_kind, TokenKind::kKwJoin);
   EXPECT_GE(fork_stmt->fork_stmts.size(), 2u);
 }
-// block_item_declaration in fork/join (§9.3.2)
+
 TEST(ParserA28, BlockItemInForkJoin) {
   auto r = Parse(
       "module m;\n"
@@ -252,9 +223,6 @@ TEST(ParserA28, BlockItemInForkJoin) {
   EXPECT_EQ(body->fork_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-// ---------------------------------------------------------------------------
-// 15. Multiple variable declarations in fork block
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_MultipleVarDeclsInFork) {
   auto r = Parse(
       "module m;\n"
@@ -276,7 +244,6 @@ TEST(ParserSection9, Sec9_3_2_MultipleVarDeclsInFork) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kVarDecl);
 }
 
-// typedef in fork/join
 TEST(ParserA28, TypedefInForkJoin) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -286,9 +253,6 @@ TEST(ParserA28, TypedefInForkJoin) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// 16. Automatic variable in fork block
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_3_2_AutomaticVarInForkBlock) {
   auto r = Parse(
       "module m;\n"
@@ -310,4 +274,4 @@ TEST(ParserSection9, Sec9_3_2_AutomaticVarInForkBlock) {
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->fork_stmts[0]->var_is_automatic);
 }
-}  // namespace
+}

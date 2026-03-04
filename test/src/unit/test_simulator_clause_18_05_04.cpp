@@ -1,5 +1,3 @@
-// §18.5.4: Uniqueness constraints
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.5.4: Distribution constraints (dist)
-// =============================================================================
 TEST(Constraint, DistributionWeighted) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -65,4 +60,4 @@ TEST(Constraint, DistributionUniform) {
   EXPECT_TRUE(val >= 1 && val <= 3);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §17.7.1: Checker variable assignments
-
 #include "fixture_checker_elab.h"
 
 namespace {
@@ -19,4 +17,4 @@ TEST(CheckerElab, ElaborateCheckerWithVars) {
   EXPECT_FALSE(mod->assigns.empty());
 }
 
-}  // namespace
+}

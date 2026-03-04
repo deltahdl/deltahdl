@@ -1,5 +1,3 @@
-// §28.5: buf and not gates
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -8,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.3.1 Production #1: gate_instantiation (n_output_gatetype alternative)
-// gate_instantiation ::=
-//   n_output_gatetype [drive_strength] [delay2] n_output_gate_instance
-//                     {, n_output_gate_instance} ;
-// =============================================================================
 TEST(ParserA301, GateInst_BufBasic) {
   auto r = Parse(
       "module m;\n"
@@ -47,11 +39,6 @@ TEST(ParserA301, GateInst_NOutputMultipleOutputs) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-// =============================================================================
-// A.3.1 Production #6: n_output_gate_instance
-// n_output_gate_instance ::= [name_of_instance]
-//   ( output_terminal {, output_terminal} , input_terminal )
-// =============================================================================
 TEST(ParserA301, NOutputGateInst_SingleOutput) {
   auto r = Parse(
       "module m;\n"
@@ -86,9 +73,6 @@ TEST(ParserA301, NOutputGateInst_Unnamed) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-// =============================================================================
-// A.3.4 Production #5: n_output_gatetype ::= buf | not
-// =============================================================================
 TEST(ParserA304, NOutputGatetype_Buf) {
   auto r = Parse(
       "module m;\n"
@@ -111,4 +95,4 @@ TEST(ParserA304, NOutputGatetype_Not) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-}  // namespace
+}

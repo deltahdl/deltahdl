@@ -1,12 +1,9 @@
-// §3.5: Interfaces
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// §3.5:
 TEST(ParserClause03, Cl3_5_ParametersConstantsVariables) {
   auto r = ParseWithPreprocessor(
       "interface ifc #(parameter WIDTH = 8);\n"
@@ -20,4 +17,4 @@ TEST(ParserClause03, Cl3_5_ParametersConstantsVariables) {
   EXPECT_GE(r.cu->interfaces[0]->items.size(), 2u);
 }
 
-}  // namespace
+}

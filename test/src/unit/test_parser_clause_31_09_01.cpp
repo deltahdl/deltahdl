@@ -1,5 +1,3 @@
-// §31.9.1: Requirements for accurate simulation
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §31.9 Extended $setuphold arguments
-// =============================================================================
 TEST_F(SpecifyTest, SetupholdWithDelayedSignals) {
   auto* cu = Parse(
       "module m;\n"
@@ -28,4 +23,4 @@ TEST_F(SpecifyTest, SetupholdWithDelayedSignals) {
   EXPECT_EQ(tc.delayed_data, "dD");
 }
 
-}  // namespace
+}

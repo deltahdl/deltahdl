@@ -1,5 +1,3 @@
-// §6.7: Net declarations
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -31,4 +29,4 @@ TEST(Lowerer, NetCreatedFromDecl) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

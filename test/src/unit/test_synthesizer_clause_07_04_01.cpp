@@ -1,5 +1,3 @@
-// §7.4.1: Packed arrays
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -25,4 +23,4 @@ TEST(SynthLower, MultiBitPortMapping) {
   EXPECT_EQ(aig->outputs.size(), 4);
 }
 
-}  // namespace
+}

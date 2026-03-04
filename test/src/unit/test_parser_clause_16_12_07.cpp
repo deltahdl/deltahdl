@@ -1,5 +1,3 @@
-// §16.12.7: Implication
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// property_expr ::= sequence_expr |-> property_expr
 TEST(ParserA210, PropertyExpr_OverlappedImplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -16,7 +13,6 @@ TEST(ParserA210, PropertyExpr_OverlappedImplication) {
               "endmodule\n"));
 }
 
-// property_expr ::= sequence_expr |=> property_expr
 TEST(ParserA210, PropertyExpr_NonOverlappedImplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -24,12 +20,6 @@ TEST(ParserA210, PropertyExpr_NonOverlappedImplication) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #30: sequence_instance
-// sequence_instance ::=
-//     ps_or_hierarchical_sequence_identifier
-//     [ ( [sequence_list_of_arguments] ) ]
-// =============================================================================
 TEST(ParserA210, SequenceInstance_InProperty) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -39,7 +29,6 @@ TEST(ParserA210, SequenceInstance_InProperty) {
               "endmodule\n"));
 }
 
-// Assert property with overlapped implication (|->).
 TEST(ParserSection16, Sec16_5_1_AssertPropertyOverlappedImplication) {
   auto r = Parse(
       "module m;\n"
@@ -53,7 +42,6 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyOverlappedImplication) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-// Assert property with non-overlapped implication (|=>).
 TEST(ParserSection16, Sec16_5_1_AssertPropertyNonOverlappedImplication) {
   auto r = Parse(
       "module m;\n"
@@ -74,7 +62,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// --- F.13: Overlapping implication |-> ---
 TEST(ParserAnnexF, AnnexFOverlapImplication) {
   auto r = Parse(
       "module m;\n"
@@ -85,7 +72,6 @@ TEST(ParserAnnexF, AnnexFOverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// --- F.14: Non-overlapping implication |=> ---
 TEST(ParserAnnexF, AnnexFNonoverlapImplication) {
   auto r = Parse(
       "module m;\n"
@@ -96,10 +82,6 @@ TEST(ParserAnnexF, AnnexFNonoverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// §16.12.7 Property instances / implication
-// =============================================================================
 TEST(ParserSection16, PropertyOverlappedImplication) {
   auto r = Parse(
       "module m;\n"
@@ -132,4 +114,4 @@ TEST(ParserSection16, SequenceUsedInPropertyDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

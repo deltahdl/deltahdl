@@ -1,5 +1,3 @@
-// §33.4.1.4: The cell clause
-
 #include "fixture_config.h"
 #include "fixture_program.h"
 #include "fixture_simulator.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §36.9.1 Config library (cell clause)
-// =============================================================================
 TEST_F(ApiParseTest, ConfigCellClauseLiblist) {
   auto* unit = Parse(R"(
     config cfg1;
@@ -46,7 +41,7 @@ TEST_F(ApiParseTest, ConfigCellClauseWithLib) {
   EXPECT_EQ(cell_rule->use_lib, "rtlLib");
   EXPECT_EQ(cell_rule->use_cell, "adder");
 }
-// cell_clause: unqualified cell identifier (no library prefix)
+
 TEST(SourceText, ConfigCellUnqualified) {
   auto r = Parse(
       "config cfg13;\n"
@@ -73,4 +68,4 @@ TEST_F(ConfigParseTest, ConfigWithCellClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §21.5: Writing memory array data to a file
-
 #include <fstream>
 
 #include "builders_ast.h"
@@ -11,9 +9,6 @@
 using namespace delta;
 namespace {
 
-// ============================================================================
-// §21.4 — $writememh, $writememb
-// ============================================================================
 TEST(Section21, WritememhBasic) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_writememh.txt";
@@ -57,4 +52,4 @@ TEST(Section21, WritemembBasic) {
   std::remove(tmp_path.c_str());
 }
 
-}  // namespace
+}

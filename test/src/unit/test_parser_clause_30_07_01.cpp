@@ -1,14 +1,9 @@
-// §30.7.1: Specify block control of pulse limit values
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// --- pulse_control_specparam ---
-// PATHPULSE$ = ( reject_limit_value [ , error_limit_value ] )
-// PATHPULSE$input$output = ( reject_limit_value [ , error_limit_value ] )
 TEST(ParserA24, PulseControlSpecparamRejectOnly) {
   auto r = Parse(
       "module m;\n"
@@ -51,8 +46,6 @@ TEST(ParserA24, PulseControlSpecparamModuleLevel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- error_limit_value / reject_limit_value / limit_value ---
-// These are constant_mintypmax_expression, tested through pulse_control above
 TEST(ParserA24, LimitValueMintypmax) {
   auto r = Parse(
       "module m;\n"
@@ -64,4 +57,4 @@ TEST(ParserA24, LimitValueMintypmax) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

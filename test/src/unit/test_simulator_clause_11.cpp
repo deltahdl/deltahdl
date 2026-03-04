@@ -1,11 +1,9 @@
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
 using namespace delta;
 
-// §11.4.6: Basic ternary with true condition selects true branch.
 TEST(SimCh11, TernaryBasicTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -27,7 +25,6 @@ TEST(SimCh11, TernaryBasicTrue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §11.4.6: Basic ternary with false condition selects false branch.
 TEST(SimCh11, TernaryBasicFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -49,7 +46,6 @@ TEST(SimCh11, TernaryBasicFalse) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §11.4.6: Ternary with a variable condition (nonzero is true).
 TEST(SimCh11, TernaryVariableCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -73,7 +69,6 @@ TEST(SimCh11, TernaryVariableCondition) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §11.4.6: Ternary with comparison condition implements max(a, b).
 TEST(SimCh11, TernaryComparisonMax) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -97,7 +92,6 @@ TEST(SimCh11, TernaryComparisonMax) {
   EXPECT_EQ(var->value.ToUint64(), 50u);
 }
 
-// §11.4.6: Ternary with equality condition.
 TEST(SimCh11, TernaryEqualityCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -120,7 +114,6 @@ TEST(SimCh11, TernaryEqualityCondition) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §11.4.6: Nested ternary — right-to-left associativity: a ? b ? 1 : 2 : 3.
 TEST(SimCh11, TernaryNested) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -141,11 +134,10 @@ TEST(SimCh11, TernaryNested) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // a=1 → inner: b=0 → 2.
+
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §11.4.6: Chained ternary as priority encoder: sel==0 ? a : sel==1 ? b : c.
 TEST(SimCh11, TernaryChainedPriorityEncoder) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -171,7 +163,6 @@ TEST(SimCh11, TernaryChainedPriorityEncoder) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §11.4.6: Ternary in continuous assignment.
 TEST(SimCh11, TernaryContinuousAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -199,7 +190,6 @@ TEST(SimCh11, TernaryContinuousAssign) {
   EXPECT_EQ(net->resolved->value.ToUint64(), 55u);
 }
 
-// §11.4.6: Ternary in blocking assignment.
 TEST(SimCh11, TernaryBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -222,7 +212,6 @@ TEST(SimCh11, TernaryBlockingAssign) {
   EXPECT_EQ(var->value.ToUint64(), 100u);
 }
 
-// §11.4.6: Ternary in nonblocking assignment.
 TEST(SimCh11, TernaryNonblockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -242,11 +231,10 @@ TEST(SimCh11, TernaryNonblockingAssign) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // sel=0 → false branch → 22.
+
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
-// §11.4.6: Ternary with bitwise AND in condition.
 TEST(SimCh11, TernaryBitwiseCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -268,11 +256,10 @@ TEST(SimCh11, TernaryBitwiseCondition) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // 0xF0 & 0x0F = 0x00 → false → 0.
+
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §11.4.6: Ternary with logical OR in condition.
 TEST(SimCh11, TernaryLogicalOrCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -293,11 +280,10 @@ TEST(SimCh11, TernaryLogicalOrCondition) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // (0 || 1) is true → 7.
+
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §11.4.6: Ternary with concatenation as result.
 TEST(SimCh11, TernaryConcatResult) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -322,7 +308,6 @@ TEST(SimCh11, TernaryConcatResult) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-// §11.4.6: Ternary with function call in branches.
 TEST(SimCh11, TernaryFunctionCallBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -345,11 +330,10 @@ TEST(SimCh11, TernaryFunctionCallBranch) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // sel=1 → double_it(5) = 10.
+
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §11.4.6: Ternary with different-width operands (wider result).
 TEST(SimCh11, TernaryDifferentWidthOperands) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -376,7 +360,6 @@ TEST(SimCh11, TernaryDifferentWidthOperands) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-// §11.4.6: Ternary with signed operands preserves signedness.
 TEST(SimCh11, TernarySignedOperands) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -397,12 +380,11 @@ TEST(SimCh11, TernarySignedOperands) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // -5 as 32-bit unsigned = 0xFFFFFFFB.
+
   auto neg5_u32 = static_cast<uint32_t>(-5);
   EXPECT_EQ(var->value.ToUint64(), neg5_u32);
 }
 
-// §11.4.6: Ternary selecting between constants.
 TEST(SimCh11, TernarySelectConstants) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -424,7 +406,6 @@ TEST(SimCh11, TernarySelectConstants) {
   EXPECT_EQ(var->value.ToUint64(), 100u);
 }
 
-// §11.4.6: Ternary in always_comb block.
 TEST(SimCh11, TernaryAlwaysComb) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -452,7 +433,6 @@ TEST(SimCh11, TernaryAlwaysComb) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// §11.4.6: Ternary result used as function argument.
 TEST(SimCh11, TernaryAsFunctionArgument) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -475,11 +455,10 @@ TEST(SimCh11, TernaryAsFunctionArgument) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // sel=0 → 20, add_one(20) = 21.
+
   EXPECT_EQ(var->value.ToUint64(), 21u);
 }
 
-// §11.4.6: Ternary with arithmetic in branches: sel ? (a+b) : (a-b).
 TEST(SimCh11, TernaryArithmeticBranches) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -501,11 +480,10 @@ TEST(SimCh11, TernaryArithmeticBranches) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // sel=1 → a+b = 20.
+
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §11.4.6: Ternary with unary NOT in condition: !sel ? a : b.
 TEST(SimCh11, TernaryUnaryNotCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -525,11 +503,10 @@ TEST(SimCh11, TernaryUnaryNotCondition) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // !0 = 1 → true branch → 77.
+
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §11.4.6: Multiple ternaries combined in one expression.
 TEST(SimCh11, TernaryMultipleInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -550,11 +527,10 @@ TEST(SimCh11, TernaryMultipleInExpression) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // (1?10:20) + (0?30:40) = 10 + 40 = 50.
+
   EXPECT_EQ(var->value.ToUint64(), 50u);
 }
 
-// §11.4.6: Ternary result used in further computation.
 TEST(SimCh11, TernaryResultInComputation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -574,11 +550,10 @@ TEST(SimCh11, TernaryResultInComputation) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // (1?6:3) * 7 = 6 * 7 = 42.
+
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §11.4.6: Ternary with bit-select condition.
 TEST(SimCh11, TernaryBitSelectCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -599,11 +574,10 @@ TEST(SimCh11, TernaryBitSelectCondition) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // flags[2] = 1 → true → 1.
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §11.4.6: Ternary with part-select operands.
 TEST(SimCh11, TernaryPartSelectOperands) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -624,11 +598,10 @@ TEST(SimCh11, TernaryPartSelectOperands) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // True branch: data[15:8] = 0xAB.
+
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-// §11.4.6: Verify .width on ternary result with 8-bit operands.
 TEST(SimCh11, TernaryResultWidth8Bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -653,7 +626,6 @@ TEST(SimCh11, TernaryResultWidth8Bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// §11.4.6: Verify .width and .ToUint64() on ternary result with 32-bit int.
 TEST(SimCh11, TernaryResultWidth32Bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -676,7 +648,6 @@ TEST(SimCh11, TernaryResultWidth32Bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-// §11.4.6: Nested ternary — outer false, inner not reached.
 TEST(SimCh11, TernaryNestedOuterFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -695,11 +666,10 @@ TEST(SimCh11, TernaryNestedOuterFalse) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // Outer condition 0 → false branch → 30.
+
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// §11.4.6: Chained ternary selects last default when no match.
 TEST(SimCh11, TernaryChainedDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -721,11 +691,10 @@ TEST(SimCh11, TernaryChainedDefault) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // No match → default 999.
+
   EXPECT_EQ(var->value.ToUint64(), 999u);
 }
 
-// §11.4.6: Ternary with logical AND in condition.
 TEST(SimCh11, TernaryLogicalAndCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -746,6 +715,6 @@ TEST(SimCh11, TernaryLogicalAndCondition) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // (3 && 4) is true → 55.
+
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }

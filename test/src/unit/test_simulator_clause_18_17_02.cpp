@@ -1,5 +1,3 @@
-// §18.17.2: if–else production statements
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// If-else in production: condition selects branch
 TEST(SimA612, IfElseProduction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,4 +30,4 @@ TEST(SimA612, IfElseProduction) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

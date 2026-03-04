@@ -1,14 +1,9 @@
-// §18.11.1: Inline constraint checker
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// §18.7 Inline constraints -- randomize() with (additional)
-// =============================================================================
 TEST(ParserSection18, RandomizeWithNullArg) {
   auto r = Parse(
       "class C;\n"
@@ -31,4 +26,4 @@ TEST(ParserA82, RandomizeCallWithNull) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

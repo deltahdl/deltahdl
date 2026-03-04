@@ -1,15 +1,11 @@
-// §9.3.3: Statement block start and finish times
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
 using namespace delta;
 
-// Sim test fixture
 namespace {
 
-// Nested sequential blocks execute sequentially
 TEST(SimA603, NestedSeqBlockExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -35,4 +31,4 @@ TEST(SimA603, NestedSeqBlockExecution) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-}  // namespace
+}

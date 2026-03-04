@@ -1,5 +1,3 @@
-// §19.5: Defining coverage points
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// S19.5: Coverpoint declaration
-// =============================================================================
 TEST(Coverage, AddCoverPointToGroup) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -23,15 +18,12 @@ TEST(Coverage, AddCoverPointToGroup) {
   EXPECT_EQ(g->coverpoints.size(), 1u);
 }
 
-// =============================================================================
-// S19.5: Coverpoint with iff guard
-// =============================================================================
 TEST(Coverage, IffGuardBlocksSampling) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
   auto* cp = CoverageDB::AddCoverPoint(g, "x");
   cp->has_iff_guard = true;
-  cp->iff_guard_value = false;  // Guard is disabled.
+  cp->iff_guard_value = false;
 
   CoverBin b;
   b.name = "b0";
@@ -39,7 +31,7 @@ TEST(Coverage, IffGuardBlocksSampling) {
   CoverageDB::AddBin(cp, b);
 
   db.Sample(g, {{"x", 0}});
-  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);  // Blocked by iff.
+  EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);
 }
 
 TEST(Coverage, IffGuardAllowsSampling) {
@@ -47,7 +39,7 @@ TEST(Coverage, IffGuardAllowsSampling) {
   auto* g = db.CreateGroup("cg");
   auto* cp = CoverageDB::AddCoverPoint(g, "x");
   cp->has_iff_guard = true;
-  cp->iff_guard_value = true;  // Guard is enabled.
+  cp->iff_guard_value = true;
 
   CoverBin b;
   b.name = "b0";
@@ -58,4 +50,4 @@ TEST(Coverage, IffGuardAllowsSampling) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
 }
 
-}  // namespace
+}

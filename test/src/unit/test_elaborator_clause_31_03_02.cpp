@@ -1,12 +1,9 @@
-// §31.3.2: $hold
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// $hold timing check elaborates
 TEST(ElabA705, HoldTimingCheckElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,4 +17,4 @@ TEST(ElabA705, HoldTimingCheckElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

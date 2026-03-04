@@ -1,5 +1,3 @@
-// §7.2.2: Assigning to structures
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §7.2.2: Packed struct members shall not have individual default values.
 TEST(Elaboration, PackedStructMemberDefault_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -31,4 +28,4 @@ TEST(Elaboration, UnpackedStructMemberDefault_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

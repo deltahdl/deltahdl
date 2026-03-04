@@ -1,5 +1,3 @@
-// §14.16.2: Driving clocking output signals
-
 #include <cstdint>
 #include <string_view>
 
@@ -14,12 +12,6 @@ using namespace delta;
 
 namespace {
 
-// Helper fixture for clocking simulation tests.
-// Schedule posedge at a given time through the scheduler.
-// Schedule negedge at a given time through the scheduler.
-// =============================================================================
-// 6. Clocking block output driving (S14.7)
-// =============================================================================
 TEST(ClockingSim, OutputDriving) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -52,9 +44,6 @@ TEST(ClockingSim, OutputDriving) {
   EXPECT_EQ(out->value.ToUint64(), 0xFEu);
 }
 
-// =============================================================================
-// 10. Synchronous drives via clocking block (S14.14)
-// =============================================================================
 TEST(ClockingSim, SynchronousDriveSchedulesAtNextClock) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -109,7 +98,6 @@ TEST(Clocking, ScheduleOutputDrive) {
 
   mgr.Attach(f.ctx, f.scheduler);
 
-  // At t=10, drive output value 0x55.
   auto* ev = f.scheduler.GetEventPool().Acquire();
   ev->callback = [&mgr, &f]() {
     mgr.ScheduleOutputDrive("cb", "data_out", 0x55, f.ctx, f.scheduler);
@@ -118,8 +106,7 @@ TEST(Clocking, ScheduleOutputDrive) {
 
   f.scheduler.Run();
 
-  // data_out should be updated at t=13 (10 + 3 output skew).
   EXPECT_EQ(data_out->value.ToUint64(), 0x55u);
 }
 
-}  // namespace
+}

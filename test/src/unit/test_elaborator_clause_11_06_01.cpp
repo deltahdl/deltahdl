@@ -1,5 +1,3 @@
-// §11.6.1: Rules for expression bit lengths
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -53,7 +51,7 @@ TEST(Elaboration, WidthInference_Concatenation) {
   Expr concat;
   concat.kind = ExprKind::kConcatenation;
   concat.elements = {&a, &b};
-  EXPECT_EQ(InferExprWidth(&concat, typedefs), 64);  // 32 + 32
+  EXPECT_EQ(InferExprWidth(&concat, typedefs), 64);
 }
 
-}  // namespace
+}

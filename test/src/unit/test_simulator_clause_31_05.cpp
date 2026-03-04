@@ -1,5 +1,3 @@
-// §31.5: Edge-control specifiers
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Runtime TimingCheckEntry stores negedge correctly
 TEST(SimA70503, RuntimeTimingCheckEntryNegedge) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -22,10 +19,6 @@ TEST(SimA70503, RuntimeTimingCheckEntryNegedge) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].ref_edge, SpecifyEdge::kNegedge);
 }
 
-// =============================================================================
-// A.7.5.3 Sim — End-to-end: timing check events with edge controls
-// =============================================================================
-// Module with timing check using edge keyword simulates
 TEST(SimA70503, EdgeKeywordSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -46,7 +39,6 @@ TEST(SimA70503, EdgeKeywordSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// Module with edge_control_specifier simulates
 TEST(SimA70503, EdgeControlSpecifierSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -67,4 +59,4 @@ TEST(SimA70503, EdgeControlSpecifierSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

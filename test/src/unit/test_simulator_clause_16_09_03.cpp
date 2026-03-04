@@ -1,5 +1,3 @@
-// §16.9.3: Sampled value functions
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -14,9 +12,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §16.9.3: $changed — assertion monitor support
-// =============================================================================
 TEST(Assertion, ChangedDetected) {
   AssertionMonitor monitor;
   SvaProperty prop;
@@ -25,12 +20,10 @@ TEST(Assertion, ChangedDetected) {
   prop.signal_name = "sig";
   monitor.AddProperty(prop);
 
-  // Initialize: prev_value = 5.
   monitor.Evaluate("p_changed", 5);
   auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_changed"));
   entry->cycle_count = 1;
 
-  // 5 -> 7 is a change → kPass.
   auto r1 = monitor.Evaluate("p_changed", 7);
   EXPECT_EQ(r1, AssertionResult::kPass);
 }
@@ -47,9 +40,8 @@ TEST(Assertion, ChangedStable) {
   auto* entry = const_cast<AssertionEntry*>(monitor.FindEntry("p_changed2"));
   entry->cycle_count = 1;
 
-  // 42 -> 42 is NOT a change → kFail.
   auto r1 = monitor.Evaluate("p_changed2", 42);
   EXPECT_EQ(r1, AssertionResult::kFail);
 }
 
-}  // namespace
+}

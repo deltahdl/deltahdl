@@ -1,5 +1,3 @@
-// §19.4: Using covergroups in classes
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,11 +9,8 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// S19.3: Covergroup in class (CoverGroup is independent, can be embedded)
-// =============================================================================
 TEST(Coverage, CoverGroupAsClassMember) {
-  // Simulates a covergroup embedded in a class: just a struct.
+
   struct MyClass {
     CoverageDB db;
     CoverGroup* cg = nullptr;
@@ -27,4 +22,4 @@ TEST(Coverage, CoverGroupAsClassMember) {
   EXPECT_EQ(obj.cg->name, "cg_in_class");
 }
 
-}  // namespace
+}

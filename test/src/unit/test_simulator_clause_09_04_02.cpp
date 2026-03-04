@@ -1,5 +1,3 @@
-// §9.4.2: Event control
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2: posedge event control triggers on 0->1 transition
 TEST(SimA605, EventControlPosedge) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +30,6 @@ TEST(SimA605, EventControlPosedge) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §9.4.2: negedge event control triggers on 1->0 transition
 TEST(SimA605, EventControlNegedge) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -58,7 +54,6 @@ TEST(SimA605, EventControlNegedge) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §9.4.2: any-change event control (no edge specified)
 TEST(SimA605, EventControlAnyChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -83,7 +78,6 @@ TEST(SimA605, EventControlAnyChange) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// §9.4: multiple timing controls in sequence
 TEST(SimA605, MultipleTimingControls) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -223,4 +217,4 @@ TEST(TimingControl, NoEdgeDetectedXToZ) {
   EXPECT_FALSE(IsEdge(Logic4::kX, Logic4::kZ));
 }
 
-}  // namespace
+}

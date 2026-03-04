@@ -1,7 +1,3 @@
-// §A.9.3 Identifiers — parser-level tests
-// Tests hierarchical_identifier, package_scope, ps_* identifier forms,
-// and c_identifier in DPI context.
-
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
@@ -28,13 +24,8 @@ static CompilationUnit* ParseSrc(const std::string& src, ParseFixture& f) {
   return parser.Parse();
 }
 
-// ===========================================================================
-// §A.9.3: hierarchical_identifier ::= [ $root . ] { identifier
-// constant_bit_select . } identifier
-// ===========================================================================
-
 TEST(ParserA93, SimpleIdentInExpr) {
-  // §A.9.3: A single identifier in expression context.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -47,7 +38,7 @@ TEST(ParserA93, SimpleIdentInExpr) {
 }
 
 TEST(ParserA93, HierarchicalIdentDotted) {
-  // §A.9.3: hierarchical_identifier with multiple dot-separated identifiers.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -60,7 +51,7 @@ TEST(ParserA93, HierarchicalIdentDotted) {
 }
 
 TEST(ParserA93, HierarchicalIdentDeep) {
-  // §A.9.3: Deeply nested hierarchical path.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -73,7 +64,7 @@ TEST(ParserA93, HierarchicalIdentDeep) {
 }
 
 TEST(ParserA93, HierarchicalIdentWithBitSelect) {
-  // §A.9.3: { identifier constant_bit_select . } identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -86,7 +77,7 @@ TEST(ParserA93, HierarchicalIdentWithBitSelect) {
 }
 
 TEST(ParserA93, HierarchicalIdentWithMultipleBitSelects) {
-  // §A.9.3: Multiple path elements with bit selects.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -99,8 +90,7 @@ TEST(ParserA93, HierarchicalIdentWithMultipleBitSelects) {
 }
 
 TEST(ParserA93, EscapedIdentInHierPath) {
-  // §A.9.3: identifier ::= simple_identifier | escaped_identifier
-  // Escaped identifiers are valid in hierarchical paths.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -112,12 +102,8 @@ TEST(ParserA93, EscapedIdentInHierPath) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ===========================================================================
-// §A.9.3: package_scope ::= package_identifier :: | $unit ::
-// ===========================================================================
-
 TEST(ParserA93, PackageScopeAccess) {
-  // §A.9.3: package_identifier :: member
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "package pkg;\n"
@@ -132,7 +118,7 @@ TEST(ParserA93, PackageScopeAccess) {
 }
 
 TEST(ParserA93, PackageScopeOnType) {
-  // §A.9.3: ps_type_identifier with package_scope.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "package pkg;\n"
@@ -147,7 +133,7 @@ TEST(ParserA93, PackageScopeOnType) {
 }
 
 TEST(ParserA93, PackageScopeInAssign) {
-  // §A.9.3: package_scope in expression within continuous assignment.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "package pkg;\n"
@@ -163,13 +149,8 @@ TEST(ParserA93, PackageScopeInAssign) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ===========================================================================
-// §A.9.3: c_identifier in DPI context (§35)
-// c_identifier54 ::= [ a-zA-Z_ ] { [ a-zA-Z0-9_ ] }  (no $ allowed)
-// ===========================================================================
-
 TEST(ParserA93, DpiImportWithCIdentifier) {
-  // §A.9.3 / §35: import "DPI-C" c_identifier = function ...
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -185,7 +166,7 @@ TEST(ParserA93, DpiImportWithCIdentifier) {
 }
 
 TEST(ParserA93, DpiImportWithoutCIdentifier) {
-  // §A.9.3 / §35: c_identifier is optional in DPI import.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -201,7 +182,7 @@ TEST(ParserA93, DpiImportWithoutCIdentifier) {
 }
 
 TEST(ParserA93, DpiExportWithCIdentifier) {
-  // §A.9.3 / §35: export "DPI-C" c_identifier = function tf_identifier;
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -214,7 +195,7 @@ TEST(ParserA93, DpiExportWithCIdentifier) {
 }
 
 TEST(ParserA93, DpiImportPureFunction) {
-  // §A.9.3 / §35: import "DPI-C" pure function ...
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -229,7 +210,7 @@ TEST(ParserA93, DpiImportPureFunction) {
 }
 
 TEST(ParserA93, DpiImportContextTask) {
-  // §A.9.3 / §35: import "DPI-C" context task ...
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -243,13 +224,8 @@ TEST(ParserA93, DpiImportContextTask) {
   EXPECT_TRUE(item->dpi_is_task);
 }
 
-// ===========================================================================
-// §A.9.3: Named identifier aliases used as different syntactic roles
-// Tests that identifiers parse correctly in various declaration contexts.
-// ===========================================================================
-
 TEST(ParserA93, ModuleIdentifier) {
-  // §A.9.3: module_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc("module my_module; endmodule\n", f);
   ASSERT_NE(cu, nullptr);
@@ -258,7 +234,7 @@ TEST(ParserA93, ModuleIdentifier) {
 }
 
 TEST(ParserA93, FunctionIdentifier) {
-  // §A.9.3: function_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -272,7 +248,7 @@ TEST(ParserA93, FunctionIdentifier) {
 }
 
 TEST(ParserA93, TaskIdentifier) {
-  // §A.9.3: task_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -284,7 +260,7 @@ TEST(ParserA93, TaskIdentifier) {
 }
 
 TEST(ParserA93, ParameterIdentifier) {
-  // §A.9.3: parameter_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -296,7 +272,7 @@ TEST(ParserA93, ParameterIdentifier) {
 }
 
 TEST(ParserA93, InstanceIdentifier) {
-  // §A.9.3: instance_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module sub; endmodule\n"
@@ -309,7 +285,7 @@ TEST(ParserA93, InstanceIdentifier) {
 }
 
 TEST(ParserA93, GenerateBlockIdentifier) {
-  // §A.9.3: generate_block_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -326,7 +302,7 @@ TEST(ParserA93, GenerateBlockIdentifier) {
 }
 
 TEST(ParserA93, InterfaceIdentifier) {
-  // §A.9.3: interface_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "interface my_intf;\n"
@@ -338,7 +314,7 @@ TEST(ParserA93, InterfaceIdentifier) {
 }
 
 TEST(ParserA93, PackageIdentifier) {
-  // §A.9.3: package_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "package my_pkg;\n"
@@ -351,7 +327,7 @@ TEST(ParserA93, PackageIdentifier) {
 }
 
 TEST(ParserA93, NetIdentifier) {
-  // §A.9.3: net_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -363,7 +339,7 @@ TEST(ParserA93, NetIdentifier) {
 }
 
 TEST(ParserA93, VariableIdentifier) {
-  // §A.9.3: variable_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -375,7 +351,7 @@ TEST(ParserA93, VariableIdentifier) {
 }
 
 TEST(ParserA93, PortIdentifier) {
-  // §A.9.3: port_identifier, input_port_identifier, output_port_identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m(input a, output b, inout c);\n"
@@ -387,7 +363,7 @@ TEST(ParserA93, PortIdentifier) {
 }
 
 TEST(ParserA93, EnumIdentifier) {
-  // §A.9.3: enum_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -400,7 +376,7 @@ TEST(ParserA93, EnumIdentifier) {
 }
 
 TEST(ParserA93, ClassIdentifier) {
-  // §A.9.3: class_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "class my_class;\n"
@@ -412,7 +388,7 @@ TEST(ParserA93, ClassIdentifier) {
 }
 
 TEST(ParserA93, MemberIdentifier) {
-  // §A.9.3: member_identifier ::= identifier (struct member)
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -427,7 +403,7 @@ TEST(ParserA93, MemberIdentifier) {
 }
 
 TEST(ParserA93, SpecparamIdentifier) {
-  // §A.9.3: specparam_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m(input a, output b);\n"
@@ -441,7 +417,7 @@ TEST(ParserA93, SpecparamIdentifier) {
 }
 
 TEST(ParserA93, GotoBlockLabel) {
-  // §A.9.3: block_identifier ::= identifier (used as a label on begin/end)
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -455,7 +431,7 @@ TEST(ParserA93, GotoBlockLabel) {
 }
 
 TEST(ParserA93, ConfigIdentifier) {
-  // §A.9.3: config_identifier ::= identifier
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "config my_cfg;\n"
@@ -467,20 +443,15 @@ TEST(ParserA93, ConfigIdentifier) {
 }
 
 TEST(ParserA93, EscapedIdentAsModuleName) {
-  // §A.9.3: identifier ::= simple_identifier | escaped_identifier.
-  // Escaped identifiers valid in all identifier roles.
+
   ParseFixture f;
   auto* cu = ParseSrc("module \\my-module ; endmodule\n", f);
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ===========================================================================
-// §A.9.3: system_tf_identifier in expression and statement contexts
-// ===========================================================================
-
 TEST(ParserA93, SystemCallInExpr) {
-  // §A.9.3: system_tf_identifier55 used in function call context.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -492,7 +463,7 @@ TEST(ParserA93, SystemCallInExpr) {
 }
 
 TEST(ParserA93, SystemCallClog2) {
-  // §A.9.3: system_tf_identifier with numeric suffix.
+
   ParseFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -504,4 +475,4 @@ TEST(ParserA93, SystemCallClog2) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

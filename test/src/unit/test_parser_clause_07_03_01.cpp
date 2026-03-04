@@ -1,5 +1,3 @@
-// §7.3.1: Packed unions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -34,9 +32,6 @@ TEST(ParserSection7, UnionSoftPacked) {
   EXPECT_TRUE(item->typedef_type.is_packed);
 }
 
-// =========================================================================
-// §7.3.1: Packed unions
-// =========================================================================
 TEST(ParserSection7, UnionPacked) {
   auto r = Parse(
       "module t;\n"
@@ -53,4 +48,4 @@ TEST(ParserSection7, UnionPacked) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
-}  // namespace
+}

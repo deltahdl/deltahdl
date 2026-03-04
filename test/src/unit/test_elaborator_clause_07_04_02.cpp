@@ -1,5 +1,3 @@
-// §7.4.2: Unpacked arrays
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -40,4 +38,4 @@ TEST(ParserA25, AscendingUnpackedRange) {
   EXPECT_FALSE(mod->variables[0].is_descending);
 }
 
-}  // namespace
+}

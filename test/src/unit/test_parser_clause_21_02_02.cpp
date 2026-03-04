@@ -1,14 +1,9 @@
-// §21.2.2: Strobed monitoring
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// ---------------------------------------------------------------------------
-// 10. $strobe system call (Postponed region sampling)
-// ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_StrobeSystemCall) {
   auto r = Parse(
       "module m;\n"
@@ -45,4 +40,4 @@ TEST(ParserSection21, StrobebHexOctal) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

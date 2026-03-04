@@ -1,5 +1,3 @@
-// §16.17: Expect statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,18 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Production #2: concurrent_assertion_statement
-// concurrent_assertion_statement ::=
-//     assert_property_statement | assume_property_statement
-//   | cover_property_statement  | cover_sequence_statement
-//   | restrict_property_statement
-// =============================================================================
-// Productions #3-#5 tested above (assert/assume/cover property).
-// =============================================================================
-// §A.2.10 Production #6: expect_property_statement
-// expect_property_statement ::= expect ( property_spec ) action_block
-// =============================================================================
 TEST(ParserA210, ExpectPropertyStatement) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
@@ -37,7 +23,6 @@ TEST(ParserA210, ExpectPropertyStatement_NoActions) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
 TEST(ParserSection16, ExpectStatement) {
   auto r = Parse(
       "module top();\n"
@@ -51,4 +36,4 @@ TEST(ParserSection16, ExpectStatement) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

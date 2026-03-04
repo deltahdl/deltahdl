@@ -1,5 +1,3 @@
-// §26.3: Referencing data in packages
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -9,7 +7,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA213, DataDeclPackageImport) {
-  // package_import_declaration alternative
+
   auto r = Parse(
       "package pkg; endpackage\n"
       "module m; import pkg::*; endmodule");
@@ -18,7 +16,7 @@ TEST(ParserA213, DataDeclPackageImport) {
 }
 
 TEST(ParserA213, PackageImportMultiple) {
-  // Multiple comma-separated import items
+
   auto r = Parse(
       "package p1; endpackage\n"
       "package p2; endpackage\n"
@@ -32,8 +30,6 @@ TEST(ParserA213, PackageImportMultiple) {
   EXPECT_GE(import_count, 2);
 }
 
-// --- package_import_declaration ---
-// import package_import_item { , package_import_item } ;
 TEST(ParserA213, PackageImportSingle) {
   auto r = Parse(
       "package pkg; endpackage\n"
@@ -46,9 +42,6 @@ TEST(ParserA213, PackageImportSingle) {
   EXPECT_EQ(item->import_item.item_name, "foo");
 }
 
-// =============================================================================
-// LRM section 26.3 -- Referencing data in packages (import)
-// =============================================================================
 TEST(ParserSection26, ModuleImportPackage) {
   auto r = Parse(
       "package p;\n"
@@ -80,9 +73,6 @@ TEST(ParserSection26, ModuleImportSpecific) {
   EXPECT_EQ(imp->import_item.item_name, "X");
 }
 
-// =============================================================================
-// Coexistence with package imports/exports
-// =============================================================================
 TEST_F(DpiParseTest, PackageImportStillWorks) {
   auto* unit = Parse(R"(
     module m;
@@ -95,9 +85,6 @@ TEST_F(DpiParseTest, PackageImportStillWorks) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
-// =============================================================================
-// LRM section 26.3 -- Multiple imports and wildcard
-// =============================================================================
 TEST(ParserSection26, ModuleMultipleImports) {
   auto r = Parse(
       "package p1;\n"
@@ -117,10 +104,6 @@ TEST(ParserSection26, ModuleMultipleImports) {
   EXPECT_EQ(import_count, 2u);
 }
 
-// =============================================================================
-// A.8.4 Primaries — class_qualifier
-// =============================================================================
-// § class_qualifier — class_scope
 TEST(ParserA84, ClassQualifierScope) {
   auto r = Parse("module m; initial x = pkg::my_const; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -146,8 +129,7 @@ TEST(ParserSection26, ImportWildcardField) {
 }
 
 TEST_F(AnnexHParseTest, AnnexGStdRandomizePackageImport) {
-  // std::randomize usage via package import at module level.
-  // The parser handles import std_pkg::* for scope-qualified access.
+
   auto* unit = Parse(
       "module m;\n"
       "  import std_pkg::*;\n"
@@ -214,9 +196,7 @@ TEST(ParserSection23, MultiItemImportWithWildcardSecond) {
   EXPECT_EQ(mod->items[1]->import_item.package_name, "other");
   EXPECT_EQ(mod->items[1]->import_item.item_name, "func");
 }
-// =========================================================================
-// §6.25: Parameterized data types
-// =========================================================================
+
 TEST(ParserSection6, ScopeResolutionType) {
   auto r = Parse(
       "module t;\n"
@@ -224,7 +204,7 @@ TEST(ParserSection6, ScopeResolutionType) {
       "  pkg::mytype x;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // Find the variable declaration.
+
   auto& items = r.cu->modules[0]->items;
   ModuleItem* var_item = nullptr;
   for (auto* it : items) {
@@ -239,7 +219,6 @@ TEST(ParserSection6, ScopeResolutionType) {
   EXPECT_EQ(var_item->data_type.type_name, "mytype");
 }
 
-// 9. Package import with :: operator
 TEST(ParserClause03, Cl3_13_PackageImportExplicit) {
   auto r = Parse(
       "package pkg;\n"
@@ -259,7 +238,6 @@ TEST(ParserClause03, Cl3_13_PackageImportExplicit) {
   EXPECT_FALSE(item->import_item.is_wildcard);
 }
 
-// 10. Package wildcard import (import pkg::*)
 TEST(ParserClause03, Cl3_13_PackageWildcardImport) {
   auto r = Parse(
       "package pkg;\n"
@@ -278,7 +256,6 @@ TEST(ParserClause03, Cl3_13_PackageWildcardImport) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
-// 11. Multiple packages imported into same module
 TEST(ParserClause03, Cl3_13_MultiplePackageImports) {
   auto r = Parse(
       "package alpha;\n"
@@ -302,7 +279,6 @@ TEST(ParserClause03, Cl3_13_MultiplePackageImports) {
   EXPECT_EQ(import_count, 2);
 }
 
-// 20. Package scope resolution (pkg::item)
 TEST(ParserClause03, Cl3_13_PackageScopeResolution) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
@@ -324,7 +300,6 @@ TEST(ParserA213, PackageImportItemStar) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
-// import in task body
 TEST(ParserA28, ImportInTask) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
@@ -337,7 +312,6 @@ TEST(ParserA28, ImportInTask) {
               "endmodule\n"));
 }
 
-// Multiple imports in one statement in block
 TEST(ParserA28, ImportMultipleInBlock) {
   EXPECT_TRUE(
       ParseOk("package p1; int a; endpackage\n"
@@ -374,9 +348,6 @@ TEST(Parser, ImportWildcard) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
-// =============================================================================
-// §24.13 Program with import
-// =============================================================================
 TEST_F(ProgramTestParse, ProgramWithImport) {
   auto* unit = Parse(
       "program p;\n"
@@ -402,4 +373,4 @@ TEST_F(ProgramParseTest, ProgramWithImportStatement) {
   EXPECT_TRUE(unit->programs[0]->items[0]->import_item.is_wildcard);
 }
 
-}  // namespace
+}

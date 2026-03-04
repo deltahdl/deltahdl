@@ -1,5 +1,3 @@
-// §11.4.7: Logical operators
-
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
@@ -35,7 +33,6 @@ TEST(ElabA86, UnaryLogicalNotElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § binary_operator — implication operators elaborate
 TEST(ElabA86, BinaryImplicationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -60,9 +57,6 @@ TEST(ElabA86, BinaryEquivalenceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// 25. always_comb with logical operators.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombLogicalOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -87,9 +81,6 @@ TEST(SimCh9, AlwaysCombLogicalOps) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 30. always @* with logical NOT (!) on a multi-bit signal.
-// ---------------------------------------------------------------------------
 TEST(SimCh9d, AlwaysStarLogicalNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -111,13 +102,10 @@ TEST(SimCh9d, AlwaysStarLogicalNot) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // !0 = 1.
+
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 15. Blocking assignment with unary operators (~, !).
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -141,15 +129,12 @@ TEST(SimCh10, BlockingAssignUnaryOps) {
   auto* r_bang = f.ctx.FindVariable("r_bang");
   ASSERT_NE(r_not, nullptr);
   ASSERT_NE(r_bang, nullptr);
-  // !0 = 1
+
   EXPECT_EQ(r_not->value.ToUint64(), 1u);
-  // !5 = 0
+
   EXPECT_EQ(r_bang->value.ToUint64(), 0u);
 }
 
-// ---------------------------------------------------------------------------
-// 16. Blocking assignment with unary logical NOT (!) and unary minus (-).
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -170,19 +155,16 @@ TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
 
   auto* neg = f.ctx.FindVariable("neg_result");
   ASSERT_NE(neg, nullptr);
-  // -5 as 32-bit unsigned = 0xFFFFFFFB
+
   auto neg5_32bit = static_cast<uint32_t>(-5);
   EXPECT_EQ(neg->value.ToUint64(), neg5_32bit);
 
   auto* notv = f.ctx.FindVariable("not_result");
   ASSERT_NE(notv, nullptr);
-  // !5 = 0
+
   EXPECT_EQ(notv->value.ToUint64(), 0u);
 }
 
-// ---------------------------------------------------------------------------
-// 21. Blocking assignment with logical operators (&&, ||).
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignLogicalOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -207,8 +189,8 @@ TEST(SimCh10, BlockingAssignLogicalOps) {
   auto* r_or = f.ctx.FindVariable("r_or");
   ASSERT_NE(r_and, nullptr);
   ASSERT_NE(r_or, nullptr);
-  EXPECT_EQ(r_and->value.ToUint64(), 0u);  // 1 && 0 = 0
-  EXPECT_EQ(r_or->value.ToUint64(), 1u);   // 1 || 0 = 1
+  EXPECT_EQ(r_and->value.ToUint64(), 0u);
+  EXPECT_EQ(r_or->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

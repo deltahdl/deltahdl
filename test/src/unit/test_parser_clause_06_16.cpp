@@ -1,5 +1,3 @@
-// §6.16: String data type
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,24 +5,21 @@ using namespace delta;
 namespace {
 
 TEST(ParserA212, VarDataTypeString) {
-  // var_data_type: data_type (non_integer_type)
+
   auto r = Parse("module m(input string name); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// string
 TEST(ParserA221, DataTypeString) {
   auto r = Parse("module m; string s; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kString);
 }
-// =========================================================================
-// §6.16: String in block scope
-// =========================================================================
+
 TEST(ParserSection6, StringBlockDecl) {
-  // §6.16: string declared inside an initial block.
+
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -40,14 +35,14 @@ TEST(ParserSection6, StringBlockDecl) {
 }
 
 TEST(ParserSection6, StringFunctionArg) {
-  // §6.16: string as a function argument type.
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  function void print_msg(string s);\n"
               "  endfunction\n"
               "endmodule\n"));
 }
-// 23. String variable declaration.
+
 TEST(ParserSection6, Sec6_5_StringVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -69,7 +64,7 @@ TEST(ParserCh509, StringLiteral_AsParameter) {
               "  parameter string MSG = \"default message\";\n"
               "endmodule"));
 }
-// Step 1a: string type in block-level declarations (fixes 6.19.5.6)
+
 TEST(ParserSection6, BlockVarDecl_StringType) {
   auto r = Parse(
       "module t;\n"
@@ -96,10 +91,7 @@ TEST(ParserSection11, StringCompareEquality) {
               "  end\n"
               "endmodule\n"));
 }
-// =============================================================================
-// Section 8.6 -- String data type
-// =============================================================================
-// Module-level string variable declaration.
+
 TEST(ParserSection8, StringTypeModuleLevel) {
   auto r = Parse(
       "module m;\n"
@@ -112,7 +104,6 @@ TEST(ParserSection8, StringTypeModuleLevel) {
   EXPECT_EQ(item->name, "name");
 }
 
-// String variable with initializer.
 TEST(ParserSection8, StringTypeWithInit) {
   auto r = Parse(
       "module m;\n"
@@ -124,7 +115,7 @@ TEST(ParserSection8, StringTypeWithInit) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
   EXPECT_NE(item->init_expr, nullptr);
 }
-// String variable inside block-level declaration.
+
 TEST(ParserSection8, StringTypeBlockLevel) {
   auto r = Parse(
       "module m;\n"
@@ -141,7 +132,7 @@ TEST(ParserSection8, StringTypeBlockLevel) {
 }
 
 TEST(ParserSection6, StringInProcedural) {
-  // String declared inside procedural block
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -150,11 +141,9 @@ TEST(ParserSection6, StringInProcedural) {
               "  end\n"
               "endmodule\n"));
 }
-// =============================================================================
-// LRM section 6.16 -- String data type
-// =============================================================================
+
 TEST(ParserSection6, StringDeclBasic) {
-  // string variable declaration (LRM 6.16)
+
   auto r = Parse(
       "module m;\n"
       "  string s;\n"
@@ -168,7 +157,7 @@ TEST(ParserSection6, StringDeclBasic) {
 }
 
 TEST(ParserSection6, StringDeclWithInitializer) {
-  // string variable with initial value
+
   auto r = Parse(
       "module m;\n"
       "  string name = \"hello\";\n"
@@ -182,7 +171,7 @@ TEST(ParserSection6, StringDeclWithInitializer) {
 }
 
 TEST(ParserSection6, StringDeclEmptyInit) {
-  // string initialized to empty string
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  string s = \"\";\n"
@@ -190,7 +179,7 @@ TEST(ParserSection6, StringDeclEmptyInit) {
 }
 
 TEST(ParserSection6, StringParameterDecl) {
-  // parameter string (LRM 6.16)
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter string DEFAULT_NAME = \"John Smith\";\n"
@@ -217,7 +206,7 @@ TEST(ParserSection6, StringFunctionReturn) {
 }
 
 TEST(ParserSection6, StringComparison) {
-  // String comparison operators
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  string a, b;\n"
@@ -241,4 +230,4 @@ TEST(ParserSection6, MultipleStringDecls) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-}  // namespace
+}

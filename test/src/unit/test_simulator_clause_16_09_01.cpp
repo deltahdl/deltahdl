@@ -1,5 +1,3 @@
-// §16.9.1: Operator precedence
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -31,9 +26,6 @@ struct SvaFixture {
 
 namespace {
 
-// =============================================================================
-// Sequence delay ##N (section 16.9)
-// =============================================================================
 TEST(SvaEngine, SequenceDelaySimple) {
   SvaFixture f;
   SvaSequence seq;
@@ -52,20 +44,16 @@ TEST(SvaEngine, SequenceDelayZero) {
   SequenceAttempt sa;
   sa.delay_remaining = 0;
   AdvanceSequence(sa);
-  // Zero delay: still at 0.
+
   EXPECT_EQ(sa.delay_remaining, 0u);
 }
 
-// =============================================================================
-// Sequence matching complete patterns
-// =============================================================================
 TEST(SvaEngine, DelaySequenceMatchFull) {
   SvaSequence seq;
   seq.kind = SvaSequenceKind::kDelay;
   seq.delay_cycles = 2;
   seq.expr_check = [](uint64_t v) { return v != 0; };
 
-  // Values: cycle0=1, delay 2, cycle2 check.
   std::vector<uint64_t> vals = {1, 0, 1};
   EXPECT_TRUE(MatchDelaySequence(seq, vals));
 }
@@ -80,4 +68,4 @@ TEST(SvaEngine, DelaySequenceNoMatchAtEnd) {
   EXPECT_FALSE(MatchDelaySequence(seq, vals));
 }
 
-}  // namespace
+}

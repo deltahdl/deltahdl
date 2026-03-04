@@ -1,5 +1,3 @@
-// §18.17.1: Random production weights
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.12 Randsequence — rs_rule (multiple alternatives with |)
-// =============================================================================
-// Multiple rules separated by |
 TEST(ParserA612, RsRuleMultipleAlternatives) {
   auto r = Parse(
       "module m;\n"
@@ -27,10 +21,6 @@ TEST(ParserA612, RsRuleMultipleAlternatives) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.6.12 Randsequence — rs_weight_specification
-// =============================================================================
-// Weight as integral number
 TEST(ParserA612, RsWeightIntegralNumber) {
   auto r = Parse(
       "module m;\n"
@@ -46,7 +36,6 @@ TEST(ParserA612, RsWeightIntegralNumber) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Weight as identifier
 TEST(ParserA612, RsWeightIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -63,7 +52,6 @@ TEST(ParserA612, RsWeightIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Weight as parenthesized expression
 TEST(ParserA612, RsWeightParenExpr) {
   auto r = Parse(
       "module m;\n"
@@ -79,7 +67,6 @@ TEST(ParserA612, RsWeightParenExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Weight with code block
 TEST(ParserA612, RsWeightWithCodeBlock) {
   auto r = Parse(
       "module m;\n"
@@ -96,4 +83,4 @@ TEST(ParserA612, RsWeightWithCodeBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

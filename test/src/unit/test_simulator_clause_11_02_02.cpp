@@ -1,5 +1,3 @@
-// §11.2.2: Aggregate expressions
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_array.h"
@@ -20,4 +18,4 @@ TEST(ArrayEquality, EqualArrays) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-}  // namespace
+}

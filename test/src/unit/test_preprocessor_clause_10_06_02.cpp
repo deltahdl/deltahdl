@@ -1,5 +1,3 @@
-// §10.6.2: The force and release procedural statements
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 10.6.2 -- Force / release
-// =============================================================================
 TEST(ParserSection10, ForceKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -87,4 +82,4 @@ TEST(ParserSection10, ForceThenRelease) {
   EXPECT_EQ(s1->kind, StmtKind::kRelease);
 }
 
-}  // namespace
+}

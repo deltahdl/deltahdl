@@ -1,5 +1,3 @@
-// §8.18: Data hiding and encapsulation
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -23,4 +21,4 @@ TEST(ParserSection8, ClassWithQualifiersLocalProtected) {
   EXPECT_TRUE(cls->members[1]->is_protected);
 }
 
-}  // namespace
+}

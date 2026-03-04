@@ -1,5 +1,3 @@
-// §6.24.2: $cast dynamic casting
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.24.2: $cast function form returns 1 on valid enum cast.
 TEST(SimCh6, CastEnumSuccess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -35,7 +32,6 @@ TEST(SimCh6, CastEnumSuccess) {
   EXPECT_EQ(c->value.ToUint64(), 1u);
 }
 
-// §6.24.2: $cast function form returns 0 on invalid enum cast.
 TEST(SimCh6, CastEnumFailure) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -57,10 +53,10 @@ TEST(SimCh6, CastEnumFailure) {
   auto* ok = f.ctx.FindVariable("ok");
   ASSERT_NE(ok, nullptr);
   EXPECT_EQ(ok->value.ToUint64(), 0u);
-  // c should remain unchanged (default 0).
+
   auto* c = f.ctx.FindVariable("c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

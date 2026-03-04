@@ -1,5 +1,3 @@
-// §35.5.2: Pure functions
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -57,4 +55,4 @@ TEST(ParserSection13, DpiImportPureFunction) {
   EXPECT_FALSE(dpi->dpi_is_context);
 }
 
-}  // namespace
+}

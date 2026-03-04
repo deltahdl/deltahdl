@@ -1,5 +1,3 @@
-// §16.14.4: Restrict statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Production #8: restrict_property_statement
-// restrict_property_statement ::= restrict property ( property_spec ) ;
-// =============================================================================
 TEST(ParserA210, RestrictProperty_Basic) {
   auto r = Parse(
       "module m;\n"
@@ -55,7 +49,6 @@ TEST(ParserA210, RestrictProperty_HasAssertExpr) {
   EXPECT_NE(item->assert_expr, nullptr);
 }
 
-// restrict_property_statement
 TEST(ParserA610, RestrictPropertyModule) {
   auto r = Parse(
       "module m;\n"
@@ -67,4 +60,4 @@ TEST(ParserA610, RestrictPropertyModule) {
   ASSERT_NE(item, nullptr);
 }
 
-}  // namespace
+}

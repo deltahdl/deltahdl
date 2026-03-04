@@ -1,5 +1,3 @@
-// §11.5: Operands
-
 #include "fixture_simulator.h"
 #include "simulator/eval.h"
 
@@ -12,7 +10,6 @@ TEST(Eval, VariableLookup) {
   auto* var = f.ctx.CreateVariable("myvar", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 123);
 
-  // Create an identifier expression manually.
   auto* expr = f.arena.Create<Expr>();
   expr->kind = ExprKind::kIdentifier;
   expr->text = "myvar";
@@ -20,4 +17,4 @@ TEST(Eval, VariableLookup) {
   EXPECT_EQ(result.ToUint64(), 123u);
 }
 
-}  // namespace
+}

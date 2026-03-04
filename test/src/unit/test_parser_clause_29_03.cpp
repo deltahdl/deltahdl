@@ -1,5 +1,3 @@
-// §29.3: UDP definition
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- udp_declaration: extern followed by full definition ---
 TEST(ParserAnnexA051, ExternThenDefinition) {
   auto r = Parse(
       "extern primitive inv(output out, input in);\n"
@@ -29,7 +26,6 @@ TEST(ParserAnnexA051, ExternThenDefinition) {
   EXPECT_EQ(r.cu->udps[1]->table.size(), 2u);
 }
 
-// --- udp_declaration: wildcard port with sequential ---
 TEST(ParserAnnexA051, WildcardPortSequential) {
   auto r = Parse(
       "primitive dff(.*);\n"
@@ -50,7 +46,7 @@ TEST(ParserAnnexA051, WildcardPortSequential) {
   EXPECT_EQ(udp->output_name, "q");
   ASSERT_EQ(udp->input_names.size(), 2u);
 }
-// --- Extern UDP declaration used for instantiation ---
+
 TEST(ParserA504, UdpInst_ExternUdp) {
   auto r = Parse(
       "extern primitive my_udp(output y, input a, input b);\n"
@@ -64,7 +60,6 @@ TEST(ParserA504, UdpInst_ExternUdp) {
   EXPECT_EQ(insts[0]->inst_module, "my_udp");
 }
 
-// description: udp_declaration
 TEST(SourceText, DescriptionUdp) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
@@ -79,4 +74,4 @@ TEST(SourceText, DescriptionUdp) {
   EXPECT_EQ(r.cu->udps[0]->name, "my_udp");
 }
 
-}  // namespace
+}

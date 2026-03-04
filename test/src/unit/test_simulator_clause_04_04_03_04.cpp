@@ -10,20 +10,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.4.3.4 Post-NBA PLI region
-//
-// Figure 4-1 shows:
-//   region_NBA -> pli_region_PostNBA -> region_PreObserved
-//
-// The Post-NBA region is a read-write PLI callback control point.
-// Post-NBA is part of the active region set (§4.4.1).
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.4.3.4 Post-NBA PLI callback control point
-// Basic: events scheduled in the Post-NBA region are executed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBARegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
@@ -37,22 +23,16 @@ TEST(SimCh4434, PostNBARegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.4 Post-NBA can read values
-// A Post-NBA callback can read state set by the NBA region.
-// ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBACanReadValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
   int sampled = -1;
 
-  // NBA sets value = 42.
   auto* nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { value = 42; };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
-  // Post-NBA reads value — should see 42.
   auto* ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPostNBA, ev);
@@ -61,22 +41,16 @@ TEST(SimCh4434, PostNBACanReadValues) {
   EXPECT_EQ(sampled, 42);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.4 Post-NBA can write values
-// A Post-NBA callback can modify state that later regions will observe.
-// ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBACanWriteValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
   int sampled_in_observed = -1;
 
-  // Post-NBA writes a value.
   auto* post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() { value = 99; };
   sched.ScheduleEvent({0}, Region::kPostNBA, post_nba);
 
-  // Observed reads the value — should see 99.
   auto* observed = sched.GetEventPool().Acquire();
   observed->callback = [&]() { sampled_in_observed = value; };
   sched.ScheduleEvent({0}, Region::kObserved, observed);
@@ -85,10 +59,6 @@ TEST(SimCh4434, PostNBACanWriteValues) {
   EXPECT_EQ(sampled_in_observed, 99);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.4 Post-NBA can create events
-// A Post-NBA callback can schedule new events (e.g., into Observed).
-// ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBACanCreateEvents) {
   Arena arena;
   Scheduler sched(arena);
@@ -97,7 +67,7 @@ TEST(SimCh4434, PostNBACanCreateEvents) {
   auto* post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() {
     order.push_back("post_nba");
-    // Create an event in the Observed region from Post-NBA.
+
     auto* new_ev = sched.GetEventPool().Acquire();
     new_ev->callback = [&order]() { order.push_back("created_observed"); };
     sched.ScheduleEvent({0}, Region::kObserved, new_ev);
@@ -110,16 +80,11 @@ TEST(SimCh4434, PostNBACanCreateEvents) {
   EXPECT_EQ(order[1], "created_observed");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.4 Post-NBA executes after NBA
-// Post-NBA executes after NBA in the same time slot.
-// ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBAExecutesAfterNBA) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Schedule Post-NBA first, then NBA — ordering must still hold.
   auto* post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() { order.push_back("post_nba"); };
   sched.ScheduleEvent({0}, Region::kPostNBA, post_nba);
@@ -134,19 +99,11 @@ TEST(SimCh4434, PostNBAExecutesAfterNBA) {
   EXPECT_EQ(order[1], "post_nba");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.4 + Figure 4-1: NBA -> Post-NBA -> PreObserved.
-// Post-NBA executes after NBA and before PreObserved.
-// ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBAExecutesAfterNBABeforePreObserved) {
   VerifyThreeRegionOrder({Region::kNBA, "nba"}, {Region::kPostNBA, "post_nba"},
                          {Region::kPreObserved, "pre_observed"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.4 Post-NBA is part of the active region set (§4.4.1).
-// Its ordinal lies between NBA and PreObserved.
-// ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBAIsWithinActiveRegionSet) {
   auto post_nba_ord = static_cast<int>(Region::kPostNBA);
   auto nba_ord = static_cast<int>(Region::kNBA);
@@ -155,10 +112,6 @@ TEST(SimCh4434, PostNBAIsWithinActiveRegionSet) {
   EXPECT_LT(post_nba_ord, pre_observed_ord);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.4 Multiple Post-NBA callbacks
-// Multiple PLI callbacks coexist in the Post-NBA region and all execute.
-// ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBARegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
@@ -174,10 +127,6 @@ TEST(SimCh4434, PostNBARegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.4 Post-NBA events across multiple time slots.
-// Each time slot has its own Post-NBA region evaluation.
-// ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBAEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
@@ -198,12 +147,6 @@ TEST(SimCh4434, PostNBAEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.4 Post-NBA read-write capability
-// Post-NBA is read-write. A Post-NBA callback reads state that NBA set
-// earlier and overwrites it; a later Observed callback sees the Post-NBA
-// modification. This verifies read-write capability in context.
-// ---------------------------------------------------------------------------
 TEST(SimCh4434, PostNBAReadWriteInActiveRegionSetContext) {
   Arena arena;
   Scheduler sched(arena);
@@ -211,12 +154,10 @@ TEST(SimCh4434, PostNBAReadWriteInActiveRegionSetContext) {
   int nba_sample = -1;
   int observed_sample = -1;
 
-  // NBA writes value = 10.
   auto* nba = sched.GetEventPool().Acquire();
   nba->callback = [&]() { value = 10; };
   sched.ScheduleEvent({0}, Region::kNBA, nba);
 
-  // Post-NBA reads the NBA-set value and overwrites it to 55.
   auto* post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() {
     nba_sample = value;
@@ -224,7 +165,6 @@ TEST(SimCh4434, PostNBAReadWriteInActiveRegionSetContext) {
   };
   sched.ScheduleEvent({0}, Region::kPostNBA, post_nba);
 
-  // Observed samples value — should see 55 from Post-NBA.
   auto* observed = sched.GetEventPool().Acquire();
   observed->callback = [&]() { observed_sample = value; };
   sched.ScheduleEvent({0}, Region::kObserved, observed);

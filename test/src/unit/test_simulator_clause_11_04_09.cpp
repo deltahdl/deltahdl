@@ -1,5 +1,3 @@
-// §11.4.9: Reduction operators
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
@@ -35,57 +33,53 @@ TEST(EvalOp, GtGtEq) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-// ==========================================================================
-// Reduction X/Z propagation — §11.4.9
-// ==========================================================================
 TEST(EvalOpXZ, ReductionAndWithX) {
   SimFixture f;
-  // &4'b1x11 → x (not all bits known-1)
-  MakeVar4(f, "ra", 4, 0b1011, 0b0100);  // bit2=x
+
+  MakeVar4(f, "ra", 4, 0b1011, 0b0100);
   auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeId(f.arena, "ra"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
 TEST(EvalOpXZ, ReductionAndWithKnown0) {
   SimFixture f;
-  // &4'b0x11 → 0 (known-0 bit forces result to 0)
-  MakeVar4(f, "rb", 4, 0b0011, 0b0100);  // bit3=0, bit2=x
+
+  MakeVar4(f, "rb", 4, 0b0011, 0b0100);
   auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeId(f.arena, "rb"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.words[0].aval, 0u);
-  EXPECT_EQ(result.words[0].bval, 0u);  // known-0
+  EXPECT_EQ(result.words[0].bval, 0u);
 }
 
 TEST(EvalOpXZ, ReductionOrWithKnown1) {
   SimFixture f;
-  // |4'b1x00 → 1 (known-1 bit forces result to 1)
-  MakeVar4(f, "rc", 4, 0b1000, 0b0100);  // bit3=1, bit2=x
+
+  MakeVar4(f, "rc", 4, 0b1000, 0b0100);
   auto* expr = MakeUnary(f.arena, TokenKind::kPipe, MakeId(f.arena, "rc"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.words[0].aval, 1u);
-  EXPECT_EQ(result.words[0].bval, 0u);  // known-1
+  EXPECT_EQ(result.words[0].bval, 0u);
 }
 
 TEST(EvalOpXZ, ReductionOrWithX) {
   SimFixture f;
-  // |4'b0x00 → x (no known-1, but X could be 1)
-  MakeVar4(f, "rd", 4, 0b0000, 0b0100);  // all 0 except bit2=x
+
+  MakeVar4(f, "rd", 4, 0b0000, 0b0100);
   auto* expr = MakeUnary(f.arena, TokenKind::kPipe, MakeId(f.arena, "rd"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
 TEST(EvalOpXZ, ReductionXorWithX) {
   SimFixture f;
-  // ^4'b1x10 → x (any X/Z in XOR → X)
-  MakeVar4(f, "re", 4, 0b1010, 0b0100);  // bit2=x
+
+  MakeVar4(f, "re", 4, 0b1010, 0b0100);
   auto* expr = MakeUnary(f.arena, TokenKind::kCaret, MakeId(f.arena, "re"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_NE(result.words[0].bval, 0u);  // result is X
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// § expression — reduction AND
 TEST(SimA83, ReductionAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -103,7 +97,6 @@ TEST(SimA83, ReductionAnd) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § expression — reduction OR
 TEST(SimA83, ReductionOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -121,7 +114,6 @@ TEST(SimA83, ReductionOr) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// § unary_operator — reduction AND
 TEST(SimA86, UnaryReductionAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -139,7 +131,6 @@ TEST(SimA86, UnaryReductionAnd) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § unary_operator — reduction NAND
 TEST(SimA86, UnaryReductionNand) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -157,7 +148,6 @@ TEST(SimA86, UnaryReductionNand) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// § unary_operator — reduction OR
 TEST(SimA86, UnaryReductionOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -175,7 +165,6 @@ TEST(SimA86, UnaryReductionOr) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// § unary_operator — reduction NOR
 TEST(SimA86, UnaryReductionNor) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -193,7 +182,6 @@ TEST(SimA86, UnaryReductionNor) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § unary_operator — reduction XOR
 TEST(SimA86, UnaryReductionXor) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -208,11 +196,10 @@ TEST(SimA86, UnaryReductionXor) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // A5 = 10100101, popcount=4 (even), XOR reduction = 0
+
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// § unary_operator — reduction XNOR (~^)
 TEST(SimA86, UnaryReductionXnor) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -227,11 +214,10 @@ TEST(SimA86, UnaryReductionXnor) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // ~^(A5) = ~(XOR reduction) = ~0 = 1
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § unary_operator — reduction XNOR (^~)
 TEST(SimA86, UnaryReductionXnorAlt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -249,12 +235,9 @@ TEST(SimA86, UnaryReductionXnorAlt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// ==========================================================================
-// Reduction operators (unary &, |, ^, ~&, ~|, ~^, ^~)
-// ==========================================================================
 TEST(EvalOp, ReductionAndAllOnes) {
   SimFixture f;
-  // &32'hFFFFFFFF = 1 (all 32 bits are 1)
+
   auto* expr =
       MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 0xFFFFFFFF));
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -263,7 +246,7 @@ TEST(EvalOp, ReductionAndAllOnes) {
 
 TEST(EvalOp, ReductionAndNotAllOnes) {
   SimFixture f;
-  // &32'd5 = 0 (not all bits 1)
+
   auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 5));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
@@ -271,7 +254,7 @@ TEST(EvalOp, ReductionAndNotAllOnes) {
 
 TEST(EvalOp, ReductionOrNonZero) {
   SimFixture f;
-  // |32'd4 = 1
+
   auto* expr = MakeUnary(f.arena, TokenKind::kPipe, MakeInt(f.arena, 4));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
@@ -279,7 +262,7 @@ TEST(EvalOp, ReductionOrNonZero) {
 
 TEST(EvalOp, ReductionOrZero) {
   SimFixture f;
-  // |32'd0 = 0
+
   auto* expr = MakeUnary(f.arena, TokenKind::kPipe, MakeInt(f.arena, 0));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
@@ -287,7 +270,7 @@ TEST(EvalOp, ReductionOrZero) {
 
 TEST(EvalOp, ReductionXorEvenOnes) {
   SimFixture f;
-  // ^32'd3 = 0 (two 1-bits => even parity)
+
   auto* expr = MakeUnary(f.arena, TokenKind::kCaret, MakeInt(f.arena, 3));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
@@ -295,7 +278,7 @@ TEST(EvalOp, ReductionXorEvenOnes) {
 
 TEST(EvalOp, ReductionXorOddOnes) {
   SimFixture f;
-  // ^32'd7 = 1 (three 1-bits => odd parity)
+
   auto* expr = MakeUnary(f.arena, TokenKind::kCaret, MakeInt(f.arena, 7));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
@@ -303,7 +286,7 @@ TEST(EvalOp, ReductionXorOddOnes) {
 
 TEST(EvalOp, ReductionNand) {
   SimFixture f;
-  // ~&32'd5 = 1 (not all bits 1)
+
   auto* expr = MakeUnary(f.arena, TokenKind::kTildeAmp, MakeInt(f.arena, 5));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
@@ -311,7 +294,7 @@ TEST(EvalOp, ReductionNand) {
 
 TEST(EvalOp, ReductionNor) {
   SimFixture f;
-  // ~|32'd0 = 1
+
   auto* expr = MakeUnary(f.arena, TokenKind::kTildePipe, MakeInt(f.arena, 0));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
@@ -319,7 +302,7 @@ TEST(EvalOp, ReductionNor) {
 
 TEST(EvalOp, ReductionXnorTildeCaret) {
   SimFixture f;
-  // ~^32'd3 = 1 (even parity -> XNOR=1)
+
   auto* expr = MakeUnary(f.arena, TokenKind::kTildeCaret, MakeInt(f.arena, 3));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
@@ -327,21 +310,18 @@ TEST(EvalOp, ReductionXnorTildeCaret) {
 
 TEST(EvalOp, ReductionXnorCaretTilde) {
   SimFixture f;
-  // ^~32'd7 = 0 (odd parity -> XNOR=0)
+
   auto* expr = MakeUnary(f.arena, TokenKind::kCaretTilde, MakeInt(f.arena, 7));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// ==========================================================================
-// Additional edge cases
-// ==========================================================================
 TEST(EvalOp, ReductionAndZero) {
   SimFixture f;
-  // &32'd0 = 0
+
   auto* expr = MakeUnary(f.arena, TokenKind::kAmp, MakeInt(f.arena, 0));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+}

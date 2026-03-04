@@ -1,5 +1,3 @@
-// §28.3.4: The primitive instance identifier
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -66,4 +64,4 @@ TEST(ParserA301, GateInst_NamedUnnamedMixedInMulti) {
   EXPECT_EQ(gates[2]->gate_inst_name, "a3");
 }
 
-}  // namespace
+}

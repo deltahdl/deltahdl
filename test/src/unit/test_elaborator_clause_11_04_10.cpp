@@ -1,5 +1,3 @@
-// §11.4.10: Shift operators
-
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
@@ -16,7 +14,6 @@ TEST(ConstEval, Shifts) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("16 >>> 2", f)), 4);
 }
 
-// § binary_operator — shift operators elaborate
 TEST(ElabA86, BinaryArithShiftRightElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -41,9 +38,6 @@ TEST(ElabA86, BinaryArithShiftLeftElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// 13. Bit-select in always_comb using initial begin/end.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombBitSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -64,13 +58,10 @@ TEST(SimCh9, AlwaysCombBitSelect) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // a = 4, a >> 2 = 1.
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 15. Upper part-select via shift in always_comb (upper nibble).
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombUpperPartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -94,9 +85,6 @@ TEST(SimCh9, AlwaysCombUpperPartSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
-// ---------------------------------------------------------------------------
-// 26. always_comb with shift operations.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -117,9 +105,6 @@ TEST(SimCh9, AlwaysCombShift) {
   EXPECT_EQ(var->value.ToUint64(), 0x30u);
 }
 
-// ---------------------------------------------------------------------------
-// 22. always_comb with left shift.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombLeftShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -140,13 +125,10 @@ TEST(SimCh9b, AlwaysCombLeftShift) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // 0x0F << 2 = 0x3C.
+
   EXPECT_EQ(y->value.ToUint64(), 0x3Cu);
 }
 
-// ---------------------------------------------------------------------------
-// 23. always_comb with right shift.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombRightShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -167,13 +149,10 @@ TEST(SimCh9b, AlwaysCombRightShift) {
 
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // 0xF0 >> 4 = 0x0F.
+
   EXPECT_EQ(y->value.ToUint64(), 0x0Fu);
 }
 
-// ---------------------------------------------------------------------------
-// 19. Blocking assignment with shift operators (<<, >>).
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignShiftOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -197,10 +176,10 @@ TEST(SimCh10, BlockingAssignShiftOps) {
   auto* shr = f.ctx.FindVariable("r_shr");
   ASSERT_NE(shl, nullptr);
   ASSERT_NE(shr, nullptr);
-  // 0x0F << 2 = 0x3C (8-bit)
+
   EXPECT_EQ(shl->value.ToUint64(), 0x3Cu);
-  // 0x0F >> 2 = 0x03
+
   EXPECT_EQ(shr->value.ToUint64(), 0x03u);
 }
 
-}  // namespace
+}

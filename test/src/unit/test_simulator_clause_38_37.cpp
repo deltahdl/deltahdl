@@ -1,5 +1,3 @@
-// §38.37: vpi_register_systf
-
 #include <gtest/gtest.h>
 
 #include "simulator/vpi.h"
@@ -50,5 +48,5 @@ TEST_F(VpiClause3837Test, RegisterSystfNullptrDoesNotCrash) {
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

@@ -1,5 +1,3 @@
-// §19.6: Defining cross coverage
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -19,9 +17,6 @@ TEST(ParserA211, CoverageSpec_CoverCross) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #17: cover_cross
-// =============================================================================
 TEST(ParserA211, CoverCross_Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -55,9 +50,6 @@ TEST(ParserA211, CoverCross_WithIff) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #18: list_of_cross_items
-// =============================================================================
 TEST(ParserA211, ListOfCrossItems_Two) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -81,9 +73,6 @@ TEST(ParserA211, ListOfCrossItems_Three) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #19: cross_item
-// =============================================================================
 TEST(ParserA211, CrossItem_CoverPointIdentifier) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -95,9 +84,6 @@ TEST(ParserA211, CrossItem_CoverPointIdentifier) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #20: cross_body
-// =============================================================================
 TEST(ParserA211, CrossBody_Empty) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -145,4 +131,4 @@ TEST_F(VerifyParseTest, CovergroupWithCross) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

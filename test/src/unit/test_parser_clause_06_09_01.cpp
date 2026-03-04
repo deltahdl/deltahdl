@@ -1,15 +1,9 @@
-// §6.9.1: Specifying vectors
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// LRM section 6.11 -- Integer data types: packed dimensions
-// =============================================================================
-// 1. Packed dimensions on logic type.
 TEST(ParserSection6, Sec6_11_LogicPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -27,7 +21,6 @@ TEST(ParserSection6, Sec6_11_LogicPackedDims) {
   EXPECT_EQ(item->name, "data");
 }
 
-// 1b. Packed dimensions on bit type.
 TEST(ParserSection6, Sec6_11_BitPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -44,7 +37,6 @@ TEST(ParserSection6, Sec6_11_BitPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-// 1c. Packed dimensions on reg type.
 TEST(ParserSection6, Sec6_11_RegPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -60,7 +52,7 @@ TEST(ParserSection6, Sec6_11_RegPackedDims) {
   ASSERT_NE(item->data_type.packed_dim_right, nullptr);
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
-// 7. Logic with packed dimensions [15:0].
+
 TEST(ParserSection6, Sec6_5_LogicPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -77,9 +69,7 @@ TEST(ParserSection6, Sec6_5_LogicPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 15u);
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
-// =========================================================================
-// §6.8: Variable declarations
-// =========================================================================
+
 TEST(ParserSection6, LogicVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -92,7 +82,6 @@ TEST(ParserSection6, LogicVarDecl) {
   EXPECT_EQ(item->name, "data");
 }
 
-// 29. Net and variable with same-width packed vectors.
 TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
   auto r = Parse(
       "module t;\n"
@@ -103,19 +92,18 @@ TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
   EXPECT_FALSE(r.has_errors);
   auto& items = r.cu->modules[0]->items;
   ASSERT_EQ(items.size(), 2u);
-  // Wire net
+
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
   EXPECT_TRUE(items[0]->data_type.is_net);
   ASSERT_NE(items[0]->data_type.packed_dim_left, nullptr);
   EXPECT_EQ(items[0]->data_type.packed_dim_left->int_val, 31u);
-  // Logic variable
+
   EXPECT_EQ(items[1]->kind, ModuleItemKind::kVarDecl);
   EXPECT_FALSE(items[1]->data_type.is_net);
   ASSERT_NE(items[1]->data_type.packed_dim_left, nullptr);
   EXPECT_EQ(items[1]->data_type.packed_dim_left->int_val, 31u);
 }
 
-// 23. reg with packed dimensions.
 TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -133,9 +121,6 @@ TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
   EXPECT_EQ(item->name, "wide_reg");
 }
 
-// =========================================================================
-// §6.9: Vector declarations
-// =========================================================================
 TEST(ParserSection6, SignedVector) {
   auto r = Parse(
       "module t;\n"
@@ -161,4 +146,4 @@ TEST(ParserSection6, UnsignedVector) {
   EXPECT_EQ(item->name, "uv");
 }
 
-}  // namespace
+}

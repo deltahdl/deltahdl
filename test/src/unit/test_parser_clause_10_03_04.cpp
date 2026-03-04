@@ -1,5 +1,3 @@
-// §10.3.4: Continuous assignment strengths
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,8 @@ using namespace delta;
 
 namespace {
 
-// --- Drive strength in continuous assign context ---
 TEST(ParserA222, DriveStrengthContinuousAssign) {
-  // drive_strength used with assign statement
+
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -19,8 +16,8 @@ TEST(ParserA222, DriveStrengthContinuousAssign) {
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[1];
   EXPECT_EQ(item->kind, ModuleItemKind::kContAssign);
-  EXPECT_EQ(item->drive_strength0, 4u);  // strong0 = 4
-  EXPECT_EQ(item->drive_strength1, 3u);  // pull1 = 3
+  EXPECT_EQ(item->drive_strength0, 4u);
+  EXPECT_EQ(item->drive_strength1, 3u);
 }
 TEST(ParserA601, ContinuousAssign_DriveStrength) {
   auto r = Parse(
@@ -64,7 +61,7 @@ TEST(ParserA601, ContinuousAssign_StrengthAndDelay) {
   EXPECT_NE(cas[0]->drive_strength1, 0u);
   EXPECT_NE(cas[0]->assign_delay, nullptr);
 }
-// §10.3.4: Drive strength on continuous assignment.
+
 TEST(ParserSection10, ContinuousAssignDriveStrength) {
   auto r = Parse(
       "module m;\n"
@@ -81,13 +78,11 @@ TEST(ParserSection10, ContinuousAssignDriveStrength) {
     }
   }
   ASSERT_NE(ca, nullptr);
-  // 4=strong, 2=weak (parser encoding:
-  // 0=none,1=highz,2=weak,3=pull,4=strong,5=supply)
+
   EXPECT_EQ(ca->drive_strength0, 4u);
   EXPECT_EQ(ca->drive_strength1, 2u);
 }
 
-// §10.3.4: Drive strength order can be reversed.
 TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
   auto r = Parse(
       "module m;\n"
@@ -104,10 +99,10 @@ TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
     }
   }
   ASSERT_NE(ca, nullptr);
-  EXPECT_EQ(ca->drive_strength0, 5u);  // supply0
-  EXPECT_EQ(ca->drive_strength1, 3u);  // pull1
+  EXPECT_EQ(ca->drive_strength0, 5u);
+  EXPECT_EQ(ca->drive_strength1, 3u);
 }
-// §6.3.2.2: Drive strength on net declaration with inline assignment.
+
 TEST(ParserSection6, NetDeclDriveStrength) {
   auto r = Parse(
       "module m;\n"
@@ -117,9 +112,9 @@ TEST(ParserSection6, NetDeclDriveStrength) {
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  // 2=weak, 4=strong (parser encoding)
+
   EXPECT_EQ(item->drive_strength0, 2u);
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-}  // namespace
+}

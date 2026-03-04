@@ -1,5 +1,3 @@
-// §8.22: Polymorphism: dynamic method lookup
-
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "parser/ast.h"
@@ -7,14 +5,6 @@
 #include "simulator/eval.h"
 
 using namespace delta;
-
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
 
 namespace {
 
@@ -33,13 +23,12 @@ TEST(ClassSim, PolymorphicVTableMultiLevel) {
   m_leaf->kind = ModuleItemKind::kFunctionDecl;
   m_leaf->name = "f";
 
-  // A defines f, B inherits, C overrides.
   base->vtable.push_back({"f", m_base, base});
-  mid->vtable.push_back({"f", m_base, base});   // Inherited.
-  leaf->vtable.push_back({"f", m_leaf, leaf});  // Overridden.
+  mid->vtable.push_back({"f", m_base, base});
+  leaf->vtable.push_back({"f", m_leaf, leaf});
 
   auto [handle, obj] = MakeObj(f, leaf);
   EXPECT_EQ(obj->ResolveVirtualMethod("f"), m_leaf);
 }
 
-}  // namespace
+}

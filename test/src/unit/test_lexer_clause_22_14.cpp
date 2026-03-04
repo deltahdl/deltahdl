@@ -1,5 +1,3 @@
-// §22.14: `begin_keywords, `end_keywords
-
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
@@ -10,7 +8,7 @@ using namespace delta;
 namespace {
 
 TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
-  // marker 1364-2001, "logic", marker 1800-2023, "logic"
+
   std::string input;
   input += kKeywordMarker;
   input +=
@@ -29,7 +27,7 @@ TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
 }
 
 TEST(Lexer, ParseKeywordVersion_ValidVersions) {
-  // §22.14: all nine version specifiers
+
   struct Case {
     const char* input;
     KeywordVersion expected;
@@ -56,4 +54,4 @@ TEST(Lexer, ParseKeywordVersion_Invalid) {
   EXPECT_FALSE(ParseKeywordVersion("").has_value());
 }
 
-}  // namespace
+}

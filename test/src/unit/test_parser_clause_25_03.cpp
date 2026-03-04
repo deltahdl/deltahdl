@@ -1,5 +1,3 @@
-// §25.3: Interface syntax
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Interface with non-ANSI ports.
 TEST(SourceText, InterfaceNonAnsiHeader) {
   auto r = Parse(
       "interface ifc(clk);\n"
@@ -19,14 +16,6 @@ TEST(SourceText, InterfaceNonAnsiHeader) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
 }
 
-// =============================================================================
-// A.4.1.2 -- Interface instantiation
-//
-// interface_instantiation ::=
-//   interface_identifier [ parameter_value_assignment ]
-//     hierarchical_instance { , hierarchical_instance } ;
-// =============================================================================
-// --- interface_instantiation: basic ---
 TEST(ParserAnnexA0412, BasicInterfaceInst) {
   auto r = Parse("module m; my_if u0(.a(a), .b(b)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -37,7 +26,6 @@ TEST(ParserAnnexA0412, BasicInterfaceInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-// --- interface_instantiation: with parameter_value_assignment ---
 TEST(ParserAnnexA0412, InterfaceInstWithParams) {
   auto r = Parse("module m; my_if #(8) u0(.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -49,7 +37,6 @@ TEST(ParserAnnexA0412, InterfaceInstWithParams) {
   ASSERT_EQ(item->inst_params.size(), 1u);
 }
 
-// --- End label on endinterface (LRM §25) ---
 TEST(ParserSection25, EndinterfaceLabel) {
   auto r = Parse(
       "interface simple_bus;\n"
@@ -100,7 +87,6 @@ TEST(ParserSection25, MultipleModportThreeItems) {
   EXPECT_EQ(iface->modports[2]->ports[0].direction, Direction::kInout);
 }
 
-// --- Interface/modport tests ---
 TEST(Parser, EmptyInterface) {
   auto r = Parse("interface simple_bus; endinterface");
   ASSERT_NE(r.cu, nullptr);
@@ -109,12 +95,6 @@ TEST(Parser, EmptyInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
 }
 
-// =============================================================================
-// A.1.6 Interface items
-// =============================================================================
-// interface_or_generate_item ::= { attribute_instance } module_common_item
-// Verify that a module_common_item (continuous assign) is accepted inside an
-// interface body, producing an item in the interface's items list.
 TEST(SourceText, InterfaceOrGenerateItemModuleCommon) {
   auto r = Parse(
       "interface ifc;\n"
@@ -127,7 +107,6 @@ TEST(SourceText, InterfaceOrGenerateItemModuleCommon) {
   EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kContAssign);
 }
 
-// non_port_interface_item ::= generate_region
 TEST(SourceText, NonPortInterfaceItemGenerateRegion) {
   auto r = Parse(
       "interface ifc;\n"
@@ -140,7 +119,6 @@ TEST(SourceText, NonPortInterfaceItemGenerateRegion) {
   EXPECT_GE(r.cu->interfaces[0]->items.size(), 1u);
 }
 
-// non_port_interface_item ::= program_declaration
 TEST(SourceText, NonPortInterfaceItemProgram) {
   auto r = Parse(
       "interface ifc;\n"
@@ -153,7 +131,6 @@ TEST(SourceText, NonPortInterfaceItemProgram) {
             ModuleItemKind::kNestedModuleDecl);
 }
 
-// non_port_interface_item ::= interface_declaration (nested interface)
 TEST(SourceText, NonPortInterfaceItemNestedInterface) {
   auto r = Parse(
       "interface outer;\n"
@@ -166,7 +143,6 @@ TEST(SourceText, NonPortInterfaceItemNestedInterface) {
             ModuleItemKind::kNestedModuleDecl);
 }
 
-// non_port_interface_item ::= timeunits_declaration
 TEST(SourceText, NonPortInterfaceItemTimeunits) {
   auto r = Parse(
       "interface ifc;\n"
@@ -176,7 +152,6 @@ TEST(SourceText, NonPortInterfaceItemTimeunits) {
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
 }
 
-// Extern interface declaration.
 TEST(SourceText, ExternInterface) {
   auto r = Parse("extern interface ifc(input logic clk);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -186,10 +161,6 @@ TEST(SourceText, ExternInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
 }
 
-// =============================================================================
-// A.1.2 interface_declaration — all 5 forms
-// =============================================================================
-// Interface with ANSI ports.
 TEST(SourceText, InterfaceAnsiHeader) {
   auto r = Parse("interface ifc(input logic clk); endinterface\n");
   ASSERT_NE(r.cu, nullptr);
@@ -198,7 +169,6 @@ TEST(SourceText, InterfaceAnsiHeader) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
 }
 
-// Interface with wildcard ports: interface i(.*);
 TEST(SourceText, InterfaceWildcardPorts) {
   auto r = Parse("interface ifc(.*); endinterface\n");
   ASSERT_NE(r.cu, nullptr);
@@ -207,7 +177,6 @@ TEST(SourceText, InterfaceWildcardPorts) {
   EXPECT_TRUE(r.cu->interfaces[0]->has_wildcard_ports);
 }
 
-// Interface parameter port list and ports
 TEST(SourceText, InterfaceParamsAndPorts) {
   auto r = Parse(
       "interface ifc #(parameter int W = 8)(input logic clk);\n"
@@ -228,8 +197,6 @@ TEST(Parser, InterfaceWithPorts) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2);
 }
 
-// interface_item ::= port_declaration ;
-// Verify that port declarations are accepted in interface ANSI port list.
 TEST(SourceText, InterfaceItemPortDecl) {
   auto r = Parse(
       "interface ifc(input logic clk, output logic data);\n"
@@ -241,7 +208,6 @@ TEST(SourceText, InterfaceItemPortDecl) {
   EXPECT_EQ(r.cu->interfaces[0]->ports[1].name, "data");
 }
 
-// non_port_interface_item ::= modport_declaration
 TEST(SourceText, NonPortInterfaceItemModport) {
   auto r = Parse(
       "interface ifc;\n"
@@ -253,7 +219,6 @@ TEST(SourceText, NonPortInterfaceItemModport) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
 }
 
-// attribute_instance on modport_ports_declaration
 TEST(ParserA29, AttrOnSimplePorts) {
   EXPECT_TRUE(
       ParseOk("interface bus;\n"
@@ -268,4 +233,4 @@ TEST(ParserSection23, InterfaceLifetimeAutomatic) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "myif");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §18.5.2: Constraint inheritance
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// constraint_declaration with dynamic_override_specifiers (§8.20)
 TEST(SourceText, ConstraintDeclDynamicOverride) {
   auto r = Parse(
       "class C;\n"
@@ -27,7 +24,6 @@ TEST(SourceText, ConstraintDeclDynamicOverride) {
   EXPECT_EQ(members[4]->name, "c4");
 }
 
-// constraint_prototype with dynamic_override_specifiers
 TEST(SourceText, ConstraintPrototypeDynamicOverride) {
   auto r = Parse(
       "class C;\n"
@@ -43,7 +39,6 @@ TEST(SourceText, ConstraintPrototypeDynamicOverride) {
   EXPECT_EQ(members[2]->name, "c2");
 }
 
-// extern_constraint_declaration with dynamic_override_specifiers at top-level
 TEST(SourceText, ExternConstraintDeclDynOverrideTopLevel) {
   auto r = Parse(
       "class C;\n"
@@ -55,4 +50,4 @@ TEST(SourceText, ExternConstraintDeclDynOverrideTopLevel) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

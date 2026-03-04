@@ -1,5 +1,3 @@
-// §17.5: Checker procedures
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §17.5 Checker procedures (always, initial)
-// =============================================================================
 TEST_F(CheckerParseTest, CheckerWithAlwaysBlock) {
   auto* unit = Parse(R"(
     checker always_check(input logic clk, input logic a);
@@ -36,9 +31,6 @@ TEST_F(CheckerParseTest, CheckerWithInitialBlock) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-// =============================================================================
-// §17.5 Checker procedures
-// =============================================================================
 TEST_F(VerifyParseTest, CheckerWithInitialProcedure) {
   auto* unit = Parse(R"(
     checker init_check(input logic clk, input logic rst);
@@ -84,4 +76,4 @@ TEST_F(VerifyParseTest, CheckerWithFinalProcedure) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+}

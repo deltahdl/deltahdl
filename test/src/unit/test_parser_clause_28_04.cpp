@@ -1,5 +1,3 @@
-// §28.4: and, nand, nor, or, xor, and xnor gates
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -10,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Delay propagation across multiple instances
-// ---------------------------------------------------------------------------
-// Gate delay shared across comma-separated instances.
 TEST(ParserA223, Delay3GateMultipleInstances) {
   auto r = Parse(
       "module m;\n"
@@ -22,7 +16,7 @@ TEST(ParserA223, Delay3GateMultipleInstances) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // wire y1, y2, a, b creates 4 items; gates are items[4] and items[5]
+
   auto* g1 = r.cu->modules[0]->items[4];
   auto* g2 = r.cu->modules[0]->items[5];
   ASSERT_NE(g1->gate_delay, nullptr);
@@ -35,9 +29,6 @@ TEST(ParserA223, Delay3GateMultipleInstances) {
   EXPECT_EQ(g2->gate_delay_fall->int_val, 6u);
 }
 
-// =============================================================================
-// A.3 -- Primitive instances (gate_instantiation)
-// =============================================================================
 TEST(ParserAnnexA, A3GateInstNInput) {
   auto r = Parse(
       "module m;\n"
@@ -54,12 +45,6 @@ TEST(ParserAnnexA, A3GateInstNInput) {
   EXPECT_EQ(gate_count, 3);
 }
 
-// =============================================================================
-// A.3.1 Production #1: gate_instantiation (n_input_gatetype alternative)
-// gate_instantiation ::=
-//   n_input_gatetype [drive_strength] [delay2] n_input_gate_instance
-//                    {, n_input_gate_instance} ;
-// =============================================================================
 TEST(ParserA301, GateInst_AndBasic) {
   auto r = Parse(
       "module m;\n"
@@ -129,11 +114,6 @@ TEST(ParserA301, GateInst_NInputMultipleInputs) {
   EXPECT_EQ(g->gate_terminals.size(), 5u);
 }
 
-// =============================================================================
-// A.3.1 Production #5: n_input_gate_instance
-// n_input_gate_instance ::= [name_of_instance]
-//   ( output_terminal , input_terminal {, input_terminal} )
-// =============================================================================
 TEST(ParserA301, NInputGateInst_TwoInputs) {
   auto r = Parse(
       "module m;\n"
@@ -179,9 +159,6 @@ TEST(ParserA301, NInputGateInst_Unnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
-// =============================================================================
-// Additional gate_instantiation combinations
-// =============================================================================
 TEST(ParserA301, GateInst_AllNInputGateTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -194,9 +171,6 @@ TEST(ParserA301, GateInst_AllNInputGateTypes) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.3.4 Production #4: n_input_gatetype ::= and | nand | or | nor | xor | xnor
-// =============================================================================
 TEST(ParserA304, NInputGatetype_And) {
   auto r = Parse(
       "module m;\n"
@@ -263,7 +237,6 @@ TEST(ParserA304, NInputGatetype_Xnor) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-// delay2: two values on n_input gate (rise, fall).
 TEST(ParserA223, Delay2NInputGateTwoValues) {
   auto r = Parse(
       "module m;\n"
@@ -279,4 +252,4 @@ TEST(ParserA223, Delay2NInputGateTwoValues) {
   EXPECT_EQ(item->gate_delay_fall->int_val, 5u);
 }
 
-}  // namespace
+}

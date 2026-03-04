@@ -1,5 +1,3 @@
-// Annex A.4.1.3: Program instantiation
-
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,10 +5,6 @@
 using namespace delta;
 namespace {
 
-// =============================================================================
-// Elaboration tests -- program instantiation resolved through elaborator
-// =============================================================================
-// --- Elaborator resolves program instantiation within a module ---
 TEST(ParserAnnexA0413, ElaborationProgramInstInModule) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -30,7 +24,6 @@ TEST(ParserAnnexA0413, ElaborationProgramInstInModule) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
-// --- Elaborator resolves program instantiation with port bindings ---
 TEST(ParserAnnexA0413, ElaborationProgramInstPortBindings) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -48,4 +41,4 @@ TEST(ParserAnnexA0413, ElaborationProgramInstPortBindings) {
   EXPECT_EQ(top->children[0].port_bindings[0].port_name, "data");
 }
 
-}  // namespace
+}

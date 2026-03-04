@@ -1,5 +1,3 @@
-// Annex A.7.5.3: System timing check event definitions
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.3 Sim — Runtime TimingCheckEntry edge storage
-// =============================================================================
-// Runtime TimingCheckEntry stores ref_edge correctly
 TEST(SimA70503, RuntimeTimingCheckEntryEdges) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -27,7 +21,6 @@ TEST(SimA70503, RuntimeTimingCheckEntryEdges) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].data_edge, SpecifyEdge::kNone);
 }
 
-// Runtime TimingCheckEntry stores edge keyword correctly
 TEST(SimA70503, RuntimeTimingCheckEntryEdgeKw) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -40,10 +33,6 @@ TEST(SimA70503, RuntimeTimingCheckEntryEdgeKw) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].ref_edge, SpecifyEdge::kEdge);
 }
 
-// =============================================================================
-// A.7.5.3 Sim — End-to-end: specify_terminal_descriptor with ranges
-// =============================================================================
-// Terminal with bit select simulates
 TEST(SimA70503, TerminalBitSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -64,7 +53,6 @@ TEST(SimA70503, TerminalBitSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// Terminal with part select simulates
 TEST(SimA70503, TerminalPartSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -85,10 +73,6 @@ TEST(SimA70503, TerminalPartSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// =============================================================================
-// A.7.5.3 Sim — End-to-end: timing_check_condition with &&&
-// =============================================================================
-// Timing check with &&& condition simulates
 TEST(SimA70503, TimingCheckConditionSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -109,10 +93,6 @@ TEST(SimA70503, TimingCheckConditionSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// =============================================================================
-// A.7.5.3 Sim — End-to-end: controlled_timing_check_event
-// =============================================================================
-// $period with controlled event simulates
 TEST(SimA70503, ControlledTimingCheckEventPeriodSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -133,7 +113,6 @@ TEST(SimA70503, ControlledTimingCheckEventPeriodSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// Full combination: edge control + bit-select + condition simulates
 TEST(SimA70503, FullCombinationSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -154,4 +133,4 @@ TEST(SimA70503, FullCombinationSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §16.4: Deferred assertions
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -31,16 +26,13 @@ struct SvaFixture {
 
 namespace {
 
-// =============================================================================
-// Assertion pass/fail action blocks (section 16.5)
-// =============================================================================
 TEST(SvaEngine, PassActionBlockInvoked) {
   SvaFixture f;
   bool pass_called = false;
   bool fail_called = false;
 
   DeferredAssertion da;
-  da.condition_val = 1;  // Passes.
+  da.condition_val = 1;
   da.pass_action = [&pass_called]() { pass_called = true; };
   da.fail_action = [&fail_called]() { fail_called = true; };
 
@@ -55,7 +47,7 @@ TEST(SvaEngine, FailActionBlockInvoked) {
   bool fail_called = false;
 
   DeferredAssertion da;
-  da.condition_val = 0;  // Fails.
+  da.condition_val = 0;
   da.pass_action = [&pass_called]() { pass_called = true; };
   da.fail_action = [&fail_called]() { fail_called = true; };
 
@@ -67,14 +59,11 @@ TEST(SvaEngine, FailActionBlockInvoked) {
 TEST(SvaEngine, NoActionBlockDoesNotCrash) {
   DeferredAssertion da;
   da.condition_val = 0;
-  // No actions set, should not crash.
+
   ExecuteDeferredAssertionAction(da);
   EXPECT_TRUE(true);
 }
 
-// =============================================================================
-// Deferred immediate assertions with #0 (section 16.4)
-// =============================================================================
 TEST(SvaEngine, DeferredAssertionScheduledInObserved) {
   SvaFixture f;
   bool executed = false;
@@ -86,7 +75,6 @@ TEST(SvaEngine, DeferredAssertionScheduledInObserved) {
   f.engine.QueueDeferredAssertion(da);
   f.engine.FlushDeferredAssertions(f.scheduler, SimTime{0});
 
-  // Must be scheduled in Observed region.
   f.scheduler.Run();
   EXPECT_TRUE(executed);
 }
@@ -120,9 +108,6 @@ TEST(SvaEngine, MultipleDeferredAssertionsQueued) {
   EXPECT_EQ(count, 5);
 }
 
-// =============================================================================
-// SvaEngine integration tests
-// =============================================================================
 TEST(SvaEngine, EngineDefaultState) {
   SvaEngine engine;
   EXPECT_EQ(engine.DeferredQueueSize(), 0u);
@@ -140,4 +125,4 @@ TEST(SvaEngine, FlushClearsQueue) {
   EXPECT_EQ(f.engine.DeferredQueueSize(), 0u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §21.7.1.3: Stopping and resuming the dump ($dumpoff/$dumpon)
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -17,4 +15,4 @@ TEST(ParserSection21, DumpOffOnSequence) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

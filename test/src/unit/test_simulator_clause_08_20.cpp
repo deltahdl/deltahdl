@@ -1,5 +1,3 @@
-// §8.20: Virtual methods
-
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -10,19 +8,8 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
-
 namespace {
 
-// =============================================================================
-// §8.20: Virtual methods and polymorphism
-// =============================================================================
 TEST(ClassSim, VirtualMethodDispatch) {
   SimFixture f;
   auto* base = MakeClassType(f, "Animal", {});
@@ -41,9 +28,8 @@ TEST(ClassSim, VirtualMethodDispatch) {
   derived_method->func_body_stmts.push_back(
       MakeReturn(f.arena, MkInt(f.arena, 1)));
 
-  // Build vtable for base.
   base->vtable.push_back({"speak", base_method, base});
-  // Build vtable for derived — overrides speak.
+
   derived->vtable.push_back({"speak", derived_method, derived});
 
   auto [handle, obj] = MakeObj(f, derived);
@@ -61,9 +47,8 @@ TEST(ClassSim, VirtualMethodInheritedNotOverridden) {
   base_method->kind = ModuleItemKind::kFunctionDecl;
   base_method->name = "action";
 
-  // Base vtable has action.
   base->vtable.push_back({"action", base_method, base});
-  // Derived inherits without override.
+
   derived->vtable.push_back({"action", base_method, base});
 
   auto [handle, obj] = MakeObj(f, derived);
@@ -71,9 +56,6 @@ TEST(ClassSim, VirtualMethodInheritedNotOverridden) {
   EXPECT_EQ(resolved, base_method);
 }
 
-// =============================================================================
-// Additional integration-style tests
-// =============================================================================
 TEST(ClassSim, VTableFindIndex) {
   SimFixture f;
   auto* type = MakeClassType(f, "Foo", {});
@@ -109,4 +91,4 @@ TEST(ClassSim, EmptyVTable) {
   EXPECT_EQ(type->FindVTableIndex("anything"), -1);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §5.4: Comments
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -7,16 +5,10 @@
 
 using namespace delta;
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
 namespace {
 
-// =========================================================================
-// Comments do NOT produce tokens
-// =========================================================================
 TEST(ParserCh501, Sec5_1_CommentDoesNotProduceTokens) {
-  // A module containing only comments and no actual items parses cleanly.
+
   auto r = Parse(
       "module m;\n"
       "  // line comment\n"
@@ -27,27 +19,18 @@ TEST(ParserCh501, Sec5_1_CommentDoesNotProduceTokens) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
-// =========================================================================
-// Line comment at end of file (no trailing newline)
-// =========================================================================
 TEST(ParserCh501, Sec5_1_LineCommentAtEofNoNewline) {
-  // A line comment at EOF without a trailing newline must still parse.
+
   EXPECT_TRUE(ParseOk("module t; endmodule // trailing comment"));
 }
 
-// =========================================================================
-// Block comment between tokens
-// =========================================================================
 TEST(ParserCh501, Sec5_1_BlockCommentBetweenTokens) {
-  // Block comment placed between keyword tokens acts as whitespace.
+
   EXPECT_TRUE(ParseOk("module/* comment */t;/* another */endmodule"));
 }
 
-// =========================================================================
-// Block comment inside expression (splitting operator from operand)
-// =========================================================================
 TEST(ParserCh501, Sec5_1_BlockCommentInsideExpression) {
-  // Block comment between operands in a continuous assignment expression.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic a, b, c;\n"
@@ -55,11 +38,8 @@ TEST(ParserCh501, Sec5_1_BlockCommentInsideExpression) {
               "endmodule\n"));
 }
 
-// =========================================================================
-// Nested /* inside line comment (not special)
-// =========================================================================
 TEST(ParserCh501, Sec5_1_NestedBlockCommentStartInsideLineComment) {
-  // A /* inside a // comment is not treated as the start of a block comment.
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  // this /* is not special\n"
@@ -67,14 +47,8 @@ TEST(ParserCh501, Sec5_1_NestedBlockCommentStartInsideLineComment) {
               "endmodule\n"));
 }
 
-// =========================================================================
-// Section 5.6: Identifiers, keywords, and system names
-// =========================================================================
-// =========================================================================
-// Adjacent line comments
-// =========================================================================
 TEST(ParserCh501, Sec5_1_AdjacentLineComments) {
-  // Multiple consecutive line comments behave as whitespace.
+
   auto r = Parse(
       "module m;\n"
       "  // first comment\n"
@@ -89,7 +63,6 @@ TEST(ParserCh501, Sec5_1_AdjacentLineComments) {
   EXPECT_EQ(item->name, "a");
 }
 
-// Block comments.
 TEST(LibraryText, BlockComments) {
   auto r = ParseLibrary(
       "/* Multi-line\n"
@@ -101,7 +74,7 @@ TEST(LibraryText, BlockComments) {
 }
 
 TEST(ParserCh501, Sec5_1_EmptyCuCommentsOnly) {
-  // A compilation unit containing only comments parses to an empty CU.
+
   auto r = Parse(
       "// line comment\n"
       "/* block\n"
@@ -129,4 +102,4 @@ TEST(ParserCh503, OneLineCommentEndsAtNewline) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

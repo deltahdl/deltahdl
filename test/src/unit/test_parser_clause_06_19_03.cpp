@@ -1,12 +1,9 @@
-// §6.19.3: Type checking
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// § constant_primary — enum_identifier
 TEST(ParserA84, ConstantPrimaryEnumIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -17,4 +14,4 @@ TEST(ParserA84, ConstantPrimaryEnumIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

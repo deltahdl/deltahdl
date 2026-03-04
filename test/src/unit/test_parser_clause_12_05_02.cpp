@@ -1,5 +1,3 @@
-// §12.5.2: Constant expression in case statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §12.5.2: constant expression as case_expression
 TEST(ParserA607, ConstExprCaseExpr) {
   auto r = Parse(
       "module m;\n"
@@ -27,4 +24,4 @@ TEST(ParserA607, ConstExprCaseExpr) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-}  // namespace
+}

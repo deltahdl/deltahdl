@@ -1,5 +1,3 @@
-// §13.3: Tasks
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Elaboration: task declaration within module
-// ---------------------------------------------------------------------------
 TEST(ParserA27, ElabTaskDeclInModule) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -24,4 +19,4 @@ TEST(ParserA27, ElabTaskDeclInModule) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

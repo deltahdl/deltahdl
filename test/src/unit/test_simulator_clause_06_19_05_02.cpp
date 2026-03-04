@@ -1,5 +1,3 @@
-// §6.19.5.2: Last()
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,14 +9,8 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture: sets up SimContext with an enum type and variable
-// =============================================================================
 namespace {
 
-// =============================================================================
-// §6.19.5.2: last() — returns the last member of the enum
-// =============================================================================
 TEST(EnumMethods, LastReturnsLastMember) {
   EnumFixture f;
   f.RegisterEnum("color", "color_t", {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
@@ -35,4 +27,4 @@ TEST(EnumMethods, LastWithGaps) {
   EXPECT_EQ(result.ToUint64(), 100u);
 }
 
-}  // namespace
+}

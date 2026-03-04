@@ -1,5 +1,3 @@
-// §23.2.2.1: Non-ANSI style port declarations
-
 #include "fixture_elaborator.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -18,7 +16,6 @@ TEST(ParserA23, ListOfInterfaceIdentifiersMultiple) {
   EXPECT_EQ(r.cu->modules[0]->ports[2].name, "c");
 }
 
-// --- Non-ANSI port declarations (LRM §23.2.2.1) ---
 TEST(ParserSection23, NonAnsiPortsBasic) {
   auto r = Parse(
       "module m(a, b);\n"
@@ -85,7 +82,7 @@ TEST(ParserSection23, NonAnsiPortsMixed) {
 }
 
 TEST(ParserSection23, Sec23_2_2_NonAnsiPortDeclarations) {
-  // Non-ANSI style: port list + separate direction declarations
+
   auto r = Parse(
       "module m (a, b, y);\n"
       "  input a, b;\n"
@@ -95,16 +92,13 @@ TEST(ParserSection23, Sec23_2_2_NonAnsiPortDeclarations) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-  // Variants with packed types and inout
+
   EXPECT_TRUE(
       ParseOk("module m (a, d); input [15:0] a; inout [7:0] d; endmodule\n"));
   EXPECT_TRUE(
       ParseOk("module m (a, b); inout [7:0] a; inout [7:0] b; endmodule\n"));
 }
 
-// =========================================================================
-// LRM section 23.2.2.1: Non-ANSI port declarations
-// =========================================================================
 TEST(ParserSection23, NonAnsiInoutPort) {
   auto r = Parse(
       "module m(bus);\n"
@@ -131,4 +125,4 @@ TEST(ParserSection23, NonAnsiMultiplePortsSameDir) {
   }
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §20.10: Severity system tasks
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -18,9 +16,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Assertion severity levels ($fatal, $error, $warning, $info)
-// =============================================================================
 TEST(SvaEngine, SeverityLevelValues) {
   EXPECT_EQ(static_cast<int>(AssertionSeverity::kInfo), 0);
   EXPECT_EQ(static_cast<int>(AssertionSeverity::kWarning), 1);
@@ -40,4 +35,4 @@ TEST(SvaEngine, SeverityDefaultIsError) {
   EXPECT_EQ(SeverityToString(sev), "ERROR");
 }
 
-}  // namespace
+}

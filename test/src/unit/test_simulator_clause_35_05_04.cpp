@@ -1,5 +1,3 @@
-// §35.5.4: Import declarations
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -12,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// DpiRuntime: import registration and invocation
-// =============================================================================
 TEST(DpiRuntime, RegisterImportAndCall) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -35,4 +30,4 @@ TEST(DpiRuntime, RegisterImportAndCall) {
   EXPECT_EQ(result.AsInt(), 30);
 }
 
-}  // namespace
+}

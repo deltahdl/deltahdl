@@ -1,5 +1,3 @@
-// §13.4.2: Static and automatic functions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -45,11 +43,6 @@ TEST(ParserA213, LifetimeInFunction) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-// ---------------------------------------------------------------------------
-// function_declaration ::=
-//   function [ dynamic_override_specifiers ] [ lifetime ]
-//     function_body_declaration
-// ---------------------------------------------------------------------------
 TEST(ParserA26, FuncLifetimeAutomatic) {
   auto r = Parse(
       "module m;\n  function automatic int foo();\n"
@@ -82,9 +75,7 @@ TEST(ParserA26, FuncLifetimeDefault) {
   EXPECT_FALSE(item->is_automatic);
   EXPECT_FALSE(item->is_static);
 }
-// =============================================================================
-// 18. Recursive automatic function with base case (Fibonacci)
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_3_RecursiveAutoFuncFibonacci) {
   auto r = Parse(
       "module m;\n"
@@ -108,9 +99,6 @@ TEST(ParserSection4, Sec4_9_3_RecursiveAutoFuncFibonacci) {
   EXPECT_NE(item->func_body_stmts[0]->else_branch, nullptr);
 }
 
-// =============================================================================
-// 20. Automatic function in class context
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoFuncInClass) {
   EXPECT_TRUE(
       ParseOk("class my_class;\n"
@@ -120,12 +108,6 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncInClass) {
               "endclass\n"));
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
-// =============================================================================
-// 28. Function without explicit lifetime (default — static in module)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_FuncNoExplicitLifetime) {
   auto r = Parse(
       "module m;\n"
@@ -138,15 +120,12 @@ TEST(ParserSection4, Sec4_9_4_FuncNoExplicitLifetime) {
   auto* fn = FirstFuncOrTask(r);
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
-  // No explicit lifetime — both flags should be false.
+
   EXPECT_FALSE(fn->is_static);
   EXPECT_FALSE(fn->is_automatic);
   EXPECT_EQ(fn->name, "adder");
 }
 
-// =============================================================================
-// 22. Mixed static and automatic functions in same module
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_MixedStaticAutoFuncsInModule) {
   auto r = Parse(
       "module m;\n"
@@ -168,9 +147,6 @@ TEST(ParserSection4, Sec4_9_3_MixedStaticAutoFuncsInModule) {
   EXPECT_FALSE(static_fn->is_automatic);
 }
 
-// =============================================================================
-// 25. Function without explicit lifetime (implicit static in module)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_FuncNoLifetimeQualifier) {
   auto r = Parse(
       "module m;\n"
@@ -187,9 +163,6 @@ TEST(ParserSection4, Sec4_9_3_FuncNoLifetimeQualifier) {
   EXPECT_FALSE(item->is_static);
 }
 
-// =============================================================================
-// 28. Automatic function returning logic with packed dimensions
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoFuncReturningLogic) {
   auto r = Parse(
       "module m;\n"
@@ -207,7 +180,6 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncReturningLogic) {
   EXPECT_NE(item->return_type.packed_dim_right, nullptr);
 }
 
-// Returns the first function or task declaration from the first module.
 static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   for (auto* item : r.cu->modules[0]->items) {
@@ -218,9 +190,6 @@ static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   return nullptr;
 }
 
-// =============================================================================
-// 1. Static function — variables are static by default
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticFunctionDecl) {
   auto r = Parse(
       "module m;\n"
@@ -240,9 +209,6 @@ TEST(ParserSection4, Sec4_9_4_StaticFunctionDecl) {
   EXPECT_EQ(fn->name, "count");
 }
 
-// =============================================================================
-// 2. Automatic function — variables are automatic by default
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutomaticFunctionDecl) {
   auto r = Parse(
       "module m;\n"
@@ -261,9 +227,6 @@ TEST(ParserSection4, Sec4_9_4_AutomaticFunctionDecl) {
   EXPECT_EQ(fn->name, "factorial");
 }
 
-// =============================================================================
-// 3. Explicit static variable in automatic function
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_ExplicitStaticInAutoFunc) {
   auto r = Parse(
       "module m;\n"
@@ -285,9 +248,6 @@ TEST(ParserSection4, Sec4_9_4_ExplicitStaticInAutoFunc) {
   EXPECT_EQ(fn->func_body_stmts[0]->var_name, "cnt");
 }
 
-// =============================================================================
-// 4. Explicit automatic variable in static function
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_ExplicitAutoInStaticFunc) {
   auto r = Parse(
       "module m;\n"
@@ -307,9 +267,7 @@ TEST(ParserSection4, Sec4_9_4_ExplicitAutoInStaticFunc) {
   EXPECT_FALSE(fn->func_body_stmts[0]->var_is_static);
   EXPECT_EQ(fn->func_body_stmts[0]->var_name, "tmp");
 }
-// =============================================================================
-// §4.6: Static vs automatic function lifetime
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_StaticVsAutomaticFunctionLifetime) {
   auto r = Parse(
       "module m;\n"
@@ -333,10 +291,6 @@ TEST(ParserSection4, Sec4_6_StaticVsAutomaticFunctionLifetime) {
   EXPECT_FALSE(static_fn->is_automatic);
 }
 
-// Returns the first module item from the first module.
-// =============================================================================
-// 1. Automatic function declaration parses (function automatic ...)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticFunctionDecl) {
   auto r = Parse(
       "module m;\n"
@@ -355,9 +309,6 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFunctionDecl) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-// =============================================================================
-// 5. Static variable with initializer in function
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticVarWithInitInFunc) {
   auto r = Parse(
       "module m;\n"
@@ -379,9 +330,6 @@ TEST(ParserSection4, Sec4_9_4_StaticVarWithInitInFunc) {
   EXPECT_NE(var_stmt->var_init, nullptr);
 }
 
-// =============================================================================
-// 2. Static function declaration parses (function static ...)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_StaticFunctionDecl) {
   auto r = Parse(
       "module m;\n"
@@ -399,9 +347,6 @@ TEST(ParserSection4, Sec4_9_3_StaticFunctionDecl) {
   EXPECT_EQ(item->name, "counter");
 }
 
-// =============================================================================
-// 6. Automatic variable with initializer in function
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_AutoVarWithInitInFunc) {
   auto r = Parse(
       "module m;\n"
@@ -422,9 +367,6 @@ TEST(ParserSection4, Sec4_9_4_AutoVarWithInitInFunc) {
   EXPECT_NE(var_stmt->var_init, nullptr);
 }
 
-// =============================================================================
-// 5. Automatic function with local variable declarations
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithLocalVars) {
   auto r = Parse(
       "module m;\n"
@@ -447,9 +389,6 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithLocalVars) {
   EXPECT_EQ(item->func_body_stmts[1]->kind, StmtKind::kVarDecl);
 }
 
-// =============================================================================
-// 6. Automatic function with recursive call (factorial)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncRecursiveCall) {
   auto r = Parse(
       "module m;\n"
@@ -472,15 +411,11 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncRecursiveCall) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kIf);
 }
 
-// Returns the first function/task body statement from a ModuleItem.
 static Stmt* FirstBodyStmt(ModuleItem* item) {
   if (!item || item->func_body_stmts.empty()) return nullptr;
   return item->func_body_stmts[0];
 }
 
-// =============================================================================
-// 7. Static function with static local variable
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_StaticFuncWithStaticLocalVar) {
   auto r = Parse(
       "module m;\n"
@@ -503,9 +438,6 @@ TEST(ParserSection4, Sec4_9_3_StaticFuncWithStaticLocalVar) {
   EXPECT_NE(var_stmt->var_init, nullptr);
 }
 
-// =============================================================================
-// 8. Automatic function in automatic module
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutomaticFuncInAutoModule) {
   auto r = Parse(
       "module automatic m;\n"
@@ -519,9 +451,7 @@ TEST(ParserSection4, Sec4_9_3_AutomaticFuncInAutoModule) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->name, "add");
-  // In an automatic module, functions without explicit qualifier inherit
-  // automatic lifetime; the parser accepts this but does not set the flag
-  // on the function itself (that is a semantic concern).
+
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
@@ -536,9 +466,6 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
   return nullptr;
 }
 
-// =============================================================================
-// LRM section 13.3.1 -- Static and automatic tasks/functions
-// =============================================================================
 TEST(ParserSection13, AutomaticFunction) {
   auto r = Parse(
       "module m;\n"
@@ -567,9 +494,6 @@ TEST(ParserSection6, StaticFunction) {
   EXPECT_TRUE(item->is_static);
 }
 
-// =============================================================================
-// 19. Static function with static local and return
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_StaticFuncWithStaticLocal) {
   auto r = Parse(
       "module m;\n"
@@ -590,9 +514,6 @@ TEST(ParserSection4, Sec4_9_4_StaticFuncWithStaticLocal) {
   EXPECT_EQ(fn->func_body_stmts[0]->var_name, "seq_num");
 }
 
-// =============================================================================
-// 9. Function in program block (automatic by default)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_FunctionInProgramBlock) {
   auto r = Parse(
       "program p;\n"
@@ -612,9 +533,6 @@ TEST(ParserSection4, Sec4_9_3_FunctionInProgramBlock) {
   EXPECT_EQ(item->name, "get_value");
 }
 
-// =============================================================================
-// 14. Automatic function with multiple local vars of different types
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoFuncMultiTypedLocalVars) {
   auto r = Parse(
       "module m;\n"
@@ -642,4 +560,4 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncMultiTypedLocalVars) {
   EXPECT_EQ(item->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
 }
 
-}  // namespace
+}

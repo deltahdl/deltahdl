@@ -1,14 +1,9 @@
-// §6.13: Void data type
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =========================================================================
-// §6.13: Void data type
-// =========================================================================
 TEST(ParserSection6, VoidFunctionReturn) {
   auto r = Parse(
       "module t;\n"
@@ -22,4 +17,4 @@ TEST(ParserSection6, VoidFunctionReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §18.5.13.2: Disabling soft constraints
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Constraint implication and disable soft
 TEST(SourceText, ConstraintImplicationDisableSoft) {
   auto r = Parse(
       "class C;\n"
@@ -23,4 +20,4 @@ TEST(SourceText, ConstraintImplicationDisableSoft) {
   EXPECT_EQ(r.cu->classes[0]->members[2]->name, "ic");
 }
 
-}  // namespace
+}

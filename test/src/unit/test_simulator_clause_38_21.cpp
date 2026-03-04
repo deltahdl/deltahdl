@@ -23,8 +23,6 @@ class VpiClause3821Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.21: vpi_handle_by_name
-
 TEST_F(VpiClause3821Test, HandleByNameFindsModule) {
   vpi_ctx_.CreateModule("dut", "dut");
   vpiHandle h = vpi_handle_by_name("dut", nullptr);
@@ -37,5 +35,5 @@ TEST_F(VpiClause3821Test, HandleByNameNullReturnsNullptr) {
   EXPECT_EQ(h, nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

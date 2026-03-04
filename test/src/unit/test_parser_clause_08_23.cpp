@@ -1,5 +1,3 @@
-// §8.23: Class scope resolution operator ::
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- class_scope ---
-// class_type ::
 TEST(ParserA221, ClassScope) {
   auto r = Parse(
       "class base_cls;\n"
@@ -19,7 +15,6 @@ TEST(ParserA221, ClassScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class_item ::= { attribute_instance } class_declaration (nested class)
 TEST(SourceText, ClassNestedClass) {
   auto r = Parse(
       "class Outer;\n"
@@ -34,7 +29,7 @@ TEST(SourceText, ClassNestedClass) {
   EXPECT_EQ(members[0]->kind, ClassMemberKind::kClassDecl);
   EXPECT_EQ(members[0]->nested_class->name, "Inner");
 }
-// §8.5 — Typedef inside class body (enum, struct)
+
 TEST(ParserSection8, ClassWithTypedef) {
   auto r = Parse(
       "class test_cls;\n"
@@ -45,7 +40,6 @@ TEST(ParserSection8, ClassWithTypedef) {
   EXPECT_EQ(r.cu->classes[0]->name, "test_cls");
 }
 
-// §8.3 — Class inside class (nested class)
 TEST(ParserSection8, NestedClass) {
   auto r = Parse(
       "class Outer;\n"
@@ -59,9 +53,6 @@ TEST(ParserSection8, NestedClass) {
   EXPECT_EQ(r.cu->classes[0]->name, "Outer");
 }
 
-// =============================================================================
-// §8.23 -- Class scope resolution operator ::
-// =============================================================================
 TEST(ParserSection8, ClassScopeResolutionStaticMethod) {
   auto r = Parse(
       "class Base;\n"
@@ -111,7 +102,6 @@ TEST(ParserSection8, ClassScopeResolutionParameter) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// 21. Class scope resolution (cls::member)
 TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
   EXPECT_TRUE(
       ParseOk("class base;\n"
@@ -122,4 +112,4 @@ TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

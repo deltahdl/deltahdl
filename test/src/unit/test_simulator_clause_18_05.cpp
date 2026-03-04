@@ -1,5 +1,3 @@
-// §18.5: Constraint blocks
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.5.1-18.5.2: Simple constraint blocks
-// =============================================================================
 TEST(Constraint, SimpleRangeConstraint) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -84,9 +79,6 @@ TEST(Constraint, InequalityConstraint) {
   EXPECT_GT(solver.GetValue("x"), 90);
 }
 
-// =============================================================================
-// Constraint solver ordering
-// =============================================================================
 TEST(Constraint, SolverOrderingMultipleBlocks) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -119,9 +111,6 @@ TEST(Constraint, SolverOrderingMultipleBlocks) {
   EXPECT_LE(val, 200);
 }
 
-// =============================================================================
-// §18.5: Custom constraint with callback
-// =============================================================================
 TEST(Constraint, CustomConstraintCallback) {
   ConstraintSolver solver(42);
   RandVariable va;
@@ -153,9 +142,6 @@ TEST(Constraint, CustomConstraintCallback) {
   EXPECT_LE(solver.GetValue("a") + solver.GetValue("b"), 30);
 }
 
-// =============================================================================
-// Not-equal constraint
-// =============================================================================
 TEST(Constraint, NotEqualConstraint) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -177,9 +163,6 @@ TEST(Constraint, NotEqualConstraint) {
   EXPECT_NE(solver.GetValue("x"), 5);
 }
 
-// =============================================================================
-// Less-than constraint
-// =============================================================================
 TEST(Constraint, LessThanConstraint) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -201,4 +184,4 @@ TEST(Constraint, LessThanConstraint) {
   EXPECT_LT(solver.GetValue("x"), 10);
 }
 
-}  // namespace
+}

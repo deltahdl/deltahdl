@@ -1,5 +1,3 @@
-// §16.14: Concurrent assertions
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -10,10 +8,6 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-// =============================================================================
-// Section 16.5.1 -- Multiple concurrent assertions in same module
-// =============================================================================
-// Multiple assert/assume/cover property items in one module.
 TEST(ParserSection16, Sec16_5_1_MultipleConcurrentAssertions) {
   auto r = Parse(
       "module m;\n"
@@ -34,4 +28,4 @@ TEST(ParserSection16, Sec16_5_1_MultipleConcurrentAssertions) {
       1u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §20.11: Assertion control system tasks
-
 #include "fixture_program.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §39 Assertion control system functions
-// =============================================================================
 TEST_F(ApiParseTest, AssertOnSystemCall) {
   auto* unit = Parse(R"(
     module m;
@@ -38,13 +33,8 @@ TEST_F(ApiParseTest, AssertKillSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-// =============================================================================
-// LRM section 39.4.1 -- Placing assertion system callbacks
-// These system tasks control assertion processing at the system level:
-// $assertOn, $assertOff, $assertKill
-// =============================================================================
 TEST(ParserSection39, AssertOnNoArgs) {
-  // $assertOn with no arguments enables all assertions
+
   auto r = Parse(R"(
     module m;
       initial $asserton;
@@ -55,7 +45,7 @@ TEST(ParserSection39, AssertOnNoArgs) {
 }
 
 TEST(ParserSection39, AssertOffNoArgs) {
-  // $assertOff with no arguments disables all assertions
+
   auto r = Parse(R"(
     module m;
       initial $assertoff;
@@ -66,7 +56,7 @@ TEST(ParserSection39, AssertOffNoArgs) {
 }
 
 TEST(ParserSection39, AssertKillNoArgs) {
-  // $assertKill kills all active assertion attempts
+
   auto r = Parse(R"(
     module m;
       initial $assertkill;
@@ -77,7 +67,7 @@ TEST(ParserSection39, AssertKillNoArgs) {
 }
 
 TEST(ParserSection39, AssertOnWithLevelArg) {
-  // $asserton with levels_arg controls depth of hierarchy
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial $asserton(0);
@@ -86,7 +76,7 @@ TEST(ParserSection39, AssertOnWithLevelArg) {
 }
 
 TEST(ParserSection39, AssertOffWithLevelAndModuleArgs) {
-  // $assertoff with levels and list of modules/instances
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial $assertoff(0, m);
@@ -94,13 +84,8 @@ TEST(ParserSection39, AssertOffWithLevelAndModuleArgs) {
   )"));
 }
 
-// =============================================================================
-// LRM section 39.5.2 -- Assertion control via system tasks
-// The assertion control functions $assertcontrol and related tasks allow
-// runtime control over assertion evaluation.
-// =============================================================================
 TEST(ParserSection39, AssertControlSystemTask) {
-  // $assertcontrol enables runtime assertion control
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial $assertcontrol(3);
@@ -109,7 +94,7 @@ TEST(ParserSection39, AssertControlSystemTask) {
 }
 
 TEST(ParserSection39, AssertControlWithMultipleArgs) {
-  // $assertcontrol with control_type and assertion_type arguments
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial $assertcontrol(3, 1);
@@ -118,7 +103,7 @@ TEST(ParserSection39, AssertControlWithMultipleArgs) {
 }
 
 TEST(ParserSection39, AssertPassStepAndFailStep) {
-  // $assertpasson / $assertpassoff control pass action execution
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial begin
@@ -130,7 +115,7 @@ TEST(ParserSection39, AssertPassStepAndFailStep) {
 }
 
 TEST(ParserSection39, AssertionControlInAlwaysBlock) {
-  // Assertion control tasks in always blocks
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, reset;
@@ -145,7 +130,7 @@ TEST(ParserSection39, AssertionControlInAlwaysBlock) {
 }
 
 TEST(ParserSection39, AssertionControlSequence) {
-  // Complete assertion control sequence: off, kill, on
+
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial begin
@@ -158,4 +143,4 @@ TEST(ParserSection39, AssertionControlSequence) {
   )"));
 }
 
-}  // namespace
+}

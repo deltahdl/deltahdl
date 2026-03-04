@@ -1,5 +1,3 @@
-// §26.2: Package declarations
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// description: package_declaration
 TEST(SourceText, DescriptionPackage) {
   auto r = Parse("package pkg; endpackage\n");
   ASSERT_NE(r.cu, nullptr);
@@ -16,7 +13,6 @@ TEST(SourceText, DescriptionPackage) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-// Package with items and lifetime.
 TEST(SourceText, PackageLifetimeWithItems) {
   auto r = Parse(
       "package automatic pkg;\n"
@@ -64,9 +60,6 @@ TEST(ParserSection26, MultiplePackages) {
   EXPECT_EQ(r.cu->packages[1]->name, "b");
 }
 
-// =============================================================================
-// LRM section 26.2 -- Package with struct typedef and class
-// =============================================================================
 TEST(ParserSection26, PackageWithStructTypedef) {
   auto r = Parse(
       "package types_pkg;\n"
@@ -104,10 +97,6 @@ TEST(Parser, PackageWithParam) {
   EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kParamDecl);
 }
 
-// =============================================================================
-// A.1.11 Package items
-// =============================================================================
-// package_item: package_or_generate_item_declaration — net/data/task/function
 TEST(SourceText, PackageOrGenerateItemDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -122,7 +111,6 @@ TEST(SourceText, PackageOrGenerateItemDecl) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 4u);
 }
 
-// package_or_generate_item_declaration: checker_declaration
 TEST(SourceText, PackageItemCheckerDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -139,7 +127,6 @@ TEST(ParserSection23, EndLabelPackage) {
   EXPECT_EQ(r.cu->packages[0]->name, "mypkg");
 }
 
-// package_or_generate_item_declaration: class_declaration
 TEST(SourceText, PackageItemClassDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -152,7 +139,6 @@ TEST(SourceText, PackageItemClassDecl) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// package_or_generate_item_declaration: interface_class_declaration
 TEST(SourceText, PackageItemInterfaceClassDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -165,7 +151,6 @@ TEST(SourceText, PackageItemInterfaceClassDecl) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// package_or_generate_item_declaration: class_constructor_declaration
 TEST(SourceText, PackageItemClassConstructorDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -176,7 +161,6 @@ TEST(SourceText, PackageItemClassConstructorDecl) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// package_or_generate_item_declaration: local_parameter_declaration
 TEST(SourceText, PackageItemLocalparamDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -189,7 +173,6 @@ TEST(SourceText, PackageItemLocalparamDecl) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
 }
 
-// package_or_generate_item_declaration: covergroup_declaration
 TEST(SourceText, PackageItemCovergroupDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -200,7 +183,6 @@ TEST(SourceText, PackageItemCovergroupDecl) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// package_or_generate_item_declaration: assertion_item_declaration
 TEST(SourceText, PackageItemAssertionDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -212,7 +194,6 @@ TEST(SourceText, PackageItemAssertionDecl) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// package_or_generate_item_declaration: ; (empty statement)
 TEST(SourceText, PackageItemEmptyStmt) {
   auto r = Parse(
       "package pkg;\n"
@@ -224,7 +205,6 @@ TEST(SourceText, PackageItemEmptyStmt) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// 8. Package with internal declarations (local scope)
 TEST(ParserClause03, Cl3_13_PackageWithInternalDeclarations) {
   auto r = Parse(
       "package my_pkg;\n"
@@ -242,10 +222,6 @@ TEST(ParserClause03, Cl3_13_PackageWithInternalDeclarations) {
   EXPECT_GE(pkg->items.size(), 3u);
 }
 
-// =============================================================================
-// A.1.2 package_declaration — with optional lifetime
-// =============================================================================
-// Package with automatic lifetime (A.1.2 gap fix).
 TEST(SourceText, PackageAutomaticLifetime) {
   auto r = Parse("package automatic pkg; endpackage\n");
   ASSERT_NE(r.cu, nullptr);
@@ -254,7 +230,6 @@ TEST(SourceText, PackageAutomaticLifetime) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-// Package with static lifetime.
 TEST(SourceText, PackageStaticLifetime) {
   auto r = Parse("package static pkg; endpackage\n");
   ASSERT_NE(r.cu, nullptr);
@@ -263,7 +238,6 @@ TEST(SourceText, PackageStaticLifetime) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-// Package with end label.
 TEST(SourceText, PackageEndLabel) {
   auto r = Parse("package pkg; endpackage : pkg\n");
   ASSERT_NE(r.cu, nullptr);
@@ -282,9 +256,6 @@ TEST(ParserAnnexA, A1PackageDecl) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-// =============================================================================
-// LRM section 26.2 -- Package declarations
-// =============================================================================
 TEST(ParserSection26, EmptyPackage) {
   auto r = Parse(
       "package pkg;\n"
@@ -314,12 +285,8 @@ static bool ParseOk5(const std::string& src) {
   return !diag.HasErrors();
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
-// --- Null module items ---
 TEST(ParserCh5, ModuleBody_NullItem) {
   EXPECT_TRUE(ParseOk5("module m; ; endmodule"));
 }
 
-}  // namespace
+}

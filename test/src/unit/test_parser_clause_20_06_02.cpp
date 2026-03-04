@@ -1,5 +1,3 @@
-// §20.6.2: Expression size system function
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// system_tf_call with expression argument: $bits(variable)
 TEST(ParserA82, SystemTfCallBitsExprArg) {
   auto r = Parse(
       "module m;\n"
@@ -23,7 +20,6 @@ TEST(ParserA82, SystemTfCallBitsExprArg) {
   EXPECT_EQ(stmt->rhs->callee, "$bits");
 }
 
-// § constant_primary — type_reference
 TEST(ParserA84, ConstantPrimaryTypeReference) {
   auto r = Parse(
       "module m;\n"
@@ -34,4 +30,4 @@ TEST(ParserA84, ConstantPrimaryTypeReference) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

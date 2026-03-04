@@ -1,5 +1,3 @@
-// §41
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -12,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// S41: Data Read API
-// =============================================================================
 TEST(Api, DataReadGetPutValue) {
   DataReadApi api;
   DataReadValue val;
@@ -88,7 +83,7 @@ TEST(Api, DataReadValueChangeCallback) {
   bool cb_fired = false;
   int cb_new_val = 0;
   api.RegisterValueChangeCb("sig",
-                            [&cb_fired, &cb_new_val](std::string_view /*name*/,
+                            [&cb_fired, &cb_new_val](std::string_view ,
                                                      const DataReadValue& val) {
                               cb_fired = true;
                               cb_new_val = val.int_val;
@@ -111,4 +106,4 @@ TEST(Api, DataReadMissingVariableReturnsDefault) {
   EXPECT_EQ(result.format, DataReadFormat::kInt);
 }
 
-}  // namespace
+}

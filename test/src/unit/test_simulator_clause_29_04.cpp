@@ -1,5 +1,3 @@
-// §29.4: Combinational UDPs
-
 #include <gtest/gtest.h>
 
 #include "parser/ast.h"
@@ -50,4 +48,4 @@ TEST(UdpCombinational, UnmatchedIsX) {
   EXPECT_EQ(state.Evaluate({'1', '0'}), 'x');
 }
 
-}  // namespace
+}

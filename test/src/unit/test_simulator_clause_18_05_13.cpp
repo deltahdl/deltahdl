@@ -1,5 +1,3 @@
-// §18.5.13: Soft constraints
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.5.13: Soft constraints
-// =============================================================================
 TEST(Constraint, SoftConstraintYieldsToHard) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -26,7 +21,6 @@ TEST(Constraint, SoftConstraintYieldsToHard) {
   v.max_val = 100;
   solver.AddVariable(v);
 
-  // Soft: x == 50.
   ConstraintBlock b_soft;
   b_soft.name = "c_soft";
   ConstraintExpr inner_expr;
@@ -40,7 +34,6 @@ TEST(Constraint, SoftConstraintYieldsToHard) {
   b_soft.constraints.push_back(sc);
   solver.AddConstraintBlock(b_soft);
 
-  // Hard: x == 30. This overrides soft.
   ConstraintBlock b_hard;
   b_hard.name = "c_hard";
   ConstraintExpr hc;
@@ -75,10 +68,9 @@ TEST(Constraint, SoftConstraintAloneSatisfied) {
   block.constraints.push_back(sc);
   solver.AddConstraintBlock(block);
 
-  // Soft alone: no crash, value is in valid range.
   ASSERT_TRUE(solver.Solve());
   EXPECT_GE(solver.GetValue("x"), 0);
   EXPECT_LE(solver.GetValue("x"), 100);
 }
 
-}  // namespace
+}

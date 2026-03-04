@@ -1,5 +1,3 @@
-// §30.7.4.2: Negative pulse detection
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Module with showcancelled declarations simulates correctly
 TEST(SimA701, SpecifyWithShowcancelledSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -30,4 +27,4 @@ TEST(SimA701, SpecifyWithShowcancelledSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-}  // namespace
+}

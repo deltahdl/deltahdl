@@ -1,5 +1,3 @@
-// §29.3.6: Summary of symbols
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- udp_declaration: table row with edge symbols ---
 TEST(ParserAnnexA051, TableEdgeSymbols) {
   auto r = Parse(
       "primitive edge_det(output reg q, input d, input clk);\n"
@@ -30,7 +27,6 @@ TEST(ParserAnnexA051, TableEdgeSymbols) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
-// --- udp_declaration: table with wildcard symbols ---
 TEST(ParserAnnexA051, TableWildcardSymbols) {
   auto r = Parse(
       "primitive wild(output out, input a, input b);\n"
@@ -49,7 +45,6 @@ TEST(ParserAnnexA051, TableWildcardSymbols) {
   EXPECT_EQ(udp->table[1].inputs[1], 'b');
 }
 
-// --- Combinational UDP with wildcard matching in simulation ---
 TEST(ParserAnnexA051, SimCombinationalWildcard) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
@@ -71,7 +66,6 @@ TEST(ParserAnnexA051, SimCombinationalWildcard) {
   EXPECT_EQ(state.Evaluate({'1', '1', '1'}), '1');
 }
 
-// next_state as '-' (no change)
 TEST(ParserAnnexA053, NextState_Dash) {
   auto r = Parse(
       "primitive p(output reg q, input d, en);\n"
@@ -82,7 +76,7 @@ TEST(ParserAnnexA053, NextState_Dash) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->udps[0]->table[0].output, '-');
 }
-// Simulation: '-' keeps current output
+
 TEST(ParserAnnexA053, NextState_SimDashKeepsState) {
   auto r = Parse(
       "primitive latch(output reg q, input d, en);\n"
@@ -96,20 +90,19 @@ TEST(ParserAnnexA053, NextState_SimDashKeepsState) {
   ASSERT_NE(r.cu, nullptr);
   auto* udp = r.cu->udps[0];
   UdpEvalState eval(*udp);
-  // Initial output = 1
+
   EXPECT_EQ(eval.GetOutput(), '1');
-  // Enable low -> no change -> still 1
+
   eval.Evaluate({'0', '0'});
   EXPECT_EQ(eval.GetOutput(), '1');
-  // Enable high, data=0 -> output=0
+
   eval.Evaluate({'0', '1'});
   EXPECT_EQ(eval.GetOutput(), '0');
-  // Enable low -> no change -> still 0
+
   eval.Evaluate({'1', '0'});
   EXPECT_EQ(eval.GetOutput(), '0');
 }
 
-// Simulation: output_symbol values
 TEST(ParserAnnexA053, OutputSymbol_SimValues) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -123,11 +116,10 @@ TEST(ParserAnnexA053, OutputSymbol_SimValues) {
   UdpEvalState eval(*udp);
   EXPECT_EQ(eval.Evaluate({'0'}), '0');
   EXPECT_EQ(eval.Evaluate({'1'}), '1');
-  // Unmatched -> x
+
   EXPECT_EQ(eval.Evaluate({'x'}), 'x');
 }
 
-// Simulation: '?' matches 0, 1, and x
 TEST(ParserAnnexA053, LevelSymbol_SimQuestion) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -143,7 +135,6 @@ TEST(ParserAnnexA053, LevelSymbol_SimQuestion) {
   EXPECT_EQ(eval.Evaluate({'x'}), '1');
 }
 
-// Simulation: 'b' matches 0 and 1, but not x
 TEST(ParserAnnexA053, LevelSymbol_SimB) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -156,11 +147,10 @@ TEST(ParserAnnexA053, LevelSymbol_SimB) {
   UdpEvalState eval(*udp);
   EXPECT_EQ(eval.Evaluate({'0'}), '1');
   EXPECT_EQ(eval.Evaluate({'1'}), '1');
-  // 'b' does not match 'x'
+
   EXPECT_EQ(eval.Evaluate({'x'}), 'x');
 }
 
-// Simulation: 'f' matches falling edge (1->0)
 TEST(ParserAnnexA053, EdgeSymbol_SimF) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -177,11 +167,10 @@ TEST(ParserAnnexA053, EdgeSymbol_SimF) {
   eval.SetInputs({'1', '0'});
   eval.EvaluateWithEdge({'1', '1'}, 1, '0');
   EXPECT_EQ(eval.GetOutput(), '1');
-  // Falling edge (1->0) with dash -> no change
+
   EXPECT_EQ(eval.EvaluateWithEdge({'1', '0'}, 1, '1'), '1');
 }
 
-// Simulation: 'p' matches positive edge (0->1, 0->x, x->1)
 TEST(ParserAnnexA053, EdgeSymbol_SimP) {
   auto r = Parse(
       "primitive p_udp(output reg q, input a);\n"
@@ -193,12 +182,11 @@ TEST(ParserAnnexA053, EdgeSymbol_SimP) {
   ASSERT_NE(r.cu, nullptr);
   auto* udp = r.cu->udps[0];
   UdpEvalState eval(*udp);
-  // 0->1 matches p
+
   eval.SetInputs({'0'});
   EXPECT_EQ(eval.EvaluateWithEdge({'1'}, 0, '0'), '1');
 }
 
-// Simulation: 'n' matches negative edge (1->0, 1->x, x->0)
 TEST(ParserAnnexA053, EdgeSymbol_SimN) {
   auto r = Parse(
       "primitive n_udp(output reg q, input a);\n"
@@ -210,12 +198,11 @@ TEST(ParserAnnexA053, EdgeSymbol_SimN) {
   ASSERT_NE(r.cu, nullptr);
   auto* udp = r.cu->udps[0];
   UdpEvalState eval(*udp);
-  // 1->0 matches n
+
   eval.SetInputs({'1'});
   EXPECT_EQ(eval.EvaluateWithEdge({'0'}, 0, '1'), '0');
 }
 
-// Simulation: '*' matches any change
 TEST(ParserAnnexA053, EdgeSymbol_SimStar) {
   auto r = Parse(
       "primitive star_udp(output reg q, input a);\n"
@@ -227,10 +214,10 @@ TEST(ParserAnnexA053, EdgeSymbol_SimStar) {
   ASSERT_NE(r.cu, nullptr);
   auto* udp = r.cu->udps[0];
   UdpEvalState eval(*udp);
-  // 0->1 matches *
+
   eval.SetInputs({'0'});
   EXPECT_EQ(eval.EvaluateWithEdge({'1'}, 0, '0'), '1');
-  // 1->0 also matches *
+
   EXPECT_EQ(eval.EvaluateWithEdge({'0'}, 0, '1'), '1');
 }
 
@@ -259,10 +246,6 @@ TEST(ParserSection29, UdpTableSpecialChars) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
-// =============================================================================
-// LRM section 29.3.6 -- UDP state table entries: symbol summary
-// =============================================================================
-// --- Combinational UDP table symbols ---
 TEST(ParserSection29, TableSymbol0And1) {
   auto r = Parse(
       "primitive and_gate(output out, input a, b);\n"
@@ -278,11 +261,11 @@ TEST(ParserSection29, TableSymbol0And1) {
   auto* udp = r.cu->udps[0];
   EXPECT_FALSE(udp->is_sequential);
   ASSERT_EQ(udp->table.size(), 4);
-  // Verify first row: inputs '0','0', output '0'
+
   EXPECT_EQ(udp->table[0].inputs[0], '0');
   EXPECT_EQ(udp->table[0].inputs[1], '0');
   EXPECT_EQ(udp->table[0].output, '0');
-  // Verify last row: inputs '1','1', output '1'
+
   EXPECT_EQ(udp->table[3].inputs[0], '1');
   EXPECT_EQ(udp->table[3].inputs[1], '1');
   EXPECT_EQ(udp->table[3].output, '1');
@@ -300,7 +283,7 @@ TEST(ParserSection29, TableSymbolQuestionMark) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1);
   ASSERT_EQ(r.cu->udps[0]->table.size(), 3);
-  // Third row uses ? as input
+
   EXPECT_EQ(r.cu->udps[0]->table[2].inputs[0], '?');
   EXPECT_EQ(r.cu->udps[0]->table[2].output, 'x');
 }
@@ -320,7 +303,7 @@ TEST(ParserSection29, TableSymbolX) {
   ASSERT_NE(r.cu, nullptr);
   auto* udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 6);
-  // Row with x input
+
   EXPECT_EQ(udp->table[4].inputs[0], 'x');
   EXPECT_EQ(udp->table[4].inputs[1], '?');
   EXPECT_EQ(udp->table[4].output, 'x');
@@ -343,7 +326,6 @@ TEST(ParserSection29, TableSymbolB) {
   EXPECT_EQ(udp->table[1].inputs[1], 'b');
 }
 
-// --- Sequential UDP table symbols ---
 TEST(ParserSection29, TableSymbolDashNoChange) {
   auto r = Parse(
       "primitive latch(output reg q, input d, en);\n"
@@ -357,9 +339,9 @@ TEST(ParserSection29, TableSymbolDashNoChange) {
   auto* udp = r.cu->udps[0];
   EXPECT_TRUE(udp->is_sequential);
   ASSERT_EQ(udp->table.size(), 3);
-  // Third row: no-change output
+
   EXPECT_EQ(udp->table[2].output, '-');
-  // Current state field should be '?'
+
   EXPECT_EQ(udp->table[2].current_state, '?');
 }
 
@@ -422,4 +404,4 @@ TEST(ParserSection29, TableEdgeNotationParenthesized) {
               "endprimitive\n"));
 }
 
-}  // namespace
+}

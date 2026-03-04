@@ -1,12 +1,9 @@
-
 #include "fixture_simulator.h"
 #include "preprocessor/preprocessor.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
 using namespace delta;
-
-// §5.6.4 Compiler directives
 
 static uint64_t PreprocessAndGet(const std::string& src, const char* var_name) {
   SimFixture f;
@@ -31,8 +28,7 @@ static uint64_t PreprocessAndGet(const std::string& src, const char* var_name) {
 }
 
 TEST(SimCh50604, DefineMacroAffectsSimulation) {
-  // §5.6.4: ` introduces a compiler directive (`define) that takes effect
-  // immediately, expanding the macro during compilation.
+
   auto result = PreprocessAndGet(
       "`define MY_VAL 8'd42\n"
       "module t;\n"
@@ -44,8 +40,7 @@ TEST(SimCh50604, DefineMacroAffectsSimulation) {
 }
 
 TEST(SimCh50604, DirectivePersistsInCompilationUnit) {
-  // §5.6.4: A directive remains in effect for the rest of the compilation
-  // unit unless a different compiler directive specifies otherwise.
+
   auto result = PreprocessAndGet(
       "`define CONST 8'd99\n"
       "module other; endmodule\n"
@@ -58,7 +53,7 @@ TEST(SimCh50604, DirectivePersistsInCompilationUnit) {
 }
 
 TEST(SimCh50604, DirectiveCanBeOverridden) {
-  // §5.6.4: A directive can be overridden by a later directive.
+
   auto result = PreprocessAndGet(
       "`define X 8'd10\n"
       "`define X 8'd20\n"

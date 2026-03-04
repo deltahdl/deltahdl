@@ -1,12 +1,10 @@
-// §11.4.3.1: Arithmetic expressions with unsigned and signed types
-
 #include <cstring>
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
-#include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -24,4 +22,4 @@ TEST(EvalAdv, UnsignedDivUnchanged) {
   EXPECT_EQ(result.ToUint64(), 124u);
 }
 
-}  // namespace
+}

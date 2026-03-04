@@ -1,5 +1,3 @@
-// §9.2.2.3: Latched logic always_latch procedure
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §9.2.3: always_latch executes at time 0
-// The always_latch procedure executes once automatically at time 0.
-// =============================================================================
-// 1. always_latch body executes at time 0 with default variable values.
 TEST(SimCh9c, ExecutesAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,14 +22,12 @@ TEST(SimCh9c, ExecutesAtTimeZero) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  // en defaults to 0, so q should retain its default value of 0.
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 8u);
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
-// 2. always_latch with unconditional assignment sets output at time 0.
 TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -57,11 +48,6 @@ TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
   EXPECT_EQ(q->value.ToUint64(), 0xABu);
 }
 
-// =============================================================================
-// §9.2.3: always_latch with if-without-else creates latch behavior
-// When the enable condition is false, the output retains its previous value.
-// =============================================================================
-// 3. if-without-else: enable low retains default (zero) value.
 TEST(SimCh9c, IfWithoutElseRetainsDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -84,11 +70,10 @@ TEST(SimCh9c, IfWithoutElseRetainsDefault) {
 
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
-  // en=0, so always_latch does not assign q; q retains 0.
+
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
-// 4. if-without-else: enable high passes data through.
 TEST(SimCh9c, EnableHighPassesData) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -114,7 +99,6 @@ TEST(SimCh9c, EnableHighPassesData) {
   EXPECT_EQ(q->value.ToUint64(), 0x42u);
 }
 
-// 5. Enable low retains previous value set by initial block ordering.
 TEST(SimCh9c, EnableLowRetainsPreviousValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -137,7 +121,7 @@ TEST(SimCh9c, EnableLowRetainsPreviousValue) {
 
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
-  // en=1, d=0xBB, so q = 0xBB.
+
   EXPECT_EQ(q->value.ToUint64(), 0xBBu);
 }
 
@@ -152,10 +136,6 @@ static void LowerRunAndFindQ1Q2(SimFixture& f, RtlirDesign* design,
   ASSERT_NE(q2_out, nullptr);
 }
 
-// =============================================================================
-// §9.2.3: Multiple latches in one always_latch block
-// =============================================================================
-// 6. Two independent latches in one always_latch begin/end block.
 TEST(SimCh9c, MultipleLatchesInOneBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -182,7 +162,6 @@ TEST(SimCh9c, MultipleLatchesInOneBlock) {
   EXPECT_EQ(q2->value.ToUint64(), 0x55u);
 }
 
-// 7. Multiple latches with enable low: both retain default 0.
 TEST(SimCh9c, MultipleLatchesEnableLow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -209,10 +188,6 @@ TEST(SimCh9c, MultipleLatchesEnableLow) {
   EXPECT_EQ(q2->value.ToUint64(), 0u);
 }
 
-// =============================================================================
-// §9.2.3: always_latch with incomplete case creates latch
-// =============================================================================
-// 8. Incomplete case (no default) retains value for unmatched selectors.
 TEST(SimCh9c, IncompleteCaseRetainsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -235,14 +210,10 @@ TEST(SimCh9c, IncompleteCaseRetainsValue) {
 
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
-  // sel=0 matches no case item; q retains default 0.
+
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
-// =============================================================================
-// §9.2.3: always_latch with different data types
-// =============================================================================
-// 11. always_latch with logic type.
 TEST(SimCh9c, LatchLogicType) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -269,7 +240,6 @@ TEST(SimCh9c, LatchLogicType) {
   EXPECT_EQ(q->value.ToUint64(), 0xCu);
 }
 
-// 12. always_latch with int type (32-bit).
 TEST(SimCh9c, LatchIntType) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -296,7 +266,6 @@ TEST(SimCh9c, LatchIntType) {
   EXPECT_EQ(q->value.ToUint64(), 12345u);
 }
 
-// 13. always_latch with byte type (8-bit).
 TEST(SimCh9c, LatchByteType) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -323,10 +292,6 @@ TEST(SimCh9c, LatchByteType) {
   EXPECT_EQ(q->value.ToUint64(), 0xFEu);
 }
 
-// =============================================================================
-// §9.2.3: always_latch with bit-select
-// =============================================================================
-// 14. Bit-select on RHS within always_latch.
 TEST(SimCh9c, BitSelectRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -350,14 +315,10 @@ TEST(SimCh9c, BitSelectRHS) {
 
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
-  // d = 0xA5 = 0b10100101; d[0] = 1.
+
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-// =============================================================================
-// §9.2.3: always_latch with concatenation
-// =============================================================================
-// 18. Concatenation on RHS within always_latch.
 TEST(SimCh9c, ConcatenationRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -382,11 +343,10 @@ TEST(SimCh9c, ConcatenationRHS) {
 
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
-  // {4'hA, 4'h5} = 8'hA5.
+
   EXPECT_EQ(q->value.ToUint64(), 0xA5u);
 }
 
-// 19. Concatenation retained when enable is low.
 TEST(SimCh9c, ConcatenationRetainedWhenLow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -411,14 +371,10 @@ TEST(SimCh9c, ConcatenationRetainedWhenLow) {
 
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
-  // en=0, q retains default 0.
+
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
-// =============================================================================
-// §9.2.3: always_latch with nested if-else
-// =============================================================================
-// 22. Nested if-else: outer condition true, inner condition true.
 TEST(SimCh9c, NestedIfElseBothTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -449,7 +405,6 @@ TEST(SimCh9c, NestedIfElseBothTrue) {
   EXPECT_EQ(q->value.ToUint64(), 0x11u);
 }
 
-// 23. Nested if-else: outer condition true, inner condition false.
 TEST(SimCh9c, NestedIfElseInnerFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -480,7 +435,6 @@ TEST(SimCh9c, NestedIfElseInnerFalse) {
   EXPECT_EQ(q->value.ToUint64(), 0x22u);
 }
 
-// 24. Nested if-else: outer condition false, output retains value.
 TEST(SimCh9c, NestedIfElseOuterFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -508,14 +462,10 @@ TEST(SimCh9c, NestedIfElseOuterFalse) {
 
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
-  // en=0 means outer if not taken; q retains default 0.
+
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
-// =============================================================================
-// §9.2.3: always_latch with multiple outputs
-// =============================================================================
-// 25. Multiple outputs assigned from different data sources.
 TEST(SimCh9c, MultipleOutputsDifferentSources) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -554,7 +504,6 @@ TEST(SimCh9c, MultipleOutputsDifferentSources) {
   EXPECT_EQ(q3->value.ToUint64(), 0x30u);
 }
 
-// 26. Multiple outputs with independent enable conditions.
 TEST(SimCh9c, MultipleOutputsIndependentEnables) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -583,15 +532,11 @@ TEST(SimCh9c, MultipleOutputsIndependentEnables) {
   auto* q2 = f.ctx.FindVariable("q2");
   ASSERT_NE(q1, nullptr);
   ASSERT_NE(q2, nullptr);
-  // en1=1, so q1=d1=0xDE. en2=0, so q2 retains default 0.
+
   EXPECT_EQ(q1->value.ToUint64(), 0xDEu);
   EXPECT_EQ(q2->value.ToUint64(), 0u);
 }
 
-// =============================================================================
-// §9.2.3: always_latch output available after scheduler run
-// =============================================================================
-// 27. Output is available after scheduler.Run() completes.
 TEST(SimCh9c, OutputAvailableAfterRun) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -618,7 +563,6 @@ TEST(SimCh9c, OutputAvailableAfterRun) {
   EXPECT_EQ(q->value.ToUint64(), 0xBEEFu);
 }
 
-// 28. Verify .width on always_latch output with 1-bit result.
 TEST(SimCh9c, WidthVerificationSingleBit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -645,10 +589,6 @@ TEST(SimCh9c, WidthVerificationSingleBit) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-// =============================================================================
-// §9.2.3: Verify .width and .ToUint64() on results
-// =============================================================================
-// 29. 32-bit always_latch output verifies width and value.
 TEST(SimCh9c, Width32BitAndToUint64) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -675,7 +615,6 @@ TEST(SimCh9c, Width32BitAndToUint64) {
   EXPECT_EQ(q->value.ToUint64(), 0xDEADBEEFu);
 }
 
-// 30. always_latch with begin/end block and arithmetic on RHS.
 TEST(SimCh9c, BeginEndBlockWithArithmetic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -701,8 +640,8 @@ TEST(SimCh9c, BeginEndBlockWithArithmetic) {
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 8u);
-  // 0x10 + 0x20 = 0x30.
+
   EXPECT_EQ(q->value.ToUint64(), 0x30u);
 }
 
-}  // namespace
+}

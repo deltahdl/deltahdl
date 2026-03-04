@@ -1,5 +1,3 @@
-// Annex A.5.2: UDP ports
-
 #include "fixture_parser.h"
 #include "simulator/udp_eval.h"
 
@@ -7,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// ANSI port list with mixed input keyword usage
-// (some inputs have 'input' keyword, some share the previous one)
 TEST(ParserAnnexA052, AnsiPortList_MixedInputKeyword) {
   auto r = Parse(
       "primitive gate(output out, input a, input b, c);\n"
@@ -26,10 +22,6 @@ TEST(ParserAnnexA052, AnsiPortList_MixedInputKeyword) {
   EXPECT_EQ(udp->input_names[2], "c");
 }
 
-// ---------------------------------------------------------------------------
-// udp_port_declaration — all three alternatives
-// ---------------------------------------------------------------------------
-// udp_output_declaration ; (plain output)
 TEST(ParserAnnexA052, PortDecl_OutputPlain) {
   auto r = Parse(
       "primitive inv(out, a);\n"
@@ -47,7 +39,6 @@ TEST(ParserAnnexA052, PortDecl_OutputPlain) {
   EXPECT_FALSE(udp->is_sequential);
 }
 
-// udp_output_declaration ; (output reg)
 TEST(ParserAnnexA052, PortDecl_OutputReg) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -65,7 +56,6 @@ TEST(ParserAnnexA052, PortDecl_OutputReg) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-// All three udp_port_declaration alternatives together
 TEST(ParserAnnexA052, PortDecl_AllThreeAlternatives) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -88,10 +78,6 @@ TEST(ParserAnnexA052, PortDecl_AllThreeAlternatives) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-// ---------------------------------------------------------------------------
-// udp_output_declaration — output reg with = constant_expression
-// ---------------------------------------------------------------------------
-// ANSI form: output reg q = 1'b0
 TEST(ParserAnnexA052, OutputDeclAnsi_RegInitZero) {
   auto r = Parse(
       "primitive dff(output reg q = 1'b0, input d, input clk);\n"
@@ -108,10 +94,6 @@ TEST(ParserAnnexA052, OutputDeclAnsi_RegInitZero) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-// ---------------------------------------------------------------------------
-// udp_input_declaration — list_of_udp_port_identifiers
-// ---------------------------------------------------------------------------
-// Single input identifier
 TEST(ParserAnnexA052, InputDecl_SingleId) {
   auto r = Parse(
       "primitive inv(out, a);\n"
@@ -129,7 +111,6 @@ TEST(ParserAnnexA052, InputDecl_SingleId) {
   EXPECT_EQ(udp->input_names[0], "a");
 }
 
-// Multiple input identifiers in single declaration
 TEST(ParserAnnexA052, InputDecl_MultipleIds) {
   auto r = Parse(
       "primitive gate(out, a, b, c, d);\n"
@@ -150,10 +131,6 @@ TEST(ParserAnnexA052, InputDecl_MultipleIds) {
   EXPECT_EQ(udp->input_names[3], "d");
 }
 
-// ---------------------------------------------------------------------------
-// { attribute_instance } on port declarations
-// ---------------------------------------------------------------------------
-// Attribute on output declaration
 TEST(ParserAnnexA052, AttrOnOutputDecl) {
   auto r = Parse(
       "primitive inv(out, a);\n"
@@ -170,7 +147,6 @@ TEST(ParserAnnexA052, AttrOnOutputDecl) {
   EXPECT_EQ(udp->output_name, "out");
 }
 
-// Attribute on reg declaration
 TEST(ParserAnnexA052, AttrOnRegDecl) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -188,4 +164,4 @@ TEST(ParserAnnexA052, AttrOnRegDecl) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-}  // namespace
+}

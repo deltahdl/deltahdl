@@ -1,5 +1,3 @@
-// §19.5.1: Specifying bins for values
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -64,9 +62,6 @@ TEST(ParserA211, BinsOrEmpty_WithBraces) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #10: bins_or_options
-// =============================================================================
 TEST(ParserA211, BinsOrOptions_ValueRangeList) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -102,9 +97,6 @@ TEST(ParserA211, BinsOrOptions_Default) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #11: bins_keyword
-// =============================================================================
 TEST(ParserA211, BinsKeyword_Bins) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -116,9 +108,6 @@ TEST(ParserA211, BinsKeyword_Bins) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #27: covergroup_range_list
-// =============================================================================
 TEST(ParserA211, CovergroupRangeList_Single) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -152,9 +141,6 @@ TEST(ParserA211, CovergroupRangeList_MixedRanges) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #28: covergroup_value_range
-// =============================================================================
 TEST(ParserA211, CovergroupValueRange_SingleValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -199,9 +185,6 @@ TEST(ParserA211, CovergroupValueRange_OpenHigh) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #31: integer_covergroup_expression
-// =============================================================================
 TEST(ParserA211, IntegerCovergroupExpression_Expr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -213,9 +196,6 @@ TEST(ParserA211, IntegerCovergroupExpression_Expr) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #33: covergroup_expression
-// =============================================================================
 TEST(ParserA211, CovergroupExpression_Literal) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -265,4 +245,4 @@ TEST_F(VerifyParseTest, CovergroupWithBins) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

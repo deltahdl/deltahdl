@@ -1,5 +1,3 @@
-// §8.10: Static methods
-
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -9,12 +7,6 @@
 #include "simulator/eval.h"
 
 using namespace delta;
-
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
 
 namespace {
 
@@ -34,4 +26,4 @@ TEST(ClassSim, StaticMethodResolution) {
   EXPECT_TRUE(it->second->is_static);
 }
 
-}  // namespace
+}

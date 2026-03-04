@@ -1,10 +1,7 @@
-// §3.13: Name spaces
-
 #include "fixture_elaborator.h"
 
 namespace {
 
-// 36. Distinct names in the same module scope are legal.
 TEST(ElabClause03, Cl3_13_DistinctNamesInModuleScope) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -14,9 +11,8 @@ TEST(ElabClause03, Cl3_13_DistinctNamesInModuleScope) {
              "endmodule\n"));
 }
 
-// 37. Same name in different modules is legal (separate name spaces).
 TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
-  // Each module has its own module name space — 'data' in both is fine.
+
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -30,7 +26,7 @@ TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
   Parser parser(lexer, arena, diag);
   auto* cu = parser.Parse();
   ASSERT_FALSE(diag.HasErrors());
-  // Elaborate both modules — neither should produce a redeclaration error.
+
   Elaborator elab_a(arena, diag, cu);
   elab_a.Elaborate("a");
   EXPECT_FALSE(diag.HasErrors());
@@ -39,12 +35,8 @@ TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
   EXPECT_FALSE(diag.HasErrors());
 }
 
-// =============================================================================
-// §3.13 Redeclaration rules (Elaboration)
-// =============================================================================
-// 34. Redeclaring a variable in the same module scope is an error.
 TEST(ElabClause03, Cl3_13_RedeclVarInModuleScope) {
-  // Two logic declarations with the same name 'x' in the same module.
+
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic x;\n"
@@ -52,7 +44,6 @@ TEST(ElabClause03, Cl3_13_RedeclVarInModuleScope) {
              "endmodule\n"));
 }
 
-// 35. Redeclaring a net in the same module scope is an error.
 TEST(ElabClause03, Cl3_13_RedeclNetInModuleScope) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -61,4 +52,4 @@ TEST(ElabClause03, Cl3_13_RedeclNetInModuleScope) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

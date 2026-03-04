@@ -1,5 +1,3 @@
-// §31
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Module with multiple timing checks simulates correctly
 TEST(SimA705, MultipleTimingChecksSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,4 +29,4 @@ TEST(SimA705, MultipleTimingChecksSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

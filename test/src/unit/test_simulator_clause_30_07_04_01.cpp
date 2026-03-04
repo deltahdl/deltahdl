@@ -1,5 +1,3 @@
-// §30.7.4.1: On-event versus on-detect pulse filtering
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Module with pulsestyle declarations simulates correctly
 TEST(SimA701, SpecifyWithPulsestyleSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -30,4 +27,4 @@ TEST(SimA701, SpecifyWithPulsestyleSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}  // namespace
+}

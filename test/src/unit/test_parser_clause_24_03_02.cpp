@@ -1,6 +1,3 @@
-// §24.3.2: Operation of program port connections in the absence of clocking
-// blocks
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -9,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §24.6 Program instantiation
-// =============================================================================
 TEST_F(ProgramTestParse, ProgramInstantiatedInModule) {
   auto* unit = Parse(
       "program test_prog(input logic clk);\n"
@@ -29,4 +23,4 @@ TEST_F(ProgramTestParse, ProgramInstantiatedInModule) {
   EXPECT_EQ(inst->inst_name, "tp");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §12.4.1: if–else–if construct
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -26,7 +24,6 @@ TEST(ParserSection12, IfElseIfChain) {
   EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kIf);
 }
 
-// §12.4.1: if-else-if chain with final else
 TEST(ParserA606, IfElseIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -41,15 +38,14 @@ TEST(ParserA606, IfElseIfElse) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  // else branch is another if statement
+
   ASSERT_NE(stmt->else_branch, nullptr);
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
-  // the inner if has its own else
+
   ASSERT_NE(stmt->else_branch->else_branch, nullptr);
   EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-// §12.4.1: multi-way if-else-if chain without final else
 TEST(ParserA606, IfElseIfNoFinalElse) {
   auto r = Parse(
       "module m;\n"
@@ -68,11 +64,10 @@ TEST(ParserA606, IfElseIfNoFinalElse) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
   ASSERT_NE(stmt->else_branch->else_branch, nullptr);
   EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kIf);
-  // last else-if has no else
+
   EXPECT_EQ(stmt->else_branch->else_branch->else_branch, nullptr);
 }
 
-// Chained if-else-if-else produces nested kIf on else_branch.
 TEST(ParserSection12, IfElseIfElseChain) {
   auto r = Parse(
       "module t;\n"
@@ -97,9 +92,6 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-// ---------------------------------------------------------------------------
-// 5. Nested if-else chain.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_NestedIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -116,9 +108,9 @@ TEST(ParserSection9, Sec9_2_3_NestedIfElse) {
   ASSERT_NE(item, nullptr);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kIf);
-  // The else branch is itself an if statement.
+
   ASSERT_NE(item->body->else_branch, nullptr);
   EXPECT_EQ(item->body->else_branch->kind, StmtKind::kIf);
 }
 
-}  // namespace
+}

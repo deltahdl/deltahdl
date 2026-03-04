@@ -1,5 +1,3 @@
-// §6.16.3: Getc()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.3: getc(i) -- return byte at index i
-// =============================================================================
 TEST(StringMethods, Getc) {
   StringFixture f;
   f.CreateStringVar("s", "hello");
@@ -19,4 +14,4 @@ TEST(StringMethods, Getc) {
   EXPECT_EQ(result.ToUint64(), static_cast<uint64_t>('e'));
 }
 
-}  // namespace
+}

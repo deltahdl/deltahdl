@@ -1,5 +1,3 @@
-// §14.11: Cycle delay: ##
-
 #include <cstdint>
 #include <string_view>
 
@@ -12,16 +10,8 @@
 
 using namespace delta;
 
-// Helper fixture for clocking simulation tests.
-// Schedule posedge at a given time through the scheduler.
-
-// Schedule negedge at a given time through the scheduler.
-
 namespace {
 
-// =============================================================================
-// 7. Cycle delay ##N (S14.11)
-// =============================================================================
 TEST(ClockingSim, CycleDelayWaitsNEdges) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -59,4 +49,4 @@ TEST(ClockingSim, CycleDelayWaitsNEdges) {
   EXPECT_GE(edge_count, 3u);
 }
 
-}  // namespace
+}

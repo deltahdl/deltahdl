@@ -1,5 +1,3 @@
-// Annex A.3.2: Primitive strengths
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -8,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// -----------------------------------------------------------------------------
-// Production #2: pullup_strength
-// pullup_strength ::= ( strength0 , strength1 )
-// -----------------------------------------------------------------------------
 TEST(ParserA302, PullupStrength_Strength0Strength1) {
   auto r = Parse(
       "module m;\n"
@@ -20,8 +14,8 @@ TEST(ParserA302, PullupStrength_Strength0Strength1) {
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
   ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 4u);  // strong0
-  EXPECT_EQ(g->drive_strength1, 3u);  // pull1
+  EXPECT_EQ(g->drive_strength0, 4u);
+  EXPECT_EQ(g->drive_strength1, 3u);
   EXPECT_EQ(g->gate_inst_name, "pu1");
 }
 
@@ -33,14 +27,10 @@ TEST(ParserA302, PullupStrength_Weak0Supply1) {
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
   ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 2u);  // weak0
-  EXPECT_EQ(g->drive_strength1, 5u);  // supply1
+  EXPECT_EQ(g->drive_strength0, 2u);
+  EXPECT_EQ(g->drive_strength1, 5u);
 }
 
-// -----------------------------------------------------------------------------
-// Production #2: pullup_strength
-// pullup_strength ::= ( strength1 , strength0 )
-// -----------------------------------------------------------------------------
 TEST(ParserA302, PullupStrength_Strength1Strength0) {
   auto r = Parse(
       "module m;\n"
@@ -49,8 +39,8 @@ TEST(ParserA302, PullupStrength_Strength1Strength0) {
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
   ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 2u);  // weak0
-  EXPECT_EQ(g->drive_strength1, 5u);  // supply1
+  EXPECT_EQ(g->drive_strength0, 2u);
+  EXPECT_EQ(g->drive_strength1, 5u);
 }
 
 TEST(ParserA302, PullupStrength_Highz1Strong0) {
@@ -61,14 +51,10 @@ TEST(ParserA302, PullupStrength_Highz1Strong0) {
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
   ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 4u);  // strong0
-  EXPECT_EQ(g->drive_strength1, 1u);  // highz1
+  EXPECT_EQ(g->drive_strength0, 4u);
+  EXPECT_EQ(g->drive_strength1, 1u);
 }
 
-// -----------------------------------------------------------------------------
-// Production #2: pullup_strength
-// pullup_strength ::= ( strength1 )
-// -----------------------------------------------------------------------------
 TEST(ParserA302, PullupStrength_SingleStrength1) {
   auto r = Parse(
       "module m;\n"
@@ -77,8 +63,8 @@ TEST(ParserA302, PullupStrength_SingleStrength1) {
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
   ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 0u);  // none
-  EXPECT_EQ(g->drive_strength1, 4u);  // strong1
+  EXPECT_EQ(g->drive_strength0, 0u);
+  EXPECT_EQ(g->drive_strength1, 4u);
 }
 
 TEST(ParserA302, PullupStrength_SingleSupply1) {
@@ -89,8 +75,8 @@ TEST(ParserA302, PullupStrength_SingleSupply1) {
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
   ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 0u);  // none
-  EXPECT_EQ(g->drive_strength1, 5u);  // supply1
+  EXPECT_EQ(g->drive_strength0, 0u);
+  EXPECT_EQ(g->drive_strength1, 5u);
 }
 
 TEST(ParserA302, PullupStrength_SingleWeak1) {
@@ -101,8 +87,8 @@ TEST(ParserA302, PullupStrength_SingleWeak1) {
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
   ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 0u);  // none
-  EXPECT_EQ(g->drive_strength1, 2u);  // weak1
+  EXPECT_EQ(g->drive_strength0, 0u);
+  EXPECT_EQ(g->drive_strength1, 2u);
 }
 
 TEST(ParserA302, PullupStrength_SinglePull1) {
@@ -113,8 +99,8 @@ TEST(ParserA302, PullupStrength_SinglePull1) {
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
   ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 0u);  // none
-  EXPECT_EQ(g->drive_strength1, 3u);  // pull1
+  EXPECT_EQ(g->drive_strength0, 0u);
+  EXPECT_EQ(g->drive_strength1, 3u);
 }
 
 TEST(ParserA302, PullupStrength_SingleHighz1) {
@@ -125,8 +111,8 @@ TEST(ParserA302, PullupStrength_SingleHighz1) {
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
   ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 0u);  // none
-  EXPECT_EQ(g->drive_strength1, 1u);  // highz1
+  EXPECT_EQ(g->drive_strength0, 0u);
+  EXPECT_EQ(g->drive_strength1, 1u);
 }
 
 TEST(ParserA302, PullupStrength_MultipleInstances) {
@@ -137,10 +123,10 @@ TEST(ParserA302, PullupStrength_MultipleInstances) {
   EXPECT_FALSE(r.has_errors);
   auto gates = FindAllGates(r.cu->modules[0]->items);
   ASSERT_EQ(gates.size(), 2u);
-  EXPECT_EQ(gates[0]->drive_strength0, 2u);  // weak0
-  EXPECT_EQ(gates[0]->drive_strength1, 4u);  // strong1
-  EXPECT_EQ(gates[1]->drive_strength0, 2u);  // weak0
-  EXPECT_EQ(gates[1]->drive_strength1, 4u);  // strong1
+  EXPECT_EQ(gates[0]->drive_strength0, 2u);
+  EXPECT_EQ(gates[0]->drive_strength1, 4u);
+  EXPECT_EQ(gates[1]->drive_strength0, 2u);
+  EXPECT_EQ(gates[1]->drive_strength1, 4u);
 }
 
 TEST(ParserA302, PullupStrength_SingleStrength1_MultipleInstances) {
@@ -151,10 +137,10 @@ TEST(ParserA302, PullupStrength_SingleStrength1_MultipleInstances) {
   EXPECT_FALSE(r.has_errors);
   auto gates = FindAllGates(r.cu->modules[0]->items);
   ASSERT_EQ(gates.size(), 2u);
-  EXPECT_EQ(gates[0]->drive_strength0, 0u);  // none
-  EXPECT_EQ(gates[0]->drive_strength1, 3u);  // pull1
-  EXPECT_EQ(gates[1]->drive_strength0, 0u);  // none
-  EXPECT_EQ(gates[1]->drive_strength1, 3u);  // pull1
+  EXPECT_EQ(gates[0]->drive_strength0, 0u);
+  EXPECT_EQ(gates[0]->drive_strength1, 3u);
+  EXPECT_EQ(gates[1]->drive_strength0, 0u);
+  EXPECT_EQ(gates[1]->drive_strength1, 3u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §10.6.2: The force and release procedural statements
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -22,8 +20,6 @@ TEST(ForceRelease, LegalTargetConcatenation) {
   EXPECT_TRUE(ValidateForceTarget(info));
 }
 
-// --- Illegal LHS targets ---
-// §10.6.2:
 TEST(ForceRelease, IllegalBitSelectVariable) {
   ForceInfo info{ForceTarget::kBitSelectVariable};
   EXPECT_FALSE(ValidateForceTarget(info));
@@ -34,13 +30,10 @@ TEST(ForceRelease, IllegalPartSelectVariable) {
   EXPECT_FALSE(ValidateForceTarget(info));
 }
 
-// §10.6.2: "A force or release statement shall not be applied to a
-//  variable that is being assigned by a mixture of continuous and
-//  procedural assignments."
 TEST(ForceRelease, IllegalMixedAssignmentTarget) {
   ForceInfo info{ForceTarget::kSingularVariable};
   info.has_mixed_assignments = true;
   EXPECT_FALSE(ValidateForceTarget(info));
 }
 
-}  // namespace
+}

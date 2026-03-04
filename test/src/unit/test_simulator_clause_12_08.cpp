@@ -1,5 +1,3 @@
-// §12.8: Jump statements
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §12.8: break exits loop in simulation
 TEST(SimA605, JumpBreakExitsLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +29,6 @@ TEST(SimA605, JumpBreakExitsLoop) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.8: continue skips to next iteration
 TEST(SimA605, JumpContinueSkipsIteration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -53,10 +49,9 @@ TEST(SimA605, JumpContinueSkipsIteration) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 4u);  // 5 iterations minus 1 skipped
+  EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// §12.8: return without value exits void function
 TEST(SimA605, JumpReturnVoidFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -78,10 +73,9 @@ TEST(SimA605, JumpReturnVoidFunction) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);  // 20 not reached due to return
+  EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.7.7: forever with continue skips to next iteration
 TEST(SimA608, ForeverContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -105,11 +99,10 @@ TEST(SimA608, ForeverContinue) {
   f.scheduler.Run();
   auto* count = f.ctx.FindVariable("count");
   ASSERT_NE(count, nullptr);
-  // x goes 1,2,3,...,10. Even values (2,4,6,8) reach count increment = 4
+
   EXPECT_EQ(count->value.ToUint64(), 4u);
 }
 
-// §12.7.6: repeat with break exits early
 TEST(SimA608, RepeatBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -133,7 +126,6 @@ TEST(SimA608, RepeatBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.7.6: repeat with continue skips remainder
 TEST(SimA608, RepeatContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -156,11 +148,10 @@ TEST(SimA608, RepeatContinue) {
   f.scheduler.Run();
   auto* count = f.ctx.FindVariable("count");
   ASSERT_NE(count, nullptr);
-  // 5 iterations, skip iteration 3 => count = 4
+
   EXPECT_EQ(count->value.ToUint64(), 4u);
 }
 
-// §12.7.4: while with break exits early
 TEST(SimA608, WhileBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -184,7 +175,6 @@ TEST(SimA608, WhileBreak) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §12.7.1: for with break exits early
 TEST(SimA608, ForBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -208,7 +198,6 @@ TEST(SimA608, ForBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.7.1: for with continue skips to step
 TEST(SimA608, ForContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -229,11 +218,10 @@ TEST(SimA608, ForContinue) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("count");
   ASSERT_NE(var, nullptr);
-  // 6 iterations, skip i==2 and i==4 => count = 4
+
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// §12.7.5: do-while with break
 TEST(SimA608, DoWhileBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -257,7 +245,6 @@ TEST(SimA608, DoWhileBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.7.5: do-while with continue
 TEST(SimA608, DoWhileContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -280,12 +267,10 @@ TEST(SimA608, DoWhileContinue) {
   f.scheduler.Run();
   auto* count = f.ctx.FindVariable("count");
   ASSERT_NE(count, nullptr);
-  // 5 iterations (x=1..5), skip x==3 => count = 4
+
   EXPECT_EQ(count->value.ToUint64(), 4u);
 }
 
-// --- Nested loops ---
-// Nested loops: inner break doesn't affect outer
 TEST(SimA608, NestedLoopInnerBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -308,11 +293,10 @@ TEST(SimA608, NestedLoopInnerBreak) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("outer_count");
   ASSERT_NE(var, nullptr);
-  // Outer loop runs 3 times despite inner break
+
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// Nested loops: inner continue doesn't affect outer
 TEST(SimA608, NestedLoopInnerContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -335,8 +319,8 @@ TEST(SimA608, NestedLoopInnerContinue) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("total");
   ASSERT_NE(var, nullptr);
-  // 3 outer * (4 inner - 1 skipped) = 3 * 3 = 9
+
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-}  // namespace
+}

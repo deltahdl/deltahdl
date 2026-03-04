@@ -1,12 +1,9 @@
-// Annex A.4.2: Generated instantiation
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// --- genvar_initialization: with inline genvar keyword ---
 TEST(ParserAnnexA042, GenvarInitWithGenvarKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -21,7 +18,6 @@ TEST(ParserAnnexA042, GenvarInitWithGenvarKeyword) {
   ASSERT_NE(gen->gen_init, nullptr);
 }
 
-// --- genvar_iteration: compound assignment_operator (i += 1) ---
 TEST(ParserAnnexA042, GenvarIterationCompoundAssign) {
   auto r = Parse(
       "module m;\n"
@@ -35,7 +31,6 @@ TEST(ParserAnnexA042, GenvarIterationCompoundAssign) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
-// --- case_generate_item: default ---
 TEST(ParserAnnexA042, CaseGenerateWithDefault) {
   auto r = Parse(
       "module m;\n"
@@ -52,7 +47,6 @@ TEST(ParserAnnexA042, CaseGenerateWithDefault) {
   EXPECT_TRUE(gen->gen_case_items[1].is_default);
 }
 
-// --- generate_item: module_or_generate_item (always block) ---
 TEST(ParserAnnexA042, GenerateItemAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
@@ -67,7 +61,6 @@ TEST(ParserAnnexA042, GenerateItemAlwaysBlock) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kAlwaysBlock);
 }
 
-// --- generate_item: interface_or_generate_item (generate in interface) ---
 TEST(ParserAnnexA042, GenerateItemInInterface) {
   auto r = Parse(
       "interface my_if;\n"
@@ -84,4 +77,4 @@ TEST(ParserAnnexA042, GenerateItemInInterface) {
   EXPECT_TRUE(found_if);
 }
 
-}  // namespace
+}

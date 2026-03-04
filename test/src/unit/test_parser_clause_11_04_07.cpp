@@ -1,5 +1,3 @@
-// §11.4.7: Logical operators
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (logical)
-// =============================================================================
-// § binary_operator ::= &&
 TEST(ParserA86, BinaryLogicalAnd) {
   auto r = Parse("module m; initial x = (a && b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -21,7 +15,6 @@ TEST(ParserA86, BinaryLogicalAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-// § binary_operator ::= ||
 TEST(ParserA86, BinaryLogicalOr) {
   auto r = Parse("module m; initial x = (a || b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -32,10 +25,6 @@ TEST(ParserA86, BinaryLogicalOr) {
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
 }
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (implication)
-// =============================================================================
-// § binary_operator ::= ->
 TEST(ParserA86, BinaryImplication) {
   auto r = Parse("module m; initial x = (a -> b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -46,7 +35,6 @@ TEST(ParserA86, BinaryImplication) {
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
 }
 
-// § binary_operator ::= <->
 TEST(ParserA86, BinaryEquivalence) {
   auto r = Parse("module m; initial x = (a <-> b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -56,7 +44,7 @@ TEST(ParserA86, BinaryEquivalence) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
 }
-// --- Logical implication and equivalence (§11.4.7) ---
+
 TEST(ParserSection11, ImplicationParsed) {
   auto r = Parse(
       "module t;\n"
@@ -96,7 +84,7 @@ TEST(ParserA83, ExprUnaryNot) {
 }
 
 TEST(ParserSection11, ImplicationRightAssocStructure) {
-  // a -> b -> c should be parsed as a -> (b -> c)
+
   auto r = Parse(
       "module t;\n"
       "  logic a, b, c, d;\n"
@@ -104,7 +92,7 @@ TEST(ParserSection11, ImplicationRightAssocStructure) {
       "endmodule\n");
   auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
-  // LHS is 'a', RHS is 'b -> c'
+
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->rhs->op, TokenKind::kArrow);
@@ -120,7 +108,6 @@ TEST(ParserA83, ExprBinaryLogicalAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-// § unary_operator ::= !
 TEST(ParserA86, UnaryLogicalNot) {
   auto r = Parse("module m; initial x = !a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -141,9 +128,6 @@ TEST(ParserSection11, Sec11_1_UnaryLogicalNot) {
   EXPECT_EQ(rhs->op, TokenKind::kBang);
 }
 
-// =========================================================================
-// Section 11.4.7 -- Logical operators
-// =========================================================================
 TEST(ParserSection11, LogicalAnd) {
   auto r = Parse(
       "module t;\n"
@@ -175,9 +159,6 @@ TEST(ParserSection11, LogicalNot) {
   EXPECT_EQ(rhs->op, TokenKind::kBang);
 }
 
-// =========================================================================
-// Section 11.3.5 -- Short-circuit evaluation
-// =========================================================================
 TEST(ParserSection11, ShortCircuitAnd) {
   auto r = Parse(
       "module t;\n"
@@ -187,4 +168,4 @@ TEST(ParserSection11, ShortCircuitAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

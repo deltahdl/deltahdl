@@ -104,8 +104,6 @@ TEST(Preprocessor, IfdefElseRegression) {
   EXPECT_EQ(result.find("line_else"), std::string::npos);
 }
 
-// --- Ifdef expression tests (IEEE 1800-2023 §22.6) ---
-
 TEST(Preprocessor, IfdefExprAnd) {
   PreprocFixture f;
   PreprocConfig cfg;

@@ -1,5 +1,3 @@
-// §7.5.1: New[ ]
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -22,4 +20,4 @@ TEST(AdvSim, DynArrayPushAndAccess) {
   EXPECT_EQ(arr.At(1), 99u);
 }
 
-}  // namespace
+}

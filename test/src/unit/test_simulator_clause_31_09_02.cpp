@@ -1,5 +1,3 @@
-// §31.9.2: Conditions in negative timing checks
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.2 Sim — $setuphold with mintypmax timestamp_condition simulates
-// =============================================================================
 TEST(SimA70502, SetupholdMinTypMaxConditionsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,4 +26,4 @@ TEST(SimA70502, SetupholdMinTypMaxConditionsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

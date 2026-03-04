@@ -1,5 +1,3 @@
-// §14.10: Clocking block events
-
 #include <cstdint>
 #include <string_view>
 
@@ -11,11 +9,6 @@
 #include "simulator/variable.h"
 
 using namespace delta;
-
-// Helper fixture for clocking simulation tests.
-// Schedule posedge at a given time through the scheduler.
-
-// Schedule negedge at a given time through the scheduler.
 
 template <typename Fixture>
 static void TestEdgeCallbackPosedge(Fixture& f) {
@@ -41,9 +34,6 @@ static void TestEdgeCallbackPosedge(Fixture& f) {
 
 namespace {
 
-// =============================================================================
-// 11. Clocking block events (@(cb)) (S14.8)
-// =============================================================================
 TEST(ClockingSim, ClockingBlockEvent) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -76,18 +66,14 @@ TEST(ClockingSim, ClockingBlockEvent) {
   EXPECT_TRUE(triggered);
 }
 
-// =============================================================================
-// 18. Edge callback registration
-// =============================================================================
 TEST(ClockingSim, EdgeCallbackOnPosedge) {
   ClockingSimFixture f;
   TestEdgeCallbackPosedge(f);
 }
 
-// --- edge callback registration ---
 TEST(SimA611, EdgeCallbackPosedge) {
   SimFixture f;
   TestEdgeCallbackPosedge(f);
 }
 
-}  // namespace
+}

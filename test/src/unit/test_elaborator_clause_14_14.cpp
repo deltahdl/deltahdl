@@ -1,12 +1,9 @@
-// §14.14: Global clocking
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Global clocking block declaration elaborates
 TEST(ElabA611, GlobalClockingElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,4 +16,4 @@ TEST(ElabA611, GlobalClockingElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

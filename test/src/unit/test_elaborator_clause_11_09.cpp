@@ -1,5 +1,3 @@
-// §11.9: Tagged union expressions and member access
-
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// § tagged_union_expression — tagged elaborates
 TEST(ElabA83, TaggedUnionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -27,4 +24,4 @@ TEST(TaggedUnion, TagDefaultEmpty) {
   EXPECT_TRUE(f.ctx.GetVariableTag("nonexistent").empty());
 }
 
-}  // namespace
+}

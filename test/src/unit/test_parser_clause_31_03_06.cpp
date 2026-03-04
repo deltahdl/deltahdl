@@ -1,5 +1,3 @@
-// §31.3.6: $recrem
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 $recrem_timing_check
-// =============================================================================
-// $recrem with all 9 arguments
 TEST(ParserA70501, RecremFullArgs) {
   auto r = Parse(
       "module m;\n"
@@ -60,7 +54,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckRecrem) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "rst");
   ASSERT_EQ(si->timing_check.limits.size(), 2u);
 }
-// system_timing_check ::= $recrem_timing_check
+
 TEST(ParserA705, SystemTimingCheckRecrem) {
   auto r = Parse(
       "module m;\n"
@@ -74,4 +68,4 @@ TEST(ParserA705, SystemTimingCheckRecrem) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecrem);
 }
 
-}  // namespace
+}

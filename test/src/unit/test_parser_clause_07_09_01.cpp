@@ -1,14 +1,9 @@
-// §7.9.1: Num() and size()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =========================================================================
-// §7.9: Associative array methods
-// =========================================================================
 TEST(ParserSection7, AssocArrayNumMethod) {
   auto r = Parse(
       "module t;\n"
@@ -23,4 +18,4 @@ TEST(ParserSection7, AssocArrayNumMethod) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

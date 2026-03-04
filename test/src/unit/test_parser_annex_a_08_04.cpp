@@ -1,5 +1,3 @@
-// Annex A.8.4: Primaries
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// § primary — null
 TEST(ParserA84, PrimaryNull) {
   auto r = Parse("module m; initial x = null; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -18,7 +15,6 @@ TEST(ParserA84, PrimaryNull) {
   EXPECT_EQ(rhs->text, "null");
 }
 
-// § bit_select — multi-dimensional
 TEST(ParserA84, BitSelectMultiDim) {
   auto r = Parse(
       "module m;\n"
@@ -33,7 +29,6 @@ TEST(ParserA84, BitSelectMultiDim) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
-// § select — member_identifier bit_select
 TEST(ParserA84, SelectMemberBitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -46,7 +41,6 @@ TEST(ParserA84, SelectMemberBitSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// function_subroutine_call in binary expression
 TEST(ParserA82, FunctionCallInBinaryExpr) {
   auto r = Parse(
       "module m;\n"
@@ -64,10 +58,6 @@ TEST(ParserA82, FunctionCallInBinaryExpr) {
   EXPECT_EQ(stmt->rhs->rhs->kind, ExprKind::kCall);
 }
 
-// =============================================================================
-// A.8.4 Primaries — module_path_primary
-// =============================================================================
-// § module_path_primary — number in specify
 TEST(ParserA84, ModulePathPrimaryNumber) {
   auto r = Parse(
       "module m(input a, output b);\n"
@@ -79,7 +69,6 @@ TEST(ParserA84, ModulePathPrimaryNumber) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § module_path_primary — identifier in specify
 TEST(ParserA84, ModulePathPrimaryIdentifier) {
   auto r = Parse(
       "module m(input a, input en, output b);\n"
@@ -91,7 +80,6 @@ TEST(ParserA84, ModulePathPrimaryIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § primary — hierarchical_identifier select
 TEST(ParserA84, PrimaryHierarchicalIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -106,7 +94,6 @@ TEST(ParserA84, PrimaryHierarchicalIdentifier) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
-// § primary — parenthesized mintypmax_expression
 TEST(ParserA84, PrimaryParenthesizedExpr) {
   auto r = Parse("module m; initial x = (1 + 2); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -116,4 +103,4 @@ TEST(ParserA84, PrimaryParenthesizedExpr) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
 }
 
-}  // namespace
+}

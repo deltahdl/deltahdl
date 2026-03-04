@@ -1,5 +1,3 @@
-// §7.2.2: Assigning to structures
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -22,7 +20,6 @@ TEST(ParserSection7, StructMemberInit) {
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
-// 23. Struct variable declaration with initializer in initial block.
 TEST(ParserSection7, Sec7_2_2_VarDeclWithInit) {
   auto r = Parse(
       "module t;\n"
@@ -41,7 +38,6 @@ TEST(ParserSection7, Sec7_2_2_VarDeclWithInit) {
   EXPECT_EQ(stmt->var_init->kind, ExprKind::kAssignmentPattern);
 }
 
-// 25. Struct with packed array member assigned.
 TEST(ParserSection7, Sec7_2_2_PackedArrayMemberAssign) {
   auto r = Parse(
       "module t;\n"
@@ -66,7 +62,7 @@ TEST(ParserSection7, Sec7_2_2_PackedArrayMemberAssign) {
   EXPECT_EQ(s0->lhs->kind, ExprKind::kMemberAccess);
   EXPECT_EQ(s1->lhs->kind, ExprKind::kMemberAccess);
 }
-// --- Packed struct with member default initializer ---
+
 TEST(ParserSection7, Sec7_2_1_PackedMemberDefaultInit) {
   auto r = Parse(
       "module t;\n"
@@ -84,7 +80,7 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberDefaultInit) {
   EXPECT_NE(item->typedef_type.struct_members[0].init_expr, nullptr);
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
-// 5. Struct variable assigned from another struct variable.
+
 TEST(ParserSection7, Sec7_2_2_AssignFromStructVar) {
   auto r = Parse(
       "module t;\n"
@@ -105,7 +101,6 @@ TEST(ParserSection7, Sec7_2_2_AssignFromStructVar) {
   EXPECT_EQ(stmt->rhs->text, "a");
 }
 
-// 9. Default member values in struct typedef.
 TEST(ParserSection7, Sec7_2_2_DefaultMemberValues) {
   auto r = Parse(
       "module t;\n"
@@ -126,7 +121,6 @@ TEST(ParserSection7, Sec7_2_2_DefaultMemberValues) {
   EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
 }
 
-// 14. Struct as function argument.
 TEST(ParserSection7, Sec7_2_2_FunctionArgStruct) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -137,10 +131,7 @@ TEST(ParserSection7, Sec7_2_2_FunctionArgStruct) {
               "  endfunction\n"
               "endmodule\n"));
 }
-// --- Test helpers ---
-// =========================================================================
-// §7.2.2: Assigning to structures
-// =========================================================================
+
 TEST(ParserSection7, StructWholeAssignment) {
   auto r = Parse(
       "module t;\n"
@@ -171,4 +162,4 @@ TEST(ParserSection7, StructMemberDefaultInit) {
   EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
 }
 
-}  // namespace
+}

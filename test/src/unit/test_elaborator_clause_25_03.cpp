@@ -1,5 +1,3 @@
-// §25.3: Interface syntax
-
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,10 +5,6 @@
 using namespace delta;
 namespace {
 
-// =============================================================================
-// Elaboration tests -- interface instantiation resolved through elaborator
-// =============================================================================
-// --- Elaborator resolves interface instantiation within a module ---
 TEST(ParserAnnexA0412, ElaborationInterfaceInstInModule) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -30,7 +24,6 @@ TEST(ParserAnnexA0412, ElaborationInterfaceInstInModule) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
-// --- Elaborator resolves interface inside interface ---
 TEST(ParserAnnexA0412, ElaborationInterfaceInsideInterface) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -55,4 +48,4 @@ TEST(ParserAnnexA0412, ElaborationInterfaceInsideInterface) {
   EXPECT_NE(outer->children[0].resolved, nullptr);
 }
 
-}  // namespace
+}

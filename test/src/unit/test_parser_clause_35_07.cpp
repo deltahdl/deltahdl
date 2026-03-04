@@ -1,5 +1,3 @@
-// §35.7: Exported functions
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_config.h"
@@ -12,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// dpi_import_export: export variants
-// ---------------------------------------------------------------------------
 TEST(ParserA26, DpiExportFunction) {
   auto r = Parse(
       "module m;\n"
@@ -81,9 +76,6 @@ TEST_F(DpiParseTest, ExportWithCName) {
   EXPECT_EQ(items[0]->name, "sv_func");
 }
 
-// =============================================================================
-// Annex H - DPI export with C name alias
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiExportWithCName) {
   auto* unit = Parse(
       "module m;\n"
@@ -98,13 +90,8 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportWithCName) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-// =============================================================================
-// LRM section 38.37 -- vpi_register_systf: DPI-C exports for system tasks
-// These tests verify DPI-C export declarations modeling the callback
-// registration pattern used by vpi_register_systf().
-// =============================================================================
 TEST(ParserSection38, DpiExportFunctionForCalltf) {
-  // Export an SV function for C-side systf registration
+
   auto r = Parse(R"(
     module m;
       export "DPI-C" function calltf_routine;
@@ -120,7 +107,7 @@ TEST(ParserSection38, DpiExportFunctionForCalltf) {
 }
 
 TEST(ParserSection38, DpiExportWithCNameForSystf) {
-  // Export with explicit C-side name for systf registration
+
   auto r = Parse(R"(
     module m;
       export "DPI-C" my_c_calltf = function sv_calltf;
@@ -133,9 +120,7 @@ TEST(ParserSection38, DpiExportWithCNameForSystf) {
   EXPECT_EQ(items[0]->dpi_c_name, "my_c_calltf");
   EXPECT_EQ(items[0]->name, "sv_calltf");
 }
-// =============================================================================
-// §35.3 DPI-C export declarations
-// =============================================================================
+
 TEST_F(DpiParseTest, ExportFunction) {
   auto* unit = Parse(R"(
     module m;
@@ -150,4 +135,4 @@ TEST_F(DpiParseTest, ExportFunction) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-}  // namespace
+}

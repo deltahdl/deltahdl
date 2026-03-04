@@ -1,5 +1,3 @@
-// §6.20: Constants
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §6.20.5: Specparam values accessible during simulation.
 TEST(Lowerer, SpecparamValue) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -30,4 +27,4 @@ TEST(Lowerer, SpecparamValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

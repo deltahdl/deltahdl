@@ -1,5 +1,3 @@
-// §20.16: Programmable logic array modeling system tasks
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -16,4 +14,4 @@ TEST(SysTask, AsyncAndArrayReturnsZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+}

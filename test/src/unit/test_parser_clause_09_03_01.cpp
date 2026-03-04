@@ -1,5 +1,3 @@
-// §9.3.1: Sequential blocks
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// attribute_instance prefix on block items
 TEST(ParserA28, AttrOnDataDeclInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -26,9 +23,6 @@ TEST(ParserA28, AttrOnLocalparamInBlock) {
               "endmodule\n"));
 }
 
-// §A.2.8 block_item_declaration alternative 1: data_declaration
-// data_declaration ::= [ const ] [ var ] [ lifetime ] data_type_or_implicit
-//                      list_of_variable_decl_assignments ;
 TEST(ParserA28, DataDeclBasicInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -97,13 +91,7 @@ TEST(ParserA602, Integration_InitialWithTimingAndAssign) {
   EXPECT_EQ(stmts[2]->kind, StmtKind::kDelay);
   EXPECT_EQ(stmts[3]->kind, StmtKind::kEventControl);
 }
-// =============================================================================
-// A.6.3 Parallel and sequential blocks
-// =============================================================================
-// ---------------------------------------------------------------------------
-// seq_block: begin...end
-// ---------------------------------------------------------------------------
-// §9.3.1: Basic sequential block
+
 TEST(ParserA603, SeqBlockBasic) {
   auto r = Parse(
       "module m;\n"
@@ -120,7 +108,6 @@ TEST(ParserA603, SeqBlockBasic) {
   EXPECT_EQ(body->stmts.size(), 2u);
 }
 
-// §9.3.1: Empty sequential block
 TEST(ParserA603, SeqBlockEmpty) {
   auto r = Parse(
       "module m;\n"
@@ -135,7 +122,6 @@ TEST(ParserA603, SeqBlockEmpty) {
   EXPECT_EQ(body->stmts.size(), 0u);
 }
 
-// §A.2.8: Sequential block with block_item_declaration (variable)
 TEST(ParserA603, SeqBlockWithVarDecl) {
   auto r = Parse(
       "module m;\n"
@@ -153,7 +139,6 @@ TEST(ParserA603, SeqBlockWithVarDecl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-// §9.3.1: Nested sequential blocks
 TEST(ParserA603, SeqBlockNested) {
   auto r = Parse(
       "module m;\n"
@@ -175,7 +160,6 @@ TEST(ParserA603, SeqBlockNested) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
 }
 
-// §A.2.8: Sequential block with parameter declaration
 TEST(ParserA603, SeqBlockWithParamDecl) {
   auto r = Parse(
       "module m;\n"
@@ -190,10 +174,7 @@ TEST(ParserA603, SeqBlockWithParamDecl) {
   ASSERT_NE(body, nullptr);
   EXPECT_GE(body->stmts.size(), 2u);
 }
-// =============================================================================
-// LRM section 9.3.1 -- Sequential blocks
-// Block-level variable declarations (block_item_declaration).
-// =============================================================================
+
 TEST(ParserSection9c, SequentialBlockWithLocalVarDecl) {
   auto r = Parse(
       "module m;\n"
@@ -230,9 +211,7 @@ TEST(ParserSection9c, SequentialBlockMultipleLocalVars) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
 }
-// =============================================================================
-// LRM section 9.3.1 -- Blocks with system function calls.
-// =============================================================================
+
 TEST(ParserSection9, Sec9_3_1_BlockWithSystemCalls) {
   auto r = Parse(
       "module m;\n"
@@ -353,9 +332,6 @@ TEST(ParserCh90301, BlockVarDecl_CommaSeparated) {
   VerifyBlockVarDecls(blk, expected_names, std::size(expected_names));
 }
 
-// =============================================================================
-// LRM section 9.3.1 -- Block with only variable declarations (no statements).
-// =============================================================================
 TEST(ParserSection9, Sec9_3_1_BlockWithOnlyVarDecls) {
   auto r = Parse(
       "module m;\n"
@@ -389,9 +365,6 @@ TEST(ParserSection9, SequentialBlockVarDecl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-// =============================================================================
-// LRM section 9.3.1 -- ParseOk smoke tests for complex block scenarios.
-// =============================================================================
 TEST(ParserSection9, Sec9_3_1_MultipleSequentialBlocksInSameInitial) {
   auto r = Parse(
       "module m;\n"
@@ -439,9 +412,7 @@ TEST(ParserSection9, SequentialBlockNestedBeginEnd) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlock);
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
 }
-// ---------------------------------------------------------------------------
-// 21. always_comb with local variable declaration
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_LocalVarDecl) {
   auto r = Parse(
       "module m;\n"
@@ -478,7 +449,6 @@ TEST(ParserSection9, SequentialBlockMultipleVarDecls) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
 }
 
-// §A.2.8 block_item_declaration alternative 3: parameter_declaration
 TEST(ParserA28, ParameterInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -494,7 +464,6 @@ TEST(ParserA28, ParameterInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "Y");
 }
 
-// Mixed block items: all 4 alternatives together
 TEST(ParserA28, MixedBlockItems) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -507,7 +476,6 @@ TEST(ParserA28, MixedBlockItems) {
               "endmodule\n"));
 }
 
-// Nested blocks with declarations
 TEST(ParserA28, NestedBlocksWithDecls) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -527,9 +495,6 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-// ---------------------------------------------------------------------------
-// 13. Variable declaration inside always_latch begin-end block.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_VarDeclInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -550,10 +515,7 @@ TEST(ParserSection9, Sec9_2_3_VarDeclInBlock) {
   ASSERT_GE(item->body->stmts.size(), 3u);
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
 }
-// =============================================================================
-// LRM section 9.3.1 -- Sequential blocks (begin...end)
-// Empty and minimal begin-end blocks.
-// =============================================================================
+
 TEST(ParserSection9, Sec9_3_1_EmptyBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -603,7 +565,6 @@ TEST(ParserSection9, Sec9_3_1_MultipleAssignmentsInBlock) {
   }
 }
 
-// §9.3.1: seq_block (begin-end)
 TEST(ParserA604, StmtItemSeqBlock) {
   auto r = Parse(
       "module m;\n"
@@ -620,7 +581,6 @@ TEST(ParserA604, StmtItemSeqBlock) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlock);
 }
 
-// data_declaration alternative: package_import_declaration
 TEST(ParserA28, ImportInBlock) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
@@ -633,9 +593,6 @@ TEST(ParserA28, ImportInBlock) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// LRM section 9.3.1 -- Variable declarations inside sequential blocks.
-// =============================================================================
 TEST(ParserSection9, Sec9_3_1_VarDeclAsFirstStatement) {
   auto r = Parse(
       "module m;\n"
@@ -693,9 +650,6 @@ TEST(ParserSection9, Sec9_3_1_VarDeclWithInitializer) {
   EXPECT_NE(body->stmts[0]->var_init, nullptr);
 }
 
-// =============================================================================
-// LRM section 9.3.1 -- Nested begin-end blocks.
-// =============================================================================
 TEST(ParserSection9, Sec9_3_1_NestedBeginEndTwoLevels) {
   auto r = Parse(
       "module m;\n"
@@ -765,7 +719,7 @@ TEST(ParserSection9, Sec9_3_1_NamedNestedBlocks) {
   ASSERT_EQ(body->stmts[0]->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->stmts[0]->label, "inner");
 }
-// §6.20.1 — block-level parameter declaration
+
 TEST(ParserSection6, BlockLevelParameter) {
   auto r = Parse(
       "module t;\n"
@@ -777,7 +731,6 @@ TEST(ParserSection6, BlockLevelParameter) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §6.20.1 — block-level localparam declaration
 TEST(ParserSection6, BlockLevelLocalparam) {
   auto r = Parse(
       "module t;\n"
@@ -789,4 +742,4 @@ TEST(ParserSection6, BlockLevelLocalparam) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

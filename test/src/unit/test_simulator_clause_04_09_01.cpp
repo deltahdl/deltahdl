@@ -1,4 +1,3 @@
-
 #include <vector>
 
 #include "common/types.h"
@@ -8,24 +7,10 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.9.1 Continuous assignment
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.9.1 Continuous assignment corresponds to a process.
-// A continuous assignment is modeled as a scheduler process (Event with
-// callback), not as a one-shot operation.
-// ---------------------------------------------------------------------------
 TEST(SimCh4091, ContinuousAssignmentCorrespondsToProcess) {
   VerifyCACorrespondsToProcess();
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.1 Sensitive to source elements in the expression.
-// The continuous assignment process is only triggered when a source element
-// in its RHS expression changes — not by unrelated signals.
-// ---------------------------------------------------------------------------
 TEST(SimCh4091, SensitiveToSourceElements) {
   Arena arena;
   Scheduler sched(arena);
@@ -35,13 +20,11 @@ TEST(SimCh4091, SensitiveToSourceElements) {
   int unrelated = 0;
   bool cont_assign_triggered = false;
 
-  // Model: assign dst = a + b;
-  // Changing 'a' triggers the process; changing 'unrelated' does not.
   auto* change_a = sched.GetEventPool().Acquire();
   change_a->kind = EventKind::kEvaluation;
   change_a->callback = [&]() {
     a = 3;
-    // Continuous assignment sensitive to a → triggers.
+
     cont_assign_triggered = true;
     auto* update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
@@ -50,7 +33,6 @@ TEST(SimCh4091, SensitiveToSourceElements) {
   };
   sched.ScheduleEvent({0}, Region::kActive, change_a);
 
-  // Changing an unrelated signal does NOT trigger the continuous assignment.
   auto* change_unrelated = sched.GetEventPool().Acquire();
   change_unrelated->kind = EventKind::kEvaluation;
   change_unrelated->callback = [&]() { unrelated = 99; };
@@ -62,20 +44,10 @@ TEST(SimCh4091, SensitiveToSourceElements) {
   EXPECT_EQ(unrelated, 99);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.1 Schedules an active update event.
-// The update event from a continuous assignment is scheduled in the Active
-// region (not Inactive, NBA, or any other region).
-// ---------------------------------------------------------------------------
 TEST(SimCh4091, SchedulesActiveUpdateEvent) {
   VerifyCASchedulesActiveUpdateEvent();
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.1 Uses current values to determine the target.
-// The target (LHS) of the continuous assignment is determined using values
-// at the time the update executes, not at the time it was scheduled.
-// ---------------------------------------------------------------------------
 TEST(SimCh4091, UsesCurrentValuesToDetermineTarget) {
   Arena arena;
   Scheduler sched(arena);
@@ -83,12 +55,10 @@ TEST(SimCh4091, UsesCurrentValuesToDetermineTarget) {
   int dst_a = 0;
   int dst_b = 0;
 
-  // Model: assign (select ? dst_b : dst_a) = 1;
-  // At time 0, schedule eval that reads current select to pick target.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
-    // Current value of select determines which target gets the update.
+
     auto* update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() {
@@ -107,17 +77,11 @@ TEST(SimCh4091, UsesCurrentValuesToDetermineTarget) {
   EXPECT_EQ(dst_b, 0);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.1 Evaluated at time zero for constant propagation.
-// Even when the RHS is a constant (never changes), the continuous assignment
-// process still executes at time 0 to propagate the constant to the LHS.
-// ---------------------------------------------------------------------------
 TEST(SimCh4091, EvaluatedAtTimeZeroForConstantPropagation) {
   Arena arena;
   Scheduler sched(arena);
   int dst = -1;
 
-  // Model: assign dst = 42; → constant RHS, evaluated at time 0.
   auto* const_assign = sched.GetEventPool().Acquire();
   const_assign->kind = EventKind::kEvaluation;
   const_assign->callback = [&]() {
@@ -133,18 +97,12 @@ TEST(SimCh4091, EvaluatedAtTimeZeroForConstantPropagation) {
   EXPECT_EQ(sched.CurrentTime().ticks, 0u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.1 Time-zero evaluation before procedural reads.
-// The time-zero evaluation ensures that signals driven by continuous
-// assignments have defined values before any procedural code reads them.
-// ---------------------------------------------------------------------------
 TEST(SimCh4091, TimeZeroEvalBeforeProceduralReads) {
   Arena arena;
   Scheduler sched(arena);
   int net_val = -1;
   int read_val = -1;
 
-  // Continuous assignment sets net_val at time 0 (Active update).
   auto* cont_assign = sched.GetEventPool().Acquire();
   cont_assign->kind = EventKind::kEvaluation;
   cont_assign->callback = [&]() {
@@ -155,7 +113,6 @@ TEST(SimCh4091, TimeZeroEvalBeforeProceduralReads) {
   };
   sched.ScheduleEvent({0}, Region::kActive, cont_assign);
 
-  // Procedural code in Inactive reads net_val after continuous assignment.
   auto* proc_read = sched.GetEventPool().Acquire();
   proc_read->kind = EventKind::kEvaluation;
   proc_read->callback = [&]() { read_val = net_val; };
@@ -166,20 +123,12 @@ TEST(SimCh4091, TimeZeroEvalBeforeProceduralReads) {
   EXPECT_EQ(read_val, 7);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.1 Implicit continuous assignment from input port (see §4.9.6).
-// Input ports behave like implicit continuous assignments from outside to
-// local — they follow the same scheduling rules as explicit assigns.
-// ---------------------------------------------------------------------------
 TEST(SimCh4091, ImplicitContinuousAssignmentFromInputPort) {
   Arena arena;
   Scheduler sched(arena);
   int outside_sig = 0;
   int local_input = 0;
 
-  // Model: module m(input wire in); → implicit: assign local_input =
-  // outside_sig; Port connection is an implicit continuous assignment that
-  // schedules an active update event, same as explicit assign.
   auto* drive = sched.GetEventPool().Acquire();
   drive->kind = EventKind::kEvaluation;
   drive->callback = [&]() {
@@ -195,20 +144,12 @@ TEST(SimCh4091, ImplicitContinuousAssignmentFromInputPort) {
   EXPECT_EQ(local_input, 5);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.1 Implicit continuous assignment from output port (see §4.9.6).
-// Output ports also behave as implicit continuous assignments from a local
-// expression to an outside net.
-// ---------------------------------------------------------------------------
 TEST(SimCh4091, ImplicitContinuousAssignmentFromOutputPort) {
   Arena arena;
   Scheduler sched(arena);
   int local_output = 0;
   int outside_net = 0;
 
-  // Model: module m(output wire out); → implicit: assign outside_net =
-  // local_output; The output port connection is also an implicit continuous
-  // assignment, scheduled as an active update event.
   auto* drive = sched.GetEventPool().Acquire();
   drive->kind = EventKind::kEvaluation;
   drive->callback = [&]() {
@@ -224,11 +165,6 @@ TEST(SimCh4091, ImplicitContinuousAssignmentFromOutputPort) {
   EXPECT_EQ(outside_net, 33);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.1 Multiple continuous assignments to the same net.
-// Multiple continuous assignments to the same net each independently
-// schedule active update events when their respective sources change.
-// ---------------------------------------------------------------------------
 TEST(SimCh4091, MultipleContinuousAssignmentsToSameNet) {
   Arena arena;
   Scheduler sched(arena);
@@ -236,8 +172,6 @@ TEST(SimCh4091, MultipleContinuousAssignmentsToSameNet) {
   int driver_b = 0;
   int net = 0;
 
-  // Model: assign net = driver_a; assign net = driver_b;
-  // Both drivers schedule active update events independently.
   auto* eval_a = sched.GetEventPool().Acquire();
   eval_a->kind = EventKind::kEvaluation;
   eval_a->callback = [&]() {
@@ -261,16 +195,10 @@ TEST(SimCh4091, MultipleContinuousAssignmentsToSameNet) {
   sched.ScheduleEvent({0}, Region::kActive, eval_b);
 
   sched.Run();
-  // Both updates execute; final value depends on execution order within
-  // Active region (nondeterministic per §4.7), but both must execute.
+
   EXPECT_TRUE(net == 1 || net == 2);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.1 No update when expression value is unchanged.
-// If the RHS expression does not change value, no update event is scheduled.
-// This models the sensitivity behavior of continuous assignments.
-// ---------------------------------------------------------------------------
 TEST(SimCh4091, NoUpdateWhenExpressionUnchanged) {
   Arena arena;
   Scheduler sched(arena);
@@ -278,7 +206,6 @@ TEST(SimCh4091, NoUpdateWhenExpressionUnchanged) {
   int dst = 0;
   int update_count = 0;
 
-  // Time 0: initial evaluation, src=5 → update dst.
   auto* eval0 = sched.GetEventPool().Acquire();
   eval0->kind = EventKind::kEvaluation;
   eval0->callback = [&]() {
@@ -293,12 +220,10 @@ TEST(SimCh4091, NoUpdateWhenExpressionUnchanged) {
   };
   sched.ScheduleEvent({0}, Region::kActive, eval0);
 
-  // Time 1: src is written but value doesn't change (still 5).
-  // A well-modeled continuous assignment would not schedule an update.
   auto* eval1 = sched.GetEventPool().Acquire();
   eval1->kind = EventKind::kEvaluation;
   eval1->callback = [&]() {
-    int new_val = src;  // still 5, no change
+    int new_val = src;
     if (new_val != dst) {
       auto* update = sched.GetEventPool().Acquire();
       update->kind = EventKind::kUpdate;
@@ -315,24 +240,7 @@ TEST(SimCh4091, NoUpdateWhenExpressionUnchanged) {
   EXPECT_EQ(dst, 5);
   EXPECT_EQ(update_count, 1);
 }
-// ===========================================================================
-// §4.2 Execution of a hardware model and its verification environment
-//
-// LRM §4.2 establishes the fundamental execution model:
-//   - SystemVerilog is a parallel programming language.
-//   - Certain constructs execute as parallel blocks or processes.
-//   - Understanding guaranteed vs. indeterminate execution order is key.
-//   - Semantics are defined for simulation.
-//
-// These tests verify the simulation-level behaviour of the concepts
-// introduced in §4.2, covering parallel process execution, sequential
-// ordering within processes, and interaction between concurrent elements.
-// ===========================================================================
 
-// ---------------------------------------------------------------------------
-// 13. §4.2 Continuous assignment as a process: assign creates an implicit
-//     process that responds to source element changes.
-// ---------------------------------------------------------------------------
 TEST(SimCh4, ContinuousAssignAsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(

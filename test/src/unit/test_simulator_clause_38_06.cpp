@@ -23,8 +23,6 @@ class VpiClause3806Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.6: vpi_get
-
 TEST_F(VpiClause3806Test, GetTypeForModule) {
   auto* mod = vpi_ctx_.CreateModule("m", "m");
   EXPECT_EQ(vpi_get(vpiType, mod), vpiModule);
@@ -66,5 +64,5 @@ TEST_F(VpiClause3806Test, GetReturnsZeroForNullHandle) {
   EXPECT_EQ(vpi_get(vpiType, nullptr), 0);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

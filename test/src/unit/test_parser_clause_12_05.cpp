@@ -1,5 +1,3 @@
-// §12.5: Case statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -24,7 +22,7 @@ TEST(ParserSection9, Sec9_3_1_BlockWithCaseStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_GE(stmt->case_items.size(), 3u);
 }
-// --- 13. Nonblocking in case statement (decoder pattern) ---
+
 TEST(ParserSection10, Sec10_4_2_CaseDecoderPattern) {
   auto r = Parse(
       "module m;\n"
@@ -50,10 +48,7 @@ TEST(ParserSection10, Sec10_4_2_CaseDecoderPattern) {
   EXPECT_EQ(stmt->case_items[2].body->kind, StmtKind::kNonblockingAssign);
   EXPECT_EQ(stmt->case_items[3].body->kind, StmtKind::kNonblockingAssign);
 }
-// =============================================================================
-// LRM section 12.5 -- Case statement (additional cases)
-// =============================================================================
-// Case with multiple expressions in a single item (comma-separated).
+
 TEST(ParserSection12, CaseMultipleExprsPerItem) {
   auto r = Parse(
       "module t;\n"
@@ -70,11 +65,10 @@ TEST(ParserSection12, CaseMultipleExprsPerItem) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   ASSERT_GE(stmt->case_items.size(), 3u);
-  // First item has two patterns (0, 1).
+
   EXPECT_EQ(stmt->case_items[0].patterns.size(), 2u);
 }
 
-// Case with only default item.
 TEST(ParserSection12, CaseWithOnlyDefault) {
   auto r = Parse(
       "module t;\n"
@@ -92,7 +86,6 @@ TEST(ParserSection12, CaseWithOnlyDefault) {
   EXPECT_TRUE(stmt->case_items[0].is_default);
 }
 
-// §12.5: case statement items count and default detection
 TEST(ParserA607, CaseStmtItems) {
   auto r = Parse(
       "module m;\n"
@@ -108,7 +101,6 @@ TEST(ParserA607, CaseStmtItems) {
   EXPECT_TRUE(stmt->case_items[1].is_default);
 }
 
-// §12.5: multiple case_item_expressions per case item (comma-separated)
 TEST(ParserA607, CaseMultipleItemExprs) {
   auto r = Parse(
       "module m;\n"
@@ -130,7 +122,6 @@ TEST(ParserA607, CaseMultipleItemExprs) {
   EXPECT_TRUE(stmt->case_items[2].is_default);
 }
 
-// §12.5: default without colon
 TEST(ParserA607, CaseDefaultNoColon) {
   auto r = Parse(
       "module m;\n"
@@ -146,7 +137,6 @@ TEST(ParserA607, CaseDefaultNoColon) {
   EXPECT_TRUE(stmt->case_items[1].is_default);
 }
 
-// §12.5: case with no default
 TEST(ParserA607, CaseNoDefault) {
   auto r = Parse(
       "module m;\n"
@@ -163,7 +153,6 @@ TEST(ParserA607, CaseNoDefault) {
   EXPECT_FALSE(stmt->case_items[1].is_default);
 }
 
-// §12.5: case with block statement in item body
 TEST(ParserA607, CaseItemWithBlock) {
   auto r = Parse(
       "module m;\n"
@@ -197,7 +186,6 @@ TEST(ParserSection12, PlainCaseHasNoQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
 }
 
-// Case inside a for loop.
 TEST(ParserSection12, CaseInsideForLoop) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -229,7 +217,6 @@ TEST(ParserSection12, PlainCaseIsNotInside) {
   EXPECT_FALSE(stmt->case_inside);
 }
 
-// §12.5: case_statement
 TEST(ParserA604, StmtItemCaseStatement) {
   auto r = Parse(
       "module m;\n"
@@ -247,7 +234,6 @@ TEST(ParserA604, StmtItemCaseStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
 
-// §12.5: nested case statements
 TEST(ParserA607, NestedCaseStmt) {
   auto r = Parse(
       "module m;\n"
@@ -269,15 +255,6 @@ TEST(ParserA607, NestedCaseStmt) {
   EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kCase);
 }
 
-// =============================================================================
-// A.6.7 Case statements
-// =============================================================================
-// ---------------------------------------------------------------------------
-// case_statement ::=
-//   [ unique_priority ] case_keyword ( case_expression )
-//     case_item { case_item } endcase
-// ---------------------------------------------------------------------------
-// §12.5: basic case statement with single items
 TEST(ParserA607, CaseStmtParse) {
   auto r = Parse(
       "module m;\n"
@@ -293,7 +270,6 @@ TEST(ParserA607, CaseStmtParse) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
 }
 
-// §12.5: case with null statement body (;)
 TEST(ParserA607, CaseItemNullBody) {
   auto r = Parse(
       "module m;\n"
@@ -312,7 +288,6 @@ TEST(ParserA607, CaseItemNullBody) {
   ASSERT_EQ(stmt->case_items.size(), 3u);
 }
 
-// §12.5: case with expression as case_expression (not just identifier)
 TEST(ParserA607, CaseComplexExpr) {
   auto r = Parse(
       "module m;\n"
@@ -330,9 +305,7 @@ TEST(ParserA607, CaseComplexExpr) {
   EXPECT_NE(stmt->condition, nullptr);
   EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
 }
-// ---------------------------------------------------------------------------
-// 4. always_comb with case statement
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_CaseStatement) {
   auto r = Parse(
       "module m;\n"
@@ -357,4 +330,4 @@ TEST(ParserSection9, Sec9_2_2_CaseStatement) {
   EXPECT_TRUE(stmt->case_items[3].is_default);
 }
 
-}  // namespace
+}

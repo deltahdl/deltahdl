@@ -1,5 +1,3 @@
-// §31.3: Timing checks using a stability window
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -30,4 +28,4 @@ TEST(ParserSection28, Sec28_12_MultipleTimingChecksInSpecifyBlock) {
             TimingCheckKind::kRecovery);
 }
 
-}  // namespace
+}

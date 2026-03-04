@@ -1,5 +1,3 @@
-// Annex H.10.1.1: Scalars of type bit and logic
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -18,4 +16,4 @@ TEST(DpiRuntime, ArgValueBit) {
   EXPECT_EQ(v.AsBit(), 1);
 }
 
-}  // namespace
+}

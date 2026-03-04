@@ -1,5 +1,3 @@
-// Annex A.2.12: Let declarations
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -163,4 +161,4 @@ TEST(ParserA212, LetFormalType_MixedUntypedAndTyped) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

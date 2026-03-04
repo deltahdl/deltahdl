@@ -1,5 +1,3 @@
-// §20.7: Array query functions
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -118,4 +116,4 @@ TEST(SysTask, UnpackedDimensionsOfQueue) {
   EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 1u);
 }
 
-}  // namespace
+}

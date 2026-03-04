@@ -1,5 +1,3 @@
-// §10.3.2: The continuous assignment statement
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -33,9 +31,6 @@ TEST(Elaboration, VarSingleContAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// =============================================================================
-// §10.3 Continuous assignments — elaboration
-// =============================================================================
 TEST(ElabClause1003, MultipleContAssigns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,4 +44,4 @@ TEST(ElabClause1003, MultipleContAssigns) {
   ASSERT_GE(mod->assigns.size(), 2u);
 }
 
-}  // namespace
+}

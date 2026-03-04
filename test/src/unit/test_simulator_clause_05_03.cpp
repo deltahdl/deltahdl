@@ -1,4 +1,3 @@
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "preprocessor/preprocessor.h"
@@ -7,13 +6,8 @@
 
 using namespace delta;
 
-// §5.3 White space
-
-// ---------------------------------------------------------------------------
-// 1. Whitespace variations do not affect simulation results
-// ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceSameResultWithSpaces) {
-  // Normal spacing — compute a + b.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -28,7 +22,7 @@ TEST(SimCh503, WhitespaceSameResultWithSpaces) {
 }
 
 TEST(SimCh503, WhitespaceSameResultWithTabs) {
-  // Tab-delimited tokens — identical computation must yield same result.
+
   auto result = RunAndGet(
       "module\tt\t;\n"
       "\tlogic\t[7:0]\ta\t,\tb\t,\tresult\t;\n"
@@ -43,7 +37,7 @@ TEST(SimCh503, WhitespaceSameResultWithTabs) {
 }
 
 TEST(SimCh503, WhitespaceSameResultWithNewlines) {
-  // Every token on its own line.
+
   auto result = RunAndGet(
       "module\n"
       "t\n"
@@ -63,14 +57,14 @@ TEST(SimCh503, WhitespaceSameResultWithNewlines) {
 }
 
 TEST(SimCh503, WhitespaceSameResultMinimal) {
-  // Minimal whitespace — only where needed to separate keywords/identifiers.
+
   auto result = RunAndGet(
       "module t;logic [7:0] result;initial result=8'd55;endmodule", "result");
   EXPECT_EQ(result, 55u);
 }
 
 TEST(SimCh503, WhitespaceSameResultExcessive) {
-  // Excessive whitespace everywhere.
+
   auto result = RunAndGet(
       "  \t\n  module   \t  t  \n  ;  \n"
       "  logic   [  7  :  0  ]   result  ;  \n"
@@ -80,11 +74,8 @@ TEST(SimCh503, WhitespaceSameResultExcessive) {
   EXPECT_EQ(result, 77u);
 }
 
-// ---------------------------------------------------------------------------
-// 2. Formfeed in source does not affect simulation
-// ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceFormfeedInSource) {
-  // Formfeed characters between tokens — must parse and simulate identically.
+
   auto result = RunAndGet(
       "module t;\f"
       "logic [7:0] result;\f"
@@ -94,11 +85,8 @@ TEST(SimCh503, WhitespaceFormfeedInSource) {
   EXPECT_EQ(result, 99u);
 }
 
-// ---------------------------------------------------------------------------
-// 3. Mixed whitespace in expressions does not affect evaluation
-// ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceMixedInExpression) {
-  // Various whitespace around operators in an expression.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, c, result;\n"
@@ -113,11 +101,8 @@ TEST(SimCh503, WhitespaceMixedInExpression) {
   EXPECT_EQ(result, 12u);
 }
 
-// ---------------------------------------------------------------------------
-// 4. Whitespace around assignment operator
-// ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceAroundAssignment) {
-  // No whitespace around '=' — still valid.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -127,12 +112,8 @@ TEST(SimCh503, WhitespaceAroundAssignment) {
   EXPECT_EQ(result, 33u);
 }
 
-// ---------------------------------------------------------------------------
-// 5. String literal preserves blanks and tabs (§5.3 + §5.9)
-// ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceStringLiteralPreserved) {
-  // §5.3: blanks and tabs are significant in string literals.
-  // Assign a string with spaces to a wide variable and verify encoding.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -146,17 +127,15 @@ TEST(SimCh503, WhitespaceStringLiteralPreserved) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
-  // "a b" is 3 bytes: 'a'=0x61, ' '=0x20, 'b'=0x62
-  // Stored MSB first: 0x61_20_62 = 6365282
+
   uint64_t val = var->value.ToUint64();
-  EXPECT_EQ(val & 0xFF, 0x62u);          // 'b'
-  EXPECT_EQ((val >> 8) & 0xFF, 0x20u);   // ' '
-  EXPECT_EQ((val >> 16) & 0xFF, 0x61u);  // 'a'
+  EXPECT_EQ(val & 0xFF, 0x62u);
+  EXPECT_EQ((val >> 8) & 0xFF, 0x20u);
+  EXPECT_EQ((val >> 16) & 0xFF, 0x61u);
 }
 
 TEST(SimCh503, WhitespaceStringLiteralTabPreserved) {
-  // §5.3: tabs are significant in string literals.
-  // Use a literal tab character inside the SV string literal.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -170,18 +149,15 @@ TEST(SimCh503, WhitespaceStringLiteralTabPreserved) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
-  // "a<TAB>b" is 3 bytes: 'a'=0x61, '\t'=0x09, 'b'=0x62
+
   uint64_t val = var->value.ToUint64();
-  EXPECT_EQ(val & 0xFF, 0x62u);          // 'b'
-  EXPECT_EQ((val >> 8) & 0xFF, 0x09u);   // '\t'
-  EXPECT_EQ((val >> 16) & 0xFF, 0x61u);  // 'a'
+  EXPECT_EQ(val & 0xFF, 0x62u);
+  EXPECT_EQ((val >> 8) & 0xFF, 0x09u);
+  EXPECT_EQ((val >> 16) & 0xFF, 0x61u);
 }
 
-// ---------------------------------------------------------------------------
-// 6. Whitespace as token separator — keyword separation
-// ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceSeparatesKeywords) {
-  // Without space, "moduleendmodule" would not parse. Whitespace separates.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -191,11 +167,8 @@ TEST(SimCh503, WhitespaceSeparatesKeywords) {
   EXPECT_EQ(result, 1u);
 }
 
-// ---------------------------------------------------------------------------
-// 7. always_comb with various whitespace patterns
-// ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceAlwaysCombWithFormfeed) {
-  // Formfeed inside always_comb body.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, result;\n"
@@ -208,11 +181,8 @@ TEST(SimCh503, WhitespaceAlwaysCombWithFormfeed) {
   EXPECT_EQ(result, 10u);
 }
 
-// ---------------------------------------------------------------------------
-// 8. Whitespace in concatenation expression
-// ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceInConcatenation) {
-  // Various whitespace around concatenation braces.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -227,9 +197,6 @@ TEST(SimCh503, WhitespaceInConcatenation) {
   EXPECT_EQ(result, 0xA5u);
 }
 
-// ---------------------------------------------------------------------------
-// 9. Whitespace around conditional operator
-// ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceAroundTernary) {
   auto result = RunAndGet(
       "module t;\n"
@@ -240,9 +207,6 @@ TEST(SimCh503, WhitespaceAroundTernary) {
   EXPECT_EQ(result, 100u);
 }
 
-// ---------------------------------------------------------------------------
-// 10. Multiple statements with only whitespace between
-// ---------------------------------------------------------------------------
 TEST(SimCh503, WhitespaceMultipleStatements) {
   SimFixture f;
   auto* design = ElaborateSrc(

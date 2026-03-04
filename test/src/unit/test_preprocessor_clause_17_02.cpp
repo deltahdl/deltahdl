@@ -1,5 +1,3 @@
-// §17.2: Checker declaration
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,11 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM §3.6 — Checkers
-// =============================================================================
-// §3.6: Checker encapsulates assertions (assert property, cover property,
-//        property/sequence declarations) — the primary purpose of checkers.
 TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
   auto r = ParseWithPreprocessor(
       "checker req_ack_chk(logic clk, req, ack);\n"
@@ -34,8 +27,6 @@ TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kCoverProperty));
 }
 
-// §3.6: Checker also encapsulates "modeling code" — variables, initial blocks,
-//        always blocks used alongside assertions for auxiliary verification.
 TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
   auto r = ParseWithPreprocessor(
       "checker model_chk;\n"
@@ -50,7 +41,7 @@ TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
   EXPECT_TRUE(
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kAlwaysBlock));
-  EXPECT_GE(r.cu->checkers[0]->items.size(), 3u);  // var + initial + always
+  EXPECT_GE(r.cu->checkers[0]->items.size(), 3u);
 }
 
-}  // namespace
+}

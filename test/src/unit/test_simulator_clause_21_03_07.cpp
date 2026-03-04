@@ -1,5 +1,3 @@
-// §21.3.7: I/O error status
-
 #include <cstdio>
 #include <fstream>
 
@@ -39,4 +37,4 @@ TEST(SysTask, FerrorReturns0OnGoodFd) {
   std::remove(tmp.c_str());
 }
 
-}  // namespace
+}

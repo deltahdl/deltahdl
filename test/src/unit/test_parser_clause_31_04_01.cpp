@@ -1,5 +1,3 @@
-// §31.4.1: $skew
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// system_timing_check ::= $skew_timing_check
 TEST(ParserA705, SystemTimingCheckSkew) {
   auto r = Parse(
       "module m;\n"
@@ -22,9 +19,6 @@ TEST(ParserA705, SystemTimingCheckSkew) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kSkew);
 }
 
-// =============================================================================
-// A.7.5.1 $skew_timing_check
-// =============================================================================
 TEST(ParserA70501, SkewTimingCheck) {
   auto r = Parse(
       "module m;\n"
@@ -61,4 +55,4 @@ TEST(ParserSection28, Sec28_12_TimingCheckSkew) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk2");
 }
 
-}  // namespace
+}

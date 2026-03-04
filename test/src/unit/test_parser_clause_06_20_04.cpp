@@ -1,12 +1,9 @@
-// §6.20.4: Local parameters (localparam)
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// 27. Parameter and localparam in module scope
 TEST(ParserClause03, Cl3_13_ParameterAndLocalparamInModule) {
   auto r = Parse(
       "module m;\n"
@@ -27,7 +24,7 @@ TEST(ParserClause03, Cl3_13_ParameterAndLocalparamInModule) {
   EXPECT_TRUE(found_param);
   EXPECT_TRUE(found_localparam);
 }
-// §8.5 — Localparam inside class body
+
 TEST(ParserSection8, ClassWithLocalparam) {
   auto r = Parse(
       "class my_cls;\n"
@@ -47,7 +44,6 @@ TEST(ParserA24, LocalparamAssignment) {
   EXPECT_EQ(item->name, "LP");
 }
 
-// §A.2.8 block_item_declaration alternative 2: local_parameter_declaration
 TEST(ParserA28, LocalparamInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -66,22 +62,19 @@ TEST(ParserA28, LocalparamInBlock) {
 }
 
 TEST(ParserSection6, LocalparamConstant) {
-  // §6.20: localparam cannot be overridden.
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  localparam int DEPTH = 16;\n"
               "endmodule\n"));
 }
 
-// =========================================================================
-// §6.20.3: Local parameters (localparam) and type parameters
-// =========================================================================
 TEST(ParserSection6, LocalparamInHeaderPort) {
-  // §6.20.3: localparam in module parameter port list.
+
   EXPECT_TRUE(
       ParseOk("module m #(parameter int W = 8, localparam int W2 = W * 2)\n"
               "  (input logic [W-1:0] d);\n"
               "endmodule\n"));
 }
 
-}  // namespace
+}

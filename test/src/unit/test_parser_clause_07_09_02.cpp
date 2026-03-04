@@ -1,5 +1,3 @@
-// §7.9.2: Delete()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -18,4 +16,4 @@ TEST(ParserSection7, AssocArrayDeleteMethod) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-}  // namespace
+}

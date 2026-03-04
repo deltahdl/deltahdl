@@ -1,12 +1,9 @@
-// §8.4: Objects (class instance)
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// § primary — null elaborates
 TEST(ElabA84, PrimaryNullElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,4 +18,4 @@ TEST(ElabA84, PrimaryNullElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

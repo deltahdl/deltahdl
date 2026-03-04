@@ -1,5 +1,3 @@
-// §7.12: Array manipulation methods
-
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
@@ -7,9 +5,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Helper fixture
-// =============================================================================
 static void MakeDynArray(SimFixture& f, std::string_view name,
                          const std::vector<uint64_t>& vals) {
   auto* q = f.ctx.CreateQueue(name, 32);
@@ -61,4 +56,4 @@ TEST(DynArrayMethod, MaxReduction) {
   EXPECT_EQ(out.ToUint64(), 50u);
 }
 
-}  // namespace
+}

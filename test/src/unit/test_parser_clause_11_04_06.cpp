@@ -1,5 +1,3 @@
-// §11.4.6: Wildcard equality operators
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// § binary_operator ::= ==?
 TEST(ParserA86, BinaryWildcardEq) {
   auto r = Parse("module m; initial x = (a ==? b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -18,7 +15,6 @@ TEST(ParserA86, BinaryWildcardEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqQuestion);
 }
 
-// § binary_operator ::= !=?
 TEST(ParserA86, BinaryWildcardNeq) {
   auto r = Parse("module m; initial x = (a !=? b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -28,9 +24,7 @@ TEST(ParserA86, BinaryWildcardNeq) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
 }
-// =========================================================================
-// Section 11.4.6 -- Wildcard equality operators
-// =========================================================================
+
 TEST(ParserSection11, WildcardEq) {
   auto r = Parse(
       "module t;\n"
@@ -63,11 +57,8 @@ TEST(ParserSection11, WildcardEqInIfCondition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
 TEST(ParserCh501, Sec5_1_ThreeCharOperatorWildcardInequality) {
-  // Verify !=? parses to the correct token kind.
+
   auto r = Parse(
       "module m;\n"
       "  initial x = (a !=? b);\n"
@@ -82,8 +73,8 @@ TEST(ParserCh501, Sec5_1_ThreeCharOperatorWildcardInequality) {
 }
 
 TEST(ParserCh505, Operator_WildcardEquality) {
-  // ==? is the wildcard equality operator.
+
   EXPECT_TRUE(ParseOk("module m; initial x = (a ==? b); endmodule"));
 }
 
-}  // namespace
+}

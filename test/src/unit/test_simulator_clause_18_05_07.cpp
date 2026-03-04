@@ -1,5 +1,3 @@
-// §18.5.7: Iterative constraints
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.5.7: Iterative constraints (foreach)
-// =============================================================================
 TEST(Constraint, ForeachConstraint) {
   ConstraintSolver solver(42);
   for (int i = 0; i < 3; ++i) {
@@ -51,4 +46,4 @@ TEST(Constraint, ForeachConstraint) {
   }
 }
 
-}  // namespace
+}

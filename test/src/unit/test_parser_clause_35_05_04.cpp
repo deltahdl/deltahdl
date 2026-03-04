@@ -1,5 +1,3 @@
-// §35.5.4: Import declarations
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_config.h"
@@ -12,15 +10,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// dpi_import_export ::=
-//   import dpi_spec_string [dpi_function_import_property] [c_identifier =]
-//     dpi_function_proto ;
-//   | import dpi_spec_string [dpi_task_import_property] [c_identifier =]
-//     dpi_task_proto ;
-//   | export dpi_spec_string [c_identifier =] function function_identifier ;
-//   | export dpi_spec_string [c_identifier =] task task_identifier ;
-// ---------------------------------------------------------------------------
 TEST(ParserA26, DpiImportFunction) {
   auto r = Parse(
       "module m;\n"
@@ -49,8 +38,6 @@ TEST(ParserA26, DpiImportTask) {
   EXPECT_EQ(item->name, "c_do_work");
 }
 
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
 TEST(ParserA26, DpiSpecStringDpiC) {
   auto r = Parse(
       "module m;\n"
@@ -71,9 +58,6 @@ TEST(ParserA26, DpiSpecStringDpi) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kDpiImport);
 }
 
-// ---------------------------------------------------------------------------
-// dpi_function_import_property ::= context | pure
-// ---------------------------------------------------------------------------
 TEST(ParserA26, DpiFunctionImportPure) {
   auto r = Parse(
       "module m;\n"
@@ -99,9 +83,6 @@ TEST(ParserA26, DpiFunctionImportContext) {
   EXPECT_FALSE(item->dpi_is_pure);
 }
 
-// ---------------------------------------------------------------------------
-// dpi_task_import_property ::= context
-// ---------------------------------------------------------------------------
 TEST(ParserA26, DpiTaskImportContext) {
   auto r = Parse(
       "module m;\n"
@@ -114,9 +95,6 @@ TEST(ParserA26, DpiTaskImportContext) {
   EXPECT_TRUE(item->dpi_is_task);
 }
 
-// ---------------------------------------------------------------------------
-// dpi_import_export: c_identifier = alias
-// ---------------------------------------------------------------------------
 TEST(ParserA26, DpiImportWithCIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -156,9 +134,6 @@ TEST(ParserA26, DpiImportPureWithCIdentifier) {
   EXPECT_EQ(item->name, "fn");
 }
 
-// ---------------------------------------------------------------------------
-// dpi_function_proto / dpi_task_proto — complex argument types
-// ---------------------------------------------------------------------------
 TEST(ParserA26, DpiFuncProtoNoArgs) {
   auto r = Parse(
       "module m;\n"
@@ -197,9 +172,6 @@ TEST(ParserA26, DpiTaskProtoWithArgs) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-// =============================================================================
-// Annex H/I - DPI C layer / svdpi.h
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiImportFunction) {
   auto* unit = Parse(
       "module m;\n"
@@ -245,9 +217,6 @@ TEST_F(DpiParseTest, DpiImportCoexistsWithPackageImport) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kDpiExport);
 }
 
-// =============================================================================
-// Annex H - DPI import task
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiImportTask) {
   auto* unit = Parse(
       "module m;\n"
@@ -263,9 +232,6 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportTask) {
   EXPECT_EQ(items[0]->func_args[0].name, "cycles");
 }
 
-// =============================================================================
-// Annex H - DPI context import task with C name
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiContextTaskWithCName) {
   auto* unit = Parse(
       "module m;\n"
@@ -281,11 +247,8 @@ TEST_F(AnnexHParseTest, AnnexHDpiContextTaskWithCName) {
   EXPECT_TRUE(items[0]->dpi_is_task);
 }
 
-// =============================================================================
-// Annex H - DPI import no-arg function
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiImportNoArgs) {
-  // A DPI import with no argument list at all (valid per LRM).
+
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function int get_seed;\n"
@@ -298,9 +261,6 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportNoArgs) {
   EXPECT_TRUE(items[0]->func_args.empty());
 }
 
-// =============================================================================
-// Annex J - Foreign language code inclusion
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexJDpiImportCoexistence) {
   auto* unit = Parse(
       "module m;\n"
@@ -316,9 +276,8 @@ TEST_F(AnnexHParseTest, AnnexJDpiImportCoexistence) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
 }
 
-// LRM section 38.36 -- vpi_register_cb callback function signatures
 TEST(ParserSection38, DpiImportVoidCallbackFunction) {
-  // Import a void function modeling a VPI callback routine
+
   auto r = Parse(R"(
     module m;
       import "DPI-C" function void my_callback();
@@ -334,7 +293,7 @@ TEST(ParserSection38, DpiImportVoidCallbackFunction) {
 }
 
 TEST(ParserSection38, DpiImportWithCNameForCallback) {
-  // C-name mapping for VPI registration function linkage
+
   auto r = Parse(R"(
     module m;
       import "DPI-C" vpi_cb_rtn =
@@ -350,7 +309,7 @@ TEST(ParserSection38, DpiImportWithCNameForCallback) {
 }
 
 TEST(ParserSection38, DpiImportPureFunctionForSizetf) {
-  // Pure function import modeling the sizetf callback (no side effects)
+
   auto r = Parse(R"(
     module m;
       import "DPI-C" pure function int my_sizetf(input string data);
@@ -363,9 +322,7 @@ TEST(ParserSection38, DpiImportPureFunctionForSizetf) {
   EXPECT_TRUE(items[0]->dpi_is_pure);
   EXPECT_FALSE(items[0]->dpi_is_context);
 }
-// =============================================================================
-// §35.3 DPI-C import declarations
-// =============================================================================
+
 TEST_F(DpiParseTest, ImportFunction) {
   auto* unit = Parse(R"(
     module m;
@@ -422,8 +379,7 @@ static bool ParseOk38(const std::string& src) {
 }
 
 TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
-  // Multiple import/export declarations modeling a complete VPI registration
-  // set
+
   EXPECT_TRUE(ParseOk38(R"(
     module m;
       import "DPI-C" context function int calltf(input string data);
@@ -435,9 +391,6 @@ TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
   )"));
 }
 
-// =============================================================================
-// Annex H - DPI import with default argument values
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiImportDefaultArgs) {
   auto* unit = Parse(
       "module m;\n"
@@ -481,7 +434,6 @@ TEST_F(AnnexHParseTest, AnnexOMultipleDpiDecls) {
   EXPECT_TRUE(items[3]->dpi_is_task);
 }
 
-// package_or_generate_item_declaration: dpi_import_export
 TEST(SourceText, PackageItemDpiImportExport) {
   auto r = Parse(
       "package pkg;\n"
@@ -513,4 +465,4 @@ TEST(ParserSection13, DpiImportWithCName) {
   EXPECT_EQ(dpi->name, "sv_wrapper");
 }
 
-}  // namespace
+}

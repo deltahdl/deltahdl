@@ -1,5 +1,3 @@
-// §18.12: Randomization of scope variables—std::randomize()
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.11: std::randomize() standalone function
-// =============================================================================
 TEST(Constraint, StdRandomizeStandalone) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -38,4 +33,4 @@ TEST(Constraint, StdRandomizeStandalone) {
   EXPECT_LE(val, 200);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.2.1: Initial procedures
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -7,10 +5,6 @@
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.6.2 Production: initial_construct
-// initial_construct ::= initial statement_or_null
-// =============================================================================
 TEST(ParserA602, InitialConstruct_SingleStmt) {
   auto r = Parse(
       "module m;\n"
@@ -48,10 +42,6 @@ TEST(ParserSection9b, StructuredProcMultipleInitial) {
   EXPECT_EQ(count, 3);
 }
 
-// =============================================================================
-// LRM section 9.2 -- Structured procedures (ParseOk smoke tests)
-// Various procedure forms that should parse without errors.
-// =============================================================================
 TEST(ParserSection9c, InitialWithTaskCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -64,9 +54,6 @@ TEST(ParserSection9c, InitialWithTaskCall) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// LRM section 9.2.1 -- Initial and final blocks
-// =============================================================================
 TEST(ParserSection9, InitialBlock) {
   auto r = Parse(
       "module m;\n"
@@ -84,4 +71,4 @@ TEST(ParserSection9, InitialBlock) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §10.3.3: Continuous assignment delays
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -52,4 +50,4 @@ TEST(ElabClause1003, ContAssignDelayThreeValues) {
   EXPECT_NE(mod->assigns[0].delay_decay, nullptr);
 }
 
-}  // namespace
+}

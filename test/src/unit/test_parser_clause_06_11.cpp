@@ -1,5 +1,3 @@
-// §6.11: Integer data types
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection6, IntegerTypeTimeDecl) {
-  // 'time' is 4-state, 64-bit unsigned (LRM 6.11)
+
   auto r = Parse(
       "module m;\n"
       "  time t;\n"
@@ -19,7 +17,7 @@ TEST(ParserSection6, IntegerTypeTimeDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTime);
   EXPECT_EQ(item->name, "t");
 }
-// 16. Integer types as function return types.
+
 TEST(ParserSection6, Sec6_11_ByteFunctionReturnType) {
   auto r = Parse(
       "module t;\n"
@@ -35,7 +33,6 @@ TEST(ParserSection6, Sec6_11_ByteFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kByte);
 }
 
-// 17. Integer types in task ports.
 TEST(ParserSection6, Sec6_11_IntegerTypesInTaskPorts) {
   auto r = Parse(
       "module t;\n"
@@ -54,10 +51,6 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInTaskPorts) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-// =============================================================================
-// LRM section 6.11 -- Additional coverage for integer types
-// =============================================================================
-// Longint with initializer.
 TEST(ParserSection6, Sec6_11_LongintWithInit) {
   auto r = Parse(
       "module t;\n"
@@ -82,13 +75,6 @@ TEST(ParserSection6, IntVarDecl) {
   EXPECT_EQ(item->name, "count");
 }
 
-// --- interface_class_type ---
-// ps_class_identifier [parameter_value_assignment]
-// (grammatically same as single class_type)
-// --- integer_type ---
-// integer_vector_type | integer_atom_type
-// --- integer_atom_type ---
-// byte | shortint | int | longint | integer | time
 TEST(ParserA221, IntegerAtomTypes) {
   auto r = Parse(
       "module m;\n"
@@ -110,4 +96,4 @@ TEST(ParserA221, IntegerAtomTypes) {
   EXPECT_EQ(r.cu->modules[0]->items[5]->data_type.kind, DataTypeKind::kTime);
 }
 
-}  // namespace
+}

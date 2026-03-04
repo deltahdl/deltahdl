@@ -1,5 +1,3 @@
-// §33.4.1: Basic configuration syntax
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -9,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.1.5 Configuration source text
-// =============================================================================
-// config_declaration: config name; design statement; endconfig
 TEST(SourceText, ConfigDeclBasic) {
   auto r = Parse(
       "config cfg1;\n"
@@ -31,7 +25,6 @@ TEST(SourceText, ConfigDeclBasic) {
   EXPECT_EQ(c->rules[0]->kind, ConfigRuleKind::kDefault);
 }
 
-// config_declaration with local_parameter_declaration
 TEST(SourceText, ConfigDeclLocalParams) {
   auto r = Parse(
       "config cfg3;\n"
@@ -48,7 +41,6 @@ TEST(SourceText, ConfigDeclLocalParams) {
   EXPECT_EQ(c->local_params[1].first, "DEPTH");
 }
 
-// config_rule_statement: default_clause liblist_clause
 TEST(SourceText, ConfigRuleDefaultLiblist) {
   auto r = Parse(
       "config cfg5;\n"
@@ -65,7 +57,6 @@ TEST(SourceText, ConfigRuleDefaultLiblist) {
   EXPECT_EQ(rule->liblist[2], "lib3");
 }
 
-// config_rule_statement: cell_clause liblist_clause
 TEST(SourceText, ConfigRuleCellLiblist) {
   auto r = Parse(
       "config cfg8;\n"
@@ -83,9 +74,6 @@ TEST(SourceText, ConfigRuleCellLiblist) {
   EXPECT_EQ(rule->liblist[1], "lib_b");
 }
 
-// =============================================================================
-// §36.3 Configuration rules (config ... endconfig)
-// =============================================================================
 TEST_F(ApiParseTest, BasicConfigDecl) {
   auto* unit = Parse(R"(
     config cfg1;
@@ -100,7 +88,6 @@ TEST_F(ApiParseTest, BasicConfigDecl) {
   EXPECT_EQ(unit->configs[0]->design_cells[0].second, "top");
 }
 
-// config_rule_statement: cell_clause use_clause with :config suffix
 TEST(SourceText, ConfigRuleCellUseConfig) {
   auto r = Parse(
       "config cfg9;\n"
@@ -117,7 +104,6 @@ TEST(SourceText, ConfigRuleCellUseConfig) {
   EXPECT_TRUE(rule->use_config);
 }
 
-// Comprehensive: multiple rules of different kinds in one config
 TEST(SourceText, ConfigMultipleRules) {
   auto r = Parse(
       "config cfg12;\n"
@@ -135,7 +121,6 @@ TEST(SourceText, ConfigMultipleRules) {
   EXPECT_EQ(c->rules[2]->kind, ConfigRuleKind::kCell);
 }
 
-// description: config_declaration
 TEST(SourceText, DescriptionConfig) {
   auto r = Parse(
       "config cfg;\n"
@@ -148,7 +133,6 @@ TEST(SourceText, DescriptionConfig) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-// config_declaration with endconfig label
 TEST(SourceText, ConfigDeclEndLabel) {
   auto r = Parse(
       "config cfg2;\n"
@@ -160,11 +144,8 @@ TEST(SourceText, ConfigDeclEndLabel) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg2");
 }
 
-// =============================================================================
-// §33.3 Library mapping (parsing only)
-// =============================================================================
 TEST_F(ConfigTest, LibraryMappingConfig) {
-  // Config with library-qualified design cells
+
   auto* unit = Parse(R"(
     config cfg;
       design rtlLib.top;
@@ -180,9 +161,6 @@ TEST_F(ConfigTest, LibraryMappingConfig) {
   EXPECT_EQ(cfg->rules[0]->liblist[0], "rtlLib");
 }
 
-// =============================================================================
-// Multiple rules in single config
-// =============================================================================
 TEST_F(ConfigTest, MultipleRulesInConfig) {
   auto* unit = Parse(R"(
     config cfg;
@@ -200,9 +178,6 @@ TEST_F(ConfigTest, MultipleRulesInConfig) {
   EXPECT_EQ(cfg->rules[2]->kind, ConfigRuleKind::kCell);
 }
 
-// =============================================================================
-// Endconfig with label
-// =============================================================================
 TEST_F(ConfigTest, EndconfigWithLabel) {
   auto* unit = Parse(R"(
     config my_config;
@@ -214,9 +189,6 @@ TEST_F(ConfigTest, EndconfigWithLabel) {
   EXPECT_FALSE(HasErrors());
 }
 
-// =============================================================================
-// §33 Configuration declarations
-// =============================================================================
 TEST_F(ConfigParseTest, BasicConfig) {
   auto* unit = Parse(R"(
     config cfg;
@@ -237,4 +209,4 @@ TEST_F(ConfigParseTest, ConfigWithEndLabel) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}  // namespace
+}

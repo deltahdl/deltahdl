@@ -1,5 +1,3 @@
-// §12.5.2: Constant expression in case statement
-
 #include <cstdint>
 #include <string_view>
 
@@ -18,17 +16,8 @@
 
 using namespace delta;
 
-// Helper to create a blocking assignment statement: lhs = rhs_val.
-
-// Driver coroutine that co_awaits an ExecTask and stores its result.
-
-// Helper to run ExecStmt synchronously (for non-suspending statements).
-// Creates a wrapper coroutine, resumes it, and returns the result.
 namespace {
 
-// =============================================================================
-// 10. Case inside (case ... inside)
-// =============================================================================
 TEST(StmtExec, CaseInsideExactMatch) {
   StmtFixture f;
   auto* result_var = f.ctx.CreateVariable("ci", 32);
@@ -79,7 +68,6 @@ TEST(StmtExec, CaseInsideNoMatchDefault) {
   EXPECT_EQ(result_var->value.ToUint64(), 77u);
 }
 
-// §12.5.2: constant expression as case_expression
 TEST(SimA607, ConstExprAsCaseExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -103,7 +91,6 @@ TEST(SimA607, ConstExprAsCaseExpr) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.5: sequential case statements (both execute)
 TEST(SimA607, SequentialCaseStatements) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -133,4 +120,4 @@ TEST(SimA607, SequentialCaseStatements) {
   EXPECT_EQ(y->value.ToUint64(), 22u);
 }
 
-}  // namespace
+}

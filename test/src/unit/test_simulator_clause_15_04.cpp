@@ -1,5 +1,3 @@
-// §15.4: Mailboxes
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -30,9 +28,6 @@ TEST(IpcSync, MailboxTryGetFifoOrder) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// =============================================================================
-// 10. Mailbox: Context registration (section 15.4)
-// =============================================================================
 TEST(IpcSync, MailboxContextCreateFind) {
   SyncFixture f;
   auto* mb = f.ctx.CreateMailbox("mbox1", 10);
@@ -46,9 +41,6 @@ TEST(IpcSync, MailboxContextCreateFind) {
   EXPECT_EQ(not_found, nullptr);
 }
 
-// =============================================================================
-// 12. Mailbox: Multiple get/put cycles
-// =============================================================================
 TEST(IpcSync, MailboxMultipleGetPutCycles) {
   MailboxObject mb;
   for (uint64_t i = 0; i < 100; ++i) {
@@ -63,9 +55,6 @@ TEST(IpcSync, MailboxMultipleGetPutCycles) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// =============================================================================
-// 15. Mailbox: IsFull predicate
-// =============================================================================
 TEST(IpcSync, MailboxIsFullBounded) {
   MailboxObject mb(2);
   EXPECT_FALSE(mb.IsFull());
@@ -81,15 +70,12 @@ TEST(IpcSync, MailboxIsFullUnbounded) {
   for (int i = 0; i < 1000; ++i) {
     mb.TryPut(static_cast<uint64_t>(i));
   }
-  EXPECT_FALSE(mb.IsFull());  // Unbounded never full.
+  EXPECT_FALSE(mb.IsFull());
 }
 
-// =============================================================================
-// 19. Mailbox: Parameterized type simulation (uint64_t values)
-// =============================================================================
 TEST(IpcSync, MailboxParameterizedTypeValues) {
   MailboxObject mb;
-  // Simulate different "types" by encoding type info in the value.
+
   mb.TryPut(0xDEADBEEF);
   mb.TryPut(0xCAFEBABE);
   uint64_t msg = 0;
@@ -99,9 +85,6 @@ TEST(IpcSync, MailboxParameterizedTypeValues) {
   EXPECT_EQ(msg, 0xCAFEBABEu);
 }
 
-// =============================================================================
-// 24. Multiple mailboxes in same context
-// =============================================================================
 TEST(IpcSync, MultipleMailboxesInContext) {
   SyncFixture f;
   auto* mb1 = f.ctx.CreateMailbox("m1", 0);
@@ -115,4 +98,4 @@ TEST(IpcSync, MultipleMailboxesInContext) {
   EXPECT_EQ(msg, 200u);
 }
 
-}  // namespace
+}

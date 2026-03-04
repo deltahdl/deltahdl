@@ -1,5 +1,3 @@
-// §25.7.4: Example of multiple task exports
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// extern_tf_declaration ::= extern forkjoin task_prototype ;
 TEST(SourceText, ExternForkjoinTaskPrototype) {
   auto r = Parse(
       "interface ifc;\n"
@@ -24,4 +21,4 @@ TEST(SourceText, ExternForkjoinTaskPrototype) {
   EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
 }
 
-}  // namespace
+}

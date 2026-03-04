@@ -1,5 +1,3 @@
-// §21.3.1: for the functional description of $fopen.
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -17,4 +15,4 @@ TEST(ParserSection21, FopenFcloseCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

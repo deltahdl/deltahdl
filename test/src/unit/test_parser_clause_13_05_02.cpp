@@ -1,5 +1,3 @@
-// §13.5.2: Pass by reference
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -50,9 +48,6 @@ TEST(ParserA27, TfPortDirectionConstRefStatic) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-// ---------------------------------------------------------------------------
-// tf_port_declaration (old-style): const ref and var
-// ---------------------------------------------------------------------------
 TEST(ParserA27, TfPortDeclOldStyleConstRef) {
   auto r = Parse(
       "module m;\n"
@@ -68,9 +63,7 @@ TEST(ParserA27, TfPortDeclOldStyleConstRef) {
   EXPECT_TRUE(item->func_args[0].is_const);
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
-// =============================================================================
-// 16. Automatic function with ref argument
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithRefArg) {
   auto r = Parse(
       "module m;\n"
@@ -93,9 +86,6 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithRefArg) {
   EXPECT_EQ(item->func_args[1].name, "y");
 }
 
-// ---------------------------------------------------------------------------
-// tf_port_direction: [ const ] ref [ static ]
-// ---------------------------------------------------------------------------
 TEST(ParserA27, TfPortDirectionRefStatic) {
   auto r = Parse(
       "module m;\n"
@@ -109,11 +99,6 @@ TEST(ParserA27, TfPortDirectionRefStatic) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// LRM section 13.5.2 -- Pass by reference (additional tests)
-// =============================================================================
-// Automatic function with ref arg (LRM: ref requires automatic lifetime).
 TEST(ParserSection13, AutomaticFunctionWithRef) {
   auto r = Parse(
       "module m;\n"
@@ -132,9 +117,6 @@ TEST(ParserSection13, AutomaticFunctionWithRef) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
 }
 
-// =============================================================================
-// 29. Automatic function with const ref argument
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithConstRefArg) {
   auto r = Parse(
       "module m;\n"
@@ -153,9 +135,6 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithConstRefArg) {
   EXPECT_EQ(item->func_args[0].name, "data");
 }
 
-// =============================================================================
-// LRM section 13.5.2 -- Const ref arguments
-// =============================================================================
 TEST(ParserSection13, ConstRefArg) {
   auto r = Parse(
       "module m;\n"
@@ -184,9 +163,6 @@ TEST(ParserSection13, RefWithoutConst) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
 }
 
-// =============================================================================
-// LRM section 13.5.2 -- Const ref arguments (additional tests)
-// =============================================================================
 TEST(ParserSection13, ConstRefArgOnTask) {
   auto r = Parse(
       "module m;\n"
@@ -232,4 +208,4 @@ TEST(ParserSection13, RefArgOnFunction) {
   EXPECT_EQ(fn->func_args[1].direction, Direction::kRef);
 }
 
-}  // namespace
+}

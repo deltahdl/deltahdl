@@ -1,5 +1,3 @@
-// Annex A.8.5: Expression left-side values
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -14,10 +12,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-// =============================================================================
-// A.8.5 Expression left-side values — net_lvalue
-// =============================================================================
-// § net_lvalue — ps_or_hierarchical_net_identifier constant_select (simple net)
 TEST(ParserA85, NetLvalueSimpleIdent) {
   auto r = Parse("module m; wire a, b; assign a = b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -29,7 +23,6 @@ TEST(ParserA85, NetLvalueSimpleIdent) {
   EXPECT_EQ(ca->assign_lhs->text, "a");
 }
 
-// § net_lvalue — ps_or_hierarchical_net_identifier constant_select (bit select)
 TEST(ParserA85, NetLvalueConstBitSelect) {
   auto r =
       Parse("module m; wire [7:0] a; wire b; assign a[3] = b; endmodule\n");
@@ -43,8 +36,6 @@ TEST(ParserA85, NetLvalueConstBitSelect) {
   EXPECT_EQ(ca->assign_lhs->base->text, "a");
 }
 
-// § net_lvalue — ps_or_hierarchical_net_identifier constant_select (part
-// select)
 TEST(ParserA85, NetLvalueConstPartSelect) {
   auto r = Parse(
       "module m; wire [7:0] a; wire [3:0] b; assign a[7:4] = b; endmodule\n");
@@ -57,7 +48,6 @@ TEST(ParserA85, NetLvalueConstPartSelect) {
   ASSERT_NE(ca->assign_lhs->index_end, nullptr);
 }
 
-// § net_lvalue — { net_lvalue { , net_lvalue } } (concatenation)
 TEST(ParserA85, NetLvalueConcatenation) {
   auto r = Parse(
       "module m; wire [7:0] a; wire [3:0] b, c; assign {b, c} = a; "
@@ -71,7 +61,6 @@ TEST(ParserA85, NetLvalueConcatenation) {
   EXPECT_EQ(ca->assign_lhs->elements.size(), 2u);
 }
 
-// § net_lvalue — nested concatenation
 TEST(ParserA85, NetLvalueNestedConcatenation) {
   auto r = Parse(
       "module m; wire a, b, c, d;\n"
@@ -87,7 +76,6 @@ TEST(ParserA85, NetLvalueNestedConcatenation) {
   EXPECT_EQ(ca->assign_lhs->elements[0]->kind, ExprKind::kConcatenation);
 }
 
-// § net_lvalue — concatenation with selects
 TEST(ParserA85, NetLvalueConcatWithSelects) {
   auto r = Parse(
       "module m; wire [7:0] a; wire [3:0] b;\n"
@@ -102,10 +90,6 @@ TEST(ParserA85, NetLvalueConcatWithSelects) {
   EXPECT_EQ(ca->assign_lhs->elements[0]->kind, ExprKind::kSelect);
 }
 
-// =============================================================================
-// A.8.5 Expression left-side values — variable_lvalue
-// =============================================================================
-// § variable_lvalue — hierarchical_variable_identifier (simple variable)
 TEST(ParserA85, VarLvalueSimpleIdent) {
   auto r = Parse("module m; logic x; initial x = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -117,7 +101,6 @@ TEST(ParserA85, VarLvalueSimpleIdent) {
   EXPECT_EQ(stmt->lhs->text, "x");
 }
 
-// § variable_lvalue — hierarchical_variable_identifier select (bit select)
 TEST(ParserA85, VarLvalueBitSelect) {
   auto r = Parse("module m; logic [7:0] x; initial x[3] = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -132,7 +115,6 @@ TEST(ParserA85, VarLvalueBitSelect) {
   EXPECT_EQ(stmt->lhs->index_end, nullptr);
 }
 
-// § variable_lvalue — hierarchical_variable_identifier select (part select)
 TEST(ParserA85, VarLvaluePartSelect) {
   auto r = Parse("module m; logic [7:0] x; initial x[7:4] = 4'hF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -145,8 +127,6 @@ TEST(ParserA85, VarLvaluePartSelect) {
   ASSERT_NE(stmt->lhs->index_end, nullptr);
 }
 
-// § variable_lvalue — hierarchical_variable_identifier select (indexed part
-// select +)
 TEST(ParserA85, VarLvalueIndexedPartSelectPlus) {
   auto r =
       Parse("module m; logic [15:0] x; initial x[4+:4] = 4'hF; endmodule\n");
@@ -159,8 +139,6 @@ TEST(ParserA85, VarLvalueIndexedPartSelectPlus) {
   EXPECT_TRUE(stmt->lhs->is_part_select_plus);
 }
 
-// § variable_lvalue — hierarchical_variable_identifier select (indexed part
-// select -)
 TEST(ParserA85, VarLvalueIndexedPartSelectMinus) {
   auto r =
       Parse("module m; logic [15:0] x; initial x[7-:4] = 4'hF; endmodule\n");
@@ -173,7 +151,6 @@ TEST(ParserA85, VarLvalueIndexedPartSelectMinus) {
   EXPECT_TRUE(stmt->lhs->is_part_select_minus);
 }
 
-// § variable_lvalue — hierarchical_variable_identifier select (member access)
 TEST(ParserA85, VarLvalueMemberAccess) {
   auto r = Parse(
       "module m;\n"
@@ -189,8 +166,6 @@ TEST(ParserA85, VarLvalueMemberAccess) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-// § variable_lvalue — { variable_lvalue { , variable_lvalue } }
-// (concatenation)
 TEST(ParserA85, VarLvalueConcatenation) {
   auto r = Parse(
       "module m; logic [3:0] a, b; logic [7:0] c;\n"
@@ -205,7 +180,6 @@ TEST(ParserA85, VarLvalueConcatenation) {
   EXPECT_EQ(stmt->lhs->elements.size(), 2u);
 }
 
-// § variable_lvalue — nested concatenation
 TEST(ParserA85, VarLvalueNestedConcatenation) {
   auto r = Parse(
       "module m; logic a, b, c, d;\n"
@@ -220,7 +194,6 @@ TEST(ParserA85, VarLvalueNestedConcatenation) {
   EXPECT_EQ(stmt->lhs->elements[0]->kind, ExprKind::kConcatenation);
 }
 
-// § variable_lvalue — streaming_concatenation
 TEST(ParserA85, VarLvalueStreamingConcat) {
   auto r = Parse(
       "module m; logic [31:0] a, b;\n"
@@ -234,4 +207,4 @@ TEST(ParserA85, VarLvalueStreamingConcat) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
 }
 
-}  // namespace
+}

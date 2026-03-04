@@ -1,5 +1,3 @@
-// §6.24.3: Bit-stream casting
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.24.3: Bit-stream cast packs unpacked array elements MSB-first.
 TEST(SimCh6, BitStreamArrayToInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,11 +29,10 @@ TEST(SimCh6, BitStreamArrayToInt) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // §6.24.3: index 0 occupies MSBs → 0xDEADBEEF.
+
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-// §6.24.3: Bit-stream cast packs shortint array into 32-bit int.
 TEST(SimCh6, BitStreamShortArrayToInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -58,8 +54,8 @@ TEST(SimCh6, BitStreamShortArrayToInt) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // 0xCAFE at MSBs, 0xBABE at LSBs → 0xCAFEBABE.
+
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEu);
 }
 
-}  // namespace
+}

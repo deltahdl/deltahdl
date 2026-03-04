@@ -1,15 +1,9 @@
-// §16.12.18: Typed formal arguments in property declarations
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Production #17: property_formal_type
-// property_formal_type ::= sequence_formal_type | property
-// =============================================================================
 TEST(ParserA210, PropertyFormalType_Property) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -28,7 +22,6 @@ TEST(ParserA210, PropertyFormalType_Sequence) {
               "endmodule\n"));
 }
 
-// property_formal_type — implicit (no type)
 TEST(ParserA210, PropertyFormalType_Implicit) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -38,4 +31,4 @@ TEST(ParserA210, PropertyFormalType_Implicit) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

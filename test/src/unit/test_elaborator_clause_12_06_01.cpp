@@ -1,5 +1,3 @@
-// §12.6.1: Pattern matching in case statements
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §12.6: case-matches statement elaborates
 TEST(ElabA60701, CaseMatchesElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -28,4 +25,4 @@ TEST(ElabA60701, CaseMatchesElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}  // namespace
+}

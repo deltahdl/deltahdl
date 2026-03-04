@@ -1,5 +1,3 @@
-// §7.2: Structures
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -8,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA221, StructMemberRandc) {
-  // random_qualifier: randc
+
   auto r = Parse(
       "module m;\n"
       "  struct { randc bit [7:0] x; } s;\n"
@@ -20,9 +18,6 @@ TEST(ParserA221, StructMemberRandc) {
   EXPECT_TRUE(members[0].is_randc);
 }
 
-// --- struct_union_member ---
-// {attribute_instance} [random_qualifier] data_type_or_void
-//   list_of_variable_decl_assignments ;
 TEST(ParserA221, StructMemberBasic) {
   auto r = Parse(
       "module m;\n"
@@ -37,7 +32,7 @@ TEST(ParserA221, StructMemberBasic) {
 }
 
 TEST(ParserA221, StructMemberRand) {
-  // random_qualifier: rand
+
   auto r = Parse(
       "module m;\n"
       "  struct { rand int a; int b; } s;\n"
@@ -51,7 +46,7 @@ TEST(ParserA221, StructMemberRand) {
 }
 
 TEST(ParserA221, StructMemberAttr) {
-  // {attribute_instance} before struct member
+
   auto r = Parse(
       "module m;\n"
       "  struct { (* mark *) int a; int b; } s;\n"
@@ -64,7 +59,6 @@ TEST(ParserA221, StructMemberAttr) {
   EXPECT_TRUE(members[1].attrs.empty());
 }
 
-// 19. Struct member access on RHS.
 TEST(ParserSection7, Sec7_2_2_MemberAccessOnRHS) {
   auto r = Parse(
       "module t;\n"
@@ -105,9 +99,6 @@ static void VerifyStructMemberNames(const std::vector<StructMember>& members,
   }
 }
 
-// =========================================================================
-// §7.2: Structures
-// =========================================================================
 TEST(ParserSection7, StructBasic) {
   auto r = Parse(
       "module t;\n"
@@ -126,10 +117,6 @@ TEST(ParserSection7, StructBasic) {
                           std::size(expected_names));
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
-// --- Comma-separated struct members ---
 TEST(ParserCh5, StructMembers_CommaSeparated) {
   auto r = Parse(
       "module m;\n"
@@ -139,10 +126,7 @@ TEST(ParserCh5, StructMembers_CommaSeparated) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->data_type.struct_members.size(), 3u);
 }
-// --- Test helpers ---
-// =========================================================================
-// §7.4: Struct variable declaration (non-typedef)
-// =========================================================================
+
 TEST(ParserSection7, StructVariableDecl) {
   auto r = Parse(
       "module t;\n"
@@ -237,4 +221,4 @@ TEST(ParserCh5, StructMembers_Single) {
   EXPECT_TRUE(ParseOk5("module m; struct { int X; } s; endmodule"));
 }
 
-}  // namespace
+}

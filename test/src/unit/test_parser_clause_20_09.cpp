@@ -1,5 +1,3 @@
-// §20.9: Bit vector system functions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- D.8: $countones as expression ---
 TEST(ParserAnnexD2, AnnexDCountonesParse) {
   auto r = Parse(
       "module m;\n"
@@ -32,7 +29,6 @@ TEST(ParserAnnexD2, AnnexDCountonesRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-// --- D.9: $isunknown ---
 TEST(ParserAnnexD2, AnnexDIsunknownParse) {
   auto r = Parse(
       "module m;\n"
@@ -57,7 +53,6 @@ TEST(ParserAnnexD2, AnnexDIsunknownRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-// --- D.10: $onehot and $onehot0 ---
 TEST(ParserAnnexD2, AnnexDOnehot) {
   auto r = Parse(
       "module m;\n"
@@ -70,4 +65,4 @@ TEST(ParserAnnexD2, AnnexDOnehot) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

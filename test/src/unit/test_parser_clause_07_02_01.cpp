@@ -1,5 +1,3 @@
-// §7.2.1: Packed structures
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -20,7 +18,6 @@ TEST(ParserAnnexA, A2TypedefStructPacked) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
 
-// struct_union [packed [signing]] { ... } {packed_dimension}
 TEST(ParserA221, DataTypeStructPacked) {
   auto r = Parse(
       "module m;\n"
@@ -33,10 +30,7 @@ TEST(ParserA221, DataTypeStructPacked) {
   EXPECT_TRUE(item->data_type.is_packed);
   EXPECT_TRUE(item->data_type.is_signed);
 }
-// =========================================================================
-// LRM section 7.2.1 -- Packed structures
-// =========================================================================
-// --- Packed struct typedef with logic members of various widths ---
+
 TEST(ParserSection7, Sec7_2_1_PackedTypedefLogicWidths) {
   auto r = Parse(
       "module t;\n"
@@ -59,7 +53,6 @@ TEST(ParserSection7, Sec7_2_1_PackedTypedefLogicWidths) {
   EXPECT_EQ(item->typedef_type.struct_members[2].name, "valid");
 }
 
-// --- Packed struct typedef with bit members and packed dim checks ---
 TEST(ParserSection7, Sec7_2_1_PackedTypedefBitMembers) {
   auto r = Parse(
       "module t;\n"
@@ -80,8 +73,6 @@ TEST(ParserSection7, Sec7_2_1_PackedTypedefBitMembers) {
   EXPECT_NE(item->typedef_type.struct_members[0].packed_dim_right, nullptr);
 }
 
-// --- Packed struct with integer type members (byte, shortint, int, longint)
-// ---
 TEST(ParserSection7, Sec7_2_1_PackedIntegerTypes) {
   auto r = Parse(
       "module t;\n"
@@ -107,7 +98,6 @@ TEST(ParserSection7, Sec7_2_1_PackedIntegerTypes) {
             DataTypeKind::kLongint);
 }
 
-// --- Packed struct signed typedef with member name verification ---
 TEST(ParserSection7, Sec7_2_1_PackedSignedTypedef) {
   auto r = Parse(
       "module t;\n"
@@ -127,7 +117,6 @@ TEST(ParserSection7, Sec7_2_1_PackedSignedTypedef) {
   EXPECT_EQ(item->typedef_type.struct_members[1].name, "imag_part");
 }
 
-// --- Packed struct variable declaration (non-typedef, inline) ---
 TEST(ParserSection7, Sec7_2_1_PackedVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -152,7 +141,6 @@ static ModuleItem* NthItem(ParseResult& r, size_t n) {
   return r.cu->modules[0]->items[n];
 }
 
-// --- Packed struct variable with initial value ---
 TEST(ParserSection7, Sec7_2_1_PackedVarWithInit) {
   auto r = Parse(
       "module t;\n"
@@ -169,7 +157,7 @@ TEST(ParserSection7, Sec7_2_1_PackedVarWithInit) {
   EXPECT_EQ(item->name, "p");
   EXPECT_NE(item->init_expr, nullptr);
 }
-// --- Packed struct member access via dot notation on RHS ---
+
 TEST(ParserSection7, Sec7_2_1_PackedMemberAccessRead) {
   auto r = Parse(
       "module t;\n"
@@ -201,7 +189,6 @@ TEST(Parser, TypedefStructPacked) {
   ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
 }
 
-// --- Packed struct member access on LHS ---
 TEST(ParserSection7, Sec7_2_1_PackedMemberAccessWrite) {
   auto r = Parse(
       "module t;\n"
@@ -234,7 +221,6 @@ TEST(ParserSection7, StructPackedSigned) {
   EXPECT_TRUE(item->typedef_type.is_signed);
 }
 
-// 21. Packed struct bitwise operations.
 TEST(ParserSection7, Sec7_2_2_PackedStructBitwise) {
   auto r = Parse(
       "module t;\n"
@@ -251,7 +237,6 @@ TEST(ParserSection7, Sec7_2_2_PackedStructBitwise) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kAmp);
 }
 
-// --- Packed struct assigned from concatenation ---
 TEST(ParserSection7, Sec7_2_1_PackedAssignFromConcat) {
   auto r = Parse(
       "module t;\n"
@@ -271,9 +256,7 @@ TEST(ParserSection7, Sec7_2_1_PackedAssignFromConcat) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
-// ---------------------------------------------------------------------------
-// 18. always_comb with struct member access
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_StructMemberAccess) {
   auto r = Parse(
       "module m;\n"
@@ -295,12 +278,11 @@ TEST(ParserSection9, Sec9_2_2_StructMemberAccess) {
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   ASSERT_GE(item->body->stmts.size(), 2u);
-  // LHS of first assignment should be a member access expression
+
   EXPECT_EQ(item->body->stmts[0]->lhs->kind, ExprKind::kMemberAccess);
   EXPECT_EQ(item->body->stmts[1]->lhs->kind, ExprKind::kMemberAccess);
 }
 
-// --- Packed struct with packed array member (extra_packed_dims) ---
 TEST(ParserSection7, Sec7_2_1_PackedWithPackedArrayMember) {
   auto r = Parse(
       "module t;\n"
@@ -320,7 +302,6 @@ TEST(ParserSection7, Sec7_2_1_PackedWithPackedArrayMember) {
   EXPECT_FALSE(item->typedef_type.struct_members[0].extra_packed_dims.empty());
 }
 
-// --- Packed struct with multiple packed dimensions on a member ---
 TEST(ParserSection7, Sec7_2_1_PackedMemberMultiPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -341,7 +322,6 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberMultiPackedDims) {
   EXPECT_GE(member.extra_packed_dims.size(), 1u);
 }
 
-// 26. Struct output port assigned in module body.
 TEST(ParserSection7, Sec7_2_2_StructOutputPort) {
   EXPECT_TRUE(
       ParseOk("module t(\n"
@@ -354,7 +334,6 @@ TEST(ParserSection7, Sec7_2_2_StructOutputPort) {
               "endmodule\n"));
 }
 
-// --- Nested packed struct (packed struct inside packed struct) ---
 TEST(ParserSection7, Sec7_2_1_NestedPackedStruct) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -368,7 +347,6 @@ TEST(ParserSection7, Sec7_2_1_NestedPackedStruct) {
               "endmodule\n"));
 }
 
-// --- Packed struct containing packed union ---
 TEST(ParserSection7, Sec7_2_1_PackedStructWithPackedUnion) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -382,7 +360,6 @@ TEST(ParserSection7, Sec7_2_1_PackedStructWithPackedUnion) {
               "endmodule\n"));
 }
 
-// 28. Packed struct assigned from bit vector and used in expression.
 TEST(ParserSection7, Sec7_2_2_PackedStructBitVector) {
   auto r = Parse(
       "module t;\n"
@@ -406,7 +383,6 @@ TEST(ParserSection7, Sec7_2_2_PackedStructBitVector) {
   EXPECT_EQ(s0->rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// --- Packed struct with enum member (named type) ---
 TEST(ParserSection7, Sec7_2_1_PackedWithEnumMember) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -418,7 +394,6 @@ TEST(ParserSection7, Sec7_2_1_PackedWithEnumMember) {
               "endmodule\n"));
 }
 
-// --- Packed struct typedef in a package ---
 TEST(ParserSection7, Sec7_2_1_PackedInPackage) {
   auto r = Parse(
       "package pkg;\n"
@@ -437,7 +412,6 @@ TEST(ParserSection7, Sec7_2_1_PackedInPackage) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
-// --- Packed struct typedef used in subsequent variable declaration ---
 TEST(ParserSection7, Sec7_2_1_TypedefUsedInVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -457,7 +431,6 @@ TEST(ParserSection7, Sec7_2_1_TypedefUsedInVarDecl) {
   EXPECT_EQ(item->data_type.type_name, "pair_t");
 }
 
-// --- Packed struct with single-bit member (no packed dimension) ---
 TEST(ParserSection7, Sec7_2_1_PackedSingleBitMember) {
   auto r = Parse(
       "module t;\n"
@@ -479,9 +452,6 @@ TEST(ParserSection7, Sec7_2_1_PackedSingleBitMember) {
   EXPECT_EQ(parity.packed_dim_right, nullptr);
 }
 
-// =========================================================================
-// §7.2.1: Packed structures (additional)
-// =========================================================================
 TEST(ParserSection7, StructPackedUnsigned) {
   auto r = Parse(
       "module t;\n"
@@ -499,7 +469,6 @@ TEST(ParserSection7, StructPackedUnsigned) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 3u);
 }
 
-// --- Packed struct with signed member type qualifier ---
 TEST(ParserSection7, Sec7_2_1_PackedMemberSignedType) {
   auto r = Parse(
       "module t;\n"
@@ -518,7 +487,6 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberSignedType) {
   EXPECT_FALSE(item->typedef_type.struct_members[1].is_signed);
 }
 
-// --- Packed struct as port type (inline struct in port list) ---
 TEST(ParserSection7, Sec7_2_1_PackedAsPortType) {
   EXPECT_TRUE(ParseOk(
       "module inner(\n"
@@ -529,7 +497,6 @@ TEST(ParserSection7, Sec7_2_1_PackedAsPortType) {
       "endmodule\n"));
 }
 
-// --- ATM cell header: LRM-style packed struct with many fields ---
 TEST(ParserSection7, Sec7_2_1_AtmCellHeader) {
   auto r = Parse(
       "module t;\n"
@@ -554,8 +521,6 @@ TEST(ParserSection7, Sec7_2_1_AtmCellHeader) {
   EXPECT_EQ(item->typedef_type.struct_members[6].name, "Payload");
 }
 
-// --- Packed struct with multiple members of the same type (comma-separated)
-// ---
 TEST(ParserSection7, Sec7_2_1_PackedMultiMembersSameType) {
   auto r = Parse(
       "module t;\n"
@@ -574,7 +539,6 @@ TEST(ParserSection7, Sec7_2_1_PackedMultiMembersSameType) {
   EXPECT_EQ(item->typedef_type.struct_members[2].name, "b");
 }
 
-// 7. Packed struct assigned from integer literal.
 TEST(ParserSection7, Sec7_2_2_PackedStructFromInteger) {
   auto r = Parse(
       "module t;\n"
@@ -591,7 +555,6 @@ TEST(ParserSection7, Sec7_2_2_PackedStructFromInteger) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// 8. Packed struct assigned from concatenation.
 TEST(ParserSection7, Sec7_2_2_PackedStructFromConcat) {
   auto r = Parse(
       "module t;\n"
@@ -607,10 +570,7 @@ TEST(ParserSection7, Sec7_2_2_PackedStructFromConcat) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
-// --- Test helpers ---
-// =========================================================================
-// §7.2.1: Packed structures
-// =========================================================================
+
 TEST(ParserSection7, PackedStructSigned2State) {
   auto r = Parse(
       "module t;\n"
@@ -695,4 +655,4 @@ TEST(ParserSection7, PackedStructPartSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-}  // namespace
+}

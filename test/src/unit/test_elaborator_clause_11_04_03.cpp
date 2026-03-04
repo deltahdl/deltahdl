@@ -1,5 +1,3 @@
-// §11.4.3: Arithmetic operators
-
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
@@ -29,7 +27,6 @@ TEST(ConstEval, Power) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 ** 0", f)), 1);
 }
 
-// § expression — binary operations in initial block elaborate
 TEST(ElabA83, BinaryExprInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -42,10 +39,6 @@ TEST(ElabA83, BinaryExprInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// =============================================================================
-// A.8.6 Operators — Elaboration
-// =============================================================================
-// § unary_operator — all unary operators elaborate
 TEST(ElabA86, UnaryPlusElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -70,7 +63,6 @@ TEST(ElabA86, UnaryMinusElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// § binary_operator — arithmetic operators elaborate
 TEST(ElabA86, BinaryAddElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -119,9 +111,6 @@ TEST(ElabA86, BinaryPowerElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// 24. always_comb with addition and subtraction.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombAddSub) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -146,9 +135,6 @@ TEST(SimCh9, AlwaysCombAddSub) {
   EXPECT_EQ(var->value.ToUint64(), 63u);
 }
 
-// ---------------------------------------------------------------------------
-// 27. always_comb with subtraction.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombSubtraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -173,9 +159,6 @@ TEST(SimCh9b, AlwaysCombSubtraction) {
   EXPECT_EQ(y->value.ToUint64(), 0x40u);
 }
 
-// ---------------------------------------------------------------------------
-// 28. always_comb with multiplication.
-// ---------------------------------------------------------------------------
 TEST(SimCh9b, AlwaysCombMultiplication) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -200,9 +183,6 @@ TEST(SimCh9b, AlwaysCombMultiplication) {
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-// ---------------------------------------------------------------------------
-// 17. Blocking assignment with arithmetic operators (+, -, *, /).
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignArithmeticOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -236,9 +216,6 @@ TEST(SimCh10, BlockingAssignArithmeticOps) {
   EXPECT_EQ(r_div->value.ToUint64(), 3u);
 }
 
-// ---------------------------------------------------------------------------
-// 29. Blocking assignment with modulo operator (%).
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignModulo) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -257,13 +234,10 @@ TEST(SimCh10, BlockingAssignModulo) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // 17 % 5 = 2
+
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 30. Blocking assignment with unary plus (+).
-// ---------------------------------------------------------------------------
 TEST(SimCh10, BlockingAssignUnaryPlus) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -286,4 +260,4 @@ TEST(SimCh10, BlockingAssignUnaryPlus) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

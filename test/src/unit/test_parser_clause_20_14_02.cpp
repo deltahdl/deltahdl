@@ -1,5 +1,3 @@
-// §20.14.2: Distribution functions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex N -- Probabilistic distribution functions
-// =============================================================================
 TEST(ParserAnnexN, AnnexNDistUniform) {
   auto r = Parse(
       "module m;\n"
@@ -70,4 +65,4 @@ TEST(ParserAnnexN, AnnexNDistChiSquare) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

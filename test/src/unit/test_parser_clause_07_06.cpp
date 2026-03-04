@@ -1,14 +1,9 @@
-// §7.6: Array assignments
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =========================================================================
-// §7.4.6: Operations on arrays
-// =========================================================================
 TEST(ParserSection7, ArrayAssignWhole) {
   auto r = Parse(
       "module t;\n"
@@ -21,9 +16,6 @@ TEST(ParserSection7, ArrayAssignWhole) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-// =========================================================================
-// §7.6: Array assignments
-// =========================================================================
 TEST(ParserSection7, ArraySliceAssign) {
   auto r = Parse(
       "module t;\n"
@@ -38,4 +30,4 @@ TEST(ParserSection7, ArraySliceAssign) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-}  // namespace
+}

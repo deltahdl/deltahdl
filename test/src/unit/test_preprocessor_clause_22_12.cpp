@@ -19,7 +19,6 @@ TEST(Preprocessor, Line_OverridesLineNumber) {
   EXPECT_EQ(pp.LineOffset(), 42);
 }
 
-// §22.12: `line directive validation
 TEST(Preprocessor, Line_IllegalLevel) {
   PreprocFixture f;
   Preprocess("`line 1 \"somefile\" 3\n", f);

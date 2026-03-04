@@ -1,5 +1,3 @@
-// §10.3.1: The net declaration assignment
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -38,8 +36,7 @@ TEST(ParserA24, NetDeclAssignmentDimsAndInit) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 TEST(ParserSection6, NetWithImplicitContAssign) {
-  // §6.5: Unlike nets, a variable cannot have an implicit continuous
-  // assignment. Wire with inline assignment is a net continuous assign.
+
   auto r = Parse(
       "module t;\n"
       "  wire w = 1'b0;\n"
@@ -50,7 +47,7 @@ TEST(ParserSection6, NetWithImplicitContAssign) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_NE(item->init_expr, nullptr);
 }
-// 10. Wire with implicit continuous assignment (wire w = 1).
+
 TEST(ParserSection6, Sec6_5_WireImplicitContAssign) {
   auto r = Parse(
       "module t;\n"
@@ -74,7 +71,7 @@ TEST(ParserSection10, NetDeclAssignmentWithRange) {
   ASSERT_FALSE(mod->items.empty());
   EXPECT_NE(mod->items[0]->init_expr, nullptr);
 }
-// §6.7.1: Wire with initializer (implicit continuous assignment).
+
 TEST(ParserSection6, Sec6_7_1_WireWithInitializer) {
   auto r = Parse(
       "module t;\n"
@@ -89,4 +86,4 @@ TEST(ParserSection6, Sec6_7_1_WireWithInitializer) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

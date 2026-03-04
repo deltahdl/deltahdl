@@ -1,5 +1,3 @@
-// Annex D.11: $scope
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -15,4 +13,4 @@ TEST(ParserAnnexD, AnnexDScope) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

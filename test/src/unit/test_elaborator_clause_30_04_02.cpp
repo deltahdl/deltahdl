@@ -1,12 +1,9 @@
-// §30.4.2: Simple module paths
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Specify block with path declaration elaborates
 TEST(ElabA701, SpecifyBlockWithPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,10 +17,6 @@ TEST(ElabA701, SpecifyBlockWithPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// =============================================================================
-// A.7.3 Specify block terminals — Elaboration
-// =============================================================================
-// Terminal with bit-select elaborates
 TEST(ElabA703, TerminalBitSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +30,6 @@ TEST(ElabA703, TerminalBitSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Terminal with part-select range elaborates
 TEST(ElabA703, TerminalPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,7 +43,6 @@ TEST(ElabA703, TerminalPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Terminal with indexed part-select elaborates
 TEST(ElabA703, TerminalIndexedPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -65,7 +56,6 @@ TEST(ElabA703, TerminalIndexedPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Terminal with dotted interface.port elaborates
 TEST(ElabA703, TerminalDottedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -79,10 +69,6 @@ TEST(ElabA703, TerminalDottedElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// =============================================================================
-// A.7.2 Specify path declarations — Elaboration
-// =============================================================================
-// Simple parallel path elaborates without errors
 TEST(ElabA702, SimpleParallelPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -96,4 +82,4 @@ TEST(ElabA702, SimpleParallelPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

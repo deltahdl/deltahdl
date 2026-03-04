@@ -1,5 +1,3 @@
-// §12.3: Syntax
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -8,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, InitialConstruct_NullStmt) {
-  // initial with null statement (just a semicolon)
+
   auto r = Parse(
       "module m;\n"
       "  initial ;\n"
@@ -20,13 +18,7 @@ TEST(ParserA602, InitialConstruct_NullStmt) {
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kNull);
 }
-// =============================================================================
-// A.6.4 Statements
-// =============================================================================
-// ---------------------------------------------------------------------------
-// statement_or_null ::= statement | { attribute_instance } ;
-// ---------------------------------------------------------------------------
-// §12.3: null statement (just semicolon)
+
 TEST(ParserA604, NullStatement) {
   auto r = Parse(
       "module m;\n"
@@ -43,7 +35,6 @@ TEST(ParserA604, NullStatement) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNull);
 }
 
-// §12.3: null statement with attribute instance
 TEST(ParserA604, NullStatementWithAttribute) {
   auto r = Parse(
       "module m;\n"
@@ -62,7 +53,6 @@ TEST(ParserA604, NullStatementWithAttribute) {
   EXPECT_EQ(stmt->attrs[0].name, "synthesis");
 }
 
-// §12.3: multiple null statements
 TEST(ParserA604, MultipleNullStatements) {
   auto r = Parse(
       "module m;\n"
@@ -82,7 +72,6 @@ TEST(ParserA604, MultipleNullStatements) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kNull);
 }
 
-// §12.3: statement with attribute instance
 TEST(ParserA604, StatementWithAttribute) {
   auto r = Parse(
       "module m;\n"
@@ -99,7 +88,6 @@ TEST(ParserA604, StatementWithAttribute) {
   EXPECT_EQ(stmt->attrs[0].name, "full_case");
 }
 
-// §12.3: statement with label AND attribute
 TEST(ParserA604, StatementWithLabelAndAttribute) {
   auto r = Parse(
       "module m;\n"
@@ -117,4 +105,4 @@ TEST(ParserA604, StatementWithLabelAndAttribute) {
   EXPECT_EQ(stmt->attrs[0].name, "mark");
 }
 
-}  // namespace
+}

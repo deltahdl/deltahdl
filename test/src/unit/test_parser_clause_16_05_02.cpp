@@ -1,5 +1,3 @@
-// §16.5.2: Assertion clock
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -14,7 +12,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-// --- F.16: Negedge clocking ---
 TEST(ParserAnnexF, AnnexFNegedgeClocking) {
   auto r = Parse(
       "module m;\n"
@@ -25,4 +22,4 @@ TEST(ParserAnnexF, AnnexFNegedgeClocking) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}  // namespace
+}

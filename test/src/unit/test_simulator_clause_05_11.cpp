@@ -1,4 +1,3 @@
-
 #include <cstring>
 
 #include "fixture_simulator.h"
@@ -7,9 +6,6 @@
 
 using namespace delta;
 
-// §5.11 Array literals
-
-// §5.11: Positional array literal — '{val, val, val} assigns each element.
 TEST(SimCh511, ArrayLitPositional) {
   std::string src =
       "module m;\n"
@@ -29,7 +25,6 @@ TEST(SimCh511, ArrayLitPositional) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xCC);
 }
 
-// §5.11: Positional array literal in declaration initializer.
 TEST(SimCh511, ArrayLitPositionalInit) {
   std::string src =
       "module m;\n"
@@ -46,7 +41,6 @@ TEST(SimCh511, ArrayLitPositionalInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x33);
 }
 
-// §5.11: Replication in array literal — '{3{val}} fills all elements.
 TEST(SimCh511, ArrayLitReplication) {
   std::string src =
       "module m;\n"
@@ -66,7 +60,6 @@ TEST(SimCh511, ArrayLitReplication) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xFF);
 }
 
-// §5.11: Replication in declaration initializer.
 TEST(SimCh511, ArrayLitReplicationInit) {
   std::string src =
       "module m;\n"
@@ -83,7 +76,6 @@ TEST(SimCh511, ArrayLitReplicationInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
 }
 
-// §5.11: Default key — '{default:val} fills all array elements.
 TEST(SimCh511, ArrayLitDefault) {
   std::string src =
       "module m;\n"
@@ -103,7 +95,6 @@ TEST(SimCh511, ArrayLitDefault) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x42);
 }
 
-// §5.11: Default key in declaration initializer.
 TEST(SimCh511, ArrayLitDefaultInit) {
   std::string src =
       "module m;\n"
@@ -120,7 +111,6 @@ TEST(SimCh511, ArrayLitDefaultInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x99);
 }
 
-// §5.11: Index key with default — '{idx:val, default:val}.
 TEST(SimCh511, ArrayLitIndexKeyDefault) {
   std::string src =
       "module m;\n"
@@ -140,7 +130,6 @@ TEST(SimCh511, ArrayLitIndexKeyDefault) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x00);
 }
 
-// §5.11: Index key in declaration initializer.
 TEST(SimCh511, ArrayLitIndexKeyInit) {
   std::string src =
       "module m;\n"
@@ -157,7 +146,6 @@ TEST(SimCh511, ArrayLitIndexKeyInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xCC);
 }
 
-// §5.11: Descending array range — '{val, val, val} maps left-to-right.
 TEST(SimCh511, ArrayLitDescending) {
   std::string src =
       "module m;\n"
@@ -169,13 +157,12 @@ TEST(SimCh511, ArrayLitDescending) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // Descending [2:0]: element 0 of pattern maps to index 2 (highest).
+
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
   EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0xBB);
   EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0xCC);
 }
 
-// §5.11: Type from assignment-like context (implicit from LHS).
 TEST(SimCh511, ArrayLitTypeFromContext) {
   std::string src =
       "module m;\n"

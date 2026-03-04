@@ -1,5 +1,3 @@
-// §27.5: Conditional generate constructs
-
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- Elaborator resolves if_generate_construct (true branch) ---
 TEST(ParserAnnexA042, ElaborationGenerateIfTrue) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -28,7 +25,6 @@ TEST(ParserAnnexA042, ElaborationGenerateIfTrue) {
   EXPECT_TRUE(found_wide);
 }
 
-// --- Elaborator resolves if_generate_construct (false/else branch) ---
 TEST(ParserAnnexA042, ElaborationGenerateIfFalse) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -49,7 +45,6 @@ TEST(ParserAnnexA042, ElaborationGenerateIfFalse) {
   EXPECT_TRUE(found_narrow);
 }
 
-// --- Elaborator resolves case_generate_construct ---
 TEST(ParserAnnexA042, ElaborationGenerateCase) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -70,7 +65,6 @@ TEST(ParserAnnexA042, ElaborationGenerateCase) {
   EXPECT_TRUE(found_bus1);
 }
 
-// --- Elaborator resolves case_generate_construct (default branch) ---
 TEST(ParserAnnexA042, ElaborationGenerateCaseDefault) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -91,4 +85,4 @@ TEST(ParserAnnexA042, ElaborationGenerateCaseDefault) {
   EXPECT_TRUE(found_def);
 }
 
-}  // namespace
+}

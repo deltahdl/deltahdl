@@ -1,5 +1,3 @@
-// §9.2.2.3: Latched logic always_latch procedure
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -26,4 +24,4 @@ TEST(SynthLower, AlwaysLatchCreatesLatch) {
   EXPECT_FALSE(aig->latches.empty());
 }
 
-}  // namespace
+}

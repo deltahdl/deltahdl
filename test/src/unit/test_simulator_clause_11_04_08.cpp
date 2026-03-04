@@ -1,5 +1,3 @@
-// §11.4.8: Bitwise operators
-
 #include <cstring>
 
 #include "builders_ast.h"
@@ -12,12 +10,9 @@ using namespace delta;
 
 namespace {
 
-// ==========================================================================
-// Binary XNOR (^~, ~^) — §11.4.8
-// ==========================================================================
 TEST(EvalOpXZ, BinaryXnorBasic) {
   SimFixture f;
-  // 4'b1100 ^~ 4'b1010 = 4'b1001 = 9
+
   auto* a = f.ctx.CreateVariable("xa", 4);
   a->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
   auto* b = f.ctx.CreateVariable("xb", 4);
@@ -32,7 +27,7 @@ TEST(EvalOpXZ, BinaryXnorBasic) {
 
 TEST(EvalOpXZ, BinaryXnorCaretTilde) {
   SimFixture f;
-  // 4'b1100 ~^ 4'b1010 = 4'b1001 = 9 (same as ^~)
+
   auto* a = f.ctx.CreateVariable("ya", 4);
   a->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
   auto* b = f.ctx.CreateVariable("yb", 4);
@@ -47,7 +42,7 @@ TEST(EvalOpXZ, BinaryXnorCaretTilde) {
 
 TEST(EvalOpXZ, BinaryXnorWithX) {
   SimFixture f;
-  // 4'b1x00 ^~ 4'b1010: result 4'b1x01
+
   auto* a = f.ctx.CreateVariable("za", 4);
   a->value = MakeLogic4Vec(f.arena, 4);
   a->value.words[0].aval = 0b1000;
@@ -64,7 +59,6 @@ TEST(EvalOpXZ, BinaryXnorWithX) {
   EXPECT_EQ(result.words[0].bval, 0b0100u);
 }
 
-// § unary_operator — bitwise NOT
 TEST(SimA86, UnaryBitwiseNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -82,10 +76,6 @@ TEST(SimA86, UnaryBitwiseNot) {
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0xF0u);
 }
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (bitwise) — Simulation
-// =============================================================================
-// § binary_operator — & (bitwise AND)
 TEST(SimA86, BinaryBitwiseAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -103,7 +93,6 @@ TEST(SimA86, BinaryBitwiseAnd) {
   EXPECT_EQ(var->value.ToUint64(), 0x30u);
 }
 
-// § binary_operator — | (bitwise OR)
 TEST(SimA86, BinaryBitwiseOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -121,7 +110,6 @@ TEST(SimA86, BinaryBitwiseOr) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// § binary_operator — ^ (bitwise XOR)
 TEST(SimA86, BinaryBitwiseXor) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -139,7 +127,6 @@ TEST(SimA86, BinaryBitwiseXor) {
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
 }
 
-// § binary_operator — ^~ (bitwise XNOR)
 TEST(SimA86, BinaryBitwiseXnor) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -157,4 +144,4 @@ TEST(SimA86, BinaryBitwiseXnor) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-}  // namespace
+}

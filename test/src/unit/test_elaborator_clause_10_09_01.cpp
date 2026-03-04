@@ -1,5 +1,3 @@
-// §10.9.1: Array assignment patterns
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -11,7 +9,7 @@ using namespace delta;
 namespace {
 
 TEST(ElabCh511, ArrayInitPattern_SimpleArrayOk) {
-  // §5.11 / §10.9.1: Expressions shall match element for element.
+
   SimFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -21,13 +19,6 @@ TEST(ElabCh511, ArrayInitPattern_SimpleArrayOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// =============================================================================
-// A.6.7.1 Patterns — Simulation tests
-// =============================================================================
-// ---------------------------------------------------------------------------
-// assignment_pattern: positional — simulation
-// ---------------------------------------------------------------------------
-// §10.9: positional assignment pattern packs elements MSB-first
 TEST(SimA60701, PositionalPatternPacksMSBFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -44,11 +35,10 @@ TEST(SimA60701, PositionalPatternPacksMSBFirst) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // '{8'd1, 8'd2} = {8'h01, 8'h02} = 16'h0102 = 258
+
   EXPECT_EQ(var->value.ToUint64(), 258u);
 }
 
-// §10.9: single-element positional pattern
 TEST(SimA60701, SingleElementPositionalPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -68,7 +58,6 @@ TEST(SimA60701, SingleElementPositionalPattern) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §10.9: four-element positional pattern
 TEST(SimA60701, FourElementPositionalPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -85,11 +74,10 @@ TEST(SimA60701, FourElementPositionalPattern) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // '{8'd1, 8'd2, 8'd3, 8'd4} = 32'h01020304 = 16909060
+
   EXPECT_EQ(var->value.ToUint64(), 0x01020304u);
 }
 
-// §10.9: assignment pattern used in conditional branch
 TEST(SimA60701, PatternInConditionalBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -107,11 +95,10 @@ TEST(SimA60701, PatternInConditionalBranch) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // '{8'd5, 8'd6} = {8'h05, 8'h06} = 16'h0506 = 1286
+
   EXPECT_EQ(var->value.ToUint64(), 1286u);
 }
 
-// §10.9: assignment pattern used in case item body
 TEST(SimA60701, PatternInCaseItemBody) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -134,11 +121,10 @@ TEST(SimA60701, PatternInCaseItemBody) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // '{8'd10, 8'd20} = {8'h0A, 8'h14} = 16'h0A14 = 2580
+
   EXPECT_EQ(var->value.ToUint64(), 2580u);
 }
 
-// §10.9: assignment pattern in for loop body
 TEST(SimA60701, PatternInForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -158,12 +144,12 @@ TEST(SimA60701, PatternInForLoop) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // '{8'd7, 8'd8} = {8'h07, 8'h08} = 16'h0708 = 1800
+
   EXPECT_EQ(var->value.ToUint64(), 1800u);
 }
 
 TEST(ElabCh511, ArrayInitPattern_NestedOk) {
-  // §5.11: Nested braces matching array dimensions are valid.
+
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -175,7 +161,7 @@ TEST(ElabCh511, ArrayInitPattern_NestedOk) {
 }
 
 TEST(ElabCh511, ArrayInitPattern_SizeMismatch) {
-  // §10.9.1: Expressions shall match element for element; 3 != 2.
+
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -185,7 +171,6 @@ TEST(ElabCh511, ArrayInitPattern_SizeMismatch) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §10.9: assignment pattern with default key elaborates
 TEST(ElabA60701, PatternDefaultKeyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -199,4 +184,4 @@ TEST(ElabA60701, PatternDefaultKeyElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}  // namespace
+}

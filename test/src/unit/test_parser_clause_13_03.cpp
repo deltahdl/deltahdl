@@ -1,14 +1,10 @@
-// §13.3: Tasks
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// Task with inout port direction.
 TEST(ParserSection13, TaskWithInoutPort) {
   auto r = Parse(
       "module m;\n"
@@ -23,7 +19,6 @@ TEST(ParserSection13, TaskWithInoutPort) {
   EXPECT_EQ(tk->func_args[0].direction, Direction::kInout);
 }
 
-// Task with no ports.
 TEST(ParserSection13, TaskWithNoPorts) {
   auto r = Parse(
       "module m;\n"
@@ -52,9 +47,6 @@ TEST(ParserA27, TfPortItemVarWithDirection) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-// ---------------------------------------------------------------------------
-// tf_port_item clarification 28: name omitted in prototype
-// ---------------------------------------------------------------------------
 TEST(ParserA27, TfPortItemNoNameInPrototype) {
   auto r = Parse(
       "module m;\n"
@@ -66,7 +58,6 @@ TEST(ParserA27, TfPortItemNoNameInPrototype) {
   ASSERT_EQ(item->func_args.size(), 2u);
 }
 
-// block_item_declaration in task body (§13.3)
 TEST(ParserA28, BlockItemInTask) {
   auto r = Parse(
       "module m;\n"
@@ -97,9 +88,6 @@ TEST(Parser, TaskDecl) {
   ASSERT_EQ(mod->items[0]->func_args.size(), 1);
 }
 
-// ---------------------------------------------------------------------------
-// tf_item_declaration: block_item_declaration and tf_port_declaration mixed
-// ---------------------------------------------------------------------------
 TEST(ParserA27, TfItemDeclMixed) {
   auto r = Parse(
       "module m;\n"
@@ -148,9 +136,6 @@ TEST(ParserSection13, OldStyleTask) {
   EXPECT_EQ(tk->func_args[1].direction, Direction::kOutput);
 }
 
-// =============================================================================
-// LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
-// =============================================================================
 TEST(ParserSection13, OldStyleTaskMultipleInputs) {
   auto r = Parse(
       "module m;\n"
@@ -172,7 +157,6 @@ TEST(ParserSection13, OldStyleTaskMultipleInputs) {
   }
 }
 
-// Task with end label matching the task name (LRM section 13.3).
 TEST(ParserSection13, TaskEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -186,10 +170,6 @@ TEST(ParserSection13, TaskEndLabel) {
   EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
 }
 
-// =============================================================================
-// LRM section 13.3 -- Tasks (additional tests)
-// =============================================================================
-// Task with timing control in body (tasks may have time-controlling stmts).
 TEST(ParserSection13, TaskWithTimingControl) {
   auto r = Parse(
       "module m;\n"
@@ -223,9 +203,6 @@ TEST(ParserA23, ListOfTfVariableIdentifiersTask) {
   EXPECT_EQ(item->func_args[2].direction, Direction::kOutput);
 }
 
-// ---------------------------------------------------------------------------
-// task_body_declaration (new-style ports)
-// ---------------------------------------------------------------------------
 TEST(ParserA27, TaskBodyNewStyleEmptyPorts) {
   auto r = Parse(
       "module m;\n"
@@ -239,7 +216,6 @@ TEST(ParserA27, TaskBodyNewStyleEmptyPorts) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
-// Helper: verify first item has 2 func_args: a(input), b.
 static void VerifyTwoArgTask(ParseResult& r) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -296,9 +272,6 @@ TEST(ParserA27, TaskBodyWithEndLabel) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "my_task");
 }
 
-// ---------------------------------------------------------------------------
-// task_body_declaration (old-style ports — tf_item_declaration)
-// ---------------------------------------------------------------------------
 TEST(ParserA27, TaskBodyOldStylePorts) {
   auto r = Parse(
       "module m;\n"
@@ -327,7 +300,7 @@ TEST(ParserA27, TaskBodyOldStyleOutputPort) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 TEST(ParserSection6, VoidTaskReturnType) {
-  // Tasks implicitly return void; verify parse is correct.
+
   auto r = Parse(
       "module t;\n"
       "  task do_nothing();\n"
@@ -339,4 +312,4 @@ TEST(ParserSection6, VoidTaskReturnType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
 }
 
-}  // namespace
+}

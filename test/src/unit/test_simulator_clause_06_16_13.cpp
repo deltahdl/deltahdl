@@ -1,5 +1,3 @@
-// §6.16.13: Octtoa()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.13: octtoa(i) -- assign octal string representation to variable
-// =============================================================================
 TEST(StringMethods, Octtoa) {
   StringFixture f;
   auto* var = f.CreateStringVar("s", "");
@@ -19,4 +14,4 @@ TEST(StringMethods, Octtoa) {
   EXPECT_EQ(VecToString(var->value), "10");
 }
 
-}  // namespace
+}

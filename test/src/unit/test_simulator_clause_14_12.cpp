@@ -1,5 +1,3 @@
-// §14.12: Default clocking
-
 #include <cstdint>
 #include <string_view>
 
@@ -12,16 +10,8 @@
 
 using namespace delta;
 
-// Helper fixture for clocking simulation tests.
-// Schedule posedge at a given time through the scheduler.
-
-// Schedule negedge at a given time through the scheduler.
-
 namespace {
 
-// =============================================================================
-// 8. Default clocking block (S14.12)
-// =============================================================================
 TEST(ClockingSim, DefaultClockingBlock) {
   ClockingManager cmgr;
   EXPECT_TRUE(cmgr.GetDefaultClocking().empty());
@@ -42,7 +32,6 @@ TEST(ClockingSim, DefaultClockingBlock) {
   EXPECT_EQ(found->default_input_skew.ticks, 1u);
 }
 
-// --- clocking_declaration: default clocking ---
 TEST(SimA611, DefaultClocking) {
   ClockingManager cmgr;
   ClockingBlock block;
@@ -57,4 +46,4 @@ TEST(SimA611, DefaultClocking) {
   EXPECT_EQ(cmgr.GetDefaultClocking(), "sys_cb");
 }
 
-}  // namespace
+}

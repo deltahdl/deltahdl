@@ -1,5 +1,3 @@
-// §34.5: Protect pragma keywords
-
 #include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
@@ -24,9 +22,6 @@ struct ProtectedTest : ::testing::Test {
 
 namespace {
 
-// =============================================================================
-// §34.5.1/2 Protected envelope begin/end parsing
-// =============================================================================
 TEST_F(ProtectedTest, BeginEndEnvelope) {
   auto result = Preprocess(
       "module m;\n"
@@ -35,12 +30,12 @@ TEST_F(ProtectedTest, BeginEndEnvelope) {
       "`pragma protect end\n"
       "endmodule\n");
   EXPECT_FALSE(diag_.HasErrors());
-  // Non-pragma lines should pass through.
+
   EXPECT_NE(result.find("module m;"), std::string::npos);
   EXPECT_NE(result.find("logic secret_wire;"), std::string::npos);
   EXPECT_NE(result.find("endmodule"), std::string::npos);
-  // Pragma lines consumed.
+
   EXPECT_EQ(result.find("pragma"), std::string::npos);
 }
 
-}  // namespace
+}

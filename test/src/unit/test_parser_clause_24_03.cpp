@@ -1,5 +1,3 @@
-// §24.3: The program construct
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.4.1.3 -- Program instantiation
-//
-// program_instantiation ::=
-//   program_identifier [ parameter_value_assignment ]
-//     hierarchical_instance { , hierarchical_instance } ;
-// =============================================================================
-// --- program_instantiation: basic ---
 TEST(ParserAnnexA0413, BasicProgramInst) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
@@ -29,7 +19,6 @@ TEST(ParserAnnexA0413, BasicProgramInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-// --- program_instantiation: multiple hierarchical_instance ---
 TEST(ParserAnnexA0413, MultipleProgramInstances) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
@@ -46,7 +35,6 @@ TEST(ParserAnnexA0413, MultipleProgramInstances) {
   EXPECT_EQ(i1->inst_name, "u1");
 }
 
-// Program parameter port list and ports
 TEST(SourceText, ProgramParamsAndPorts) {
   auto r = Parse(
       "program prg #(parameter int N = 10)(input logic clk);\n"
@@ -57,9 +45,7 @@ TEST(SourceText, ProgramParamsAndPorts) {
   EXPECT_EQ(r.cu->programs[0]->params.size(), 1u);
   EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
 }
-// =============================================================================
-// §4.6: Program block for deterministic test scheduling
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_ProgramBlockDeterministicScheduling) {
   auto r = Parse(
       "program p;\n"
@@ -82,9 +68,6 @@ TEST(Parser, ProgramWithInitial) {
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-// =============================================================================
-// §4.6: Program block with initial block
-// =============================================================================
 TEST(ParserSection4, Sec4_6_ProgramWithInitialBlock) {
   auto r = Parse(
       "program p;\n"
@@ -127,9 +110,6 @@ TEST_F(ProgramTestParse, ProgramWithMultipleInitialBlocks) {
       2);
 }
 
-// =============================================================================
-// 30. Program block with function parses
-// =============================================================================
 TEST(ParserSection4, Sec4_9_4_ProgramWithFunction) {
   EXPECT_TRUE(
       ParseOk("program p;\n"
@@ -143,9 +123,6 @@ TEST(ParserSection4, Sec4_9_4_ProgramWithFunction) {
               "endprogram\n"));
 }
 
-// =============================================================================
-// §24.4 Program with task/function declarations
-// =============================================================================
 TEST_F(ProgramTestParse, ProgramWithTask) {
   auto* unit = Parse(
       "program p;\n"
@@ -172,9 +149,6 @@ TEST_F(ProgramTestParse, ProgramWithFunction) {
   EXPECT_EQ(unit->programs[0]->items[0]->name, "compute");
 }
 
-// =============================================================================
-// §24.7 Multiple programs and coexistence
-// =============================================================================
 TEST_F(ProgramTestParse, MultipleProgramsCoexist) {
   auto* unit = Parse(
       "program p1; endprogram\n"
@@ -186,9 +160,6 @@ TEST_F(ProgramTestParse, MultipleProgramsCoexist) {
   EXPECT_EQ(unit->programs[1]->name, "p2");
 }
 
-// =============================================================================
-// §24.8 Program with variable declarations
-// =============================================================================
 TEST_F(ProgramTestParse, ProgramWithVariableDecls) {
   auto* unit = Parse(
       "program p;\n"
@@ -199,7 +170,6 @@ TEST_F(ProgramTestParse, ProgramWithVariableDecls) {
   EXPECT_GE(unit->programs[0]->items.size(), 2u);
 }
 
-// anonymous_program_item: class_declaration, interface_class_declaration
 TEST(SourceText, AnonymousProgramClasses) {
   auto r = Parse(
       "package pkg;\n"
@@ -215,9 +185,6 @@ TEST(SourceText, AnonymousProgramClasses) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// =============================================================================
-// 30. Task in program block (automatic by default)
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_TaskInProgramBlock) {
   EXPECT_TRUE(
       ParseOk("program test_prog;\n"
@@ -229,7 +196,6 @@ TEST(ParserSection4, Sec4_9_3_TaskInProgramBlock) {
               "endprogram\n"));
 }
 
-// anonymous_program_item: covergroup, class_constructor, ;
 TEST(SourceText, AnonymousProgramMisc) {
   auto r = Parse(
       "package pkg;\n"
@@ -243,9 +209,7 @@ TEST(SourceText, AnonymousProgramMisc) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
-// ---------------------------------------------------------------------------
-// 24. Program block (Reactive region)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_ProgramBlock) {
   auto r = Parse(
       "program test_prog;\n"
@@ -262,9 +226,6 @@ TEST(ParserSection4, Sec4_5_ProgramBlock) {
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-// =============================================================================
-// §24.1 Basic program declarations
-// =============================================================================
 TEST_F(ProgramParseTest, EmptyProgram) {
   auto* unit = Parse("program p; endprogram");
   ASSERT_EQ(unit->programs.size(), 1u);
@@ -282,9 +243,6 @@ TEST_F(ProgramParseTest, ProgramWithEndLabel) {
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
-// =============================================================================
-// §24.2 Program ports and parameters
-// =============================================================================
 TEST_F(ProgramParseTest, ProgramWithPorts) {
   auto* unit = Parse(
       "program p(input logic clk, input logic rst);\n"
@@ -312,9 +270,6 @@ TEST_F(ProgramParseTest, ProgramWithParameters) {
   EXPECT_EQ(unit->programs[0]->ports[0].name, "clk");
 }
 
-// =============================================================================
-// §24.3 Program body items
-// =============================================================================
 TEST_F(ProgramParseTest, ProgramWithInitialBlock) {
   auto* unit = Parse(
       "program p;\n"
@@ -344,9 +299,6 @@ TEST_F(ProgramParseTest, ProgramWithMultipleItems) {
   ASSERT_GE(unit->programs[0]->items.size(), 3u);
 }
 
-// =============================================================================
-// §24.4 Multiple programs and coexistence with modules
-// =============================================================================
 TEST_F(ProgramParseTest, ProgramCoexistsWithModule) {
   auto* unit = Parse(
       "module m;\n"
@@ -373,9 +325,6 @@ TEST_F(ProgramParseTest, MultipleProgramsInCompilationUnit) {
   EXPECT_EQ(unit->programs[1]->decl_kind, ModuleDeclKind::kProgram);
 }
 
-// =============================================================================
-// §24.6 Program with task and function declarations
-// =============================================================================
 TEST_F(ProgramParseTest, ProgramWithTaskDecl) {
   auto* unit = Parse(
       "program p;\n"
@@ -424,10 +373,6 @@ TEST_F(ProgramParseTest, ProgramWithTaskAndFunction) {
   EXPECT_EQ(unit->programs[0]->items[1]->kind, ModuleItemKind::kFunctionDecl);
 }
 
-// =============================================================================
-// A.1.7 Program items
-// =============================================================================
-// program_item ::= port_declaration ;
 TEST(SourceText, ProgramItemPortDecl) {
   auto r = Parse(
       "program prg(input logic clk, output logic done);\n"
@@ -442,7 +387,6 @@ TEST(SourceText, ProgramItemPortDecl) {
   EXPECT_EQ(p->ports[1].direction, Direction::kOutput);
 }
 
-// Returns true if any item in the list matches the given kind.
 bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
   for (auto* item : items) {
     if (item->kind == kind) return true;
@@ -450,7 +394,6 @@ bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
   return false;
 }
 
-// non_port_program_item ::= continuous_assign
 TEST(SourceText, ProgramContinuousAssign) {
   auto r = Parse(
       "program prg;\n"
@@ -464,7 +407,6 @@ TEST(SourceText, ProgramContinuousAssign) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kContAssign));
 }
 
-// Returns true if any item matches the given kind and name.
 bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
                       ModuleItemKind kind, std::string_view name) {
   for (auto* item : items) {
@@ -473,7 +415,6 @@ bool HasItemKindNamed(const std::vector<ModuleItem*>& items,
   return false;
 }
 
-// non_port_program_item ::= module_or_generate_item_declaration
 TEST(SourceText, ProgramModuleOrGenerateItemDecl) {
   auto r = Parse(
       "program prg;\n"
@@ -491,7 +432,6 @@ TEST(SourceText, ProgramModuleOrGenerateItemDecl) {
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTaskDecl, "run"));
 }
 
-// non_port_program_item ::= initial_construct
 TEST(SourceText, ProgramInitialConstruct) {
   auto r = Parse(
       "program prg;\n"
@@ -506,7 +446,6 @@ TEST(SourceText, ProgramInitialConstruct) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-// non_port_program_item ::= final_construct
 TEST(SourceText, ProgramFinalConstruct) {
   auto r = Parse(
       "program prg;\n"
@@ -521,7 +460,6 @@ TEST(SourceText, ProgramFinalConstruct) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
-// non_port_program_item ::= concurrent_assertion_item
 TEST(SourceText, ProgramConcurrentAssertion) {
   auto r = Parse(
       "program prg;\n"
@@ -535,7 +473,6 @@ TEST(SourceText, ProgramConcurrentAssertion) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kAssertProperty));
 }
 
-// program_generate_item ::= conditional_generate_construct
 TEST(SourceText, ProgramGenerateConditional) {
   auto r = Parse(
       "program prg;\n"
@@ -551,7 +488,6 @@ TEST(SourceText, ProgramGenerateConditional) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateIf));
 }
 
-// program_generate_item ::= generate_region
 TEST(SourceText, ProgramGenerateRegion) {
   auto r = Parse(
       "program prg;\n"
@@ -565,7 +501,6 @@ TEST(SourceText, ProgramGenerateRegion) {
   EXPECT_FALSE(r.cu->programs[0]->items.empty());
 }
 
-// Combined: program with multiple A.1.7 item types.
 TEST(SourceText, ProgramMultipleItemTypes) {
   auto r = Parse(
       "program prg(input logic clk);\n"
@@ -590,7 +525,6 @@ TEST(SourceText, ProgramMultipleItemTypes) {
   EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kElabSystemTask));
 }
 
-// 17. Program block with declarations
 TEST(ParserClause03, Cl3_13_ProgramBlockWithDeclarations) {
   auto r = Parse(
       "program test_prog;\n"
@@ -607,7 +541,6 @@ TEST(ParserClause03, Cl3_13_ProgramBlockWithDeclarations) {
   EXPECT_FALSE(r.cu->programs[0]->items.empty());
 }
 
-// description: program_declaration
 TEST(SourceText, DescriptionProgram) {
   auto r = Parse("program prg; endprogram\n");
   ASSERT_NE(r.cu, nullptr);
@@ -616,10 +549,6 @@ TEST(SourceText, DescriptionProgram) {
   EXPECT_EQ(r.cu->programs[0]->name, "prg");
 }
 
-// =============================================================================
-// A.1.2 program_declaration — all forms
-// =============================================================================
-// Program with lifetime.
 TEST(SourceText, ProgramWithLifetime) {
   auto r = Parse("program automatic prg; endprogram\n");
   ASSERT_NE(r.cu, nullptr);
@@ -627,14 +556,12 @@ TEST(SourceText, ProgramWithLifetime) {
   ASSERT_EQ(r.cu->programs.size(), 1u);
 }
 
-// Program with end label.
 TEST(SourceText, ProgramEndLabel) {
   auto r = Parse("program prg; endprogram : prg\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// Extern program declaration.
 TEST(SourceText, ExternProgram) {
   auto r = Parse("extern program prg(input logic clk);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -644,10 +571,6 @@ TEST(SourceText, ExternProgram) {
   EXPECT_EQ(r.cu->programs[0]->name, "prg");
 }
 
-// =============================================================================
-// A.1.2 program_declaration — all 5 forms
-// =============================================================================
-// Program with ANSI ports.
 TEST(SourceText, ProgramAnsiHeader) {
   auto r = Parse("program prg(input logic clk); endprogram\n");
   ASSERT_NE(r.cu, nullptr);
@@ -656,7 +579,6 @@ TEST(SourceText, ProgramAnsiHeader) {
   EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
 }
 
-// Program with non-ANSI ports.
 TEST(SourceText, ProgramNonAnsiHeader) {
   auto r = Parse(
       "program prg(clk);\n"
@@ -668,7 +590,6 @@ TEST(SourceText, ProgramNonAnsiHeader) {
   EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
 }
 
-// Program with wildcard ports: program p(.*);
 TEST(SourceText, ProgramWildcardPorts) {
   auto r = Parse("program prg(.*); endprogram\n");
   ASSERT_NE(r.cu, nullptr);
@@ -677,4 +598,4 @@ TEST(SourceText, ProgramWildcardPorts) {
   EXPECT_TRUE(r.cu->programs[0]->has_wildcard_ports);
 }
 
-}  // namespace
+}

@@ -1,14 +1,9 @@
-// §11.10: String literal expressions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =========================================================================
-// Section 11.10 -- String literal expressions and methods
-// =========================================================================
 TEST(ParserSection11, StringLiteralToVector) {
   auto r = Parse(
       "module t;\n"
@@ -44,4 +39,4 @@ TEST(ParserSection11, Sec11_1_StringLiteralAsExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-}  // namespace
+}

@@ -1,17 +1,10 @@
-// §14.12: Default clocking
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// =============================================================================
-// LRM section 14.12 -- Default clocking
-// =============================================================================
-// §14.12: default clocking with negedge (variation of the LRM examples).
 TEST(ParserSection14, DefaultClockingNegedge) {
   auto r = Parse(
       "module m;\n"
@@ -28,7 +21,6 @@ TEST(ParserSection14, DefaultClockingNegedge) {
   ASSERT_EQ(item->clocking_signals.size(), 2u);
 }
 
-// §14.12: default clocking block with end label.
 TEST(ParserSection14, DefaultClockingEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -42,7 +34,6 @@ TEST(ParserSection14, DefaultClockingEndLabel) {
   EXPECT_EQ(item->name, "bus");
 }
 
-// §14.12: unnamed default clocking block with multiple signals.
 TEST(ParserSection14, DefaultClockingUnnamedMultipleSignals) {
   auto r = Parse(
       "module m;\n"
@@ -58,9 +49,6 @@ TEST(ParserSection14, DefaultClockingUnnamedMultipleSignals) {
   ASSERT_EQ(item->clocking_signals.size(), 3u);
 }
 
-// =============================================================================
-// A.6.11 clocking_declaration — default clocking reference form
-// =============================================================================
 TEST(ParserA611, DefaultClockingReference) {
   auto r = Parse(
       "module m;\n"
@@ -73,7 +61,6 @@ TEST(ParserA611, DefaultClockingReference) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// default clocking as module_or_generate_item_declaration.
 TEST(SourceText, DefaultClockingAsModuleItem) {
   auto r = Parse(
       "module m;\n"
@@ -86,10 +73,7 @@ TEST(SourceText, DefaultClockingAsModuleItem) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kClockingBlock);
   EXPECT_TRUE(r.cu->modules[0]->items[0]->is_default_clocking);
 }
-// =============================================================================
-// LRM section 19.5.1 -- Default clocking
-// =============================================================================
-// Declaring a clocking block inline as default.
+
 TEST(ParserSection19, DefaultClocking_InlineDecl) {
   auto r = Parse(
       "module t;\n"
@@ -105,7 +89,6 @@ TEST(ParserSection19, DefaultClocking_InlineDecl) {
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
 }
 
-// Unnamed default clocking block.
 TEST(ParserSection19, DefaultClocking_Unnamed) {
   auto r = Parse(
       "module t;\n"
@@ -119,7 +102,6 @@ TEST(ParserSection19, DefaultClocking_Unnamed) {
   EXPECT_TRUE(item->name.empty());
 }
 
-// Assigning an existing clocking block as default via a separate statement.
 TEST(ParserSection19, DefaultClocking_SeparateStatement) {
   auto r = Parse(
       "module t;\n"
@@ -129,7 +111,7 @@ TEST(ParserSection19, DefaultClocking_SeparateStatement) {
       "  default clocking busA;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // The reference form creates a second clocking block item.
+
   auto& items = r.cu->modules[0]->items;
   bool found_ref = false;
   for (auto* item : items) {
@@ -141,9 +123,7 @@ TEST(ParserSection19, DefaultClocking_SeparateStatement) {
   }
   EXPECT_TRUE(found_ref);
 }
-// =============================================================================
-// A.6.11 clocking_declaration — default clocking
-// =============================================================================
+
 TEST(ParserA611, ClockingDeclDefault) {
   auto r = Parse(
       "module m;\n"
@@ -160,9 +140,6 @@ TEST(ParserA611, ClockingDeclDefault) {
   EXPECT_EQ(item->name, "cb");
 }
 
-// =============================================================================
-// A.6.11 clocking_declaration — unnamed default clocking
-// =============================================================================
 TEST(ParserA611, ClockingDeclUnnamed) {
   auto r = Parse(
       "module m;\n"
@@ -178,7 +155,6 @@ TEST(ParserA611, ClockingDeclUnnamed) {
   EXPECT_TRUE(item->name.empty());
 }
 
-// Default clocking in an interface.
 TEST(ParserSection19, DefaultClocking_InInterface) {
   EXPECT_TRUE(
       ParseOk("interface my_if (input clk);\n"
@@ -189,4 +165,4 @@ TEST(ParserSection19, DefaultClocking_InInterface) {
               "endinterface\n"));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// Annex E.5: `delay_mode_path
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- E.3: `delay_mode_path ---
 TEST(ParserAnnexE2, AnnexEDelayModePath) {
   auto r = Parse(
       "`delay_mode_path\n"
@@ -18,4 +15,4 @@ TEST(ParserAnnexE2, AnnexEDelayModePath) {
   }
 }
 
-}  // namespace
+}

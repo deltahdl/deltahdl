@@ -1,5 +1,3 @@
-// §19.7: Specifying coverage options
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.11 Production #2: coverage_spec_or_option
-// =============================================================================
 TEST(ParserA211, CoverageSpecOrOption_Option) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -20,9 +15,6 @@ TEST(ParserA211, CoverageSpecOrOption_Option) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #3: coverage_option
-// =============================================================================
 TEST(ParserA211, CoverageOption_OptionMember) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -41,9 +33,6 @@ TEST(ParserA211, CoverageOption_Goal) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #22: bins_selection_or_option
-// =============================================================================
 TEST(ParserA211, BinsSelectionOrOption_CoverageOption) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -81,4 +70,4 @@ TEST_F(VerifyParseTest, CovergroupWithOption) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

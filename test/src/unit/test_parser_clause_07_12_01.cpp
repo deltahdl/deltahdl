@@ -1,15 +1,10 @@
-// §7.12.1: Array locator methods
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-// --- Test helpers ---
+
 namespace {
 
-// =========================================================================
-// §7.12.1: Array locator methods
-// =========================================================================
 TEST(ParserSection7, ArrayFindWithClause) {
   auto r = Parse(
       "module t;\n"
@@ -35,9 +30,6 @@ TEST(ParserSection7, ArrayFindIndexMethod) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-// =========================================================================
-// §7.12.1: Array locator method 'unique' (keyword as method name)
-// =========================================================================
 TEST(ParserSection7, ArrayLocatorUnique) {
   auto r = Parse(
       "module t;\n"
@@ -52,9 +44,6 @@ TEST(ParserSection7, ArrayLocatorUnique) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-// =========================================================================
-// §7.12: Array manipulation methods (additional tests)
-// =========================================================================
 TEST(ParserSection7, ArrayLocatorFindWithClause) {
   auto r = Parse(
       "module t;\n"
@@ -91,13 +80,10 @@ TEST(ParserSection7, ArrayMethodMin) {
   ASSERT_NE(stmt, nullptr);
   auto* rhs = stmt->rhs;
   ASSERT_NE(rhs, nullptr);
-  // min without parens is a member access
+
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
-// =============================================================================
-// A.6.9 — array_method_name keywords (unique, and, or, xor)
-// =============================================================================
 TEST(ParserA609, ArrayMethodUnique) {
   auto r = Parse(
       "module m;\n"
@@ -110,9 +96,6 @@ TEST(ParserA609, ArrayMethodUnique) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-// =============================================================================
-// A.6.9 — array_manipulation_call with 'with' clause
-// =============================================================================
 TEST(ParserA609, ArrayMethodWithClause) {
   auto r = Parse(
       "module m;\n"
@@ -124,7 +107,6 @@ TEST(ParserA609, ArrayMethodWithClause) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// array_manipulation_call with 'with' clause
 TEST(ParserA82, ArrayManipCallWithClause) {
   auto r = Parse(
       "module m;\n"
@@ -136,10 +118,6 @@ TEST(ParserA82, ArrayManipCallWithClause) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.8.2 Subroutine calls — array_method_name
-// =============================================================================
-// § array_method_name ::= method_identifier | unique | and | or | xor
 TEST(ParserA82, ArrayMethodNameUnique) {
   auto r = Parse(
       "module m;\n"
@@ -177,4 +155,4 @@ TEST(ParserSection7, ArrayMethodUniqueIndex) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-}  // namespace
+}

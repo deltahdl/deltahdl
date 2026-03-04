@@ -1,5 +1,3 @@
-// §30.4.7.3: Negative polarity
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -13,7 +11,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-// ( input - => output ) — negative polarity, parallel
 TEST(ParserA702, ParallelPathNegativePolarity) {
   auto r = Parse(
       "module m;\n"
@@ -29,7 +26,6 @@ TEST(ParserA702, ParallelPathNegativePolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
 }
 
-// ( inputs - *> outputs ) — negative polarity, full
 TEST(ParserA702, FullPathNegativePolarity) {
   auto r = Parse(
       "module m;\n"
@@ -45,4 +41,4 @@ TEST(ParserA702, FullPathNegativePolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
 }
 
-}  // namespace
+}

@@ -1,12 +1,9 @@
-// §12.7.3: The foreach-loop
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// §12.7.3: foreach loop elaborates without error
 TEST(ElabA608, ForeachLoop) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,4 +19,4 @@ TEST(ElabA608, ForeachLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

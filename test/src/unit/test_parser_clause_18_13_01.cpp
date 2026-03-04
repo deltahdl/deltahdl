@@ -1,5 +1,3 @@
-// §18.13.1: $urandom
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,11 +5,8 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex G - Std package: randomize (§G.4)
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexGRandomizeCall) {
-  // $urandom and simple randomize() call inside initial block.
+
   auto* unit = Parse(
       "module m;\n"
       "  int x;\n"
@@ -25,4 +20,4 @@ TEST_F(AnnexHParseTest, AnnexGRandomizeCall) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-}  // namespace
+}

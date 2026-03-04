@@ -1,5 +1,3 @@
-// §8.25.1: Class scope resolution operator for parameterized classes
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- class_type ---
-// ps_class_identifier [param] { :: class_identifier [param] }
 TEST(ParserA221, ClassTypeParameterized) {
   auto r = Parse(
       "class param_cls #(type T = int);\n"
@@ -19,8 +15,6 @@ TEST(ParserA221, ClassTypeParameterized) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Test helpers ---
-// §13.8: Class scope resolution call with parameterization.
 TEST(ParserSection13, Sec13_8_ScopeCallParsesAsExpr) {
   auto r = Parse(
       "module top;\n"
@@ -32,7 +26,6 @@ TEST(ParserSection13, Sec13_8_ScopeCallParsesAsExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §13.8: Two different specializations in the same module.
 TEST(ParserSection13, Sec13_8_TwoSpecializations) {
   auto r = Parse(
       "module m;\n"
@@ -47,7 +40,6 @@ TEST(ParserSection13, Sec13_8_TwoSpecializations) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §13.8: Specialization with multiple parameter overrides.
 TEST(ParserSection13, Sec13_8_MultiParamSpecialization) {
   auto r = Parse(
       "module m;\n"
@@ -59,7 +51,6 @@ TEST(ParserSection13, Sec13_8_MultiParamSpecialization) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §13.8: Call to parameterized class with type parameter override.
 TEST(ParserSection13, Sec13_8_TypeParamOverrideCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -68,7 +59,6 @@ TEST(ParserSection13, Sec13_8_TypeParamOverrideCall) {
               "endmodule\n"));
 }
 
-// §13.8: Chained call — result of parameterized call used as argument.
 TEST(ParserSection13, Sec13_8_ChainedParameterizedCalls) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -77,7 +67,6 @@ TEST(ParserSection13, Sec13_8_ChainedParameterizedCalls) {
               "endmodule\n"));
 }
 
-// §13.8: Specialized call with explicit parameter (no default).
 TEST(ParserSection13, Sec13_8_ExplicitParamSpecialization) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -86,7 +75,6 @@ TEST(ParserSection13, Sec13_8_ExplicitParamSpecialization) {
               "endmodule\n"));
 }
 
-// §13.8: Calling parameterized task from initial block.
 TEST(ParserSection13, Sec13_8_CallParamTaskFromInitial) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -94,7 +82,6 @@ TEST(ParserSection13, Sec13_8_CallParamTaskFromInitial) {
               "endmodule\n"));
 }
 
-// §13.8: Parameterized class scope in conditional expression.
 TEST(ParserSection13, Sec13_8_ParamCallInTernary) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -103,7 +90,7 @@ TEST(ParserSection13, Sec13_8_ParamCallInTernary) {
               "  assign y = sel ? C#(8)::ENCODER_f(x) : '0;\n"
               "endmodule\n"));
 }
-// §8.25.1 — Parameterized class scope resolution: ClassName#(params)::member
+
 TEST(ParserSection8, ParameterizedClassScopeResolution) {
   auto r = Parse(
       "module m;\n"
@@ -118,4 +105,4 @@ TEST(ParserSection8, ParameterizedClassScopeResolution) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

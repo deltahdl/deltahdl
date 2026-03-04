@@ -1,17 +1,9 @@
-// §33.4.1: Basic configuration syntax
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM §3.10 — Configurations
-// =============================================================================
-// §3.10: "SystemVerilog provides the ability to specify design configurations,
-//         which specify the binding information of module instances to specific
-//         SystemVerilog source code. Configurations utilize libraries."
 TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
   auto r = ParseWithPreprocessor(
       "config cfg1;\n"
@@ -24,11 +16,11 @@ TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->name, "cfg1");
-  // Design statement: binding to specific source (lib.cell notation)
+
   ASSERT_EQ(r.cu->configs[0]->design_cells.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->design_cells[0].first, "work");
   EXPECT_EQ(r.cu->configs[0]->design_cells[0].second, "top");
-  // Three rules: default, instance, cell — all configuration binding types
+
   ASSERT_EQ(r.cu->configs[0]->rules.size(), 3u);
   EXPECT_EQ(r.cu->configs[0]->rules[0]->kind, ConfigRuleKind::kDefault);
   ASSERT_EQ(r.cu->configs[0]->rules[0]->liblist.size(), 1u);
@@ -44,7 +36,6 @@ TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
   ASSERT_EQ(r2->liblist.size(), 2u);
 }
 
-// 15. Config declarations at top level (part of CU).
 TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
   auto r = ParseWithPreprocessor(
       "module lib_mod; endmodule\n"
@@ -58,4 +49,4 @@ TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
   EXPECT_EQ(r.cu->configs[0]->name, "my_cfg");
 }
 
-}  // namespace
+}

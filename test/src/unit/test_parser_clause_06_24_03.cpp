@@ -1,5 +1,3 @@
-// §6.24.3: Bit-stream casting
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -8,11 +6,8 @@ using namespace delta;
 
 namespace {
 
-// =========================================================================
-// §6.24.3: Bit-stream casting
-// =========================================================================
 TEST(ParserSection6, BitstreamCastStructToInt) {
-  // §6.24.3: Cast between bit-stream types (struct to int).
+
   EXPECT_TRUE(ParseOk(
       "module t;\n"
       "  typedef struct packed { logic [15:0] hi; logic [15:0] lo; } pair_t;\n"
@@ -25,7 +20,7 @@ TEST(ParserSection6, BitstreamCastStructToInt) {
 }
 
 TEST(ParserSection6, BitstreamCastIntToStruct) {
-  // §6.24.3: Cast from int to packed struct (bit-stream).
+
   EXPECT_TRUE(ParseOk(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -35,9 +30,7 @@ TEST(ParserSection6, BitstreamCastIntToStruct) {
       "  end\n"
       "endmodule\n"));
 }
-// =========================================================================
-// §6.24.3 -- Bit-stream casting
-// =========================================================================
+
 TEST(ParserSection6, BitStreamCastToType) {
   auto r = Parse(
       "module t;\n"
@@ -63,4 +56,4 @@ TEST(ParserSection6, BitStreamCastFromStruct) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

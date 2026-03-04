@@ -1,5 +1,3 @@
-// §23.7: Member selects and hierarchical names
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -8,13 +6,13 @@ using namespace delta;
 namespace {
 
 TEST(ParserCh513, BuiltInMethod_ChainedAccess) {
-  // Chained member accesses: a.b.c().
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial x = obj.sub.method();\n"
               "endmodule"));
 }
-// --- Member access ---
+
 TEST(ParserSection11, Sec11_1_MemberAccessExpression) {
   auto r = Parse(
       "module t;\n"
@@ -24,7 +22,7 @@ TEST(ParserSection11, Sec11_1_MemberAccessExpression) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
-// 6. Struct member assigned individually (s.a = 1).
+
 TEST(ParserSection7, Sec7_2_2_MemberAssignment) {
   auto r = Parse(
       "module t;\n"
@@ -43,7 +41,7 @@ TEST(ParserSection7, Sec7_2_2_MemberAssignment) {
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
-// --- Test helpers ---
+
 TEST(ParserSection7, StructMemberAccess) {
   auto r = Parse(
       "module t;\n"
@@ -57,4 +55,4 @@ TEST(ParserSection7, StructMemberAccess) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-}  // namespace
+}

@@ -1,19 +1,10 @@
-// §14.10: Clocking block events
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// =============================================================================
-// LRM section 14.10 -- Clocking block events
-// =============================================================================
-// §14.10: clocking block event used in always block (from LRM example).
-// The clocking block name itself acts as an event trigger in the Observed
-// region. This tests the LRM example: always @(dram) $display(...);
 TEST(ParserSection14, ClockingBlockEventAlwaysAt) {
   auto r = Parse(
       "module foo(input phi1, input [7:0] data);\n"
@@ -28,11 +19,10 @@ TEST(ParserSection14, ClockingBlockEventAlwaysAt) {
   auto* item = FindClockingBlock(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "dram");
-  // The always block should also have been parsed (at least 2 items).
+
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-// §14.10: clocking event alongside a posedge always block.
 TEST(ParserSection14, ClockingBlockEventWithPosedgeAlways) {
   auto r = Parse(
       "module m;\n"
@@ -45,11 +35,10 @@ TEST(ParserSection14, ClockingBlockEventWithPosedgeAlways) {
   ASSERT_NE(r.cu, nullptr);
   auto* item = FindClockingBlock(r);
   ASSERT_NE(item, nullptr);
-  // Three items: clocking block + two always blocks.
+
   EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-// §14.10: clocking block with multiple input signals triggers one event.
 TEST(ParserSection14, ClockingBlockEventMultipleInputs) {
   auto r = Parse(
       "module m;\n"
@@ -65,10 +54,6 @@ TEST(ParserSection14, ClockingBlockEventMultipleInputs) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-// =============================================================================
-// LRM section 19.5 -- Clocking block events
-// =============================================================================
-// Use a clocking block name as an event in an always block.
 TEST(ParserSection19, ClockingBlockEvent_AlwaysAt) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -80,7 +65,6 @@ TEST(ParserSection19, ClockingBlockEvent_AlwaysAt) {
               "endmodule\n"));
 }
 
-// Clocking event used alongside a posedge always for comparison.
 TEST(ParserSection19, ClockingBlockEvent_BothTriggers) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -93,7 +77,6 @@ TEST(ParserSection19, ClockingBlockEvent_BothTriggers) {
               "endmodule\n"));
 }
 
-// Clocking block event used in an initial block with @(cb).
 TEST(ParserSection19, ClockingBlockEvent_InitialBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -107,4 +90,4 @@ TEST(ParserSection19, ClockingBlockEvent_InitialBlock) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

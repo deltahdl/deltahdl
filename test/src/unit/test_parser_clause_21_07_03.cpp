@@ -1,5 +1,3 @@
-// §21.7.3: Creating extended VCD file
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -18,4 +16,4 @@ TEST(ParserSection21, DumpportsOffOnFlush) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

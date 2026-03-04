@@ -1,5 +1,3 @@
-// Annex A.3.1: Primitive instantiation and instances
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -9,7 +7,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA303, OutputTerminal_MultipleOutputs) {
-  // Multiple output_terminals in n-output gate
+
   auto r = Parse(
       "module m;\n"
       "  buf (o1, o2, o3, in);\n"
@@ -21,7 +19,7 @@ TEST(ParserA303, OutputTerminal_MultipleOutputs) {
 }
 
 TEST(ParserA303, OutputTerminal_PullGate) {
-  // output_terminal in pull gate (single terminal)
+
   auto r = Parse(
       "module m;\n"
       "  pullup (net_a);\n"
@@ -32,4 +30,4 @@ TEST(ParserA303, OutputTerminal_PullGate) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
-}  // namespace
+}

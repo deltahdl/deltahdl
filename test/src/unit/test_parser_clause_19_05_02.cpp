@@ -1,5 +1,3 @@
-// §19.5.2: Specifying bins for transitions
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -17,9 +15,6 @@ TEST(ParserA211, BinsOrOptions_DefaultSequence) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #12: trans_list
-// =============================================================================
 TEST(ParserA211, TransList_Single) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -42,9 +37,6 @@ TEST(ParserA211, TransList_Multiple) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #13: trans_set
-// =============================================================================
 TEST(ParserA211, TransSet_SingleRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -67,9 +59,6 @@ TEST(ParserA211, TransSet_MultipleRanges) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #14: trans_range_list
-// =============================================================================
 TEST(ParserA211, TransRangeList_SimpleItem) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -114,9 +103,6 @@ TEST(ParserA211, TransRangeList_NonConsecutiveRepeat) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #15: trans_item (alias for covergroup_range_list)
-// =============================================================================
 TEST(ParserA211, TransItem_SingleValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -139,9 +125,6 @@ TEST(ParserA211, TransItem_MultipleValues) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.11 Production #16: repeat_range
-// =============================================================================
 TEST(ParserA211, RepeatRange_SingleExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -180,4 +163,4 @@ TEST(ParserA211, CoverGroup_TransitionBins) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

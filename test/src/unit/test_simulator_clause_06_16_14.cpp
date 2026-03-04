@@ -1,5 +1,3 @@
-// §6.16.14: Bintoa()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.14: bintoa(i) -- assign binary string representation to variable
-// =============================================================================
 TEST(StringMethods, Bintoa) {
   StringFixture f;
   auto* var = f.CreateStringVar("s", "");
@@ -19,4 +14,4 @@ TEST(StringMethods, Bintoa) {
   EXPECT_EQ(VecToString(var->value), "1010");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §28.3.2: The drive strength specification
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -15,8 +13,8 @@ TEST(ParserSection28, StrengthWithDelay) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 4);  // strong0
-  EXPECT_EQ(item->drive_strength1, 4);  // strong1
+  EXPECT_EQ(item->drive_strength0, 4);
+  EXPECT_EQ(item->drive_strength1, 4);
   EXPECT_NE(item->gate_delay, nullptr);
   ASSERT_EQ(item->gate_terminals.size(), 3);
 }
@@ -29,8 +27,8 @@ TEST(ParserSection28, StrengthSpec) {
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->gate_kind, GateKind::kAnd);
-  EXPECT_EQ(item->drive_strength0, 4);  // strong0 = 4
-  EXPECT_EQ(item->drive_strength1, 2);  // weak1 = 2
+  EXPECT_EQ(item->drive_strength0, 4);
+  EXPECT_EQ(item->drive_strength1, 2);
   EXPECT_EQ(item->gate_inst_name, "g1");
 }
 
@@ -41,8 +39,8 @@ TEST(ParserSection28, StrengthSpecSupply) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 5);  // supply0 = 5
-  EXPECT_EQ(item->drive_strength1, 5);  // supply1 = 5
+  EXPECT_EQ(item->drive_strength0, 5);
+  EXPECT_EQ(item->drive_strength1, 5);
 }
 
 TEST(ParserSection28, StrengthSpecHighz) {
@@ -52,8 +50,8 @@ TEST(ParserSection28, StrengthSpecHighz) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 1);  // highz0 = 1
-  EXPECT_EQ(item->drive_strength1, 3);  // pull1 = 3
+  EXPECT_EQ(item->drive_strength0, 1);
+  EXPECT_EQ(item->drive_strength1, 3);
 }
 
-}  // namespace
+}

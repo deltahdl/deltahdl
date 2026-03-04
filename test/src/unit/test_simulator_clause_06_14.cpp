@@ -1,5 +1,3 @@
-// §6.14: Chandle data type
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §6.14: Chandle variables initialized to null, boolean test.
 TEST(Lowerer, ChandleNullDefault) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -33,4 +30,4 @@ TEST(Lowerer, ChandleNullDefault) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

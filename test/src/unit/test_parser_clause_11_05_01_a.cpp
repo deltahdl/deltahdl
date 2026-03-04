@@ -1,15 +1,9 @@
-// §11.5.1: Vector bit-select and part-select addressing
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =========================================================================
-// LRM section 11.4.1 -- Vector bit-select and part-select addressing
-// =========================================================================
-// --- Bit-select with constant index ---
 TEST(ParserSection11, Sec11_4_1_BitSelectConstantIndex) {
   auto r = Parse(
       "module t;\n"
@@ -30,7 +24,6 @@ TEST(ParserSection11, Sec11_4_1_BitSelectConstantIndex) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-// --- Bit-select with variable index ---
 TEST(ParserSection11, Sec11_4_1_BitSelectVariableIndex) {
   auto r = Parse(
       "module t;\n"
@@ -47,7 +40,6 @@ TEST(ParserSection11, Sec11_4_1_BitSelectVariableIndex) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-// --- Bit-select with expression index (a+b) ---
 TEST(ParserSection11, Sec11_4_1_BitSelectExpressionIndex) {
   auto r = Parse(
       "module t;\n"
@@ -64,7 +56,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectExpressionIndex) {
   EXPECT_EQ(rhs->index->op, TokenKind::kPlus);
   EXPECT_EQ(rhs->index_end, nullptr);
 }
-// --- 7. Blocking assignment to part-select: a[7:4] = 4'hF ---
+
 TEST(ParserSection10, Sec10_4_1_PartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -83,7 +75,6 @@ TEST(ParserSection10, Sec10_4_1_PartSelect) {
   ASSERT_NE(stmt->lhs->index_end, nullptr);
 }
 
-// --- Constant part-select [7:0] ---
 TEST(ParserSection11, Sec11_4_1_ConstPartSelectDescending) {
   auto r = Parse(
       "module t;\n"
@@ -103,7 +94,6 @@ TEST(ParserSection11, Sec11_4_1_ConstPartSelectDescending) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-// --- Constant part-select [0:7] (ascending range) ---
 TEST(ParserSection11, Sec11_4_1_ConstPartSelectAscending) {
   auto r = Parse(
       "module t;\n"
@@ -121,7 +111,6 @@ TEST(ParserSection11, Sec11_4_1_ConstPartSelectAscending) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-// --- Indexed part-select up with variable base ---
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectUpVariableBase) {
   auto r = Parse(
       "module t;\n"
@@ -141,7 +130,6 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectUpVariableBase) {
   EXPECT_EQ(rhs->index_end->kind, ExprKind::kIntegerLiteral);
 }
 
-// --- Indexed part-select down with variable base ---
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownVariableBase) {
   auto r = Parse(
       "module t;\n"
@@ -159,9 +147,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownVariableBase) {
   EXPECT_EQ(rhs->index->kind, ExprKind::kIdentifier);
   ASSERT_NE(rhs->index_end, nullptr);
 }
-// ---------------------------------------------------------------------------
-// 16. always_comb with bit select on LHS
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_BitSelectLHS) {
   auto r = Parse(
       "module m;\n"
@@ -179,10 +165,6 @@ TEST(ParserSection9, Sec9_2_2_BitSelectLHS) {
   EXPECT_EQ(item->body->lhs->kind, ExprKind::kSelect);
 }
 
-// =============================================================================
-// A.8.4 Primaries — range_expression
-// =============================================================================
-// § range_expression — expression (simple index)
 TEST(ParserA84, RangeExpressionSimpleIndex) {
   auto r = Parse(
       "module m;\n"
@@ -197,7 +179,6 @@ TEST(ParserA84, RangeExpressionSimpleIndex) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
-// § range_expression — part_select_range
 TEST(ParserA84, RangeExpressionPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -212,7 +193,7 @@ TEST(ParserA84, RangeExpressionPartSelect) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
   EXPECT_NE(rhs->index_end, nullptr);
 }
-// --- Packed struct bit-select ---
+
 TEST(ParserSection7, Sec7_2_1_PackedBitSelect) {
   auto r = Parse(
       "module t;\n"
@@ -230,9 +211,6 @@ TEST(ParserSection7, Sec7_2_1_PackedBitSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-// ---------------------------------------------------------------------------
-// 17. always_comb with part select on LHS
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_PartSelectLHS) {
   auto r = Parse(
       "module m;\n"
@@ -257,7 +235,6 @@ static Expr* FirstAssignLhs(ParseResult& r) {
   return stmt->lhs;
 }
 
-// --- Part-select on LHS of blocking assignment ---
 TEST(ParserSection11, Sec11_4_1_PartSelectOnLhsBlocking) {
   auto r = Parse(
       "module t;\n"
@@ -275,7 +252,6 @@ TEST(ParserSection11, Sec11_4_1_PartSelectOnLhsBlocking) {
   EXPECT_FALSE(lhs->is_part_select_minus);
 }
 
-// --- Indexed part-select on LHS ---
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectOnLhs) {
   auto r = Parse(
       "module t;\n"
@@ -299,7 +275,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
   return nullptr;
 }
 
-// --- Part-select in continuous assignment RHS ---
 TEST(ParserSection11, Sec11_4_1_PartSelectInContAssignRhs) {
   auto r = Parse(
       "module t;\n"
@@ -317,7 +292,6 @@ TEST(ParserSection11, Sec11_4_1_PartSelectInContAssignRhs) {
   ASSERT_NE(ca->assign_rhs->index_end, nullptr);
 }
 
-// § constant_range_expression in bit-select context
 TEST(ParserA83, ConstantRangeExprBitSelect) {
   auto r = Parse("module m; initial x = data[3]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -329,7 +303,6 @@ TEST(ParserA83, ConstantRangeExprBitSelect) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-// § constant_range in part-select context
 TEST(ParserA83, ConstantRangePartSelect) {
   auto r = Parse("module m; initial x = data[7:4]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -368,10 +341,6 @@ TEST(ParserSection7, IndexedPartSelectMinus) {
   EXPECT_TRUE(rhs->is_part_select_minus);
 }
 
-// =============================================================================
-// A.8.3 Expressions — constant_indexed_range / indexed_range
-// =============================================================================
-// § constant_indexed_range ::= constant_expression +: constant_expression
 TEST(ParserA83, IndexedRangePlusColon) {
   auto r = Parse("module m; initial x = data[2+:4]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -383,7 +352,6 @@ TEST(ParserA83, IndexedRangePlusColon) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-// § constant_indexed_range ::= constant_expression -: constant_expression
 TEST(ParserA83, IndexedRangeMinusColon) {
   auto r = Parse("module m; initial x = data[7-:4]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -395,7 +363,6 @@ TEST(ParserA83, IndexedRangeMinusColon) {
   EXPECT_TRUE(rhs->is_part_select_minus);
 }
 
-// --- Part-select after bit-select a[i][7:0] ---
 TEST(ParserSection11, Sec11_4_1_PartSelectAfterBitSelect) {
   auto r = Parse(
       "module t;\n"
@@ -414,7 +381,6 @@ TEST(ParserSection11, Sec11_4_1_PartSelectAfterBitSelect) {
   EXPECT_EQ(rhs->base->index_end, nullptr);
 }
 
-// § indexed_range with variable base
 TEST(ParserA83, IndexedRangeVariableBase) {
   auto r = Parse("module m; initial x = data[i+:8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -425,7 +391,7 @@ TEST(ParserA83, IndexedRangeVariableBase) {
   EXPECT_TRUE(rhs->is_part_select_plus);
   EXPECT_EQ(rhs->index->kind, ExprKind::kIdentifier);
 }
-// --- Bit-select on concatenation (§11.4.12) ---
+
 TEST(ParserSection11, BitSelectOnConcat) {
   auto r = Parse(
       "module t;\n"
@@ -436,7 +402,6 @@ TEST(ParserSection11, BitSelectOnConcat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Select on member access result (s.field[i]) ---
 TEST(ParserSection11, Sec11_4_1_SelectOnMemberAccess) {
   auto r = Parse(
       "module t;\n"
@@ -452,7 +417,7 @@ TEST(ParserSection11, Sec11_4_1_SelectOnMemberAccess) {
   ASSERT_NE(rhs->index, nullptr);
   EXPECT_EQ(rhs->index_end, nullptr);
 }
-// --- Indexed part-select in always_comb ---
+
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInAlwaysComb) {
   auto r = Parse(
       "module t;\n"
@@ -481,7 +446,6 @@ TEST(ParserAnnexA, A8BitAndPartSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Part-select with system function as index ($clog2) ---
 TEST(ParserSection11, Sec11_4_1_PartSelectWithSysFuncIndex) {
   auto r = Parse(
       "module t;\n"
@@ -498,7 +462,6 @@ TEST(ParserSection11, Sec11_4_1_PartSelectWithSysFuncIndex) {
   ASSERT_NE(rhs->index_end, nullptr);
 }
 
-// --- Multiple part-selects in expression ---
 TEST(ParserSection11, Sec11_4_1_MultiplePartSelectsInExpr) {
   auto r = Parse(
       "module t;\n"
@@ -519,7 +482,6 @@ TEST(ParserSection11, Sec11_4_1_MultiplePartSelectsInExpr) {
   ASSERT_NE(rhs->rhs->index_end, nullptr);
 }
 
-// --- Indexed part-select with complex base expression ---
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectComplexBase) {
   auto r = Parse(
       "module t;\n"
@@ -536,9 +498,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectComplexBase) {
   EXPECT_EQ(rhs->index->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->index->op, TokenKind::kStar);
 }
-// =========================================================================
-// Section 11.5.1 -- Bit-select
-// =========================================================================
+
 TEST(ParserSection11, BitSelectWithExprIndex) {
   auto r = Parse(
       "module t;\n"
@@ -551,10 +511,6 @@ TEST(ParserSection11, BitSelectWithExprIndex) {
   EXPECT_EQ(rhs->index->kind, ExprKind::kBinary);
 }
 
-// =============================================================================
-// A.8.4 Primaries — bit_select
-// =============================================================================
-// § bit_select — single dimension
 TEST(ParserA84, BitSelectSingleDim) {
   auto r = Parse(
       "module m;\n"
@@ -571,7 +527,6 @@ TEST(ParserA84, BitSelectSingleDim) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-// --- Part-select in if condition ---
 TEST(ParserSection11, Sec11_4_1_PartSelectInIfCondition) {
   auto r = Parse(
       "module t;\n"
@@ -592,7 +547,6 @@ TEST(ParserSection11, Sec11_4_1_PartSelectInIfCondition) {
   ASSERT_NE(stmt->condition->lhs->index_end, nullptr);
 }
 
-// --- Packed struct indexed part-select plus ---
 TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectPlus) {
   auto r = Parse(
       "module t;\n"
@@ -613,10 +567,6 @@ TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectPlus) {
   EXPECT_TRUE(stmt->rhs->is_part_select_plus);
 }
 
-// =============================================================================
-// A.8.4 Primaries — select
-// =============================================================================
-// § select — bit_select with part_select_range
 TEST(ParserA84, SelectBitWithPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -633,9 +583,6 @@ TEST(ParserA84, SelectBitWithPartSelect) {
   ASSERT_NE(rhs->index_end, nullptr);
 }
 
-// =========================================================================
-// Section 11.5.2 -- Part-select
-// =========================================================================
 TEST(ParserSection11, PartSelectHasIndexEnd) {
   auto r = Parse(
       "module t;\n"
@@ -648,10 +595,6 @@ TEST(ParserSection11, PartSelectHasIndexEnd) {
   EXPECT_NE(rhs->index_end, nullptr);
 }
 
-// =============================================================================
-// A.8.3 Expressions — part_select_range / constant_part_select_range
-// =============================================================================
-// § part_select_range ::= constant_range
 TEST(ParserA83, PartSelectConstantRange) {
   auto r = Parse("module m; initial x = data[15:8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -665,7 +608,6 @@ TEST(ParserA83, PartSelectConstantRange) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-// § part_select_range ::= indexed_range (+:)
 TEST(ParserA83, PartSelectIndexedPlus) {
   auto r = Parse("module m; initial x = data[0+:8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -676,7 +618,6 @@ TEST(ParserA83, PartSelectIndexedPlus) {
   EXPECT_TRUE(rhs->is_part_select_plus);
 }
 
-// § part_select_range ::= indexed_range (-:)
 TEST(ParserA83, PartSelectIndexedMinus) {
   auto r = Parse("module m; initial x = data[7-:8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -687,10 +628,6 @@ TEST(ParserA83, PartSelectIndexedMinus) {
   EXPECT_TRUE(rhs->is_part_select_minus);
 }
 
-// =============================================================================
-// A.8.4 Primaries — nonrange_select
-// =============================================================================
-// § nonrange_select — simple bit_select
 TEST(ParserA84, NonrangeSelectBitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -701,7 +638,6 @@ TEST(ParserA84, NonrangeSelectBitSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Bit-select assigned from function call ---
 TEST(ParserSection11, Sec11_4_1_BitSelectAssignedFromFuncCall) {
   auto r = Parse(
       "module t;\n"
@@ -719,7 +655,6 @@ TEST(ParserSection11, Sec11_4_1_BitSelectAssignedFromFuncCall) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-// --- Indexed part-select in for loop ---
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInForLoop) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -732,7 +667,6 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInForLoop) {
               "endmodule\n"));
 }
 
-// --- Indexed part-select down on LHS ---
 TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownOnLhs) {
   auto r = Parse(
       "module t;\n"
@@ -750,7 +684,6 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownOnLhs) {
   ASSERT_NE(lhs->index_end, nullptr);
 }
 
-// --- Select on function return value ---
 TEST(ParserSection11, Sec11_4_1_SelectOnFuncReturnValue) {
   auto r = Parse(
       "module t;\n"
@@ -767,7 +700,6 @@ TEST(ParserSection11, Sec11_4_1_SelectOnFuncReturnValue) {
   ASSERT_NE(rhs->index_end, nullptr);
 }
 
-// --- Select on system function result ---
 TEST(ParserSection11, Sec11_4_1_SelectOnSystemFuncResult) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -775,4 +707,4 @@ TEST(ParserSection11, Sec11_4_1_SelectOnSystemFuncResult) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -1,16 +1,9 @@
-// §8.16: Casting
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// Use of type(this) as return type for singleton pattern.
-// =============================================================================
-// Section 8.16 -- Casting
-// =============================================================================
-// $cast system call with class handles.
 TEST(ParserSection8, DynamicCastClassHandles) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -30,4 +23,4 @@ TEST(ParserSection8, DynamicCastClassHandles) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

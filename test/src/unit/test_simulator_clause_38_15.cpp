@@ -25,8 +25,6 @@ class VpiClause3815Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.15: vpi_get_value
-
 TEST_F(VpiClause3815Test, GetValueIntFormat) {
   auto* var = sim_ctx_.CreateVariable("x", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 123);
@@ -130,7 +128,7 @@ TEST_F(VpiClause3815Test, GetValueOctStrFormat) {
 
 TEST_F(VpiClause3815Test, GetValueStringFormat) {
   auto* var = sim_ctx_.CreateVariable("sv", 32);
-  // Encode "AB" as ASCII: 0x4142 = 16706
+
   var->value = MakeLogic4VecVal(arena_, 32, 0x00004142);
   vpi_ctx_.Attach(sim_ctx_);
 
@@ -158,5 +156,5 @@ TEST_F(VpiClause3815Test, GetValueTimeFormat) {
   EXPECT_EQ(val.value.integer, 500);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

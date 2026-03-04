@@ -1,5 +1,3 @@
-// §13.8: Parameterized tasks and functions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §13.8: Parameterized class with type parameter.
 TEST(ParserSection13, Sec13_8_TypeParameter) {
   EXPECT_TRUE(
       ParseOk("virtual class Converter#(parameter type T = int);\n"
@@ -17,7 +14,6 @@ TEST(ParserSection13, Sec13_8_TypeParameter) {
               "endclass\n"));
 }
 
-// §13.8: Static method with return value used in expression.
 TEST(ParserSection13, Sec13_8_StaticMethodInExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -26,12 +22,6 @@ TEST(ParserSection13, Sec13_8_StaticMethodInExpr) {
               "endmodule\n"));
 }
 
-// --- Test helpers ---
-// =============================================================================
-// LRM §13.8 -- Parameterized tasks and functions
-// =============================================================================
-// §13.8: A virtual class with type parameters and a static method serves as
-// a parameterized subroutine.
 TEST(ParserSection13, Sec13_8_VirtualClassStaticTask) {
   auto r = Parse(
       "virtual class C#(parameter W = 8);\n"
@@ -47,7 +37,6 @@ TEST(ParserSection13, Sec13_8_VirtualClassStaticTask) {
   EXPECT_EQ(r.cu->classes[0]->params[0].first, "W");
 }
 
-// §13.8: Parameterized class with parameter used in local variable.
 TEST(ParserSection13, Sec13_8_ParamInLocalVar) {
   EXPECT_TRUE(
       ParseOk("virtual class BitOps#(parameter W = 8);\n"
@@ -59,7 +48,6 @@ TEST(ParserSection13, Sec13_8_ParamInLocalVar) {
               "endclass\n"));
 }
 
-// §13.8: Parameterized class with for loop using parameter as bound.
 TEST(ParserSection13, Sec13_8_ForLoopWithParamBound) {
   EXPECT_TRUE(
       ParseOk("virtual class Popcount#(parameter W = 8);\n"
@@ -74,7 +62,6 @@ TEST(ParserSection13, Sec13_8_ForLoopWithParamBound) {
               "endclass\n"));
 }
 
-// §13.8: Return type uses parameter.
 TEST(ParserSection13, Sec13_8_ReturnTypeUsesParam) {
   EXPECT_TRUE(
       ParseOk("virtual class Pack#(parameter W = 8);\n"
@@ -85,7 +72,6 @@ TEST(ParserSection13, Sec13_8_ReturnTypeUsesParam) {
               "endclass\n"));
 }
 
-// §13.8: Parameterized class with multiple methods calling each other.
 TEST(ParserSection13, Sec13_8_MethodsCallEachOther) {
   EXPECT_TRUE(
       ParseOk("virtual class Math#(parameter W = 32);\n"
@@ -100,7 +86,6 @@ TEST(ParserSection13, Sec13_8_MethodsCallEachOther) {
               "endclass\n"));
 }
 
-// §13.8: Assign result of parameterized call to variable.
 TEST(ParserSection13, Sec13_8_AssignParamCallResult) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -111,7 +96,6 @@ TEST(ParserSection13, Sec13_8_AssignParamCallResult) {
               "endmodule\n"));
 }
 
-// §13.8: Virtual class with only a static task (no function).
 TEST(ParserSection13, Sec13_8_OnlyStaticTask) {
   auto r = Parse(
       "virtual class Printer#(parameter int ID = 0);\n"
@@ -125,12 +109,6 @@ TEST(ParserSection13, Sec13_8_OnlyStaticTask) {
   EXPECT_TRUE(r.cu->classes[0]->is_virtual);
 }
 
-// =============================================================================
-// LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
-// =============================================================================
-// =============================================================================
-// LRM section 13.8 -- Parameterized tasks and functions
-// =============================================================================
 TEST(ParserSection13, ParameterizedSubroutine_VirtualClassWithStaticMethod) {
   auto r = Parse(
       "virtual class C#(parameter DECODE_W = 8,\n"
@@ -185,4 +163,4 @@ TEST(ParserSection13, ParameterizedSubroutine_DifferentSpecializations) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

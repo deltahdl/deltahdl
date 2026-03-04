@@ -1,5 +1,3 @@
-// §8.15: Super
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,14 +5,12 @@ using namespace delta;
 
 namespace {
 
-// § implicit_class_handle — super
 TEST(ParserA84, ImplicitClassHandleSuper) {
   auto r = Parse("module m; initial x = super; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// method_call_root: implicit_class_handle (super)
 TEST(ParserA82, MethodCallRootSuper) {
   auto r = Parse(
       "module m;\n"
@@ -27,7 +23,6 @@ TEST(ParserA82, MethodCallRootSuper) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-// class_constructor_declaration with super.new()
 TEST(SourceText, ClassConstructorSuperNew) {
   auto r = Parse(
       "class Base;\n"
@@ -44,4 +39,4 @@ TEST(SourceText, ClassConstructorSuperNew) {
   EXPECT_EQ(r.cu->classes[1]->members[0]->method->name, "new");
 }
 
-}  // namespace
+}

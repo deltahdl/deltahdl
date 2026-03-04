@@ -1,5 +1,3 @@
-// §11.4.13: for an explanation of range list syntax.
-
 #include "fixture_parser.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -78,9 +76,6 @@ TEST(ParserSection11, InsideInAssign) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =========================================================================
-// Section 11.4.13 -- Set membership operator (inside) -- additional
-// =========================================================================
 TEST(ParserSection11, InsideWithWildcardBits) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -117,10 +112,6 @@ TEST(ParserSection11, InsideMixedValuesAndRanges) {
   EXPECT_EQ(cond->elements.size(), 4u);
 }
 
-// =============================================================================
-// A.8.3 Expressions — inside_expression
-// =============================================================================
-// § inside_expression ::= expression inside { range_list }
 TEST(ParserA83, InsideExprSingleValue) {
   auto r = Parse("module m; initial x = a inside {3}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -149,7 +140,7 @@ TEST(ParserA83, InsideExprWithRange) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kInside);
   EXPECT_EQ(rhs->elements.size(), 1u);
-  // Range element is a select node
+
   EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kSelect);
 }
 
@@ -164,7 +155,6 @@ TEST(ParserA83, InsideExprMixedValuesAndRanges) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-// --- Inside expression ---
 TEST(ParserSection11, Sec11_1_InsideExpressionWithLhsAndElements) {
   auto r = Parse(
       "module t;\n"
@@ -181,9 +171,7 @@ TEST(ParserSection11, Sec11_1_InsideExpressionWithLhsAndElements) {
   EXPECT_EQ(cond->lhs->kind, ExprKind::kIdentifier);
   EXPECT_EQ(cond->elements.size(), 3u);
 }
-// =========================================================================
-// Section 11.4.13 -- Inside operator (set membership)
-// =========================================================================
+
 TEST(ParserSection11, InsideBasicListParses) {
   auto r = Parse(
       "module t;\n"
@@ -198,11 +186,8 @@ TEST(ParserSection11, InsideBasicListParses) {
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
 
-// =============================================================================
-// §11.2.2 Aggregate expressions — struct in set membership
-// =============================================================================
 TEST(AggregateExpr, PackedStructInsideSet) {
-  // A packed struct is just a bitvector — inside should work by value.
+
   SimFixture f;
   auto* var = f.ctx.CreateVariable("s", 8);
   var->value = MakeLogic4VecVal(f.arena, 8, 5);
@@ -220,4 +205,4 @@ TEST(AggregateExpr, PackedStructNotInSet) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+}

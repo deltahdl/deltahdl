@@ -1,5 +1,3 @@
-// Annex A.8.4: Primaries
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § constant_primary — real literal used in constant expression
 TEST(SimA84, ConstantPrimaryRealLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -27,7 +24,6 @@ TEST(SimA84, ConstantPrimaryRealLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// § primary — string literal
 TEST(SimA84, PrimaryStringLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -42,7 +38,6 @@ TEST(SimA84, PrimaryStringLiteral) {
   f.scheduler.Run();
 }
 
-// § primary — hierarchical identifier
 TEST(SimA84, PrimaryIdentifier) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -60,7 +55,6 @@ TEST(SimA84, PrimaryIdentifier) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// § primary — function call
 TEST(SimA84, PrimaryFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -79,7 +73,6 @@ TEST(SimA84, PrimaryFunctionCall) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-// § primary — parenthesized expression
 TEST(SimA84, PrimaryParenthesizedExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -97,7 +90,6 @@ TEST(SimA84, PrimaryParenthesizedExpr) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// § primary — octal literal
 TEST(SimA84, PrimaryOctalLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -115,4 +107,4 @@ TEST(SimA84, PrimaryOctalLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 63u);
 }
 
-}  // namespace
+}

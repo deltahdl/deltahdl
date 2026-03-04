@@ -1,5 +1,3 @@
-// §29.9: Mixing level-sensitive and edge-sensitive descriptions
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -41,11 +39,11 @@ TEST(ParserSection29, MixedLevelEdgeSensitive) {
   EXPECT_TRUE(udp->is_sequential);
   ASSERT_EQ(udp->table.size(), 5);
   UdpSpotCheck checks[] = {
-      {0, '?', '1'},  // Level-sensitive entry
-      {2, 'r', '1'},  // Edge-sensitive entry
-      {4, 'f', '-'},  // Falling edge with no-change output
+      {0, '?', '1'},
+      {2, 'r', '1'},
+      {4, 'f', '-'},
   };
   VerifyUdpTableSpotChecks(udp, checks, std::size(checks));
 }
 
-}  // namespace
+}

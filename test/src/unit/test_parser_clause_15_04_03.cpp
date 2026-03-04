@@ -1,14 +1,10 @@
-// §15.4.3: Put()
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
-// --- Test helpers ---
 namespace {
 
-// §15.4.1: mailbox method calls (put, get) after new().
 TEST(ParserSection15, MailboxNewThenPutGet) {
   auto r = Parse(
       "module m;\n"
@@ -24,4 +20,4 @@ TEST(ParserSection15, MailboxNewThenPutGet) {
   ASSERT_NE(stmt, nullptr);
 }
 
-}  // namespace
+}

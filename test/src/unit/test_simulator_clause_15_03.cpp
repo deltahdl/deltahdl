@@ -1,5 +1,3 @@
-// §15.3: Semaphores
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -15,9 +13,6 @@
 
 namespace {
 
-// =============================================================================
-// 4. Semaphore: Context registration (section 15.3)
-// =============================================================================
 TEST(IpcSync, SemaphoreContextCreateFind) {
   SyncFixture f;
   auto* sem = f.ctx.CreateSemaphore("sem1", 3);
@@ -31,9 +26,6 @@ TEST(IpcSync, SemaphoreContextCreateFind) {
   EXPECT_EQ(not_found, nullptr);
 }
 
-// =============================================================================
-// 14. Semaphore: Multiple put/tryget cycles
-// =============================================================================
 TEST(IpcSync, SemaphoreMultiplePutTryGetCycles_DrainKeys) {
   SemaphoreObject sem(0);
   sem.Put(10);
@@ -53,9 +45,6 @@ TEST(IpcSync, SemaphoreMultiplePutTryGetCycles_RefillAndDrain) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
-// =============================================================================
-// 20. Semaphore: Large key count
-// =============================================================================
 TEST(IpcSync, SemaphoreLargeKeyCount) {
   SemaphoreObject sem(1000000);
   EXPECT_EQ(sem.TryGet(999999), 1);
@@ -66,9 +55,6 @@ TEST(IpcSync, SemaphoreLargeKeyCount) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
-// =============================================================================
-// 23. Multiple semaphores in same context
-// =============================================================================
 TEST(IpcSync, MultipleSemaphoresInContext) {
   SyncFixture f;
   auto* sem1 = f.ctx.CreateSemaphore("s1", 1);
@@ -78,4 +64,4 @@ TEST(IpcSync, MultipleSemaphoresInContext) {
   EXPECT_NE(f.ctx.FindSemaphore("s1"), f.ctx.FindSemaphore("s2"));
 }
 
-}  // namespace
+}

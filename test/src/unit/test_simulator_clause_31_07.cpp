@@ -1,5 +1,3 @@
-// §31.7: Enabling timing checks with conditioned events
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Conditions on both events simulate
 TEST(SimA70503, ConditionBothEventsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -30,4 +27,4 @@ TEST(SimA70503, ConditionBothEventsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-}  // namespace
+}

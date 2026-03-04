@@ -1,5 +1,3 @@
-// §18.17.4: Repeat production statements
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// rs_prod as rs_repeat
 TEST(ParserA612, RsProdAsRepeat) {
   auto r = Parse(
       "module m;\n"
@@ -22,10 +19,6 @@ TEST(ParserA612, RsProdAsRepeat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.6.12 Randsequence — rs_repeat
-// =============================================================================
-// repeat with integral expression
 TEST(ParserA612, RsRepeat) {
   auto r = Parse(
       "module m;\n"
@@ -40,4 +33,4 @@ TEST(ParserA612, RsRepeat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

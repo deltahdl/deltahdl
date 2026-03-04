@@ -1,5 +1,3 @@
-// §18.17: Random sequence generation—randsequence
-
 #include <algorithm>
 #include <cstdint>
 #include <unordered_map>
@@ -14,9 +12,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.17: randsequence (basic structure)
-// =============================================================================
 TEST(Constraint, RandsequenceBasicProduction) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -40,10 +35,6 @@ TEST(Constraint, RandsequenceBasicProduction) {
   EXPECT_LE(val, 2);
 }
 
-// =============================================================================
-// Simulation tests — A.6.12 Randsequence
-// =============================================================================
-// Basic randsequence: code block side effects execute
 TEST(SimA612, CodeBlockSideEffect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -66,7 +57,6 @@ TEST(SimA612, CodeBlockSideEffect) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// Sequence of productions: all execute in order
 TEST(SimA612, ProductionSequenceOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -91,7 +81,6 @@ TEST(SimA612, ProductionSequenceOrder) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// No production name — first production is used as top
 TEST(SimA612, NoProductionNameUsesFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -114,4 +103,4 @@ TEST(SimA612, NoProductionNameUsesFirst) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

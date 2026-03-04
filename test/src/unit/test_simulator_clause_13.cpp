@@ -1,5 +1,3 @@
-
-
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
@@ -8,11 +6,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Full-simulation fixture: parse → elaborate → lower → run → check.
-// =============================================================================
-
-// Helper: elaborate + lower + run, then return FindVariable result.
 static Variable* RunAndFind(const std::string& src, SimFixture& f,
                             const char* var_name) {
   auto* design = ElaborateSrc(src, f);
@@ -23,12 +16,6 @@ static Variable* RunAndFind(const std::string& src, SimFixture& f,
   return f.ctx.FindVariable(var_name);
 }
 
-// =============================================================================
-// §13.8: ClassTypeInfo-level tests — verify that the lowerer correctly
-// registers parameterized virtual classes with static methods.
-// =============================================================================
-
-// §13.8: Virtual class flag maps to is_abstract in ClassTypeInfo.
 TEST(SimCh13, VirtualClassIsAbstract) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -47,7 +34,6 @@ TEST(SimCh13, VirtualClassIsAbstract) {
   EXPECT_TRUE(info->is_abstract);
 }
 
-// §13.8: ClassTypeInfo preserves ClassDecl with params.
 TEST(SimCh13, ClassParamsPreserved) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -69,7 +55,6 @@ TEST(SimCh13, ClassParamsPreserved) {
   EXPECT_EQ(info->decl->params[1].first, "B");
 }
 
-// §13.8: Static method is registered in ClassTypeInfo.methods.
 TEST(SimCh13, StaticMethodRegistered) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -90,7 +75,6 @@ TEST(SimCh13, StaticMethodRegistered) {
   EXPECT_TRUE(it->second->is_static);
 }
 
-// §13.8: Multiple static methods registered in same class.
 TEST(SimCh13, MultipleStaticMethodsRegistered) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -111,7 +95,6 @@ TEST(SimCh13, MultipleStaticMethodsRegistered) {
   EXPECT_NE(info->methods.find("beta"), info->methods.end());
 }
 
-// §13.8: Non-virtual parameterized class also works.
 TEST(SimCh13, NonVirtualParameterizedClass) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -131,11 +114,6 @@ TEST(SimCh13, NonVirtualParameterizedClass) {
   EXPECT_NE(info->methods.find("get_w"), info->methods.end());
 }
 
-// =============================================================================
-// §13.8: End-to-end simulation — parameterized scope call C#(N)::method().
-// =============================================================================
-
-// §13.8: Static method returns parameter value via C#(16)::get_w().
 TEST(SimCh13, SimpleParameterReturn) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -151,7 +129,6 @@ TEST(SimCh13, SimpleParameterReturn) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-// §13.8: Default parameter used when only first param specified.
 TEST(SimCh13, DefaultParameterValue) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -164,11 +141,10 @@ TEST(SimCh13, DefaultParameterValue) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // Only A=20 specified; B defaults to 5.
+
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §13.8: Default parameter using $clog2 of another parameter.
 TEST(SimCh13, DefaultParamClog2) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -184,11 +160,10 @@ TEST(SimCh13, DefaultParamClog2) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // $clog2(8) = 3.
+
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §13.8: Multiple specializations in same module give different results.
 TEST(SimCh13, MultipleSpecializations) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -216,7 +191,6 @@ TEST(SimCh13, MultipleSpecializations) {
   EXPECT_EQ(r2->value.ToUint64(), 32u);
 }
 
-// §13.8: Two parameters, both provided explicitly at call site.
 TEST(SimCh13, TwoParametersExplicit) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -232,7 +206,6 @@ TEST(SimCh13, TwoParametersExplicit) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// §13.8: Parameter used in arithmetic expression.
 TEST(SimCh13, ParameterArithmetic) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -248,7 +221,6 @@ TEST(SimCh13, ParameterArithmetic) {
   EXPECT_EQ(var->value.ToUint64(), 14u);
 }
 
-// §13.8: Parameter used in bitmask computation: (1 << W) - 1.
 TEST(SimCh13, ParameterBitmask) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -263,11 +235,10 @@ TEST(SimCh13, ParameterBitmask) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // (1 << 4) - 1 = 15.
+
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// §13.8: Parameter in if-else condition.
 TEST(SimCh13, ParameterIfElse) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -287,7 +258,6 @@ TEST(SimCh13, ParameterIfElse) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §13.8: Static method with input argument.
 TEST(SimCh13, MethodWithInputArg) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -302,11 +272,10 @@ TEST(SimCh13, MethodWithInputArg) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // 5 + 10 = 15.
+
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// §13.8: Static method with two input arguments.
 TEST(SimCh13, MethodWithTwoArgs) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -321,11 +290,10 @@ TEST(SimCh13, MethodWithTwoArgs) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // 4 * 3 + 5 = 17.
+
   EXPECT_EQ(var->value.ToUint64(), 17u);
 }
 
-// §13.8: Two different static methods in same class.
 TEST(SimCh13, TwoMethodsSameClass) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -356,7 +324,6 @@ TEST(SimCh13, TwoMethodsSameClass) {
   EXPECT_EQ(r2->value.ToUint64(), 11u);
 }
 
-// §13.8: Parameterized scope call in continuous assignment.
 TEST(SimCh13, ContinuousAssignCall) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -372,7 +339,6 @@ TEST(SimCh13, ContinuousAssignCall) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §13.8: Parameterized scope call in always_comb.
 TEST(SimCh13, AlwaysCombCall) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -388,7 +354,6 @@ TEST(SimCh13, AlwaysCombCall) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §13.8: Different specializations produce different results.
 TEST(SimCh13, DifferentSpecsDifferentResults) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -414,11 +379,10 @@ TEST(SimCh13, DifferentSpecsDifferentResults) {
   auto* r8 = f.ctx.FindVariable("r8");
   ASSERT_NE(r4, nullptr);
   ASSERT_NE(r8, nullptr);
-  EXPECT_EQ(r4->value.ToUint64(), 15u);   // (1<<4)-1
-  EXPECT_EQ(r8->value.ToUint64(), 255u);  // (1<<8)-1
+  EXPECT_EQ(r4->value.ToUint64(), 15u);
+  EXPECT_EQ(r8->value.ToUint64(), 255u);
 }
 
-// §13.8: Parameter subtraction.
 TEST(SimCh13, ParameterSubtract) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -436,7 +400,6 @@ TEST(SimCh13, ParameterSubtract) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// §13.8: Chained parameter expression: (W + 1) * 2.
 TEST(SimCh13, ChainedParamExpr) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -451,11 +414,10 @@ TEST(SimCh13, ChainedParamExpr) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // (5 + 1) * 2 = 12.
+
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-// §13.8: Parameter used in shift: val << W.
 TEST(SimCh13, ParameterShift) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -470,11 +432,10 @@ TEST(SimCh13, ParameterShift) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // 1 << 3 = 8.
+
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-// §13.8: Calling same method twice with same specialization.
 TEST(SimCh13, MultipleCallsSameSpec) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -504,7 +465,6 @@ TEST(SimCh13, MultipleCallsSameSpec) {
   EXPECT_EQ(r2->value.ToUint64(), 12u);
 }
 
-// §13.8: Zero parameter value edge case.
 TEST(SimCh13, ZeroParamValue) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -520,7 +480,6 @@ TEST(SimCh13, ZeroParamValue) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §13.8: Nested if using parameter in static method.
 TEST(SimCh13, ParameterNestedIf) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -542,11 +501,10 @@ TEST(SimCh13, ParameterNestedIf) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // 24 <= 32, so result = 4.
+
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// §13.8: For loop in static method with parameter as bound.
 TEST(SimCh13, ForLoopWithParam) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -563,11 +521,10 @@ TEST(SimCh13, ForLoopWithParam) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // 1+2+3+4+5 = 15.
+
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// §13.8: For loop with different specializations.
 TEST(SimCh13, ForLoopDifferentSpecs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -595,12 +552,10 @@ TEST(SimCh13, ForLoopDifferentSpecs) {
   auto* r4 = f.ctx.FindVariable("r4");
   ASSERT_NE(r3, nullptr);
   ASSERT_NE(r4, nullptr);
-  EXPECT_EQ(r3->value.ToUint64(), 6u);   // 1+2+3
-  EXPECT_EQ(r4->value.ToUint64(), 10u);  // 1+2+3+4
+  EXPECT_EQ(r3->value.ToUint64(), 6u);
+  EXPECT_EQ(r4->value.ToUint64(), 10u);
 }
 
-// §13.8 LRM example: Decoder function — C#(4)::DECODER_f(2'b11).
-// DECODER_f sets bit EncodeIn to 1: result[3] = 1 → 4'b1000 = 8.
 TEST(SimCh13, DecoderFunction) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -617,12 +572,10 @@ TEST(SimCh13, DecoderFunction) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // 1 << 3 = 8 (bit 3 set).
+
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-// §13.8 LRM example: Encoder function (simplified, no break).
-// Finds the last set bit in DecodeIn using a for loop bounded by DECODE_W.
 TEST(SimCh13, EncoderFunction) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -642,11 +595,10 @@ TEST(SimCh13, EncoderFunction) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // Bit 6 is set, so encoder returns 6.
+
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-// §13.8 LRM example: Both encoder and decoder in same class.
 TEST(SimCh13, EncoderDecoderSameClass) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -679,11 +631,10 @@ TEST(SimCh13, EncoderDecoderSameClass) {
   auto* dec = f.ctx.FindVariable("dec_out");
   ASSERT_NE(enc, nullptr);
   ASSERT_NE(dec, nullptr);
-  EXPECT_EQ(enc->value.ToUint64(), 6u);  // bit 6 of 64
-  EXPECT_EQ(dec->value.ToUint64(), 8u);  // 1 << 3
+  EXPECT_EQ(enc->value.ToUint64(), 6u);
+  EXPECT_EQ(dec->value.ToUint64(), 8u);
 }
 
-// §13.8: Parser preserves param expressions in AST (kIdentifier.elements).
 TEST(SimCh13, ParserPreservesParams) {
   SimFixture f;
   auto fid = f.mgr.AddFile("<test>",
@@ -699,5 +650,5 @@ TEST(SimCh13, ParserPreservesParams) {
   auto* cu = parser.Parse();
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(cu->modules.empty());
-  // Parse succeeds — the parameterized scope expression was accepted.
+
 }

@@ -1,14 +1,9 @@
-// §11.3.2: Operator precedence
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =========================================================================
-// Section 11.1 -- Overview: general expression parsing
-// =========================================================================
 TEST(ParserSection11, NestedParenthesizedExpression) {
   auto r = Parse(
       "module t;\n"
@@ -43,7 +38,7 @@ TEST(Parser, ExpressionPrecedence) {
   ASSERT_NE(r.cu, nullptr);
 }
 TEST(ParserSection11, ImplicationRightAssocParses) {
-  // a -> b -> c should be parsed as a -> (b -> c)
+
   auto r = Parse(
       "module t;\n"
       "  logic a, b, c, d;\n"
@@ -65,16 +60,12 @@ TEST(ParserA83, ExprPrecedenceChain) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
-  // b * c should be the RHS of the + node
+
   ASSERT_NE(rhs->rhs, nullptr);
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
 }
 
-// =============================================================================
-// A.8.3 Expressions — misc expression forms
-// =============================================================================
-// Multiple binary operators chained
 TEST(ParserA83, ChainedBinaryOps) {
   auto r = Parse("module m; initial x = a | b & c ^ d; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -84,7 +75,6 @@ TEST(ParserA83, ChainedBinaryOps) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
 }
 
-// Parenthesized expression
 TEST(ParserA83, ParenthesizedExpr) {
   auto r = Parse("module m; initial x = (a + b) * c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -93,12 +83,11 @@ TEST(ParserA83, ParenthesizedExpr) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kStar);
-  // LHS should be binary add (from the parens)
+
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
 }
 
-// --- Parenthesized expression ---
 TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
   auto r = Parse(
       "module t;\n"
@@ -126,9 +115,6 @@ TEST(ParserSection11, Sec11_1_ExprInInitialBlock) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-// =========================================================================
-// Section 11.3.2 -- Operator precedence (complex expression)
-// =========================================================================
 TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
   auto r = Parse(
       "module t;\n"
@@ -138,7 +124,7 @@ TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
   EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
-  // * has higher precedence than +, so top-level is +
+
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
@@ -166,4 +152,4 @@ TEST(ParserSection11, OperatorPrecedenceCompareAndLogical) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-}  // namespace
+}

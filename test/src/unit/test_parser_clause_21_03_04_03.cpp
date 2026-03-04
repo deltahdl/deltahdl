@@ -1,5 +1,3 @@
-// §21.3.4.3: Reading formatted data
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -25,4 +23,4 @@ TEST(ParserSection21, SscanfCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

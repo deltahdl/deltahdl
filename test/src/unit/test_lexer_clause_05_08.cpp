@@ -1,5 +1,3 @@
-// §5.8: Time literals
-
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 7. Lexer: all six time suffixes produce kTimeLiteral tokens.
 TEST(ParserClause03, Cl3_14_LexerAllTimeSuffixes) {
   auto r_s = LexOne("1s");
   EXPECT_EQ(r_s.token.kind, TokenKind::kTimeLiteral);
@@ -31,7 +28,6 @@ TEST(ParserClause03, Cl3_14_LexerAllTimeSuffixes) {
   EXPECT_EQ(r_fs.token.text, "1fs");
 }
 
-// 8. Lexer: magnitudes 1, 10, 100 with time suffix.
 TEST(ParserClause03, Cl3_14_LexerTimeMagnitudes) {
   auto r1 = LexOne("1ns");
   EXPECT_EQ(r1.token.kind, TokenKind::kTimeLiteral);
@@ -44,4 +40,4 @@ TEST(ParserClause03, Cl3_14_LexerTimeMagnitudes) {
   EXPECT_EQ(r100.token.text, "100ns");
 }
 
-}  // namespace
+}

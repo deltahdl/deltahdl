@@ -1,5 +1,3 @@
-// §6.3.1: Logic values
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,11 +5,8 @@
 using namespace delta;
 namespace {
 
-// =========================================================================
-// §6.3: Value set — 4-state vs 2-state data types
-// =========================================================================
 TEST(ParserSection6, ValueSet_4StateLogicDecl) {
-  // §6.3: logic is the basic 4-state data type.
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [3:0] val;\n"
@@ -23,4 +18,4 @@ TEST(ParserSection6, ValueSet_4StateLogicDecl) {
   EXPECT_TRUE(Is4stateType(DataTypeKind::kLogic));
 }
 
-}  // namespace
+}

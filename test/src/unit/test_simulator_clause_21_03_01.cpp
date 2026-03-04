@@ -1,5 +1,3 @@
-// §21.3.1: for the functional description of $fopen.
-
 #include <fstream>
 
 #include "builders_ast.h"
@@ -11,12 +9,9 @@
 using namespace delta;
 namespace {
 
-// ============================================================================
-// §21.3.1/§21.3.2 — $fopen, $fclose
-// ============================================================================
 TEST(Section21, FopenFclose) {
   SimFixture f;
-  // Create a temporary file for the test.
+
   std::string tmp_path = "/tmp/deltahdl_test_fopen.txt";
   {
     std::ofstream ofs(tmp_path);
@@ -44,4 +39,4 @@ TEST(Section21, FopenInvalidFile) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+}

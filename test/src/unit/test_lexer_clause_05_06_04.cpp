@@ -6,11 +6,8 @@
 
 using namespace delta;
 
-// --- §5.6.4: Compiler directives ---
-
 TEST(LexerCh50604, BacktickIsUnexpected) {
-  // §5.6.4: Backtick introduces compiler directives; if it reaches the
-  // lexer (not consumed by preprocessor), it is an error.
+
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", "`define FOO 1");

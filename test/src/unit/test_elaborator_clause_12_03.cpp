@@ -1,5 +1,3 @@
-// §12.3: Syntax
-
 #include "builders_ast.h"
 #include "fixture_enum_methods.h"
 #include "fixture_evaluator.h"
@@ -12,14 +10,6 @@ using namespace delta;
 
 namespace {
 
-// Sim test fixture
-// =============================================================================
-// A.6.4 Statements — Simulation
-// =============================================================================
-// ---------------------------------------------------------------------------
-// Simulation: statement_or_null and statement execution
-// ---------------------------------------------------------------------------
-// §12.3: null statement has no effect in simulation
 TEST(SimA604, NullStatementNoEffect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -41,4 +31,4 @@ TEST(SimA604, NullStatementNoEffect) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-}  // namespace
+}

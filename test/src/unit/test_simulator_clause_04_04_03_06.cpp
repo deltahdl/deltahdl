@@ -10,20 +10,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.4.3.6 Post-Observed PLI region
-//
-// Figure 4-1 shows:
-//   region_Observed -> pli_region_PostObserved -> region_Reactive
-//
-// The Post-Observed region is a read-only PLI callback control point.
-// Post-Observed is part of the reactive region set (§4.4.1 iterative regions).
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.4.3.6 Post-Observed PLI callback control point
-// Basic: events scheduled in the Post-Observed region are executed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedRegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
@@ -37,30 +23,20 @@ TEST(SimCh4436, PostObservedRegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.6 Post-Observed can read values
-// A Post-Observed callback can read state set by the active region set.
-// ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedCanReadValues) {
   VerifyRegionCanReadActiveValue(Region::kPostObserved);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.6 Post-Observed reads after property evaluation
-// Post-Observed sees state set by the Observed region.
-// ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedReadsAfterObservedRegion) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
   int sampled = -1;
 
-  // Observed sets value = 77 (simulating property evaluation side-effect).
   auto* observed = sched.GetEventPool().Acquire();
   observed->callback = [&]() { value = 77; };
   sched.ScheduleEvent({0}, Region::kObserved, observed);
 
-  // Post-Observed should see 77.
   auto* ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPostObserved, ev);
@@ -69,28 +45,17 @@ TEST(SimCh4436, PostObservedReadsAfterObservedRegion) {
   EXPECT_EQ(sampled, 77);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.6 + Figure 4-1: Observed -> PostObserved -> Reactive.
-// Post-Observed executes after Observed and before Reactive.
-// ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedExecutesAfterObservedBeforeReactive) {
   VerifyThreeRegionOrder({Region::kObserved, "observed"},
                          {Region::kPostObserved, "post_observed"},
                          {Region::kReactive, "reactive"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.6 Post-Observed after full chain through Observed
-// Post-Observed sees state from the entire chain: Active set -> Observed.
-// Full chain: Active -> NBA -> PostNBA -> PreObserved -> Observed ->
-// PostObserved.
-// ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedExecutesAfterEntireChainThroughObserved) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Schedule in reverse to prove region ordering, not insertion order.
   ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
   ScheduleLabeled(sched, Region::kObserved, "observed", order);
   ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
@@ -104,9 +69,6 @@ TEST(SimCh4436, PostObservedExecutesAfterEntireChainThroughObserved) {
   EXPECT_EQ(order[3], "post_observed");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.6 Post-Observed ordinal lies between Observed and Reactive.
-// ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedIsAfterObservedBeforeReactive) {
   auto post_observed_ord = static_cast<int>(Region::kPostObserved);
   auto observed_ord = static_cast<int>(Region::kObserved);
@@ -115,10 +77,6 @@ TEST(SimCh4436, PostObservedIsAfterObservedBeforeReactive) {
   EXPECT_LT(post_observed_ord, reactive_ord);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.6 Multiple Post-Observed callbacks
-// Multiple PLI callbacks coexist in the Post-Observed region and all execute.
-// ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
@@ -134,10 +92,6 @@ TEST(SimCh4436, PostObservedRegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.6 Post-Observed events across multiple time slots.
-// Each time slot has its own Post-Observed region evaluation.
-// ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
@@ -158,12 +112,6 @@ TEST(SimCh4436, PostObservedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.6 Post-Observed is read-only
-// Post-Observed is read-only. This test confirms that Post-Observed executes
-// after Observed, so a PLI callback sampling state sees the snapshot produced
-// by property evaluation in the Observed region.
-// ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedProvidesReadOnlySnapshotAfterObserved) {
   Arena arena;
   Scheduler sched(arena);
@@ -171,7 +119,6 @@ TEST(SimCh4436, PostObservedProvidesReadOnlySnapshotAfterObserved) {
   int b = 0;
   int sum_in_post_observed = -1;
 
-  // Active sets initial values, Observed modifies them (property evaluation).
   auto* active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     a = 10;
@@ -183,7 +130,6 @@ TEST(SimCh4436, PostObservedProvidesReadOnlySnapshotAfterObserved) {
   observed->callback = [&]() { b = 30; };
   sched.ScheduleEvent({0}, Region::kObserved, observed);
 
-  // Post-Observed reads both — should see a=10, b=30 (Observed overwrote b).
   auto* post_obs = sched.GetEventPool().Acquire();
   post_obs->callback = [&]() { sum_in_post_observed = a + b; };
   sched.ScheduleEvent({0}, Region::kPostObserved, post_obs);
@@ -192,13 +138,6 @@ TEST(SimCh4436, PostObservedProvidesReadOnlySnapshotAfterObserved) {
   EXPECT_EQ(sum_in_post_observed, 40);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.6 Post-Observed infrastructure with full region chain
-// Even though no PLI currently uses this region, the infrastructure must
-// still correctly process events placed here. This test schedules a
-// Post-Observed event alongside a full set of surrounding regions and
-// verifies the complete ordering is respected.
-// ---------------------------------------------------------------------------
 TEST(SimCh4436, PostObservedInfrastructureWorksEvenIfCurrentlyUnused) {
   Arena arena;
   Scheduler sched(arena);

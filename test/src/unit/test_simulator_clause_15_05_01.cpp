@@ -1,5 +1,3 @@
-// §15.5.1: Triggering an event
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -15,9 +13,6 @@
 
 namespace {
 
-// =============================================================================
-// 22. Event variable creation with is_event flag
-// =============================================================================
 TEST(IpcSync, EventVariableCreation) {
   SyncFixture f;
   auto* ev = f.ctx.CreateVariable("ev1", 1);
@@ -29,4 +24,4 @@ TEST(IpcSync, EventVariableCreation) {
   EXPECT_TRUE(found->is_event);
 }
 
-}  // namespace
+}

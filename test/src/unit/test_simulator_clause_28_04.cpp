@@ -1,5 +1,3 @@
-// §28.4: and, nand, nor, or, xor, and xnor gates
-
 #include <gtest/gtest.h>
 
 #include <initializer_list>
@@ -21,29 +19,25 @@ static void RunGateTruthTable(GateKind kind,
 
 namespace {
 
-// =============================================================
-// §28.4: and, nand, nor, or, xor, and xnor gates
-// =============================================================
-// §28.4: Truth tables (Table 28-3)
 TEST(LogicGates, AndGateTruthTable) {
   RunGateTruthTable(GateKind::kAnd,
                     {
-                        // Row 0
+
                         {Val4::kV0, Val4::kV0, Val4::kV0},
                         {Val4::kV0, Val4::kV1, Val4::kV0},
                         {Val4::kV0, Val4::kX, Val4::kV0},
                         {Val4::kV0, Val4::kZ, Val4::kV0},
-                        // Row 1
+
                         {Val4::kV1, Val4::kV0, Val4::kV0},
                         {Val4::kV1, Val4::kV1, Val4::kV1},
                         {Val4::kV1, Val4::kX, Val4::kX},
                         {Val4::kV1, Val4::kZ, Val4::kX},
-                        // Row x
+
                         {Val4::kX, Val4::kV0, Val4::kV0},
                         {Val4::kX, Val4::kV1, Val4::kX},
                         {Val4::kX, Val4::kX, Val4::kX},
                         {Val4::kX, Val4::kZ, Val4::kX},
-                        // Row z
+
                         {Val4::kZ, Val4::kV0, Val4::kV0},
                         {Val4::kZ, Val4::kV1, Val4::kX},
                         {Val4::kZ, Val4::kX, Val4::kX},
@@ -98,7 +92,6 @@ TEST(LogicGates, XorGateTruthTable) {
                     "Xor");
 }
 
-// §28.4: nand = NOT(and), nor = NOT(or), xnor = NOT(xor)
 TEST(LogicGates, NandIsInvertedAnd) {
   CheckInversion(GateKind::kAnd, GateKind::kNand);
 }
@@ -111,10 +104,8 @@ TEST(LogicGates, XnorIsInvertedXor) {
   CheckInversion(GateKind::kXor, GateKind::kXnor);
 }
 
-// §28.4: "If there is no delay specification, there shall be no
-//  propagation delay through the gate."
 TEST(LogicGates, NoDelayZeroPropagation) {
   EXPECT_EQ(ComputeGateDelay(0, 0, Val4::kV0, Val4::kV1), 0u);
 }
 
-}  // namespace
+}

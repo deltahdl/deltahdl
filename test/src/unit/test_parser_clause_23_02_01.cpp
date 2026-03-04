@@ -1,5 +1,3 @@
-// §23.2.1: Module header definition
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// 27. Module with static lifetime qualifier
-// =============================================================================
 TEST(ParserSection4, Sec4_9_3_StaticModuleLifetime) {
   EXPECT_TRUE(
       ParseOk("module static m;\n"
@@ -18,7 +13,7 @@ TEST(ParserSection4, Sec4_9_3_StaticModuleLifetime) {
               "  endfunction\n"
               "endmodule\n"));
 }
-// --- End labels on design elements (LRM section 3) ---
+
 TEST(ParserSection23, EndLabelModule) {
   auto r = Parse("module foo; endmodule : foo\n");
   ASSERT_NE(r.cu, nullptr);
@@ -33,7 +28,6 @@ TEST(ParserSection23, EndLabelModuleNoLabel) {
   EXPECT_EQ(r.cu->modules[0]->name, "bar");
 }
 
-// --- Package import in module headers (LRM section 26.4) ---
 TEST(ParserSection23, ModuleHeaderImport) {
   auto r = Parse(
       "module m import pkg::*; ();\n"
@@ -41,7 +35,7 @@ TEST(ParserSection23, ModuleHeaderImport) {
   ASSERT_NE(r.cu, nullptr);
   auto* mod = r.cu->modules[0];
   EXPECT_EQ(mod->name, "m");
-  // The header import generates an import item in the module body.
+
   ASSERT_GE(mod->items.size(), 1);
   EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
 }
@@ -90,9 +84,6 @@ TEST(ParserSection23, ModuleHeaderMultipleImportsFirst) {
   EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
 }
 
-// =============================================================================
-// LRM section 23.2 -- Module definitions (additional)
-// =============================================================================
 TEST(ParserSection23, ModuleWithParameters) {
   auto r = Parse(
       "module m #(parameter WIDTH = 8, parameter DEPTH = 16)(\n"
@@ -109,9 +100,6 @@ TEST(ParserSection23, ModuleWithParameters) {
   ASSERT_EQ(mod->ports.size(), 2u);
 }
 
-// =========================================================================
-// LRM section 23.1: Module definitions
-// =========================================================================
 TEST(ParserSection23, ModuleDefinitionEmpty) {
   auto r = Parse("module empty_mod; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -131,4 +119,4 @@ TEST(ParserCh512, TopLevel_TrailingSemicolonAfterEndmodule) {
   EXPECT_TRUE(ParseOk("module m; endmodule;"));
 }
 
-}  // namespace
+}

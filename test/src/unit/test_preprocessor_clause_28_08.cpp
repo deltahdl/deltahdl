@@ -1,5 +1,3 @@
-// §28.8: Bidirectional pass switches
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -29,4 +27,4 @@ TEST(Parser, GateTran) {
   EXPECT_EQ(item->gate_terminals.size(), 2);
 }
 
-}  // namespace
+}

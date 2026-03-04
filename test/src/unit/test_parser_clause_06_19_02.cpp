@@ -1,5 +1,3 @@
-// §6.19.2: Enumerated type ranges
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -7,7 +5,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA221, EnumNameWithRange) {
-  // enum_id [ integral_number ]
+
   auto r = Parse("module m; enum {A[3]} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -16,7 +14,7 @@ TEST(ParserA221, EnumNameWithRange) {
 }
 
 TEST(ParserA221, EnumNameWithRangeColon) {
-  // enum_id [ integral_number : integral_number ]
+
   auto r = Parse("module m; enum {A[0:3] = 10} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -26,4 +24,4 @@ TEST(ParserA221, EnumNameWithRangeColon) {
   EXPECT_NE(member.value, nullptr);
 }
 
-}  // namespace
+}

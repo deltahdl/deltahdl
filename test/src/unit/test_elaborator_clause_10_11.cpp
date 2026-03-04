@@ -1,13 +1,8 @@
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
-namespace {}  // namespace
-
-// =============================================================================
-// §10.11 Net alias — elaboration
-// =============================================================================
+namespace {}
 
 TEST(ElabClause1011, NetAliasNotSilentlyIgnored) {
   ElabFixture f;
@@ -36,10 +31,6 @@ TEST(ElabClause1011, NetAliasThreeNets) {
   ASSERT_GE(mod->aliases.size(), 1u);
   ASSERT_EQ(mod->aliases[0].nets.size(), 3u);
 }
-
-// =============================================================================
-// §10.11 Net alias — validation (not yet implemented)
-// =============================================================================
 
 TEST(ElabClause1011, Validate_NetAlias_TypeCompatibility) {
   ElabFixture f;

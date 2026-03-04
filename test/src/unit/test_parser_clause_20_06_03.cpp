@@ -1,5 +1,3 @@
-// §20.6.3: Range system function
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -32,4 +30,4 @@ TEST(ParserSection20, IsUnboundedWithBoundedParam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

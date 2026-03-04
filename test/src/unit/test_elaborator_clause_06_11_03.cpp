@@ -1,5 +1,3 @@
-// §6.11.3: Signed and unsigned integer types
-
 #include <gtest/gtest.h>
 
 #include "elaborator/type_eval.h"
@@ -11,8 +9,7 @@ using namespace delta;
 namespace {
 
 TEST(TypeEval, ImplicitlySignedTypes) {
-  // §6.8: integer, int, shortint, longint, byte are implicitly signed.
-  // logic, reg, bit are NOT implicitly signed.
+
   struct Case {
     DataTypeKind kind;
     bool expected;
@@ -33,7 +30,6 @@ TEST(TypeEval, ImplicitlySignedTypes) {
   }
 }
 
-// 23. type() with byte, verify unsigned flag is not set (byte is signed).
 TEST(SimCh6b, TypeOpByteIsSigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -55,4 +51,4 @@ TEST(SimCh6b, TypeOpByteIsSigned) {
   EXPECT_EQ(var->value.width, 8u);
 }
 
-}  // namespace
+}

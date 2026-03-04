@@ -1,6 +1,3 @@
-// §23.3.2.4: Connecting module instances using wildcard named port connections
-// ( .*)
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -9,7 +6,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserAnnexA0411, WildcardPortConnection) {
-  // . * — wildcard port connection
+
   auto r = Parse("module m; sub u0(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -18,7 +15,7 @@ TEST(ParserAnnexA0411, WildcardPortConnection) {
 }
 
 TEST(ParserAnnexA0411, WildcardWithNamedPorts) {
-  // Named ports mixed with .*
+
   auto r = Parse("module m; sub u0(.clk(clk), .*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -52,7 +49,6 @@ TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
   EXPECT_EQ(inst->inst_ports.size(), 0u);
 }
 
-// --- interface_instantiation: wildcard port ---
 TEST(ParserAnnexA0412, InterfaceInstWildcardPort) {
   auto r = Parse("module m; my_if u0(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -61,7 +57,6 @@ TEST(ParserAnnexA0412, InterfaceInstWildcardPort) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
-// --- program_instantiation: wildcard port ---
 TEST(ParserAnnexA0413, ProgramInstWildcardPort) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
@@ -72,7 +67,7 @@ TEST(ParserAnnexA0413, ProgramInstWildcardPort) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->inst_wildcard);
 }
-// --- Wildcard .* port connections (LRM §23.3.2.4) ---
+
 TEST(ParserSection23, WildcardConnection) {
   auto r = Parse(
       "module top;\n"
@@ -99,9 +94,6 @@ TEST(ParserSection23, WildcardWithNamed) {
   EXPECT_EQ(item->inst_ports[0].first, "clk");
 }
 
-// =========================================================================
-// LRM section 23.3.3.7.2: Implicit named port connections (.*)
-// =========================================================================
 TEST(ParserSection23, WildcardOnly) {
   auto r = Parse(
       "module top;\n"
@@ -140,4 +132,4 @@ TEST(ParserSection23, WildcardWithEmptyPort) {
   EXPECT_EQ(item->inst_ports[0].second, nullptr);
 }
 
-}  // namespace
+}

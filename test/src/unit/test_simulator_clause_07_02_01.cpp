@@ -1,5 +1,3 @@
-// §7.2.1: Packed structures
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// § primary — member access (struct field)
 TEST(SimA84, PrimaryMemberAccess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -28,4 +25,4 @@ TEST(SimA84, PrimaryMemberAccess) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-}  // namespace
+}

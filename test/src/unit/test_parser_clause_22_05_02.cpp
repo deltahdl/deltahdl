@@ -1,5 +1,3 @@
-// §22.5.2: `undef
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -14,4 +12,4 @@ TEST(ParserSection22, DefineAndUndef) {
               "`undef FOO\n"));
 }
 
-}  // namespace
+}

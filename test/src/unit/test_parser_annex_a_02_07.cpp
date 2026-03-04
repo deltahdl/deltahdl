@@ -1,5 +1,3 @@
-// Annex A.2.7: Task declarations
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -50,9 +48,6 @@ TEST(ParserA27, TfPortDeclOldStyleVar) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
 }
 
-// ---------------------------------------------------------------------------
-// tf_port_item: [ var ] data_type_or_implicit
-// ---------------------------------------------------------------------------
 TEST(ParserA27, TfPortItemVar) {
   auto r = Parse(
       "module m;\n"
@@ -66,4 +61,4 @@ TEST(ParserA27, TfPortItemVar) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-}  // namespace
+}

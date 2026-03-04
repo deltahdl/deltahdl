@@ -1,5 +1,3 @@
-// §34.5.29: runtime_license
-
 #include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
@@ -24,9 +22,6 @@ struct ProtectedTest : ::testing::Test {
 
 namespace {
 
-// =============================================================================
-// §34.5 License checking stub
-// =============================================================================
 TEST_F(ProtectedTest, RuntimeLicensePragma) {
   auto result = Preprocess(
       "`pragma protect runtime_license=(library=\"lic.so\","
@@ -38,4 +33,4 @@ TEST_F(ProtectedTest, RuntimeLicensePragma) {
   EXPECT_NE(result.find("module m;"), std::string::npos);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §6.14: Chandle data type
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,9 +8,8 @@ using namespace delta;
 
 namespace {
 
-// --- §6.14 Chandle restriction tests ---
 TEST(Elaboration, ChandlePort_Error) {
-  // §6.14: chandle cannot be used as a port.
+
   ElabFixture f;
   ElaborateSrc(
       "module top(input chandle ch);\n"
@@ -22,7 +19,7 @@ TEST(Elaboration, ChandlePort_Error) {
 }
 
 TEST(Elaboration, ChandleContAssign_Error) {
-  // §6.14: chandle cannot be used in continuous assignment.
+
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -34,7 +31,7 @@ TEST(Elaboration, ChandleContAssign_Error) {
 }
 
 TEST(Elaboration, ChandleSensitivity_Error) {
-  // §6.14: chandle cannot appear in event expression.
+
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -46,7 +43,7 @@ TEST(Elaboration, ChandleSensitivity_Error) {
 }
 
 TEST(Elaboration, ChandleVarDecl_OK) {
-  // §6.14: chandle variable declaration is legal.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -57,4 +54,4 @@ TEST(Elaboration, ChandleVarDecl_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

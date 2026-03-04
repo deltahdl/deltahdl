@@ -1,5 +1,3 @@
-// §30.4.2: Simple module paths
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7 -- Specify section
-// =============================================================================
 TEST(ParserAnnexA, A7SpecifyParallelPath) {
   auto r = Parse("module m; specify (a => b) = 5; endspecify endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -55,10 +50,6 @@ TEST(ParserSection28, Sec28_12_MultiplePathsInSpecifyBlock) {
   EXPECT_EQ(spec->specify_items[2]->path.path_kind, SpecifyPathKind::kParallel);
 }
 
-// =============================================================================
-// A.7.3 specify_input_terminal_descriptor — with constant_range_expression
-// =============================================================================
-// Input terminal with bit-select
 TEST(ParserA703, InputTerminalBitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -92,7 +83,6 @@ TEST(ParserA701, SpecifyItemPathDecl) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
 }
 
-// Output terminal with part-select range
 TEST(ParserA703, OutputTerminalPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -118,10 +108,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
   return spec->specify_items[0];
 }
 
-// =============================================================================
-// A.7.2 path_declaration — 3 alternatives
-// =============================================================================
-// path_declaration ::= simple_path_declaration ;
 TEST(ParserA702, PathDeclSimpleParallel) {
   auto r = Parse(
       "module m;\n"
@@ -140,7 +126,6 @@ TEST(ParserA702, PathDeclSimpleParallel) {
   EXPECT_FALSE(si->path.is_ifnone);
 }
 
-// path_declaration ::= simple_path_declaration ; (full connection)
 TEST(ParserA702, PathDeclSimpleFull) {
   auto r = Parse(
       "module m;\n"
@@ -157,7 +142,6 @@ TEST(ParserA702, PathDeclSimpleFull) {
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
 }
 
-// Both input and output with range expressions
 TEST(ParserA703, BothInputOutputWithRanges) {
   auto r = Parse(
       "module m;\n"
@@ -175,7 +159,6 @@ TEST(ParserA703, BothInputOutputWithRanges) {
   EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-// Output identifier — interface_identifier.port_identifier
 TEST(ParserA703, OutputIdentifierDotted) {
   auto r = Parse(
       "module m;\n"
@@ -192,9 +175,6 @@ TEST(ParserA703, OutputIdentifierDotted) {
   EXPECT_EQ(si->path.dst_ports[0].name, "sig");
 }
 
-// =============================================================================
-// A.7.2 simple_path_declaration — parallel_path_description = path_delay_value
-// =============================================================================
 TEST(ParserA702, SimplePathParallelSingleDelay) {
   auto r = Parse(
       "module m;\n"
@@ -214,7 +194,6 @@ TEST(ParserA702, SimplePathParallelSingleDelay) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-// simple_path_declaration — full_path_description = path_delay_value
 TEST(ParserA702, SimplePathFullMultiplePorts) {
   auto r = Parse(
       "module m;\n"
@@ -229,10 +208,6 @@ TEST(ParserA702, SimplePathFullMultiplePorts) {
   VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
 }
 
-// =============================================================================
-// A.7.3 Combined forms — terminals with ranges in full/edge/conditional paths
-// =============================================================================
-// Multiple input terminals with mixed forms in full path
 TEST(ParserA703, MixedInputTerminalsFullPath) {
   auto r = Parse(
       "module m;\n"
@@ -253,10 +228,6 @@ TEST(ParserA703, MixedInputTerminalsFullPath) {
   EXPECT_EQ(si->path.src_ports[2].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-// =============================================================================
-// A.8.3 Expressions — module_path_expression
-// =============================================================================
-// § module_path_expression used in specify block path conditions
 TEST(ParserA83, ModulePathExprInSpecify) {
   auto r = Parse(
       "module m(input a, output y);\n"
@@ -268,7 +239,6 @@ TEST(ParserA83, ModulePathExprInSpecify) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §3.3 Specify blocks
 TEST(ParserClause03, Cl3_3_SpecifyBlock) {
   EXPECT_TRUE(
       ParseOk("module m (input a, output y);\n"
@@ -293,9 +263,6 @@ TEST(ParserSection28, Sec28_12_MultipleSourceDestPorts) {
   VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
 }
 
-// =============================================================================
-// §30.3 Path delay declarations
-// =============================================================================
 TEST_F(SpecifyTest, ParallelPathDelay) {
   auto* cu = Parse(
       "module m;\n"
@@ -317,4 +284,4 @@ TEST_F(SpecifyTest, ParallelPathDelay) {
   ASSERT_EQ(item->path.delays.size(), 1u);
 }
 
-}  // namespace
+}

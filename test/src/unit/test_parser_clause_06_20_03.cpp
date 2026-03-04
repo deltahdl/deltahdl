@@ -1,12 +1,9 @@
-// §6.20.3: Type parameters
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// parameter_port_list: type parameter (#(type T = int))
 TEST(SourceText, ParamPortTypeParameter) {
   auto r = Parse("module m #(type T = int); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -27,10 +24,6 @@ TEST(ParserA24, TypeAssignmentComplexType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// Section 8.10 -- Type parameters
-// =============================================================================
-// Module with type parameter.
 TEST(ParserSection8, TypeParameterModule) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type T = int);\n"
@@ -38,7 +31,6 @@ TEST(ParserSection8, TypeParameterModule) {
               "endmodule\n"));
 }
 
-// Module with type parameter defaulting to logic vector.
 TEST(ParserSection8, TypeParameterLogicVector) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type T = logic [7:0]);\n"
@@ -47,7 +39,7 @@ TEST(ParserSection8, TypeParameterLogicVector) {
 }
 
 TEST(ParserSection6, TypeParamDefaultLogicVector) {
-  // §6.20.3: Type parameter with a vector default.
+
   EXPECT_TRUE(
       ParseOk("module m #(parameter type DATA_T = logic [15:0])\n"
               "  ();\n"
@@ -55,12 +47,10 @@ TEST(ParserSection6, TypeParamDefaultLogicVector) {
               "endmodule\n"));
 }
 
-// Step 1d: type parameter in module header (fixes 6.20.3)
 TEST(ParserSection6, TypeParamPort) {
   EXPECT_TRUE(ParseOk6("module top #(type T = real); endmodule\n"));
 }
 
-// Step 1d: localparam type declaration (fixes 6.23-localparam_type_decl)
 TEST(ParserSection6, LocalparamTypeDecl) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
@@ -69,9 +59,6 @@ TEST(ParserSection6, LocalparamTypeDecl) {
                "endmodule\n"));
 }
 
-// =========================================================================
-// §6.20.3: Type parameters (additional tests)
-// =========================================================================
 TEST(ParserSection6, TypeParameterWithMultipleParams) {
   EXPECT_TRUE(
       ParseOk6("module m #(parameter type T = int, parameter type U = real)\n"
@@ -89,4 +76,4 @@ TEST(ParserSection6, TypeParameterDefaultShortint) {
                "endmodule\n"));
 }
 
-}  // namespace
+}

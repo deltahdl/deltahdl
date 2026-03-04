@@ -1,5 +1,3 @@
-// §30.4.4.2: Simple state-dependent paths
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// if (expr) simple_path_declaration — full
 TEST(ParserA702, StateDependentIfSimpleFull) {
   auto r = Parse(
       "module m;\n"
@@ -25,7 +22,6 @@ TEST(ParserA702, StateDependentIfSimpleFull) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
 }
 
-// Polarity with conditional path
 TEST(ParserA702, PolarityWithConditionalPath) {
   auto r = Parse(
       "module m;\n"
@@ -41,9 +37,6 @@ TEST(ParserA702, PolarityWithConditionalPath) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
 }
 
-// =============================================================================
-// §30.3.3 Conditional path delays
-// =============================================================================
 TEST_F(SpecifyTest, ConditionalIfPath) {
   auto* cu = Parse(
       "module m;\n"
@@ -66,7 +59,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
   return spec->specify_items[0];
 }
 
-// path_declaration ::= state_dependent_path_declaration ; (if)
 TEST(ParserA702, PathDeclStateDependentIf) {
   auto r = Parse(
       "module m;\n"
@@ -82,7 +74,6 @@ TEST(ParserA702, PathDeclStateDependentIf) {
   EXPECT_FALSE(si->path.is_ifnone);
 }
 
-// § binary_module_path_operator — & in specify path condition
 TEST(ParserA86, BinaryModulePathBitwiseAnd) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -94,7 +85,6 @@ TEST(ParserA86, BinaryModulePathBitwiseAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 6 delays with conditional path
 TEST(ParserA704, SixDelaysConditionalPath) {
   auto r = Parse(
       "module m;\n"
@@ -141,4 +131,4 @@ TEST(ParserSection28, Sec28_12_ConditionalFullPath) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §21.2.1.1: Format specifications
-
 #include "fixture_simulator.h"
 #include "simulator/eval.h"
 #include "simulator/lowerer.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § system_tf_call — $display executes without crash
 TEST(SimA82, SystemTaskDisplay) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -60,16 +57,10 @@ TEST(SysTask, FormatReal_f) {
   EXPECT_NE(out.find("2.5"), std::string::npos);
 }
 
-// =============================================================================
-// Helper fixture
-// =============================================================================
-// =============================================================================
-// Phase 3: §21.2.1 FormatArg specifiers
-// =============================================================================
 TEST(FormatArg, DecimalUnsigned) {
   Arena arena;
   auto val = MakeLogic4VecVal(arena, 8, 42);
   EXPECT_EQ(FormatArg(val, 'd'), "42");
 }
 
-}  // namespace
+}

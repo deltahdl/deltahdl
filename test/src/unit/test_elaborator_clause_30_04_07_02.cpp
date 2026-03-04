@@ -1,12 +1,9 @@
-// §30.4.7.2: Positive polarity
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Path with polarity operator elaborates
 TEST(ElabA702, PathWithPolarityElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,4 +17,4 @@ TEST(ElabA702, PathWithPolarityElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

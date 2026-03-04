@@ -1,12 +1,9 @@
-// §12.7.6: The forever-loop
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// §12.7.7: forever loop elaborates without error
 TEST(ElabA608, ForeverLoop) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,4 +21,4 @@ TEST(ElabA608, ForeverLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

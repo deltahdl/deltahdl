@@ -1,14 +1,9 @@
-// §12.4.2: unique-if, unique0-if, and priority-if
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// §4.6: unique if statement
-// =============================================================================
 TEST(ParserSection4, Sec4_6_UniqueIf) {
   auto r = Parse(
       "module m;\n"
@@ -26,9 +21,6 @@ TEST(ParserSection4, Sec4_6_UniqueIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-// =============================================================================
-// §4.6: unique0 if statement
-// =============================================================================
 TEST(ParserSection4, Sec4_6_Unique0If) {
   auto r = Parse(
       "module m;\n"
@@ -45,9 +37,6 @@ TEST(ParserSection4, Sec4_6_Unique0If) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-// =============================================================================
-// §4.6: priority if statement
-// =============================================================================
 TEST(ParserSection4, Sec4_6_PriorityIf) {
   auto r = Parse(
       "module m;\n"
@@ -64,7 +53,7 @@ TEST(ParserSection4, Sec4_6_PriorityIf) {
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
-// unique0 if with else-if chain (no violation when none match).
+
 TEST(ParserSection12, Unique0IfChainElseIf) {
   auto r = Parse(
       "module t;\n"
@@ -81,10 +70,6 @@ TEST(ParserSection12, Unique0IfChainElseIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-// ---------------------------------------------------------------------------
-// unique_priority ::= unique | unique0 | priority
-// ---------------------------------------------------------------------------
-// §12.4.2: unique if
 TEST(ParserA606, UniqueIf) {
   auto r = Parse(
       "module m;\n"
@@ -101,7 +86,6 @@ TEST(ParserA606, UniqueIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-// priority if with a final else (covers all cases, LRM says no violation).
 TEST(ParserSection12, PriorityIfWithElse) {
   auto r = Parse(
       "module t;\n"
@@ -116,12 +100,11 @@ TEST(ParserSection12, PriorityIfWithElse) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
-  // Verify the else-if chain is fully linked.
+
   ASSERT_NE(stmt->else_branch, nullptr);
   ASSERT_NE(stmt->else_branch->else_branch, nullptr);
 }
 
-// §12.4.2: unique0 if
 TEST(ParserA606, Unique0If) {
   auto r = Parse(
       "module m;\n"
@@ -138,7 +121,6 @@ TEST(ParserA606, Unique0If) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-// §12.4.2: priority if
 TEST(ParserA606, PriorityIf) {
   auto r = Parse(
       "module m;\n"
@@ -156,7 +138,6 @@ TEST(ParserA606, PriorityIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-// §12.4.2: unique if with else-if chain and final else
 TEST(ParserA606, UniqueIfElseIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -173,14 +154,12 @@ TEST(ParserA606, UniqueIfElseIfElse) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
-  // qualifier only on outermost if; else-if branches are plain if stmts
+
   ASSERT_NE(stmt->else_branch, nullptr);
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->else_branch->qualifier, CaseQualifier::kNone);
 }
-// ---------------------------------------------------------------------------
-// 29. always_comb with unique if
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_UniqueIf) {
   auto r = Parse(
       "module m;\n"
@@ -207,4 +186,4 @@ TEST(ParserSection9, Sec9_2_2_UniqueIf) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-}  // namespace
+}

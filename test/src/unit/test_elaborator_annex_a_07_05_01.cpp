@@ -1,14 +1,9 @@
-// Annex A.7.5.1: System timing check commands
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 All 12 commands with full argument forms
-// =============================================================================
 TEST(ElabA70501, AllTwelveCommandFormsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,4 +28,4 @@ TEST(ElabA70501, AllTwelveCommandFormsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

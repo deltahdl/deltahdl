@@ -1,5 +1,3 @@
-// §34.5.32: viewport
-
 #include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
@@ -24,9 +22,6 @@ struct ProtectedTest : ::testing::Test {
 
 namespace {
 
-// =============================================================================
-// §34.5 Viewport support
-// =============================================================================
 TEST_F(ProtectedTest, ViewportPragma) {
   auto result = Preprocess(
       "`pragma protect viewport=all\n"
@@ -37,4 +32,4 @@ TEST_F(ProtectedTest, ViewportPragma) {
   EXPECT_NE(result.find("module m;"), std::string::npos);
 }
 
-}  // namespace
+}

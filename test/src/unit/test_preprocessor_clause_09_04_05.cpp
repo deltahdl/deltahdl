@@ -1,5 +1,3 @@
-// §9.4.5: Intra-assignment timing controls
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 10.4.1 -- Intra-assignment delay
-// =============================================================================
 TEST(ParserSection10, BlockingIntraAssignDelayKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -70,9 +65,6 @@ TEST(ParserSection10, NonblockingIntraAssignDelayOperands) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// =============================================================================
-// LRM section 10.4.2 -- Intra-assignment event control
-// =============================================================================
 TEST(ParserSection10, BlockingIntraAssignEventKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -135,4 +127,4 @@ TEST(ParserSection10, NonblockingIntraAssignEventEdge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
 
-}  // namespace
+}

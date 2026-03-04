@@ -1,5 +1,3 @@
-// §10.3.2: The continuous assignment statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -7,12 +5,6 @@
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.6.1 Production: continuous_assign (parsing)
-// continuous_assign ::=
-//   assign [ drive_strength ] [ delay3 ] list_of_net_assignments ;
-//   | assign [ delay_control ] list_of_variable_assignments ;
-// =============================================================================
 TEST(ParserA601, ContinuousAssign_Basic) {
   auto r = Parse(
       "module m;\n"
@@ -27,10 +19,6 @@ TEST(ParserA601, ContinuousAssign_Basic) {
   ASSERT_NE(cas[0]->assign_rhs, nullptr);
 }
 
-// =============================================================================
-// A.6.1 Production: list_of_net_assignments (parsing)
-// list_of_net_assignments ::= net_assignment { , net_assignment }
-// =============================================================================
 TEST(ParserA601, ListOfNetAssignments_Two) {
   auto r = Parse(
       "module m;\n"
@@ -78,10 +66,6 @@ TEST(ParserA601, ListOfNetAssignments_SharedStrengthAndDelay) {
   EXPECT_NE(cas[1]->assign_delay, nullptr);
 }
 
-// =============================================================================
-// A.6.1 Production: net_assignment (parsing)
-// net_assignment ::= net_lvalue = expression
-// =============================================================================
 TEST(ParserA601, NetAssignment_ConcatLhs) {
   auto r = Parse(
       "module m;\n"
@@ -109,7 +93,7 @@ TEST(ParserA601, NetAssignment_ExprRhs) {
   EXPECT_EQ(cas[0]->assign_rhs->kind, ExprKind::kBinary);
 }
 TEST(ParserSection6, VariableContinuousAssign) {
-  // §6.5: Variables can be written by one continuous assignment.
+
   auto r = Parse(
       "module t;\n"
       "  logic vw;\n"
@@ -123,9 +107,7 @@ TEST(ParserSection6, VariableContinuousAssign) {
   }
   EXPECT_TRUE(found_ca);
 }
-// =============================================================================
-// LRM section 10.3.4 -- Continuous assignment with drive strengths
-// =============================================================================
+
 TEST(ParserSection10, ContinuousAssignMultipleTargets) {
   auto r = Parse(
       "module m;\n"
@@ -151,9 +133,7 @@ static ModuleItem* FindItemByKindFromResult(ParseResult& r,
 static ModuleItem* FindContAssign(ParseResult& r) {
   return FindItemByKindFromResult(r, ModuleItemKind::kContAssign);
 }
-// ---------------------------------------------------------------------------
-// 3. Continuous assignment with assign (Active region)
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_ContinuousAssign) {
   auto r = Parse(
       "module m;\n"
@@ -184,9 +164,6 @@ TEST(ParserSection6, RealVariableContinuousAssign) {
   EXPECT_TRUE(found_ca);
 }
 
-// =============================================================================
-// LRM section 10.3 -- Continuous assignments (additional tests)
-// =============================================================================
 TEST(ParserSection10, ContinuousAssignExpression) {
   auto r = Parse(
       "module m;\n"
@@ -213,7 +190,7 @@ TEST(ParserSection10, ContinuousAssignTernary) {
   ASSERT_NE(ca, nullptr);
   ASSERT_NE(ca->assign_rhs, nullptr);
 }
-// 12. Net driven by assign statement produces kContAssign.
+
 TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
   auto r = Parse(
       "module t;\n"
@@ -230,7 +207,6 @@ TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
   ASSERT_NE(items[1]->assign_rhs, nullptr);
 }
 
-// 16. Variable with continuous assignment (assign logic_var = expr).
 TEST(ParserSection6, Sec6_5_VarWithContAssign) {
   auto r = Parse(
       "module t;\n"
@@ -253,7 +229,6 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
   return nullptr;
 }
 
-// tf_call in continuous assignment (function_subroutine_call as primary)
 TEST(ParserA82, TfCallInContAssign) {
   auto r = Parse(
       "module m;\n"
@@ -271,7 +246,6 @@ TEST(ParserA82, TfCallInContAssign) {
   EXPECT_EQ(rhs->callee, "compute");
 }
 
-// Continuous assignment with expression
 TEST(ParserA83, ExprInContAssign) {
   auto r = Parse(
       "module m;\n"
@@ -293,7 +267,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
   return nullptr;
 }
 
-// --- Bit-select in continuous assignment LHS ---
 TEST(ParserSection11, Sec11_4_1_BitSelectInContAssignLhs) {
   auto r = Parse(
       "module t;\n"
@@ -310,7 +283,6 @@ TEST(ParserSection11, Sec11_4_1_BitSelectInContAssignLhs) {
   EXPECT_EQ(ca->assign_lhs->index_end, nullptr);
 }
 
-// --- Packed struct continuous assignment ---
 TEST(ParserSection7, Sec7_2_1_PackedContAssign) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -328,7 +300,6 @@ static ModuleItem* NthItem(ParseResult& r, size_t n) {
   return r.cu->modules[0]->items[n];
 }
 
-// 12. Struct assigned via continuous assign statement.
 TEST(ParserSection7, Sec7_2_2_ContinuousAssign) {
   auto r = Parse(
       "module t;\n"
@@ -345,4 +316,4 @@ TEST(ParserSection7, Sec7_2_2_ContinuousAssign) {
   ASSERT_NE(item->assign_rhs, nullptr);
 }
 
-}  // namespace
+}

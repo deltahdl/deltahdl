@@ -1,5 +1,3 @@
-// §non-lrm:dpi_helpers
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -15,7 +13,7 @@ namespace {
 
 TEST(DpiRuntime, PopEmptyScopeDoesNotCrash) {
   DpiRuntime rt;
-  rt.PopScope();  // Should not crash.
+  rt.PopScope();
   EXPECT_EQ(rt.CurrentScope(), nullptr);
 }
 
@@ -25,9 +23,6 @@ TEST(DpiRuntime, ArgValueReal) {
   EXPECT_DOUBLE_EQ(v.AsReal(), 3.14);
 }
 
-// =============================================================================
-// DpiArgValue: typed argument construction and access
-// =============================================================================
 TEST(DpiRuntime, ArgValueInt) {
   auto v = DpiArgValue::FromInt(42);
   EXPECT_EQ(v.type, DataTypeKind::kInt);
@@ -40,9 +35,6 @@ TEST(DpiRuntime, ArgValueString) {
   EXPECT_EQ(v.AsString(), "hello");
 }
 
-// =============================================================================
-// DpiRuntime: scope management (svGetScope, svSetScope)
-// =============================================================================
 TEST(DpiRuntime, ScopeManagement) {
   DpiRuntime rt;
   EXPECT_EQ(rt.CurrentScope(), nullptr);
@@ -74,4 +66,4 @@ TEST(DpiRuntime, CallMissingImportReturnsZero) {
   EXPECT_EQ(result.AsInt(), 0);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §31.3.5: $recovery
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 $recovery_timing_check
-// =============================================================================
 TEST(ParserA70501, RecoveryTimingCheck) {
   auto r = Parse(
       "module m;\n"
@@ -41,7 +36,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckRecovery) {
   EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
   EXPECT_EQ(si->timing_check.data_terminal.name, "rst");
 }
-// system_timing_check ::= $recovery_timing_check
+
 TEST(ParserA705, SystemTimingCheckRecovery) {
   auto r = Parse(
       "module m;\n"
@@ -55,4 +50,4 @@ TEST(ParserA705, SystemTimingCheckRecovery) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecovery);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §35.5.5: Function result
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -21,9 +19,6 @@ TEST(ParserA26, DpiImportFunctionVoid) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-// =============================================================================
-// Annex H - DPI string return type
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiImportStringReturn) {
   auto* unit = Parse(
       "module m;\n"
@@ -38,4 +33,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportStringReturn) {
   EXPECT_TRUE(items[0]->dpi_is_pure);
 }
 
-}  // namespace
+}

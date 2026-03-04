@@ -1,14 +1,9 @@
-// §21.6: Command line input
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// ============================================================================
-// Additional coverage -- Command line input from 21.1 overview
-// ============================================================================
 TEST(ParserSection21, TestPlusargsCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -30,4 +25,4 @@ TEST(ParserSection21, ValuePlusargsCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

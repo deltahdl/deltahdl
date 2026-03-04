@@ -1,5 +1,3 @@
-// §14.4: Input and output skews
-
 #include <cstdint>
 
 #include "common/types.h"
@@ -13,7 +11,6 @@ using namespace delta;
 
 namespace {
 
-// --- clocking_skew: per-signal skew overrides default ---
 TEST(SimA611, PerSignalSkewOverride) {
   ClockingManager cmgr;
   ClockingBlock block;
@@ -34,9 +31,6 @@ TEST(SimA611, PerSignalSkewOverride) {
   EXPECT_EQ(cmgr.GetInputSkew("cb", "other").ticks, 10u);
 }
 
-// =============================================================================
-// 17. Inout direction signal
-// =============================================================================
 TEST(ClockingSim, InoutSignalDirection) {
   ClockingManager cmgr;
   ClockingBlock block;
@@ -56,12 +50,6 @@ TEST(ClockingSim, InoutSignalDirection) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "bidir").ticks, 3u);
 }
 
-// Helper fixture for clocking simulation tests.
-// Schedule posedge at a given time through the scheduler.
-// Schedule negedge at a given time through the scheduler.
-// =============================================================================
-// 2. Input skew (S14.4)
-// =============================================================================
 TEST(ClockingSim, InputSkewSamplesBeforeClockEdge) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -92,9 +80,6 @@ TEST(ClockingSim, InputSkewSamplesBeforeClockEdge) {
   EXPECT_EQ(sampled, 0xABu);
 }
 
-// =============================================================================
-// 3. Output skew (S14.4)
-// =============================================================================
 TEST(ClockingSim, OutputSkewDrivesAfterClockEdge) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -121,9 +106,6 @@ TEST(ClockingSim, OutputSkewDrivesAfterClockEdge) {
   EXPECT_EQ(data_out->value.ToUint64(), 0x55u);
 }
 
-// =============================================================================
-// 13. Per-signal skew override for input
-// =============================================================================
 TEST(ClockingSim, PerSignalInputSkewOverride) {
   ClockingManager cmgr;
   ClockingBlock block;
@@ -144,9 +126,6 @@ TEST(ClockingSim, PerSignalInputSkewOverride) {
   EXPECT_EQ(cmgr.GetInputSkew("cb", "other").ticks, 5u);
 }
 
-// =============================================================================
-// 14. Per-signal skew override for output
-// =============================================================================
 TEST(ClockingSim, PerSignalOutputSkewOverride) {
   ClockingManager cmgr;
   ClockingBlock block;
@@ -186,9 +165,8 @@ TEST(Clocking, PerSignalSkewOverridesDefault) {
   auto skew = mgr.GetInputSkew("cb", "data_in");
   EXPECT_EQ(skew.ticks, 7u);
 
-  // Unknown signal falls back to default.
   auto default_skew = mgr.GetInputSkew("cb", "other_signal");
   EXPECT_EQ(default_skew.ticks, 5u);
 }
 
-}  // namespace
+}

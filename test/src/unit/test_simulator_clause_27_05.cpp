@@ -1,5 +1,3 @@
-// §27.5: Conditional generate constructs
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -109,4 +107,4 @@ TEST(Elaborator, GenerateCaseDefault) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}  // namespace
+}

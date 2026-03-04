@@ -1,5 +1,3 @@
-// §6.14: Chandle data type
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 
@@ -7,11 +5,8 @@ using namespace delta;
 
 namespace {
 
-// =========================================================================
-// §6.6.8: Chandle data type
-// =========================================================================
 TEST(ParserSection6, ChandleInClass) {
-  // §6.6.8: chandle used in a class for DPI handle.
+
   auto r = ParseWithPreprocessor(
       "class Wrapper;\n"
       "  chandle ptr;\n"
@@ -23,4 +18,4 @@ TEST(ParserSection6, ChandleInClass) {
             DataTypeKind::kChandle);
 }
 
-}  // namespace
+}

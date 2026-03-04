@@ -1,5 +1,3 @@
-// §29.7: Sequential UDP initialization
-
 #include "fixture_parser.h"
 #include "simulator/udp_eval.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- udp_declaration: sequential with initial value 1 ---
 TEST(ParserAnnexA051, SequentialInitialOne) {
   auto r = Parse(
       "primitive latch(output reg q, input d, input en);\n"
@@ -25,11 +22,6 @@ TEST(ParserAnnexA051, SequentialInitialOne) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-// ---------------------------------------------------------------------------
-// Production 5: udp_initial_statement ::= initial output_port_identifier =
-//               init_val ;
-// ---------------------------------------------------------------------------
-// Initial statement parsed correctly
 TEST(ParserAnnexA053, InitStmt_Parsed) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -46,4 +38,4 @@ TEST(ParserAnnexA053, InitStmt_Parsed) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-}  // namespace
+}

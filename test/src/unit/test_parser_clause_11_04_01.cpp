@@ -1,15 +1,9 @@
-// §11.4.1: Assignment operators
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.6.2 Production: operator_assignment
-// operator_assignment ::= variable_lvalue assignment_operator expression
-// =============================================================================
 TEST(ParserA602, OperatorAssignment_PlusEq) {
   auto r = Parse(
       "module m;\n"
@@ -169,7 +163,7 @@ TEST(ParserA602, OperatorAssignment_ArithRightShiftEq) {
 }
 
 TEST(ParserA602, OperatorAssignment_WithSelectLhs) {
-  // Compound assignment with array/bit-select LHS
+
   auto r = Parse(
       "module m;\n"
       "  initial begin mem[0] += 1; end\n"
@@ -182,14 +176,6 @@ TEST(ParserA602, OperatorAssignment_WithSelectLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-// =============================================================================
-// A.6.2 Production: assignment_operator
-// assignment_operator ::= = | += | -= | *= | /= | %= | &= | |= | ^=
-//                        | <<= | >>= | <<<= | >>>=
-// (The simple '=' is tested by blocking_assignment tests above; compound
-// operators are tested by operator_assignment tests above. This section
-// tests that all 13 operators work correctly in sequence.)
-// =============================================================================
 TEST(ParserA602, AssignmentOperator_AllThirteen) {
   auto r = Parse(
       "module m;\n"
@@ -213,7 +199,7 @@ TEST(ParserA602, AssignmentOperator_AllThirteen) {
   EXPECT_FALSE(r.has_errors);
   auto stmts = AllInitialStmts(r);
   ASSERT_EQ(stmts.size(), 13u);
-  // All should be blocking assignments
+
   for (auto* s : stmts) {
     EXPECT_EQ(s->kind, StmtKind::kBlockingAssign);
   }
@@ -352,7 +338,7 @@ TEST(ParserSection10, OperatorAssignGtGtGtEq) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
-// --- 19. Compound assignment operator += ---
+
 TEST(ParserSection10, Sec10_4_1_CompoundPlusEq) {
   auto r = Parse(
       "module m;\n"
@@ -370,7 +356,6 @@ TEST(ParserSection10, Sec10_4_1_CompoundPlusEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kPlusEq);
 }
 
-// --- 20. Compound assignment operator -= ---
 TEST(ParserSection10, Sec10_4_1_CompoundMinusEq) {
   auto r = Parse(
       "module m;\n"
@@ -388,7 +373,6 @@ TEST(ParserSection10, Sec10_4_1_CompoundMinusEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kMinusEq);
 }
 
-// --- 21. Compound assignment operators *=, /=, %= ---
 TEST(ParserSection10, Sec10_4_1_CompoundMulDivMod) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -399,7 +383,7 @@ TEST(ParserSection10, Sec10_4_1_CompoundMulDivMod) {
               "  end\n"
               "endmodule\n"));
 }
-// --- 22. Compound assignment operators &=, |=, ^= ---
+
 TEST(ParserSection10, Sec10_4_1_CompoundBitwise) {
   auto r = Parse(
       "module m;\n"
@@ -422,7 +406,6 @@ TEST(ParserSection10, Sec10_4_1_CompoundBitwise) {
   EXPECT_EQ(s2->rhs->op, TokenKind::kCaretEq);
 }
 
-// --- 23. Compound assignment operators <<=, >>=, <<<=, >>>= ---
 TEST(ParserSection10, Sec10_4_1_CompoundShifts) {
   auto r = Parse(
       "module m;\n"
@@ -449,7 +432,6 @@ TEST(ParserSection10, Sec10_4_1_CompoundShifts) {
   EXPECT_EQ(s3->rhs->op, TokenKind::kGtGtGtEq);
 }
 
-// § variable_lvalue — compound assignment +=
 TEST(ParserA85, VarLvalueCompoundAdd) {
   auto r = Parse("module m; int x; initial x += 5; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -460,7 +442,6 @@ TEST(ParserA85, VarLvalueCompoundAdd) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
 }
 
-// § variable_lvalue — compound assignment with bit select LHS
 TEST(ParserA85, VarLvalueCompoundBitSelect) {
   auto r = Parse("module m; logic [7:0] x; initial x[3] |= 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -470,9 +451,7 @@ TEST(ParserA85, VarLvalueCompoundBitSelect) {
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
-// =========================================================================
-// Section 11.3.6 -- Assignment operators in expressions
-// =========================================================================
+
 TEST(ParserSection11, CompoundAssignPlusEq) {
   auto r = Parse(
       "module t;\n"
@@ -481,7 +460,7 @@ TEST(ParserSection11, CompoundAssignPlusEq) {
   ASSERT_NE(r.cu, nullptr);
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  // Compound assignment is parsed as blocking assign with op
+
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
@@ -596,4 +575,4 @@ TEST(ParserSection9b, BlockingAssignCompound) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

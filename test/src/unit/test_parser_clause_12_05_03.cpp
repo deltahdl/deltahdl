@@ -1,14 +1,9 @@
-// §12.5.3: unique-case, unique0-case, and priority-case
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// §4.6: unique case statement — exactly one match expected
-// =============================================================================
 TEST(ParserSection4, Sec4_6_UniqueCaseOneMatch) {
   auto r = Parse(
       "module m;\n"
@@ -29,9 +24,6 @@ TEST(ParserSection4, Sec4_6_UniqueCaseOneMatch) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-// =============================================================================
-// §4.6: unique0 case statement — at most one match
-// =============================================================================
 TEST(ParserSection4, Sec4_6_Unique0CaseAtMostOneMatch) {
   auto r = Parse(
       "module m;\n"
@@ -50,9 +42,6 @@ TEST(ParserSection4, Sec4_6_Unique0CaseAtMostOneMatch) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-// =============================================================================
-// §4.6: priority case statement — first match
-// =============================================================================
 TEST(ParserSection4, Sec4_6_PriorityCaseFirstMatch) {
   auto r = Parse(
       "module m;\n"
@@ -71,9 +60,7 @@ TEST(ParserSection4, Sec4_6_PriorityCaseFirstMatch) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
-// ---------------------------------------------------------------------------
-// 19. always_comb with unique case
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_UniqueCase) {
   auto r = Parse(
       "module m;\n"
@@ -96,7 +83,7 @@ TEST(ParserSection9, Sec9_2_2_UniqueCase) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
-// unique casez combines qualifier with casez keyword.
+
 TEST(ParserSection12, UniqueCasezQualifier) {
   auto r = Parse(
       "module t;\n"
@@ -115,9 +102,6 @@ TEST(ParserSection12, UniqueCasezQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-// ---------------------------------------------------------------------------
-// 20. always_comb with priority case
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_PriorityCase) {
   auto r = Parse(
       "module m;\n"
@@ -142,7 +126,6 @@ TEST(ParserSection9, Sec9_2_2_PriorityCase) {
   ASSERT_EQ(stmt->case_items.size(), 5u);
 }
 
-// priority casex.
 TEST(ParserSection12, PriorityCasex) {
   auto r = Parse(
       "module t;\n"
@@ -160,7 +143,7 @@ TEST(ParserSection12, PriorityCasex) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
-// @* with unique case
+
 TEST(ParserSection9, Sec9_4_2_3_AtStarUniqueCase) {
   auto r = Parse(
       "module m;\n"
@@ -179,9 +162,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarUniqueCase) {
   EXPECT_EQ(case_stmt->qualifier, CaseQualifier::kUnique);
 }
 
-// =============================================================================
-// §4.6: Priority case with default
-// =============================================================================
 TEST(ParserSection4, Sec4_6_PriorityCaseWithDefault) {
   auto r = Parse(
       "module m;\n"
@@ -203,9 +183,6 @@ TEST(ParserSection4, Sec4_6_PriorityCaseWithDefault) {
   EXPECT_TRUE(HasDefaultCaseItem(stmt));
 }
 
-// =============================================================================
-// §4.6: Unique case with multiple matches listed
-// =============================================================================
 TEST(ParserSection4, Sec4_6_UniqueCaseMultipleItems) {
   auto r = Parse(
       "module m;\n"
@@ -227,9 +204,6 @@ TEST(ParserSection4, Sec4_6_UniqueCaseMultipleItems) {
   EXPECT_EQ(stmt->case_items.size(), 4u);
 }
 
-// ---------------------------------------------------------------------------
-// 26. always_comb with unique0 case
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_Unique0Case) {
   auto r = Parse(
       "module m;\n"
@@ -286,10 +260,6 @@ TEST(ParserSection12, PriorityCase) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-// ---------------------------------------------------------------------------
-// unique_priority with case
-// ---------------------------------------------------------------------------
-// §12.5.3: unique case
 TEST(ParserA607, UniqueCaseParse) {
   auto r = Parse(
       "module m;\n"
@@ -314,9 +284,6 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-// ---------------------------------------------------------------------------
-// 14. unique case statement inside always_latch.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_UniqueCaseStatement) {
   auto r = Parse(
       "module m;\n"
@@ -339,10 +306,6 @@ TEST(ParserSection9, Sec9_2_3_UniqueCaseStatement) {
   EXPECT_EQ(item->body->qualifier, CaseQualifier::kUnique);
 }
 
-// =============================================================================
-// Combined patterns -- real-world usage patterns from sections 12.4-12.8
-// =============================================================================
-// Case inside always_comb with unique qualifier.
 TEST(ParserSection12, UniqueCaseInsideAlwaysComb) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -359,7 +322,6 @@ TEST(ParserSection12, UniqueCaseInsideAlwaysComb) {
               "endmodule\n"));
 }
 
-// §12.5.3: unique0 case
 TEST(ParserA607, Unique0CaseParse) {
   auto r = Parse(
       "module m;\n"
@@ -377,9 +339,6 @@ TEST(ParserA607, Unique0CaseParse) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-// ---------------------------------------------------------------------------
-// 15. priority case statement inside always_latch.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_PriorityCaseStatement) {
   auto r = Parse(
       "module m;\n"
@@ -401,7 +360,6 @@ TEST(ParserSection9, Sec9_2_3_PriorityCaseStatement) {
   EXPECT_EQ(item->body->qualifier, CaseQualifier::kPriority);
 }
 
-// §12.5.3: priority case
 TEST(ParserA607, PriorityCaseParse) {
   auto r = Parse(
       "module m;\n"
@@ -419,7 +377,6 @@ TEST(ParserA607, PriorityCaseParse) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-// §12.5.3: priority casez
 TEST(ParserA607, PriorityCasezParse) {
   auto r = Parse(
       "module m;\n"
@@ -438,7 +395,6 @@ TEST(ParserA607, PriorityCasezParse) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
 }
 
-// Unique0 case with empty default.
 TEST(ParserSection12, Unique0CaseWithDefault) {
   auto r = Parse(
       "module t;\n"
@@ -459,9 +415,6 @@ TEST(ParserSection12, Unique0CaseWithDefault) {
   EXPECT_TRUE(stmt->case_items[2].is_default);
 }
 
-// ---------------------------------------------------------------------------
-// 26. unique0 case inside always_latch.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_Unique0CaseStatement) {
   auto r = Parse(
       "module m;\n"
@@ -482,9 +435,6 @@ TEST(ParserSection9, Sec9_2_3_Unique0CaseStatement) {
   EXPECT_EQ(item->body->qualifier, CaseQualifier::kUnique0);
 }
 
-// =============================================================================
-// Combined tests -- qualifiers with named blocks
-// =============================================================================
 TEST(ParserSection12, UniqueCasexQualifier) {
   auto r = Parse(
       "module t;\n"
@@ -503,4 +453,4 @@ TEST(ParserSection12, UniqueCasexQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §16.15: Disable iff resolution
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// checker_or_generate_item_declaration ::= default disable iff expr ;
 TEST(SourceText, CheckerDefaultDisableIff) {
   auto r = Parse(
       "checker chk;\n"
@@ -22,8 +19,6 @@ TEST(SourceText, CheckerDefaultDisableIff) {
             ModuleItemKind::kDefaultDisableIff);
 }
 
-// --- Test helpers ---
-// default disable iff expression_or_dist (module_or_generate_item_declaration).
 TEST(SourceText, DefaultDisableIff) {
   auto r = Parse(
       "module m;\n"
@@ -37,4 +32,4 @@ TEST(SourceText, DefaultDisableIff) {
   EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
 }
 
-}  // namespace
+}

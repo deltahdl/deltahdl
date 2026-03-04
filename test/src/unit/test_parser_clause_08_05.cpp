@@ -1,5 +1,3 @@
-// §8.5: Object properties and object parameter data
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -24,4 +22,4 @@ TEST(ParserSection8, ClassWithProperties) {
   }
 }
 
-}  // namespace
+}

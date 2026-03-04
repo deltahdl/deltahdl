@@ -1,5 +1,3 @@
-// §18.17.3: Case production statements
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Case item with default
 TEST(ParserA612, RsCaseItemDefault) {
   auto r = Parse(
       "module m;\n"
@@ -26,7 +23,6 @@ TEST(ParserA612, RsCaseItemDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Default with colon (default :)
 TEST(ParserA612, RsCaseItemDefaultColon) {
   auto r = Parse(
       "module m;\n"
@@ -43,7 +39,6 @@ TEST(ParserA612, RsCaseItemDefaultColon) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// rs_prod as rs_case
 TEST(ParserA612, RsProdAsCase) {
   auto r = Parse(
       "module m;\n"
@@ -61,10 +56,6 @@ TEST(ParserA612, RsProdAsCase) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.6.12 Randsequence — rs_case
-// =============================================================================
-// Case with multiple items
 TEST(ParserA612, RsCaseMultipleItems) {
   auto r = Parse(
       "module m;\n"
@@ -85,10 +76,6 @@ TEST(ParserA612, RsCaseMultipleItems) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.6.12 Randsequence — rs_case_item
-// =============================================================================
-// Case item with comma-separated expressions
 TEST(ParserA612, RsCaseItemCommaSeparated) {
   auto r = Parse(
       "module m;\n"
@@ -107,4 +94,4 @@ TEST(ParserA612, RsCaseItemCommaSeparated) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

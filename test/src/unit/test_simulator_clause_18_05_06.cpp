@@ -1,5 +1,3 @@
-// §18.5.6: if–else constraints
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -15,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §18.5.6: Implication constraints (if-else)
-// =============================================================================
 TEST(Constraint, ImplicationTrue) {
   ConstraintSolver solver(42);
   RandVariable vmode;
@@ -105,4 +100,4 @@ TEST(Constraint, ImplicationFalseAntecedent) {
   EXPECT_LE(solver.GetValue("data"), 255);
 }
 
-}  // namespace
+}

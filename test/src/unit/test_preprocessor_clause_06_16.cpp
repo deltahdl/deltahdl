@@ -1,5 +1,3 @@
-// §6.16: String data type
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -17,11 +15,9 @@ TEST(ParserSection6, AssignCompatibleStringLiteral) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// =========================================================================
-// §6.16: String data type
-// =========================================================================
+
 TEST(ParserSection6, StringDeclModule) {
-  // §6.16: String data type is a dynamic ordered collection of characters.
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  string name;\n"
@@ -34,7 +30,7 @@ TEST(ParserSection6, StringDeclModule) {
 }
 
 TEST(ParserSection6, StringDeclWithInit) {
-  // §6.16: String variable with initializer.
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  string msg = \"hello\";\n"
@@ -46,4 +42,4 @@ TEST(ParserSection6, StringDeclWithInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

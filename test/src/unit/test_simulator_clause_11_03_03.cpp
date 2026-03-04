@@ -1,5 +1,3 @@
-// §11.3.3: Using integer literals in expressions
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.4 Primaries — Simulation
-// =============================================================================
-// § constant_primary — integer literal in parameter
 TEST(SimA84, ConstantPrimaryIntegerLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -30,4 +24,4 @@ TEST(SimA84, ConstantPrimaryIntegerLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

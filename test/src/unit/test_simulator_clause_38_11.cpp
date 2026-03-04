@@ -23,8 +23,6 @@ class VpiClause3811Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.11: vpi_get_str
-
 TEST_F(VpiClause3811Test, GetStrNameForModule) {
   vpi_ctx_.CreateModule("top_mod", "lib.top_mod");
   vpiHandle h = vpi_handle_by_name("top_mod", nullptr);
@@ -58,5 +56,5 @@ TEST_F(VpiClause3811Test, GetStrReturnsNullForNullHandle) {
   EXPECT_EQ(vpi_get_str(vpiName, nullptr), nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

@@ -1,15 +1,10 @@
-// §7.12.5: Array mapping method
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
-// --- Test helpers ---
+
 namespace {
 
-// =========================================================================
-// §7.12.5: Array mapping method
-// =========================================================================
 TEST(ParserSection7, ArrayMapMethod) {
   auto r = Parse(
       "module t;\n"
@@ -22,4 +17,4 @@ TEST(ParserSection7, ArrayMapMethod) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}  // namespace
+}

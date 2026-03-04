@@ -1,5 +1,3 @@
-// Non-LRM tests
-
 #include <gtest/gtest.h>
 
 #include <string_view>
@@ -11,15 +9,12 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// SvCallable
-// =============================================================================
 TEST(SvCallable, ConstructFunction_BasicProperties) {
   std::vector<CallableParam> params = {
       {"a", Direction::kInput, 8},
       {"b", Direction::kInput, 8},
   };
-  SvCallable func("add", /*is_task=*/false, params, nullptr);
+  SvCallable func("add", false, params, nullptr);
   EXPECT_EQ(func.Name(), "add");
   EXPECT_FALSE(func.IsTask());
   EXPECT_EQ(func.Params().size(), 2u);
@@ -31,13 +26,13 @@ TEST(SvCallable, ConstructFunction_ParamDetails) {
       {"a", Direction::kInput, 8},
       {"b", Direction::kInput, 8},
   };
-  SvCallable func("add", /*is_task=*/false, params, nullptr);
+  SvCallable func("add", false, params, nullptr);
   EXPECT_EQ(func.Params()[0].name, "a");
   EXPECT_EQ(func.Params()[1].width, 8u);
 }
 
 TEST(SvCallable, ConstructTask) {
-  SvCallable task("my_task", /*is_task=*/true, {}, nullptr);
+  SvCallable task("my_task", true, {}, nullptr);
   EXPECT_EQ(task.Name(), "my_task");
   EXPECT_TRUE(task.IsTask());
   EXPECT_TRUE(task.Params().empty());
@@ -55,9 +50,6 @@ TEST(SvCallable, ParamDirections) {
   EXPECT_EQ(func.Params()[2].direction, Direction::kInout);
 }
 
-// =============================================================================
-// SvCallableContext
-// =============================================================================
 TEST(SvCallableContext, EmptyStack) {
   SvCallableContext ctx;
   EXPECT_TRUE(ctx.Empty());
@@ -112,4 +104,4 @@ TEST(SvCallableContext, NestedCalls) {
   EXPECT_TRUE(ctx.Empty());
 }
 
-}  // namespace
+}

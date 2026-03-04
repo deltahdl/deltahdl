@@ -1,5 +1,3 @@
-// §27.5: Conditional generate constructs
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -48,7 +46,6 @@ TEST(ParserAnnexA, A4GenerateCase) {
   EXPECT_EQ(item->gen_case_items.size(), 2u);
 }
 
-// --- if_generate_construct: basic if ---
 TEST(ParserAnnexA042, IfGenerateBasic) {
   auto r = Parse(
       "module m;\n"
@@ -63,7 +60,6 @@ TEST(ParserAnnexA042, IfGenerateBasic) {
   EXPECT_EQ(gen->gen_else, nullptr);
 }
 
-// --- if_generate_construct: if with else ---
 TEST(ParserAnnexA042, IfGenerateWithElse) {
   auto r = Parse(
       "module m;\n"
@@ -80,7 +76,6 @@ TEST(ParserAnnexA042, IfGenerateWithElse) {
   ASSERT_EQ(gen->gen_else->gen_body.size(), 1u);
 }
 
-// --- if_generate_construct: if / else-if / else chain ---
 TEST(ParserAnnexA042, IfGenerateElseIfChain) {
   auto r = Parse(
       "module m;\n"
@@ -100,7 +95,6 @@ TEST(ParserAnnexA042, IfGenerateElseIfChain) {
   ASSERT_NE(gen->gen_else->gen_else, nullptr);
 }
 
-// --- case_generate_construct: basic case ---
 TEST(ParserAnnexA042, CaseGenerateBasic) {
   auto r = Parse(
       "module m;\n"
@@ -118,7 +112,6 @@ TEST(ParserAnnexA042, CaseGenerateBasic) {
   EXPECT_FALSE(gen->gen_case_items[1].is_default);
 }
 
-// --- case_generate_item: multiple patterns ---
 TEST(ParserAnnexA042, CaseGenerateMultiplePatterns) {
   auto r = Parse(
       "module m;\n"
@@ -137,7 +130,6 @@ TEST(ParserAnnexA042, CaseGenerateMultiplePatterns) {
   EXPECT_TRUE(gen->gen_case_items[2].is_default);
 }
 
-// --- nested generate constructs: for inside if ---
 TEST(ParserAnnexA042, NestedForInsideIf) {
   auto r = Parse(
       "module m;\n"
@@ -155,7 +147,6 @@ TEST(ParserAnnexA042, NestedForInsideIf) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
-// §27.1: Generate-if with nested generate-for (hierarchical conditional).
 TEST(ParserSection27, GenerateIfWithNestedFor) {
   auto r = Parse(
       "module m;\n"
@@ -192,9 +183,6 @@ TEST(ParserSection23, GenerateRegionWithIf) {
   EXPECT_TRUE(found);
 }
 
-// =========================================================================
-// LRM section 27.5: Conditional generates (if-generate)
-// =========================================================================
 TEST(ParserSection23, IfGenerateWithElseIf) {
   auto r = Parse(
       "module m;\n"
@@ -355,7 +343,6 @@ TEST(Parser, GenerateCaseInRegion) {
   EXPECT_TRUE(found);
 }
 
-// 15. Labeled generate blocks (if-generate)
 TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
   auto r = Parse(
       "module m;\n"
@@ -395,7 +382,6 @@ TEST(ParserSection23, CaseGenerateMultipleLabels) {
   EXPECT_EQ(item->gen_case_items[1].patterns.size(), 2);
 }
 
-// --- Single-item generate-if without begin/end (§27.5) ---
 TEST(ParserSection27, GenerateIfSingleItemParse) {
   auto r = Parse(
       "module m;\n"
@@ -454,7 +440,6 @@ TEST(ParserSection27, GenerateIfElseSingleItemBranches) {
   EXPECT_EQ(gen->gen_else->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
 
-// --- Generate-case (§27.6) ---
 TEST(ParserSection27, GenerateCaseParse) {
   auto r = Parse(
       "module m;\n"
@@ -489,7 +474,6 @@ TEST(ParserSection27, GenerateCaseItemDefaults) {
   }
 }
 
-// --- Generate-if with begin/end blocks (§27.5) ---
 TEST(ParserSection27, GenerateIfBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -506,7 +490,6 @@ TEST(ParserSection27, GenerateIfBeginEnd) {
   ASSERT_GE(gen->gen_body.size(), 2u);
 }
 
-// --- Generate-if/else-if chain (§27.5) ---
 TEST(ParserSection27, GenerateIfElseIfChainParse) {
   auto r = Parse(
       "module m;\n"
@@ -540,9 +523,7 @@ TEST(ParserSection27, GenerateIfElseIfChainNesting) {
   EXPECT_EQ(gen->gen_else->kind, ModuleItemKind::kGenerateIf);
   ASSERT_NE(gen->gen_else->gen_else, nullptr);
 }
-// =============================================================================
-// LRM section 23.10.2.2 -- Conditional generate
-// =============================================================================
+
 TEST(ParserSection23, ConditionalGenerateIfElse) {
   auto r = Parse(
       "module top;\n"
@@ -573,4 +554,4 @@ TEST(ParserSection23, ConditionalGenerateCase) {
   ASSERT_EQ(gen->gen_case_items.size(), 3u);
 }
 
-}  // namespace
+}

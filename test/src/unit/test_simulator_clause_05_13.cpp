@@ -1,4 +1,3 @@
-
 #include <cstring>
 
 #include "fixture_simulator.h"
@@ -7,9 +6,6 @@
 
 using namespace delta;
 
-// §5.13 Built-in methods
-
-// §5.13: Built-in method call with dot notation and parentheses — arr.size().
 TEST(SimCh513, BuiltinMethodCallWithParens) {
   std::string src =
       "module m;\n"
@@ -28,7 +24,6 @@ TEST(SimCh513, BuiltinMethodCallWithParens) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 4u);
 }
 
-// §5.13: Optional empty parentheses — arr.size (property syntax, no parens).
 TEST(SimCh513, BuiltinMethodNoParens) {
   std::string src =
       "module m;\n"
@@ -47,7 +42,6 @@ TEST(SimCh513, BuiltinMethodNoParens) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 3u);
 }
 
-// §5.13: Method result used in an expression — arr.size() + 1.
 TEST(SimCh513, BuiltinMethodInExpr) {
   std::string src =
       "module m;\n"
@@ -66,7 +60,6 @@ TEST(SimCh513, BuiltinMethodInExpr) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 6u);
 }
 
-// §5.13: Built-in method on queue — q.size() returns element count.
 TEST(SimCh513, BuiltinMethodOnQueue) {
   std::string src =
       "module m;\n"
@@ -87,7 +80,6 @@ TEST(SimCh513, BuiltinMethodOnQueue) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
 }
 
-// §5.13: Built-in method with argument — q.push_back(val) modifies queue.
 TEST(SimCh513, BuiltinMethodWithArg) {
   std::string src =
       "module m;\n"
@@ -112,7 +104,6 @@ TEST(SimCh513, BuiltinMethodWithArg) {
   EXPECT_EQ(q->elements[2].ToUint64(), 0x44u);
 }
 
-// §5.13: Reduction built-in method — arr.sum() on fixed array.
 TEST(SimCh513, BuiltinMethodReduction) {
   std::string src =
       "module m;\n"
@@ -131,7 +122,6 @@ TEST(SimCh513, BuiltinMethodReduction) {
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
 }
 
-// §5.13: Mutating built-in method — arr.reverse() reorders elements.
 TEST(SimCh513, BuiltinMethodMutating) {
   std::string src =
       "module m;\n"
@@ -151,7 +141,6 @@ TEST(SimCh513, BuiltinMethodMutating) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
 }
 
-// §5.13: Mutating method without parens — arr.reverse (property syntax).
 TEST(SimCh513, BuiltinMethodMutatingNoParens) {
   std::string src =
       "module m;\n"
@@ -171,7 +160,6 @@ TEST(SimCh513, BuiltinMethodMutatingNoParens) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x11);
 }
 
-// §5.13: Dynamic array method — dyn.size() returns dynamic array length.
 TEST(SimCh513, BuiltinMethodDynArray) {
   std::string src =
       "module m;\n"
@@ -190,7 +178,6 @@ TEST(SimCh513, BuiltinMethodDynArray) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
 }
 
-// §5.13: Queue pop_front — void mutating method with implicit return.
 TEST(SimCh513, BuiltinMethodQueuePopFront) {
   std::string src =
       "module m;\n"

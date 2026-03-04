@@ -1,5 +1,3 @@
-// §33.3.2: Using multiple library map files
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -8,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.1.1 include_statement ::= include file_path_spec ;
-// =============================================================================
-// Basic include statement.
 TEST(LibraryText, IncludeStatement) {
   auto r = ParseLibrary("include /proj/other.map;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -20,7 +14,6 @@ TEST(LibraryText, IncludeStatement) {
   EXPECT_EQ(r.cu->lib_includes[0]->file_path, "/proj/other.map");
 }
 
-// Include statement with relative path.
 TEST(LibraryText, IncludeStatementRelative) {
   auto r = ParseLibrary("include ./sub/lib.map;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -29,10 +22,6 @@ TEST(LibraryText, IncludeStatementRelative) {
   EXPECT_EQ(r.cu->lib_includes[0]->file_path, "./sub/lib.map");
 }
 
-// =============================================================================
-// Comments in library source text.
-// =============================================================================
-// Line comments.
 TEST(LibraryText, LineComments) {
   auto r = ParseLibrary(
       "// This is a library map file\n"
@@ -42,7 +31,6 @@ TEST(LibraryText, LineComments) {
   ASSERT_EQ(r.cu->libraries.size(), 1u);
 }
 
-// Verify IncludeStmt stores source location.
 TEST(LibraryText, IncludeStmtHasSourceLoc) {
   auto r = ParseLibrary("include /proj/lib.map;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -51,10 +39,9 @@ TEST(LibraryText, IncludeStmtHasSourceLoc) {
   EXPECT_NE(r.cu->lib_includes[0]->loc.line, 0u);
 }
 
-// Include without file path.
 TEST(LibraryText, ErrorIncludeNoPath) {
   auto r = ParseLibrary("include;\n");
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

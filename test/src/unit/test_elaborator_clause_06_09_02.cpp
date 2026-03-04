@@ -1,5 +1,3 @@
-// §6.9.2: Vector net accessibility
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -24,4 +22,4 @@ TEST(NetDecl, ScalaredWithPackedDimensionOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-}  // namespace
+}

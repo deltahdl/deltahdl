@@ -1,5 +1,3 @@
-// §21.2.1.2: Size of displayed data
-
 #include "fixture_simulator.h"
 #include "simulator/eval.h"
 #include "simulator/lowerer.h"
@@ -9,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- system_tf_call ---
-// $display as system task call
 TEST(SimA609, SystemTaskDisplay) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -34,14 +30,14 @@ TEST(SimA609, SystemTaskDisplay) {
 TEST(FormatArg, HexLeadingZeros) {
   Arena arena;
   auto val = MakeLogic4VecVal(arena, 8, 0x0A);
-  // %h for 8-bit value should be 2 hex digits.
+
   EXPECT_EQ(FormatArg(val, 'h'), "0a");
 }
 
 TEST(FormatArg, OctalLeadingZeros) {
   Arena arena;
   auto val = MakeLogic4VecVal(arena, 8, 5);
-  // %o for 8-bit value: ceil(8/3) = 3 octal digits.
+
   EXPECT_EQ(FormatArg(val, 'o'), "005");
 }
 
@@ -51,4 +47,4 @@ TEST(FormatArg, BinaryReturnsToString) {
   EXPECT_EQ(FormatArg(val, 'b'), "1010");
 }
 
-}  // namespace
+}

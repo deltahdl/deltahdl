@@ -1,5 +1,3 @@
-// §21.4.1: Reading packed data
-
 #include "fixture_program.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -18,4 +16,4 @@ TEST_F(ApiParseTest, ReadmembSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

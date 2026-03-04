@@ -1,5 +1,3 @@
-// §15.3: Semaphores
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,11 +5,8 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex G - Std package: semaphore class (§G.2)
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexGSemaphoreAllMethods) {
-  // Semaphore method calls (get, put, try_get) as member-access expressions.
+
   auto* unit = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -39,4 +34,4 @@ TEST(ParserAnnexG, AnnexGSemaphoreUsage) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

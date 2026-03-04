@@ -1,12 +1,9 @@
-// §18.17.7: Value passing between productions
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Randsequence with production ports and return types elaborates
 TEST(ElabA612, ProductionPortsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -23,4 +20,4 @@ TEST(ElabA612, ProductionPortsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

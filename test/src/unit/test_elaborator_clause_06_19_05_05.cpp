@@ -1,5 +1,3 @@
-// §6.19.5.5: Num()
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,9 +9,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture: sets up SimContext with an enum type and variable
-// =============================================================================
 namespace {
 
 TEST(EnumMethods, NumSingleMember) {
@@ -24,4 +19,4 @@ TEST(EnumMethods, NumSingleMember) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-}  // namespace
+}

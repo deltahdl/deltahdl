@@ -1,5 +1,3 @@
-// §12.5: Case statement
-
 #include <cstdint>
 #include <string_view>
 
@@ -18,17 +16,8 @@
 
 using namespace delta;
 
-// Helper to create a blocking assignment statement: lhs = rhs_val.
-
-// Driver coroutine that co_awaits an ExecTask and stores its result.
-
-// Helper to run ExecStmt synchronously (for non-suspending statements).
-// Creates a wrapper coroutine, resumes it, and returns the result.
 namespace {
 
-// =============================================================================
-// 12. Unique case / Priority case
-// =============================================================================
 TEST(StmtExec, UniqueCaseExactMatch) {
   StmtFixture f;
   auto* result_var = f.ctx.CreateVariable("uc", 32);
@@ -68,15 +57,11 @@ TEST(StmtExec, PriorityCaseNoMatchNoDefaultWarning) {
   item1.body = MakeBlockAssign(f.arena, "pcw", 10);
   stmt->case_items.push_back(item1);
 
-  // No default => should warn.
   RunStmt(stmt, f.ctx, f.arena);
   EXPECT_EQ(result_var->value.ToUint64(), 0u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// =============================================================================
-// 17. Case with exact match (baseline)
-// =============================================================================
 TEST(StmtExec, CaseExactMatchBaseline) {
   StmtFixture f;
   auto* result_var = f.ctx.CreateVariable("ce", 32);
@@ -106,9 +91,6 @@ TEST(StmtExec, CaseExactMatchBaseline) {
   EXPECT_EQ(result_var->value.ToUint64(), 30u);
 }
 
-// =============================================================================
-// 21. Case multiple patterns in one item
-// =============================================================================
 TEST(StmtExec, CaseMultiplePatterns) {
   StmtFixture f;
   auto* result_var = f.ctx.CreateVariable("cmp", 32);
@@ -135,10 +117,6 @@ TEST(StmtExec, CaseMultiplePatterns) {
   EXPECT_EQ(result_var->value.ToUint64(), 111u);
 }
 
-// =============================================================================
-// Simulation tests — A.6.7 Case statements
-// =============================================================================
-// §12.5: case statement — first matching item
 TEST(SimA607, CaseFirstMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -163,7 +141,6 @@ TEST(SimA607, CaseFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.5: case falls to default when no item matches
 TEST(SimA607, CaseDefaultFallthrough) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -188,7 +165,6 @@ TEST(SimA607, CaseDefaultFallthrough) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §12.5: no default, no match — no change
 TEST(SimA607, CaseNoDefaultNoMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -213,7 +189,6 @@ TEST(SimA607, CaseNoDefaultNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.5: case inside for loop
 TEST(SimA607, CaseInsideForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -240,7 +215,6 @@ TEST(SimA607, CaseInsideForLoop) {
   EXPECT_EQ(var->value.ToUint64(), 111u);
 }
 
-// §12.5: nested case statements
 TEST(SimA607, NestedCaseExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -269,7 +243,6 @@ TEST(SimA607, NestedCaseExecution) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.5: case with block body in item
 TEST(SimA607, CaseWithBlockBody) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -295,4 +268,4 @@ TEST(SimA607, CaseWithBlockBody) {
   EXPECT_EQ(y->value.ToUint64(), 6u);
 }
 
-}  // namespace
+}

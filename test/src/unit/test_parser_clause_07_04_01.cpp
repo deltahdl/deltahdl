@@ -1,5 +1,3 @@
-// §7.4.1: Packed arrays
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -9,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// packed_dimension ::= [ constant_range ] | unsized_dimension
-// Note 24: unsized_dimension only legal in DPI import declarations.
-// ---------------------------------------------------------------------------
 TEST(ParserA25, PackedDimConstantRange) {
   auto r = Parse("module m; logic [7:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -31,7 +25,7 @@ TEST(ParserA25, PackedDimMultiple) {
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
   EXPECT_EQ(item->data_type.extra_packed_dims.size(), 1u);
 }
-// 2. Multiple packed dimensions on logic type.
+
 TEST(ParserSection6, Sec6_11_MultiplePackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -46,10 +40,7 @@ TEST(ParserSection6, Sec6_11_MultiplePackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 3u);
   EXPECT_FALSE(item->data_type.extra_packed_dims.empty());
 }
-// --- Test helpers ---
-// =========================================================================
-// §7.4: Packed arrays — multi-dimensional packed declaration
-// =========================================================================
+
 TEST(ParserSection7, PackedArrayMultiDim) {
   auto r = Parse(
       "module t;\n"
@@ -62,10 +53,6 @@ TEST(ParserSection7, PackedArrayMultiDim) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
 }
 
-// =============================================================================
-// A.8.3 Expressions — constant_range_expression / constant_range
-// =============================================================================
-// § constant_range ::= constant_expression : constant_expression
 TEST(ParserA83, ConstantRangeInPackedDim) {
   auto r = Parse(
       "module m;\n"
@@ -80,14 +67,10 @@ TEST(ParserA83, ConstantRangeInPackedDim) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-// =============================================================================
-// A.8.4 Primaries — constant_bit_select and constant_select
-// =============================================================================
-// § constant_bit_select — in packed dimension
 TEST(ParserA84, ConstantBitSelectPackedDim) {
   auto r = Parse("module m; logic [7:0] data; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

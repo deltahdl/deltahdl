@@ -1,5 +1,3 @@
-// §5.6.3: System tasks and system functions
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// system_tf_call with empty parentheses
 TEST(ParserA609, SystemTfCallEmptyParens) {
   auto r = Parse(
       "module m;\n"
@@ -24,7 +21,6 @@ TEST(ParserA609, SystemTfCallEmptyParens) {
   EXPECT_TRUE(expr->args.empty());
 }
 
-// system_tf_call with arguments
 TEST(ParserA609, SystemTfCallWithArgs) {
   auto r = Parse(
       "module m;\n"
@@ -40,7 +36,6 @@ TEST(ParserA609, SystemTfCallWithArgs) {
   EXPECT_EQ(expr->args.size(), 2u);
 }
 
-// system_tf_call with empty positional arguments (commas with no expressions)
 TEST(ParserA609, SystemTfCallEmptyArgs) {
   auto r = Parse(
       "module m;\n"
@@ -57,11 +52,6 @@ TEST(ParserA609, SystemTfCallEmptyArgs) {
   ASSERT_NE(expr->args[2], nullptr);
 }
 
-// =============================================================================
-// LRM section 38.36 -- vpi_register_cb: DPI-C imports for VPI callbacks
-// These tests verify that DPI-C import declarations with signatures typical
-// of VPI callback routines parse correctly.
-// =============================================================================
 TEST(ParserSection38, VpiSystemCallDeposit) {
   auto r = Parse(
       "module m;\n"
@@ -73,11 +63,8 @@ TEST(ParserSection38, VpiSystemCallDeposit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =========================================================================
-// Section 5.6.3: System tasks and system functions
-// =========================================================================
 TEST(ParserCh50603, SystemTask_Display) {
-  // $display is a system task call (Section 5.6.3, Section 21.2).
+
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"hello\");\n"
@@ -90,4 +77,4 @@ TEST(ParserCh50603, SystemTask_Display) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

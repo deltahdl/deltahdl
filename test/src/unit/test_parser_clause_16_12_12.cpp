@@ -1,12 +1,9 @@
-// §16.12.12: Until property
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// property_expr ::= property_expr until property_expr
 TEST(ParserA210, PropertyExpr_Until) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -14,7 +11,6 @@ TEST(ParserA210, PropertyExpr_Until) {
               "endmodule\n"));
 }
 
-// property_expr ::= property_expr s_until property_expr
 TEST(ParserA210, PropertyExpr_SUntil) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -22,7 +18,6 @@ TEST(ParserA210, PropertyExpr_SUntil) {
               "endmodule\n"));
 }
 
-// property_expr ::= property_expr until_with property_expr
 TEST(ParserA210, PropertyExpr_UntilWith) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -30,7 +25,6 @@ TEST(ParserA210, PropertyExpr_UntilWith) {
               "endmodule\n"));
 }
 
-// property_expr ::= property_expr s_until_with property_expr
 TEST(ParserA210, PropertyExpr_SUntilWith) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -38,4 +32,4 @@ TEST(ParserA210, PropertyExpr_SUntilWith) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

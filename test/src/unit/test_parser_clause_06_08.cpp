@@ -1,6 +1,3 @@
-// §6.8: on variable initialization). This is roughly equivalent to a C
-// automatic variable.
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -8,15 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.2.1.3 Type declarations
-// =============================================================================
-// --- data_declaration ---
-// [ const ] [ var ] [ lifetime ] data_type_or_implicit
-//     list_of_variable_decl_assignments ;
-// | type_declaration
-// | package_import_declaration
-// | nettype_declaration
 TEST(ParserA213, DataDeclBasicVar) {
   auto r = Parse("module m; logic [7:0] data; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -28,7 +16,7 @@ TEST(ParserA213, DataDeclBasicVar) {
 }
 
 TEST(ParserA213, DataDeclVarPrefix) {
-  // [var] data_type list
+
   auto r = Parse("module m; var logic x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -37,7 +25,7 @@ TEST(ParserA213, DataDeclVarPrefix) {
 }
 
 TEST(ParserA213, DataDeclLifetimeAutomatic) {
-  // [lifetime] data_type list
+
   auto r = Parse("module m; automatic int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -47,7 +35,7 @@ TEST(ParserA213, DataDeclLifetimeAutomatic) {
 }
 
 TEST(ParserA213, DataDeclLifetimeStatic) {
-  // [lifetime] data_type list
+
   auto r = Parse("module m; static int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -56,8 +44,6 @@ TEST(ParserA213, DataDeclLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
-// --- list_of_variable_decl_assignments ---
-// variable_decl_assignment { , variable_decl_assignment }
 TEST(ParserA23, ListOfVariableDeclAssignmentsSingle) {
   auto r = Parse("module m; int x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -76,11 +62,6 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsMultiple) {
   EXPECT_GE(count, 3);
 }
 
-// --- variable_decl_assignment ---
-// variable_identifier { variable_dimension } [ = expression ]
-// | dynamic_array_variable_identifier unsized_dimension { variable_dimension }
-//   [ = dynamic_array_new ]
-// | class_variable_identifier [ = class_new ]
 TEST(ParserA24, VarDeclAssignmentBasic) {
   auto r = Parse("module m; int x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -117,7 +98,7 @@ TEST(ParserAnnexA, A2VarDeclWithInit) {
 }
 
 TEST(ParserA213, DataDeclMultipleAssign) {
-  // list_of_variable_decl_assignments: multiple names
+
   auto r = Parse("module m; int a = 1, b = 2; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -128,7 +109,6 @@ TEST(ParserA213, DataDeclMultipleAssign) {
   EXPECT_GE(count, 2);
 }
 
-// [class_scope | package_scope] type_identifier {packed_dimension}
 TEST(ParserA221, DataTypeScopedType) {
   auto r = Parse(
       "package pkg;\n"
@@ -152,7 +132,7 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsWithDims) {
   }
   EXPECT_GE(count, 2);
 }
-// 4. Int variable declaration.
+
 TEST(ParserSection6, Sec6_5_IntVarDeclKind) {
   auto r = Parse(
       "module t;\n"
@@ -168,7 +148,6 @@ TEST(ParserSection6, Sec6_5_IntVarDeclKind) {
   EXPECT_EQ(item->name, "count");
 }
 
-// 11. Variable with initialization (logic v = 0).
 TEST(ParserSection6, Sec6_5_LogicVarInit) {
   auto r = Parse(
       "module t;\n"
@@ -182,7 +161,7 @@ TEST(ParserSection6, Sec6_5_LogicVarInit) {
   EXPECT_FALSE(item->data_type.is_net);
   ASSERT_NE(item->init_expr, nullptr);
 }
-// 13. Multiple variables with packed dims share the same type.
+
 TEST(ParserSection6, Sec6_11_MultipleVarsWithPackedDims) {
   auto r = Parse(
       "module t;\n"
@@ -202,7 +181,6 @@ TEST(ParserSection6, Sec6_11_MultipleVarsWithPackedDims) {
   }
 }
 
-// 18. Multiple logic declarations on one line.
 TEST(ParserSection6, Sec6_5_MultipleLogicDecls) {
   auto r = Parse(
       "module t;\n"
@@ -221,7 +199,7 @@ TEST(ParserSection6, Sec6_5_MultipleLogicDecls) {
   EXPECT_EQ(items[1]->name, "y");
   EXPECT_EQ(items[2]->name, "z");
 }
-// 14. Integer types with initializer expressions.
+
 TEST(ParserSection6, Sec6_11_ByteWithInitializer) {
   auto r = Parse(
       "module t;\n"
@@ -236,17 +214,14 @@ TEST(ParserSection6, Sec6_11_ByteWithInitializer) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-// =========================================================================
-// §6.8: Variable declarations
-// =========================================================================
 TEST(ParserSection6, VarKeywordLogicDecl) {
-  // §6.8: "var" keyword can precede an explicit data type.
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var logic [7:0] data;\n"
               "endmodule\n"));
 }
-// --- Multiple integer declarations ---
+
 TEST(ParserSection6, MultipleIntDeclsCommaSeparated) {
   auto r = Parse(
       "module m;\n"
@@ -258,7 +233,7 @@ TEST(ParserSection6, MultipleIntDeclsCommaSeparated) {
 }
 
 TEST(ParserSection6, VarKeywordImplicitType) {
-  // §6.8: "var" without explicit type implies logic.
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var [3:0] nibble;\n"
@@ -278,14 +253,13 @@ TEST(ParserSection6, IntWithInitializer) {
 }
 
 TEST(ParserSection6, VarWithEnumType) {
-  // §6.8: "var enum bit { clear, error } status;"
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var enum bit { clear, error } status;\n"
               "endmodule\n"));
 }
 
-// 19. Integer var with complex initializer expression.
 TEST(ParserSection6, Sec6_11_IntWithComplexInit) {
   auto r = Parse(
       "module t;\n"
@@ -301,10 +275,6 @@ TEST(ParserSection6, Sec6_11_IntWithComplexInit) {
   EXPECT_EQ(item->init_expr->kind, ExprKind::kBinary);
 }
 
-// =============================================================================
-// LRM section 6.11 -- Integer types coexisting with real types
-// =============================================================================
-// 25. Integer types coexisting with real types in the same module.
 TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
   auto r = Parse(
       "module t;\n"
@@ -324,7 +294,7 @@ TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
 }
 
 TEST(ParserSection6, VarRegDecl) {
-  // §6.8: "var reg r;"
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var reg r;\n"
@@ -332,7 +302,7 @@ TEST(ParserSection6, VarRegDecl) {
 }
 
 TEST(ParserSection6, VarImplicitInProcedural) {
-  // §6.8: "var [3:0] x;" in procedural context.
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -341,9 +311,8 @@ TEST(ParserSection6, VarImplicitInProcedural) {
               "endmodule\n"));
 }
 
-// --- Mixed types in one module ---
 TEST(ParserSection6, MixedIntegerRealStringTypes) {
-  // All major type families coexisting
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int i;\n"
@@ -358,7 +327,7 @@ TEST(ParserSection6, MixedIntegerRealStringTypes) {
 }
 
 TEST(ParserSection6, IntegerTypesInProcedural) {
-  // All integer types declared inside initial block
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -401,4 +370,4 @@ TEST(ParserSection6, ShortrealWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

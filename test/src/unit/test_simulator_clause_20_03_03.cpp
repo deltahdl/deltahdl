@@ -1,5 +1,3 @@
-// §20.3.3: $realtime
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -16,4 +14,4 @@ TEST(SysTask, RealtimeReturns64Bit) {
   EXPECT_EQ(result.width, 64u);
 }
 
-}  // namespace
+}

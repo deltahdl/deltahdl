@@ -1,5 +1,3 @@
-// §13.5.3: Default argument values
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -47,9 +45,7 @@ TEST(ParserA27, TaskBodyNewStyleDefaultValue) {
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_NE(item->func_args[0].default_value, nullptr);
 }
-// =============================================================================
-// 21. Automatic function with default argument values
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithDefaultArgs) {
   auto r = Parse(
       "module m;\n"
@@ -69,11 +65,6 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithDefaultArgs) {
   EXPECT_NE(item->func_args[1].default_value, nullptr);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// LRM section 13.5.3 -- Default argument values (additional tests)
-// =============================================================================
-// Mix of default and non-default args (non-default first, default last).
 TEST(ParserSection13, MixedDefaultAndNonDefaultArgs) {
   auto r = Parse(
       "module m;\n"
@@ -90,7 +81,6 @@ TEST(ParserSection13, MixedDefaultAndNonDefaultArgs) {
   EXPECT_NE(fn->func_args[2].default_value, nullptr);
 }
 
-// Default arg with expression (not just literal).
 TEST(ParserSection13, DefaultArgWithExpression) {
   auto r = Parse(
       "module m;\n"
@@ -106,9 +96,6 @@ TEST(ParserSection13, DefaultArgWithExpression) {
   EXPECT_EQ(fn->func_args[0].default_value->kind, ExprKind::kBinary);
 }
 
-// =============================================================================
-// LRM section 13.5.3 -- Default argument values
-// =============================================================================
 TEST(ParserSection13, DefaultArgValues) {
   auto r = Parse(
       "module m;\n"
@@ -151,4 +138,4 @@ TEST(ParserSection13, DefaultArgNoDefault) {
   EXPECT_EQ(fn->func_args[1].default_value, nullptr);
 }
 
-}  // namespace
+}

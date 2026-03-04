@@ -1,18 +1,9 @@
-// §16.8.2: Local variable formal arguments in sequence declarations
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Productions #22-#23: sequence_port_list, sequence_port_item
-// sequence_port_item ::=
-//     { attribute_instance } [ local [ sequence_lvar_port_direction ] ]
-//     sequence_formal_type formal_port_identifier { variable_dimension }
-//     [ = sequence_actual_arg ]
-// =============================================================================
 TEST(ParserA210, SequencePortItem_LocalInout) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -22,10 +13,6 @@ TEST(ParserA210, SequencePortItem_LocalInout) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// §A.2.10 Production #24: sequence_lvar_port_direction
-// sequence_lvar_port_direction ::= input | inout | output
-// =============================================================================
 TEST(ParserA210, SequenceLvarPortDirection_Input) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -44,4 +31,4 @@ TEST(ParserA210, SequenceLvarPortDirection_Output) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

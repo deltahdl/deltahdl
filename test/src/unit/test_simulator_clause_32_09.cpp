@@ -1,5 +1,3 @@
-// §32.9: Loading timing data from an SDF file
-
 #include <gtest/gtest.h>
 
 #include "simulator/sdf_parser.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// SDF file parsing
-// =============================================================================
 TEST(SdfParser, ParseEmptyFile) {
   SdfFile file;
   bool ok = ParseSdf("(DELAYFILE)", file);
@@ -33,4 +28,4 @@ TEST(SdfParser, ParseDesign) {
   EXPECT_EQ(file.design, "top");
 }
 
-}  // namespace
+}

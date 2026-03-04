@@ -1,5 +1,3 @@
-// §11.12: Let construct
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// let_declaration in function body
 TEST(ParserA28, LetDeclInFunction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -17,11 +14,6 @@ TEST(ParserA28, LetDeclInFunction) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.2.12 Production #1: let_declaration
-// let_declaration ::= let let_identifier [ ( [ let_port_list ] ) ] = expression
-// ;
-// =============================================================================
 TEST(ParserA212, LetDecl_NoArgs) {
   auto r = Parse(
       "module m;\n"
@@ -130,10 +122,6 @@ TEST(ParserA212, LetDecl_Multiple) {
   EXPECT_EQ(count, 2);
 }
 
-// =============================================================================
-// A.2.12 Production #2: let_identifier
-// let_identifier ::= identifier
-// =============================================================================
 TEST(ParserA212, LetIdentifier_Simple) {
   auto r = Parse(
       "module m;\n"
@@ -146,10 +134,6 @@ TEST(ParserA212, LetIdentifier_Simple) {
   EXPECT_EQ(item->name, "foo");
 }
 
-// =============================================================================
-// A.2.12 Production #3: let_port_list
-// let_port_list ::= let_port_item { , let_port_item }
-// =============================================================================
 TEST(ParserA212, LetPortList_Single) {
   auto r = Parse(
       "module m;\n"
@@ -191,11 +175,6 @@ TEST(ParserA212, LetPortList_MixedTypes) {
   ASSERT_EQ(item->func_args.size(), 3u);
 }
 
-// =============================================================================
-// A.2.12 Production #4: let_port_item
-// let_port_item ::= {attribute_instance} let_formal_type
-//     formal_port_identifier {variable_dimension} [= expression]
-// =============================================================================
 TEST(ParserA212, LetPortItem_ImplicitType) {
   auto r = Parse(
       "module m;\n"
@@ -209,10 +188,6 @@ TEST(ParserA212, LetPortItem_ImplicitType) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-// =============================================================================
-// A.2.12 Production #5: let_formal_type
-// let_formal_type ::= data_type_or_implicit | untyped
-// =============================================================================
 TEST(ParserA212, LetFormalType_Untyped) {
   auto r = Parse(
       "module m;\n"
@@ -226,11 +201,6 @@ TEST(ParserA212, LetFormalType_Untyped) {
   EXPECT_EQ(item->func_args[0].name, "a");
 }
 
-// =============================================================================
-// A.2.12 Production #6: let_expression
-// let_expression ::= [package_scope] let_identifier
-//     [ ( [ let_list_of_arguments ] ) ]
-// =============================================================================
 TEST(ParserA212, LetExpr_SimpleCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -309,13 +279,6 @@ TEST(ParserA212, LetExpr_InConditional) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.2.12 Production #7: let_list_of_arguments
-// let_list_of_arguments ::=
-//     [let_actual_arg] { , [let_actual_arg] }
-//         { , .identifier ( [let_actual_arg] ) }
-//   | .identifier ( [let_actual_arg] ) { , .identifier ( [let_actual_arg] ) }
-// =============================================================================
 TEST(ParserA212, LetArgs_SinglePositional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -384,10 +347,6 @@ TEST(ParserA212, LetArgs_ExprInArgs) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.2.12 Production #8: let_actual_arg
-// let_actual_arg ::= expression
-// =============================================================================
 TEST(ParserA212, LetActualArg_Literal) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -462,9 +421,6 @@ struct LetParseResult {
   bool has_errors = false;
 };
 
-// ==========================================================================
-// §11.12: Let declaration parsing
-// ==========================================================================
 TEST(ParserLet, DeclNoArgsParse) {
   auto r = Parse(
       "module t;\n"
@@ -595,10 +551,6 @@ TEST(ParserLet, DeclEmptyParens) {
   EXPECT_TRUE(let_item->func_args.empty());
 }
 
-// =============================================================================
-// A.8.4 Primaries — constant_let_expression
-// =============================================================================
-// § constant_let_expression — let declaration usage
 TEST(ParserA84, ConstantLetExpression) {
   auto r = Parse(
       "module m;\n"
@@ -608,11 +560,8 @@ TEST(ParserA84, ConstantLetExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// ==========================================================================
-// §11.12: Let instantiation parsing (calls parsed as kCall expressions)
-// ==========================================================================
 TEST(ParserLet, InstantiationParsed) {
-  // Let calls look syntactically like function calls — verify parsing.
+
   auto r = Parse(
       "module t;\n"
       "  let op(x, y) = x + y;\n"
@@ -654,9 +603,6 @@ TEST(ParserLet, InstantiationDefaultArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// ==========================================================================
-// §11.12: Let in package scope
-// ==========================================================================
 TEST(ParserLet, DeclInPackage) {
   auto r = Parse(
       "package pkg;\n"
@@ -666,7 +612,6 @@ TEST(ParserLet, DeclInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.2.8 block_item_declaration alternative 4: let_declaration
 TEST(ParserA28, LetDeclInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -685,7 +630,6 @@ TEST(ParserA28, LetDeclNoArgsInBlock) {
               "endmodule\n"));
 }
 
-// let_declaration in task body
 TEST(ParserA28, LetDeclInTask) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -695,7 +639,6 @@ TEST(ParserA28, LetDeclInTask) {
               "endmodule\n"));
 }
 
-// let_declaration in fork/join
 TEST(ParserA28, LetDeclInForkJoin) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -712,4 +655,4 @@ TEST(ParserA210, AssertionItemDecl_LetDecl) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

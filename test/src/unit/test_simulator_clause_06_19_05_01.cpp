@@ -1,5 +1,3 @@
-// §6.19.5.1: First()
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,14 +9,8 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture: sets up SimContext with an enum type and variable
-// =============================================================================
 namespace {
 
-// =============================================================================
-// §6.19.5.1: first() — returns the first member of the enum
-// =============================================================================
 TEST(EnumMethods, FirstReturnsFirstMember) {
   EnumFixture f;
   f.RegisterEnum("color", "color_t", {{"RED", 0}, {"GREEN", 1}, {"BLUE", 2}});
@@ -36,4 +28,4 @@ TEST(EnumMethods, FirstWithNonZeroStart) {
   EXPECT_EQ(result.ToUint64(), 5u);
 }
 
-}  // namespace
+}

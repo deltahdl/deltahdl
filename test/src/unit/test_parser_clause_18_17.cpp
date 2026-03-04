@@ -1,5 +1,3 @@
-// §18.17: Random sequence generation—randsequence
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.12 Randsequence — complex / combined constructs
-// =============================================================================
-// Multiple productions with mixed prods (if, repeat, code_block, items)
 TEST(ParserA612, ComplexMixedProds) {
   auto r = Parse(
       "module m;\n"
@@ -28,7 +22,6 @@ TEST(ParserA612, ComplexMixedProds) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Nested randsequence (randsequence inside code block)
 TEST(ParserA612, NestedRandsequence) {
   auto r = Parse(
       "module m;\n"
@@ -46,10 +39,6 @@ TEST(ParserA612, NestedRandsequence) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.6.12 Randsequence — randsequence_statement
-// =============================================================================
-// randsequence ( production_identifier ) production+ endsequence
 TEST(ParserA612, RandsequenceStmtWithName) {
   auto r = Parse(
       "module m;\n"
@@ -68,7 +57,6 @@ TEST(ParserA612, RandsequenceStmtWithName) {
   EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
 }
 
-// randsequence ( ) production+ endsequence — no production name
 TEST(ParserA612, RandsequenceStmtNoName) {
   auto r = Parse(
       "module m;\n"
@@ -86,10 +74,6 @@ TEST(ParserA612, RandsequenceStmtNoName) {
   EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
 }
 
-// =============================================================================
-// A.6.12 Randsequence — rs_production_list
-// =============================================================================
-// Sequence of production items
 TEST(ParserA612, RsProductionListSequence) {
   auto r = Parse(
       "module m;\n"
@@ -106,10 +90,6 @@ TEST(ParserA612, RsProductionListSequence) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.6.12 Randsequence — rs_code_block
-// =============================================================================
-// Code block with data declaration and statement
 TEST(ParserA612, RsCodeBlockWithDataDecl) {
   auto r = Parse(
       "module m;\n"
@@ -123,10 +103,6 @@ TEST(ParserA612, RsCodeBlockWithDataDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.6.12 Randsequence — rs_prod (all alternatives)
-// =============================================================================
-// rs_prod as rs_production_item
 TEST(ParserA612, RsProdAsProductionItem) {
   auto r = Parse(
       "module m;\n"
@@ -141,7 +117,6 @@ TEST(ParserA612, RsProdAsProductionItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// rs_prod as rs_code_block
 TEST(ParserA612, RsProdAsCodeBlock) {
   auto r = Parse(
       "module m;\n"
@@ -155,7 +130,6 @@ TEST(ParserA612, RsProdAsCodeBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Production item bare (no arguments)
 TEST(ParserA612, RsProductionItemBare) {
   auto r = Parse(
       "module m;\n"
@@ -170,7 +144,6 @@ TEST(ParserA612, RsProductionItemBare) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Randsequence statement (§18.17) ---
 TEST(ParserSection18, RandsequenceStmt) {
   auto r = Parse(
       "module top;\n"
@@ -187,4 +160,4 @@ TEST(ParserSection18, RandsequenceStmt) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

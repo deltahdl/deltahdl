@@ -1,5 +1,3 @@
-// §28.16.1: min:typ:max delays
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -19,4 +17,4 @@ TEST(ParserSection28, GateMinTypMaxDelay) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-}  // namespace
+}

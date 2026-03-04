@@ -1,5 +1,3 @@
-// §30.5.1: Specifying transition delays on module paths
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -97,7 +95,6 @@ TEST(ParserSection28, Sec28_12_TwelveDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 12u);
 }
 
-// 6 delays: t01, t10, t0z, tz1, t1z, tz0
 TEST(ParserA704, ListOfPathDelayExpr6) {
   auto r = Parse(
       "module m;\n"
@@ -112,7 +109,6 @@ TEST(ParserA704, ListOfPathDelayExpr6) {
   ASSERT_EQ(si->path.delays.size(), 6u);
 }
 
-// 12 delays: t01, t10, t0z, tz1, t1z, tz0, t0x, tx1, t1x, tx0, txz, tzx
 TEST(ParserA704, ListOfPathDelayExpr12) {
   auto r = Parse(
       "module m;\n"
@@ -127,10 +123,6 @@ TEST(ParserA704, ListOfPathDelayExpr12) {
   ASSERT_EQ(si->path.delays.size(), 12u);
 }
 
-// =============================================================================
-// A.7.4 path_delay_expression ::= constant_mintypmax_expression
-// =============================================================================
-// Single min:typ:max delay (bare form)
 TEST(ParserA704, PathDelayExprMinTypMaxBare) {
   auto r = Parse(
       "module m;\n"
@@ -146,7 +138,6 @@ TEST(ParserA704, PathDelayExprMinTypMaxBare) {
   EXPECT_EQ(si->path.delays[0]->kind, ExprKind::kMinTypMax);
 }
 
-// Single min:typ:max delay (parenthesized)
 TEST(ParserA704, PathDelayExprMinTypMaxParenthesized) {
   auto r = Parse(
       "module m;\n"
@@ -162,7 +153,6 @@ TEST(ParserA704, PathDelayExprMinTypMaxParenthesized) {
   EXPECT_EQ(si->path.delays[0]->kind, ExprKind::kMinTypMax);
 }
 
-// 2 delays with min:typ:max (trise, tfall)
 TEST(ParserA704, PathDelayExprMinTypMax2) {
   auto r = Parse(
       "module m;\n"
@@ -179,7 +169,6 @@ TEST(ParserA704, PathDelayExprMinTypMax2) {
   EXPECT_EQ(si->path.delays[1]->kind, ExprKind::kMinTypMax);
 }
 
-// 3 delays with min:typ:max (trise, tfall, tz)
 TEST(ParserA704, PathDelayExprMinTypMax3) {
   auto r = Parse(
       "module m;\n"
@@ -197,7 +186,6 @@ TEST(ParserA704, PathDelayExprMinTypMax3) {
   }
 }
 
-// 6 delays with min:typ:max
 TEST(ParserA704, PathDelayExprMinTypMax6) {
   auto r = Parse(
       "module m;\n"
@@ -215,7 +203,6 @@ TEST(ParserA704, PathDelayExprMinTypMax6) {
   }
 }
 
-// 12 delays with min:typ:max
 TEST(ParserA704, PathDelayExprMinTypMax12) {
   auto r = Parse(
       "module m;\n"
@@ -235,7 +222,6 @@ TEST(ParserA704, PathDelayExprMinTypMax12) {
   }
 }
 
-// Rise/fall delays using specparam identifiers
 TEST(ParserA704, PathDelayRiseFallSpecparams) {
   auto r = Parse(
       "module m;\n"
@@ -249,10 +235,6 @@ TEST(ParserA704, PathDelayRiseFallSpecparams) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// =============================================================================
-// A.7.4 Invalid delay counts (not 1, 2, 3, 6, or 12)
-// =============================================================================
-// 4 delays — invalid
 TEST(ParserA704, InvalidDelayCount4) {
   auto r = Parse(
       "module m;\n"
@@ -263,7 +245,6 @@ TEST(ParserA704, InvalidDelayCount4) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// 5 delays — invalid
 TEST(ParserA704, InvalidDelayCount5) {
   auto r = Parse(
       "module m;\n"
@@ -274,10 +255,6 @@ TEST(ParserA704, InvalidDelayCount5) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// =============================================================================
-// A.7.4 6 and 12 delays on parallel and full paths
-// =============================================================================
-// 6 delays on a parallel path
 TEST(ParserA704, SixDelaysParallelPath) {
   auto r = Parse(
       "module m;\n"
@@ -293,7 +270,6 @@ TEST(ParserA704, SixDelaysParallelPath) {
   ASSERT_EQ(si->path.delays.size(), 6u);
 }
 
-// 12 delays on a parallel path
 TEST(ParserA704, TwelveDelaysParallelPath) {
   auto r = Parse(
       "module m;\n"
@@ -309,7 +285,6 @@ TEST(ParserA704, TwelveDelaysParallelPath) {
   ASSERT_EQ(si->path.delays.size(), 12u);
 }
 
-// 6 delays with edge-sensitive path
 TEST(ParserA704, SixDelaysEdgeSensitive) {
   auto r = Parse(
       "module m;\n"
@@ -325,4 +300,4 @@ TEST(ParserA704, SixDelaysEdgeSensitive) {
   ASSERT_EQ(si->path.delays.size(), 6u);
 }
 
-}  // namespace
+}

@@ -1,12 +1,9 @@
-// Annex A.7.3: Specify block terminals
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Dotted terminal with range elaborates
 TEST(ElabA703, DottedTerminalWithRangeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,4 +17,4 @@ TEST(ElabA703, DottedTerminalWithRangeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -1,15 +1,9 @@
-// §30.5.1: Specifying transition delays on module paths
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.4 Specify path delays — Elaboration
-// =============================================================================
-// 6-delay path elaborates
 TEST(ElabA704, SixDelayPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -23,7 +17,6 @@ TEST(ElabA704, SixDelayPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// 12-delay path elaborates
 TEST(ElabA704, TwelveDelayPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +30,6 @@ TEST(ElabA704, TwelveDelayPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Min:typ:max delay elaborates
 TEST(ElabA704, MinTypMaxDelayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,7 +43,6 @@ TEST(ElabA704, MinTypMaxDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Min:typ:max with 2 delays elaborates
 TEST(ElabA704, MinTypMaxTwoDelaysElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -65,7 +56,6 @@ TEST(ElabA704, MinTypMaxTwoDelaysElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// 6-delay min:typ:max elaborates
 TEST(ElabA704, SixDelayMinTypMaxElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -79,4 +69,4 @@ TEST(ElabA704, SixDelayMinTypMaxElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

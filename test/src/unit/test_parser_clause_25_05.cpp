@@ -1,12 +1,9 @@
-// §25.5: Modports
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// §A.2.9 modport_declaration ::= modport modport_item { , modport_item } ;
 TEST(ParserA29, BasicModportDecl) {
   auto r = Parse(
       "interface bus;\n"
@@ -20,8 +17,6 @@ TEST(ParserA29, BasicModportDecl) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "target");
 }
 
-// modport_simple_ports_declaration ::=
-//   port_direction modport_simple_port { , modport_simple_port }
 TEST(ParserA29, MultipleSimplePortsSameDir) {
   auto r = Parse(
       "interface bus;\n"
@@ -40,7 +35,6 @@ TEST(ParserA29, MultipleSimplePortsSameDir) {
   EXPECT_EQ(mp->ports[2].name, "c");
 }
 
-// Direction persists across simple ports (§25.5)
 TEST(ParserA29, DirectionPersistsAcrossPorts) {
   auto r = Parse(
       "interface bus;\n"
@@ -115,7 +109,6 @@ TEST(Parser, ModportMultipleGroups) {
   EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
 }
 
-// 16. Interface with modport declarations
 TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
   auto r = Parse(
       "interface bus_if;\n"
@@ -165,7 +158,6 @@ TEST(ParserA29, AllFourDirections) {
   EXPECT_EQ(mp->ports[3].direction, Direction::kRef);
 }
 
-// Verify source location is captured on ModportDecl
 TEST(ParserA29, ModportDeclHasSourceLoc) {
   auto r = Parse(
       "interface bus;\n"
@@ -178,4 +170,4 @@ TEST(ParserA29, ModportDeclHasSourceLoc) {
   EXPECT_TRUE(mp->loc.IsValid());
 }
 
-}  // namespace
+}

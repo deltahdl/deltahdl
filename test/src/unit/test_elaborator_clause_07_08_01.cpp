@@ -1,5 +1,3 @@
-// §7.8.1: Wildcard index type
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -17,4 +15,4 @@ TEST(ParserA25, AssocDimElaboratesWildcard) {
   EXPECT_TRUE(mod->variables[0].is_assoc);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.2.2.4: Sequential logic always_ff procedure
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -18,17 +16,14 @@ TEST(ParserA602, AlwaysConstruct_AlwaysFF) {
   auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-  // Sensitivity list should contain posedge clk and negedge rst_n
+
   EXPECT_EQ(item->sensitivity.size(), 2u);
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
 }
 
-// =============================================================================
-// Integration: Procedural blocks containing various assignment forms
-// =============================================================================
 TEST(ParserA602, Integration_AlwaysFFWithBlockingAndNonblocking) {
-  // Typical always_ff pattern with reset
+
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk or negedge rst_n) begin\n"
@@ -88,7 +83,7 @@ TEST(Parser, AlwaysFFBlock) {
   }
   EXPECT_TRUE(found_ff);
 }
-// --- 23. Nonblocking in always_ff with reset pattern ---
+
 TEST(ParserSection10, Sec10_4_2_AlwaysFFResetPattern) {
   auto r = Parse(
       "module m;\n"
@@ -117,9 +112,7 @@ TEST(ParserSection10, Sec10_4_2_AlwaysFFResetPattern) {
   ASSERT_NE(if_stmt->else_branch, nullptr);
   EXPECT_EQ(if_stmt->else_branch->kind, StmtKind::kNonblockingAssign);
 }
-// =============================================================================
-// §4.6: always_ff with if-else chain
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_AlwaysFfWithIfElseChain) {
   auto r = Parse(
       "module m;\n"
@@ -139,7 +132,7 @@ TEST(ParserSection4, Sec4_6_AlwaysFfWithIfElseChain) {
   ASSERT_GE(item->body->stmts.size(), 1u);
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
 }
-// 15. Variable driven by always_ff with clock sensitivity.
+
 TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysFF) {
   auto r = Parse(
       "module t;\n"
@@ -174,10 +167,7 @@ TEST(ParserSection9c, AlwaysFFSimplePosedge) {
   ASSERT_EQ(item->sensitivity.size(), 1u);
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
-// Returns the first always_* item from the first module.
-// ---------------------------------------------------------------------------
-// 20. always_ff block
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_AlwaysFF) {
   auto r = Parse(
       "module m;\n"
@@ -214,9 +204,6 @@ TEST(ParserSection9, AlwaysFF) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
 
-// =============================================================================
-// §4.6: always_ff guarantees flip-flop semantics
-// =============================================================================
 TEST(ParserSection4, Sec4_6_AlwaysFfFlipFlop) {
   auto r = Parse(
       "module m;\n"
@@ -235,4 +222,4 @@ TEST(ParserSection4, Sec4_6_AlwaysFfFlipFlop) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

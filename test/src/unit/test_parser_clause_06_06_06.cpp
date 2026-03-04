@@ -1,12 +1,9 @@
-// §6.6.6: Supply nets
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// 20. Supply0 and supply1 net declarations.
 TEST(ParserSection6, Sec6_5_Supply0AndSupply1) {
   auto r = Parse(
       "module t;\n"
@@ -26,7 +23,7 @@ TEST(ParserSection6, Sec6_5_Supply0AndSupply1) {
   EXPECT_TRUE(items[1]->data_type.is_net);
   EXPECT_EQ(items[1]->name, "vdd");
 }
-// §6.7.1: Supply0 net declaration.
+
 TEST(ParserSection6, Sec6_7_1_Supply0Decl) {
   auto r = Parse(
       "module t;\n"
@@ -42,7 +39,6 @@ TEST(ParserSection6, Sec6_7_1_Supply0Decl) {
   EXPECT_EQ(item->name, "gnd");
 }
 
-// §6.7.1: Supply1 net declaration.
 TEST(ParserSection6, Sec6_7_1_Supply1Decl) {
   auto r = Parse(
       "module t;\n"
@@ -58,4 +54,4 @@ TEST(ParserSection6, Sec6_7_1_Supply1Decl) {
   EXPECT_EQ(item->name, "vdd");
 }
 
-}  // namespace
+}

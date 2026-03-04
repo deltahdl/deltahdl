@@ -1,12 +1,9 @@
-// §25.5: Modports
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// §3.5: "the modport construct is provided"
 TEST(ParserClause03, Cl3_5_Modport) {
   auto r = ParseWithPreprocessor(
       "interface myif;\n"
@@ -23,4 +20,4 @@ TEST(ParserClause03, Cl3_5_Modport) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
 
-}  // namespace
+}

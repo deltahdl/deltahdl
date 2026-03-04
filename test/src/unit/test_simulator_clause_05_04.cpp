@@ -1,4 +1,3 @@
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "preprocessor/preprocessor.h"
@@ -6,13 +5,8 @@
 
 using namespace delta;
 
-// §5.4 Comments
-
-// ---------------------------------------------------------------------------
-// 1. Line comments stripped — simulation produces correct result
-// ---------------------------------------------------------------------------
 TEST(SimCh504, CommentLineCommentStripped) {
-  // §5.4: One-line comment starts with // and ends with newline.
+
   auto result = RunAndGet(
       "module t; // module declaration\n"
       "  logic [7:0] result; // variable\n"
@@ -22,11 +16,8 @@ TEST(SimCh504, CommentLineCommentStripped) {
   EXPECT_EQ(result, 77u);
 }
 
-// ---------------------------------------------------------------------------
-// 2. Block comments stripped — simulation produces correct result
-// ---------------------------------------------------------------------------
 TEST(SimCh504, CommentBlockCommentStripped) {
-  // §5.4: Block comment starts with /* and ends with */.
+
   auto result = RunAndGet(
       "module /* module */ t /* name */;\n"
       "  logic /* type */ [7:0] /* width */ result /* var */;\n"
@@ -36,12 +27,8 @@ TEST(SimCh504, CommentBlockCommentStripped) {
   EXPECT_EQ(result, 55u);
 }
 
-// ---------------------------------------------------------------------------
-// 3. Block comments not nested — first */ ends the comment
-// ---------------------------------------------------------------------------
 TEST(SimCh504, CommentBlockNotNested) {
-  // §5.4: Block comments are not nested.
-  // "/* outer /* inner */" ends at first */ — remaining code is active.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -51,11 +38,8 @@ TEST(SimCh504, CommentBlockNotNested) {
   EXPECT_EQ(result, 33u);
 }
 
-// ---------------------------------------------------------------------------
-// 4. // inside block comment has no special meaning
-// ---------------------------------------------------------------------------
 TEST(SimCh504, CommentLineInsideBlockNoEffect) {
-  // §5.4: // has no special meaning inside a block comment.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -67,11 +51,8 @@ TEST(SimCh504, CommentLineInsideBlockNoEffect) {
   EXPECT_EQ(result, 99u);
 }
 
-// ---------------------------------------------------------------------------
-// 5. /* and */ inside line comment have no special meaning
-// ---------------------------------------------------------------------------
 TEST(SimCh504, CommentBlockInsideLineNoEffect) {
-  // §5.4: /* and */ have no special meaning inside a one-line comment.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -83,11 +64,8 @@ TEST(SimCh504, CommentBlockInsideLineNoEffect) {
   EXPECT_EQ(result, 22u);
 }
 
-// ---------------------------------------------------------------------------
-// 6. Mixed line and block comments in expressions
-// ---------------------------------------------------------------------------
 TEST(SimCh504, CommentMixedInExpression) {
-  // Both comment forms within an expression do not alter results.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -101,11 +79,8 @@ TEST(SimCh504, CommentMixedInExpression) {
   EXPECT_EQ(result, 30u);
 }
 
-// ---------------------------------------------------------------------------
-// 7. Multiline block comment spans code lines
-// ---------------------------------------------------------------------------
 TEST(SimCh504, CommentMultilineBlockSpan) {
-  // A block comment spanning multiple lines removes all enclosed text.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -120,11 +95,8 @@ TEST(SimCh504, CommentMultilineBlockSpan) {
   EXPECT_EQ(result, 11u);
 }
 
-// ---------------------------------------------------------------------------
-// 8. Block comment as token separator in simulation
-// ---------------------------------------------------------------------------
 TEST(SimCh504, CommentBlockAsSeparator) {
-  // §5.4: Block comments serve as token separators, just like whitespace.
+
   auto result = RunAndGet(
       "module/**/t;logic/**/[7:0]/**/result;initial/**/result=8'd71;"
       "endmodule",

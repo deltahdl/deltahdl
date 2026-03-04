@@ -1,5 +1,3 @@
-// §35.5: Imported tasks and functions
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// DpiContext registration
-// =============================================================================
 TEST(Dpi, RegisterImport) {
   DpiContext ctx;
   DpiFunction func;
@@ -51,4 +46,4 @@ TEST(Dpi, FindImport) {
   EXPECT_EQ(ctx.FindImport("missing"), nullptr);
 }
 
-}  // namespace
+}

@@ -1,4 +1,3 @@
-
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "preprocessor/preprocessor.h"
@@ -7,10 +6,8 @@
 
 using namespace delta;
 
-// §5.6.2 Keywords
-
 TEST(SimCh50602, KeywordDefinesConstruct) {
-  // §5.6.2: Keywords define language constructs (if/else/begin/end/for).
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -26,7 +23,7 @@ TEST(SimCh50602, KeywordDefinesConstruct) {
 }
 
 TEST(SimCh50602, EscapedKeywordCoexistsWithKeyword) {
-  // §5.6.2: Escaped keyword (\begin) used as variable inside begin/end block.
+
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\begin ;\n"
@@ -39,7 +36,7 @@ TEST(SimCh50602, EscapedKeywordCoexistsWithKeyword) {
 }
 
 TEST(SimCh50602, KeywordLowercaseOnly) {
-  // §5.6.2: Keywords are lowercase only; uppercase is an identifier.
+
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -1,5 +1,3 @@
-// §8.23: Class scope resolution operator ::
-
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "parser/ast.h"
@@ -8,17 +6,8 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
 namespace {
 
-// =============================================================================
-// §8.23: Class scope resolution operator ::
-// =============================================================================
 TEST(ClassSim, ScopeResolutionStaticLookup) {
   SimFixture f;
   auto* type = MakeClassType(f, "MyClass", {});
@@ -45,4 +34,4 @@ TEST(ClassSim, ScopeResolutionMethodLookup) {
   EXPECT_EQ(it->second->name, "compute");
 }
 
-}  // namespace
+}

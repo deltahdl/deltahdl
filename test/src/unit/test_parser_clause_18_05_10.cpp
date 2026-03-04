@@ -1,5 +1,3 @@
-// §18.5.10: Static constraint blocks
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// package_or_generate_item_declaration: static extern_constraint_declaration
 TEST(SourceText, PackageItemStaticExternConstraint) {
   auto r = Parse(
       "package pkg;\n"
@@ -18,7 +15,6 @@ TEST(SourceText, PackageItemStaticExternConstraint) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// extern_constraint_declaration with static and dynamic_override_specifiers
 TEST(SourceText, ExternConstraintDeclStaticOverride) {
   auto r = Parse(
       "class C;\n"
@@ -30,16 +26,14 @@ TEST(SourceText, ExternConstraintDeclStaticOverride) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// Footnote 11: dynamic_override_specifiers illegal with static (semantic, not
-// syntactic) — parser still accepts for later semantic check
 TEST(SourceText, ConstraintFootnote11StaticWithOverride) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
       "  static constraint :initial c1 { x > 0; }\n"
       "endclass\n");
-  // Parser should accept; footnote 11 is a semantic restriction
+
   ASSERT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

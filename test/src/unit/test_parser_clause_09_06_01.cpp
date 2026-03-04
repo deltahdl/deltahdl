@@ -1,14 +1,9 @@
-// §9.6.1: Wait fork statement
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// Section 9.7 -- Fine-grain process control
-// =============================================================================
 TEST(ParserSection9b, WaitForkStatement) {
   auto r = Parse(
       "module m;\n"
@@ -42,9 +37,7 @@ TEST(ParserSection9b, ForkJoinNoneWithWaitFork) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// ---------------------------------------------------------------------------
-// 17. Fork-join_none followed by wait fork
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenWaitFork) {
   auto r = Parse(
       "module m;\n"
@@ -66,7 +59,6 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenWaitFork) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kWaitFork);
 }
 
-// §9.6.1: wait fork
 TEST(ParserA605, WaitFork) {
   auto r = Parse(
       "module m;\n"
@@ -81,4 +73,4 @@ TEST(ParserA605, WaitFork) {
   EXPECT_EQ(stmt->kind, StmtKind::kWaitFork);
 }
 
-}  // namespace
+}

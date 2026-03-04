@@ -1,5 +1,3 @@
-// §6.20.3: Type parameters
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.20.3: Type parameter with default type resolves variable width.
 TEST(SimCh6, TypeParameterDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -26,9 +23,9 @@ TEST(SimCh6, TypeParameterDefault) {
 
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // T = shortint (16-bit), so x truncates to 16 bits.
+
   EXPECT_EQ(var->value.width, 16u);
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
 }
 
-}  // namespace
+}

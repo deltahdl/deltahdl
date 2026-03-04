@@ -1,5 +1,3 @@
-// §21.7.1: Creating 4-state VCD file
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -41,4 +39,4 @@ TEST(ParserSection21, FullVcdWorkflow) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

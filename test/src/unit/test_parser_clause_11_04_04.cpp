@@ -1,5 +1,3 @@
-// §11.4.4: Relational operators
-
 #include "fixture_parser.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -9,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.6 Operators — binary_operator (relational)
-// =============================================================================
-// § binary_operator ::= <
 TEST(ParserA86, BinaryLessThan) {
   auto r = Parse("module m; initial x = (a < b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -23,7 +17,6 @@ TEST(ParserA86, BinaryLessThan) {
   EXPECT_EQ(rhs->op, TokenKind::kLt);
 }
 
-// § binary_operator ::= <=
 TEST(ParserA86, BinaryLessOrEqual) {
   auto r = Parse("module m; initial x = (a <= b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -34,7 +27,6 @@ TEST(ParserA86, BinaryLessOrEqual) {
   EXPECT_EQ(rhs->op, TokenKind::kLtEq);
 }
 
-// § binary_operator ::= >
 TEST(ParserA86, BinaryGreaterThan) {
   auto r = Parse("module m; initial x = (a > b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -45,7 +37,6 @@ TEST(ParserA86, BinaryGreaterThan) {
   EXPECT_EQ(rhs->op, TokenKind::kGt);
 }
 
-// § binary_operator ::= >=
 TEST(ParserA86, BinaryGreaterOrEqual) {
   auto r = Parse("module m; initial x = (a >= b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -55,9 +46,7 @@ TEST(ParserA86, BinaryGreaterOrEqual) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kGtEq);
 }
-// =========================================================================
-// Section 11.4.4 -- Relational operators
-// =========================================================================
+
 TEST(ParserSection11, RelationalLt) {
   auto r = Parse(
       "module t;\n"
@@ -105,4 +94,4 @@ TEST(Eval, Comparison) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-}  // namespace
+}

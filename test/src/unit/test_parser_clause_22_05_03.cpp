@@ -1,5 +1,3 @@
-// §22.5.3: `undefineall
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -15,4 +13,4 @@ TEST(ParserSection22, UndefineallDirective) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

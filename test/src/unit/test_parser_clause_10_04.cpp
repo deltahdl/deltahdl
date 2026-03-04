@@ -1,14 +1,9 @@
-// §10.4: Procedural assignments
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// Integration: Mixing blocking and nonblocking in the same block
-// =============================================================================
 TEST(ParserA602, MixedAssignments_BlockingAndNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -25,7 +20,7 @@ TEST(ParserA602, MixedAssignments_BlockingAndNonblocking) {
   ASSERT_EQ(stmts.size(), 4u);
   EXPECT_EQ(stmts[0]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(stmts[1]->kind, StmtKind::kNonblockingAssign);
-  EXPECT_EQ(stmts[2]->kind, StmtKind::kBlockingAssign);  // compound
+  EXPECT_EQ(stmts[2]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(stmts[3]->kind, StmtKind::kNonblockingAssign);
   EXPECT_NE(stmts[3]->delay, nullptr);
 }
@@ -33,9 +28,7 @@ TEST(ParserA602, MixedAssignments_BlockingAndNonblocking) {
 static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKind(r, ModuleItemKind::kInitialBlock);
 }
-// ---------------------------------------------------------------------------
-// 7. Mix of blocking and non-blocking assignments
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_MixBlockingNonblocking) {
   auto r = Parse(
       "module m;\n"
@@ -56,4 +49,4 @@ TEST(ParserSection4, Sec4_5_MixBlockingNonblocking) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-}  // namespace
+}

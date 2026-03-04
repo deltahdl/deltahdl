@@ -1,5 +1,3 @@
-// Annex A.2.10: Assertion declarations
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// property_expr ::= ( property_expr )
 TEST(ParserA210, PropertyExpr_Parenthesized) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -15,7 +12,6 @@ TEST(ParserA210, PropertyExpr_Parenthesized) {
               "endmodule\n"));
 }
 
-// property_expr ::= property_expr and property_expr
 TEST(ParserA210, PropertyExpr_And) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -40,7 +36,6 @@ TEST(ParserA210, PropertyAndSequenceDeclsTogether) {
       nullptr);
 }
 
-// sequence_actual_arg ::= event_expression
 TEST(ParserA210, SequenceActualArg_EventExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -49,4 +44,4 @@ TEST(ParserA210, SequenceActualArg_EventExpr) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

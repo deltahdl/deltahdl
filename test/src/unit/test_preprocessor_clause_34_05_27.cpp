@@ -1,5 +1,3 @@
-// §34.5.27: key_block
-
 #include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
@@ -24,9 +22,6 @@ struct ProtectedTest : ::testing::Test {
 
 namespace {
 
-// =============================================================================
-// §34.5 Key block recognition
-// =============================================================================
 TEST_F(ProtectedTest, KeyBlockPragma) {
   auto result = Preprocess(
       "`pragma protect key_keyowner=\"Acme\"\n"
@@ -35,9 +30,9 @@ TEST_F(ProtectedTest, KeyBlockPragma) {
       "base64encodedkeydata\n"
       "`pragma protect end_protected\n");
   EXPECT_FALSE(diag_.HasErrors());
-  // Pragma lines consumed.
+
   EXPECT_EQ(result.find("key_keyowner"), std::string::npos);
   EXPECT_EQ(result.find("key_method"), std::string::npos);
 }
 
-}  // namespace
+}

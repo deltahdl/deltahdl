@@ -1,12 +1,9 @@
-// §18.17.5: Interleaving productions—rand join
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// Randsequence with rand join elaborates
 TEST(ElabA612, RandJoinElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,4 +21,4 @@ TEST(ElabA612, RandJoinElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

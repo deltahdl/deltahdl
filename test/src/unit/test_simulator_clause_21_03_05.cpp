@@ -1,5 +1,3 @@
-// §21.3.5: File positioning
-
 #include <cstdio>
 #include <fstream>
 
@@ -76,9 +74,7 @@ TEST(SysTask, RewindResetsPosition) {
   EvalExpr(close_expr, f.ctx, f.arena);
   std::remove(tmp.c_str());
 }
-// ============================================================================
-// §21.3 — $rewind(fd)
-// ============================================================================
+
 TEST(Section21, Rewind) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_rewind.txt";
@@ -93,16 +89,13 @@ TEST(Section21, Rewind) {
   uint64_t fd = fd_val.ToUint64();
   ASSERT_NE(fd, 0u);
 
-  // Read first char.
   auto* getc1 = MakeSysCall(f.arena, "$fgetc", {MakeInt(f.arena, fd)});
   auto ch1 = EvalExpr(getc1, f.ctx, f.arena);
   EXPECT_EQ(ch1.ToUint64(), static_cast<uint64_t>('A'));
 
-  // Rewind.
   auto* rw = MakeSysCall(f.arena, "$rewind", {MakeInt(f.arena, fd)});
   EvalExpr(rw, f.ctx, f.arena);
 
-  // Read first char again — should be 'A' after rewind.
   auto* getc2 = MakeSysCall(f.arena, "$fgetc", {MakeInt(f.arena, fd)});
   auto ch2 = EvalExpr(getc2, f.ctx, f.arena);
   EXPECT_EQ(ch2.ToUint64(), static_cast<uint64_t>('A'));
@@ -112,4 +105,4 @@ TEST(Section21, Rewind) {
   std::remove(tmp_path.c_str());
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §28.10: pullup and pulldown sources
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -30,4 +28,4 @@ TEST(Parser, GatePullup) {
   EXPECT_EQ(item->gate_terminals.size(), 1);
 }
 
-}  // namespace
+}

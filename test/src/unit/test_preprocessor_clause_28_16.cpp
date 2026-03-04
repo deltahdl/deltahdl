@@ -1,5 +1,3 @@
-// §28.16: Gate and net delays
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -17,4 +15,4 @@ TEST(ParserSection28, GateWithParenDelay) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-}  // namespace
+}

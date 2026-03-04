@@ -1,5 +1,3 @@
-// §6.10: Implicit declarations
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 6.10 -- Implicit declarations
-// =============================================================================
 TEST(ParserSection6, ImplicitNetInPortList) {
   auto r = ParseWithPreprocessor(
       "module m(a, b);\n"
@@ -40,4 +35,4 @@ TEST(ParserSection6, ImplicitNetInModuleInst) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §21.4: Loading memory array data from a file
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ============================================================================
-// Additional coverage -- Memory load/dump tasks from 21.1 overview
-// ============================================================================
 TEST(ParserSection21, ReadmemhBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -53,4 +48,4 @@ TEST_F(ApiParseTest, ReadmemhSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}  // namespace
+}

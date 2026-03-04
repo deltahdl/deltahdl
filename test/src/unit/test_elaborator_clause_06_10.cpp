@@ -1,5 +1,3 @@
-// §6.10: Implicit declarations
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -10,9 +8,8 @@ using namespace delta;
 
 namespace {
 
-// --- §6.10: Implicit declarations ---
 TEST(Elaboration, ImplicitNetOnAssignLhs) {
-  // Undeclared identifier on continuous assign LHS creates implicit wire.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -22,7 +19,7 @@ TEST(Elaboration, ImplicitNetOnAssignLhs) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
   auto* mod = design->top_modules[0];
-  // The implicit net 'w' should appear in nets.
+
   bool found = false;
   for (const auto& n : mod->nets) {
     if (n.name == "w") {
@@ -34,7 +31,7 @@ TEST(Elaboration, ImplicitNetOnAssignLhs) {
 }
 
 TEST(Elaboration, ImplicitNetOnInstancePort) {
-  // Undeclared identifier in instance port connection creates implicit wire.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
@@ -58,7 +55,7 @@ TEST(Elaboration, ImplicitNetOnInstancePort) {
 }
 
 TEST(Elaboration, ImplicitNetNone_Error) {
-  // `default_nettype none causes undeclared identifier to be an error.
+
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>",
                            "module top;\n"
@@ -73,4 +70,4 @@ TEST(Elaboration, ImplicitNetNone_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

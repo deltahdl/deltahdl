@@ -1,5 +1,3 @@
-// §20.6.2: Expression size system function
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "simulator/eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// § primary — system call ($bits)
 TEST(SimA84, PrimarySystemCallBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -38,4 +35,4 @@ TEST(Section20, BitsOfVariable) {
   EXPECT_EQ(result.ToUint64(), 64u);
 }
 
-}  // namespace
+}

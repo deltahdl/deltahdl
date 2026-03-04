@@ -1,5 +1,3 @@
-// §30.4: Module path declarations
-
 #include "fixture_simulator.h"
 #include "fixture_specify.h"
 #include "helpers_scheduler.h"
@@ -29,7 +27,6 @@ TEST_F(SpecifyTest, RuntimeMultiplePathDelays) {
   EXPECT_EQ(mgr.GetPathDelay("in2", "out2"), 8u);
 }
 
-// Path declarations do not interfere with behavioral initial block
 TEST(SimA702, PathDeclsDoNotInterfereBehavioral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -50,4 +47,4 @@ TEST(SimA702, PathDeclsDoNotInterfereBehavioral) {
   LowerRunAndCheck(f, design, {{"a", 11u}, {"b", 22u}});
 }
 
-}  // namespace
+}

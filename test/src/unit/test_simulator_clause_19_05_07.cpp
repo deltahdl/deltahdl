@@ -1,5 +1,3 @@
-// §19.5.7: Value resolution
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// S19.5.7: Ignore bins
-// =============================================================================
 TEST(Coverage, IgnoreBinsNotSampled) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -48,4 +43,4 @@ TEST(Coverage, IgnoreBinsExcludedFromCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §9.4.3: Level-sensitive event control
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.3: wait statement blocks until condition is true
 TEST(SimA605, WaitConditionBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +30,6 @@ TEST(SimA605, WaitConditionBlocks) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// §9.4.3: wait with already-true condition executes immediately
 TEST(SimA605, WaitAlreadyTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -63,4 +59,4 @@ TEST(TimingControl, WaitConditionFalseBlocks) {
   EXPECT_FALSE(EvaluateWaitCondition(0));
 }
 
-}  // namespace
+}

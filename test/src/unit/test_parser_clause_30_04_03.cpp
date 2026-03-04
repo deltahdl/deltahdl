@@ -1,5 +1,3 @@
-// §30.4.3: Edge-sensitive paths
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §30.3.1 Edge-sensitive paths
-// =============================================================================
 TEST_F(SpecifyTest, PosedgePath) {
   auto* cu = Parse(
       "module m;\n"
@@ -40,10 +35,6 @@ TEST_F(SpecifyTest, NegedgePath) {
   EXPECT_EQ(spec->specify_items[0]->path.edge, SpecifyEdge::kNegedge);
 }
 
-// =============================================================================
-// A.7.2 data_source_expression with output polarity
-// =============================================================================
-// Edge-sensitive path with output-side polarity and data source
 TEST(ParserA702, DataSourceWithOutputPolarity) {
   auto r = Parse(
       "module m;\n"
@@ -59,7 +50,6 @@ TEST(ParserA702, DataSourceWithOutputPolarity) {
   EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kPositive);
 }
 
-// Edge-sensitive path with negative output polarity and data source
 TEST(ParserA702, DataSourceWithNegativeOutputPolarity) {
   auto r = Parse(
       "module m;\n"
@@ -81,7 +71,6 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
   return spec->specify_items[0];
 }
 
-// path_declaration ::= edge_sensitive_path_declaration ;
 TEST(ParserA702, PathDeclEdgeSensitiveParallel) {
   auto r = Parse(
       "module m;\n"
@@ -97,7 +86,6 @@ TEST(ParserA702, PathDeclEdgeSensitiveParallel) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
 }
 
-// path_declaration ::= edge_sensitive_path_declaration ; (full)
 TEST(ParserA702, PathDeclEdgeSensitiveFull) {
   auto r = Parse(
       "module m;\n"
@@ -114,7 +102,6 @@ TEST(ParserA702, PathDeclEdgeSensitiveFull) {
   ASSERT_EQ(si->path.dst_ports.size(), 2u);
 }
 
-// Terminal descriptor with edge-sensitive path
 TEST(ParserA703, TerminalWithEdgeSensitivePath) {
   auto r = Parse(
       "module m;\n"
@@ -133,9 +120,6 @@ TEST(ParserA703, TerminalWithEdgeSensitivePath) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// =============================================================================
-// A.7.2 edge_identifier — posedge | negedge | edge
-// =============================================================================
 TEST(ParserA702, EdgeIdentifierPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -178,10 +162,6 @@ TEST(ParserA702, EdgeIdentifierEdge) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kEdge);
 }
 
-// =============================================================================
-// A.7.2 edge_sensitive_path_declaration — parallel form
-// =============================================================================
-// parallel_edge_sensitive_path_description with data_source
 TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -200,7 +180,6 @@ TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// parallel_edge_sensitive_path_description without data_source
 TEST(ParserA702, EdgeSensitiveParallelWithoutDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -216,7 +195,6 @@ TEST(ParserA702, EdgeSensitiveParallelWithoutDataSource) {
   EXPECT_EQ(si->path.data_source, nullptr);
 }
 
-// parallel_edge_sensitive_path_description with polarity and data_source
 TEST(ParserA702, EdgeSensitiveParallelPolarityAndDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -233,10 +211,6 @@ TEST(ParserA702, EdgeSensitiveParallelPolarityAndDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// =============================================================================
-// A.7.2 edge_sensitive_path_declaration — full form
-// =============================================================================
-// full_edge_sensitive_path_description with data_source
 TEST(ParserA702, EdgeSensitiveFullWithDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -253,7 +227,6 @@ TEST(ParserA702, EdgeSensitiveFullWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// full_edge_sensitive_path_description without data_source
 TEST(ParserA702, EdgeSensitiveFullWithoutDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -270,7 +243,6 @@ TEST(ParserA702, EdgeSensitiveFullWithoutDataSource) {
   EXPECT_EQ(si->path.data_source, nullptr);
 }
 
-// full_edge_sensitive_path_description with edge keyword and data_source
 TEST(ParserA702, EdgeSensitiveFullEdgeKeywordWithDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -333,4 +305,4 @@ TEST(ParserSection28, Sec28_12_PosedgeFullPath) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

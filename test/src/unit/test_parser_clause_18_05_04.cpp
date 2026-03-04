@@ -1,5 +1,3 @@
-// §18.5.4: Uniqueness constraints
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// uniqueness_constraint ::= unique { range_list }
 TEST(SourceText, UniquenessConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -21,4 +18,4 @@ TEST(SourceText, UniquenessConstraint) {
   EXPECT_EQ(r.cu->classes[0]->members[3]->name, "uc");
 }
 
-}  // namespace
+}

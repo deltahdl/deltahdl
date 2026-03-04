@@ -1,5 +1,3 @@
-// §28.16: Gate and net delays
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -20,7 +18,7 @@ TEST(ParserA301, GateInst_EnableWithDelay) {
   EXPECT_NE(g->gate_delay_fall, nullptr);
   EXPECT_NE(g->gate_delay_decay, nullptr);
 }
-// §6.7.1: Net with two delays (rise, fall).
+
 TEST(ParserSection6, Sec6_7_1_WireTwoDelays) {
   auto r = Parse(
       "module t;\n"
@@ -38,7 +36,6 @@ TEST(ParserSection6, Sec6_7_1_WireTwoDelays) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-// §6.7.1: Net with three delays (rise, fall, turnoff).
 TEST(ParserSection6, Sec6_7_1_WireThreeDelays) {
   auto r = Parse(
       "module t;\n"
@@ -79,4 +76,4 @@ TEST(ParserSection6, TriregSingleDelay_NoFallDecay) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-}  // namespace
+}

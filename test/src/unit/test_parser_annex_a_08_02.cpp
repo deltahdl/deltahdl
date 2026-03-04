@@ -1,5 +1,3 @@
-// Annex A.8.2: Subroutine calls
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// tf_call with multiple positional arguments
 TEST(ParserA609, TfCallMultipleArgs) {
   auto r = Parse(
       "module m;\n"
@@ -21,10 +18,6 @@ TEST(ParserA609, TfCallMultipleArgs) {
   EXPECT_EQ(expr->args.size(), 3u);
 }
 
-// =============================================================================
-// A.6.9 — system_tf_call
-// =============================================================================
-// system_tf_call without parentheses
 TEST(ParserA609, SystemTfCallNoParens) {
   auto r = Parse(
       "module m;\n"
@@ -55,7 +48,6 @@ TEST(ParserAnnexA, A8FunctionCallExpr) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-// tf_call with no arguments (footnote 42: only legal for tasks/void/class)
 TEST(ParserA82, TfCallNoArgs) {
   auto r = Parse(
       "module m;\n"
@@ -70,7 +62,6 @@ TEST(ParserA82, TfCallNoArgs) {
   EXPECT_TRUE(expr->args.empty());
 }
 
-// system_tf_call with multiple expression arguments
 TEST(ParserA82, SystemTfCallMultipleExprArgs) {
   auto r = Parse(
       "module m;\n"
@@ -84,7 +75,6 @@ TEST(ParserA82, SystemTfCallMultipleExprArgs) {
   EXPECT_EQ(expr->args.size(), 3u);
 }
 
-// system_tf_call with empty positional arg slots
 TEST(ParserA82, SystemTfCallEmptyArgSlots) {
   auto r = Parse(
       "module m;\n"
@@ -101,7 +91,6 @@ TEST(ParserA82, SystemTfCallEmptyArgSlots) {
   ASSERT_NE(expr->args[2], nullptr);
 }
 
-// Named argument with empty expression
 TEST(ParserA82, ListOfArgsNamedEmptyExpr) {
   auto r = Parse(
       "module m;\n"
@@ -116,4 +105,4 @@ TEST(ParserA82, ListOfArgsNamedEmptyExpr) {
   ASSERT_NE(expr->args[1], nullptr);
 }
 
-}  // namespace
+}

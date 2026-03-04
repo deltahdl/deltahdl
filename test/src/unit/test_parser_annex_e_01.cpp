@@ -1,5 +1,3 @@
-// Annex E.1: General
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- E.5: All Annex E directives combined ---
 TEST(ParserAnnexE2, AnnexEAllDirectivesCombined) {
   auto r = Parse(
       "`default_decay_time 10\n"
@@ -23,4 +20,4 @@ TEST(ParserAnnexE2, AnnexEAllDirectivesCombined) {
   }
 }
 
-}  // namespace
+}

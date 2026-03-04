@@ -1,5 +1,3 @@
-// Annex D.3: $getpattern
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex D -- Optional system tasks and system functions
-// =============================================================================
-// --- D.1: $getpattern ---
 TEST(ParserAnnexD2, AnnexDGetpatternParse) {
   auto r = Parse(
       "module m;\n"
@@ -35,4 +29,4 @@ TEST(ParserAnnexD2, AnnexDGetpatternRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

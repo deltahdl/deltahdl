@@ -1,5 +1,3 @@
-// §34.4: Protect pragma directives
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,12 +5,8 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex O - Encryption/decryption
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexOPragmaProtect) {
-  // pragma protect directives are preprocessor-level and stripped before
-  // parsing. This test confirms the module around them parses correctly.
+
   auto* unit = Parse(
       "module m;\n"
       "  logic x;\n"
@@ -24,4 +18,4 @@ TEST_F(AnnexHParseTest, AnnexOPragmaProtect) {
   EXPECT_EQ(items[0]->name, "x");
 }
 
-}  // namespace
+}

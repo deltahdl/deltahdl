@@ -1,5 +1,3 @@
-// §4.4.2.3: Inactive events region
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -31,4 +29,4 @@ TEST(Lowerer, DelayZero) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

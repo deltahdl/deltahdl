@@ -1,5 +1,3 @@
-// §6.17: Event data type
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -26,4 +24,4 @@ TEST(Lowerer, EventVariableCreated) {
   EXPECT_TRUE(var->is_event);
 }
 
-}  // namespace
+}

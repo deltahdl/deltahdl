@@ -1,14 +1,9 @@
-// §12.7.3: The foreach-loop
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// ---------------------------------------------------------------------------
-// 10. always_comb with foreach loop
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_ForeachLoop) {
   auto r = Parse(
       "module m;\n"
@@ -27,9 +22,6 @@ TEST(ParserSection9, Sec9_2_2_ForeachLoop) {
   ASSERT_FALSE(stmt->foreach_vars.empty());
 }
 
-// =============================================================================
-// LRM section 12.7.3 -- foreach loop
-// =============================================================================
 TEST(ParserSection12, ForeachBasicParses) {
   auto r = Parse(
       "module t;\n"
@@ -102,7 +94,6 @@ TEST(ParserSection12, ForeachWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-// --- foreach ( ps_or_hierarchical_array_identifier [loop_variables] ) stmt ---
 TEST(ParserA608, ForeachStmt) {
   auto r = Parse(
       "module m;\n"
@@ -130,7 +121,6 @@ TEST(ParserA608, ForeachSingleVar) {
   EXPECT_EQ(stmt->foreach_vars[0], "i");
 }
 
-// §A.6.8: loop_variables — multiple comma-separated identifiers
 TEST(ParserA608, ForeachMultipleVars) {
   auto r = Parse(
       "module m;\n"
@@ -145,7 +135,6 @@ TEST(ParserA608, ForeachMultipleVars) {
   EXPECT_EQ(stmt->foreach_vars[1], "j");
 }
 
-// §A.6.8: loop_variables — empty slots (skipped dimensions)
 TEST(ParserA608, ForeachEmptyVarSlot) {
   auto r = Parse(
       "module m;\n"
@@ -160,7 +149,6 @@ TEST(ParserA608, ForeachEmptyVarSlot) {
   EXPECT_EQ(stmt->foreach_vars[1], "j");
 }
 
-// §A.6.8: ps_or_hierarchical_array_identifier — hierarchical name
 TEST(ParserA608, ForeachHierarchicalArray) {
   auto r = Parse(
       "module m;\n"
@@ -192,4 +180,4 @@ TEST(ParserA608, ForeachBlockBody) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

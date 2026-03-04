@@ -1,5 +1,3 @@
-// §6.16.11: Itoa()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.11: itoa(i) -- assign decimal string representation to variable
-// =============================================================================
 TEST(StringMethods, Itoa) {
   StringFixture f;
   auto* var = f.CreateStringVar("s", "");
@@ -19,4 +14,4 @@ TEST(StringMethods, Itoa) {
   EXPECT_EQ(VecToString(var->value), "123");
 }
 
-}  // namespace
+}

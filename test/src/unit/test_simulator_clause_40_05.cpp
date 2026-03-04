@@ -1,14 +1,9 @@
-// §40.5: VPI coverage extensions
-
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
 
 namespace {
 
-// =============================================================================
-// Coverage VPI constants
-// =============================================================================
 TEST(SvVpiUser, CoverageControlConstants) {
   EXPECT_EQ(vpiCoverageStart, 750);
   EXPECT_EQ(vpiCoverageStop, 751);
@@ -23,4 +18,4 @@ TEST(SvVpiUser, CoverageTypeConstants) {
   EXPECT_EQ(vpiCovered, 765);
 }
 
-}  // namespace
+}

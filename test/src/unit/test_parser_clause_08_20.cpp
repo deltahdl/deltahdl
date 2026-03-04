@@ -1,5 +1,3 @@
-// §8.20: Virtual methods
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -118,4 +116,4 @@ TEST(ParserSection8, ClassWithVirtualMethod) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

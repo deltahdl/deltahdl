@@ -1,5 +1,3 @@
-// Non-LRM internal VPI infrastructure tests.
-
 #include <gtest/gtest.h>
 
 #include "fixture_program.h"
@@ -15,13 +13,10 @@ TEST(NonLrmVpi, DefaultContextIsAvailable) {
 }
 
 TEST(VpiCompatL2, HeaderIncludable) {
-  // Simply including the header should compile.
+
   SUCCEED();
 }
 
-// =============================================================================
-// Annex K/L/M - VPI headers (VPI-backed system tasks/functions)
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexKVpiSystemCalls) {
   auto* unit = Parse(
       "module m;\n"
@@ -48,5 +43,5 @@ TEST_F(AnnexHParseTest, AnnexMSvVpiCalls) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

@@ -1,5 +1,3 @@
-// §6.12: Real, shortreal, and realtime data types
-
 #include <cmath>
 
 #include "common/types.h"
@@ -14,9 +12,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.12: Real literal evaluation
-// =============================================================================
 TEST(RealTypes, RealLiteralEval) {
   RealFixture f;
   auto* lit = f.MakeRealLiteral(3.14);
@@ -38,9 +33,6 @@ TEST(RealTypes, RealLiteralNegative) {
   EXPECT_NEAR(VecToDouble(result), -2.5, 1e-10);
 }
 
-// =============================================================================
-// §6.12: Real variable storage
-// =============================================================================
 TEST(RealTypes, RealVarStorage) {
   RealFixture f;
   f.CreateRealVar("x", 1.5);
@@ -57,7 +49,6 @@ TEST(RealTypes, IsRealVariable) {
   EXPECT_FALSE(f.ctx.IsRealVariable("i"));
 }
 
-// § number — real_number simulates
 TEST(SimA87, NumberReal) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -75,4 +66,4 @@ TEST(SimA87, NumberReal) {
   EXPECT_DOUBLE_EQ(ToDouble(var), 3.14);
 }
 
-}  // namespace
+}

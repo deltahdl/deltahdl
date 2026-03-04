@@ -1,5 +1,3 @@
-// §11.2.2: Aggregate expressions
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// 18. Struct comparison with another struct.
 TEST(ParserSection7, Sec7_2_2_StructComparison) {
   auto r = Parse(
       "module t;\n"
@@ -25,4 +22,4 @@ TEST(ParserSection7, Sec7_2_2_StructComparison) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kEqEq);
 }
 
-}  // namespace
+}

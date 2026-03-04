@@ -1,5 +1,3 @@
-// Annex H.7.4: Basic types
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 
@@ -7,11 +5,8 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// Annex H - DPI chandle return type
-// =============================================================================
 TEST_F(AnnexHParseTest, AnnexHDpiImportChandle) {
-  // chandle is the opaque pointer type used for DPI handles.
+
   auto* unit = Parse(
       "module m;\n"
       "  import \"DPI-C\" function chandle create_handle();\n"
@@ -29,4 +24,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportChandle) {
   EXPECT_EQ(items[1]->func_args[0].data_type.kind, DataTypeKind::kChandle);
 }
 
-}  // namespace
+}

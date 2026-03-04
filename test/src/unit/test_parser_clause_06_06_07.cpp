@@ -1,5 +1,3 @@
-// §6.6.7: User-defined nettypes
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -18,10 +16,6 @@ static ModuleItem* FindNettypeDecl(ParseResult& r, std::string_view name = "") {
 }
 namespace {
 
-// =============================================================================
-// LRM section 6.6.7 -- User-defined nettypes
-// =============================================================================
-// §6.6.7: Basic nettype declaration with a simple built-in data type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithIntType) {
   auto r = Parse(
       "module m;\n"
@@ -34,7 +28,7 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithIntType) {
   EXPECT_EQ(nt->name, "mynet");
 }
 TEST(ParserSection6, NettypeDeclWithResolveFunc) {
-  // nettype data_type nettype_identifier with tf_identifier ;
+
   auto r = Parse(
       "module t;\n"
       "  typedef struct { real field1; bit field2; } T;\n"
@@ -54,7 +48,6 @@ TEST(ParserSection6, NettypeDeclWithResolveFunc) {
   EXPECT_EQ(nt->nettype_resolve_func, "Tsum");
 }
 
-// §6.6.7: Nettype with logic data type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithLogicType) {
   auto r = Parse(
       "module m;\n"
@@ -68,7 +61,7 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithLogicType) {
 }
 
 TEST(ParserSection6, NettypeDeclAlias) {
-  // nettype nettype_identifier nettype_identifier ;  (alias form)
+
   auto r = Parse(
       "module t;\n"
       "  typedef real TR[5];\n"
@@ -84,7 +77,6 @@ TEST(ParserSection6, NettypeDeclAlias) {
   EXPECT_GE(nettype_count, 2);
 }
 
-// §6.6.7: Nettype with a packed vector type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithPackedVector) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -92,7 +84,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithPackedVector) {
               "endmodule\n"));
 }
 
-// §6.6.7: Nettype with a struct data type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithStruct) {
   auto r = Parse(
       "module m;\n"
@@ -116,7 +107,6 @@ TEST(Parser, NettypeDeclaration) {
   EXPECT_EQ(item->name, "mynet");
 }
 
-// §6.6.7: Nettype with resolution function — checks resolve func field.
 TEST(ParserSection6, Sec6_6_7_NettypeWithResolveFuncName) {
   auto r = Parse(
       "module m;\n"
@@ -130,7 +120,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithResolveFuncName) {
   EXPECT_EQ(nt->nettype_resolve_func, "Tsum");
 }
 
-// §6.6.7: Nettype alias — declaring a new name for an existing nettype.
 TEST(ParserSection6, Sec6_6_7_NettypeAlias) {
   auto r = Parse(
       "module m;\n"
@@ -157,7 +146,6 @@ TEST(Parser, NettypeWithResolutionFunction) {
   EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
 }
 
-// §6.6.7: Multiple nettypes in the same module.
 TEST(ParserSection6, Sec6_6_7_MultipleNettypesInModule) {
   auto r = Parse(
       "module m;\n"
@@ -176,7 +164,7 @@ TEST(ParserSection6, Sec6_6_7_MultipleNettypesInModule) {
 }
 
 TEST(ParserA213, DataDeclNettypeDeclaration) {
-  // nettype_declaration alternative
+
   auto r = Parse("module m; nettype logic my_net; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -184,7 +172,6 @@ TEST(ParserA213, DataDeclNettypeDeclaration) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
 }
 
-// §6.6.7: Nettype with real data type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithRealType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -192,9 +179,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithRealType) {
               "endmodule\n"));
 }
 
-// --- nettype_declaration ---
-// Form 1: nettype data_type nettype_id [with [scope] tf_id] ;
-// Form 2: nettype [scope] nettype_id nettype_id ;
 TEST(ParserA213, NettypeDeclBasic) {
   auto r = Parse("module m; nettype real my_real_net; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -204,7 +188,6 @@ TEST(ParserA213, NettypeDeclBasic) {
   EXPECT_EQ(item->name, "my_real_net");
 }
 
-// §6.6.7: Nettype with shortreal data type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithShortrealType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -222,7 +205,7 @@ TEST(ParserA213, NettypeDeclWithResolve) {
 }
 
 TEST(ParserA213, NettypeDeclWithScopedResolve) {
-  // with package_scope tf_identifier
+
   auto r =
       Parse("module m; nettype logic my_net with pkg::resolve_fn; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -232,7 +215,6 @@ TEST(ParserA213, NettypeDeclWithScopedResolve) {
   EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
 }
 
-// §6.6.7: Nettype in a package scope.
 TEST(ParserSection6, Sec6_6_7_NettypeInPackage) {
   auto r = Parse(
       "package pkg;\n"
@@ -244,7 +226,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeInPackage) {
   ASSERT_GE(r.cu->packages.size(), 1u);
 }
 
-// §6.6.7: Nettype with byte type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithByteType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -252,7 +233,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithByteType) {
               "endmodule\n"));
 }
 
-// §6.6.7: Nettype with bit type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithBitType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -260,7 +240,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithBitType) {
               "endmodule\n"));
 }
 
-// §6.6.7: Nettype with longint type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithLongintType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -268,7 +247,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithLongintType) {
               "endmodule\n"));
 }
 
-// §6.6.7: Nettype with typedef'd type used as port type.
 TEST(ParserSection6, Sec6_6_7_NettypeAsPortType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -280,7 +258,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeAsPortType) {
               "endmodule\n"));
 }
 
-// §6.6.7: Nettype with packed struct type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithPackedStruct) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
@@ -289,7 +266,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithPackedStruct) {
       "endmodule\n"));
 }
 
-// §6.6.7: Nettype with array typedef.
 TEST(ParserSection6, Sec6_6_7_NettypeWithArrayTypedef) {
   auto r = Parse(
       "module m;\n"
@@ -302,7 +278,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithArrayTypedef) {
   ASSERT_NE(nt, nullptr);
 }
 
-// §6.6.7: Nettype alias used to declare nets.
 TEST(ParserSection6, Sec6_6_7_NettypeAliasForNetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -313,7 +288,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeAliasForNetDecl) {
               "endmodule\n"));
 }
 
-// §6.6.7: Nettype with resolution function — multiple drivers scenario.
 TEST(ParserSection6, Sec6_6_7_NettypeResolveFuncMultipleDrivers) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -325,7 +299,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeResolveFuncMultipleDrivers) {
               "endmodule\n"));
 }
 
-// §6.6.7: Multiple nettypes with different resolution functions.
 TEST(ParserSection6, Sec6_6_7_DifferentResolveFuncs) {
   auto r = Parse(
       "module m;\n"
@@ -343,7 +316,6 @@ TEST(ParserSection6, Sec6_6_7_DifferentResolveFuncs) {
   EXPECT_EQ(nt_b->nettype_resolve_func, "resolve_b");
 }
 
-// §6.6.7: Nettype with no resolution function — empty resolve func field.
 TEST(ParserSection6, Sec6_6_7_NettypeNoResolveFunc) {
   auto r = Parse(
       "module m;\n"
@@ -356,7 +328,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeNoResolveFunc) {
   EXPECT_TRUE(nt->nettype_resolve_func.empty());
 }
 
-// §6.6.7: Nettype with shortint type.
 TEST(ParserSection6, Sec6_6_7_NettypeWithShortintType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -364,7 +335,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithShortintType) {
               "endmodule\n"));
 }
 
-// §6.6.7: Nettype coexisting with wire and other net declarations.
 TEST(ParserSection6, Sec6_6_7_NettypeWithWireDecls) {
   auto r = Parse(
       "module m;\n"
@@ -377,7 +347,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithWireDecls) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-// §6.6.7: Nettype with named type from typedef.
 TEST(ParserSection6, Sec6_6_7_NettypeWithNamedType) {
   auto r = Parse(
       "module m;\n"
@@ -390,7 +359,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithNamedType) {
   ASSERT_NE(nt, nullptr);
 }
 
-// §6.6.7: Nettype used with resolution function and net declaration.
 TEST(ParserSection6, Sec6_6_7_NettypeWithResolveAndNetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -400,4 +368,4 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithResolveAndNetDecl) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

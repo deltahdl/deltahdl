@@ -1,5 +1,3 @@
-// §9.3.3: Statement block start and finish times
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §9.3.3: Nested fork inside begin-end
 TEST(ParserA603, NestedForkInSeqBlock) {
   auto r = Parse(
       "module m;\n"
@@ -32,4 +29,4 @@ TEST(ParserA603, NestedForkInSeqBlock) {
   EXPECT_EQ(inner_block->stmts[0]->kind, StmtKind::kFork);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §11.3: Operators
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- Additional all-operator coverage ---
 TEST(ParserSection11, Sec11_1_AllBinaryOperatorsParse) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -60,11 +57,8 @@ TEST(ParserSection11, Sec11_1_AllUnaryOperatorsParse) {
               "endmodule\n"));
 }
 
-// =========================================================================
-// All single-char operators parse correctly
-// =========================================================================
 TEST(ParserCh501, Sec5_1_SingleCharOperators) {
-  // Exercise +, -, *, /, %, &, |, ^, ~ as single-character operators.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -81,4 +75,4 @@ TEST(ParserCh501, Sec5_1_SingleCharOperators) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

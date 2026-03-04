@@ -1,5 +1,3 @@
-// §12.7.5: The do...while-loop
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- do-while ---
-// §12.7.5: do-while executes body at least once
 TEST(SimA608, DoWhileAtLeastOnce) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -27,11 +23,10 @@ TEST(SimA608, DoWhileAtLeastOnce) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // Body executes once even though condition is false
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.7.5: do-while iterates until condition becomes false
 TEST(SimA608, DoWhileIterates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -52,4 +47,4 @@ TEST(SimA608, DoWhileIterates) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-}  // namespace
+}

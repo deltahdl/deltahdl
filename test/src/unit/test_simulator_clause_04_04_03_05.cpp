@@ -10,20 +10,6 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.4.3.5 Pre-Observed PLI region
-//
-// Figure 4-1 shows:
-//   pli_region_PostNBA -> pli_region_PreObserved -> region_Observed
-//
-// The Pre-Observed region is a read-only PLI callback control point.
-// Pre-Observed is part of the reactive region set (§4.4.1 iterative regions).
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.4.3.5 Pre-Observed PLI callback control point
-// Basic: events scheduled in the Pre-Observed region are executed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedRegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
@@ -37,27 +23,16 @@ TEST(SimCh4435, PreObservedRegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.5 Pre-Observed can read values
-// A Pre-Observed callback can read state set by the active region set.
-// ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedCanReadValues) {
   VerifyRegionCanReadActiveValue(Region::kPreObserved);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.5 Read after active region set stabilization
-// Pre-Observed sees final state from the entire active region set
-// (PreActive, Active, Inactive, PreNBA, NBA, PostNBA), not just Active.
-// ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedReadsAfterActiveRegionSetStabilized) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
   int sampled = -1;
 
-  // PostNBA is the last region in the active region set.
-  // It overwrites what Active set.
   auto* active = sched.GetEventPool().Acquire();
   active->callback = [&]() { value = 10; };
   sched.ScheduleEvent({0}, Region::kActive, active);
@@ -66,7 +41,6 @@ TEST(SimCh4435, PreObservedReadsAfterActiveRegionSetStabilized) {
   post_nba->callback = [&]() { value = 77; };
   sched.ScheduleEvent({0}, Region::kPostNBA, post_nba);
 
-  // Pre-Observed should see 77 (final state after active set stabilized).
   auto* ev = sched.GetEventPool().Acquire();
   ev->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPreObserved, ev);
@@ -75,27 +49,17 @@ TEST(SimCh4435, PreObservedReadsAfterActiveRegionSetStabilized) {
   EXPECT_EQ(sampled, 77);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.5 + Figure 4-1: PostNBA -> PreObserved -> Observed.
-// Pre-Observed executes after PostNBA and before Observed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedExecutesAfterPostNBABeforeObserved) {
   VerifyThreeRegionOrder({Region::kPostNBA, "post_nba"},
                          {Region::kPreObserved, "pre_observed"},
                          {Region::kObserved, "observed"});
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.5 Pre-Observed after entire active region set
-// Pre-Observed executes after the entire active region set, not just Active.
-// Full chain: Active -> Inactive -> PreNBA -> NBA -> PostNBA -> PreObserved.
-// ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedExecutesAfterEntireActiveRegionSet) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Schedule in reverse to prove region ordering, not insertion order.
   ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
   ScheduleLabeled(sched, Region::kPostNBA, "post_nba", order);
   ScheduleLabeled(sched, Region::kNBA, "nba", order);
@@ -109,9 +73,6 @@ TEST(SimCh4435, PreObservedExecutesAfterEntireActiveRegionSet) {
   EXPECT_EQ(order[3], "pre_observed");
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.5 Pre-Observed ordinal lies between PostNBA and Observed.
-// ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedIsAfterPostNBABeforeObserved) {
   auto pre_observed_ord = static_cast<int>(Region::kPreObserved);
   auto post_nba_ord = static_cast<int>(Region::kPostNBA);
@@ -120,10 +81,6 @@ TEST(SimCh4435, PreObservedIsAfterPostNBABeforeObserved) {
   EXPECT_LT(pre_observed_ord, observed_ord);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.5 Multiple Pre-Observed callbacks
-// Multiple PLI callbacks coexist in the Pre-Observed region and all execute.
-// ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
@@ -139,10 +96,6 @@ TEST(SimCh4435, PreObservedRegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.5 Pre-Observed events across multiple time slots.
-// Each time slot has its own Pre-Observed region evaluation.
-// ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
@@ -163,12 +116,6 @@ TEST(SimCh4435, PreObservedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.5 Pre-Observed is read-only
-// Pre-Observed is read-only. This test confirms that Pre-Observed executes
-// in isolation after the active set, so a PLI callback sampling state sees
-// the stable snapshot produced by the active region set.
-// ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedProvidesReadOnlySnapshotAfterActiveSet) {
   Arena arena;
   Scheduler sched(arena);
@@ -176,7 +123,6 @@ TEST(SimCh4435, PreObservedProvidesReadOnlySnapshotAfterActiveSet) {
   int b = 0;
   int sum_in_pre_observed = -1;
 
-  // Active at time 0 sets both a and b.
   auto* active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
     a = 10;
@@ -184,7 +130,6 @@ TEST(SimCh4435, PreObservedProvidesReadOnlySnapshotAfterActiveSet) {
   };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
-  // Pre-Observed reads both — should see the values Active set.
   auto* pre_obs = sched.GetEventPool().Acquire();
   pre_obs->callback = [&]() { sum_in_pre_observed = a + b; };
   sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);
@@ -193,21 +138,12 @@ TEST(SimCh4435, PreObservedProvidesReadOnlySnapshotAfterActiveSet) {
   EXPECT_EQ(sum_in_pre_observed, 30);
 }
 
-// ---------------------------------------------------------------------------
-// §4.4.3.5 Pre-Observed reads fully-stabilized active set state
-// Pre-Observed reads the fully-stabilized state, even when multiple active
-// region set iterations occur due to feedback (Active -> Inactive -> Active).
-// The final value after all active-set iterations is what Pre-Observed sees.
-// ---------------------------------------------------------------------------
 TEST(SimCh4435, PreObservedReadsFullyStabilizedActiveSetState) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
   int sampled = -1;
 
-  // Active sets value = 1, then schedules an Inactive event that
-  // re-enters Active with value = 99. After active set stabilizes,
-  // Pre-Observed should see 99.
   auto set_final = [&]() { value = 99; };
   auto schedule_reentry = [&]() {
     auto* active2 = sched.GetEventPool().Acquire();
@@ -226,7 +162,6 @@ TEST(SimCh4435, PreObservedReadsFullyStabilizedActiveSetState) {
   };
   sched.ScheduleEvent({0}, Region::kActive, active);
 
-  // Pre-Observed samples the fully-stabilized value.
   auto* pre_obs = sched.GetEventPool().Acquire();
   pre_obs->callback = [&]() { sampled = value; };
   sched.ScheduleEvent({0}, Region::kPreObserved, pre_obs);

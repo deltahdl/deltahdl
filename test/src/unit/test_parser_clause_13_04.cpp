@@ -1,5 +1,3 @@
-// §13.4: Functions
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// function_body_declaration (old-style ports)
-// ---------------------------------------------------------------------------
 TEST(ParserA26, FuncBodyOldStylePorts) {
   auto r = Parse(
       "module m;\n"
@@ -28,11 +23,6 @@ TEST(ParserA26, FuncBodyOldStylePorts) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-// --- Test helpers ---
-// =============================================================================
-// LRM section 13.4 -- Functions (additional tests)
-// =============================================================================
-// Function with no ports (implicit return by function name assignment).
 TEST(ParserSection13, FunctionNoPorts) {
   auto r = Parse(
       "module m;\n"
@@ -47,7 +37,6 @@ TEST(ParserSection13, FunctionNoPorts) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
 }
 
-// Function with multiple statements in body.
 TEST(ParserSection13, FunctionMultipleBodyStmts) {
   auto r = Parse(
       "module m;\n"
@@ -63,9 +52,7 @@ TEST(ParserSection13, FunctionMultipleBodyStmts) {
   ASSERT_EQ(fn->func_args.size(), 3u);
   EXPECT_GE(fn->func_body_stmts.size(), 3u);
 }
-// =============================================================================
-// 23. Automatic function with input/output/inout ports
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithAllPortDirs) {
   auto r = Parse(
       "module m;\n"
@@ -135,7 +122,7 @@ TEST(ParserA26, FuncReturnTypeImplicit) {
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kImplicit);
 }
-// 15. Integer types as function parameters.
+
 TEST(ParserSection6, Sec6_11_IntegerTypesAsFunctionParams) {
   auto r = Parse(
       "module t;\n"
@@ -193,11 +180,6 @@ TEST(ParserA26, FuncBodyNewStyleMultipleDirections) {
                            Direction::kInout, Direction::kRef});
 }
 
-// ---------------------------------------------------------------------------
-// function_statement ::= statement
-// function_statement_or_null ::= function_statement | { attribute_instance } ;
-// ---------------------------------------------------------------------------
-// §13: function_statement — regular statement in function body
 TEST(ParserA604, FunctionStatement) {
   auto r = Parse(
       "module m;\n"
@@ -213,7 +195,6 @@ TEST(ParserA604, FunctionStatement) {
   EXPECT_EQ(func->func_body_stmts[0]->kind, StmtKind::kBlockingAssign);
 }
 
-// §13: multiple function statements including null
 TEST(ParserA604, FunctionBodyMultipleStatements) {
   auto r = Parse(
       "module m;\n"
@@ -233,7 +214,6 @@ TEST(ParserA604, FunctionBodyMultipleStatements) {
   EXPECT_EQ(func->func_body_stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-// --- Block-level var decl in function body ---
 TEST(ParserSection18, FuncBodyVarDecl) {
   auto r = Parse(
       "module top;\n"
@@ -248,9 +228,6 @@ TEST(ParserSection18, FuncBodyVarDecl) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// function_body_declaration (new-style ports)
-// ---------------------------------------------------------------------------
 TEST(ParserA26, FuncBodyNewStyleEmptyPorts) {
   auto r =
       Parse("module m;\n  function void foo();\n  endfunction\nendmodule\n");
@@ -314,9 +291,6 @@ TEST(ParserA26, FuncBodyOldStyleOutputPort) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-// ---------------------------------------------------------------------------
-// function_body_declaration: argument unpacked dimensions (§13.4)
-// ---------------------------------------------------------------------------
 TEST(ParserA26, FuncArgUnpackedDim) {
   auto r = Parse(
       "module m;\n"
@@ -329,7 +303,6 @@ TEST(ParserA26, FuncArgUnpackedDim) {
   EXPECT_EQ(item->func_args[0].unpacked_dims.size(), 1u);
 }
 
-// block_item_declaration in function body (§13.4)
 TEST(ParserA28, BlockItemInFunction) {
   auto r = Parse(
       "module m;\n"
@@ -347,9 +320,6 @@ TEST(ParserA28, BlockItemInFunction) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-// =============================================================================
-// LRM section 13.4 -- Array parameters on function args
-// =============================================================================
 TEST(ParserSection13, ArrayParamOnFuncArg) {
   auto r = Parse(
       "module m;\n"
@@ -376,9 +346,6 @@ TEST(ParserSection13, NoDimsOnFuncArg) {
   EXPECT_TRUE(fn->func_args[0].unpacked_dims.empty());
 }
 
-// =============================================================================
-// LRM section 13.3-13.4 -- Old-style (non-ANSI) task/function declarations
-// =============================================================================
 TEST(ParserSection13, OldStyleFunction) {
   auto r = Parse(
       "module m;\n"
@@ -394,10 +361,6 @@ TEST(ParserSection13, OldStyleFunction) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kInput);
 }
 
-// =============================================================================
-// LRM section 13.1 -- Tasks and functions overview (additional tests)
-// =============================================================================
-// Function with end label matching the function name (LRM section 13.4).
 TEST(ParserSection13, FunctionEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -411,7 +374,6 @@ TEST(ParserSection13, FunctionEndLabel) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
 }
 
-// Function with empty body.
 TEST(ParserSection13, FunctionEmptyBody) {
   auto r = Parse(
       "module m;\n"
@@ -424,10 +386,7 @@ TEST(ParserSection13, FunctionEmptyBody) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
   EXPECT_TRUE(fn->func_body_stmts.empty());
 }
-// Returns the first module item from the first module.
-// =============================================================================
-// 15. Automatic function with output argument
-// =============================================================================
+
 TEST(ParserSection4, Sec4_9_3_AutoFuncWithOutputArg) {
   auto r = Parse(
       "module m;\n"
@@ -448,4 +407,4 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithOutputArg) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-}  // namespace
+}

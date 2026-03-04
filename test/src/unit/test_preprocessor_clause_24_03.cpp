@@ -1,5 +1,3 @@
-// §24.3: The program construct
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,13 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM §3.4 — Programs
-// =============================================================================
-// §3.4 LRM example (verbatim) with end label:
-//   program test (input clk, input [16:1] addr, inout [7:0] data);
-//   initial begin ... end
-//   endprogram : test
 TEST(ParserClause03, Cl3_4_LrmExample) {
   auto r = ParseWithPreprocessor(
       "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
@@ -33,8 +24,6 @@ TEST(ParserClause03, Cl3_4_LrmExample) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-// §3.4: "A program block can contain ... subroutine definitions ...
-//        initial ... final procedures"
 TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
   auto r = ParseWithPreprocessor(
       "program p;\n"
@@ -55,7 +44,6 @@ TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
-// §3.4:
 TEST(ParserClause03, Cl3_4_RejectsDisallowedItems) {
   EXPECT_TRUE(
       ParseWithPreprocessor("program p; always @(*) begin end endprogram\n")
@@ -72,10 +60,10 @@ TEST(ParserClause03, Cl3_4_RejectsDisallowedItems) {
   EXPECT_TRUE(ParseWithPreprocessor("module c; endmodule\n"
                                     "program p; c i(); endprogram\n")
                   .has_errors);
-  // Interface and program instances hit the same instantiation path.
+
   EXPECT_TRUE(ParseWithPreprocessor("interface ifc; endinterface\n"
                                     "program p; ifc i(); endprogram\n")
                   .has_errors);
 }
 
-}  // namespace
+}

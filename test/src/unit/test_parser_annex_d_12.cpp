@@ -1,5 +1,3 @@
-// Annex D.12: $showscopes
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- D.7: $showscopes with argument ---
 TEST(ParserAnnexD2, AnnexDShowscopesArg) {
   auto r = Parse(
       "module m;\n"
@@ -20,4 +17,4 @@ TEST(ParserAnnexD2, AnnexDShowscopesArg) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}  // namespace
+}

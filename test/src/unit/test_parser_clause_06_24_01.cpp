@@ -1,5 +1,3 @@
-// §6.24.1: Cast operator
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -8,13 +6,8 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.2.2.1 Net and variable types
-// =============================================================================
-// --- casting_type ---
-// simple_type | constant_primary | signing | string | const
 TEST(ParserA221, CastingTypeSimpleInt) {
-  // simple_type: integer_type cast
+
   auto r = Parse(
       "module m;\n"
       "  initial begin int x; x = int'(3.14); end\n"
@@ -24,7 +17,7 @@ TEST(ParserA221, CastingTypeSimpleInt) {
 }
 
 TEST(ParserA221, CastingTypeSigning) {
-  // signing: signed'(val)
+
   auto r = Parse(
       "module m;\n"
       "  initial begin int x; x = signed'(8'hFF); end\n"
@@ -34,7 +27,7 @@ TEST(ParserA221, CastingTypeSigning) {
 }
 
 TEST(ParserA221, CastingTypeString) {
-  // string: string'(val)
+
   auto r = Parse(
       "module m;\n"
       "  initial begin string s; s = string'(65); end\n"
@@ -44,7 +37,7 @@ TEST(ParserA221, CastingTypeString) {
 }
 
 TEST(ParserA221, CastingTypeConst) {
-  // const: const'(expr)
+
   auto r = Parse(
       "module m;\n"
       "  initial begin int x; x = const'(42); end\n"
@@ -54,9 +47,7 @@ TEST(ParserA221, CastingTypeConst) {
 }
 
 TEST(ParserA221, CastingTypeUserDefined) {
-  // casting_type with user-defined type (simple_type: ps_type_identifier)
-  // Note: constant_primary'(expr) cast (e.g., N'(val)) requires semantic
-  // analysis to distinguish from sized literals — tested via type casts.
+
   auto r = Parse(
       "module m;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -66,7 +57,6 @@ TEST(ParserA221, CastingTypeUserDefined) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 17. Struct type cast from integer using type'(expr).
 TEST(ParserSection7, Sec7_2_2_TypeCastToStruct) {
   auto r = Parse(
       "module t;\n"
@@ -81,7 +71,7 @@ TEST(ParserSection7, Sec7_2_2_TypeCastToStruct) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
-// --- 20. Nonblocking with cast RHS ---
+
 TEST(ParserSection10, Sec10_4_2_CastRhs) {
   auto r = Parse(
       "module m;\n"
@@ -98,7 +88,7 @@ TEST(ParserSection10, Sec10_4_2_CastRhs) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
-// --- 25. Blocking assignment with cast: a = int'(b) ---
+
 TEST(ParserSection10, Sec10_4_1_CastRhs) {
   auto r = Parse(
       "module m;\n"
@@ -116,7 +106,7 @@ TEST(ParserSection10, Sec10_4_1_CastRhs) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
-// --- Cast packed struct to integer type ---
+
 TEST(ParserSection7, Sec7_2_1_PackedCastToInt) {
   auto r = Parse(
       "module t;\n"
@@ -135,7 +125,6 @@ TEST(ParserSection7, Sec7_2_1_PackedCastToInt) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
 
-// --- Cast integer to packed struct type ---
 TEST(ParserSection7, Sec7_2_1_IntCastToPackedStruct) {
   auto r = Parse(
       "module t;\n"
@@ -154,7 +143,6 @@ TEST(ParserSection7, Sec7_2_1_IntCastToPackedStruct) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
 
-// § constant_primary — constant_cast
 TEST(ParserA84, ConstantPrimaryCast) {
   auto r = Parse(
       "module m;\n"
@@ -167,7 +155,6 @@ TEST(ParserA84, ConstantPrimaryCast) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kCast);
 }
 
-// § primary — cast
 TEST(ParserA84, PrimaryCast) {
   auto r = Parse(
       "module m;\n"
@@ -181,10 +168,6 @@ TEST(ParserA84, PrimaryCast) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-// =============================================================================
-// A.8.4 Primaries — cast and constant_cast
-// =============================================================================
-// § cast — type cast in expression
 TEST(ParserA84, CastInExpression) {
   auto r = Parse(
       "module m;\n"
@@ -199,7 +182,6 @@ TEST(ParserA84, CastInExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-// § cast — signed cast
 TEST(ParserA84, CastSigned) {
   auto r = Parse(
       "module m;\n"
@@ -213,7 +195,6 @@ TEST(ParserA84, CastSigned) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-// § constant_cast — in parameter
 TEST(ParserA84, ConstantCastInParam) {
   auto r = Parse("module m; parameter int P = int'(3.0); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -222,7 +203,7 @@ TEST(ParserA84, ConstantCastInParam) {
   ASSERT_NE(param->init_expr, nullptr);
   EXPECT_EQ(param->init_expr->kind, ExprKind::kCast);
 }
-// --- Cast expression ---
+
 TEST(ParserSection11, Sec11_1_CastExpression) {
   auto r = Parse(
       "module t;\n"
@@ -233,7 +214,6 @@ TEST(ParserSection11, Sec11_1_CastExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-// Static cast with type apostrophe syntax: type'(expr).
 TEST(ParserSection8, StaticCastTypeSyntax) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -254,11 +234,8 @@ TEST(ParserSection6, CastCompatibleRealToInt) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-// =========================================================================
-// §6.24.1: Static casting — type and size casts
-// =========================================================================
 TEST(ParserSection6, StaticCastRealToInt) {
-  // §6.24.1: int'(2.0 * 3.0) casts real to int.
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -269,7 +246,7 @@ TEST(ParserSection6, StaticCastRealToInt) {
 }
 
 TEST(ParserSection6, StaticCastStringType) {
-  // §6.24.1: string'(expr) cast is valid per grammar.
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -279,7 +256,6 @@ TEST(ParserSection6, StaticCastStringType) {
               "endmodule\n"));
 }
 
-// Step 2a: user-defined type cast (fixes 6.19.4-cast)
 TEST(ParserSection6, TypeCast_UserDefined) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
@@ -291,9 +267,7 @@ TEST(ParserSection6, TypeCast_UserDefined) {
                "  end\n"
                "endmodule\n"));
 }
-// =========================================================================
-// §6.6.8: Void data type (additional tests)
-// =========================================================================
+
 TEST(ParserSection6, VoidCastExpression) {
   auto r = Parse(
       "module t;\n"
@@ -305,9 +279,7 @@ TEST(ParserSection6, VoidCastExpression) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
-// =========================================================================
-// §6.24: Casting
-// =========================================================================
+
 TEST(ParserSection6, IntCast) {
   auto r = Parse(
       "module t;\n"
@@ -364,7 +336,7 @@ TEST(ParserSection6, ConstCast) {
 }
 
 TEST(ParserSection6, RealCastExplicit) {
-  // Explicit cast: int'(real_val) (LRM 6.24)
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 3.7;\n"
@@ -374,7 +346,7 @@ TEST(ParserSection6, RealCastExplicit) {
 }
 
 TEST(ParserSection6, ShortrealCast) {
-  // Cast to shortreal
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int i = 42;\n"
@@ -383,4 +355,4 @@ TEST(ParserSection6, ShortrealCast) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

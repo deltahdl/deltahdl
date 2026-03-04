@@ -1,5 +1,3 @@
-// §21.7.2.3: Description of keyword commands
-
 #include "fixture_vcd.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -50,5 +48,5 @@ TEST_F(VcdClause21070203Test, RegistersSignal) {
   EXPECT_NE(content.find("clk"), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

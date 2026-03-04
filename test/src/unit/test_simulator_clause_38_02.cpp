@@ -26,8 +26,6 @@ class VpiClause3802Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.2: vpi_chk_error
-
 TEST_F(VpiClause3802Test, ChkErrorNoErrorReturnsZero) {
   SVpiErrorInfo info = {};
   int result = VpiChkErrorC(&info);
@@ -37,9 +35,9 @@ TEST_F(VpiClause3802Test, ChkErrorNoErrorReturnsZero) {
 
 TEST_F(VpiClause3802Test, ChkErrorNullDoesNotCrash) {
   int result = VpiChkErrorC(nullptr);
-  // No error pending, so returns 0.
+
   EXPECT_EQ(result, 0);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

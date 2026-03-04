@@ -10,38 +10,17 @@
 
 using namespace delta;
 
-// ===========================================================================
-// §4.9 Scheduling implication of assignments
-//
-// Every assignment type in SystemVerilog is implemented through the
-// scheduler's process/event model. The seven assignment types are:
-//   4.9.1 Continuous assignment
-//   4.9.2 Procedural continuous assignment
-//   4.9.3 Blocking assignment
-//   4.9.4 Nonblocking assignment
-//   4.9.5 Switch (transistor) processing
-//   4.9.6 Port connections
-//   4.9.7 Subroutines
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// §4.9 Continuous assignment (4.9.1) as process and event.
-// A process sensitive to source elements schedules an active update event
-// when the expression changes.
-// ---------------------------------------------------------------------------
 TEST(SimCh49, ContinuousAssignmentAsProcessAndEvent) {
   Arena arena;
   Scheduler sched(arena);
   int src = 0;
   int dst = 0;
 
-  // Model: assign dst = src; → process triggers update event when src changes.
-  // Time 0: src changes to 5 → schedules active update for dst.
   auto* process = sched.GetEventPool().Acquire();
   process->kind = EventKind::kEvaluation;
   process->callback = [&]() {
     src = 5;
-    // Continuous assignment triggers an active update event.
+
     auto* update = sched.GetEventPool().Acquire();
     update->kind = EventKind::kUpdate;
     update->callback = [&]() { dst = src; };
@@ -53,19 +32,12 @@ TEST(SimCh49, ContinuousAssignmentAsProcessAndEvent) {
   EXPECT_EQ(dst, 5);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9 Procedural continuous assignment (4.9.2) as process and event.
-// assign/force creates a process sensitive to the expression;
-// deassign/release deactivates it.
-// ---------------------------------------------------------------------------
 TEST(SimCh49, ProceduralContinuousAssignmentAsProcessAndEvent) {
   Arena arena;
   Scheduler sched(arena);
   int forced_val = 0;
   bool force_active = true;
 
-  // Model: force dst = expr; → process schedules active update events.
-  // A subsequent release deactivates the process.
   auto* force_proc = sched.GetEventPool().Acquire();
   force_proc->kind = EventKind::kEvaluation;
   force_proc->callback = [&]() {
@@ -78,7 +50,6 @@ TEST(SimCh49, ProceduralContinuousAssignmentAsProcessAndEvent) {
   };
   sched.ScheduleEvent({0}, Region::kActive, force_proc);
 
-  // Time 1: release → deactivate force, value stays.
   auto* release_proc = sched.GetEventPool().Acquire();
   release_proc->kind = EventKind::kEvaluation;
   release_proc->callback = [&]() { force_active = false; };
@@ -89,23 +60,17 @@ TEST(SimCh49, ProceduralContinuousAssignmentAsProcessAndEvent) {
   EXPECT_FALSE(force_active);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9 Blocking assignment (4.9.3) as process and event.
-// With intra-assignment delay, the process suspends and is scheduled as
-// a future event.
-// ---------------------------------------------------------------------------
 TEST(SimCh49, BlockingAssignmentAsProcessAndEvent) {
   Arena arena;
   Scheduler sched(arena);
   int result = 0;
   SimTime resume_time{0};
 
-  // Model: result = #2 expr; → compute RHS, suspend, resume at time 2.
   auto* proc = sched.GetEventPool().Acquire();
   proc->kind = EventKind::kEvaluation;
   proc->callback = [&]() {
-    int rhs = 99;  // Compute RHS with current values.
-    // Suspend: schedule future event at current_time + 2.
+    int rhs = 99;
+
     auto* resume = sched.GetEventPool().Acquire();
     resume->kind = EventKind::kEvaluation;
     resume->callback = [&, rhs]() {
@@ -122,23 +87,18 @@ TEST(SimCh49, BlockingAssignmentAsProcessAndEvent) {
   EXPECT_EQ(resume_time.ticks, 2u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9 Blocking assignment with zero delay (4.9.3).
-// Process is scheduled as an Inactive event for the current time.
-// ---------------------------------------------------------------------------
 TEST(SimCh49, BlockingAssignmentZeroDelaySchedulesInactive) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
   std::vector<std::string> order;
 
-  // Model: value = #0 expr; → schedules in Inactive (not Active).
   auto* proc = sched.GetEventPool().Acquire();
   proc->kind = EventKind::kEvaluation;
   proc->callback = [&]() {
     order.push_back("active");
     int rhs = 10;
-    // #0 delay → schedule in Inactive region.
+
     auto* resume = sched.GetEventPool().Acquire();
     resume->kind = EventKind::kEvaluation;
     resume->callback = [&, rhs]() {
@@ -156,18 +116,12 @@ TEST(SimCh49, BlockingAssignmentZeroDelaySchedulesInactive) {
   EXPECT_EQ(order[1], "inactive");
 }
 
-// ---------------------------------------------------------------------------
-// §4.9 Nonblocking assignment (4.9.4) as NBA event.
-// Always computes the updated value and schedules the update as an NBA
-// update event.
-// ---------------------------------------------------------------------------
 TEST(SimCh49, NonblockingAssignmentAsNBAEvent) {
   Arena arena;
   Scheduler sched(arena);
   int a = 0;
   int b = 0;
 
-  // Model: a <= 1; b <= 2; → NBA updates scheduled, execute after Active.
   auto* proc = sched.GetEventPool().Acquire();
   proc->kind = EventKind::kEvaluation;
   proc->callback = [&]() {
@@ -190,19 +144,12 @@ TEST(SimCh49, NonblockingAssignmentAsNBAEvent) {
   EXPECT_EQ(b, 2);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9 Switch processing (4.9.5) as active events.
-// Bidirectional switch events are scheduled as active update events,
-// intermingled with other active events.
-// ---------------------------------------------------------------------------
 TEST(SimCh49, SwitchProcessingAsActiveEvents) {
   Arena arena;
   Scheduler sched(arena);
   int node_a = 0;
   int node_b = 0;
 
-  // Model: tran(a, b) — bidirectional switch propagates values as active
-  // update events intermingled with other events.
   auto* drive = sched.GetEventPool().Acquire();
   drive->kind = EventKind::kEvaluation;
   drive->callback = [&]() { node_a = 1; };
@@ -218,22 +165,17 @@ TEST(SimCh49, SwitchProcessingAsActiveEvents) {
   EXPECT_EQ(node_b, 1);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9 Port connections (4.9.6) as implicit continuous assignments.
-// Ports connect processes through implicit continuous assignment statements.
-// ---------------------------------------------------------------------------
 TEST(SimCh49, PortConnectionAsImplicitContinuousAssignment) {
   Arena arena;
   Scheduler sched(arena);
   int outside_sig = 0;
   int local_input = 0;
 
-  // Model: input port — implicit continuous assignment from outside to local.
   auto* driver = sched.GetEventPool().Acquire();
   driver->kind = EventKind::kEvaluation;
   driver->callback = [&]() {
     outside_sig = 7;
-    // Implicit continuous assignment: local_input = outside_sig.
+
     auto* port_update = sched.GetEventPool().Acquire();
     port_update->kind = EventKind::kUpdate;
     port_update->callback = [&]() { local_input = outside_sig; };
@@ -245,11 +187,6 @@ TEST(SimCh49, PortConnectionAsImplicitContinuousAssignment) {
   EXPECT_EQ(local_input, 7);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9 Subroutines (4.9.7) as blocking assignment events.
-// Copy-in on invocation and copy-out on return behave as blocking
-// assignments, modeled as evaluation events.
-// ---------------------------------------------------------------------------
 TEST(SimCh49, SubroutineArgumentPassingAsBlockingAssignment) {
   Arena arena;
   Scheduler sched(arena);
@@ -257,15 +194,14 @@ TEST(SimCh49, SubroutineArgumentPassingAsBlockingAssignment) {
   int callee_local = 0;
   int caller_out = 0;
 
-  // Model: task with output — copy-in at call, copy-out at return.
   auto* call = sched.GetEventPool().Acquire();
   call->kind = EventKind::kEvaluation;
   call->callback = [&]() {
-    // Copy-in: callee gets a copy of caller_arg.
+
     callee_local = caller_arg;
-    // Subroutine body modifies local copy.
+
     callee_local += 5;
-    // Copy-out on return: behaves as blocking assignment.
+
     caller_out = callee_local;
   };
   sched.ScheduleEvent({0}, Region::kActive, call);
@@ -274,53 +210,40 @@ TEST(SimCh49, SubroutineArgumentPassingAsBlockingAssignment) {
   EXPECT_EQ(caller_out, 15);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9 All seven assignment types use the same scheduler infrastructure.
-// They all go through ScheduleEvent.
-// ---------------------------------------------------------------------------
 TEST(SimCh49, AllAssignmentTypesUseSchedulerInfrastructure) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> executed;
 
-  // Schedule one event per assignment type to show they all use the same
-  // scheduler infrastructure (ScheduleEvent -> Region -> EventQueue -> Run).
-  ScheduleLabeled(sched, Region::kActive, "continuous", executed);  // §4.9.1
+  ScheduleLabeled(sched, Region::kActive, "continuous", executed);
   ScheduleLabeled(sched, Region::kActive, "proc_continuous",
-                  executed);  // §4.9.2
+                  executed);
   ScheduleLabeled(sched, Region::kInactive, "blocking",
-                  executed);  // §4.9.3 (zero delay)
-  ScheduleLabeled(sched, Region::kNBA, "nonblocking", executed);    // §4.9.4
-  ScheduleLabeled(sched, Region::kActive, "switch", executed);      // §4.9.5
-  ScheduleLabeled(sched, Region::kActive, "port", executed);        // §4.9.6
-  ScheduleLabeled(sched, Region::kActive, "subroutine", executed);  // §4.9.7
+                  executed);
+  ScheduleLabeled(sched, Region::kNBA, "nonblocking", executed);
+  ScheduleLabeled(sched, Region::kActive, "switch", executed);
+  ScheduleLabeled(sched, Region::kActive, "port", executed);
+  ScheduleLabeled(sched, Region::kActive, "subroutine", executed);
 
   sched.Run();
   EXPECT_EQ(executed.size(), 7u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9 Assignment ordering follows region ordering (§4.5).
-// Active → Inactive → NBA.
-// ---------------------------------------------------------------------------
 TEST(SimCh49, AssignmentOrderingFollowsRegionOrdering) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
 
-  // Continuous assignment → Active update event.
   auto* cont = sched.GetEventPool().Acquire();
   cont->kind = EventKind::kUpdate;
   cont->callback = [&]() { order.push_back("continuous_active"); };
   sched.ScheduleEvent({0}, Region::kActive, cont);
 
-  // Blocking assignment #0 → Inactive event.
   auto* blk = sched.GetEventPool().Acquire();
   blk->kind = EventKind::kEvaluation;
   blk->callback = [&]() { order.push_back("blocking_inactive"); };
   sched.ScheduleEvent({0}, Region::kInactive, blk);
 
-  // Nonblocking assignment → NBA event.
   auto* nba = sched.GetEventPool().Acquire();
   nba->kind = EventKind::kUpdate;
   nba->callback = [&]() { order.push_back("nba"); };

@@ -1,5 +1,3 @@
-// §28.8: Bidirectional pass switches
-
 #include <gtest/gtest.h>
 
 #include "helpers_switch_network.h"
@@ -8,10 +6,6 @@
 
 namespace {
 
-// =============================================================
-// §28.8: Bidirectional pass switches
-// =============================================================
-// §28.8: tran and rtran are bidirectional.
 TEST(BidrectionalSwitches, TranIsBidirectional) {
   EXPECT_TRUE(IsBidirectional(SwitchType::kTran));
   EXPECT_TRUE(IsBidirectional(SwitchType::kRtran));
@@ -24,15 +18,11 @@ TEST(BidrectionalSwitches, MosSwitchesNotBidirectional) {
   EXPECT_FALSE(IsBidirectional(SwitchType::kPmos));
 }
 
-// §28.8: "The tran and rtran devices cannot be turned off; they shall
-//  always pass signals."
-// §28.8: "tran and rtran devices shall not accept delay specifications."
 TEST(BidrectionalSwitches, TranNoDelays) {
   EXPECT_FALSE(AcceptsDelaySpec(SwitchType::kTran));
   EXPECT_FALSE(AcceptsDelaySpec(SwitchType::kRtran));
 }
 
-// §28.8: tranif/rtranif accept 0-2 delays.
 TEST(BidrectionalSwitches, TranifAcceptsDelays) {
   EXPECT_TRUE(AcceptsDelaySpec(SwitchType::kTranif0));
   EXPECT_TRUE(AcceptsDelaySpec(SwitchType::kTranif1));
@@ -40,15 +30,10 @@ TEST(BidrectionalSwitches, TranifAcceptsDelays) {
   EXPECT_EQ(MaxSwitchDelays(SwitchType::kTranif1), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// §4.9.5 — Six transistor source element types
-// ---------------------------------------------------------------------------
 TEST(SimCh4095, TransistorSourceElements) {
   Arena arena;
   Scheduler sched(arena);
 
-  // Enumerate all six transistor types as distinct source elements.
-  // Each is represented as a named type with bidirectional connectivity.
   enum class TranType : std::uint8_t {
     kTran,
     kTranif0,
@@ -63,7 +48,6 @@ TEST(SimCh4095, TransistorSourceElements) {
 
   int resolved_count = 0;
 
-  // Each transistor type participates in switch processing.
   auto* eval = sched.GetEventPool().Acquire();
   eval->kind = EventKind::kEvaluation;
   eval->callback = [&]() {
@@ -78,10 +62,10 @@ TEST(SimCh4095, TransistorSourceElements) {
   sched.ScheduleEvent({0}, Region::kActive, eval);
 
   sched.Run();
-  // All six transistor types processed.
+
   EXPECT_EQ(resolved_count, 6);
 }
-// --- Bidirectional signal flow ---
+
 TEST(SwitchProcessing, TranPropagatesDrivenToUndriven) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
@@ -106,7 +90,6 @@ TEST(SwitchProcessing, TranBidirectionalPropagation) {
   EXPECT_EQ(ValOf(*va), kVal0);
 }
 
-// --- tranif1 / tranif0 control semantics ---
 TEST(SwitchProcessing, Tranif1ConductsWhenControlHigh) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
@@ -147,7 +130,6 @@ TEST(SwitchProcessing, UserDefinedNetZControlTreatedAsOff) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-// --- User-defined net type: on -> single net, off -> separate ---
 TEST(SwitchProcessing, UserDefinedNetControlOnSingleNet) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
@@ -164,4 +146,4 @@ TEST(SwitchProcessing, UserDefinedNetControlOffSeparate) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-}  // namespace
+}

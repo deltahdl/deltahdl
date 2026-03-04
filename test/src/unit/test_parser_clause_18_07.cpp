@@ -1,5 +1,3 @@
-// §18.7: Inline constraints—randomize() with
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -44,7 +42,6 @@ TEST(ParserA82, RandomizeCallWithConstraintBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Inline randomize with constraint block (§18.7) ---
 TEST(ParserSection18, RandomizeWithInlineConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -71,4 +68,4 @@ TEST(ParserSection18, RandomizeWithIdListAndConstraint) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

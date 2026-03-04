@@ -1,5 +1,3 @@
-// §22.6: `ifdef, `else, `elsif, `endif, `ifndef
-
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -62,4 +60,4 @@ TEST(ParserSection22, NestedIfdef) {
               "`endif\n"));
 }
 
-}  // namespace
+}

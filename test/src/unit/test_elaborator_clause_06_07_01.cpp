@@ -1,5 +1,3 @@
-// §6.7.1: Net declarations with built-in net types
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -10,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- Interconnect restrictions (§6.7.1) ---
-// §6.7.1: "A net declared as an interconnect net shall:
-//  — have no data type"
 TEST(NetDecl, InterconnectNoDataType) {
   NetDeclInfo info;
   info.is_interconnect = true;
@@ -27,7 +22,6 @@ TEST(NetDecl, InterconnectWithDimensionsOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-// §6.7.1: "— not specify drive_strength or charge_strength"
 TEST(NetDecl, InterconnectNoDriveStrength) {
   NetDeclInfo info;
   info.is_interconnect = true;
@@ -42,7 +36,6 @@ TEST(NetDecl, InterconnectNoChargeStrength) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-// §6.7.1: "— not have assignment expressions"
 TEST(NetDecl, InterconnectNoAssignment) {
   NetDeclInfo info;
   info.is_interconnect = true;
@@ -50,7 +43,6 @@ TEST(NetDecl, InterconnectNoAssignment) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-// §6.7.1: "— specify at most one delay value."
 TEST(NetDecl, InterconnectOneDelayOk) {
   NetDeclInfo info;
   info.is_interconnect = true;
@@ -65,20 +57,14 @@ TEST(NetDecl, InterconnectMultipleDelaysError) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-// --- Valid net data types (§6.7.1) ---
-// §6.7.1: "A valid data type for a net shall be one of the following:
-//  a) A 4-state integral type"
 TEST(NetDecl, ValidNetDataType4StateIntegral) {
   EXPECT_TRUE(ValidateNetDataType(NetDataTypeKind::k4StateIntegral));
 }
 
-// §6.7.1: "b) A fixed-size unpacked array or unpacked structure or union,
-//  where each element has a valid data type for a net."
 TEST(NetDecl, ValidNetDataTypeFixedUnpacked) {
   EXPECT_TRUE(ValidateNetDataType(NetDataTypeKind::kFixedUnpackedValid));
 }
 
-// §6.7.1: 2-state integral is NOT valid for built-in net types.
 TEST(NetDecl, InvalidNetDataType2StateIntegral) {
   EXPECT_FALSE(ValidateNetDataType(NetDataTypeKind::k2StateIntegral));
 }
@@ -95,4 +81,4 @@ TEST(NetDecl, InvalidNetDataTypeString) {
   EXPECT_FALSE(ValidateNetDataType(NetDataTypeKind::kString));
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §16.9.8: First_match operation
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,9 +15,6 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -32,11 +27,11 @@ struct SvaFixture {
 namespace {
 
 TEST(SvaEngine, SequenceOperatorIntersect) {
-  // Intersect: both match and complete at the same cycle.
+
   EXPECT_TRUE(EvalSequenceIntersect(true, true, 3, 3));
-  // Different lengths: false.
+
   EXPECT_FALSE(EvalSequenceIntersect(true, true, 3, 4));
   EXPECT_FALSE(EvalSequenceIntersect(true, false, 3, 3));
 }
 
-}  // namespace
+}

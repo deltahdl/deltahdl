@@ -1,5 +1,3 @@
-// §30.7.4.1: On-event versus on-detect pulse filtering
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -23,9 +21,6 @@ TEST(ParserA701, SpecifyItemPulsestyleDecl) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPulsestyle);
 }
 
-// =============================================================================
-// A.7.1 pulsestyle_declaration
-// =============================================================================
 TEST(ParserA701, PulsestyleOneventSingleOutput) {
   auto r = Parse(
       "module m;\n"
@@ -100,9 +95,6 @@ TEST(ParserA701, PulsestyleOndetectMultipleOutputs) {
   EXPECT_EQ(item->signal_list[1], "q2");
 }
 
-// =============================================================================
-// §30.4 Pulsestyle and showcancelled
-// =============================================================================
 TEST_F(SpecifyTest, PulsestyleOnevent) {
   auto* cu = Parse(
       "module m;\n"
@@ -167,4 +159,4 @@ TEST(ParserSection28, Sec28_12_PulsestyleOndetect) {
   EXPECT_EQ(si->signal_list[1], "c");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §8.21: Abstract classes and pure virtual methods
-
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
@@ -10,19 +8,8 @@
 
 using namespace delta;
 
-// =============================================================================
-// Test fixture — provides arena, scheduler, sim context, and helpers to
-// build class types and objects at the AST/runtime level.
-// =============================================================================
-// Build a simple ClassTypeInfo and register it with the context.
-
-// Allocate a ClassObject of the given type, returning (handle_id, object*).
-
 namespace {
 
-// =============================================================================
-// §8.21: Abstract classes and pure virtual methods
-// =============================================================================
 TEST(ClassSim, AbstractClassFlag) {
   SimFixture f;
   auto* abstract_type = MakeClassType(f, "AbstractBase", {});
@@ -36,11 +23,9 @@ TEST(ClassSim, PureVirtualMethodNullBody) {
   auto* abstract_type = MakeClassType(f, "Shape", {});
   abstract_type->is_abstract = true;
 
-  // Pure virtual: vtable entry with nullptr method.
   abstract_type->vtable.push_back({"area", nullptr, abstract_type});
   EXPECT_EQ(abstract_type->vtable[0].method, nullptr);
 
-  // Concrete derived class overrides it.
   auto* concrete = MakeClassType(f, "Circle", {"radius"});
   concrete->parent = abstract_type;
   auto* method = f.arena.Create<ModuleItem>();
@@ -54,4 +39,4 @@ TEST(ClassSim, PureVirtualMethodNullBody) {
   EXPECT_EQ(resolved, method);
 }
 
-}  // namespace
+}

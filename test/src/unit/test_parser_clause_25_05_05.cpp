@@ -1,12 +1,9 @@
-// §25.5.5: Clocking blocks and modports
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// modport_clocking_declaration ::= clocking clocking_identifier
 TEST(ParserA29, ClockingInModport) {
   auto r = Parse(
       "interface A_Bus(input logic clk);\n"
@@ -64,7 +61,6 @@ TEST(ParserA29, AttrOnClockingPort) {
               "endinterface\n"));
 }
 
-// Complex integration: all production alternatives together
 TEST(ParserA29, AllAlternativesTogether) {
   EXPECT_TRUE(
       ParseOk("interface complex_bus(input logic clk);\n"
@@ -88,7 +84,6 @@ TEST(ParserA29, AllAlternativesTogether) {
               "endinterface\n"));
 }
 
-// Additional AST verification for clocking port details
 TEST(ParserA29, ClockingPort_NotImportExport) {
   auto r = Parse(
       "interface A_Bus(input logic clk);\n"
@@ -106,7 +101,6 @@ TEST(ParserA29, ClockingPort_NotImportExport) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kNone);
 }
 
-// Clocking block inside an interface with modport.
 TEST(ParserSection19, InterfaceClockingWithModport) {
   EXPECT_TRUE(
       ParseOk("interface bus_A (input clk);\n"
@@ -121,4 +115,4 @@ TEST(ParserSection19, InterfaceClockingWithModport) {
               "endinterface\n"));
 }
 
-}  // namespace
+}

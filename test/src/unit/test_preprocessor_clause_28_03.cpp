@@ -1,5 +1,3 @@
-// §28.3: Gate and switch declaration syntax
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -16,11 +14,6 @@ static bool HasGateOfKind(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-// =============================================================================
-// LRM §3.7 — Primitives
-// =============================================================================
-// §3.7:
-//       — logic gates and switches instantiated inside a module.
 TEST(ParserClause03, Cl3_7_BuiltInPrimitives) {
   auto r = ParseWithPreprocessor(
       "module gate_test(input a, b, c, output w, x, y, z);\n"
@@ -40,9 +33,8 @@ TEST(ParserClause03, Cl3_7_BuiltInPrimitives) {
   EXPECT_TRUE(HasGateOfKind(r.cu->modules[0]->items, GateKind::kNmos));
 }
 
-// --- Drive strength in gate instantiation context ---
 TEST(ParserA222, DriveStrengthGateInst) {
-  // drive_strength used with gate instantiation
+
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire y, a, b;\n"
@@ -50,11 +42,11 @@ TEST(ParserA222, DriveStrengthGateInst) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // wire y, a, b creates 3 items; gate is at index 3
+
   auto* item = r.cu->modules[0]->items[3];
   EXPECT_EQ(item->kind, ModuleItemKind::kGateInst);
-  EXPECT_EQ(item->drive_strength0, 5u);  // supply0 = 5
-  EXPECT_EQ(item->drive_strength1, 5u);  // supply1 = 5
+  EXPECT_EQ(item->drive_strength0, 5u);
+  EXPECT_EQ(item->drive_strength1, 5u);
 }
 
 static void VerifyGateInstances(const std::vector<ModuleItem*>& items,
@@ -135,4 +127,4 @@ TEST(Parser, GateNoInstanceName) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
-}  // namespace
+}

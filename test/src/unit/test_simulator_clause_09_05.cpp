@@ -1,12 +1,9 @@
-// §9.5: Process execution threads
-
 #include <gtest/gtest.h>
 
 #include "simulator/process.h"
 
 using namespace delta;
 
-// A real coroutine that produces a SimCoroutine.
 SimCoroutine MakeTestCoroutine() { co_return; }
 
 namespace {
@@ -27,7 +24,7 @@ TEST(Process, ProcessDefaultState_Flags) {
 }
 
 TEST(Process, ProcessWithCoroutine) {
-  // §9.5: Process can hold and execute a coroutine.
+
   auto coro = MakeTestCoroutine();
   Process p;
   p.coro = coro.Release();
@@ -36,4 +33,4 @@ TEST(Process, ProcessWithCoroutine) {
   EXPECT_TRUE(p.Done());
 }
 
-}  // namespace
+}

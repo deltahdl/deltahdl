@@ -1,12 +1,9 @@
-// §31.2: Overview
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// All 12 system_timing_check alternatives in one specify block
 TEST(ElabA705, AllTwelveCheckTypesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -31,4 +28,4 @@ TEST(ElabA705, AllTwelveCheckTypesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §30.4.5: Full connection and parallel connection paths
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -60,4 +58,4 @@ TEST_F(SpecifyTest, FullPathDelay) {
   EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kFull);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §13.5: Subroutine calls and argument passing
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// tf_call without parentheses (task call — footnote 42)
 TEST(ParserA609, TfCallNoParens) {
   auto r = Parse(
       "module m;\n"
@@ -21,7 +18,6 @@ TEST(ParserA609, TfCallNoParens) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-// --- subroutine_call_statement: void ' ( function_subroutine_call ) ; ---
 TEST(ParserA609, VoidCastFunctionCall) {
   auto r = Parse(
       "module m;\n"
@@ -39,7 +35,6 @@ TEST(ParserA609, VoidCastFunctionCall) {
   EXPECT_EQ(expr->lhs->callee, "foo");
 }
 
-// method_call with arguments
 TEST(ParserA609, MethodCallWithArgs) {
   auto r = Parse(
       "module m;\n"
@@ -53,7 +48,6 @@ TEST(ParserA609, MethodCallWithArgs) {
   EXPECT_EQ(expr->args.size(), 2u);
 }
 
-// §13: subroutine_call_statement
 TEST(ParserA604, StmtItemSubroutineCallStatement) {
   auto r = Parse(
       "module m;\n"
@@ -68,13 +62,6 @@ TEST(ParserA604, StmtItemSubroutineCallStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-// =============================================================================
-// A.8.2 Subroutine calls — subroutine_call / function_subroutine_call
-// =============================================================================
-// § subroutine_call ::= tf_call | system_tf_call | method_call
-//                      | [ std :: ] randomize_call
-// § function_subroutine_call ::= subroutine_call
-// function_subroutine_call nested in expression
 TEST(ParserA82, FunctionSubroutineCallNested) {
   auto r = Parse(
       "module m;\n"
@@ -93,13 +80,6 @@ TEST(ParserA82, FunctionSubroutineCallNested) {
   EXPECT_EQ(stmt->rhs->args[0]->callee, "g");
 }
 
-// =============================================================================
-// A.8.2 Subroutine calls — list_of_arguments
-// =============================================================================
-// § list_of_arguments ::=
-//   [ expression ] { , [ expression ] } { , . identifier ( [ expression ] ) }
-//   | . identifier ( [ expression ] ) { , . identifier ( [ expression ] ) }
-// Positional arguments only
 TEST(ParserA82, ListOfArgsPositionalOnly) {
   auto r = Parse(
       "module m;\n"
@@ -121,4 +101,4 @@ TEST(ParserSection11, Sec11_1_ExprAsFunctionArgument) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

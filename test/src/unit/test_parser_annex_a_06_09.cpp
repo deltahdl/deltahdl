@@ -1,5 +1,3 @@
-// Annex A.6.9: Subroutine call statements
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// tf_call with single argument
 TEST(ParserA609, TfCallSingleArg) {
   auto r = Parse(
       "module m;\n"
@@ -21,7 +18,6 @@ TEST(ParserA609, TfCallSingleArg) {
   EXPECT_EQ(expr->args.size(), 1u);
 }
 
-// method_call with chained member access
 TEST(ParserA609, MethodCallChained) {
   auto r = Parse(
       "module m;\n"
@@ -34,4 +30,4 @@ TEST(ParserA609, MethodCallChained) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

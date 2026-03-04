@@ -1,13 +1,9 @@
-// §3.14: Simulation time units and precision
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// 1. TimeUnit enum: six values with correct power-of-10 exponents
-// (s=0, ms=-3, us=-6, ns=-9, ps=-12, fs=-15).
 TEST(ParserClause03, Cl3_14_TimeUnitEnumValues) {
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kS), 0);
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kMs), -3);
@@ -17,7 +13,6 @@ TEST(ParserClause03, Cl3_14_TimeUnitEnumValues) {
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kFs), -15);
 }
 
-// 2. Table 3-1: ParseTimeUnitStr maps all six character strings.
 TEST(ParserClause03, Cl3_14_Table3_1_AllUnitStrings) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_TRUE(ParseTimeUnitStr("s", u));
@@ -34,25 +29,21 @@ TEST(ParserClause03, Cl3_14_Table3_1_AllUnitStrings) {
   EXPECT_EQ(u, TimeUnit::kFs);
 }
 
-// 3. Table 3-1: invalid unit strings are rejected.
 TEST(ParserClause03, Cl3_14_Table3_1_InvalidStrings) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_FALSE(ParseTimeUnitStr("", u));
   EXPECT_FALSE(ParseTimeUnitStr("xs", u));
   EXPECT_FALSE(ParseTimeUnitStr("sec", u));
-  EXPECT_FALSE(ParseTimeUnitStr("NS", u));  // case-sensitive
+  EXPECT_FALSE(ParseTimeUnitStr("NS", u));
 }
 
-// 4. "us" represents microseconds (substitution for the mu-s symbol).
 TEST(ParserClause03, Cl3_14_UsForMicroseconds) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_TRUE(ParseTimeUnitStr("us", u));
   EXPECT_EQ(u, TimeUnit::kUs);
-  EXPECT_EQ(static_cast<int8_t>(u), -6);  // 10^-6 = microsecond
+  EXPECT_EQ(static_cast<int8_t>(u), -6);
 }
 
-// 12. Precision constraint: precision exponent <= unit exponent.
-// Finer units have more-negative exponents (kFs < kPs < ... < kS).
 TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
   EXPECT_LE(static_cast<int8_t>(TimeUnit::kFs),
             static_cast<int8_t>(TimeUnit::kPs));
@@ -66,4 +57,4 @@ TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
             static_cast<int8_t>(TimeUnit::kS));
 }
 
-}  // namespace
+}

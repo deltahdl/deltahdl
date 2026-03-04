@@ -1,5 +1,3 @@
-// §6.18: User-defined types
-
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -55,4 +53,4 @@ TEST(Elaborator, TypedefChain) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §13.5.4: Argument binding by name
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.6.9 — list_of_arguments (named)
-// =============================================================================
-// All named arguments
 TEST(ParserA609, ListOfArgsAllNamed) {
   auto r = Parse(
       "module m;\n"
@@ -27,7 +21,6 @@ TEST(ParserA609, ListOfArgsAllNamed) {
   EXPECT_EQ(expr->args.size(), 2u);
 }
 
-// Named argument with empty expression
 TEST(ParserA609, ListOfArgsNamedEmpty) {
   auto r = Parse(
       "module m;\n"
@@ -43,11 +36,6 @@ TEST(ParserA609, ListOfArgsNamedEmpty) {
   ASSERT_NE(expr->args[1], nullptr);
 }
 
-// --- Test helpers ---
-// =============================================================================
-// LRM section 13.5.5 -- Optional argument list / binding by name (additional)
-// =============================================================================
-// Named arg binding on a task call.
 TEST(ParserSection13, NamedArgBindingOnTaskCall) {
   auto r = Parse(
       "module m;\n"
@@ -67,7 +55,6 @@ TEST(ParserSection13, NamedArgBindingOnTaskCall) {
   EXPECT_EQ(call->arg_names[1], "addr");
 }
 
-// Mixed positional then named arguments
 TEST(ParserA609, ListOfArgsMixedPositionalThenNamed) {
   auto r = Parse(
       "module m;\n"
@@ -78,13 +65,12 @@ TEST(ParserA609, ListOfArgsMixedPositionalThenNamed) {
   auto* expr = FirstInitialExpr(r);
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kCall);
-  // Two positional args + one named arg
+
   EXPECT_EQ(expr->args.size(), 3u);
   ASSERT_EQ(expr->arg_names.size(), 1u);
   EXPECT_EQ(expr->arg_names[0], "c");
 }
 
-// Named arg binding with empty arg (.name()).
 TEST(ParserSection13, NamedArgBindingEmptyArg) {
   auto r = Parse(
       "module m;\n"
@@ -106,8 +92,6 @@ TEST(ParserSection13, NamedArgBindingEmptyArg) {
   EXPECT_EQ(stmt->rhs->arg_names[1], "j");
 }
 
-// Named and positional arguments cannot be mixed in the same call.
-// This test verifies that a purely named call parses with correct count.
 TEST(ParserSection13, NamedArgBindingAllNamed) {
   auto r = Parse(
       "module m;\n"
@@ -129,7 +113,6 @@ TEST(ParserSection13, NamedArgBindingAllNamed) {
   EXPECT_EQ(stmt->rhs->arg_names[2], "b");
 }
 
-// Mixed positional + named arguments
 TEST(ParserA82, ListOfArgsMixed) {
   auto r = Parse(
       "module m;\n"
@@ -145,9 +128,6 @@ TEST(ParserA82, ListOfArgsMixed) {
   EXPECT_EQ(expr->arg_names[0], "b");
 }
 
-// =============================================================================
-// LRM section 13.5.4 -- Named argument binding
-// =============================================================================
 TEST(ParserSection13, NamedArgBindingParses) {
   auto r = Parse(
       "module m;\n"
@@ -210,8 +190,8 @@ TEST(ParserSection13, PositionalArgsNoNamedArgs) {
   auto* call = stmt->expr;
   ASSERT_NE(call, nullptr);
   ASSERT_EQ(call->args.size(), 2u);
-  // Positional calls: arg_names is empty (no named args detected)
+
   EXPECT_TRUE(call->arg_names.empty());
 }
 
-}  // namespace
+}

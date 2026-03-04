@@ -1,5 +1,3 @@
-// §11.3.6: Assignment within an expression
-
 #include <cstring>
 
 #include "builders_ast.h"
@@ -7,18 +5,15 @@
 #include "parser/ast.h"
 #include "simulator/adv_sim.h"
 #include "simulator/eval.h"
-#include "simulator/sim_context.h"  // StructTypeInfo, StructFieldInfo
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
 namespace {
 
-// ==========================================================================
-// §11.3.6: Assignment within expression
-// ==========================================================================
 TEST(EvalAdv, AssignInExprBasic) {
   SimFixture f;
-  // (a = 42) should assign 42 to a and return 42.
+
   MakeVar(f, "aie", 32, 0);
   auto* assign = f.arena.Create<Expr>();
   assign->kind = ExprKind::kBinary;
@@ -33,7 +28,7 @@ TEST(EvalAdv, AssignInExprBasic) {
 
 TEST(EvalAdv, AssignInExprTruncToLHSWidth) {
   SimFixture f;
-  // (b = 0x1FF) where b is 8-bit should truncate to 0xFF.
+
   MakeVar(f, "aie8", 8, 0);
   auto* assign = f.arena.Create<Expr>();
   assign->kind = ExprKind::kBinary;
@@ -41,9 +36,9 @@ TEST(EvalAdv, AssignInExprTruncToLHSWidth) {
   assign->lhs = MakeId(f.arena, "aie8");
   assign->rhs = MakeInt(f.arena, 0x1FF);
   auto result = EvalExpr(assign, f.ctx, f.arena);
-  // §11.3.6: Result should be cast to LHS type (8-bit).
+
   EXPECT_EQ(result.width, 8u);
   EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
-}  // namespace
+}

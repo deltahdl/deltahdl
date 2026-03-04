@@ -1,14 +1,9 @@
-// §9.4.4: Level-sensitive sequence controls
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =============================================================================
-// §9.4.4 -- Level-sensitive sequence controls
-// =============================================================================
 TEST(ParserSection9, WaitSequenceTriggered) {
   auto r = Parse(
       "module m;\n"
@@ -40,12 +35,8 @@ TEST(ParserSection9, WaitSequenceTriggeredOr) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// =============================================================================
-// LRM section 9.4.4 -- Level-sensitive sequence controls
-// Wait on sequence.triggered to synchronize with sequence end point.
-// =============================================================================
 TEST(ParserSection9c, WaitSequenceTriggeredWithAction) {
-  // After wait(seq.triggered), execute a procedural statement.
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence req_ack;\n"
@@ -74,4 +65,4 @@ TEST(ParserSection9c, WaitTriggeredInLoop) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

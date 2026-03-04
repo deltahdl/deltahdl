@@ -1,5 +1,3 @@
-// Annex K.2: Source code
-
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
@@ -58,9 +56,6 @@ TEST(VpiAnnexK2, VpiSystfDataDefaultInit) {
   EXPECT_EQ(data.user_data, nullptr);
 }
 
-// =============================================================================
-// Assertion types
-// =============================================================================
 TEST(SvVpiUser, AssertionTypes) {
   EXPECT_EQ(vpiAssert, 686);
   EXPECT_EQ(vpiAssume, 687);
@@ -89,4 +84,4 @@ TEST(VpiAnnexK2, VpiTimeDefaultInit) {
   EXPECT_DOUBLE_EQ(time.real, 0.0);
 }
 
-}  // namespace
+}

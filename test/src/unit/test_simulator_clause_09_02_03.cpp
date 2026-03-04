@@ -1,5 +1,3 @@
-// §9.2.3: Final procedures
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -23,7 +21,6 @@ TEST(Lowerer, FinalBlockExecutesAfterRun) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  // Before RunFinalBlocks, x should still have default value.
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -47,7 +44,6 @@ TEST(Lowerer, FinalBlockNotScheduledAtTimeZero) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  // After scheduler, initial ran (x=10) but final didn't.
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -71,8 +67,8 @@ TEST(Lowerer, FinalBlocksFIFOOrder) {
 
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // Second final block overwrites first, so x == 20.
+
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

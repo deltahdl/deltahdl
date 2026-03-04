@@ -1,5 +1,3 @@
-// §6.6.5: Tri0 and tri1 nets
-
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
@@ -18,9 +16,9 @@ TEST(NetResolution, Tri0ResolvesToZero) {
   Net net;
   net.type = NetType::kTri0;
   net.resolved = var;
-  // Single driver with z → resolves to 0 for tri0.
+
   auto drv = MakeLogic4Vec(arena, 8);
-  drv.words[0].aval = ~uint64_t{0};  // All z.
+  drv.words[0].aval = ~uint64_t{0};
   drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(drv);
   net.Resolve(arena);
@@ -35,7 +33,7 @@ TEST(NetResolution, Tri1ResolvesToOne) {
   Net net;
   net.type = NetType::kTri1;
   net.resolved = var;
-  // Single driver with z → resolves to 1 for tri1.
+
   auto drv = MakeLogic4Vec(arena, 8);
   drv.words[0].aval = ~uint64_t{0};
   drv.words[0].bval = ~uint64_t{0};
@@ -45,4 +43,4 @@ TEST(NetResolution, Tri1ResolvesToOne) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
 }
 
-}  // namespace
+}

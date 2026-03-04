@@ -1,5 +1,3 @@
-// §29.4: Combinational UDPs
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -10,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.5 -- UDP declarations
-// =============================================================================
 TEST(ParserAnnexA, A5UdpCombinational) {
   auto r = Parse(
       "primitive mux2(output y, input a, input b, input s);\n"
@@ -30,28 +25,6 @@ TEST(ParserAnnexA, A5UdpCombinational) {
   EXPECT_FALSE(r.cu->udps[0]->is_sequential);
 }
 
-// =============================================================================
-// A.5.1 -- UDP declaration
-//
-// udp_nonansi_declaration ::=
-//   { attribute_instance } primitive udp_identifier ( udp_port_list ) ;
-//
-// udp_ansi_declaration ::=
-//   { attribute_instance } primitive udp_identifier
-//     ( udp_declaration_port_list ) ;
-//
-// udp_declaration ::=
-//   udp_nonansi_declaration udp_port_declaration { udp_port_declaration }
-//     udp_body endprimitive [ : udp_identifier ]
-//   | udp_ansi_declaration udp_body
-//     endprimitive [ : udp_identifier ]
-//   | extern udp_nonansi_declaration
-//   | extern udp_ansi_declaration
-//   | { attribute_instance } primitive udp_identifier ( . * ) ;
-//     { udp_port_declaration } udp_body
-//     endprimitive [ : udp_identifier ]
-// =============================================================================
-// --- udp_ansi_declaration: combinational ---
 TEST(ParserAnnexA051, AnsiCombinational) {
   auto r = Parse(
       "primitive and_gate(output out, input a, input b);\n"
@@ -75,7 +48,6 @@ TEST(ParserAnnexA051, AnsiCombinational) {
   ASSERT_EQ(udp->table.size(), 4u);
 }
 
-// --- udp_declaration: multiple UDPs in compilation unit ---
 TEST(ParserAnnexA051, MultipleUdps) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -97,7 +69,6 @@ TEST(ParserAnnexA051, MultipleUdps) {
   EXPECT_EQ(r.cu->udps[1]->name, "buf2");
 }
 
-// --- udp_declaration: single input UDP ---
 TEST(ParserAnnexA051, SingleInput) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -118,10 +89,6 @@ TEST(ParserAnnexA051, SingleInput) {
   EXPECT_EQ(udp->table[0].output, '1');
 }
 
-// =============================================================================
-// Simulation tests -- UDP evaluation (covers A.5.1 declaration semantics)
-// =============================================================================
-// --- Combinational UDP evaluation ---
 TEST(ParserAnnexA051, SimCombinationalEval) {
   auto r = Parse(
       "primitive and_gate(output out, input a, input b);\n"
@@ -143,25 +110,6 @@ TEST(ParserAnnexA051, SimCombinationalEval) {
   EXPECT_EQ(state.Evaluate({'1', '1'}), '1');
 }
 
-// =============================================================================
-// A.5.3 -- UDP body (part a: productions 1-8)
-//
-// udp_body ::= combinational_body | sequential_body
-// combinational_body ::= table combinational_entry { combinational_entry }
-//                         endtable
-// combinational_entry ::= level_input_list : output_symbol ;
-// sequential_body ::= [ udp_initial_statement ] table sequential_entry
-//                     { sequential_entry } endtable
-// udp_initial_statement ::= initial output_port_identifier = init_val ;
-// init_val ::= 1'b0 | 1'b1 | 1'bx | 1'bX | 1'B0 | 1'B1 | 1'Bx | 1'BX
-//              | 1 | 0
-// sequential_entry ::= seq_input_list : current_state : next_state ;
-// seq_input_list ::= level_input_list | edge_input_list
-// =============================================================================
-// ---------------------------------------------------------------------------
-// Production 1: udp_body ::= combinational_body | sequential_body
-// ---------------------------------------------------------------------------
-// udp_body alternative 1: combinational_body
 TEST(ParserAnnexA053, UdpBody_CombinationalAlternative) {
   auto r = Parse(
       "primitive and_gate(output y, input a, b);\n"
@@ -180,7 +128,6 @@ TEST(ParserAnnexA053, UdpBody_CombinationalAlternative) {
   EXPECT_EQ(udp->table.size(), 4);
 }
 
-// Simulation: combinational body evaluates correctly
 TEST(ParserAnnexA053, UdpBody_SimCombinational) {
   auto r = Parse(
       "primitive or_gate(output y, input a, b);\n"
@@ -200,11 +147,6 @@ TEST(ParserAnnexA053, UdpBody_SimCombinational) {
   EXPECT_EQ(eval.Evaluate({'1', '1'}), '1');
 }
 
-// ---------------------------------------------------------------------------
-// Production 2: combinational_body ::= table combinational_entry
-//               { combinational_entry } endtable
-// ---------------------------------------------------------------------------
-// Single combinational entry
 TEST(ParserAnnexA053, CombBody_SingleEntry) {
   auto r = Parse(
       "primitive buf_prim(output y, input a);\n"
@@ -219,7 +161,6 @@ TEST(ParserAnnexA053, CombBody_SingleEntry) {
   EXPECT_EQ(udp->table.size(), 1);
 }
 
-// Multiple combinational entries
 TEST(ParserAnnexA053, CombBody_MultipleEntries) {
   auto r = Parse(
       "primitive xor_gate(output y, input a, b);\n"
@@ -236,7 +177,6 @@ TEST(ParserAnnexA053, CombBody_MultipleEntries) {
   EXPECT_EQ(udp->table.size(), 4);
 }
 
-// Simulation: verify table entries are evaluated in order
 TEST(ParserAnnexA053, CombBody_SimFirstMatch) {
   auto r = Parse(
       "primitive nand_gate(output y, input a, b);\n"
@@ -255,10 +195,6 @@ TEST(ParserAnnexA053, CombBody_SimFirstMatch) {
   EXPECT_EQ(eval.Evaluate({'1', '1'}), '0');
 }
 
-// ---------------------------------------------------------------------------
-// Production 3: combinational_entry ::= level_input_list : output_symbol ;
-// ---------------------------------------------------------------------------
-// Verify structure of a parsed combinational entry
 TEST(ParserAnnexA053, CombEntry_Structure) {
   auto r = Parse(
       "primitive buf_prim(output y, input a);\n"
@@ -271,12 +207,12 @@ TEST(ParserAnnexA053, CombEntry_Structure) {
   ASSERT_FALSE(r.has_errors);
   auto* udp = r.cu->udps[0];
   ASSERT_EQ(udp->table.size(), 2);
-  // Row 0: input '0', output '0'
+
   EXPECT_EQ(udp->table[0].inputs.size(), 1);
   EXPECT_EQ(udp->table[0].inputs[0], '0');
   EXPECT_EQ(udp->table[0].output, '0');
   EXPECT_EQ(udp->table[0].current_state, 0);
-  // Row 1: input '1', output '1'
+
   EXPECT_EQ(udp->table[1].inputs[0], '1');
   EXPECT_EQ(udp->table[1].output, '1');
 }
@@ -335,10 +271,6 @@ TEST(ParserSection29, CombinationalUdp) {
   EXPECT_EQ(udp->table[0].current_state, 0);
 }
 
-// §3.7: "Designers can supplement the built-in primitives with user-defined
-//        primitives (UDPs). A UDP is enclosed between the keywords
-//        primitive...endprimitive."
-//        Combinational UDP with truth table for gate-level modeling.
 TEST(ParserClause03, Cl3_7_CombinationalUdp) {
   auto r = Parse(
       "primitive udp_or (output out, input a, b);\n"
@@ -384,4 +316,4 @@ TEST(ParserSection29, UdpMultiple) {
   EXPECT_EQ(r.cu->udps[1]->name, "buf2");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §18.4.2: Randc modifier
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -18,7 +16,7 @@ TEST(ParserSection18, RandcMultiDeclarator) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_GE(r.cu->classes[0]->members.size(), 2u);
 }
-// §8.3 — Randc qualifier
+
 TEST(ParserSection8, RandcQualifier) {
   auto r = Parse(
       "class Die;\n"
@@ -30,4 +28,4 @@ TEST(ParserSection8, RandcQualifier) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_randc);
 }
 
-}  // namespace
+}

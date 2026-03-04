@@ -1,15 +1,9 @@
-// §16.8.1: Typed formal arguments in sequence declarations
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §A.2.10 Production #25: sequence_formal_type
-// sequence_formal_type ::= data_type_or_implicit | sequence | untyped
-// =============================================================================
 TEST(ParserA210, SequenceFormalType_Sequence) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -37,4 +31,4 @@ TEST(ParserA210, SequenceFormalType_DataType) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

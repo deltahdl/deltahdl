@@ -1,15 +1,11 @@
-// §9.3.5: Statement labels
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
 using namespace delta;
 
-// Sim test fixture
 namespace {
 
-// §12.3: labeled statements execute normally
 TEST(SimA604, LabeledStatementExecutes) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,4 +25,4 @@ TEST(SimA604, LabeledStatementExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

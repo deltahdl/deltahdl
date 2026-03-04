@@ -1,17 +1,11 @@
-// §3.2: set=1
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM §3.2 — Design elements
-// =============================================================================
 TEST(ParserClause03, AllSevenDesignElements) {
-  // §3.2: A design element is a module, program, interface, checker,
-  //       package, primitive, or configuration.
+
   auto r = ParseWithPreprocessor(
       "module m; endmodule\n"
       "program p; endprogram\n"
@@ -42,12 +36,12 @@ TEST(ParserClause03, AllSevenDesignElements) {
   EXPECT_EQ(r.cu->udps[0]->name, "udp_and");
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
-  // Multiple design elements of same type in one compilation unit
+
   EXPECT_TRUE(ParseOk("module a; endmodule\nmodule b; endmodule\n"));
-  // Module + package coexist in same unit with import
+
   EXPECT_TRUE(
       ParseOk("package p; typedef int myint; endpackage\n"
               "module m; import p::*; endmodule\n"));
 }
 
-}  // namespace
+}

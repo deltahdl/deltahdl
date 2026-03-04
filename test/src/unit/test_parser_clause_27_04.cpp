@@ -1,5 +1,3 @@
-// §27.4: Loop generate constructs
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -25,7 +23,6 @@ TEST(ParserAnnexA, A4GenerateForBlock) {
   EXPECT_TRUE(found);
 }
 
-// --- loop_generate_construct: basic for loop ---
 TEST(ParserAnnexA042, LoopGenerateBasic) {
   auto r = Parse(
       "module m;\n"
@@ -43,7 +40,6 @@ TEST(ParserAnnexA042, LoopGenerateBasic) {
   ASSERT_EQ(gen->gen_body.size(), 1u);
 }
 
-// --- genvar_initialization: without genvar keyword (pre-declared) ---
 TEST(ParserAnnexA042, GenvarInitWithoutGenvarKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -61,7 +57,6 @@ TEST(ParserAnnexA042, GenvarInitWithoutGenvarKeyword) {
   EXPECT_TRUE(found);
 }
 
-// --- genvar_iteration: assignment_operator (i = i + 1) ---
 TEST(ParserAnnexA042, GenvarIterationAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -75,7 +70,6 @@ TEST(ParserAnnexA042, GenvarIterationAssignment) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
-// --- genvar_iteration: genvar_identifier inc_or_dec_operator (i++) ---
 TEST(ParserAnnexA042, GenvarIterationPostIncrement) {
   auto r = Parse(
       "module m;\n"
@@ -89,7 +83,6 @@ TEST(ParserAnnexA042, GenvarIterationPostIncrement) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
-// --- genvar_iteration: genvar_identifier dec_operator (i--) ---
 TEST(ParserAnnexA042, GenvarIterationPostDecrement) {
   auto r = Parse(
       "module m;\n"
@@ -103,7 +96,6 @@ TEST(ParserAnnexA042, GenvarIterationPostDecrement) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
-// --- generate_block: single generate_item (no begin/end) ---
 TEST(ParserAnnexA042, GenerateBlockSingleItem) {
   auto r = Parse(
       "module m;\n"
@@ -118,7 +110,6 @@ TEST(ParserAnnexA042, GenerateBlockSingleItem) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
 
-// --- generate_item: module_or_generate_item (module instantiation) ---
 TEST(ParserAnnexA042, GenerateItemModuleInst) {
   auto r = Parse(
       "module m;\n"
@@ -133,7 +124,6 @@ TEST(ParserAnnexA042, GenerateItemModuleInst) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-// --- nested generate constructs: for inside for ---
 TEST(ParserAnnexA042, NestedForInsideFor) {
   auto r = Parse(
       "module m;\n"
@@ -151,10 +141,6 @@ TEST(ParserAnnexA042, NestedForInsideFor) {
   EXPECT_EQ(outer->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
-// =============================================================================
-// LRM section 27.1 -- General (generate constructs overview)
-// =============================================================================
-// §27.1: Generate-for with module instantiation (structural repetition).
 TEST(ParserSection27, GenerateForWithModuleInst2) {
   auto r = Parse(
       "module m;\n"
@@ -171,9 +157,6 @@ TEST(ParserSection27, GenerateForWithModuleInst2) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-// =========================================================================
-// LRM section 27.3: Generate construct syntax / generate regions
-// =========================================================================
 TEST(ParserSection23, GenerateRegionWithFor) {
   auto r = Parse(
       "module m;\n"
@@ -192,7 +175,6 @@ TEST(ParserSection23, GenerateRegionWithFor) {
   EXPECT_TRUE(found);
 }
 
-// §27.1: Generate-for with always block body.
 TEST(ParserSection27, GenerateForWithAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
@@ -208,9 +190,6 @@ TEST(ParserSection27, GenerateForWithAlwaysBlock) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kAlwaysBlock);
 }
 
-// =========================================================================
-// LRM section 27.3: Generate block syntax (begin/end with labels)
-// =========================================================================
 TEST(ParserSection23, GenerateBlockNamedBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -249,7 +228,6 @@ TEST(Parser, GenerateFor) {
   EXPECT_FALSE(gen->gen_body.empty());
 }
 
-// §3.3 Generate blocks
 TEST(ParserClause03, Cl3_3_GenerateBlocks) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter N = 4) ();\n"
@@ -262,7 +240,6 @@ TEST(ParserClause03, Cl3_3_GenerateBlocks) {
               "endmodule\n"));
 }
 
-// 14. Generate block scope (for-generate)
 TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
   auto r = Parse(
       "module m;\n"
@@ -284,9 +261,6 @@ TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
   EXPECT_TRUE(found_gen);
 }
 
-// =========================================================================
-// LRM section 27.4: Loop generates
-// =========================================================================
 TEST(ParserSection23, LoopGenerateForStructure) {
   auto r = Parse(
       "module m;\n"
@@ -332,9 +306,6 @@ TEST(ParserSection23, LoopGenerateWithModuleInst) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-// =========================================================================
-// LRM section 27.4: Genvar declarations
-// =========================================================================
 TEST(ParserSection23, GenvarDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -354,8 +325,6 @@ TEST(ParserA213, GenvarDeclMultiple) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-// --- list_of_genvar_identifiers ---
-// genvar_identifier { , genvar_identifier }
 TEST(ParserA23, ListOfGenvarIdentifiersSingle) {
   auto r = Parse("module m; genvar i; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -377,9 +346,6 @@ TEST(ParserSection23, GenvarMultipleDeclarations) {
   EXPECT_EQ(mod->items[2]->name, "k");
 }
 
-// =========================================================================
-// LRM section 27.4: Genvar expressions in loop generate
-// =========================================================================
 TEST(ParserSection23, GenvarExprInLoopBound) {
   auto r = Parse(
       "module m;\n"
@@ -407,9 +373,6 @@ TEST(ParserSection23, GenvarPostIncrementStep) {
               "endmodule\n"));
 }
 
-// =========================================================================
-// LRM section 27.4: Indexed generate block names
-// =========================================================================
 TEST(ParserSection23, IndexedGenerateBlockName) {
   auto r = Parse(
       "module m;\n"
@@ -437,9 +400,6 @@ TEST(ParserSection23, EndLabelOnGenerateBlock) {
               "endmodule\n"));
 }
 
-// =========================================================================
-// Combined / integration tests
-// =========================================================================
 TEST(ParserSection23, ParameterizedModuleWithGenerate) {
   auto r = Parse(
       "module gray2bin #(parameter SIZE = 8) (\n"
@@ -506,10 +466,6 @@ TEST(ParserSection23, GenerateIfInsideForLoop) {
   EXPECT_TRUE(has_if);
 }
 
-// =============================================================================
-// A.8.3 Expressions — genvar_expression
-// =============================================================================
-// § genvar_expression ::= constant_expression (used in generate for)
 TEST(ParserA83, GenvarExprInGenerateFor) {
   auto r = Parse(
       "module m;\n"
@@ -524,7 +480,6 @@ TEST(ParserA83, GenvarExprInGenerateFor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Single-item generate-for without begin/end (§27.4) ---
 TEST(ParserSection27, GenerateForSingleItem) {
   auto r = Parse(
       "module m;\n"
@@ -540,7 +495,6 @@ TEST(ParserSection27, GenerateForSingleItem) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
 
-// --- Inline genvar in generate-for init (§27.4) ---
 TEST(ParserSection27, InlineGenvarInForInitParse) {
   auto r = Parse(
       "module m;\n"
@@ -569,7 +523,6 @@ TEST(ParserSection27, InlineGenvarInForInitBody) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
 
-// --- Generate-for with i++ step (§27.4) ---
 TEST(ParserSection27, GenerateForPostIncrement) {
   auto r = Parse(
       "module m;\n"
@@ -586,7 +539,6 @@ TEST(ParserSection27, GenerateForPostIncrement) {
   ASSERT_EQ(gen->gen_body.size(), 1);
 }
 
-// --- Generate-for with labeled begin/end (§27.4) ---
 TEST(ParserSection27, GenerateForLabeled) {
   auto r = Parse(
       "module m;\n"
@@ -618,7 +570,6 @@ TEST(ParserSection27, GenerateForCompoundAssign) {
   ASSERT_EQ(gen->gen_body.size(), 1);
 }
 
-// --- Loop generate with module instantiation (§27.4) ---
 TEST(ParserSection27, GenerateForWithModuleInst) {
   auto r = Parse(
       "module m;\n"
@@ -662,7 +613,6 @@ TEST(ParserSection27, GenerateForPreDecrement) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
-// Returns true if any item in the list matches the given kind.
 bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
   for (auto* item : items) {
     if (item->kind == kind) return true;
@@ -670,7 +620,6 @@ bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
   return false;
 }
 
-// program_generate_item ::= loop_generate_construct
 TEST(SourceText, ProgramGenerateLoop) {
   auto r = Parse(
       "program prg;\n"
@@ -685,9 +634,7 @@ TEST(SourceText, ProgramGenerateLoop) {
   EXPECT_TRUE(
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateFor));
 }
-// =============================================================================
-// LRM section 23.10.2 -- Generated instantiation
-// =============================================================================
+
 TEST(ParserSection23, GenerateForInstantiation) {
   auto r = Parse(
       "module top;\n"
@@ -703,10 +650,6 @@ TEST(ParserSection23, GenerateForInstantiation) {
   EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-// =============================================================================
-// LRM section 6.11 -- Integer types in generate blocks
-// =============================================================================
-// 28. Integer types in generate blocks.
 TEST(ParserSection6, Sec6_11_IntegerTypesInGenerateBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -719,4 +662,4 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInGenerateBlock) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

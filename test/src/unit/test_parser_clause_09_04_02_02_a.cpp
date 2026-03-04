@@ -1,5 +1,3 @@
-// §9.4.2.2: Implicit event_expression list
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,7 @@ using namespace delta;
 namespace {
 
 TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityStar) {
-  // @* implicit sensitivity
+
   auto r = Parse(
       "module m;\n"
       "  always @* y = a + b;\n"
@@ -19,7 +17,7 @@ TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityStar) {
 }
 
 TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityParenStar) {
-  // @(*) implicit sensitivity
+
   auto r = Parse(
       "module m;\n"
       "  always @(*) y = a + b;\n"
@@ -29,10 +27,7 @@ TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityParenStar) {
   auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
   ASSERT_NE(item, nullptr);
 }
-// =============================================================================
-// LRM section 9.4.2.3 -- Implicit event_expression list (@* and @(*))
-// =============================================================================
-// @* at always block level: always @* stmt
+
 TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSimple) {
   auto r = Parse(
       "module m;\n"
@@ -49,7 +44,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSimple) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-// @(*) at always block level: always @(*) stmt
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSimple) {
   auto r = Parse(
       "module m;\n"
@@ -65,8 +59,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSimple) {
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
-// @* at statement level inside initial: produces kEventControl with
-// is_star_event=true
+
 TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelInitial) {
   auto r = Parse(
       "module m;\n"
@@ -83,9 +76,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelInitial) {
   EXPECT_TRUE(stmt->is_star_event);
   EXPECT_TRUE(stmt->events.empty());
 }
-// ---------------------------------------------------------------------------
-// 20. always @* with variable declarations in begin-end block.
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarVarDecls) {
   auto r = Parse(
       "module m;\n"
@@ -98,7 +89,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarVarDecls) {
   VerifyAlwaysVarDecl(r);
 }
 
-// @(*) at statement level: produces kEventControl with is_star_event=true
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenStmtLevel) {
   auto r = Parse(
       "module m;\n"
@@ -116,7 +106,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenStmtLevel) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-// @* with begin-end block body at always level
 TEST(ParserSection9, Sec9_4_2_3_AtStarBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -136,7 +125,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-// @(*) with begin-end block body at always level
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -156,9 +144,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-// ---------------------------------------------------------------------------
-// 22. always @* with function call in body.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -172,7 +157,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarFunctionCall) {
               "endmodule\n"));
 }
 
-// @* with if-else body
 TEST(ParserSection9, Sec9_4_2_3_AtStarIfElseBody) {
   auto r = Parse(
       "module m;\n"
@@ -191,7 +175,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarIfElseBody) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
-// @* with case body
 TEST(ParserSection9, Sec9_4_2_3_AtStarCaseBody) {
   auto r = Parse(
       "module m;\n"
@@ -212,9 +195,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarCaseBody) {
   EXPECT_EQ(item->body->kind, StmtKind::kCase);
   EXPECT_EQ(item->body->case_items.size(), 3u);
 }
-// ---------------------------------------------------------------------------
-// 24. always @* with multiple assignment statements.
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarMultipleAssigns) {
   auto r = Parse(
       "module m;\n"
@@ -227,7 +208,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarMultipleAssigns) {
   VerifyAlwaysMultiAssigns(r);
 }
 
-// @(*) with multiple assignments in begin-end
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenMultipleAssignments) {
   auto r = Parse(
       "module m;\n"
@@ -248,7 +228,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenMultipleAssignments) {
   EXPECT_EQ(item->body->stmts.size(), 3u);
 }
 
-// Helper for block 18: verify star event control.
 static void VerifyStarEventControl(ParseResult& r) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -261,10 +240,6 @@ static void VerifyStarEventControl(ParseResult& r) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-// ---------------------------------------------------------------------------
-// 25. Stmt-level @* produces kEventControl with is_star_event (not at
-//     module level). Contrast with always @* which absorbs @* into the item.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarEventIsStarTrue) {
   auto r = Parse(
       "module m;\n"
@@ -275,9 +250,6 @@ TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarEventIsStarTrue) {
   VerifyStarEventControl(r);
 }
 
-// ---------------------------------------------------------------------------
-// 26. Stmt-level @(*) also sets is_star_event.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarParenEventIsStarTrue) {
   auto r = Parse(
       "module m;\n"
@@ -288,7 +260,6 @@ TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarParenEventIsStarTrue) {
   VerifyStarEventControl(r);
 }
 
-// @* in initial block (statement-level event control)
 TEST(ParserSection9, Sec9_4_2_3_AtStarInInitialBlock) {
   auto r = Parse(
       "module m;\n"
@@ -307,7 +278,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarInInitialBlock) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-// @(*) in initial block
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenInInitialBlock) {
   auto r = Parse(
       "module m;\n"
@@ -322,9 +292,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenInInitialBlock) {
   EXPECT_TRUE(stmt->is_star_event);
   EXPECT_TRUE(stmt->events.empty());
 }
-// ---------------------------------------------------------------------------
-// 28. always @* with nested if-else inside begin-end.
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarNestedIfElseInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -339,7 +307,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarNestedIfElseInBlock) {
   VerifyAlwaysNestedIfElse(r);
 }
 
-// @* in always block -- sensitivity list is empty, body is the statement
 TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSensitivityEmpty) {
   auto r = Parse(
       "module m;\n"
@@ -354,7 +321,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSensitivityEmpty) {
   ASSERT_NE(item->body, nullptr);
 }
 
-// @(*) in always block -- same: sensitivity empty, body is statement
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSensitivityEmpty) {
   auto r = Parse(
       "module m;\n"
@@ -369,7 +335,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSensitivityEmpty) {
   ASSERT_NE(item->body, nullptr);
 }
 
-// @* with nested blocks
 TEST(ParserSection9, Sec9_4_2_3_AtStarNestedBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -395,7 +360,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarNestedBlocks) {
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlock);
 }
 
-// @* with variable declarations in body
 TEST(ParserSection9, Sec9_4_2_3_AtStarVarDeclInBody) {
   auto r = Parse(
       "module m;\n"
@@ -416,7 +380,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarVarDeclInBody) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-// @(*) with complex combinational logic
 TEST(ParserSection9, Sec9_4_2_3_AtStarParenComplexCombLogic) {
   auto r = Parse(
       "module m;\n"
@@ -436,7 +399,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenComplexCombLogic) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-// @* with function calls in body
 TEST(ParserSection9, Sec9_4_2_3_AtStarFunctionCalls) {
   auto r = Parse(
       "module m;\n"
@@ -454,7 +416,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarFunctionCalls) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-// @* with for loop in body
 TEST(ParserSection9, Sec9_4_2_3_AtStarForLoop) {
   auto r = Parse(
       "module m;\n"
@@ -486,7 +447,6 @@ static ModuleItem* NthAlwaysItem(ParseResult& r, size_t n) {
   return nullptr;
 }
 
-// Multiple @* blocks in same module
 TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -505,7 +465,7 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarBlocks) {
   ASSERT_NE(item0->body, nullptr);
   ASSERT_NE(item1->body, nullptr);
 }
-// @* with case inside body
+
 TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
   auto r = Parse(
       "module m;\n"
@@ -525,7 +485,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
   EXPECT_EQ(case_stmt->case_items.size(), 4u);
 }
 
-// @* with priority case
 TEST(ParserSection9, Sec9_4_2_3_AtStarPriorityCase) {
   auto r = Parse(
       "module m;\n"
@@ -543,7 +502,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarPriorityCase) {
   EXPECT_EQ(case_stmt->qualifier, CaseQualifier::kPriority);
 }
 
-// @* with concatenation assignments
 TEST(ParserSection9, Sec9_4_2_3_AtStarConcatenation) {
   auto r = Parse(
       "module m;\n"
@@ -562,7 +520,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarConcatenation) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kConcatenation);
 }
 
-// @* with ternary expression assignment
 TEST(ParserSection9, Sec9_4_2_3_AtStarTernary) {
   auto r = Parse(
       "module m;\n"
@@ -580,7 +537,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarTernary) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
-// Verify is_star_event is true and events empty for @(*) at statement level
 TEST(ParserSection9, Sec9_4_2_3_IsStarEventTrueAtStarParen) {
   auto r = Parse(
       "module m;\n"
@@ -598,7 +554,6 @@ TEST(ParserSection9, Sec9_4_2_3_IsStarEventTrueAtStarParen) {
   EXPECT_EQ(stmt->events.size(), 0u);
 }
 
-// @* body is present for statement-level event control
 TEST(ParserSection9, Sec9_4_2_3_AtStarStmtBodyPresent) {
   auto r = Parse(
       "module m;\n"
@@ -616,7 +571,6 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtBodyPresent) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlockingAssign);
 }
 
-// @* statement level with begin-end block
 TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -638,9 +592,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelBeginEnd) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
   EXPECT_EQ(stmt->body->stmts.size(), 2u);
 }
-// ---------------------------------------------------------------------------
-// 13. @* (implicit sensitivity) event control
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_StarEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -657,7 +609,7 @@ TEST(ParserSection4, Sec4_5_StarEventControl) {
   EXPECT_TRUE(stmt->is_star_event);
   EXPECT_TRUE(stmt->events.empty());
 }
-// Multiple @* event controls in sequence inside initial block
+
 TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarInInitial) {
   auto r = Parse(
       "module m;\n"
@@ -679,7 +631,6 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarInInitial) {
   EXPECT_TRUE(s1->is_star_event);
 }
 
-// ParseOk: @* parses without errors in a typical combinational module
 TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarCombiModule) {
   EXPECT_TRUE(
       ParseOk("module mux4(\n"
@@ -698,9 +649,6 @@ TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarCombiModule) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// 14. @(*) -- parenthesized implicit sensitivity
-// ---------------------------------------------------------------------------
 TEST(ParserSection4, Sec4_5_ParenStarEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -718,7 +666,6 @@ TEST(ParserSection4, Sec4_5_ParenStarEventControl) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-// ParseOk: @(*) parses without errors in a typical combinational module
 TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarParenCombiModule) {
   EXPECT_TRUE(
       ParseOk("module adder(\n"
@@ -731,7 +678,6 @@ TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarParenCombiModule) {
               "endmodule\n"));
 }
 
-// --- 29. Full blocking assignment pattern in always block ---
 TEST(ParserSection10, Sec10_4_1_FullPatternAlwaysComb) {
   EXPECT_TRUE(
       ParseOk("module m(\n"
@@ -748,10 +694,7 @@ TEST(ParserSection10, Sec10_4_1_FullPatternAlwaysComb) {
               "  end\n"
               "endmodule\n"));
 }
-// Return the first always-kind module item (any always variant).
-// ---------------------------------------------------------------------------
-// 4. always @* also has empty sensitivity (star consumed at module level).
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarEmptySensitivity) {
   auto r = Parse(
       "module m;\n"
@@ -764,9 +707,6 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarEmptySensitivity) {
   EXPECT_TRUE(item->sensitivity.empty());
 }
 
-// ---------------------------------------------------------------------------
-// 5. always @(*) is equivalent to always @* -- same empty sensitivity.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenEquivalent) {
   auto r = Parse(
       "module m;\n"
@@ -780,4 +720,4 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenEquivalent) {
   EXPECT_TRUE(item->sensitivity.empty());
 }
 
-}  // namespace
+}

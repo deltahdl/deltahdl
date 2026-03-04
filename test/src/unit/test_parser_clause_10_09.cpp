@@ -1,5 +1,3 @@
-// §10.9: Assignment patterns
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// 20. Struct with type-prefixed assignment pattern T'{...}.
 TEST(ParserSection7, Sec7_2_2_TypePrefixedPattern) {
   auto r = Parse(
       "module t;\n"
@@ -31,13 +28,6 @@ TEST(ParserSection10, AssignmentPatternTypePrefixed) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// ---------------------------------------------------------------------------
-// assignment_pattern_expression ::= [ type ] assignment_pattern
-// assignment_pattern_expression_type ::=
-//   ps_type_identifier | ps_parameter_identifier | integer_atom_type |
-//   type_reference
-// ---------------------------------------------------------------------------
-// §10.9: typed assignment pattern expression with user-defined type
 TEST(ParserA60701, AssignmentPatternWithType) {
   auto r = Parse(
       "module m;\n"
@@ -51,7 +41,6 @@ TEST(ParserA60701, AssignmentPatternWithType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §10.9: typed assignment pattern expression with integer_atom_type
 TEST(ParserA60701, AssignmentPatternWithIntegerAtomType) {
   auto r = Parse(
       "module m;\n"
@@ -64,12 +53,6 @@ TEST(ParserA60701, AssignmentPatternWithIntegerAtomType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// structure_pattern_key ::= member_identifier | assignment_pattern_key
-// array_pattern_key ::= constant_expression | assignment_pattern_key
-// assignment_pattern_key ::= simple_type | default
-// ---------------------------------------------------------------------------
-// §10.9: assignment_pattern_key with default
 TEST(ParserA60701, PatternKeyDefault) {
   auto r = Parse(
       "module m;\n"
@@ -81,12 +64,6 @@ TEST(ParserA60701, PatternKeyDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// assignment_pattern_net_lvalue ::= '{ net_lvalue { , net_lvalue } }
-// assignment_pattern_variable_lvalue ::= '{ variable_lvalue { , variable_lvalue
-// } }
-// ---------------------------------------------------------------------------
-// §10.9: assignment pattern as LHS (variable lvalue)
 TEST(ParserA60701, AssignmentPatternVariableLvalue) {
   auto r = Parse(
       "module m;\n"
@@ -98,10 +75,6 @@ TEST(ParserA60701, AssignmentPatternVariableLvalue) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// AST structure: assignment pattern elements and keys
-// ---------------------------------------------------------------------------
-// §10.9: positional assignment pattern — AST elements count
 TEST(ParserA60701, AssignmentPatternElementsCount) {
   auto r = Parse(
       "module m;\n"
@@ -120,7 +93,6 @@ TEST(ParserA60701, AssignmentPatternElementsCount) {
   EXPECT_EQ(rhs->elements.size(), 4u);
 }
 
-// --- §5.12 Attributes ---
 TEST(ParserCh510, AssignmentPatternPositional_Elements) {
   auto r = Parse(
       "module t;\n"
@@ -135,7 +107,6 @@ TEST(ParserCh510, AssignmentPatternPositional_Elements) {
   EXPECT_TRUE(rhs->pattern_keys.empty());
 }
 
-// §10.9: empty assignment pattern '{} parses
 TEST(ParserA60701, EmptyAssignmentPattern) {
   auto r = Parse(
       "module m;\n"
@@ -153,4 +124,4 @@ TEST(ParserA60701, EmptyAssignmentPattern) {
   EXPECT_EQ(rhs->elements.size(), 0u);
 }
 
-}  // namespace
+}

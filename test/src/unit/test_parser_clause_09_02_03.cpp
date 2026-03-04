@@ -1,5 +1,3 @@
-// §9.2.3: Final procedures
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -7,10 +5,6 @@
 using namespace delta;
 namespace {
 
-// =============================================================================
-// A.6.2 Production: final_construct
-// final_construct ::= final function_statement
-// =============================================================================
 TEST(ParserA602, FinalConstruct_SingleStmt) {
   auto r = Parse(
       "module m;\n"
@@ -53,7 +47,7 @@ TEST(ParserA602, FinalConstruct_Multiple) {
 }
 
 TEST(ParserA602, Integration_InitialFinalCoexistence) {
-  // initial and final blocks coexist
+
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -71,10 +65,7 @@ TEST(ParserA602, Integration_InitialFinalCoexistence) {
   ASSERT_NE(init, nullptr);
   ASSERT_NE(fin, nullptr);
 }
-// =============================================================================
-// LRM section 9.2.3 -- Final procedures
-// Final blocks with begin/end and multiple statements.
-// =============================================================================
+
 TEST(ParserSection9c, FinalBlockWithBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -106,9 +97,7 @@ TEST(ParserSection9c, MultipleFinalBlocks) {
   }
   EXPECT_EQ(count, 2);
 }
-// =============================================================================
-// §4.6: Program block with final block
-// =============================================================================
+
 TEST(ParserSection4, Sec4_6_ProgramWithFinalBlock) {
   auto r = Parse(
       "program p;\n"
@@ -143,9 +132,7 @@ TEST(ParserSection9, Sec9_3_1_BlockInFinalBlock) {
   }
   EXPECT_TRUE(found);
 }
-// =============================================================================
-// §24.12 Program with final block
-// =============================================================================
+
 TEST_F(ProgramTestParse, ProgramWithFinalBlock) {
   auto* unit = Parse(
       "program p;\n"
@@ -167,9 +154,7 @@ TEST(ParserSection9b, StructuredProcFinalBlock) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
-// ---------------------------------------------------------------------------
-// 23. final block
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection4, Sec4_5_FinalBlock) {
   auto r = Parse(
       "module m;\n"
@@ -202,4 +187,4 @@ TEST(ParserSection9, FinalBlock) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

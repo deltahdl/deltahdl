@@ -1,5 +1,3 @@
-// §28.3.3: The delay specification
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -20,4 +18,4 @@ TEST(ParserSection28, GateWithDelay) {
   ASSERT_EQ(item->gate_terminals.size(), 3);
 }
 
-}  // namespace
+}

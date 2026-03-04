@@ -1,5 +1,3 @@
-// §6.22.2: Equivalent types
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// 22. always_comb with packed struct assignment.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombStructAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -37,4 +32,4 @@ TEST(SimCh9, AlwaysCombStructAssign) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-}  // namespace
+}

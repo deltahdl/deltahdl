@@ -1,5 +1,3 @@
-// §20.3.3: $realtime
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -32,4 +30,4 @@ TEST(Lowerer, RealtimeReturnsTime) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

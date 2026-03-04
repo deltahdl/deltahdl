@@ -1,12 +1,9 @@
-// §8.21: Abstract classes and pure virtual methods
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// §8.21 — Pure virtual function (no body)
 TEST(ParserSection8, PureVirtualFunction) {
   auto r = Parse(
       "virtual class Base;\n"
@@ -40,4 +37,4 @@ TEST(ParserA27, TaskPrototypePureVirtual) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

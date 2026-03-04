@@ -1,5 +1,3 @@
-// §33.4.1.3: The instance clause
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// config_rule_statement: inst_clause liblist_clause with hierarchical inst_name
 TEST(SourceText, ConfigRuleInstLiblist) {
   auto r = Parse(
       "config cfg6;\n"
@@ -25,9 +22,6 @@ TEST(SourceText, ConfigRuleInstLiblist) {
   EXPECT_EQ(rule->liblist[0], "mylib");
 }
 
-// =============================================================================
-// §36.9.2 Config instance clause
-// =============================================================================
 TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
   auto* unit = Parse(R"(
     config cfg1;
@@ -46,7 +40,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
 }
 
 TEST(ParserSection34, ConfigWithInstanceAndLiblist) {
-  // Config with instance clause pointing to a specific library
+
   auto r = Parse(R"(
     config inst_cfg;
       design work.top;
@@ -71,4 +65,4 @@ TEST_F(ConfigParseTest, ConfigWithInstanceClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// Annex D.10: $scale
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- D.6: $scale ---
 TEST(ParserAnnexD2, AnnexDScaleParse) {
   auto r = Parse(
       "module m;\n"
@@ -32,4 +29,4 @@ TEST(ParserAnnexD2, AnnexDScaleRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

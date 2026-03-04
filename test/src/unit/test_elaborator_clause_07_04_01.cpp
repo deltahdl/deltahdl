@@ -1,5 +1,3 @@
-// §7.4.1: Packed arrays
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// 20. Verify result variable width is 8 bits.
-// ---------------------------------------------------------------------------
 TEST(SimCh9, AlwaysCombResultWidth8) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,9 +27,6 @@ TEST(SimCh9, AlwaysCombResultWidth8) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// ---------------------------------------------------------------------------
-// 26. Verify .width and .ToUint64() for 8-bit variable.
-// ---------------------------------------------------------------------------
 TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -57,4 +49,4 @@ TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-}  // namespace
+}

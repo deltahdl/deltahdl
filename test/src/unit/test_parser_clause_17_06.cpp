@@ -1,5 +1,3 @@
-// §17.6: Covergroups in checkers
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -30,9 +28,6 @@ TEST_F(VerifyParseTest, CheckerWithCovergroupAndClocking) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-// =============================================================================
-// §17.14 Checker with covergroup
-// =============================================================================
 TEST_F(CheckerParseTest, CheckerWithCovergroup) {
   auto* unit = Parse(R"(
     checker cov_check(input logic clk, input logic x);
@@ -46,4 +41,4 @@ TEST_F(CheckerParseTest, CheckerWithCovergroup) {
       HasItemOfKind(unit->checkers[0]->items, ModuleItemKind::kCovergroupDecl));
 }
 
-}  // namespace
+}

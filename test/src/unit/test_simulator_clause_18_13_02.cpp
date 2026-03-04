@@ -1,5 +1,3 @@
-// §18.13.2: $urandom_range()
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -19,4 +17,4 @@ TEST(SysTask, UrandomRangeInBounds) {
   EXPECT_LE(val, 10u);
 }
 
-}  // namespace
+}

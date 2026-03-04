@@ -1,5 +1,3 @@
-// §11.4.13: for an explanation of range list syntax.
-
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "helpers_eval_op.h"
@@ -9,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// § inside_expression — value no match
 TEST(SimA83, InsideValueNoMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -27,7 +24,6 @@ TEST(SimA83, InsideValueNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// § inside_expression — range match
 TEST(SimA83, InsideRangeMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -45,7 +41,6 @@ TEST(SimA83, InsideRangeMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// § inside_expression — inside in initial block elaborates
 TEST(ElabA83, InsideExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -59,4 +54,4 @@ TEST(ElabA83, InsideExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

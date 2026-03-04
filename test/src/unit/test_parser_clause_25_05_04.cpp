@@ -1,12 +1,9 @@
-// §25.5.4: Modport expressions
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// modport_simple_port ::= . port_identifier ( [ expression ] )
 TEST(ParserA29, PortExprDotNotation) {
   auto r = Parse(
       "interface bus;\n"
@@ -50,7 +47,6 @@ TEST(ParserA29, PortExprMixedWithSimple) {
   EXPECT_EQ(mp->ports[1].name, "R");
 }
 
-// --- Modport with port expressions (LRM §25.5.4) ---
 TEST(ParserSection25, ModportPortExpressionName) {
   auto r = Parse(
       "interface bus;\n"
@@ -119,4 +115,4 @@ TEST(ParserSection25, ModportMixedDirectionAndExprSecond) {
   EXPECT_NE(mp->ports[1].expr, nullptr);
 }
 
-}  // namespace
+}

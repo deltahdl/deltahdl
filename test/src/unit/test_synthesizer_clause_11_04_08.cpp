@@ -1,5 +1,3 @@
-// §11.4.8: Bitwise operators
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -26,4 +24,4 @@ TEST(SynthLower, MultiBitAndGate) {
   EXPECT_EQ(aig->outputs.size(), 2);
 }
 
-}  // namespace
+}

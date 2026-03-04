@@ -1,5 +1,3 @@
-// §25.7: Tasks and functions in interfaces
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -22,8 +20,6 @@ TEST(ParserA29, ImportMultipleIdentifiers) {
   EXPECT_EQ(mp->ports[1].name, "Write");
 }
 
-// modport_tf_ports_declaration ::=
-//   import_export modport_tf_port { , modport_tf_port }
 TEST(ParserA29, ImportSingleIdentifier) {
   auto r = Parse(
       "interface bus;\n"
@@ -37,7 +33,6 @@ TEST(ParserA29, ImportSingleIdentifier) {
   EXPECT_EQ(mp->ports[0].name, "Read");
 }
 
-// Mixed modport_ports_declarations
 TEST(ParserA29, MixedDirImportExport) {
   auto r = Parse(
       "interface bus;\n"
@@ -66,7 +61,6 @@ TEST(ParserA29, AttrOnImportPort) {
               "endinterface\n"));
 }
 
-// --- Modport import/export (LRM §25.5, §25.7) ---
 TEST(ParserSection25, ModportImportExportName) {
   auto r = Parse(
       "interface bus;\n"
@@ -104,9 +98,6 @@ TEST(ParserSection25, ModportImportWithDirectionSecond) {
   EXPECT_EQ(mp->ports[1].name, "Read");
 }
 
-// interface_or_generate_item ::= { attribute_instance } extern_tf_declaration
-// extern_tf_declaration ::= extern method_prototype ;
-// Verify extern function prototype inside an interface.
 TEST(SourceText, ExternFunctionPrototypeInInterface) {
   auto r = Parse(
       "interface ifc;\n"
@@ -119,12 +110,10 @@ TEST(SourceText, ExternFunctionPrototypeInInterface) {
   EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(ifc->items[0]->name, "compute");
   EXPECT_TRUE(ifc->items[0]->is_extern);
-  // Prototype only — no body statements.
+
   EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
 }
 
-// extern_tf_declaration ::= extern method_prototype ;
-// method_prototype ::= task_prototype — extern task prototype.
 TEST(SourceText, ExternTaskPrototypeInInterface) {
   auto r = Parse(
       "interface ifc;\n"
@@ -186,7 +175,6 @@ TEST(ParserA29, ImportFunctionVoidReturn) {
               "endinterface\n"));
 }
 
-// Verify import/export flags are mutually exclusive in AST
 TEST(ParserA29, ImportFlag_NotExport) {
   auto r = Parse(
       "interface bus;\n"
@@ -199,7 +187,6 @@ TEST(ParserA29, ImportFlag_NotExport) {
   EXPECT_FALSE(mp->ports[0].is_export);
 }
 
-// Verify function prototype return type stored
 TEST(ParserA29, FunctionPrototype_ReturnType) {
   auto r = Parse(
       "interface bus;\n"
@@ -214,7 +201,6 @@ TEST(ParserA29, FunctionPrototype_ReturnType) {
   EXPECT_EQ(mp->ports[0].prototype->data_type.kind, DataTypeKind::kInt);
 }
 
-// Verify task prototype with arguments stores them
 TEST(ParserA29, TaskPrototype_HasArgs) {
   auto r = Parse(
       "interface bus;\n"
@@ -227,4 +213,4 @@ TEST(ParserA29, TaskPrototype_HasArgs) {
   EXPECT_FALSE(mp->ports[0].prototype->func_args.empty());
 }
 
-}  // namespace
+}

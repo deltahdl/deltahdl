@@ -1,5 +1,3 @@
-// Annex L.2: Source code
-
 #include <gtest/gtest.h>
 
 #include "simulator/vpi_compatibility.h"
@@ -14,4 +12,4 @@ TEST(VpiCompatL2, VersionMacroAvailable) {
 #endif
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §15.5: Named events
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -63,7 +61,6 @@ TEST(Lowerer, NamedEventBareWaitSyntax) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §15.5.1/§15.5.2: named event trigger and wait
 TEST(SimA605, EventTriggerAndWait) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -87,4 +84,4 @@ TEST(SimA605, EventTriggerAndWait) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

@@ -1,15 +1,9 @@
-// §31.7: Enabling timing checks with conditioned events
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.3 Elab — timing_check_condition with &&&
-// =============================================================================
-// &&& bare condition elaborates
 TEST(ElabA70503, TimingCheckConditionBareElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -23,7 +17,6 @@ TEST(ElabA70503, TimingCheckConditionBareElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// &&& with parenthesized scalar_timing_check_condition elaborates
 TEST(ElabA70503, TimingCheckConditionParenthesizedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +30,6 @@ TEST(ElabA70503, TimingCheckConditionParenthesizedElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// &&& with negation elaborates
 TEST(ElabA70503, TimingCheckConditionNegationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,7 +43,6 @@ TEST(ElabA70503, TimingCheckConditionNegationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// &&& on both ref and data events elaborates
 TEST(ElabA70503, ConditionBothEventsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -65,7 +56,6 @@ TEST(ElabA70503, ConditionBothEventsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// $width with controlled_timing_check_event and condition elaborates
 TEST(ElabA70503, ControlledTimingCheckEventWidthCondElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -79,10 +69,6 @@ TEST(ElabA70503, ControlledTimingCheckEventWidthCondElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// =============================================================================
-// A.7.5.3 Elab — combined edge + terminal range + condition
-// =============================================================================
-// Full combination: edge + bit-select terminal + &&& condition elaborates
 TEST(ElabA70503, FullCombinationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -96,4 +82,4 @@ TEST(ElabA70503, FullCombinationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

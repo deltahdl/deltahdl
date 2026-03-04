@@ -1,5 +1,3 @@
-// §22.14.7: IEEE Std 1800-2009 keywords
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -15,4 +13,4 @@ TEST(ParserSection22, BeginKeywords1800_2009) {
               "`end_keywords\n"));
 }
 
-}  // namespace
+}

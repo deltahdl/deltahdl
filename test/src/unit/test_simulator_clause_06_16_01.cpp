@@ -1,5 +1,3 @@
-// §6.16.1: Len()
-
 #include "builders_ast.h"
 #include "fixture_string.h"
 #include "simulator/eval.h"
@@ -8,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// §6.16.1: len() -- returns the length of the string
-// =============================================================================
 TEST(StringMethods, LenEmpty) {
   StringFixture f;
   f.CreateStringVar("s", "");
@@ -27,4 +22,4 @@ TEST(StringMethods, LenBasic) {
   EXPECT_EQ(result.ToUint64(), 5u);
 }
 
-}  // namespace
+}

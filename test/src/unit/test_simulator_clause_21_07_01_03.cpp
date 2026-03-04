@@ -1,5 +1,3 @@
-// §21.7.1.3: $dumpoff / $dumpon
-
 #include "fixture_vcd.h"
 #include "simulator/vcd_writer.h"
 
@@ -36,5 +34,5 @@ TEST_F(VcdClause21070103Test, ReEnableAfterDisable) {
   EXPECT_NE(content.find("#200"), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

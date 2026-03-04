@@ -1,5 +1,3 @@
-// §31.4.3: $fullskew
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 Runtime — $fullskew dual limits stored
-// =============================================================================
 TEST(SimA70501, FullskewDualLimitsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -29,4 +24,4 @@ TEST(SimA70501, FullskewDualLimitsStored) {
   EXPECT_EQ(stored.limit2, 6u);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §28.3.1: The gate type specification
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "model_gate_logic.h"
@@ -21,4 +19,4 @@ TEST(ParserA301, GateInst_EnableWithStrengthAndDelay) {
   EXPECT_NE(g->gate_delay, nullptr);
 }
 
-}  // namespace
+}

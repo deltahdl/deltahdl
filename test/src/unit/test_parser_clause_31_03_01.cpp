@@ -1,5 +1,3 @@
-// §31.3.1: $setup
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.7.5.1 $setup_timing_check
-// =============================================================================
-// $setup ( data_event , reference_event , timing_check_limit [ , [ notifier ] ]
-// )
 TEST(ParserA70501, SetupTimingCheck) {
   auto r = Parse(
       "module m;\n"
@@ -31,7 +24,6 @@ TEST(ParserA70501, SetupTimingCheck) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-// $setup with notifier
 TEST(ParserA70501, SetupWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -68,9 +60,6 @@ TEST(ParserA701, SpecifyItemSystemTimingCheck) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kTimingCheck);
 }
 
-// =============================================================================
-// A.7.5.2 timing_check_limit ::= expression
-// =============================================================================
 TEST(ParserA70502, TimingCheckLimitExpression) {
   auto r = Parse(
       "module m;\n"
@@ -85,10 +74,6 @@ TEST(ParserA70502, TimingCheckLimitExpression) {
   EXPECT_NE(tc->limits[0], nullptr);
 }
 
-// =============================================================================
-// A.7.5.3 timing_check_event
-// =============================================================================
-// timing_check_event with no edge (edge is optional)
 TEST(ParserA70503, TimingCheckEventNoEdge) {
   auto r = Parse(
       "module m;\n"
@@ -134,10 +119,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckSetup) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
-// =============================================================================
-// A.7.5 system_timing_check — dispatch to 12 timing check types
-// =============================================================================
-// system_timing_check ::= $setup_timing_check
+
 TEST(ParserA705, SystemTimingCheckSetup) {
   auto r = Parse(
       "module m;\n"
@@ -151,4 +133,4 @@ TEST(ParserA705, SystemTimingCheckSetup) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetup);
 }
 
-}  // namespace
+}

@@ -1,5 +1,3 @@
-// §20.3.2: $stime
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -16,4 +14,4 @@ TEST(SysTask, StimeReturns32Bit) {
   EXPECT_EQ(result.width, 32u);
 }
 
-}  // namespace
+}

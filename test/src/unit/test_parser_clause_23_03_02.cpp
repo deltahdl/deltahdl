@@ -1,5 +1,3 @@
-// §23.3.2: Module instantiation syntax
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,14 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.4.1.1 -- Module instantiation
-//
-// module_instantiation ::=
-//   module_identifier [ parameter_value_assignment ]
-//     hierarchical_instance { , hierarchical_instance } ;
-// =============================================================================
-// --- module_instantiation: basic ---
 TEST(ParserAnnexA0411, BasicModuleInst) {
   auto r = Parse("module m; sub u0(a, b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -25,8 +15,6 @@ TEST(ParserAnnexA0411, BasicModuleInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-// --- module_instantiation: multiple hierarchical_instance ---
-// module_identifier [#(...)] inst1(...), inst2(...), inst3(...) ;
 TEST(ParserAnnexA0411, MultipleHierarchicalInstances) {
   auto r = Parse("module m; sub u0(a), u1(b), u2(c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -59,17 +47,8 @@ TEST(ParserAnnexA0411, MultipleInstancesWithParams) {
   EXPECT_EQ(i1->inst_params.size(), 1u);
 }
 
-// =============================================================================
-// parameter_value_assignment ::= # ( [ list_of_parameter_value_assignments ] )
-// list_of_parameter_value_assignments ::=
-//   ordered_parameter_assignment { , ordered_parameter_assignment }
-//   | named_parameter_assignment { , named_parameter_assignment }
-// ordered_parameter_assignment ::= param_expression
-// named_parameter_assignment ::= . parameter_identifier ( [ param_expression ]
-// )
-// =============================================================================
 TEST(ParserAnnexA0411, EmptyParameterValueAssignment) {
-  // #() — empty parameter list
+
   auto r = Parse("module m; sub #() u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -79,7 +58,7 @@ TEST(ParserAnnexA0411, EmptyParameterValueAssignment) {
 }
 
 TEST(ParserAnnexA0411, FullCombination) {
-  // Named params, instance array, named ports, wildcard
+
   auto r = Parse(
       "module m;\n"
       "  sub #(.W(8)) u0[3:0](.clk(clk), .*);\n"
@@ -117,7 +96,6 @@ TEST(ParserAnnexA0411, MultipleInstancesSharedParams) {
   EXPECT_EQ(i1->inst_params[0].first, "W");
 }
 
-// --- interface_instantiation: with empty parameter ---
 TEST(ParserAnnexA0412, InterfaceInstEmptyParam) {
   auto r = Parse("module m; my_if #() u0(.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -127,7 +105,6 @@ TEST(ParserAnnexA0412, InterfaceInstEmptyParam) {
   EXPECT_TRUE(item->inst_params.empty());
 }
 
-// --- program_instantiation: empty parameter list ---
 TEST(ParserAnnexA0413, ProgramInstEmptyParam) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
@@ -149,7 +126,7 @@ TEST(ParserSection23, InstanceArraySingle) {
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(item->inst_name, "inst");
   EXPECT_NE(item->inst_range_left, nullptr);
-  // Single dimension: only left is set, right is nullptr.
+
   EXPECT_EQ(item->inst_range_right, nullptr);
 }
 
@@ -165,4 +142,4 @@ TEST(ParserSection23, ModuleInstanceEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-}  // namespace
+}

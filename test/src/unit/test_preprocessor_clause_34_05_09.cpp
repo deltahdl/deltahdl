@@ -1,5 +1,3 @@
-// §34.5.9: encoding
-
 #include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
@@ -24,9 +22,6 @@ struct ProtectedTest : ::testing::Test {
 
 namespace {
 
-// =============================================================================
-// §34.5.3/4 Protected region with encoding (begin_protected/end_protected)
-// =============================================================================
 TEST_F(ProtectedTest, ProtectedRegionWithEncoding) {
   auto result = Preprocess(
       "`pragma protect encoding=(enctype=\"raw\")\n"
@@ -36,10 +31,10 @@ TEST_F(ProtectedTest, ProtectedRegionWithEncoding) {
       "encrypted_data_here\n"
       "`pragma protect end_protected\n");
   EXPECT_FALSE(diag_.HasErrors());
-  // All pragma lines consumed.
+
   EXPECT_EQ(result.find("pragma"), std::string::npos);
-  // Non-pragma content passes through (encrypted data).
+
   EXPECT_NE(result.find("encrypted_data_here"), std::string::npos);
 }
 
-}  // namespace
+}

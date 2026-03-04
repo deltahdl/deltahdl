@@ -1,5 +1,3 @@
-// §20.11: Assertion control system tasks
-
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -38,9 +36,6 @@ TEST(SysTask, AssertControlDoesNotCrash) {
   EXPECT_EQ(result.width, 1u);
 }
 
-// =============================================================================
-// AssertionControl: $assertoff/$asserton/$assertkill (section 16.13)
-// =============================================================================
 TEST(SvaEngine, AssertionControlDefaultOn) {
   AssertionControl ctrl;
   EXPECT_TRUE(ctrl.IsEnabled("inst1"));
@@ -69,9 +64,6 @@ TEST(SvaEngine, AssertkillKillsAndDisables) {
   EXPECT_TRUE(ctrl.WasKilled("inst1"));
 }
 
-// =============================================================================
-// $assertcontrol, $assertpassoff, $assertfailon (section 16.13)
-// =============================================================================
 TEST(SvaEngine, AssertControlGlobalOff) {
   AssertionControl ctrl;
   ctrl.SetGlobalOff();
@@ -102,9 +94,6 @@ TEST(SvaEngine, AssertFailOn) {
   EXPECT_TRUE(ctrl.IsFailEnabled("inst1"));
 }
 
-// =============================================================================
-// Test fixture
-// =============================================================================
 struct SvaFixture {
   SourceManager mgr;
   Arena arena;
@@ -195,4 +184,4 @@ TEST(SvaEngine, KillClearsPendingAssertions) {
   EXPECT_EQ(count, 0);
 }
 
-}  // namespace
+}

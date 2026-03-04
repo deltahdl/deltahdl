@@ -1,5 +1,3 @@
-// §11.4.11: Conditional operator
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "simulator/udp_eval.h"
@@ -32,7 +30,6 @@ TEST(ParserA602, VariableAssignment_TernaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-// --- Ternary in case expression ---
 TEST(ParserSection11, Sec11_4_6_TernaryInCaseExpr) {
   auto r = Parse(
       "module t;\n"
@@ -52,7 +49,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryInCaseExpr) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
 }
 
-// --- Ternary with system call operand ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithSystemCall) {
   auto r = Parse(
       "module t;\n"
@@ -70,7 +66,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithSystemCall) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIntegerLiteral);
 }
 
-// --- Ternary with unary operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithUnaryOperands) {
   auto r = Parse(
       "module t;\n"
@@ -89,7 +84,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithUnaryOperands) {
   EXPECT_EQ(rhs->false_expr->op, TokenKind::kAmp);
 }
 
-// --- Ternary as function argument ---
 TEST(ParserSection11, Sec11_4_6_TernaryAsFunctionArgument) {
   auto r = Parse(
       "module t;\n"
@@ -106,11 +100,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryAsFunctionArgument) {
   EXPECT_EQ(rhs->args[0]->kind, ExprKind::kTernary);
 }
 
-// =============================================================================
-// A.8.3 Expressions — conditional_expression
-// =============================================================================
-// § conditional_expression ::= cond_predicate ? { attribute_instance }
-// expression : expression
 TEST(ParserA83, ConditionalExprSimple) {
   auto r = Parse("module m; initial x = a ? b : c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -123,7 +112,6 @@ TEST(ParserA83, ConditionalExprSimple) {
   ASSERT_NE(rhs->false_expr, nullptr);
 }
 
-// --- Ternary with cast operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithCast) {
   auto r = Parse(
       "module t;\n"
@@ -139,9 +127,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithCast) {
   ASSERT_NE(rhs->false_expr, nullptr);
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kCast);
 }
-// ---------------------------------------------------------------------------
-// 12. always_comb with ternary expression
-// ---------------------------------------------------------------------------
+
 TEST(ParserSection9, Sec9_2_2_TernaryExpression) {
   auto r = Parse(
       "module m;\n"
@@ -177,7 +163,6 @@ TEST(ParserA83, ConditionalExprWithBinaryCondition) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-// --- Ternary with inside condition ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithInsideCondition) {
   auto r = Parse(
       "module t;\n"
@@ -196,7 +181,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithInsideCondition) {
   EXPECT_EQ(stmt->condition->condition->kind, ExprKind::kInside);
 }
 
-// --- Verify ExprKind::kTernary kind ---
 TEST(ParserSection11, Sec11_4_6_VerifyExprKindTernary) {
   auto r = Parse(
       "module t;\n"
@@ -209,7 +193,6 @@ TEST(ParserSection11, Sec11_4_6_VerifyExprKindTernary) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-// --- Verify condition, true_expr, false_expr fields ---
 TEST(ParserSection11, Sec11_4_6_VerifyTernaryFields) {
   auto r = Parse(
       "module t;\n"
@@ -221,7 +204,6 @@ TEST(ParserSection11, Sec11_4_6_VerifyTernaryFields) {
   VerifyTernaryFieldsAllIdentifier(rhs);
 }
 
-// --- Ternary in module port connection ---
 TEST(ParserSection11, Sec11_4_6_TernaryInModulePortConnection) {
   auto r = Parse(
       "module t;\n"
@@ -238,7 +220,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryInModulePortConnection) {
   EXPECT_EQ(inst->inst_ports[0].second->kind, ExprKind::kTernary);
 }
 
-// --- Ternary in always_comb ---
 TEST(ParserSection11, Sec11_4_6_TernaryInAlwaysComb) {
   auto r = Parse(
       "module t;\n"
@@ -264,7 +245,6 @@ TEST(ParserSection11, ConstExprTernaryInLocalparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Ternary in generate if condition ---
 TEST(ParserSection11, Sec11_4_6_TernaryInGenerateIfCondition) {
   auto r = Parse(
       "module t;\n"
@@ -283,7 +263,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryInGenerateIfCondition) {
   EXPECT_EQ(gen->gen_cond->kind, ExprKind::kTernary);
 }
 
-// --- Multiple ternaries in same expression ---
 TEST(ParserSection11, Sec11_4_6_MultipleTernariesInExpr) {
   auto r = Parse(
       "module t;\n"
@@ -300,7 +279,7 @@ TEST(ParserSection11, Sec11_4_6_MultipleTernariesInExpr) {
   ASSERT_NE(rhs->rhs, nullptr);
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
 }
-// --- 9. Blocking assignment with ternary RHS ---
+
 TEST(ParserSection10, Sec10_4_1_TernaryRhs) {
   auto r = Parse(
       "module m;\n"
@@ -318,7 +297,6 @@ TEST(ParserSection10, Sec10_4_1_TernaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-// --- Ternary with string literal operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithStringLiterals) {
   auto r = Parse(
       "module t;\n"
@@ -336,7 +314,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithStringLiterals) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kStringLiteral);
 }
 
-// --- Ternary with real literal operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithRealLiterals) {
   auto r = Parse(
       "module t;\n"
@@ -354,7 +331,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithRealLiterals) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kRealLiteral);
 }
 
-// --- Deeply nested ternary (three levels) ---
 TEST(ParserSection11, Sec11_4_6_DeeplyNestedTernary) {
   auto r = Parse(
       "module t;\n"
@@ -365,7 +341,7 @@ TEST(ParserSection11, Sec11_4_6_DeeplyNestedTernary) {
   auto* rhs = FirstAssignRhs(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  // s1 ? a : (s2 ? b : (s3 ? c : d))
+
   ASSERT_NE(rhs->false_expr, nullptr);
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->false_expr->false_expr, nullptr);
@@ -375,7 +351,6 @@ TEST(ParserSection11, Sec11_4_6_DeeplyNestedTernary) {
             ExprKind::kIdentifier);
 }
 
-// --- Ternary in continuous assignment with complex LHS ---
 TEST(ParserSection11, Sec11_4_6_TernaryContAssignWithBitSelectLhs) {
   auto r = Parse(
       "module t;\n"
@@ -393,11 +368,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryContAssignWithBitSelectLhs) {
   EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kTernary);
 }
 
-// ---------------------------------------------------------------------------
-// cond_predicate ::=
-//   expression_or_cond_pattern { &&& expression_or_cond_pattern }
-// ---------------------------------------------------------------------------
-// §12.6: cond_predicate with &&& operator
 TEST(ParserA606, CondPredicateTripleAnd) {
   auto r = Parse(
       "module m;\n"
@@ -413,7 +383,6 @@ TEST(ParserA606, CondPredicateTripleAnd) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-// 22. Struct in conditional expression (ternary).
 TEST(ParserSection7, Sec7_2_2_StructTernary) {
   auto r = Parse(
       "module t;\n"
@@ -429,9 +398,7 @@ TEST(ParserSection7, Sec7_2_2_StructTernary) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
-// =========================================================================
-// Section 11.4.6 -- Conditional operator (ternary)
-// =========================================================================
+
 TEST(ParserSection11, TernaryFieldAccess) {
   auto r = Parse(
       "module t;\n"
@@ -466,9 +433,6 @@ TEST(ParserSection11, TernaryTristateDriver) {
               "endmodule\n"));
 }
 
-// =============================================================================
-// A.8 -- Expressions
-// =============================================================================
 TEST(ParserAnnexA, A8TernaryExpr) {
   auto r = Parse("module m; initial x = (a > b) ? a : b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -478,9 +442,6 @@ TEST(ParserAnnexA, A8TernaryExpr) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-// ---------------------------------------------------------------------------
-// 12. Ternary expression in RHS.
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_3_TernaryExpressionRHS) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -491,9 +452,6 @@ TEST(ParserSection9, Sec9_2_3_TernaryExpressionRHS) {
               "endmodule\n"));
 }
 
-// ---------------------------------------------------------------------------
-// 28. always_comb with nested ternary expressions
-// ---------------------------------------------------------------------------
 TEST(ParserSection9, Sec9_2_2_NestedTernary) {
   auto r = Parse(
       "module m;\n"
@@ -510,7 +468,7 @@ TEST(ParserSection9, Sec9_2_2_NestedTernary) {
   ASSERT_NE(item->body->rhs, nullptr);
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
-// --- Bit-select in ternary condition ---
+
 TEST(ParserSection11, Sec11_4_1_BitSelectInTernaryCondition) {
   auto r = Parse(
       "module t;\n"
@@ -527,10 +485,6 @@ TEST(ParserSection11, Sec11_4_1_BitSelectInTernaryCondition) {
   EXPECT_EQ(rhs->condition->index_end, nullptr);
 }
 
-// =========================================================================
-// LRM section 11.4.6 -- Conditional operator (ternary ? :)
-// =========================================================================
-// --- Simple ternary: sel ? a : b ---
 TEST(ParserSection11, Sec11_4_6_SimpleTernary) {
   auto r = Parse(
       "module t;\n"
@@ -549,7 +503,6 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
   return nullptr;
 }
 
-// --- Ternary in continuous assignment ---
 TEST(ParserSection11, Sec11_4_6_TernaryInContAssign) {
   auto r = Parse(
       "module t;\n"
@@ -568,7 +521,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryInContAssign) {
   ASSERT_NE(ca->assign_rhs->false_expr, nullptr);
 }
 
-// --- Ternary in blocking assignment ---
 TEST(ParserSection11, Sec11_4_6_TernaryInBlockingAssign) {
   auto r = Parse(
       "module t;\n"
@@ -583,7 +535,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryInBlockingAssign) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-// --- Ternary in nonblocking assignment ---
 TEST(ParserSection11, Sec11_4_6_TernaryInNonblockingAssign) {
   auto r = Parse(
       "module t;\n"
@@ -599,7 +550,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryInNonblockingAssign) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-// --- Nested ternary with parentheses ---
 TEST(ParserSection11, Sec11_4_6_NestedTernaryWithParens) {
   auto r = Parse(
       "module t;\n"
@@ -616,7 +566,6 @@ TEST(ParserSection11, Sec11_4_6_NestedTernaryWithParens) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIdentifier);
 }
 
-// --- Chained ternary without parens (right-associative) ---
 TEST(ParserSection11, Sec11_4_6_ChainedTernaryRightAssoc) {
   auto r = Parse(
       "module t;\n"
@@ -629,7 +578,7 @@ TEST(ParserSection11, Sec11_4_6_ChainedTernaryRightAssoc) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->true_expr, nullptr);
   EXPECT_EQ(rhs->true_expr->kind, ExprKind::kIdentifier);
-  // Right-associative: false_expr is itself a ternary.
+
   ASSERT_NE(rhs->false_expr, nullptr);
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
   ASSERT_NE(rhs->false_expr->true_expr, nullptr);
@@ -638,7 +587,6 @@ TEST(ParserSection11, Sec11_4_6_ChainedTernaryRightAssoc) {
   EXPECT_EQ(rhs->false_expr->false_expr->kind, ExprKind::kIdentifier);
 }
 
-// --- Ternary with complex condition ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithComplexCondition) {
   auto r = Parse(
       "module t;\n"
@@ -654,7 +602,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithComplexCondition) {
   EXPECT_EQ(rhs->condition->op, TokenKind::kGt);
 }
 
-// --- Ternary with binary expression operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithBinaryOperands) {
   auto r = Parse(
       "module t;\n"
@@ -673,7 +620,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithBinaryOperands) {
   EXPECT_EQ(rhs->false_expr->op, TokenKind::kMinus);
 }
 
-// --- Ternary with function call operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithFuncCallOperands) {
   auto r = Parse(
       "module t;\n"
@@ -691,7 +637,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithFuncCallOperands) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kCall);
 }
 
-// --- Ternary with concatenation operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithConcatenationOperands) {
   auto r = Parse(
       "module t;\n"
@@ -710,7 +655,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithConcatenationOperands) {
   EXPECT_EQ(rhs->false_expr->elements.size(), 2u);
 }
 
-// --- Ternary with replication operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithReplication) {
   auto r = Parse(
       "module t;\n"
@@ -728,7 +672,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithReplication) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kReplicate);
 }
 
-// --- Ternary with bit-select operands ---
 TEST(ParserSection11, Sec11_4_6_TernaryWithBitSelectOperands) {
   auto r = Parse(
       "module t;\n"
@@ -748,7 +691,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithBitSelectOperands) {
   EXPECT_EQ(rhs->false_expr->index_end, nullptr);
 }
 
-// --- Ternary in if condition ---
 TEST(ParserSection11, Sec11_4_6_TernaryInIfCondition) {
   auto r = Parse(
       "module t;\n"
@@ -765,7 +707,6 @@ TEST(ParserSection11, Sec11_4_6_TernaryInIfCondition) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
 }
 
-// --- Ternary conditional expression ---
 TEST(ParserSection11, Sec11_1_TernaryConditionalFields) {
   auto r = Parse(
       "module t;\n"
@@ -775,4 +716,4 @@ TEST(ParserSection11, Sec11_1_TernaryConditionalFields) {
   VerifyTernaryFieldsAllIdentifier(rhs);
 }
 
-}  // namespace
+}

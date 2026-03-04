@@ -1,5 +1,3 @@
-// §30.3: Specify block declaration
-
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -9,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- list_of_specparam_assignments ---
-// specparam_assignment { , specparam_assignment }
 TEST(ParserA23, ListOfSpecparamAssignmentsSingle) {
   auto r = Parse(
       "module m;\n"
@@ -20,7 +16,6 @@ TEST(ParserA23, ListOfSpecparamAssignmentsSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// system_timing_check is a specify_item (mixed with paths)
 TEST(ParserA705, TimingCheckMixedWithPaths) {
   auto r = Parse(
       "module m;\n"
@@ -50,9 +45,7 @@ TEST(ParserAnnexA, A7SpecparamInSpecify) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// =============================================================================
-// A.7.1 specify_block ::= specify { specify_item } endspecify
-// =============================================================================
+
 TEST(ParserA701, SpecifyBlockEmpty) {
   auto r = Parse("module m; specify endspecify endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -79,9 +72,6 @@ TEST(ParserA701, SpecifyBlockMultipleItems) {
   ASSERT_EQ(spec->specify_items.size(), 3u);
 }
 
-// =============================================================================
-// A.7.1 specify_item — all 5 alternatives
-// =============================================================================
 TEST(ParserA701, SpecifyItemSpecparamDecl) {
   auto r = Parse(
       "module m;\n"
@@ -120,9 +110,6 @@ TEST(ParserA701, SpecifyItemAllFiveKinds) {
   EXPECT_EQ(spec->specify_items[4]->kind, SpecifyItemKind::kTimingCheck);
 }
 
-// =============================================================================
-// A.7.1 specify_block coexistence with other module items
-// =============================================================================
 TEST(ParserA701, SpecifyBlockCoexistsWithModuleItems) {
   auto r = Parse(
       "module m;\n"
@@ -194,9 +181,6 @@ TEST_F(SpecifyParseTest, SpecifyBlockCoexistsWithOtherItems) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
 }
 
-// =============================================================================
-// Complex specify block with mixed items
-// =============================================================================
 TEST_F(SpecifyTest, MixedSpecifyBlockItems) {
   auto* cu = Parse(
       "module m;\n"
@@ -218,4 +202,4 @@ TEST_F(SpecifyTest, MixedSpecifyBlockItems) {
   EXPECT_EQ(spec->specify_items[4]->kind, SpecifyItemKind::kTimingCheck);
 }
 
-}  // namespace
+}

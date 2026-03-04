@@ -1,5 +1,3 @@
-// §21.7.1.2: $dumpvars
-
 #include "fixture_vcd.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -40,5 +38,5 @@ TEST_F(VcdClause21070102Test, VectorValueChange) {
   EXPECT_NE(content.find("b10100101 !"), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+}
+}

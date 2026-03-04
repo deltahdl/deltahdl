@@ -1,5 +1,3 @@
-// §5.12 Attributes — elaboration-level semantics (A.9.1 BNF)
-
 #include <cstdint>
 
 #include "common/types.h"
@@ -11,7 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Helper: parse without elaboration, return CompilationUnit.
 static CompilationUnit* ParseSrc(const std::string& src, ElabFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -19,14 +16,8 @@ static CompilationUnit* ParseSrc(const std::string& src, ElabFixture& f) {
   return parser.Parse();
 }
 
-// =========================================================================
-// A.9.1 BNF production: attribute_instance ::= (* attr_spec { , attr_spec } *)
-// =========================================================================
-
-// --- Lexer level: (* and *) token recognition ---
-
 TEST(ElabA91, LexerRecognizesAttrStartEnd) {
-  // §A.9.1: (* and *) are the delimiters for attribute_instance.
+
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>", "(* foo *)");
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -37,7 +28,7 @@ TEST(ElabA91, LexerRecognizesAttrStartEnd) {
 }
 
 TEST(ElabA91, LexerDisambiguatesAttrFromMul) {
-  // §A.9.1: (a * b) should NOT produce kAttrStart.
+
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>", "(a * b)");
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -46,10 +37,8 @@ TEST(ElabA91, LexerDisambiguatesAttrFromMul) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kStar);
 }
 
-// --- Parser level: single attr_spec ---
-
 TEST(ElabA91, ParserSingleAttrNoValue) {
-  // §A.9.1: attr_spec with just attr_name, no value.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -64,10 +53,8 @@ TEST(ElabA91, ParserSingleAttrNoValue) {
   EXPECT_EQ(item->attrs[0].value, nullptr);
 }
 
-// --- Parser level: attr_spec with value ---
-
 TEST(ElabA91, ParserAttrWithConstExpr) {
-  // §A.9.1: attr_spec ::= attr_name [ = constant_expression ]
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -81,10 +68,8 @@ TEST(ElabA91, ParserAttrWithConstExpr) {
   ASSERT_NE(item->attrs[0].value, nullptr);
 }
 
-// --- Parser level: multiple attr_spec in one attribute_instance ---
-
 TEST(ElabA91, ParserMultipleAttrSpecs) {
-  // §A.9.1: attribute_instance ::= (* attr_spec { , attr_spec } *)
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -98,10 +83,8 @@ TEST(ElabA91, ParserMultipleAttrSpecs) {
   EXPECT_EQ(item->attrs[1].name, "parallel_case");
 }
 
-// --- Parser level: multiple separate attribute_instance blocks ---
-
 TEST(ElabA91, ParserMultipleSeparateInstances) {
-  // §5.12: Multiple attribute_instance blocks are merged.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -117,11 +100,8 @@ TEST(ElabA91, ParserMultipleSeparateInstances) {
   EXPECT_EQ(item->attrs[1].name, "second");
 }
 
-// --- Parser level: attr_name ::= identifier ---
-
 TEST(ElabA91, AttrNameIsIdentifier) {
-  // §A.9.1: attr_name ::= identifier — any valid identifier can be an attr
-  // name.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -134,13 +114,8 @@ TEST(ElabA91, AttrNameIsIdentifier) {
   EXPECT_EQ(item->attrs[0].name, "my_tool_attr123");
 }
 
-// =========================================================================
-// §5.12 Semantic: Nesting of attribute instances is disallowed
-// =========================================================================
-
 TEST(ElabA91, NestedAttributeDisallowed) {
-  // §5.12: It shall be illegal to specify the value of an attribute
-  // with a constant expression that contains an attribute instance.
+
   ElabFixture f;
   ParseSrc(
       "module m;\n"
@@ -151,7 +126,7 @@ TEST(ElabA91, NestedAttributeDisallowed) {
 }
 
 TEST(ElabA91, NonNestedConstExprOk) {
-  // §5.12: A constant expression without nesting is fine.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -162,13 +137,8 @@ TEST(ElabA91, NonNestedConstExprOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// =========================================================================
-// §5.12 Semantic: Default value — attribute with no value is bit with value 1
-// =========================================================================
-
 TEST(ElabA91, DefaultValueBitOne) {
-  // §5.12: The default type of an attribute with no value is bit, with
-  // a value of 1.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -177,11 +147,10 @@ TEST(ElabA91, DefaultValueBitOne) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
-  // After elaboration, the attribute with no value should have been
-  // assigned a default value of 1'b1.
+
   auto* mod = design->top_modules[0];
   ASSERT_FALSE(mod->variables.empty());
-  // Verify the attribute is propagated to the RTLIR variable.
+
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   EXPECT_EQ(mod->variables[0].attrs[0].name, "full_case");
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
@@ -200,12 +169,8 @@ static void VerifyFirstAttrResolved(RtlirDesign* design, ElabFixture& f,
             expected);
 }
 
-// =========================================================================
-// §5.12 Semantic: Attribute takes type of expression when value assigned
-// =========================================================================
-
 TEST(ElabA91, AttributeValueFromExpression) {
-  // §5.12: Otherwise, the attribute takes the type of the expression.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -223,7 +188,7 @@ TEST(ElabA91, AttributeValueFromExpression) {
 }
 
 TEST(ElabA91, AttributeValueConstExpr) {
-  // §5.12: Value is a constant expression — evaluated at elaboration time.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -234,7 +199,7 @@ TEST(ElabA91, AttributeValueConstExpr) {
 }
 
 TEST(ElabA91, AttributeValueString) {
-  // §5.12 Example 6: mode = "cla" — string-valued attribute.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -247,18 +212,12 @@ TEST(ElabA91, AttributeValueString) {
   ASSERT_FALSE(mod->variables.empty());
   ASSERT_FALSE(mod->variables[0].attrs.empty());
   EXPECT_EQ(mod->variables[0].attrs[0].name, "tool_purpose");
-  // String values: resolved_value may be nullopt (not integer-evaluable).
-  // The string_value should be preserved.
+
   EXPECT_EQ(mod->variables[0].attrs[0].string_value, "synthesis");
 }
 
-// =========================================================================
-// §5.12 Semantic: Duplicate attribute — last value wins + warning
-// =========================================================================
-
 TEST(ElabA91, DuplicateAttrLastWins) {
-  // §5.12: If the same attribute name is defined more than once for the
-  // same language element, the last attribute value shall be used.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -268,7 +227,7 @@ TEST(ElabA91, DuplicateAttrLastWins) {
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
   ASSERT_FALSE(mod->variables.empty());
-  // After dedup, only one 'depth' attribute should remain with the last value.
+
   auto& attrs = mod->variables[0].attrs;
   int depth_count = 0;
   for (auto& a : attrs) {
@@ -282,8 +241,7 @@ TEST(ElabA91, DuplicateAttrLastWins) {
 }
 
 TEST(ElabA91, DuplicateAttrWarning) {
-  // §5.12: A tool can issue a warning that a duplicate attribute
-  // specification has occurred.
+
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -294,7 +252,7 @@ TEST(ElabA91, DuplicateAttrWarning) {
 }
 
 TEST(ElabA91, DuplicateAttrAcrossInstances) {
-  // §5.12: Duplicate across separate attribute_instance blocks.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -319,12 +277,8 @@ TEST(ElabA91, DuplicateAttrAcrossInstances) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// =========================================================================
-// §5.12 Prefix attachment: declarations
-// =========================================================================
-
 TEST(ElabA91, AttrOnVarDecl) {
-  // §5.12: attribute_instance as prefix on a declaration.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -339,7 +293,7 @@ TEST(ElabA91, AttrOnVarDecl) {
 }
 
 TEST(ElabA91, AttrOnNetDecl) {
-  // §5.12: attribute on a net declaration.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -353,12 +307,8 @@ TEST(ElabA91, AttrOnNetDecl) {
   EXPECT_EQ(mod->nets[0].attrs[0].name, "mark");
 }
 
-// =========================================================================
-// §5.12 Prefix attachment: module items
-// =========================================================================
-
 TEST(ElabA91, AttrOnContAssign) {
-  // §5.12: attribute on a continuous assignment (module item).
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -374,7 +324,7 @@ TEST(ElabA91, AttrOnContAssign) {
 }
 
 TEST(ElabA91, AttrOnModuleInst) {
-  // §5.12 Example 4: attribute on a module instantiation.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module sub(input a);\n"
@@ -392,7 +342,7 @@ TEST(ElabA91, AttrOnModuleInst) {
 }
 
 TEST(ElabA91, AttrOnModuleDefinition) {
-  // §5.12 Example 3: attribute on a module definition.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "(* optimize_power *)\n"
@@ -405,12 +355,8 @@ TEST(ElabA91, AttrOnModuleDefinition) {
   EXPECT_EQ(mod->attrs[0].name, "optimize_power");
 }
 
-// =========================================================================
-// §5.12 Prefix attachment: statements
-// =========================================================================
-
 TEST(ElabA91, AttrOnCaseStmt) {
-  // §5.12 Example 1: full_case, parallel_case on a case statement.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -435,7 +381,7 @@ TEST(ElabA91, AttrOnCaseStmt) {
 }
 
 TEST(ElabA91, AttrOnIfStmt) {
-  // §5.12: attribute as prefix on an if statement.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -454,7 +400,7 @@ TEST(ElabA91, AttrOnIfStmt) {
 }
 
 TEST(ElabA91, AttrOnForLoop) {
-  // §5.12: attribute on a for loop statement.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -472,7 +418,7 @@ TEST(ElabA91, AttrOnForLoop) {
 }
 
 TEST(ElabA91, AttrOnAssignStmt) {
-  // §5.12: attribute on an assignment statement.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -488,12 +434,8 @@ TEST(ElabA91, AttrOnAssignStmt) {
   EXPECT_EQ(assign_stmt->attrs[0].name, "mark");
 }
 
-// =========================================================================
-// §5.12 Prefix attachment: port connections
-// =========================================================================
-
 TEST(ElabA91, AttrOnPortConnection) {
-  // §5.12: attribute_instance as prefix on a port connection.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -504,12 +446,8 @@ TEST(ElabA91, AttrOnPortConnection) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// =========================================================================
-// §5.12 Suffix attachment: operators
-// =========================================================================
-
 TEST(ElabA91, AttrOnBinaryOperator) {
-  // §5.12 Example 6: a = b + (* mode = "cla" *) c;
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -522,7 +460,7 @@ TEST(ElabA91, AttrOnBinaryOperator) {
 }
 
 TEST(ElabA91, AttrOnTernaryOperator) {
-  // §5.12 Example 8: a = b ? (* no_glitch *) c : d;
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -534,12 +472,8 @@ TEST(ElabA91, AttrOnTernaryOperator) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// =========================================================================
-// §5.12 Suffix attachment: function name in expression
-// =========================================================================
-
 TEST(ElabA91, AttrOnFunctionCall) {
-  // §5.12 Example 7: a = add (* mode = "cla" *) (b, c);
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -552,7 +486,7 @@ TEST(ElabA91, AttrOnFunctionCall) {
 }
 
 TEST(ElabA91, AttrOnFunctionCallNoArgs) {
-  // §5.12: attribute on function call with no arguments.
+
   ElabFixture f;
   auto* cu = ParseSrc(
       "module m;\n"
@@ -564,12 +498,8 @@ TEST(ElabA91, AttrOnFunctionCallNoArgs) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// =========================================================================
-// Elaboration: attribute propagation to RTLIR
-// =========================================================================
-
 TEST(ElabA91, AttrPropagatedToRtlirProcess) {
-  // Attributes on always block should propagate to RtlirProcess.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -585,12 +515,8 @@ TEST(ElabA91, AttrPropagatedToRtlirProcess) {
   EXPECT_EQ(mod->processes[0].attrs[0].name, "synthesis");
 }
 
-// =========================================================================
-// Mixed: attribute with various constant expression types
-// =========================================================================
-
 TEST(ElabA91, AttrValueZero) {
-  // §5.12 Example 2: parallel_case = 0 explicitly disables.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -606,7 +532,7 @@ TEST(ElabA91, AttrValueZero) {
 }
 
 TEST(ElabA91, AttrValueLargeInt) {
-  // Constant expression with a larger integer value.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -616,12 +542,8 @@ TEST(ElabA91, AttrValueLargeInt) {
   VerifyFirstAttrResolved(design, f, 255);
 }
 
-// =========================================================================
-// §5.12: Multiple attributes on same declaration, different names
-// =========================================================================
-
 TEST(ElabA91, MultipleDistinctAttrsPreserved) {
-  // Multiple distinct attributes should all be preserved.
+
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -636,7 +558,6 @@ TEST(ElabA91, MultipleDistinctAttrsPreserved) {
   EXPECT_EQ(mod->variables[0].attrs[1].name, "optimize");
 }
 
-// §12.3: statements with attributes execute normally
 TEST(SimA604, AttributedStatementExecutes) {
   SimA604Fixture f;
   auto* design = ElaborateSrc(
@@ -656,4 +577,4 @@ TEST(SimA604, AttributedStatementExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

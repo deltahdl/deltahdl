@@ -1,5 +1,3 @@
-// §33.3.1: Specifying libraries—the library map file
-
 #include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -8,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.1.1 library_description ::=
-//   library_declaration | include_statement | config_declaration | ;
-// =============================================================================
-// Multiple library descriptions mixed together.
 TEST(LibraryText, MixedDescriptions) {
   auto r = ParseLibrary(
       "library lib1 /a/*.v;\n"
@@ -27,10 +20,6 @@ TEST(LibraryText, MixedDescriptions) {
   ASSERT_EQ(r.cu->lib_includes.size(), 1u);
 }
 
-// =============================================================================
-// AST structural verification — ensures AST nodes capture all data.
-// =============================================================================
-// Verify LibraryDecl stores source range.
 TEST(LibraryText, LibraryDeclHasSourceRange) {
   auto r = ParseLibrary("library mylib /proj/*.v;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -39,10 +28,6 @@ TEST(LibraryText, LibraryDeclHasSourceRange) {
   EXPECT_NE(r.cu->libraries[0]->range.start.line, 0u);
 }
 
-// =============================================================================
-// Multiple library declarations.
-// =============================================================================
-// Multiple libraries, each mapping different file patterns.
 TEST(LibraryText, MultipleLibraries) {
   auto r = ParseLibrary(
       "library rtlLib *.v;\n"
@@ -56,32 +41,22 @@ TEST(LibraryText, MultipleLibraries) {
   EXPECT_EQ(r.cu->libraries[2]->name, "tbLib");
 }
 
-// =============================================================================
-// Error handling.
-// =============================================================================
-// Missing semicolon after library declaration.
 TEST(LibraryText, ErrorMissingSemicolon) {
   auto r = ParseLibrary("library lib /proj/*.v\n");
   EXPECT_TRUE(r.has_errors);
 }
 
-// Missing file path spec.
 TEST(LibraryText, ErrorMissingFilePath) {
   auto r = ParseLibrary("library lib;\n");
-  // Should produce an error: file_path_spec is required.
+
   EXPECT_TRUE(r.has_errors);
 }
 
-// Missing library identifier.
 TEST(LibraryText, ErrorMissingLibraryName) {
   auto r = ParseLibrary("library;\n");
   EXPECT_TRUE(r.has_errors);
 }
 
-// =============================================================================
-// LRM §33 examples — library map file from the specification.
-// =============================================================================
-// LRM example: library rtlLib *.v;
 TEST(LibraryText, LrmExampleSimple) {
   auto r = ParseLibrary("library rtlLib *.v;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -91,7 +66,6 @@ TEST(LibraryText, LrmExampleSimple) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "*.v");
 }
 
-// LRM example: library gateLib ./*.vg;
 TEST(LibraryText, LrmExampleDotSlash) {
   auto r = ParseLibrary("library gateLib ./*.vg;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -101,7 +75,6 @@ TEST(LibraryText, LrmExampleDotSlash) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "./*.vg");
 }
 
-// LRM comprehensive example with all features.
 TEST(LibraryText, LrmComprehensiveExample) {
   auto r = ParseLibrary(
       "// Library map file\n"
@@ -120,10 +93,6 @@ TEST(LibraryText, LrmComprehensiveExample) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
 }
 
-// =============================================================================
-// Lexer: file_path_spec token recognition.
-// =============================================================================
-// Verify the lexer correctly reads file path specs with special chars.
 TEST(LibraryText, LexerFilePathSpecAbsolute) {
   auto r = ParseLibrary("library lib /proj/rtl/top.v;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -131,7 +100,6 @@ TEST(LibraryText, LexerFilePathSpecAbsolute) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/proj/rtl/top.v");
 }
 
-// File path spec with parent directory (..).
 TEST(LibraryText, LexerFilePathSpecParentDir) {
   auto r = ParseLibrary("library lib ../rtl/*.v;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -139,7 +107,6 @@ TEST(LibraryText, LexerFilePathSpecParentDir) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "../rtl/*.v");
 }
 
-// Config declaration within library text.
 TEST(LibraryText, ConfigInLibraryText) {
   auto r = ParseLibrary(
       "library lib1 /a/*.v;\n"
@@ -154,10 +121,6 @@ TEST(LibraryText, ConfigInLibraryText) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-// =============================================================================
-// A.1.1 library_text ::= { library_description }
-// =============================================================================
-// Empty library text produces an empty CompilationUnit.
 TEST(LibraryText, EmptyInput) {
   auto r = ParseLibrary("");
   ASSERT_NE(r.cu, nullptr);
@@ -167,12 +130,6 @@ TEST(LibraryText, EmptyInput) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
-// =============================================================================
-// A.1.1 library_declaration ::=
-//   library library_identifier file_path_spec
-//   { , file_path_spec } [ -incdir file_path_spec { , file_path_spec } ] ;
-// =============================================================================
-// Basic library declaration with a single file path.
 TEST(LibraryText, BasicLibraryDecl) {
   auto r = ParseLibrary("library mylib /proj/rtl/top.v;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -183,7 +140,6 @@ TEST(LibraryText, BasicLibraryDecl) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/proj/rtl/top.v");
 }
 
-// Library declaration with wildcard file path.
 TEST(LibraryText, LibraryDeclWildcard) {
   auto r = ParseLibrary("library rtlLib *.v;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -194,7 +150,6 @@ TEST(LibraryText, LibraryDeclWildcard) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "*.v");
 }
 
-// Library declaration with dot-slash relative path.
 TEST(LibraryText, LibraryDeclDotSlash) {
   auto r = ParseLibrary("library gateLib ./*.vg;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -203,7 +158,6 @@ TEST(LibraryText, LibraryDeclDotSlash) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "./*.vg");
 }
 
-// Library declaration with multiple file paths.
 TEST(LibraryText, LibraryDeclMultiplePaths) {
   auto r = ParseLibrary("library lib /a/*.v, /b/*.v;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -214,7 +168,6 @@ TEST(LibraryText, LibraryDeclMultiplePaths) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[1], "/b/*.v");
 }
 
-// Library declaration with -incdir clause.
 TEST(LibraryText, LibraryDeclWithIncdir) {
   auto r = ParseLibrary("library lib /proj/*.v -incdir /proj/inc;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -226,7 +179,6 @@ TEST(LibraryText, LibraryDeclWithIncdir) {
   EXPECT_EQ(r.cu->libraries[0]->incdir_paths[0], "/proj/inc");
 }
 
-// Library declaration with multiple -incdir paths.
 TEST(LibraryText, LibraryDeclMultipleIncdir) {
   auto r = ParseLibrary("library lib /proj/*.v -incdir /inc1, /inc2, /inc3;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -238,7 +190,6 @@ TEST(LibraryText, LibraryDeclMultipleIncdir) {
   EXPECT_EQ(r.cu->libraries[0]->incdir_paths[2], "/inc3");
 }
 
-// Library declaration with both multiple file paths and multiple -incdir.
 TEST(LibraryText, LibraryDeclFullForm) {
   auto r = ParseLibrary(
       "library rtlLib /proj/rtl/*.v, /proj/extra/*.v\n"
@@ -255,7 +206,6 @@ TEST(LibraryText, LibraryDeclFullForm) {
   EXPECT_EQ(r.cu->libraries[0]->incdir_paths[1], "/proj/common");
 }
 
-// Library declaration with hierarchical wildcard path (...).
 TEST(LibraryText, LibraryDeclHierarchicalWildcard) {
   auto r = ParseLibrary("library deepLib .../a.v;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -264,7 +214,6 @@ TEST(LibraryText, LibraryDeclHierarchicalWildcard) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], ".../a.v");
 }
 
-// Library declaration with single-char wildcard (?).
 TEST(LibraryText, LibraryDeclQuestionWildcard) {
   auto r = ParseLibrary("library lib ./rtl/?.v;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -273,7 +222,6 @@ TEST(LibraryText, LibraryDeclQuestionWildcard) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "./rtl/?.v");
 }
 
-// Library declaration with directory-only path (trailing slash).
 TEST(LibraryText, LibraryDeclDirectoryPath) {
   auto r = ParseLibrary("library lib /proj/rtl/;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -282,4 +230,4 @@ TEST(LibraryText, LibraryDeclDirectoryPath) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/proj/rtl/");
 }
 
-}  // namespace
+}

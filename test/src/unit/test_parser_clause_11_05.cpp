@@ -1,15 +1,9 @@
-// §11.5: Operands
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
 
-// =========================================================================
-// LRM section 11.1 -- Operators and operands overview
-// =========================================================================
-// --- Primary operand types ---
 TEST(ParserSection11, Sec11_1_IdentifierAsExpression) {
   auto r = Parse(
       "module t;\n"
@@ -20,7 +14,6 @@ TEST(ParserSection11, Sec11_1_IdentifierAsExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kIdentifier);
 }
 
-// --- Call expressions ---
 TEST(ParserSection11, Sec11_1_SystemFunctionCallExpression) {
   auto r = Parse(
       "module t;\n"
@@ -44,4 +37,4 @@ TEST(ParserSection11, Sec11_1_FunctionCallExpression) {
   EXPECT_EQ(rhs->args.size(), 2u);
 }
 
-}  // namespace
+}

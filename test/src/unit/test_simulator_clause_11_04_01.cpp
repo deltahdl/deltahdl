@@ -1,5 +1,3 @@
-// §11.4.1: Assignment operators
-
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "simulator/eval.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// § variable_lvalue — compound assignment +=
 TEST(SimA85, VarLvalueCompoundAdd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -28,9 +25,6 @@ TEST(SimA85, VarLvalueCompoundAdd) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// ==========================================================================
-// Compound assignment operators (+=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
-// ==========================================================================
 TEST(EvalOp, PlusEq) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
@@ -91,4 +85,4 @@ TEST(EvalOp, PercentEq) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

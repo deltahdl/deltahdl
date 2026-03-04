@@ -1,15 +1,9 @@
-// §30.4.4.1: Conditional expression
-
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-// =============================================================================
-// A.8.6 Operators — unary_module_path_operator
-// =============================================================================
-// § unary_module_path_operator — ! in specify path condition
 TEST(ParserA86, UnaryModulePathNot) {
   auto r = Parse(
       "module m(input a, output y);\n"
@@ -21,7 +15,6 @@ TEST(ParserA86, UnaryModulePathNot) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § unary_module_path_operator — ~ in specify path condition
 TEST(ParserA86, UnaryModulePathBitwiseNot) {
   auto r = Parse(
       "module m(input a, output y);\n"
@@ -33,7 +26,6 @@ TEST(ParserA86, UnaryModulePathBitwiseNot) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § binary_module_path_operator — != in specify path condition
 TEST(ParserA86, BinaryModulePathNeq) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -45,7 +37,6 @@ TEST(ParserA86, BinaryModulePathNeq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § binary_module_path_operator — || in specify path condition
 TEST(ParserA86, BinaryModulePathLogicalOr) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -57,7 +48,6 @@ TEST(ParserA86, BinaryModulePathLogicalOr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// § binary_module_path_operator — ~^ in specify path condition
 TEST(ParserA86, BinaryModulePathXnorAlt) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -69,4 +59,4 @@ TEST(ParserA86, BinaryModulePathXnorAlt) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

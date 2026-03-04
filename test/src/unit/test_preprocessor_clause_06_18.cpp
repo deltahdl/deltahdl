@@ -1,5 +1,3 @@
-// §6.18: User-defined types
-
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -36,11 +34,9 @@ TEST(ParserSection6, TypedefUnion) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-// =========================================================================
-// §6.18: User-defined types (typedef)
-// =========================================================================
+
 TEST(ParserSection6, TypedefLogicVector) {
-  // §6.18: typedef creates a user-defined type from a built-in type.
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -53,7 +49,7 @@ TEST(ParserSection6, TypedefLogicVector) {
 }
 
 TEST(ParserSection6, TypedefUsedInVarDecl) {
-  // §6.18: A typedef-defined name appears as kNamed in subsequent decls.
+
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  typedef int counter_t;\n"
@@ -66,4 +62,4 @@ TEST(ParserSection6, TypedefUsedInVarDecl) {
   EXPECT_EQ(var->data_type.type_name, "counter_t");
 }
 
-}  // namespace
+}

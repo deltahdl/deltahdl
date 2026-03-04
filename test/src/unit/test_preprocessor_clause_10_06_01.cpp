@@ -1,5 +1,3 @@
-// §10.6.1: The assign and deassign procedural statements
-
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// =============================================================================
-// LRM section 10.6.1 -- Procedural assign / deassign
-// =============================================================================
 TEST(ParserSection10, ProceduralAssignKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -87,4 +82,4 @@ TEST(ParserSection10, ProceduralAssignThenDeassign) {
   EXPECT_EQ(s1->kind, StmtKind::kDeassign);
 }
 
-}  // namespace
+}

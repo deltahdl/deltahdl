@@ -1,5 +1,3 @@
-// §6.9.1: Specifying vectors
-
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -18,7 +16,6 @@ TEST(ParserA25, PackedDimElaboratesWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// § genvar_expression — genvar in generate for elaborates
 TEST(ElabA83, GenvarExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -31,4 +28,4 @@ TEST(ElabA83, GenvarExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

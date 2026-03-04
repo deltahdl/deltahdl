@@ -1,5 +1,3 @@
-// §12.6.2: Pattern matching in if statements
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -10,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §12.6.2: matches operator in if-condition elaborates
 TEST(ElabA60701, MatchesInIfElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -26,4 +23,4 @@ TEST(ElabA60701, MatchesInIfElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}  // namespace
+}
