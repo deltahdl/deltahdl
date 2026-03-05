@@ -87,9 +87,7 @@ def test_filter_implementable_prints_rationale(capsys) -> None:
     )
     with patch("implement_clause.subprocess.run", return_value=cp):
         filter_implementable("text", THREE_SUBCLAUSES)
-    out = capsys.readouterr().out
-    assert "4.1" in out
-    assert "Defines syntax rules" in out
+    assert "Rationale for 4.1: Defines syntax rules" in capsys.readouterr().out
 
 
 def test_filter_implementable_empty() -> None:
