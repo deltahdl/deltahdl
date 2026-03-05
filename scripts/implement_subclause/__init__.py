@@ -12,6 +12,11 @@ import sys
 from pathlib import Path
 
 from lib.lrm import extract_clause_text, load_lrm_titles
+from lib.supplementary import (
+    build_supplementary_lines,
+    check_supplementary_args,
+    parse_supplementary_csv_args,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -91,22 +96,6 @@ def find_context_subclauses(
 # Supplementary files (Figures / Tables)
 # ---------------------------------------------------------------------------
 
-def _label_from_gv(path: Path) -> str:
-    """Figure_4_1.gv -> 'Figure 4-1'."""
-    return path.stem.replace("_", " ", 1).replace("_", "-")
-
-
-def _label_from_md(path: Path) -> str:
-    """TABLE_B_1.md -> 'Table B-1'."""
-    raw = path.stem[len("TABLE_"):]
-    return f"Table {raw.replace('_', '-')}"
-
-
-def _shorthand_from_label(label: str) -> str:
-    """'Figure 4-1' -> '4-1', 'Table B-1' -> 'B-1'."""
-    return label.split(" ", 1)[1]
-
-
 def _lrm_labels_for_subclause(
     lrm_path: Path, clause: str,
 ) -> tuple[list[str], list[str]]:
@@ -125,88 +114,6 @@ def _lrm_labels_for_subclause(
             tables.append(m.group(1))
 
     return figures, tables
-
-
-def check_supplementary_args(
-    clause: str,
-    lrm_path: Path,
-    *,
-    figures: list[Path],
-    tables: list[Path],
-    ignore_figures: list[str],
-) -> list[str]:
-    """Validate that all required figures/tables are provided.
-
-    Returns the list of validated labels.
-    Raises ``SystemExit`` if any are missing or paths don't exist.
-    """
-    errors: list[str] = []
-
-    for path in figures:
-        if not path.is_file():
-            errors.append(f"--figures path does not exist: {path}")
-    for path in tables:
-        if not path.is_file():
-            errors.append(f"--tables path does not exist: {path}")
-
-    if errors:
-        for e in errors:
-            print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    lrm_figs, lrm_tbls = _lrm_labels_for_subclause(lrm_path, clause)
-
-    provided_fig_shorthands = {
-        _shorthand_from_label(_label_from_gv(p)) for p in figures
-    }
-    ignored = set(ignore_figures)
-
-    for label in lrm_figs:
-        if label not in provided_fig_shorthands and label not in ignored:
-            errors.append(
-                f"Figure {label} required for clause {clause}"
-                f" (use --figures or --ignore-figures {label})"
-            )
-
-    provided_tbl_shorthands = {
-        _shorthand_from_label(_label_from_md(p)) for p in tables
-    }
-
-    for label in lrm_tbls:
-        if label not in provided_tbl_shorthands:
-            errors.append(
-                f"Table {label} required for clause {clause}"
-                f" (use --tables)"
-            )
-
-    if errors:
-        for e in errors:
-            print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    return lrm_figs + lrm_tbls
-
-
-def build_supplementary_lines(
-    *, figures: list[Path], tables: list[Path],
-) -> str:
-    """Build prompt lines referencing available Figures/Tables."""
-    if not figures and not tables:
-        return ""
-    lines: list[str] = []
-    for path in figures:
-        label = _label_from_gv(path)
-        lines.append(
-            f"Consult {label} at {path} (DOT GraphViz)"
-            f" when implementing."
-        )
-    for path in tables:
-        label = _label_from_md(path)
-        lines.append(
-            f"Consult {label} at {path} (Markdown)"
-            f" when implementing."
-        )
-    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -341,16 +248,16 @@ def invoke_claude(
         sys.exit(1)
 
 
-def run_prompt(
-    build_fn, lrm_path: Path, clause: str, *,
-    issue: int, model: str, continue_session: bool = False,
-) -> None:
+def run_prompt(build_fn, args: argparse.Namespace) -> None:
     """Load titles, build a prompt via *build_fn*, and invoke Claude."""
-    titles = load_lrm_titles(lrm_path)
-    print(f"Loaded {len(titles)} LRM clause titles from {lrm_path}")
-    prompt = build_fn(clause, titles, str(lrm_path), issue=issue)
+    titles = load_lrm_titles(args.lrm)
+    print(f"Loaded {len(titles)} LRM clause titles from {args.lrm}")
+    prompt = build_fn(args.subclause, titles, str(args.lrm), issue=args.issue)
     print(f"Built prompt ({len(prompt)} characters)")
-    invoke_claude(prompt, model=model, continue_session=continue_session)
+    invoke_claude(
+        prompt, model=args.model,
+        continue_session=args.continue_session,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -423,18 +330,7 @@ def parse_args(argv=None):
             "(V is a number or uppercase letter; remaining parts are numbers)."
         )
 
-    args.figures = (
-        [Path(p.strip()) for p in args.figures.split(",") if p.strip()]
-        if args.figures else []
-    )
-    args.tables = (
-        [Path(p.strip()) for p in args.tables.split(",") if p.strip()]
-        if args.tables else []
-    )
-    args.ignore_figures = (
-        [s.strip() for s in args.ignore_figures.split(",") if s.strip()]
-        if args.ignore_figures else []
-    )
+    parse_supplementary_csv_args(args)
 
     return args
 
@@ -453,8 +349,9 @@ def main(argv=None):
         f" issue #{args.issue}, model {args.model}",
     )
 
+    lrm_labels = _lrm_labels_for_subclause(args.lrm, args.subclause)
     check_supplementary_args(
-        args.subclause, args.lrm,
+        args.subclause, lrm_labels,
         figures=args.figures,
         tables=args.tables,
         ignore_figures=args.ignore_figures,
@@ -470,8 +367,4 @@ def main(argv=None):
     bound_handler = functools.partial(
         build_prompt, supplementary=supplementary,
     )
-    run_prompt(
-        bound_handler, args.lrm, args.subclause,
-        issue=args.issue, model=args.model,
-        continue_session=args.continue_session,
-    )
+    run_prompt(bound_handler, args)

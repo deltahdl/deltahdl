@@ -481,36 +481,6 @@ def test_parse_args_neither_rejects(monkeypatch):
         _parse_args()
 
 
-# ---- fetch_issue_title -----------------------------------------------------
-
-
-def test_fetch_issue_title_returns_title(monkeypatch):
-    """Returns stripped stdout from gh api."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "Classify tests in foo.cpp\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr(
-        subprocess, "run", lambda _cmd, **_kw: mock_result,
-    )
-    assert classify_files.fetch_issue_title("o", "r", 1) == (
-        "Classify tests in foo.cpp"
-    )
-
-
-def test_fetch_issue_title_exits_on_failure(monkeypatch):
-    """sys.exit(1) when gh api fails."""
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-    mock_result.stderr = "not found"
-    monkeypatch.setattr(
-        subprocess, "run", lambda _cmd, **_kw: mock_result,
-    )
-    with pytest.raises(SystemExit):
-        classify_files.fetch_issue_title("o", "r", 999)
-
-
 # ---- extract_filename_from_title ------------------------------------------
 
 

@@ -1,13 +1,14 @@
 """Unit tests for implement_subclause."""
 
+import argparse
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from implement_subclause import (
+    _lrm_labels_for_subclause,
     build_hierarchy,
-    build_supplementary_lines,
-    check_supplementary_args,
     find_context_subclauses,
     format_prompt,
     invoke_claude,
@@ -121,65 +122,8 @@ class TestBuildHierarchyAnnex:
         }
 
 
-# ---- build_supplementary_lines ---------------------------------------------
+# ---- _lrm_labels_for_subclause --------------------------------------------
 
-
-def test_build_supplementary_lines_with_figure(tmp_path):
-    """Generates consult line for a .gv figure."""
-    gv = tmp_path / "Figure_4_1.gv"
-    gv.write_text("digraph {}")
-    lines = build_supplementary_lines(figures=[gv], tables=[])
-    assert "Figure 4-1" in lines and "DOT GraphViz" in lines
-
-
-def test_build_supplementary_lines_with_table(tmp_path):
-    """Generates consult line for a .md table."""
-    md = tmp_path / "TABLE_B_1.md"
-    md.write_text("| keyword |\n")
-    lines = build_supplementary_lines(figures=[], tables=[md])
-    assert "Table B-1" in lines and "Markdown" in lines
-
-
-def test_build_supplementary_lines_empty_when_none():
-    """Returns empty string when no figures or tables provided."""
-    assert build_supplementary_lines(figures=[], tables=[]) == ""
-
-
-def test_build_supplementary_lines_includes_figure(tmp_path):
-    """Multiple supplementary files include the figure label."""
-    gv = tmp_path / "Figure_4_1.gv"
-    gv.write_text("digraph {}")
-    md = tmp_path / "TABLE_4_1.md"
-    md.write_text("| col |\n")
-    assert "Figure 4-1" in build_supplementary_lines(figures=[gv], tables=[md])
-
-
-def test_build_supplementary_lines_includes_table(tmp_path):
-    """Multiple supplementary files include the table label."""
-    gv = tmp_path / "Figure_4_1.gv"
-    gv.write_text("digraph {}")
-    md = tmp_path / "TABLE_4_1.md"
-    md.write_text("| col |\n")
-    assert "Table 4-1" in build_supplementary_lines(figures=[gv], tables=[md])
-
-
-# ---- check_supplementary_args ---------------------------------------------
-
-
-_LRM_WITH_FIGURES_AND_TABLES = """\
-4. Scheduling semantics
-Figure 4-1\u2014Event scheduling regions
-Table 4-1\u2014PLI callbacks
-
-5. Data types
-"""
-
-_LRM_NO_SUPPLEMENTARY = """\
-99. Empty clause
-Nothing here.
-
-100. Next clause
-"""
 
 _LRM_MULTI_SUBCLAUSE = """\
 4. Scheduling semantics
@@ -198,117 +142,18 @@ No figures or tables.
 """
 
 
-def test_check_fails_when_figure_missing(tmp_path):
-    """Fails when LRM lists a figure but no --figures or --ignore-figures."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
-    with pytest.raises(SystemExit):
-        check_supplementary_args(
-            "4", lrm, figures=[], tables=[], ignore_figures=[],
-        )
-
-
-def test_check_passes_when_figure_ignored(tmp_path):
-    """Passes when figure is in --ignore-figures."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
-    tbl = tmp_path / "TABLE_4_1.md"
-    tbl.write_text("| col |\n")
-    assert check_supplementary_args(
-        "4", lrm, figures=[], tables=[tbl], ignore_figures=["4-1"],
-    ) == ["4-1", "4-1"]
-
-
-def test_check_passes_when_all_supplementary_provided(tmp_path):
-    """Passes when all figures and tables are provided."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
-    fig = tmp_path / "Figure_4_1.gv"
-    fig.write_text("digraph {}")
-    tbl = tmp_path / "TABLE_4_1.md"
-    tbl.write_text("| col |\n")
-    assert check_supplementary_args(
-        "4", lrm, figures=[fig], tables=[tbl], ignore_figures=[],
-    ) == ["4-1", "4-1"]
-
-
-def test_check_fails_when_table_missing(tmp_path):
-    """Fails when LRM lists a table but no --tables provided."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_WITH_FIGURES_AND_TABLES)
-    fig = tmp_path / "Figure_4_1.gv"
-    fig.write_text("digraph {}")
-    with pytest.raises(SystemExit):
-        check_supplementary_args(
-            "4", lrm, figures=[fig], tables=[], ignore_figures=[],
-        )
-
-
-def test_check_fails_when_figure_path_missing(tmp_path):
-    """Fails when a --figures path does not exist on disk."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_NO_SUPPLEMENTARY)
-    with pytest.raises(SystemExit):
-        check_supplementary_args(
-            "99", lrm,
-            figures=[tmp_path / "nonexistent.gv"],
-            tables=[], ignore_figures=[],
-        )
-
-
-def test_check_fails_when_table_path_missing(tmp_path):
-    """Fails when a --tables path does not exist on disk."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_NO_SUPPLEMENTARY)
-    with pytest.raises(SystemExit):
-        check_supplementary_args(
-            "99", lrm,
-            figures=[],
-            tables=[tmp_path / "nonexistent.md"],
-            ignore_figures=[],
-        )
-
-
-def test_check_passes_when_no_supplementary(tmp_path):
-    """Passes when clause has no figures or tables in LRM."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_NO_SUPPLEMENTARY)
-    assert not check_supplementary_args(
-        "99", lrm, figures=[], tables=[], ignore_figures=[],
-    )
-
-
-# ---- scoped supplementary (subclause-only) --------------------------------
-
-
-def test_check_passes_when_subclause_has_no_refs(tmp_path):
-    """Passes when subclause text has no figure/table references."""
+def test_lrm_labels_subclause_has_no_refs(tmp_path):
+    """Returns empty lists when subclause has no figure/table refs."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_MULTI_SUBCLAUSE)
-    assert not check_supplementary_args(
-        "4.3", lrm, figures=[], tables=[], ignore_figures=[],
-    )
+    assert _lrm_labels_for_subclause(lrm, "4.3") == ([], [])
 
 
-def test_check_requires_only_subclause_tables(tmp_path):
-    """Only requires tables referenced in the target subclause."""
+def test_lrm_labels_subclause_finds_table(tmp_path):
+    """Finds table labels scoped to the target subclause."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_MULTI_SUBCLAUSE)
-    tbl = tmp_path / "TABLE_4_2.md"
-    tbl.write_text("| col |\n")
-    assert check_supplementary_args(
-        "4.2", lrm, figures=[], tables=[tbl], ignore_figures=[],
-    ) == ["4-2"]
-
-
-def test_check_fails_when_subclause_table_missing(tmp_path):
-    """Fails when subclause references a table but it is not provided."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_MULTI_SUBCLAUSE)
-    with pytest.raises(SystemExit):
-        check_supplementary_args(
-            "4.2", lrm, figures=[], tables=[], ignore_figures=[],
-        )
+    assert _lrm_labels_for_subclause(lrm, "4.2") == ([], ["4-2"])
 
 
 # ---- format_prompt --------------------------------------------------------
@@ -421,7 +266,11 @@ def test_run_prompt_calls_invoke(mock_invoke, tmp_path):
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("4. Scheduling semantics\n4.1 General\n")
     build_fn = MagicMock(return_value="generated prompt")
-    run_prompt(build_fn, lrm, "4.1", issue=6, model="sonnet")
+    args = argparse.Namespace(
+        lrm=lrm, subclause="4.1", issue=6,
+        model="sonnet", continue_session=False,
+    )
+    run_prompt(build_fn, args)
     assert mock_invoke.call_args[0][0] == "generated prompt"
 
 
@@ -431,8 +280,9 @@ def test_run_prompt_passes_continue_session(mock_invoke, tmp_path):
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("4. Scheduling semantics\n4.1 General\n")
     build_fn = MagicMock(return_value="generated prompt")
-    run_prompt(
-        build_fn, lrm, "4.1", issue=6, model="sonnet",
-        continue_session=True,
+    args = argparse.Namespace(
+        lrm=lrm, subclause="4.1", issue=6,
+        model="sonnet", continue_session=True,
     )
+    run_prompt(build_fn, args)
     assert mock_invoke.call_args[1]["continue_session"] is True

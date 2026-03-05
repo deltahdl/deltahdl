@@ -136,17 +136,19 @@ def test_parse_args_continue_default_false(tmp_path):
 
 @patch("implement_subclause.run_prompt")
 @patch("implement_subclause.check_supplementary_args")
-def test_main_dispatches_depth_1(_mock_check, mock_run, tmp_path):
-    """main() passes model through to run_prompt."""
+@patch("implement_subclause._lrm_labels_for_subclause", return_value=([], []))
+def test_main_dispatches_depth_1(_mock_labels, _mock_check, mock_run, tmp_path):
+    """main() passes args namespace to run_prompt."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
     main(["--lrm", str(lrm), "--subclause", "4", "--issue", "6", "--model", "opus"])
-    assert mock_run.call_args[1]["model"] == "opus"
+    assert mock_run.call_args[0][1].model == "opus"
 
 
 @patch("implement_subclause.run_prompt")
 @patch("implement_subclause.check_supplementary_args")
-def test_main_with_figures(_mock_check, mock_run, tmp_path):
+@patch("implement_subclause._lrm_labels_for_subclause", return_value=([], []))
+def test_main_with_figures(_mock_labels, _mock_check, mock_run, tmp_path):
     """main() builds supplementary string when --figures is provided."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")

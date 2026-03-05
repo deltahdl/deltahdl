@@ -9,6 +9,7 @@ from pathlib import Path
 
 from classify_test._git import commit_and_push
 from classify_test._github import fetch_issue_body, update_issue_body
+from lib.classify import add_github_args, add_output_args, add_run_mode_args
 
 
 _TEST_RE = re.compile(
@@ -165,14 +166,7 @@ def _parse_args() -> argparse.Namespace:
         "--file", required=True,
         help="Path to the input test file",
     )
-    parser.add_argument(
-        "--output-dir", required=True,
-        help="Directory for output files",
-    )
-    parser.add_argument(
-        "--lrm", required=True,
-        help="Path to IEEE 1800-2023 LRM text file",
-    )
+    add_output_args(parser)
     issue_group = parser.add_mutually_exclusive_group(required=True)
     issue_group.add_argument(
         "--issue", type=int,
@@ -182,26 +176,8 @@ def _parse_args() -> argparse.Namespace:
         "--create-issue", action="store_true", default=False,
         help="Create a new GitHub issue for tracking",
     )
-    parser.add_argument(
-        "--organization", required=True,
-        help="GitHub organization for the issue",
-    )
-    parser.add_argument(
-        "--repo", required=True,
-        help="GitHub repository for the issue",
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Classify only, don't write files",
-    )
-    parser.add_argument(
-        "--no-commit", action="store_true",
-        help="Skip git commit and push",
-    )
-    parser.add_argument(
-        "--max-lines", type=int, required=True,
-        help="Maximum lines per output file",
-    )
+    add_github_args(parser)
+    add_run_mode_args(parser)
     return parser.parse_args()
 
 

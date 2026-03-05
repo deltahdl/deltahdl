@@ -9,6 +9,7 @@ import pytest
 from lib.github import (
     build_synced_body,
     fetch_issue_body,
+    fetch_issue_title,
     next_unchecked,
     sync_checklist,
     update_issue_body,
@@ -41,6 +42,34 @@ def test_fetch_issue_body_failure() -> None:
     with patch("lib.github.subprocess.run", return_value=cp):
         with pytest.raises(SystemExit):
             fetch_issue_body("org", "repo", 1)
+
+
+# --- fetch_issue_title ---
+
+
+def test_fetch_issue_title_success() -> None:
+    """Title text is returned on successful fetch."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="Title\n")
+    with patch("lib.github.subprocess.run", return_value=cp):
+        assert fetch_issue_title("org", "repo", 1) == "Title"
+
+
+def test_fetch_issue_title_prints_action(capsys) -> None:
+    """Prints that it is fetching the issue title."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="T\n")
+    with patch("lib.github.subprocess.run", return_value=cp):
+        fetch_issue_title("org", "repo", 42)
+    assert "Fetching title" in capsys.readouterr().out
+
+
+def test_fetch_issue_title_failure() -> None:
+    """SystemExit raised on fetch failure."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="", stderr="err",
+    )
+    with patch("lib.github.subprocess.run", return_value=cp):
+        with pytest.raises(SystemExit):
+            fetch_issue_title("org", "repo", 1)
 
 
 # --- update_issue_body ---

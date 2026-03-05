@@ -19,6 +19,10 @@ from lib.github import (
     update_issue_body,
 )
 from lib.lrm import extract_clause_text, parse_subclauses
+from lib.supplementary import (
+    check_supplementary_args,
+    parse_supplementary_csv_args,
+)
 
 
 FIGURE_LABEL_RE = re.compile(r"^Figure ([\d\w]+-[\d\w]+)")
@@ -46,82 +50,6 @@ def _lrm_labels_for_clause(
             tables.append(m.group(1))
 
     return figures, tables
-
-
-def _label_from_gv(path: Path) -> str:
-    """Figure_4_1.gv -> 'Figure 4-1'."""
-    return path.stem.replace("_", " ", 1).replace("_", "-")
-
-
-def _label_from_md(path: Path) -> str:
-    """TABLE_B_1.md -> 'Table B-1'."""
-    raw = path.stem[len("TABLE_"):]
-    return f"Table {raw.replace('_', '-')}"
-
-
-def _shorthand_from_label(label: str) -> str:
-    """'Figure 4-1' -> '4-1', 'Table B-1' -> 'B-1'."""
-    return label.split(" ", 1)[1]
-
-
-def check_supplementary_args(
-    clause: str,
-    lrm_path: Path,
-    *,
-    figures: list[Path],
-    tables: list[Path],
-    ignore_figures: list[str],
-) -> list[str]:
-    """Validate that all clause-level figures/tables are provided.
-
-    Returns the list of validated labels.
-    Raises ``SystemExit`` if any are missing or paths don't exist.
-    """
-    errors: list[str] = []
-
-    for path in figures:
-        if not path.is_file():
-            errors.append(f"--figures path does not exist: {path}")
-    for path in tables:
-        if not path.is_file():
-            errors.append(f"--tables path does not exist: {path}")
-
-    if errors:
-        for e in errors:
-            print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    lrm_figs, lrm_tbls = _lrm_labels_for_clause(lrm_path, clause)
-
-    provided_fig_shorthands = {
-        _shorthand_from_label(_label_from_gv(p)) for p in figures
-    }
-    ignored = set(ignore_figures)
-
-    for label in lrm_figs:
-        if label not in provided_fig_shorthands and label not in ignored:
-            errors.append(
-                f"Figure {label} required for clause {clause}"
-                f" (use --figures or --ignore-figures {label})"
-            )
-
-    provided_tbl_shorthands = {
-        _shorthand_from_label(_label_from_md(p)) for p in tables
-    }
-
-    for label in lrm_tbls:
-        if label not in provided_tbl_shorthands:
-            errors.append(
-                f"Table {label} required for clause {clause}"
-                f" (use --tables)"
-            )
-
-    if errors:
-        for e in errors:
-            print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    return lrm_figs + lrm_tbls
 
 
 def filter_implementable(
@@ -175,23 +103,20 @@ def filter_implementable(
 
 
 def invoke_implement_subclause(
-    *,
-    lrm: str,
+    args: argparse.Namespace,
     subclause: str,
-    issue: int,
-    organization: str,
-    repo: str,
+    *,
     continue_session: bool = False,
 ) -> None:
     """Shell out to ``python -m implement_subclause``."""
     print(f"Invoking implement_subclause for {subclause}...")
     cmd = [
         sys.executable, "-m", "implement_subclause",
-        "--lrm", lrm,
+        "--lrm", args.lrm,
         "--subclause", subclause,
-        "--issue", str(issue),
-        "--organization", organization,
-        "--repo", repo,
+        "--issue", str(args.issue),
+        "--organization", args.organization,
+        "--repo", args.repo,
     ]
     if continue_session:
         cmd.append("--continue")
@@ -231,18 +156,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     if not lrm.exists():
         parser.error(f"LRM file not found: {args.lrm}")
 
-    args.figures = (
-        [Path(p.strip()) for p in args.figures.split(",") if p.strip()]
-        if args.figures else []
-    )
-    args.tables = (
-        [Path(p.strip()) for p in args.tables.split(",") if p.strip()]
-        if args.tables else []
-    )
-    args.ignore_figures = (
-        [s.strip() for s in args.ignore_figures.split(",") if s.strip()]
-        if args.ignore_figures else []
-    )
+    parse_supplementary_csv_args(args)
 
     return args
 
@@ -257,11 +171,7 @@ def main(argv: list[str] | None = None) -> None:
 
     if not subclauses:
         print(f"No subclauses for {clause}; invoking directly.")
-        invoke_implement_subclause(
-            lrm=args.lrm, subclause=clause,
-            issue=args.issue, organization=args.organization,
-            repo=args.repo,
-        )
+        invoke_implement_subclause(args, clause)
         return
 
     print(f"Found {len(subclauses)} subclauses for {clause}.")
@@ -286,8 +196,6 @@ def main(argv: list[str] | None = None) -> None:
 
         print(f"Next unchecked: {subclause}")
         invoke_implement_subclause(
-            lrm=args.lrm, subclause=subclause,
-            issue=args.issue, organization=args.organization,
-            repo=args.repo, continue_session=not first,
+            args, subclause, continue_session=not first,
         )
         first = False

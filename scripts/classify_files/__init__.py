@@ -11,6 +11,8 @@ from classify_test._github import (
     remove_checkbox,
     update_issue_body,
 )
+from lib.classify import add_github_args, add_output_args, add_run_mode_args
+from lib.github import fetch_issue_title
 
 _TITLE_RE = re.compile(r"^Classify tests in (.+)$")
 
@@ -34,55 +36,10 @@ def _parse_args() -> argparse.Namespace:
         "--issue", type=int, required=True,
         help="Master GitHub issue number to update",
     )
-    parser.add_argument(
-        "--output-dir", required=True,
-        help="Directory for output files",
-    )
-    parser.add_argument(
-        "--lrm", required=True,
-        help="Path to IEEE 1800-2023 LRM text file",
-    )
-    parser.add_argument(
-        "--organization", required=True,
-        help="GitHub organization for the issue",
-    )
-    parser.add_argument(
-        "--repo", required=True,
-        help="GitHub repository for the issue",
-    )
-    parser.add_argument(
-        "--max-lines", type=int, required=True,
-        help="Maximum lines per output file",
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Classify only, don't write files",
-    )
-    parser.add_argument(
-        "--no-commit", action="store_true",
-        help="Skip git commit and push",
-    )
+    add_output_args(parser)
+    add_github_args(parser)
+    add_run_mode_args(parser)
     return parser.parse_args()
-
-
-def fetch_issue_title(
-    org: str,
-    repo: str,
-    issue: int,
-) -> str:
-    """Fetch the title of a GitHub issue using gh api."""
-    result = subprocess.run(
-        ["gh", "api", f"repos/{org}/{repo}/issues/{issue}",
-         "--jq", ".title"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to fetch issue #{issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    return result.stdout.strip()
 
 
 def extract_filename_from_title(title: str) -> str:

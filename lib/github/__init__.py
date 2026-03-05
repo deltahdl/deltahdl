@@ -23,6 +23,23 @@ def fetch_issue_body(organization: str, repo: str, issue: int) -> str:
     return result.stdout
 
 
+def fetch_issue_title(organization: str, repo: str, issue: int) -> str:
+    """Fetch the title of a GitHub issue using ``gh api``."""
+    print(f"Fetching title for issue #{issue} from {organization}/{repo}...")
+    result = subprocess.run(
+        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
+         "--jq", ".title"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: Failed to fetch issue #{issue}:"
+              f"\n{result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    return result.stdout.strip()
+
+
 def update_issue_body(
     organization: str, repo: str, issue: int, body: str,
 ) -> None:

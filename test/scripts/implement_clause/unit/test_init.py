@@ -1,5 +1,6 @@
 """Tests for implement_clause core functions."""
 
+import argparse
 import subprocess
 import sys
 from contextlib import contextmanager
@@ -8,10 +9,15 @@ from unittest.mock import patch
 import pytest
 
 from implement_clause import (
-    check_supplementary_args,
+    _lrm_labels_for_clause,
     invoke_implement_subclause,
     main,
     parse_args,
+)
+
+_STUB_ARGS = argparse.Namespace(
+    lrm="/path/lrm.txt", issue=123,
+    organization="deltahdl", repo="deltahdl",
 )
 
 @contextmanager
@@ -55,10 +61,7 @@ def test_invoke_implement_subclause_calls_subprocess(
     invoke_subprocess_ok,
 ) -> None:
     """Correct command is passed to subprocess.run."""
-    invoke_implement_subclause(
-        lrm="/path/lrm.txt", subclause="4.2", issue=123,
-        organization="deltahdl", repo="deltahdl",
-    )
+    invoke_implement_subclause(_STUB_ARGS, "4.2")
     assert invoke_subprocess_ok.call_args[0][0] == [
         sys.executable, "-m", "implement_subclause",
         "--lrm", "/path/lrm.txt",
@@ -72,10 +75,7 @@ def test_invoke_implement_subclause_calls_subprocess(
 @pytest.mark.usefixtures("invoke_subprocess_ok")
 def test_invoke_implement_subclause_prints_subclause(capsys) -> None:
     """Prints which subclause is being invoked."""
-    invoke_implement_subclause(
-        lrm="/path/lrm.txt", subclause="4.2", issue=123,
-        organization="deltahdl", repo="deltahdl",
-    )
+    invoke_implement_subclause(_STUB_ARGS, "4.2")
     assert "4.2" in capsys.readouterr().out
 
 
@@ -156,7 +156,7 @@ def test_main_no_subclauses(clause_argv) -> None:
         patch("implement_clause.invoke_implement_subclause") as mock_inv,
     ):
         main(clause_argv)
-    assert mock_inv.call_args.kwargs["subclause"] == "4"
+    assert mock_inv.call_args[0][1] == "4"
 
 
 def test_main_no_subclauses_prints_leaf(clause_argv, capsys) -> None:
@@ -173,7 +173,7 @@ def test_main_with_subclauses(clause_argv) -> None:
     """Next unchecked subclause is passed to implement_subclause."""
     with _patch_main_with_subclauses() as mock_inv:
         main(clause_argv)
-    assert mock_inv.call_args.kwargs["subclause"] == "4.2"
+    assert mock_inv.call_args[0][1] == "4.2"
 
 
 def test_main_prints_subclauses_found(clause_argv, capsys) -> None:
@@ -236,13 +236,7 @@ def test_invoke_implement_subclause_failure() -> None:
             args=[], returncode=1,
         )
         with pytest.raises(SystemExit):
-            invoke_implement_subclause(
-                lrm="/path/lrm.txt",
-                subclause="4.2",
-                issue=123,
-                organization="deltahdl",
-                repo="deltahdl",
-            )
+            invoke_implement_subclause(_STUB_ARGS, "4.2")
 
 
 def test_invoke_implement_subclause_passes_continue(
@@ -250,9 +244,7 @@ def test_invoke_implement_subclause_passes_continue(
 ) -> None:
     """--continue appears in subprocess command when continue_session=True."""
     invoke_implement_subclause(
-        lrm="/path/lrm.txt", subclause="4.2", issue=123,
-        organization="deltahdl", repo="deltahdl",
-        continue_session=True,
+        _STUB_ARGS, "4.2", continue_session=True,
     )
     assert "--continue" in invoke_subprocess_ok.call_args[0][0]
 
@@ -261,10 +253,7 @@ def test_invoke_implement_subclause_no_continue_by_default(
     invoke_subprocess_ok,
 ) -> None:
     """--continue not in subprocess command by default."""
-    invoke_implement_subclause(
-        lrm="/path/lrm.txt", subclause="4.2", issue=123,
-        organization="deltahdl", repo="deltahdl",
-    )
+    invoke_implement_subclause(_STUB_ARGS, "4.2")
     assert "--continue" not in invoke_subprocess_ok.call_args[0][0]
 
 
@@ -298,7 +287,7 @@ def test_main_second_subclause_uses_continue(clause_argv) -> None:
     assert mock_inv.call_args_list[1].kwargs["continue_session"] is True
 
 
-# --- check_supplementary_args (whole-clause) ---
+# --- _lrm_labels_for_clause (whole-clause) ---
 
 
 _LRM_CLAUSE_WITH_TABLE = """\
@@ -310,63 +299,34 @@ Table 4-1\u2014PLI callbacks
 """
 
 
-def test_check_supplementary_fails_when_clause_table_missing(tmp_path) -> None:
-    """Fails when clause has a table in the LRM but none provided."""
+def test_lrm_labels_for_clause_finds_both(tmp_path) -> None:
+    """Finds figure and table labels for a clause."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
-    with pytest.raises(SystemExit):
-        check_supplementary_args(
-            "4", lrm, figures=[], tables=[], ignore_figures=[],
-        )
+    figs, tbls = _lrm_labels_for_clause(lrm, "4")
+    assert figs == ["4-1"]
+    assert tbls == ["4-1"]
 
 
-def test_check_supplementary_passes_when_all_provided(tmp_path) -> None:
-    """Passes when all clause-level figures and tables are provided."""
+def test_lrm_labels_for_clause_empty(tmp_path) -> None:
+    """Returns empty lists when no labels exist."""
     lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
-    fig = tmp_path / "Figure_4_1.gv"
-    fig.write_text("digraph {}")
-    tbl = tmp_path / "TABLE_4_1.md"
-    tbl.write_text("| col |\n")
-    assert check_supplementary_args(
-        "4", lrm, figures=[fig], tables=[tbl], ignore_figures=[],
-    ) == ["4-1", "4-1"]
+    lrm.write_text("No figures or tables here.\n")
+    figs, tbls = _lrm_labels_for_clause(lrm, "99")
+    assert figs == []
+    assert tbls == []
 
 
-def test_check_supplementary_fails_figure_path_missing(tmp_path) -> None:
-    """Fails when a --figures path does not exist on disk."""
+def test_lrm_labels_for_clause_ignores_other_clauses(tmp_path) -> None:
+    """Does not pick up labels from other clauses."""
     lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    with pytest.raises(SystemExit):
-        check_supplementary_args(
-            "99", lrm,
-            figures=[tmp_path / "nonexistent.gv"],
-            tables=[], ignore_figures=[],
-        )
-
-
-def test_check_supplementary_fails_table_path_missing(tmp_path) -> None:
-    """Fails when a --tables path does not exist on disk."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    with pytest.raises(SystemExit):
-        check_supplementary_args(
-            "99", lrm,
-            figures=[],
-            tables=[tmp_path / "nonexistent.md"],
-            ignore_figures=[],
-        )
-
-
-def test_check_supplementary_ignore_figures(tmp_path) -> None:
-    """Passes when figure is in ignore list."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
-    tbl = tmp_path / "TABLE_4_1.md"
-    tbl.write_text("| col |\n")
-    assert check_supplementary_args(
-        "4", lrm, figures=[], tables=[tbl], ignore_figures=["4-1"],
-    ) == ["4-1", "4-1"]
+    lrm.write_text(
+        "Figure 5-1\u2014Something\n"
+        "Table 5-1\u2014Other\n"
+    )
+    figs, tbls = _lrm_labels_for_clause(lrm, "4")
+    assert figs == []
+    assert tbls == []
 
 
 # --- parse_args supplementary flags ---
