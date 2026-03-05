@@ -374,30 +374,16 @@ def test_find_context_depth_1():
 # ---- invoke_claude --------------------------------------------------------
 
 
-@patch("implement_subclause.subprocess.Popen")
-def test_invoke_claude_passes_verbose(mock_popen):
+def test_invoke_claude_passes_verbose(popen_ok):
     """invoke_claude includes --verbose in the CLI command."""
-    proc = MagicMock()
-    proc.communicate.return_value = (None, None)
-    proc.returncode = 0
-    proc.__enter__ = MagicMock(return_value=proc)
-    proc.__exit__ = MagicMock(return_value=False)
-    mock_popen.return_value = proc
     invoke_claude("test prompt", model="opus")
-    assert "--verbose" in mock_popen.call_args[0][0]
+    assert "--verbose" in popen_ok.call_args[0][0]
 
 
-@patch("implement_subclause.subprocess.Popen")
-def test_invoke_claude_success(mock_popen):
+def test_invoke_claude_success(popen_ok):
     """invoke_claude streams prompt to Claude CLI and returns on success."""
-    proc = MagicMock()
-    proc.communicate.return_value = (None, None)
-    proc.returncode = 0
-    proc.__enter__ = MagicMock(return_value=proc)
-    proc.__exit__ = MagicMock(return_value=False)
-    mock_popen.return_value = proc
     invoke_claude("test prompt", model="opus")
-    assert proc.communicate.called
+    assert popen_ok.return_value.communicate.called
 
 
 @patch("implement_subclause.sys.exit")
