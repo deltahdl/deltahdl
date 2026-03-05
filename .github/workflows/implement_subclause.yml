@@ -52,7 +52,7 @@ jobs:
         run: >-
           assert-one-assert-per-pytest
           --verbose
-          ${{ github.workspace }}/test/lib/
+          ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
       - name: Run pylint on source
         run: >-
@@ -63,7 +63,7 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts:test/scripts/implement_subclause/unit
           python3 -m pylint --recursive=y
-          test/scripts/ test/lib/
+          test/scripts/ test/lib/python/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
@@ -73,7 +73,7 @@ jobs:
         run: >-
           MYPYPATH=.:scripts:test/scripts/implement_subclause/unit
           python3 -m mypy --explicit-package-bases
-          test/scripts/ test/lib/
+          test/scripts/ test/lib/python/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
@@ -83,19 +83,19 @@ jobs:
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
-          test/scripts/ test/lib/
+          test/scripts/ test/lib/python/
       # DO NOT lower coverage thresholds. Uncovered code is untested code —
       # lowering it hides bugs and lets regressions slip through silently.
       - name: Run lib/github unit tests with 100% coverage gate
         run: >-
-          python3 -m pytest test/lib/github/unit/ -v
+          python3 -m pytest test/lib/python/github/unit/ -v
           --cov=lib.python.github
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
       - name: Run lib/lrm unit tests with 100% coverage gate
         run: >-
-          python3 -m pytest test/lib/lrm/unit/ -v
+          python3 -m pytest test/lib/python/lrm/unit/ -v
           --cov=lib.python.lrm
           --cov-branch
           --cov-report=term-missing
@@ -123,10 +123,12 @@ on:
       - .github/workflows/implement_subclause.yml
       - lib/python/github/**
       - lib/python/lrm/**
+      - lib/python/supplementary/**
       - lib/python/test/**
       - scripts/implement_subclause/**
-      - test/lib/github/**
-      - test/lib/lrm/**
+      - test/lib/python/github/**
+      - test/lib/python/lrm/**
+      - test/lib/python/supplementary/**
       - test/scripts/implement_subclause/**
   push:
     branches: [main]
@@ -134,9 +136,11 @@ on:
       - .github/workflows/implement_subclause.yml
       - lib/python/github/**
       - lib/python/lrm/**
+      - lib/python/supplementary/**
       - lib/python/test/**
       - scripts/implement_subclause/**
-      - test/lib/github/**
-      - test/lib/lrm/**
+      - test/lib/python/github/**
+      - test/lib/python/lrm/**
+      - test/lib/python/supplementary/**
       - test/scripts/implement_subclause/**
   workflow_dispatch:

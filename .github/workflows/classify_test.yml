@@ -52,7 +52,7 @@ jobs:
         run: >-
           assert-one-assert-per-pytest
           --verbose
-          ${{ github.workspace }}/test/lib/
+          ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
       - name: Run pylint on source
         run: >-
@@ -63,7 +63,7 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts:test/scripts/classify_test/unit
           python3 -m pylint --recursive=y
-          test/scripts/ test/lib/
+          test/scripts/ test/lib/python/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
@@ -73,7 +73,7 @@ jobs:
         run: >-
           MYPYPATH=.:scripts:test/scripts/classify_test/unit
           python3 -m mypy --explicit-package-bases
-          test/scripts/ test/lib/
+          test/scripts/ test/lib/python/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
@@ -82,7 +82,7 @@ jobs:
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
-          test/scripts/ test/lib/
+          test/scripts/ test/lib/python/
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
@@ -104,18 +104,26 @@ on:
   pull_request:
     paths:
       - .github/workflows/classify_test.yml
+      - lib/python/classify/**
+      - lib/python/github/**
       - lib/python/lrm/**
       - lib/python/test/**
       - scripts/classify_test/**
-      - test/lib/lrm/**
+      - test/lib/python/classify/**
+      - test/lib/python/github/**
+      - test/lib/python/lrm/**
       - test/scripts/classify_test/**
   push:
     branches: [main]
     paths:
       - .github/workflows/classify_test.yml
+      - lib/python/classify/**
+      - lib/python/github/**
       - lib/python/lrm/**
       - lib/python/test/**
       - scripts/classify_test/**
-      - test/lib/lrm/**
+      - test/lib/python/classify/**
+      - test/lib/python/github/**
+      - test/lib/python/lrm/**
       - test/scripts/classify_test/**
   workflow_dispatch:
