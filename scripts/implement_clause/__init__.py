@@ -75,8 +75,15 @@ def filter_implementable(
         "scheduling).\n\n"
         f"Clause text:\n{clause_text}\n\n"
         f"Subclauses:\n{numbered}\n\n"
-        "Return ONLY a JSON array of the implementable subclause "
-        'numbers. Example: ["4.2", "4.3"]'
+        "Return ONLY a JSON object where each key is a subclause "
+        "number and each value is one of:\n"
+        "- true if the subclause is implementable\n"
+        "- false if it is not implementable\n"
+        "- For subclauses titled 'General' or 'Overview', you MUST "
+        "provide a string rationale explaining why it is implementable, "
+        "or false to exclude it.\n\n"
+        'Example: {"4.1": "Defines syntax rules that must be parsed", '
+        '"4.2": true, "4.3": false}'
     )
 
     env = os.environ.copy()
@@ -98,7 +105,16 @@ def filter_implementable(
         sys.exit(1)
 
     print(f"Claude response:\n{result.stdout.strip()}")
-    implementable = json.loads(result.stdout.strip())
+    verdicts = json.loads(result.stdout.strip())
+
+    implementable: list[str] = []
+    for key, value in verdicts.items():
+        if isinstance(value, str):
+            print(f"Rationale for {key}: {value}")
+            implementable.append(key)
+        elif value:
+            implementable.append(key)
+
     print(f"Implementable: {implementable}")
     return implementable
 

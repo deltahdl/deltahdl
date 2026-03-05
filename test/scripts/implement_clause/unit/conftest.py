@@ -32,7 +32,9 @@ def invoke_subprocess_ok():
 def patch_filter_ok():
     """Patch subprocess to return ["4.2", "4.3"] for filter calls."""
     cp = subprocess.CompletedProcess(
-        args=[], returncode=0, stdout='["4.2", "4.3"]\n', stderr="",
+        args=[], returncode=0,
+        stdout='{"4.1": false, "4.2": true, "4.3": true}\n',
+        stderr="",
     )
     with patch("implement_clause.subprocess.run", return_value=cp):
         yield
