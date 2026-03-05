@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import classify_files
+from lib.python.test_fixtures.subprocess_stubs import stub_subprocess_success
 
 
 _run = getattr(classify_files, "_run")
@@ -35,20 +36,6 @@ def _pipeline_args(**overrides):
         **_ARGS_DEFAULTS, **overrides,
     }
     return SimpleNamespace(**result)
-
-
-def _mock_run_ok(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
-    """Stub subprocess.run to succeed; return command log."""
-    log: list[list[str]] = []
-
-    def ok_run(cmd: list[str], **_kw: object) -> MagicMock:
-        log.append(list(cmd))
-        result = MagicMock()
-        result.returncode, result.stdout, result.stderr = 0, "", ""
-        return result
-
-    monkeypatch.setattr(subprocess, "run", ok_run)
-    return log
 
 
 def _mock_run_fail_first(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -80,7 +67,7 @@ def _stub_remove(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 def test_processes_two_files(monkeypatch):
     """Pipeline invokes classify_file for each of two files."""
-    log = _mock_run_ok(monkeypatch)
+    log = stub_subprocess_success(monkeypatch)
     _stub_remove(monkeypatch)
     _run(_pipeline_args())
     assert len(log) == 2
@@ -88,7 +75,7 @@ def test_processes_two_files(monkeypatch):
 
 def test_each_call_targets_distinct_file(monkeypatch):
     """Each subprocess call targets a different file."""
-    log = _mock_run_ok(monkeypatch)
+    log = stub_subprocess_success(monkeypatch)
     _stub_remove(monkeypatch)
     _run(_pipeline_args())
     files = [c[c.index("--file") + 1] for c in log]
@@ -105,7 +92,7 @@ def test_halts_on_first_failure(monkeypatch):
 
 def test_removes_checkbox_after_each_file(monkeypatch):
     """Removes file checkbox after each successful file."""
-    _mock_run_ok(monkeypatch)
+    stub_subprocess_success(monkeypatch)
     removed = _stub_remove(monkeypatch)
     _run(_pipeline_args())
     assert removed == ["a.cpp", "b.cpp"]
@@ -115,7 +102,7 @@ def test_skips_checkbox_when_file_exists(monkeypatch, tmp_path):
     """Does not remove checkbox when the file still exists."""
     f = tmp_path / "a.cpp"
     f.write_text("", encoding="utf-8")
-    _mock_run_ok(monkeypatch)
+    stub_subprocess_success(monkeypatch)
     removed = _stub_remove(monkeypatch)
     _run(_pipeline_args(files=str(f)))
     assert not removed
@@ -135,7 +122,7 @@ def _stub_resolve(monkeypatch, entries):
 def test_sub_issues_uses_issue_flag(monkeypatch):
     """Each subprocess command has --issue, not --create-issue."""
     _stub_resolve(monkeypatch, [("a.cpp", 76), ("b.cpp", 77)])
-    log = _mock_run_ok(monkeypatch)
+    log = stub_subprocess_success(monkeypatch)
     _stub_remove(monkeypatch)
     _run(_pipeline_args(files=None, sub_issues="76,77"))
     assert all("--create-issue" not in c for c in log)
@@ -144,7 +131,7 @@ def test_sub_issues_uses_issue_flag(monkeypatch):
 def test_sub_issues_removes_master_checkbox(monkeypatch):
     """Master checkbox removed with correct filenames."""
     _stub_resolve(monkeypatch, [("a.cpp", 76), ("b.cpp", 77)])
-    _mock_run_ok(monkeypatch)
+    stub_subprocess_success(monkeypatch)
     removed = _stub_remove(monkeypatch)
     _run(_pipeline_args(files=None, sub_issues="76,77"))
     assert removed == ["a.cpp", "b.cpp"]

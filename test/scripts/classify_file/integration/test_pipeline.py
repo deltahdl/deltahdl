@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import classify_file
+from lib.python.test_fixtures.subprocess_stubs import stub_subprocess_success
 
 _run = getattr(classify_file, "_run")
 
@@ -39,20 +40,6 @@ def _write_and_args(tmp_path: Path, body: str, **overrides: object) -> SimpleNam
         body, encoding="utf-8",
     )
     return _pipeline_args(tmp_path, **overrides)
-
-
-def _mock_run_ok(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
-    """Stub subprocess.run to succeed; return command log."""
-    log: list[list[str]] = []
-
-    def ok_run(cmd: list[str], **_kw: object) -> MagicMock:
-        log.append(list(cmd))
-        m = MagicMock()
-        m.returncode, m.stdout, m.stderr = 0, "", ""
-        return m
-
-    monkeypatch.setattr(subprocess, "run", ok_run)
-    return log
 
 
 def _mock_run_selective(monkeypatch: pytest.MonkeyPatch, fail_set: set[str]) -> None:
@@ -111,7 +98,7 @@ def test_processes_all_three_tests(tmp_path, monkeypatch):
         "TEST(S, Gamma) {\n}\n"
     )
     _stub_ensure(monkeypatch)
-    log = _mock_run_ok(monkeypatch)
+    log = stub_subprocess_success(monkeypatch)
     _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, body))
     assert len(log) == 3
@@ -124,7 +111,7 @@ def test_each_call_has_distinct_test_name(tmp_path, monkeypatch):
         "TEST(S, Beta) {\n}\n"
     )
     _stub_ensure(monkeypatch)
-    log = _mock_run_ok(monkeypatch)
+    log = stub_subprocess_success(monkeypatch)
     _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, body))
     names = [c[c.index("--test") + 1] for c in log]
@@ -134,7 +121,7 @@ def test_each_call_has_distinct_test_name(tmp_path, monkeypatch):
 def test_flags_propagated_to_subprocess(tmp_path, monkeypatch):
     """Optional flags are forwarded to classify_test calls."""
     _stub_ensure(monkeypatch)
-    log = _mock_run_ok(monkeypatch)
+    log = stub_subprocess_success(monkeypatch)
     _run(_write_and_args(tmp_path, "TEST(S, T) {\n}\n", dry_run=True))
     assert "--dry-run" in log[0]
 
@@ -159,7 +146,7 @@ def test_stops_after_first_failure(
 def test_single_test_file(tmp_path, monkeypatch):
     """Single-test file succeeds without error."""
     _stub_ensure(monkeypatch)
-    log = _mock_run_ok(monkeypatch)
+    log = stub_subprocess_success(monkeypatch)
     _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, "TEST(S, Only) {\n}\n"))
     assert len(log) == 1
@@ -168,7 +155,7 @@ def test_single_test_file(tmp_path, monkeypatch):
 def test_closes_issue_after_all_pass(tmp_path, monkeypatch):
     """Pipeline closes the issue after all tests succeed."""
     _stub_ensure(monkeypatch)
-    _mock_run_ok(monkeypatch)
+    stub_subprocess_success(monkeypatch)
     log = _stub_close(monkeypatch)
     _run(_write_and_args(tmp_path, "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"))
     assert len(log) == 1
@@ -177,7 +164,7 @@ def test_closes_issue_after_all_pass(tmp_path, monkeypatch):
 def test_create_issue_then_process(tmp_path, monkeypatch):
     """Pipeline creates issue then processes all tests."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
-    log = _mock_run_ok(monkeypatch)
+    log = stub_subprocess_success(monkeypatch)
     _stub_close(monkeypatch)
     _stub_create(monkeypatch, 55)
     _run(_write_and_args(
