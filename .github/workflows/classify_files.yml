@@ -68,7 +68,7 @@ jobs:
         run: PYTHONPATH=. python3 -m mypy lib/python/ scripts/
       - name: Run mypy on tests
         run: >-
-          MYPYPATH=.:scripts:test/scripts/classify_files/unit
+          MYPYPATH=.:scripts:test/scripts/classify_test/unit:test/scripts/classify_file/unit:test/scripts/classify_files/unit
           python3 -m mypy --explicit-package-bases
           test/scripts/ test/lib/
       - name: Detect copy-paste in source
