@@ -12,14 +12,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lib.github import (
+from lib.python.github import (
     build_synced_body,
     fetch_issue_body,
     next_unchecked,
     update_issue_body,
 )
-from lib.lrm import extract_clause_text, parse_subclauses
-from lib.supplementary import (
+from lib.python.lrm import extract_clause_text, parse_subclauses
+from lib.python.supplementary import (
     check_supplementary_args,
     parse_supplementary_csv_args,
 )

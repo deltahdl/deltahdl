@@ -3,7 +3,7 @@
 import re
 import sys
 
-from lib.github import fetch_issue_body, update_issue_body
+from lib.python.github import fetch_issue_body, update_issue_body
 
 
 def _validate_issue_args(args):

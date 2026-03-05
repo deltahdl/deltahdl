@@ -19,8 +19,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from lib.classify import add_github_args, add_output_args, add_run_mode_args
-from lib.lrm import load_lrm_titles
+from lib.python.classify import add_github_args, add_output_args, add_run_mode_args
+from lib.python.lrm import load_lrm_titles
 
 from ._github import (
     _validate_issue_args,

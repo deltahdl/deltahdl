@@ -11,13 +11,13 @@ from classify_test._github import (
     remove_checkbox,
     update_issue_body,
 )
-from lib.classify import (
+from lib.python.classify import (
     add_github_args,
     add_output_args,
     add_run_mode_args,
     append_classify_cmd_flags,
 )
-from lib.github import fetch_issue_title
+from lib.python.github import fetch_issue_title
 
 _TITLE_RE = re.compile(r"^Classify tests in (.+)$")
 

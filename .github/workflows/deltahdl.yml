@@ -878,7 +878,7 @@ jobs:
             exit 0
           fi
           CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
-          PAT='^(lib/run_tests_common/|scripts/run_sim_tests/|scripts/run_sv_tests/|test/lib/run_tests_common/|test/scripts/run_sim_tests/|test/scripts/run_sv_tests/)'
+          PAT='^(lib/python/run_tests_common/|scripts/run_sim_tests/|scripts/run_sv_tests/|test/lib/run_tests_common/|test/scripts/run_sim_tests/|test/scripts/run_sv_tests/)'
           if echo "$CHANGED" | grep -qE "$PAT"; then
             echo "scripts_changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -950,7 +950,7 @@ jobs:
           assert-no-inline-directives
           --tools clang-tidy,clang-format,clang-diagnostic,pylint,mypy,yamllint
           src/ test/
-          lib/ scripts/ test/lib/ test/scripts/
+          lib/python/ scripts/ test/lib/ test/scripts/
           ${{ github.workspace }}/**/*
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Assert one assert per pytest
@@ -964,34 +964,34 @@ jobs:
         name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
-          lib/ scripts/
+          lib/python/ scripts/
           --fail-on=C,R,W --fail-under=10.0
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint --recursive=y
-          lib/test/ test/scripts/ test/lib/
+          test/scripts/ test/lib/
           --fail-on=C,R,W --fail-under=10.0
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy
-          lib/ scripts/
+          lib/python/ scripts/
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts python3 -m mypy
-          lib/test/ test/scripts/ test/lib/
+          test/scripts/ test/lib/
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Detect copy-paste in source (Python)
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console lib/ scripts/
+          --reporters console lib/python/ scripts/
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Detect copy-paste in tests (Python)
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console lib/test/ test/scripts/ test/lib/
+          --reporters console test/scripts/ test/lib/
       # ── C++ formatting and limits ──
       - name: Check formatting
         run: |
@@ -1023,7 +1023,7 @@ jobs:
           --minimum-tokens 100
           --language cpp
           --dir test/src/
-          --dir lib/test/
+          --dir lib/cpp/test/
   # ── Lane: lib/run_tests_common ──
   test-lib-run-tests-common:
     if: >-
@@ -1046,7 +1046,7 @@ jobs:
       - name: Run tests with 100% coverage gate
         run: >-
           python3 -m pytest test/lib/run_tests_common/ -v
-          --cov=lib.run_tests_common
+          --cov=lib.python.run_tests_common
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
@@ -1267,8 +1267,8 @@ on:
       - .github/workflows/deltahdl.yml
       - CMakeLists.txt
       - etc/**
-      - lib/run_tests_common/**
-      - lib/test/**
+      - lib/python/run_tests_common/**
+      - lib/cpp/test/**
       - scripts/run_sim_tests/**
       - scripts/run_sv_tests/**
       - src/**
@@ -1283,8 +1283,8 @@ on:
       - .github/workflows/deltahdl.yml
       - CMakeLists.txt
       - etc/**
-      - lib/run_tests_common/**
-      - lib/test/**
+      - lib/python/run_tests_common/**
+      - lib/cpp/test/**
       - scripts/run_sim_tests/**
       - scripts/run_sv_tests/**
       - src/**

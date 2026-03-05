@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lib.supplementary import (
+from lib.python.supplementary import (
     build_supplementary_lines,
     check_supplementary_args,
     label_from_gv,

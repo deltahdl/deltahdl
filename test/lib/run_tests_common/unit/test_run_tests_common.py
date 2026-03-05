@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from lib import run_tests_common
+from lib.python import run_tests_common
 
 
 def test_repo_root_contains_scripts_dir():
@@ -47,7 +47,7 @@ class TestCheckBinary:
         mock_binary.exists.return_value = False
         exit_code = None
         try:
-            with patch("lib.run_tests_common.BINARY", mock_binary):
+            with patch("lib.python.run_tests_common.BINARY", mock_binary):
                 run_tests_common.check_binary()
         except SystemExit as exc:
             exit_code = exc.code
@@ -57,7 +57,7 @@ class TestCheckBinary:
         """check_binary() should return None when the binary is present."""
         mock_binary = MagicMock(spec=Path)
         mock_binary.exists.return_value = True
-        with patch("lib.run_tests_common.BINARY", mock_binary):
+        with patch("lib.python.run_tests_common.BINARY", mock_binary):
             run_tests_common.check_binary()
             assert mock_binary.exists.called
 

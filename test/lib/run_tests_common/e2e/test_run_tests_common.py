@@ -3,7 +3,7 @@
 import subprocess
 import sys
 
-from lib import run_tests_common
+from lib.python import run_tests_common
 
 REPO_ROOT = run_tests_common.REPO_ROOT
 
@@ -16,7 +16,7 @@ def test_import_succeeds_in_subprocess():
             sys.executable,
             "-c",
             f"import sys; sys.path.insert(0, {repo_root!r}); "
-            "from lib import run_tests_common",
+            "from lib.python import run_tests_common",
         ],
         capture_output=True,
         text=True,

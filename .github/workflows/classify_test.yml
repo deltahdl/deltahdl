@@ -57,32 +57,32 @@ jobs:
       - name: Run pylint on source
         run: >-
           PYTHONPATH=. python3 -m pylint
-          lib/ scripts/
+          lib/python/ scripts/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts:test/scripts/classify_test/unit
           python3 -m pylint --recursive=y
-          lib/test/ test/scripts/ test/lib/
+          test/scripts/ test/lib/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
           PYTHONPATH=. python3 -m mypy
-          lib/ scripts/
+          lib/python/ scripts/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts:test/scripts/classify_test/unit
           python3 -m mypy --explicit-package-bases
-          lib/test/ test/scripts/ test/lib/
+          test/scripts/ test/lib/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console lib/ scripts/
+          --reporters console lib/python/ scripts/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
-          lib/test/ test/scripts/ test/lib/
+          test/scripts/ test/lib/
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
@@ -104,7 +104,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/classify_test.yml
-      - lib/lrm/**
+      - lib/python/lrm/**
       - scripts/classify_test/**
       - test/lib/lrm/**
       - test/scripts/classify_test/**
@@ -112,7 +112,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/classify_test.yml
-      - lib/lrm/**
+      - lib/python/lrm/**
       - scripts/classify_test/**
       - test/lib/lrm/**
       - test/scripts/classify_test/**

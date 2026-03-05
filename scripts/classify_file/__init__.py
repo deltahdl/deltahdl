@@ -9,7 +9,7 @@ from pathlib import Path
 
 from classify_test._git import commit_and_push
 from classify_test._github import fetch_issue_body, update_issue_body
-from lib.classify import (
+from lib.python.classify import (
     add_github_args,
     add_output_args,
     add_run_mode_args,

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.lrm import extract_clause_text, load_lrm_titles, parse_subclauses
+from lib.python.lrm import extract_clause_text, load_lrm_titles, parse_subclauses
 
 
 # ---- load_lrm_titles -------------------------------------------------------

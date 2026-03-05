@@ -11,8 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lib.lrm import extract_clause_text, load_lrm_titles
-from lib.supplementary import (
+from lib.python.lrm import extract_clause_text, load_lrm_titles
+from lib.python.supplementary import (
     build_supplementary_lines,
     check_supplementary_args,
     parse_supplementary_csv_args,

@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lib import run_tests_common
+from lib.python import run_tests_common
 
 
 @pytest.fixture()

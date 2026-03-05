@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lib.github import (
+from lib.python.github import (
     build_synced_body,
     fetch_issue_body,
     fetch_issue_title,
@@ -22,14 +22,14 @@ from lib.github import (
 def test_fetch_issue_body_success() -> None:
     """Body text is returned on successful fetch."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="hello\n")
-    with patch("lib.github.subprocess.run", return_value=cp):
+    with patch("lib.python.github.subprocess.run", return_value=cp):
         assert fetch_issue_body("org", "repo", 1) == "hello\n"
 
 
 def test_fetch_issue_body_prints_action(capsys) -> None:
     """Prints that it is fetching the issue."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="body\n")
-    with patch("lib.github.subprocess.run", return_value=cp):
+    with patch("lib.python.github.subprocess.run", return_value=cp):
         fetch_issue_body("org", "repo", 42)
     assert "Fetching issue #42" in capsys.readouterr().out
 
@@ -39,7 +39,7 @@ def test_fetch_issue_body_failure() -> None:
     cp = subprocess.CompletedProcess(
         args=[], returncode=1, stdout="", stderr="err",
     )
-    with patch("lib.github.subprocess.run", return_value=cp):
+    with patch("lib.python.github.subprocess.run", return_value=cp):
         with pytest.raises(SystemExit):
             fetch_issue_body("org", "repo", 1)
 
@@ -50,14 +50,14 @@ def test_fetch_issue_body_failure() -> None:
 def test_fetch_issue_title_success() -> None:
     """Title text is returned on successful fetch."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="Title\n")
-    with patch("lib.github.subprocess.run", return_value=cp):
+    with patch("lib.python.github.subprocess.run", return_value=cp):
         assert fetch_issue_title("org", "repo", 1) == "Title"
 
 
 def test_fetch_issue_title_prints_action(capsys) -> None:
     """Prints that it is fetching the issue title."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="T\n")
-    with patch("lib.github.subprocess.run", return_value=cp):
+    with patch("lib.python.github.subprocess.run", return_value=cp):
         fetch_issue_title("org", "repo", 42)
     assert "Fetching title" in capsys.readouterr().out
 
@@ -67,7 +67,7 @@ def test_fetch_issue_title_failure() -> None:
     cp = subprocess.CompletedProcess(
         args=[], returncode=1, stdout="", stderr="err",
     )
-    with patch("lib.github.subprocess.run", return_value=cp):
+    with patch("lib.python.github.subprocess.run", return_value=cp):
         with pytest.raises(SystemExit):
             fetch_issue_title("org", "repo", 1)
 
@@ -78,7 +78,7 @@ def test_fetch_issue_title_failure() -> None:
 def test_update_issue_body_success() -> None:
     """Correct payload is sent on update."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
-    with patch("lib.github.subprocess.run", return_value=cp) as mock_run:
+    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
         update_issue_body("org", "repo", 1, "new body")
     assert mock_run.call_args.kwargs["input"] == json.dumps(
         {"body": "new body"},
@@ -88,7 +88,7 @@ def test_update_issue_body_success() -> None:
 def test_update_issue_body_prints_action(capsys) -> None:
     """Prints that it is updating the issue."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
-    with patch("lib.github.subprocess.run", return_value=cp):
+    with patch("lib.python.github.subprocess.run", return_value=cp):
         update_issue_body("org", "repo", 42, "body")
     assert "Updating issue #42" in capsys.readouterr().out
 
@@ -98,7 +98,7 @@ def test_update_issue_body_failure() -> None:
     cp = subprocess.CompletedProcess(
         args=[], returncode=1, stdout="", stderr="err",
     )
-    with patch("lib.github.subprocess.run", return_value=cp):
+    with patch("lib.python.github.subprocess.run", return_value=cp):
         with pytest.raises(SystemExit):
             update_issue_body("org", "repo", 1, "body")
 
@@ -154,8 +154,8 @@ def test_build_synced_body_removes_stale() -> None:
 def test_sync_checklist_calls_update() -> None:
     """Fetches body, transforms, and updates with correct args."""
     with (
-        patch("lib.github.fetch_issue_body", return_value=""),
-        patch("lib.github.update_issue_body") as mock_update,
+        patch("lib.python.github.fetch_issue_body", return_value=""),
+        patch("lib.python.github.update_issue_body") as mock_update,
     ):
         sync_checklist("org", "repo", 1, {"4.1": "General"})
     assert mock_update.call_args[0] == (

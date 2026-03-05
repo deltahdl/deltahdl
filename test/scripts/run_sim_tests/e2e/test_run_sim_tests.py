@@ -4,7 +4,7 @@ import subprocess
 import sys
 import textwrap
 
-from lib import run_tests_common
+from lib.python import run_tests_common
 
 REPO_ROOT = run_tests_common.REPO_ROOT
 SCRIPTS_DIR = REPO_ROOT / "scripts"
@@ -26,7 +26,7 @@ def _run_sim_script(test_dir, binary_path):
         sys.path.insert(0, {str(SCRIPTS_DIR)!r})
         from pathlib import Path
         import run_sim_tests
-        from lib import run_tests_common
+        from lib.python import run_tests_common
         run_sim_tests.TEST_DIR = Path({str(test_dir)!r})
         run_tests_common.BINARY = Path({str(binary_path)!r})
         run_sim_tests.BINARY = run_tests_common.BINARY

@@ -57,46 +57,46 @@ jobs:
       - name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
-          lib/ scripts/
+          lib/python/ scripts/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts:test/scripts/implement_subclause/unit
           python3 -m pylint --recursive=y
-          lib/test/ test/scripts/ test/lib/
+          test/scripts/ test/lib/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy
-          lib/ scripts/
+          lib/python/ scripts/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts:test/scripts/implement_subclause/unit
           python3 -m mypy --explicit-package-bases
-          lib/test/ test/scripts/ test/lib/
+          test/scripts/ test/lib/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
-          lib/ scripts/
+          lib/python/ scripts/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
-          lib/test/ test/scripts/ test/lib/
+          test/scripts/ test/lib/
       # DO NOT lower coverage thresholds. Uncovered code is untested code —
       # lowering it hides bugs and lets regressions slip through silently.
       - name: Run lib/github unit tests with 100% coverage gate
         run: >-
           python3 -m pytest test/lib/github/unit/ -v
-          --cov=lib.github
+          --cov=lib.python.github
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
       - name: Run lib/lrm unit tests with 100% coverage gate
         run: >-
           python3 -m pytest test/lib/lrm/unit/ -v
-          --cov=lib.lrm
+          --cov=lib.python.lrm
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
@@ -121,8 +121,8 @@ on:
   pull_request:
     paths:
       - .github/workflows/implement_subclause.yml
-      - lib/github/**
-      - lib/lrm/**
+      - lib/python/github/**
+      - lib/python/lrm/**
       - scripts/implement_subclause/**
       - test/lib/github/**
       - test/lib/lrm/**
@@ -131,8 +131,8 @@ on:
     branches: [main]
     paths:
       - .github/workflows/implement_subclause.yml
-      - lib/github/**
-      - lib/lrm/**
+      - lib/python/github/**
+      - lib/python/lrm/**
       - scripts/implement_subclause/**
       - test/lib/github/**
       - test/lib/lrm/**

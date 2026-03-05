@@ -2,7 +2,7 @@
 
 import argparse
 
-from lib.classify import (
+from lib.python.classify import (
     add_github_args,
     add_output_args,
     add_run_mode_args,

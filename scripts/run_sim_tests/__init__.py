@@ -3,7 +3,7 @@
 import subprocess
 import sys
 
-from lib.run_tests_common import BINARY, REPO_ROOT, check_binary, print_result
+from lib.python.run_tests_common import BINARY, REPO_ROOT, check_binary, print_result
 
 TEST_DIR = REPO_ROOT / "test" / "src" / "e2e"
 
