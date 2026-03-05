@@ -142,6 +142,16 @@ enum class Region : uint8_t {
 
 static constexpr size_t kRegionCount = static_cast<size_t>(Region::kCOUNT);
 
+// --- Annex E: Delay mode directives ---
+
+enum class DelayModeDirective : uint8_t {
+  kNone,         // No delay mode directive specified.
+  kDistributed,  // §E.4
+  kPath,         // §E.5
+  kUnit,         // §E.6
+  kZero,         // §E.7
+};
+
 // --- Net types (IEEE 1800-2023 §6.5) ---
 
 enum class NetType : uint8_t {

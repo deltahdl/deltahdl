@@ -249,4 +249,92 @@ void Preprocessor::HandleEndKeywords(SourceLoc loc, std::string& output) {
   output += '\n';
 }
 
+// --- Annex E: optional compiler directives ---
+
+void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
+                                          SourceLoc loc) {
+  auto arg = TrimDirective(rest);
+  if (arg.empty()) {
+    diag_.Error(loc, "`default_decay_time requires an argument");
+    return;
+  }
+  if (arg == "infinite") {
+    default_decay_time_infinite_ = true;
+    default_decay_time_ = 0;
+    default_decay_time_real_ = 0.0;
+    return;
+  }
+  // Try parsing as integer or real constant.
+  bool has_dot = arg.find('.') != std::string_view::npos;
+  if (has_dot) {
+    // Real constant.
+    size_t i = 0;
+    bool saw_dot = false;
+    while (i < arg.size()) {
+      if (arg[i] == '.' && !saw_dot) {
+        saw_dot = true;
+      } else if (!std::isdigit(static_cast<unsigned char>(arg[i]))) {
+        diag_.Error(loc, "invalid `default_decay_time argument: '" +
+                             std::string(arg) + "'");
+        return;
+      }
+      ++i;
+    }
+    double val = 0.0;
+    // Manual parse: integer part + fractional part.
+    auto dot_pos = arg.find('.');
+    auto int_part = arg.substr(0, dot_pos);
+    auto frac_part = arg.substr(dot_pos + 1);
+    for (char c : int_part) val = val * 10.0 + (c - '0');
+    double frac = 0.0;
+    double divisor = 10.0;
+    for (char c : frac_part) {
+      frac += (c - '0') / divisor;
+      divisor *= 10.0;
+    }
+    val += frac;
+    default_decay_time_real_ = val;
+    default_decay_time_ = static_cast<uint64_t>(val);
+    default_decay_time_infinite_ = false;
+  } else {
+    // Integer constant.
+    for (char c : arg) {
+      if (!std::isdigit(static_cast<unsigned char>(c))) {
+        diag_.Error(loc, "invalid `default_decay_time argument: '" +
+                             std::string(arg) + "'");
+        return;
+      }
+    }
+    uint64_t val = 0;
+    for (char c : arg) val = val * 10 + (c - '0');
+    default_decay_time_ = val;
+    default_decay_time_real_ = static_cast<double>(val);
+    default_decay_time_infinite_ = false;
+  }
+}
+
+void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
+                                               SourceLoc loc) {
+  auto arg = TrimDirective(rest);
+  if (arg.empty()) {
+    diag_.Error(loc, "`default_trireg_strength requires an argument");
+    return;
+  }
+  for (char c : arg) {
+    if (!std::isdigit(static_cast<unsigned char>(c))) {
+      diag_.Error(loc, "invalid `default_trireg_strength argument: '" +
+                           std::string(arg) + "'");
+      return;
+    }
+  }
+  uint32_t val = 0;
+  for (char c : arg) val = val * 10 + (c - '0');
+  // §E.3: value must be between 0 and 250.
+  if (val > 250) {
+    diag_.Error(loc, "`default_trireg_strength value must be between 0 and 250");
+    return;
+  }
+  default_trireg_strength_ = val;
+}
+
 }  // namespace delta

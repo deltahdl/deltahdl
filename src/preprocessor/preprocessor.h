@@ -63,6 +63,8 @@ class Preprocessor {
   void HandleDefaultNettype(std::string_view rest, SourceLoc loc);
   void HandleUnconnectedDrive(std::string_view rest, SourceLoc loc);
   void HandleLine(std::string_view rest, SourceLoc loc);
+  void HandleDefaultDecayTime(std::string_view rest, SourceLoc loc);
+  void HandleDefaultTriregStrength(std::string_view rest, SourceLoc loc);
   void HandleBeginKeywords(std::string_view rest, SourceLoc loc,
                            std::string& output);
   void HandleEndKeywords(SourceLoc loc, std::string& output);
@@ -109,6 +111,14 @@ class Preprocessor {
   uint32_t LineOffset() const { return line_offset_; }
   bool HasLineOverride() const { return has_line_override_; }
   const std::string& LineFile() const { return line_file_override_; }
+  // Annex E accessors.
+  uint64_t DefaultDecayTime() const { return default_decay_time_; }
+  double DefaultDecayTimeReal() const { return default_decay_time_real_; }
+  bool DefaultDecayTimeInfinite() const { return default_decay_time_infinite_; }
+  uint32_t DefaultTriregStrength() const { return default_trireg_strength_; }
+  enum DelayModeDirective DelayModeDirective() const {
+    return delay_mode_directive_;
+  }
 
  private:
   TimeScale current_timescale_;
@@ -124,6 +134,12 @@ class Preprocessor {
   std::vector<KeywordVersion> keyword_version_stack_;
   uint32_t design_element_depth_ = 0;  // §22.3: for resetall validation.
   bool in_block_comment_ = false;       // §22.2: track /* */ across lines.
+  // Annex E state.
+  uint64_t default_decay_time_ = 0;
+  double default_decay_time_real_ = 0.0;
+  bool default_decay_time_infinite_ = true;  // §E.2: default is no decay.
+  uint32_t default_trireg_strength_ = 0;     // §E.3: 0-250.
+  enum DelayModeDirective delay_mode_directive_ = DelayModeDirective::kNone;
 };
 
 }  // namespace delta

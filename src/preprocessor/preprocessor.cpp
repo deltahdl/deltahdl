@@ -79,6 +79,12 @@ static bool IsCompilerDirective(std::string_view name) {
       "nounconnected_drive",
       "begin_keywords",
       "end_keywords",
+      "default_decay_time",
+      "default_trireg_strength",
+      "delay_mode_distributed",
+      "delay_mode_path",
+      "delay_mode_unit",
+      "delay_mode_zero",
   };
   for (auto d : kDirectives) {
     if (name == d) return true;
@@ -307,6 +313,12 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
     unconnected_drive_ = NetType::kWire;
     has_timescale_ = false;
     current_timescale_ = TimeScale{};
+    // Annex E: reset optional directive state.
+    default_decay_time_ = 0;
+    default_decay_time_real_ = 0.0;
+    default_decay_time_infinite_ = true;
+    default_trireg_strength_ = 0;
+    delay_mode_directive_ = DelayModeDirective::kNone;
     OutputRemainder(line, "resetall", file_id, line_num, output);
     return true;
   }
@@ -355,6 +367,58 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
   }
   if (StartsWithDirective(line, "line")) {
     HandleLine(AfterDirective(line, "line"), loc);
+    return true;
+  }
+  // --- Annex E: optional compiler directives ---
+  if (StartsWithDirective(line, "default_decay_time")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`default_decay_time illegal inside a design element");
+      return true;
+    }
+    HandleDefaultDecayTime(AfterDirective(line, "default_decay_time"), loc);
+    return true;
+  }
+  if (StartsWithDirective(line, "default_trireg_strength")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc,
+                  "`default_trireg_strength illegal inside a design element");
+      return true;
+    }
+    HandleDefaultTriregStrength(
+        AfterDirective(line, "default_trireg_strength"), loc);
+    return true;
+  }
+  if (StartsWithDirective(line, "delay_mode_distributed")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc,
+                  "`delay_mode_distributed illegal inside a design element");
+      return true;
+    }
+    delay_mode_directive_ = DelayModeDirective::kDistributed;
+    return true;
+  }
+  if (StartsWithDirective(line, "delay_mode_path")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`delay_mode_path illegal inside a design element");
+      return true;
+    }
+    delay_mode_directive_ = DelayModeDirective::kPath;
+    return true;
+  }
+  if (StartsWithDirective(line, "delay_mode_unit")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`delay_mode_unit illegal inside a design element");
+      return true;
+    }
+    delay_mode_directive_ = DelayModeDirective::kUnit;
+    return true;
+  }
+  if (StartsWithDirective(line, "delay_mode_zero")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`delay_mode_zero illegal inside a design element");
+      return true;
+    }
+    delay_mode_directive_ = DelayModeDirective::kZero;
     return true;
   }
   return false;
