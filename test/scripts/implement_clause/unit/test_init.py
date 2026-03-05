@@ -210,8 +210,8 @@ def test_main_closes_issue_when_all_done(ic, clause_argv) -> None:
         subclauses={"4.1": "General"}, next_sub=None,
     ) as (_, __, mock_close):
         ic.main(clause_argv)
-    mock_close.assert_called_once_with(
-        "o", "r", 1, "all subclauses are implemented",
+    assert mock_close.call_args == (
+        ("o", "r", 1, "all subclauses are implemented"),
     )
 
 

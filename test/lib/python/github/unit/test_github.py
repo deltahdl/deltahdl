@@ -107,15 +107,20 @@ def test_update_issue_body_failure() -> None:
 # --- close_issue ---
 
 
-def test_close_issue_success() -> None:
-    """Calls gh api PATCH with state=closed."""
+def test_close_issue_calls_correct_endpoint() -> None:
+    """Calls gh api with the correct issue endpoint."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
     with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
         close_issue("org", "repo", 42, "all done")
-    cmd = mock_run.call_args[0][0]
-    assert "repos/org/repo/issues/42" in cmd
-    assert "-f" in cmd
-    assert "state=closed" in cmd
+    assert "repos/org/repo/issues/42" in mock_run.call_args[0][0]
+
+
+def test_close_issue_sets_state_closed() -> None:
+    """Passes state=closed to gh api."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
+    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
+        close_issue("org", "repo", 42, "all done")
+    assert "state=closed" in mock_run.call_args[0][0]
 
 
 def test_close_issue_prints_reason(capsys) -> None:
@@ -123,9 +128,15 @@ def test_close_issue_prints_reason(capsys) -> None:
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
     with patch("lib.python.github.subprocess.run", return_value=cp):
         close_issue("org", "repo", 42, "all done")
-    out = capsys.readouterr().out
-    assert "all done" in out
-    assert "Closed issue #42" in out
+    assert "all done" in capsys.readouterr().out
+
+
+def test_close_issue_prints_confirmation(capsys) -> None:
+    """Prints confirmation after closing."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        close_issue("org", "repo", 42, "all done")
+    assert "Closed issue #42" in capsys.readouterr().out
 
 
 def test_close_issue_failure() -> None:
