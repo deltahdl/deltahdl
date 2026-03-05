@@ -954,6 +954,10 @@ struct CompilationUnit {
   double default_decay_time_real = 0.0;
   bool default_decay_time_infinite = true;
 
+  // §E.3: default trireg strength (0-250 capacitance).
+  uint32_t default_trireg_strength = 0;
+  bool has_default_trireg_strength = false;
+
   // CU-scope timeunit/timeprecision (§3.14.2.3 rule c)
   TimeUnit cu_time_unit = TimeUnit::kNs;
   TimeUnit cu_time_prec = TimeUnit::kNs;

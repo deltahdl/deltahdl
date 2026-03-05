@@ -318,6 +318,7 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
     default_decay_time_real_ = 0.0;
     default_decay_time_infinite_ = true;
     default_trireg_strength_ = 0;
+    has_default_trireg_strength_ = false;
     delay_mode_directive_ = DelayModeDirective::kNone;
     OutputRemainder(line, "resetall", file_id, line_num, output);
     return true;

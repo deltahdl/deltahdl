@@ -116,6 +116,7 @@ class Preprocessor {
   double DefaultDecayTimeReal() const { return default_decay_time_real_; }
   bool DefaultDecayTimeInfinite() const { return default_decay_time_infinite_; }
   uint32_t DefaultTriregStrength() const { return default_trireg_strength_; }
+  bool HasDefaultTriregStrength() const { return has_default_trireg_strength_; }
   enum DelayModeDirective DelayModeDirective() const {
     return delay_mode_directive_;
   }
@@ -139,6 +140,7 @@ class Preprocessor {
   double default_decay_time_real_ = 0.0;
   bool default_decay_time_infinite_ = true;  // §E.2: default is no decay.
   uint32_t default_trireg_strength_ = 0;     // §E.3: 0-250.
+  bool has_default_trireg_strength_ = false;
   enum DelayModeDirective delay_mode_directive_ = DelayModeDirective::kNone;
 };
 

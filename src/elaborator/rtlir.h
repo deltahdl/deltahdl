@@ -63,6 +63,7 @@ struct RtlirNet {
   std::vector<uint32_t> driver_indices;
   // §6.6.4: Trireg charge strength and decay time.
   Strength charge_strength = Strength::kMedium;
+  uint32_t trireg_capacitance = 0;  // §E.3: 0-250 numeric capacitance.
   uint64_t decay_ticks = 0;
   std::vector<ResolvedAttribute> attrs;
 };

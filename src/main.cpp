@@ -332,6 +332,9 @@ struct PreprocResult {
   uint64_t default_decay_time = 0;
   double default_decay_time_real = 0.0;
   bool default_decay_time_infinite = true;
+  // §E.3
+  uint32_t default_trireg_strength = 0;
+  bool has_default_trireg_strength = false;
 };
 
 PreprocResult PreprocessSources(const CliOptions& opts,
@@ -355,6 +358,8 @@ PreprocResult PreprocessSources(const CliOptions& opts,
   result.default_decay_time = preproc.DefaultDecayTime();
   result.default_decay_time_real = preproc.DefaultDecayTimeReal();
   result.default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
+  result.default_trireg_strength = preproc.DefaultTriregStrength();
+  result.has_default_trireg_strength = preproc.HasDefaultTriregStrength();
   return result;
 }
 
@@ -514,6 +519,8 @@ int main(int argc, char* argv[]) {
   cu->default_decay_time = pp.default_decay_time;
   cu->default_decay_time_real = pp.default_decay_time_real;
   cu->default_decay_time_infinite = pp.default_decay_time_infinite;
+  cu->default_trireg_strength = pp.default_trireg_strength;
+  cu->has_default_trireg_strength = pp.has_default_trireg_strength;
 
   if (opts.dump_ast) {
     DumpAst(cu);

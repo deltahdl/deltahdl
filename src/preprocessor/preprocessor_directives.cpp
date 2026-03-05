@@ -335,6 +335,7 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
     return;
   }
   default_trireg_strength_ = val;
+  has_default_trireg_strength_ = true;
 }
 
 }  // namespace delta
