@@ -18,6 +18,7 @@ from classify_file.test_helpers import (
     stub_subprocess_mixed,
     stub_subprocess_success,
 )
+from lib.python.test.subprocess_stubs import spy_subprocess_run
 
 _parse_args = getattr(classify_file, "_parse_args")
 _build_command = getattr(classify_file, "_build_command")
@@ -219,12 +220,17 @@ def test_parse_args_max_lines(monkeypatch):
     assert _parse_args().max_lines == 500
 
 
+def _argv_without_flag(base, flag):
+    """Return *base* with *flag* and its value removed."""
+    return [v for i, v in enumerate(base)
+            if base[max(0, i - 1)] != flag and v != flag]
+
+
 def test_parse_args_max_lines_required(monkeypatch):
     """Rejects missing --max-lines flag."""
-    argv = [v for i, v in enumerate(_BASE_ARGV)
-            if _BASE_ARGV[max(0, i - 1)] != "--max-lines"
-            and v != "--max-lines"]
-    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(
+        sys, "argv", _argv_without_flag(_BASE_ARGV, "--max-lines"),
+    )
     with pytest.raises(SystemExit):
         _parse_args()
 
@@ -360,15 +366,7 @@ def test_run_classify_test_passes_test_name(monkeypatch):
 
 def test_run_classify_test_does_not_capture_output(monkeypatch):
     """Subprocess inherits stdout/stderr (no capture_output)."""
-    kwargs_log: list[dict] = []
-
-    def spy_run(_cmd, **kwargs):
-        kwargs_log.append(kwargs)
-        result = MagicMock()
-        result.returncode = 0
-        return result
-
-    monkeypatch.setattr(subprocess, "run", spy_run)
+    kwargs_log = spy_subprocess_run(monkeypatch)
     classify_file.run_classify_test(_make_args(), "T", 1, 1)
     assert "capture_output" not in kwargs_log[0]
 

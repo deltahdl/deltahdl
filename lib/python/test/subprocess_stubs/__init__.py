@@ -29,3 +29,21 @@ def stub_subprocess_failure(monkeypatch):
     monkeypatch.setattr(
         subprocess, "run", lambda *_a, **_kw: mock_result,
     )
+
+
+def spy_subprocess_run(monkeypatch):
+    """Spy on subprocess.run; return (kwargs_log, result_stub).
+
+    The stub returns exit code 0 for every call.  Callers inspect
+    *kwargs_log* to verify keyword arguments (e.g. ``capture_output``).
+    """
+    kwargs_log: list[dict] = []
+
+    def spy_run(_cmd, **kwargs):
+        kwargs_log.append(kwargs)
+        result = MagicMock()
+        result.returncode = 0
+        return result
+
+    monkeypatch.setattr(subprocess, "run", spy_run)
+    return kwargs_log

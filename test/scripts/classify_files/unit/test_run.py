@@ -14,6 +14,7 @@ from classify_files.test_helpers import (
     stub_subprocess_success,
     stub_remove_file_checkbox,
 )
+from lib.python.test.subprocess_stubs import spy_subprocess_run
 
 _parse_args = getattr(classify_files, "_parse_args")
 _build_command = getattr(classify_files, "_build_command")
@@ -91,16 +92,16 @@ def test_parse_args_issue_required(monkeypatch):
         _parse_args()
 
 
-def test_parse_args_output_dir(monkeypatch):
-    """Parses --output-dir flag."""
-    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().output_dir == "/out"
-
-
 def test_parse_args_lrm(monkeypatch):
     """Parses --lrm flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().lrm == "/lrm.txt"
+
+
+def test_parse_args_output_dir(monkeypatch):
+    """Parses --output-dir flag."""
+    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
+    assert _parse_args().output_dir == "/out"
 
 
 def test_parse_args_organization(monkeypatch):
@@ -280,15 +281,7 @@ def test_run_classify_file_passes_file_path(monkeypatch):
 
 def test_run_classify_file_does_not_capture_output(monkeypatch):
     """Subprocess inherits stdout/stderr (no capture_output)."""
-    kwargs_log: list[dict] = []
-
-    def spy_run(_cmd, **kwargs):
-        kwargs_log.append(kwargs)
-        result = MagicMock()
-        result.returncode = 0
-        return result
-
-    monkeypatch.setattr(subprocess, "run", spy_run)
+    kwargs_log = spy_subprocess_run(monkeypatch)
     classify_files.run_classify_file(
         _make_args(), "/p/a.cpp", 1, 1,
     )

@@ -2,9 +2,9 @@
 
 import os
 import stat
-import subprocess
-import sys
 from pathlib import Path
+
+from lib.python.test import build_base_env, invoke_module
 
 _SCRIPTS_DIR = str(
     Path(__file__).resolve().parents[4] / "scripts",
@@ -96,35 +96,13 @@ def _install_fake_gh(tmp_path, issue_body=""):
 
 def _base_env(tmp_path, fake_scripts_dir, issue_body=""):
     """Build subprocess env with fake classify_test before real scripts."""
-    env = os.environ.copy()
-    env["HOME"] = str(tmp_path)
-    pypath = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = os.pathsep.join(
-        [fake_scripts_dir, _SCRIPTS_DIR]
-        + ([pypath] if pypath else []),
-    )
     fake_bin = _install_fake_gh(tmp_path, issue_body=issue_body)
-    env["PATH"] = fake_bin + os.pathsep + env.get("PATH", "")
-    return env
+    return build_base_env(tmp_path, fake_scripts_dir, fake_bin)
 
 
 def _invoke(*args, cwd=None, env=None):
     """Run classify_file in a child process."""
-    run_env = (env or os.environ).copy()
-    if "PYTHONPATH" not in run_env:
-        pypath = run_env.get("PYTHONPATH", "")
-        run_env["PYTHONPATH"] = (
-            _SCRIPTS_DIR + os.pathsep + pypath
-            if pypath else _SCRIPTS_DIR
-        )
-    return subprocess.run(
-        [sys.executable, "-m", "classify_file", *args],
-        capture_output=True,
-        text=True,
-        cwd=cwd,
-        env=run_env,
-        check=False,
-    )
+    return invoke_module("classify_file", *args, cwd=cwd, env=env)
 
 
 def _write_test_file(tmp_path, body):
