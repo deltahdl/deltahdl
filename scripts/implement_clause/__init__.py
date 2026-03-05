@@ -116,8 +116,6 @@ def invoke_implement_subclause(
         "--lrm", args.lrm,
         "--subclause", subclause,
         "--issue", str(args.issue),
-        "--organization", args.organization,
-        "--repo", args.repo,
     ]
     if continue_session:
         cmd.append("--continue")

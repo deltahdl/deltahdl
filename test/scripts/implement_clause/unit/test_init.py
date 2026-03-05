@@ -67,8 +67,6 @@ def test_invoke_implement_subclause_calls_subprocess(
         "--lrm", "/path/lrm.txt",
         "--subclause", "4.2",
         "--issue", "123",
-        "--organization", "deltahdl",
-        "--repo", "deltahdl",
     ]
 
 
