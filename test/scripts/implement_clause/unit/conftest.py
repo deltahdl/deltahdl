@@ -40,6 +40,30 @@ def invoke_subprocess_ok():
 
 
 @pytest.fixture()
+def commit_push_calls():
+    """Run commit_and_push and return captured subprocess calls.
+
+    Returns a factory: call it with ``(ic, subclause)`` and get
+    back the list of recorded ``cmd`` lists.
+    """
+
+    def _run(ic_mod, subclause="4.1"):
+        calls: list[list[str]] = []
+
+        def fake_run(cmd, **_kw):
+            calls.append(cmd)
+            if cmd == ["git", "diff", "--cached", "--quiet"]:
+                return subprocess.CompletedProcess(args=cmd, returncode=1)
+            return subprocess.CompletedProcess(args=cmd, returncode=0)
+
+        with patch("implement_clause.subprocess.run", side_effect=fake_run):
+            ic_mod.commit_and_push(subclause)
+        return calls
+
+    return _run
+
+
+@pytest.fixture()
 def patch_filter_ok():
     """Patch subprocess to return ["4.2", "4.3"] for filter calls."""
     cp = subprocess.CompletedProcess(

@@ -329,45 +329,24 @@ def test_commit_and_push_skips_when_nothing_staged(ic) -> None:
     )
 
 
-def test_commit_and_push_runs_commit(ic) -> None:
+def test_commit_and_push_runs_commit(ic, commit_push_calls) -> None:
     """commit_and_push runs git commit when changes exist."""
-    calls = []
-    def fake_run(cmd, **_kw):
-        calls.append(cmd)
-        if cmd == ["git", "diff", "--cached", "--quiet"]:
-            return subprocess.CompletedProcess(args=cmd, returncode=1)
-        return subprocess.CompletedProcess(args=cmd, returncode=0)
-    with patch("implement_clause.subprocess.run", side_effect=fake_run):
-        ic.commit_and_push("4.1")
+    calls = commit_push_calls(ic)
     git_cmds = [c[1] for c in calls if isinstance(c, list) and c[0] == "git"]
     assert "commit" in git_cmds
 
 
-def test_commit_and_push_runs_push(ic) -> None:
+def test_commit_and_push_runs_push(ic, commit_push_calls) -> None:
     """commit_and_push runs git push when changes exist."""
-    calls = []
-    def fake_run(cmd, **_kw):
-        calls.append(cmd)
-        if cmd == ["git", "diff", "--cached", "--quiet"]:
-            return subprocess.CompletedProcess(args=cmd, returncode=1)
-        return subprocess.CompletedProcess(args=cmd, returncode=0)
-    with patch("implement_clause.subprocess.run", side_effect=fake_run):
-        ic.commit_and_push("4.1")
+    calls = commit_push_calls(ic)
     git_cmds = [c[1] for c in calls if isinstance(c, list) and c[0] == "git"]
     assert "push" in git_cmds
 
 
-def test_commit_and_push_message_contains_subclause(ic) -> None:
+def test_commit_and_push_message_contains_subclause(ic, commit_push_calls) -> None:
     """Commit message contains the subclause number."""
-    calls = []
-    def fake_run(cmd, **kw):
-        calls.append((cmd, kw))
-        if cmd == ["git", "diff", "--cached", "--quiet"]:
-            return subprocess.CompletedProcess(args=cmd, returncode=1)
-        return subprocess.CompletedProcess(args=cmd, returncode=0)
-    with patch("implement_clause.subprocess.run", side_effect=fake_run):
-        ic.commit_and_push("4.1")
-    commit_call = [c for c, k in calls if c[0] == "git" and c[1] == "commit"][0]
+    calls = commit_push_calls(ic)
+    commit_call = [c for c in calls if c[0] == "git" and c[1] == "commit"][0]
     msg_idx = commit_call.index("-m") + 1
     assert "4.1" in commit_call[msg_idx]
 
@@ -495,24 +474,9 @@ General text.
 """
 
 
-def test_main_exits_when_tables_missing(ic, tmp_path) -> None:
-    """main() exits early when LRM has tables but --tables not provided."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_WITH_TABLE)
-    with (
-        patch("implement_clause.parse_subclauses") as mock_ps,
-        pytest.raises(SystemExit),
-    ):
-        ic.main([
-            "--lrm", str(lrm), "--clause", "4",
-            "--issue", "1", "--organization", "o", "--repo", "r",
-        ])
-    mock_ps.assert_not_called()
-
-
 _LRM_WITH_FIGURE = """\
 4. Scheduling semantics
-Figure 4-1\u2014Overview diagram
+Figure 4-1—Overview diagram
 
 4.1 General
 General text.
@@ -521,10 +485,17 @@ General text.
 """
 
 
-def test_main_exits_when_figures_missing(ic, tmp_path) -> None:
-    """main() exits early when LRM has figures but --figures not provided."""
+@pytest.mark.parametrize(
+    "lrm_content",
+    [_LRM_WITH_TABLE, _LRM_WITH_FIGURE],
+    ids=["tables_missing", "figures_missing"],
+)
+def test_main_exits_when_supplementary_missing(
+    ic, tmp_path, lrm_content,
+) -> None:
+    """main() exits early when LRM has supplementary but flag not provided."""
     lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_WITH_FIGURE)
+    lrm.write_text(lrm_content)
     with (
         patch("implement_clause.parse_subclauses") as mock_ps,
         pytest.raises(SystemExit),

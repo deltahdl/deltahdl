@@ -6,9 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-_SCRIPTS_DIR = str(
-    Path(__file__).resolve().parents[3] / "scripts",
-)
+_REPO_ROOT = str(Path(__file__).resolve().parents[3])
+_SCRIPTS_DIR = str(Path(_REPO_ROOT) / "scripts")
 
 
 def build_base_env(tmp_path, fake_scripts_dir, fake_bin):
@@ -17,7 +16,7 @@ def build_base_env(tmp_path, fake_scripts_dir, fake_bin):
     env["HOME"] = str(tmp_path)
     pypath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = os.pathsep.join(
-        [fake_scripts_dir, _SCRIPTS_DIR]
+        [fake_scripts_dir, _SCRIPTS_DIR, _REPO_ROOT]
         + ([pypath] if pypath else []),
     )
     env["PATH"] = fake_bin + os.pathsep + env.get("PATH", "")
