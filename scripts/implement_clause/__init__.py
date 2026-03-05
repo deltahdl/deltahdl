@@ -104,8 +104,11 @@ def filter_implementable(
         )
         sys.exit(1)
 
-    print(f"Claude response:\n{result.stdout.strip()}")
-    verdicts = json.loads(result.stdout.strip())
+    raw = result.stdout.strip()
+    print(f"Claude response:\n{raw}")
+    raw = re.sub(r"^```(?:json)?\s*\n?", "", raw)
+    raw = re.sub(r"\n?```\s*$", "", raw)
+    verdicts = json.loads(raw)
 
     implementable: list[str] = []
     for key, value in verdicts.items():

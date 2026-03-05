@@ -90,6 +90,16 @@ def test_filter_implementable_prints_rationale(capsys) -> None:
     assert "Rationale for 4.1: Defines syntax rules" in capsys.readouterr().out
 
 
+def test_filter_implementable_strips_markdown_fences() -> None:
+    """Claude response wrapped in ```json fences is parsed correctly."""
+    fenced = '```json\n{"4.1": false, "4.2": true}\n```\n'
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout=fenced, stderr="",
+    )
+    with patch("implement_clause.subprocess.run", return_value=cp):
+        assert filter_implementable("text", THREE_SUBCLAUSES) == ["4.2"]
+
+
 def test_filter_implementable_empty() -> None:
     """Empty list when Claude returns no implementable subclauses."""
     cp = subprocess.CompletedProcess(
