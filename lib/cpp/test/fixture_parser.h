@@ -83,6 +83,7 @@ inline ParseResult ParseWithPreprocessor(const std::string& src) {
   result.cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
   result.cu->default_trireg_strength = preproc.DefaultTriregStrength();
   result.cu->has_default_trireg_strength = preproc.HasDefaultTriregStrength();
+  result.cu->delay_mode_directive = preproc.DelayModeDirective();
   result.has_errors = diag.HasErrors();
   return result;
 }

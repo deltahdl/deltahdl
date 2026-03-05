@@ -47,6 +47,7 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
   cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
   cu->default_trireg_strength = preproc.DefaultTriregStrength();
   cu->has_default_trireg_strength = preproc.HasDefaultTriregStrength();
+  cu->delay_mode_directive = preproc.DelayModeDirective();
   Elaborator elab(f.arena, f.diag, cu);
   auto name = top.empty() ? cu->modules.back()->name : top;
   auto* design = elab.Elaborate(name);

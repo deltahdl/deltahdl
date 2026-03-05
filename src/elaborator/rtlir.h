@@ -164,6 +164,7 @@ struct RtlirEnumMember {
 struct RtlirModule {
   std::string_view name;
   std::vector<ResolvedAttribute> attrs;
+  DelayModeDirective delay_mode = DelayModeDirective::kNone;  // §E.4-E.7
 
   std::vector<RtlirPort> ports;
   std::vector<RtlirNet> nets;

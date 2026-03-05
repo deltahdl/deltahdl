@@ -150,6 +150,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
   mod->name = decl->name;
+  // §E.4-E.7: propagate delay mode directive.
+  mod->delay_mode = unit_->delay_mode_directive;
   // §5.12: Resolve attributes on module definition.
   mod->attrs = ResolveAttributes(decl->attrs, diag_);
 

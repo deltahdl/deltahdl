@@ -958,6 +958,9 @@ struct CompilationUnit {
   uint32_t default_trireg_strength = 0;
   bool has_default_trireg_strength = false;
 
+  // §E.4-E.7: delay mode directive.
+  DelayModeDirective delay_mode_directive = DelayModeDirective::kNone;
+
   // CU-scope timeunit/timeprecision (§3.14.2.3 rule c)
   TimeUnit cu_time_unit = TimeUnit::kNs;
   TimeUnit cu_time_prec = TimeUnit::kNs;

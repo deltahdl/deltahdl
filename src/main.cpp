@@ -335,6 +335,8 @@ struct PreprocResult {
   // §E.3
   uint32_t default_trireg_strength = 0;
   bool has_default_trireg_strength = false;
+  // §E.4-E.7
+  delta::DelayModeDirective delay_mode_directive = delta::DelayModeDirective::kNone;
 };
 
 PreprocResult PreprocessSources(const CliOptions& opts,
@@ -360,6 +362,7 @@ PreprocResult PreprocessSources(const CliOptions& opts,
   result.default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
   result.default_trireg_strength = preproc.DefaultTriregStrength();
   result.has_default_trireg_strength = preproc.HasDefaultTriregStrength();
+  result.delay_mode_directive = preproc.DelayModeDirective();
   return result;
 }
 
@@ -521,6 +524,7 @@ int main(int argc, char* argv[]) {
   cu->default_decay_time_infinite = pp.default_decay_time_infinite;
   cu->default_trireg_strength = pp.default_trireg_strength;
   cu->has_default_trireg_strength = pp.has_default_trireg_strength;
+  cu->delay_mode_directive = pp.delay_mode_directive;
 
   if (opts.dump_ast) {
     DumpAst(cu);
