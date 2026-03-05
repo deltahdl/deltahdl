@@ -950,18 +950,15 @@ jobs:
           assert-no-inline-directives
           --tools clang-tidy,clang-format,clang-diagnostic,pylint,mypy,yamllint
           src/ test/
-          lib/run_tests_common/ scripts/run_sim_tests/
-          scripts/run_sv_tests/ test/lib/run_tests_common/
-          test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
+          lib/ scripts/ test/lib/ test/scripts/
           ${{ github.workspace }}/**/*
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Assert one assert per pytest
         run: >-
           assert-one-assert-per-pytest
           --verbose
-          ${{ github.workspace }}/test/lib/run_tests_common
-          ${{ github.workspace }}/test/scripts/run_sim_tests
-          ${{ github.workspace }}/test/scripts/run_sv_tests
+          ${{ github.workspace }}/test/lib/
+          ${{ github.workspace }}/test/scripts/
       # ── Python linters (conditional) ──
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Run pylint on source

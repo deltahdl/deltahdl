@@ -52,7 +52,8 @@ jobs:
         run: >-
           assert-one-assert-per-pytest
           --verbose
-          ${{ github.workspace }}/test/scripts/classify_file
+          ${{ github.workspace }}/test/lib/
+          ${{ github.workspace }}/test/scripts/
       - name: Run pylint on source
         run: >-
           PYTHONPATH=. python3 -m pylint lib/ scripts/
