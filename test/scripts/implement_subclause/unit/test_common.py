@@ -168,6 +168,12 @@ def test_lrm_labels_subclause_finds_figure(tmp_path):
 # ---- format_prompt --------------------------------------------------------
 
 
+def test_format_prompt_forbids_building():
+    """Prompt tells Claude not to build or run tests."""
+    result = format_prompt("4.1", "~/LRM.txt", ["4"], issue=6)
+    assert "Do not build or run tests" in result
+
+
 def test_format_prompt_includes_supplementary():
     """Supplementary text appears in the formatted prompt."""
     result = format_prompt(

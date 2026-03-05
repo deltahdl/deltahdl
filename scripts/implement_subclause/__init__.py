@@ -181,6 +181,7 @@ def format_prompt(
     )
 
     lines.append("Do not copy LRM prose into source comments.")
+    lines.append("Do not build or run tests.")
 
     lines.append(
         f"After implementation, mark §{subclause}"
