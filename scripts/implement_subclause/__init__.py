@@ -11,7 +11,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lib.python.lrm import extract_clause_text, load_lrm_titles
+from lib.python.lrm import (
+    extract_clause_text,
+    load_lrm_titles,
+    lrm_labels_for_subclause,
+)
 from lib.python.supplementary import (
     add_supplementary_args,
     build_supplementary_lines,
@@ -25,8 +29,6 @@ from lib.python.supplementary import (
 # ---------------------------------------------------------------------------
 
 CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
-FIGURE_LABEL_RE = re.compile(r"^Figure ([\d\w]+-[\d\w]+)")
-TABLE_LABEL_RE = re.compile(r"^Table ([\d\w]+-[\d\w]+)")
 
 
 # ---------------------------------------------------------------------------
@@ -91,30 +93,6 @@ def find_context_subclauses(
                 context.append(key)
 
     return context
-
-
-# ---------------------------------------------------------------------------
-# Supplementary files (Figures / Tables)
-# ---------------------------------------------------------------------------
-
-def _lrm_labels_for_subclause(
-    lrm_path: Path, clause: str,
-) -> tuple[list[str], list[str]]:
-    """Parse the LRM to find figure/table labels within *clause*'s text."""
-    text = extract_clause_text(lrm_path, clause)
-    figures: list[str] = []
-    tables: list[str] = []
-
-    for line in text.splitlines():
-        m = FIGURE_LABEL_RE.match(line)
-        if m:
-            figures.append(m.group(1))
-            continue
-        m = TABLE_LABEL_RE.match(line)
-        if m:
-            tables.append(m.group(1))
-
-    return figures, tables
 
 
 # ---------------------------------------------------------------------------
@@ -335,7 +313,7 @@ def main(argv=None):
         f" issue #{args.issue}, model {args.model}",
     )
 
-    lrm_labels = _lrm_labels_for_subclause(args.lrm, args.subclause)
+    lrm_labels = lrm_labels_for_subclause(args.lrm, args.subclause)
     check_supplementary_args(
         args.subclause, lrm_labels,
         figures=args.figures,

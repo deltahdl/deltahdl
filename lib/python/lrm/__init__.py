@@ -104,6 +104,28 @@ def extract_clause_text(lrm_path: Path, clause: str) -> str:
     return "\n".join(lines[start:end]).rstrip()
 
 
+FIGURE_LABEL_RE = re.compile(r"^Figure ([\d\w]+-[\d\w]+)")
+TABLE_LABEL_RE = re.compile(r"^Table ([\d\w]+-[\d\w]+)")
+
+
+def lrm_labels_for_subclause(
+    lrm_path: Path, clause: str,
+) -> tuple[list[str], list[str]]:
+    """Find figure/table labels within a subclause's LRM text."""
+    text = extract_clause_text(lrm_path, clause)
+    figures: list[str] = []
+    tables: list[str] = []
+    for line in text.splitlines():
+        m = FIGURE_LABEL_RE.match(line)
+        if m:
+            figures.append(m.group(1))
+            continue
+        m = TABLE_LABEL_RE.match(line)
+        if m:
+            tables.append(m.group(1))
+    return figures, tables
+
+
 def parse_subclauses(lrm_path: Path, clause: str) -> dict[str, str]:
     """Return direct subclauses of *clause* as a ``{number: title}`` dict."""
     all_titles = load_lrm_titles(lrm_path)

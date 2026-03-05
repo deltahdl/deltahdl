@@ -141,6 +141,63 @@ static std::string_view AfterDirective(std::string_view line,
   return Trim(rest);
 }
 
+// §22.2: Replace comment content with spaces so backticks within comments
+// are not processed by ExpandInlineMacros. Tracks block comment state.
+static std::string StripComments(std::string_view line,
+                                 bool& in_block_comment) {
+  std::string result;
+  result.reserve(line.size());
+  bool in_string = false;
+  size_t i = 0;
+
+  while (i < line.size()) {
+    if (in_block_comment) {
+      if (i + 1 < line.size() && line[i] == '*' && line[i + 1] == '/') {
+        result += "*/";
+        i += 2;
+        in_block_comment = false;
+      } else {
+        result += ' ';
+        ++i;
+      }
+      continue;
+    }
+
+    if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
+      in_string = !in_string;
+      result += line[i++];
+      continue;
+    }
+
+    if (in_string) {
+      result += line[i++];
+      continue;
+    }
+
+    // Line comment: replace remainder with spaces.
+    if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '/') {
+      result += "//";
+      i += 2;
+      while (i < line.size()) {
+        result += ' ';
+        ++i;
+      }
+      return result;
+    }
+
+    // Block comment start.
+    if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '*') {
+      result += "/*";
+      i += 2;
+      in_block_comment = true;
+      continue;
+    }
+
+    result += line[i++];
+  }
+  return result;
+}
+
 std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
                                         int depth) {
   if (depth > kMaxIncludeDepth) {
@@ -161,6 +218,38 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     std::string_view line = src.substr(pos, eol - pos);
     ++line_num;
 
+    // §22.2: Handle block comments spanning multiple lines.
+    if (in_block_comment_) {
+      auto close = line.find("*/");
+      if (close == std::string_view::npos) {
+        // Entire line is inside block comment; pass through as-is.
+        output.append(line);
+        output.push_back('\n');
+        pos = eol + 1;
+        continue;
+      }
+      // Block comment ends on this line. Pass the comment portion through,
+      // then process the remainder after */.
+      output.append(line.substr(0, close + 2));
+      in_block_comment_ = false;
+      auto remainder = line.substr(close + 2);
+      // Process remainder as a new (virtual) line.
+      if (!Trim(remainder).empty()) {
+        bool handled =
+            ProcessDirective(remainder, file_id, line_num, depth, output);
+        if (!handled && IsActive()) {
+          auto stripped = StripComments(remainder, in_block_comment_);
+          auto expanded =
+              ExpandInlineMacros(stripped, file_id, line_num);
+          TrackDesignElement(Trim(expanded));
+          output.append(expanded);
+        }
+      }
+      output.push_back('\n');
+      pos = eol + 1;
+      continue;
+    }
+
     // Join backslash-continued lines for `define directives.
     std::string joined;
     if (StartsWithDirective(line, "define") && EndsWithBackslash(line)) {
@@ -170,7 +259,8 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);
     if (!handled && IsActive()) {
-      auto expanded = ExpandInlineMacros(line, file_id, line_num);
+      auto stripped = StripComments(line, in_block_comment_);
+      auto expanded = ExpandInlineMacros(stripped, file_id, line_num);
       TrackDesignElement(Trim(expanded));
       output.append(expanded);
     }
@@ -180,8 +270,28 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   return output;
 }
 
-bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc) {
+// §22.2: Output text that follows a directive with a defined end on the
+// same line.  Applies macro expansion and comment stripping.
+void Preprocessor::OutputRemainder(std::string_view line,
+                                   std::string_view directive,
+                                   uint32_t file_id, uint32_t line_num,
+                                   std::string& output) {
+  auto rest = AfterDirective(line, directive);
+  if (rest.empty()) return;
+  auto stripped = StripComments(rest, in_block_comment_);
+  auto expanded = ExpandInlineMacros(stripped, file_id, line_num);
+  TrackDesignElement(Trim(expanded));
+  output.append(expanded);
+}
+
+bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
+                                         uint32_t file_id, uint32_t line_num,
+                                         std::string& output) {
   if (StartsWithDirective(line, "timescale")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`timescale illegal inside a design element");
+      return true;
+    }
     HandleTimescale(AfterDirective(line, "timescale"), loc);
     return true;
   }
@@ -197,25 +307,41 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc) {
     unconnected_drive_ = NetType::kWire;
     has_timescale_ = false;
     current_timescale_ = TimeScale{};
+    OutputRemainder(line, "resetall", file_id, line_num, output);
     return true;
   }
   if (StartsWithDirective(line, "default_nettype")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`default_nettype illegal inside a design element");
+      return true;
+    }
     HandleDefaultNettype(AfterDirective(line, "default_nettype"), loc);
     return true;
   }
   if (StartsWithDirective(line, "endcelldefine")) {
     in_celldefine_ = false;
+    OutputRemainder(line, "endcelldefine", file_id, line_num, output);
     return true;
   }
   if (StartsWithDirective(line, "celldefine")) {
     in_celldefine_ = true;
+    OutputRemainder(line, "celldefine", file_id, line_num, output);
     return true;
   }
   if (StartsWithDirective(line, "nounconnected_drive")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`nounconnected_drive illegal inside a design element");
+      return true;
+    }
     unconnected_drive_ = NetType::kWire;
+    OutputRemainder(line, "nounconnected_drive", file_id, line_num, output);
     return true;
   }
   if (StartsWithDirective(line, "unconnected_drive")) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`unconnected_drive illegal inside a design element");
+      return true;
+    }
     HandleUnconnectedDrive(AfterDirective(line, "unconnected_drive"), loc);
     return true;
   }
@@ -248,13 +374,14 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
   }
   if (StartsWithDirective(line, "undefineall")) {
     macros_.UndefineAll();
+    OutputRemainder(line, "undefineall", file_id, line_num, output);
     return true;
   }
   if (StartsWithDirective(line, "undef")) {
     HandleUndef(AfterDirective(line, "undef"), loc);
     return true;
   }
-  if (ProcessConditionalDirective(line)) return true;
+  if (ProcessConditionalDirective(line, file_id, line_num, output)) return true;
   if (StartsWithDirective(line, "include") && IsActive()) {
     auto inc_arg = AfterDirective(line, "include");
     // §22.4: expand macros in include argument before processing.
@@ -273,7 +400,8 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     HandleEndKeywords(loc, output);
     return true;
   }
-  if (ProcessStateDirective(line, loc)) return true;
+  if (IsActive() && ProcessStateDirective(line, loc, file_id, line_num, output))
+    return true;
   // Check for macro invocation: `MACRO_NAME
   if (IsActive() && TryExpandMacro(trimmed, output, file_id, line_num, depth)) {
     return true;
@@ -281,7 +409,10 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
   return false;
 }
 
-bool Preprocessor::ProcessConditionalDirective(std::string_view line) {
+bool Preprocessor::ProcessConditionalDirective(std::string_view line,
+                                                uint32_t file_id,
+                                                uint32_t line_num,
+                                                std::string& output) {
   if (StartsWithDirective(line, "ifdef")) {
     HandleIfdef(AfterDirective(line, "ifdef"), false);
     return true;
@@ -296,10 +427,14 @@ bool Preprocessor::ProcessConditionalDirective(std::string_view line) {
   }
   if (StartsWithDirective(line, "else")) {
     HandleElse();
+    // §22.2: text after `else on same line is preserved.
+    if (IsActive()) OutputRemainder(line, "else", file_id, line_num, output);
     return true;
   }
   if (StartsWithDirective(line, "endif")) {
     HandleEndif();
+    // §22.2: text after `endif on same line is preserved.
+    if (IsActive()) OutputRemainder(line, "endif", file_id, line_num, output);
     return true;
   }
   return false;
@@ -310,6 +445,11 @@ bool Preprocessor::ValidateMacroArgCount(const MacroDef& def,
                                          std::string_view args_text,
                                          SourceLoc loc, std::string_view name) {
   auto args = SplitMacroArgs(args_text);
+  if (args.size() > def.params.size()) {
+    diag_.Error(loc,
+                "too many arguments for macro '" + std::string(name) + "'");
+    return false;
+  }
   for (size_t i = args.size(); i < def.params.size(); ++i) {
     bool has_default =
         i < def.param_defaults.size() && !def.param_defaults[i].empty();
@@ -327,7 +467,11 @@ bool Preprocessor::TryPredefinedMacro(std::string_view name,
                                       uint32_t line_num) {
   if (name == "__FILE__") {
     output.append("\"");
-    output.append(src_mgr_.FilePath(file_id));
+    if (has_line_override_ && !line_file_override_.empty()) {
+      output.append(line_file_override_);
+    } else {
+      output.append(src_mgr_.FilePath(file_id));
+    }
     output.append("\"");
     return true;
   }
@@ -425,7 +569,11 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
 
   if (name == "__FILE__") {
     result += '"';
-    result += src_mgr_.FilePath(file_id);
+    if (has_line_override_ && !line_file_override_.empty()) {
+      result += line_file_override_;
+    } else {
+      result += src_mgr_.FilePath(file_id);
+    }
     result += '"';
     return i;
   }
@@ -453,6 +601,11 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
       return i;
     }
     args_text = balanced.substr(1, balanced.size() - 2);
+    if (!ValidateMacroArgCount(*def, args_text, {file_id, line_num, 1},
+                               name)) {
+      result.append(line.substr(pos, i - pos));
+      return i;
+    }
     i += balanced.size();
   }
   result += ExpandMacro(*def, args_text);
@@ -509,6 +662,59 @@ void Preprocessor::TrackDesignElement(std::string_view trimmed) {
   }
 }
 
+// §22.5.1: Strip comments from macro body text.
+// Line comments (// ...) are removed entirely.
+// Block comments (/* ... */) are removed entirely.
+// Comments inside string literals or `" regions are preserved.
+static std::string StripMacroBodyComments(std::string_view body) {
+  std::string result;
+  result.reserve(body.size());
+  bool in_string = false;
+  size_t i = 0;
+
+  while (i < body.size()) {
+    // Track string literals (skip \" escapes).
+    if (body[i] == '"' && (i == 0 || body[i - 1] != '\\')) {
+      // Check for `" (backtick-quote) — not a real string delimiter.
+      if (i > 0 && body[i - 1] == '`') {
+        result += body[i++];
+        continue;
+      }
+      in_string = !in_string;
+      result += body[i++];
+      continue;
+    }
+
+    if (in_string) {
+      result += body[i++];
+      continue;
+    }
+
+    // Line comment: remove remainder.
+    if (i + 1 < body.size() && body[i] == '/' && body[i + 1] == '/') {
+      break;
+    }
+
+    // Block comment: remove entirely.
+    if (i + 1 < body.size() && body[i] == '/' && body[i + 1] == '*') {
+      i += 2;
+      while (i + 1 < body.size() && !(body[i] == '*' && body[i + 1] == '/')) {
+        ++i;
+      }
+      if (i + 1 < body.size()) i += 2;  // Skip */
+      continue;
+    }
+
+    result += body[i++];
+  }
+  // Trim trailing whitespace left after comment removal.
+  while (!result.empty() &&
+         std::isspace(static_cast<unsigned char>(result.back()))) {
+    result.pop_back();
+  }
+  return result;
+}
+
 void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   if (!IsActive()) return;
 
@@ -537,10 +743,10 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
       def.is_function_like = true;
       def.params =
           ParseMacroParams(after_name.substr(1, close - 1), def.param_defaults);
-      def.body = std::string(Trim(after_name.substr(close + 1)));
+      def.body = StripMacroBodyComments(Trim(after_name.substr(close + 1)));
     }
   } else {
-    def.body = std::string(Trim(after_name));
+    def.body = StripMacroBodyComments(Trim(after_name));
   }
   if (HasUnterminatedString(def.body)) {
     diag_.Error(loc, "unterminated string literal in macro body");
@@ -593,10 +799,12 @@ void Preprocessor::HandleEndif() {
 }
 
 // --- Ifdef expression evaluator (IEEE 1800-2023 §22.6) ---
-// Grammar: expr ::= or_expr
-//          or_expr ::= and_expr ('||' and_expr)*
-//          and_expr ::= unary ('&&' unary)*
-//          unary ::= '!' unary | '(' expr ')' | identifier
+// Grammar: expr       ::= equiv_expr
+//          equiv_expr ::= impl_expr ('<->' impl_expr)*
+//          impl_expr  ::= or_expr ('->' or_expr)*
+//          or_expr    ::= and_expr ('||' and_expr)*
+//          and_expr   ::= unary ('&&' unary)*
+//          unary      ::= '!' unary | '(' expr ')' | identifier
 
 static void SkipSpaces(std::string_view& s) {
   while (!s.empty() && std::isspace(static_cast<unsigned char>(s[0]))) {
@@ -606,7 +814,31 @@ static void SkipSpaces(std::string_view& s) {
 
 bool Preprocessor::EvalIfdefExpr(std::string_view expr) {
   auto e = Trim(expr);
-  return EvalIfdefOr(e);
+  return EvalIfdefEquiv(e);
+}
+
+bool Preprocessor::EvalIfdefEquiv(std::string_view& expr) {
+  bool result = EvalIfdefImpl(expr);
+  SkipSpaces(expr);
+  while (expr.size() >= 3 && expr[0] == '<' && expr[1] == '-' && expr[2] == '>') {
+    expr.remove_prefix(3);
+    bool rhs = EvalIfdefImpl(expr);
+    result = (result == rhs);
+    SkipSpaces(expr);
+  }
+  return result;
+}
+
+bool Preprocessor::EvalIfdefImpl(std::string_view& expr) {
+  bool result = EvalIfdefOr(expr);
+  SkipSpaces(expr);
+  while (expr.size() >= 2 && expr[0] == '-' && expr[1] == '>') {
+    expr.remove_prefix(2);
+    bool rhs = EvalIfdefOr(expr);
+    result = !result || rhs;
+    SkipSpaces(expr);
+  }
+  return result;
 }
 
 bool Preprocessor::EvalIfdefOr(std::string_view& expr) {
@@ -639,7 +871,7 @@ bool Preprocessor::EvalIfdefUnary(std::string_view& expr) {
   }
   if (!expr.empty() && expr[0] == '(') {
     expr.remove_prefix(1);
-    bool result = EvalIfdefOr(expr);
+    bool result = EvalIfdefEquiv(expr);
     SkipSpaces(expr);
     if (!expr.empty() && expr[0] == ')') expr.remove_prefix(1);
     return result;
@@ -657,6 +889,10 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
                                  int depth, std::string& output,
                                  bool angle_bracket) {
   auto fn = Trim(filename_raw);
+  if (fn.empty()) {
+    diag_.Error(loc, "`include requires a filename");
+    return;
+  }
   // Strip quotes properly: find matching closing " or >.
   std::string_view after_close;
   if (fn.size() >= 2 && (fn.front() == '"' || fn.front() == '<')) {
@@ -677,6 +913,11 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
                                   after_close[1] == '*'))) {
     diag_.Error(loc,
                 "only whitespace or a comment may follow `include filename");
+  }
+
+  if (fn.empty()) {
+    diag_.Error(loc, "`include filename is empty");
+    return;
   }
 
   // §22.4: Absolute paths are only allowed with the double-quote form.

@@ -36,14 +36,22 @@ class Preprocessor {
   std::string ProcessSource(std::string_view src, uint32_t file_id, int depth);
   bool ProcessDirective(std::string_view line, uint32_t file_id,
                         uint32_t line_num, int depth, std::string& output);
-  bool ProcessConditionalDirective(std::string_view line);
-  bool ProcessStateDirective(std::string_view line, SourceLoc loc);
+  bool ProcessConditionalDirective(std::string_view line, uint32_t file_id,
+                                   uint32_t line_num, std::string& output);
+  bool ProcessStateDirective(std::string_view line, SourceLoc loc,
+                             uint32_t file_id, uint32_t line_num,
+                             std::string& output);
+  void OutputRemainder(std::string_view line, std::string_view directive,
+                       uint32_t file_id, uint32_t line_num,
+                       std::string& output);
   bool IsActive() const;
   void HandleDefine(std::string_view rest, SourceLoc loc);
   void HandleUndef(std::string_view rest, SourceLoc loc);
   void HandleIfdef(std::string_view rest, bool inverted);
   void HandleElsif(std::string_view rest);
   bool EvalIfdefExpr(std::string_view expr);
+  bool EvalIfdefEquiv(std::string_view& expr);
+  bool EvalIfdefImpl(std::string_view& expr);
   bool EvalIfdefOr(std::string_view& expr);
   bool EvalIfdefAnd(std::string_view& expr);
   bool EvalIfdefUnary(std::string_view& expr);
@@ -100,6 +108,7 @@ class Preprocessor {
   NetType UnconnectedDrive() const { return unconnected_drive_; }
   uint32_t LineOffset() const { return line_offset_; }
   bool HasLineOverride() const { return has_line_override_; }
+  const std::string& LineFile() const { return line_file_override_; }
 
  private:
   TimeScale current_timescale_;
@@ -111,8 +120,10 @@ class Preprocessor {
   uint32_t line_offset_ = 0;             // Line number from `line directive.
   uint32_t line_override_src_line_ = 0;  // Source line where `line appeared.
   bool has_line_override_ = false;
+  std::string line_file_override_;
   std::vector<KeywordVersion> keyword_version_stack_;
   uint32_t design_element_depth_ = 0;  // §22.3: for resetall validation.
+  bool in_block_comment_ = false;       // §22.2: track /* */ across lines.
 };
 
 }  // namespace delta

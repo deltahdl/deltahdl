@@ -288,6 +288,100 @@ TEST(Preprocessor, Include_AnywhereInSource) {
   EXPECT_NE(result.find("assign b = a;"), std::string::npos);
 }
 
+// --- §22.4: Block comment after include filename ---
+
+TEST(Preprocessor, Include_BlockCommentAfterFilename_OK) {
+  PreprocFixture f;
+  auto result =
+      Preprocess("`include \"/dev/null\" /* block comment */\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// --- §22.4: Source dir searched before include_dirs (double-quote form) ---
+
+TEST(Preprocessor, Include_SourceDirBeforeIncludeDirs) {
+  IncludeTestDir tmp;
+  fs::create_directories(tmp.dir / "src_dir");
+  fs::create_directories(tmp.dir / "inc_dir");
+  tmp.WriteFile("src_dir/priority.svh", "wire from_src;\n");
+  tmp.WriteFile("inc_dir/priority.svh", "wire from_inc;\n");
+
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back((tmp.dir / "inc_dir").string());
+  auto fid = f.mgr.AddFile((tmp.dir / "src_dir" / "top.sv").string(),
+                            "`include \"priority.svh\"\n");
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  // Source dir is searched first, so src_dir/priority.svh wins.
+  EXPECT_NE(result.find("wire from_src;"), std::string::npos);
+  EXPECT_EQ(result.find("wire from_inc;"), std::string::npos);
+}
+
+// --- §22.4: Included file defines macros used after the include ---
+
+TEST(Preprocessor, Include_DefinedMacrosAvailableAfterInclude) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("macros.svh", "`define WIDTH 8\n");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                            "`include \"macros.svh\"\n"
+                            "logic [`WIDTH-1:0] data;\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("8"), std::string::npos);
+}
+
+// --- §22.4: Include from macro body expansion ---
+
+TEST(Preprocessor, Include_FromMacroBodyExpansion) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("via_macro.svh", "wire via_macro;\n");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile(
+      (tmp.dir / "top.sv").string(),
+      "`define DO_INCLUDE `include \"via_macro.svh\"\n"
+      "`DO_INCLUDE\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("wire via_macro;"), std::string::npos);
+}
+
+// --- §22.4: Double-quote form falls back to include_dirs ---
+
+TEST(Preprocessor, Include_DoubleQuote_FallsBackToIncludeDirs) {
+  IncludeTestDir tmp;
+  fs::create_directories(tmp.dir / "inc");
+  tmp.WriteFile("inc/fallback.svh", "wire fallback;\n");
+
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back((tmp.dir / "inc").string());
+  // Source is in a directory that does NOT contain fallback.svh.
+  auto fid = f.mgr.AddFile("<test>", "`include \"fallback.svh\"\n");
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("wire fallback;"), std::string::npos);
+}
+
+// --- §22.4: Angle-bracket with non-existent include dir ---
+
+TEST(Preprocessor, Include_AngleBracket_NoIncludeDirs_Error) {
+  PreprocFixture f;
+  auto result = Preprocess("`include <missing.svh>\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 // --- §22.4: Subdirectory relative path ---
 
 TEST(Preprocessor, Include_SubdirectoryRelativePath) {

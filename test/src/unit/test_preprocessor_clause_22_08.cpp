@@ -86,3 +86,106 @@ TEST(ParserSection6, DefaultNettypeNone) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
 }
+
+// --- §22.8: illegal inside a design element ---
+
+TEST(Preprocessor, DefaultNettype_IllegalInsideDesignElement) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("module foo;\n`default_nettype none\nendmodule\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.8: invalid net type name ---
+
+TEST(Preprocessor, DefaultNettype_InvalidType) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype bogus\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.8: latest directive wins at preprocessor level ---
+
+TEST(Preprocessor, DefaultNettype_LatestDirectiveWins) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype none\n`default_nettype tri\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kTri);
+}
+
+// --- §22.8: default is wire when no directive ---
+
+TEST(Preprocessor, DefaultNettype_DefaultIsWire) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("// no directives\n", f, pp);
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
+}
+
+// --- §22.8: all valid net types at preprocessor level ---
+
+TEST(Preprocessor, DefaultNettype_Wand) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype wand\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kWand);
+}
+
+TEST(Preprocessor, DefaultNettype_Wor) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype wor\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kWor);
+}
+
+TEST(Preprocessor, DefaultNettype_Tri0) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype tri0\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kTri0);
+}
+
+TEST(Preprocessor, DefaultNettype_Tri1) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype tri1\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kTri1);
+}
+
+TEST(Preprocessor, DefaultNettype_Triand) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype triand\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kTriand);
+}
+
+TEST(Preprocessor, DefaultNettype_Trior) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype trior\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kTrior);
+}
+
+TEST(Preprocessor, DefaultNettype_Uwire) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype uwire\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kUwire);
+}
+
+TEST(Preprocessor, DefaultNettype_Trireg) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype trireg\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kTrireg);
+}

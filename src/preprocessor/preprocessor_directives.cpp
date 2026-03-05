@@ -59,6 +59,13 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
     return;
   }
 
+  // §22.7: precision shall be at least as precise as the unit.
+  if (static_cast<int>(ts.precision) > static_cast<int>(ts.unit)) {
+    diag_.Error(loc,
+                "`timescale precision is less precise than the time unit");
+    return;
+  }
+
   current_timescale_ = ts;
   if (!has_timescale_ ||
       static_cast<int>(ts.precision) < static_cast<int>(global_precision_)) {
@@ -140,6 +147,12 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
     new_line = new_line * 10 + (trimmed[j] - '0');
   }
 
+  // §22.12: number must be a positive integer (zero is not positive).
+  if (new_line == 0) {
+    diag_.Error(loc, "`line number must be a positive integer");
+    return;
+  }
+
   // Parse required filename (must be a string literal).
   auto after_num = TrimDirective(trimmed.substr(i));
   if (after_num.empty() || after_num[0] != '"') {
@@ -151,6 +164,7 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
     diag_.Error(loc, "unterminated string in `line directive");
     return;
   }
+  auto filename = after_num.substr(1, end_quote - 1);
 
   // Parse required level (must be 0, 1, or 2).
   auto after_file = TrimDirective(after_num.substr(end_quote + 1));
@@ -165,9 +179,17 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
     return;
   }
 
+  // §22.12: Only whitespace may appear after the level on the same line.
+  auto after_level = TrimDirective(after_file.substr(1));
+  if (!after_level.empty()) {
+    diag_.Error(loc, "only whitespace may appear on the same line as `line");
+    return;
+  }
+
   line_offset_ = new_line;
   line_override_src_line_ = loc.line;
   has_line_override_ = true;
+  line_file_override_ = std::string(filename);
 }
 
 std::string Preprocessor::ResolveInclude(std::string_view filename,

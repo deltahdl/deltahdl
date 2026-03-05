@@ -18,16 +18,18 @@ from lib.python.github import (
     next_unchecked,
     update_issue_body,
 )
-from lib.python.lrm import extract_clause_text, parse_subclauses
+from lib.python.lrm import (
+    FIGURE_LABEL_RE,
+    TABLE_LABEL_RE,
+    extract_clause_text,
+    lrm_labels_for_subclause,
+    parse_subclauses,
+)
 from lib.python.supplementary import (
     add_supplementary_args,
     check_supplementary_args,
     parse_supplementary_csv_args,
 )
-
-
-FIGURE_LABEL_RE = re.compile(r"^Figure ([\d\w]+-[\d\w]+)")
-TABLE_LABEL_RE = re.compile(r"^Table ([\d\w]+-[\d\w]+)")
 
 
 def _lrm_labels_for_clause(
@@ -140,24 +142,6 @@ def commit_and_push(subclause: str) -> None:
     print(f"Committed and pushed §{subclause}.")
 
 
-def _lrm_labels_for_subclause(
-    lrm_path: Path, clause: str,
-) -> tuple[list[str], list[str]]:
-    """Find figure/table labels within a subclause's LRM text."""
-    text = extract_clause_text(lrm_path, clause)
-    figures: list[str] = []
-    tables: list[str] = []
-    for line in text.splitlines():
-        m = FIGURE_LABEL_RE.match(line)
-        if m:
-            figures.append(m.group(1))
-            continue
-        m = TABLE_LABEL_RE.match(line)
-        if m:
-            tables.append(m.group(1))
-    return figures, tables
-
-
 def _format_key_path_csv(mapping: dict[str, Path]) -> str:
     """Format a dict as 'key=path,key=path' for CLI forwarding."""
     return ",".join(
@@ -259,7 +243,7 @@ def main(argv: list[str] | None = None) -> None:
             return
 
         print(f"Next unchecked: {subclause}")
-        sub_figs, sub_tbls = _lrm_labels_for_subclause(lrm, subclause)
+        sub_figs, sub_tbls = lrm_labels_for_subclause(lrm, subclause)
         sub_figures = {k: v for k, v in args.figures.items() if k in sub_figs}
         sub_tables = {k: v for k, v in args.tables.items() if k in sub_tbls}
         invoke_implement_subclause(

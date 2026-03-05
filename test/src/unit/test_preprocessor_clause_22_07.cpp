@@ -85,4 +85,147 @@ TEST(ParserSection22, TimescaleModuleNamePreserved) {
   EXPECT_EQ(r.cu->modules[0]->name, "foo");
 }
 
+// --- §22.7: precision must be at least as precise as unit ---
+
+TEST(Preprocessor, Timescale_PrecisionLessPreciseThanUnit) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ns / 1us\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Timescale_PrecisionEqualToUnit) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ns / 1ns\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// --- §22.7: invalid magnitudes ---
+
+TEST(Preprocessor, Timescale_InvalidMagnitude5) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 5ns / 1ns\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Timescale_InvalidMagnitude0) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 0ns / 1ns\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Timescale_InvalidMagnitude1000) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1000ns / 1ns\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.7: all valid unit strings ---
+
+TEST(Preprocessor, Timescale_UnitS) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1s / 1s\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kS);
+}
+
+TEST(Preprocessor, Timescale_UnitMs) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ms / 1ms\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kMs);
+}
+
+TEST(Preprocessor, Timescale_UnitPs) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ps / 1ps\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kPs);
+}
+
+TEST(Preprocessor, Timescale_UnitFs) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1fs / 1fs\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kFs);
+}
+
+// --- §22.7: spaces between magnitude and unit ---
+
+TEST(Preprocessor, Timescale_SpaceBetweenMagnitudeAndUnit) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1 ns / 1 ps\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kNs);
+  EXPECT_EQ(pp.CurrentTimescale().precision, TimeUnit::kPs);
+}
+
+// --- §22.7: later timescale overrides earlier ---
+
+TEST(Preprocessor, Timescale_LaterOverridesEarlier) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ns / 1ps\n`timescale 10us / 1us\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kUs);
+  EXPECT_EQ(pp.CurrentTimescale().magnitude, 10);
+}
+
+// --- §22.7: illegal inside a design element ---
+
+TEST(Preprocessor, Timescale_IllegalInsideDesignElement) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("module foo;\n`timescale 1ns / 1ps\nendmodule\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.7: missing slash (no precision) ---
+
+TEST(Preprocessor, Timescale_MissingSlash) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ns\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.7: missing precision after slash ---
+
+TEST(Preprocessor, Timescale_MissingPrecisionAfterSlash) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ns /\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.7: global precision tracks finest across multiple timescales ---
+
+TEST(Preprocessor, Timescale_GlobalPrecisionTracksFines) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1ns / 1ps\n"
+      "`timescale 1us / 1ns\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
+}
+
+// --- §22.7: invalid precision unit ---
+
+TEST(Preprocessor, Timescale_InvalidPrecisionUnit) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ns / 1xx\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace

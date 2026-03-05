@@ -25,10 +25,10 @@ def check_supplementary_args(
     """
     errors: list[str] = []
 
-    for key, path in figures.items():
+    for path in figures.values():
         if not path.is_file():
             errors.append(f"--figures path does not exist: {path}")
-    for key, path in tables.items():
+    for path in tables.values():
         if not path.is_file():
             errors.append(f"--tables path does not exist: {path}")
 
