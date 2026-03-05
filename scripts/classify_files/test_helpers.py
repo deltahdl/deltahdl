@@ -6,6 +6,13 @@ from lib.python.test.subprocess_stubs import (
     stub_subprocess_success,
 )
 
+__all__ = [
+    "stub_fetch_issue_title",
+    "stub_remove_file_checkbox",
+    "stub_subprocess_failure",
+    "stub_subprocess_success",
+]
+
 
 def stub_remove_file_checkbox(monkeypatch):
     """Stub remove_file_checkbox; return list of filenames removed."""

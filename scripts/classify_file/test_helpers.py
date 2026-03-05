@@ -11,6 +11,16 @@ from lib.python.test.subprocess_stubs import (
     stub_subprocess_success,
 )
 
+__all__ = [
+    "make_test_file",
+    "stub_close_issue",
+    "stub_create_issue",
+    "stub_ensure_unchecked",
+    "stub_subprocess_failure",
+    "stub_subprocess_mixed",
+    "stub_subprocess_success",
+]
+
 
 def make_test_file(tmp_path: Path, body: str) -> Path:
     """Write *body* to test_input.cpp and return its path."""
