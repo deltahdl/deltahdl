@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import classify_file
-from lib.python.test.subprocess_stubs import (
+from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
     stub_subprocess_success,
 )

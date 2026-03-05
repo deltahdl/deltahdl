@@ -1,7 +1,7 @@
 """Shared test helpers for classify_files unit tests."""
 
 import classify_files
-from lib.python.test.subprocess_stubs import (
+from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
     stub_subprocess_success,
 )

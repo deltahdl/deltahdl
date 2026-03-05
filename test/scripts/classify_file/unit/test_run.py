@@ -16,8 +16,8 @@ from classify_file.test_helpers import (
     stub_subprocess_mixed,
     stub_subprocess_success,
 )
-from lib.python.test import capture_help_output
-from lib.python.test.subprocess_stubs import spy_subprocess_run
+from lib.python.test_fixtures import capture_help_output
+from lib.python.test_fixtures.subprocess_stubs import spy_subprocess_run
 
 _parse_args = getattr(classify_file, "_parse_args")
 _build_command = getattr(classify_file, "_build_command")

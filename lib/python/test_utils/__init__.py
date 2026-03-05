@@ -37,17 +37,6 @@ def install_fake_script(tmp_path, name, content):
     return str(fake_bin)
 
 
-def capture_help_output(parse_func, monkeypatch, capsys):
-    """Call *parse_func* with ``--help`` and return captured stdout."""
-    monkeypatch.setattr(sys, "argv", ["prog", "--help"])
-    try:
-        parse_func()
-    except SystemExit:
-        pass
-    return capsys.readouterr().out
-
-
-
 def invoke_module(module_name, *args, cwd=None, env=None):
     """Run *module_name* in a child process via ``python -m``."""
     run_env = (env or os.environ).copy()

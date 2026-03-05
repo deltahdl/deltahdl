@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from lib.python.test import build_base_env, install_fake_script, invoke_module
+from lib.python.test_utils import build_base_env, install_fake_script, invoke_module
 
 _SCRIPTS_DIR = str(
     Path(__file__).resolve().parents[4] / "scripts",
