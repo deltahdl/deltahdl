@@ -52,7 +52,7 @@ def stub_close_issue(monkeypatch):
     log: list = []
     monkeypatch.setattr(
         classify_file, "close_issue",
-        lambda args, reason: log.append((args, reason)),
+        lambda org, repo, issue, reason: log.append((org, repo, issue, reason)),
     )
     return log
 

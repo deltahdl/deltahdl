@@ -14,6 +14,7 @@ from pathlib import Path
 
 from lib.python.github import (
     build_synced_body,
+    close_issue,
     fetch_issue_body,
     next_unchecked,
     update_issue_body,
@@ -219,6 +220,10 @@ def _run_subclause_loop(
         subclause = next_unchecked(new_body)
         if subclause is None:
             print("All subclauses are done.")
+            close_issue(
+                args.organization, args.repo, args.issue,
+                "all subclauses are implemented",
+            )
             return
 
         print(f"Next unchecked: {subclause}")

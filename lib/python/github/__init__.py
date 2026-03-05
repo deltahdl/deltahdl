@@ -60,6 +60,25 @@ def update_issue_body(
         sys.exit(1)
 
 
+def close_issue(
+    organization: str, repo: str, issue: int, reason: str,
+) -> None:
+    """Close a GitHub issue using ``gh api``."""
+    print(f"Closing issue #{issue} because {reason}...")
+    result = subprocess.run(
+        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
+         "-X", "PATCH", "-f", "state=closed"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: Failed to close issue #{issue}:"
+              f"\n{result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Closed issue #{issue}.")
+
+
 def build_synced_body(body: str, items: dict[str, str]) -> str:
     """Return issue body with subclauses checklist synced to *items*."""
     checked = {

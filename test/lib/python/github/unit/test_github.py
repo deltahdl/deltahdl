@@ -8,6 +8,7 @@ import pytest
 
 from lib.python.github import (
     build_synced_body,
+    close_issue,
     fetch_issue_body,
     fetch_issue_title,
     next_unchecked,
@@ -101,6 +102,40 @@ def test_update_issue_body_failure() -> None:
     with patch("lib.python.github.subprocess.run", return_value=cp):
         with pytest.raises(SystemExit):
             update_issue_body("org", "repo", 1, "body")
+
+
+# --- close_issue ---
+
+
+def test_close_issue_success() -> None:
+    """Calls gh api PATCH with state=closed."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
+    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
+        close_issue("org", "repo", 42, "all done")
+    cmd = mock_run.call_args[0][0]
+    assert "repos/org/repo/issues/42" in cmd
+    assert "-f" in cmd
+    assert "state=closed" in cmd
+
+
+def test_close_issue_prints_reason(capsys) -> None:
+    """Prints the reason for closing."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        close_issue("org", "repo", 42, "all done")
+    out = capsys.readouterr().out
+    assert "all done" in out
+    assert "Closed issue #42" in out
+
+
+def test_close_issue_failure() -> None:
+    """SystemExit raised on close failure."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="", stderr="err",
+    )
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        with pytest.raises(SystemExit):
+            close_issue("org", "repo", 1, "reason")
 
 
 # --- build_synced_body ---

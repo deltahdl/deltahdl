@@ -395,40 +395,6 @@ def test_build_issue_body_single_test():
     assert "Progress: 0/1" in build_issue_body("f.cpp", ["Only"])
 
 
-# ---- close_issue -----------------------------------------------------------
-
-
-def test_close_issue_calls_gh_api(monkeypatch):
-    """Invokes gh api with correct repo path and PATCH method."""
-    captured = stub_subprocess_success(monkeypatch)
-    classify_file.close_issue(_make_args(issue=42), "test reason")
-    assert "repos/testorg/testrepo/issues/42" in captured[0][2]
-
-
-def test_close_issue_prints_confirmation(monkeypatch, capsys):
-    """Prints confirmation message after closing."""
-    stub_subprocess_success(monkeypatch)
-    classify_file.close_issue(_make_args(issue=99), "test reason")
-    assert "Closed issue #99" in capsys.readouterr().out
-
-
-def test_close_issue_prints_reason(monkeypatch, capsys):
-    """Prints reason in the 'Closing' message."""
-    stub_subprocess_success(monkeypatch)
-    classify_file.close_issue(
-        _make_args(issue=99), "all tests have been classified",
-    )
-    out = capsys.readouterr().out
-    assert "because all tests have been classified" in out
-
-
-def test_close_issue_exits_on_failure(monkeypatch):
-    """Exits when gh api fails."""
-    stub_subprocess_failure(monkeypatch)
-    with pytest.raises(SystemExit):
-        classify_file.close_issue(_make_args(), "test reason")
-
-
 # ---- create_issue ----------------------------------------------------------
 
 

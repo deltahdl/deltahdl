@@ -9,6 +9,7 @@ from pathlib import Path
 
 from classify_test._git import commit_and_push
 from classify_test._github import fetch_issue_body, update_issue_body
+from lib.python.github import close_issue
 from lib.python.classify import (
     add_github_args,
     add_output_args,
@@ -135,23 +136,6 @@ def run_classify_test(
     return True
 
 
-def close_issue(args: argparse.Namespace, reason: str) -> None:
-    """Close the GitHub issue using gh api."""
-    print(f"Closing issue #{args.issue} because {reason}...")
-    result = subprocess.run(
-        ["gh", "api",
-         f"repos/{args.organization}/{args.repo}/issues/{args.issue}",
-         "-X", "PATCH", "-f", "state=closed"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to close issue #{args.issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    print(f"Closed issue #{args.issue}")
-
 
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
@@ -184,7 +168,10 @@ def _run(args: argparse.Namespace) -> None:
     if not filepath.is_file():
         print(f"Skipping: {filepath} not found")
         if not args.create_issue and args.issue is not None:
-            close_issue(args, "the source file no longer exists")
+            close_issue(
+                args.organization, args.repo, args.issue,
+                "the source file no longer exists",
+            )
         return
     test_names = extract_test_names(filepath)
     if not test_names:
@@ -195,7 +182,10 @@ def _run(args: argparse.Namespace) -> None:
         if not args.dry_run and not args.no_commit:
             commit_and_push([], [filepath], f"Delete empty {filepath.name}\n")
         if not args.create_issue and args.issue is not None:
-            close_issue(args, "the file has no tests")
+            close_issue(
+                args.organization, args.repo, args.issue,
+                "the file has no tests",
+            )
         return
     if args.create_issue:
         args.issue = create_issue(args, test_names)
@@ -206,7 +196,10 @@ def _run(args: argparse.Namespace) -> None:
         if not run_classify_test(args, name, i, total):
             sys.exit(1)
     if not args.dry_run:
-        close_issue(args, "all tests have been classified")
+        close_issue(
+            args.organization, args.repo, args.issue,
+            "all tests have been classified",
+        )
 
 
 def main():

@@ -49,8 +49,9 @@ def _patch_main_with_subclauses(
         patch("implement_clause.next_unchecked", **next_kw),
         patch("implement_clause.invoke_implement_subclause") as mock_inv,
         patch("implement_clause.commit_and_push") as mock_cap,
+        patch("implement_clause.close_issue") as mock_close,
     ):
-        yield mock_inv, mock_cap
+        yield mock_inv, mock_cap, mock_close
 
 
 def test_invoke_implement_subclause_calls_subprocess(
@@ -165,14 +166,14 @@ def test_main_no_subclauses_prints_leaf(ic, clause_argv, capsys) -> None:
 
 def test_main_with_subclauses(ic, clause_argv) -> None:
     """Next unchecked subclause is passed to implement_subclause."""
-    with _patch_main_with_subclauses() as (mock_inv, _):
+    with _patch_main_with_subclauses() as (mock_inv, _, ___):
         ic.main(clause_argv)
     assert mock_inv.call_args[0][1] == "4.2"
 
 
 def test_main_prints_subclauses_found(ic, clause_argv, capsys) -> None:
     """Prints how many subclauses were discovered."""
-    with _patch_main_with_subclauses() as (_, __):
+    with _patch_main_with_subclauses() as (_, __, ___):
         ic.main(clause_argv)
     assert "Found 2 subclauses" in capsys.readouterr().out
 
@@ -182,14 +183,14 @@ def test_main_prints_synced_body(ic, clause_argv, capsys) -> None:
     with _patch_main_with_subclauses(
         synced_body="## Subclauses\n\n- [ ] 4.1 General\n",
         next_sub="4.1",
-    ) as (_, __):
+    ) as (_, __, ___):
         ic.main(clause_argv)
     assert "## Subclauses" in capsys.readouterr().out
 
 
 def test_main_prints_next_subclause(ic, clause_argv, capsys) -> None:
     """Prints which subclause was picked as next."""
-    with _patch_main_with_subclauses() as (_, __):
+    with _patch_main_with_subclauses() as (_, __, ___):
         ic.main(clause_argv)
     assert "Next unchecked: 4.2" in capsys.readouterr().out
 
@@ -198,9 +199,20 @@ def test_main_all_done(ic, clause_argv, capsys) -> None:
     """Prints all-done message when no unchecked subclauses remain."""
     with _patch_main_with_subclauses(
         subclauses={"4.1": "General"}, next_sub=None,
-    ) as (_, __):
+    ) as (_, __, ___):
         ic.main(clause_argv)
     assert "All subclauses are done" in capsys.readouterr().out
+
+
+def test_main_closes_issue_when_all_done(ic, clause_argv) -> None:
+    """Issue is closed when all subclauses are implemented."""
+    with _patch_main_with_subclauses(
+        subclauses={"4.1": "General"}, next_sub=None,
+    ) as (_, __, mock_close):
+        ic.main(clause_argv)
+    mock_close.assert_called_once_with(
+        "o", "r", 1, "all subclauses are implemented",
+    )
 
 
 def test_main_annex(ic, tmp_path) -> None:
@@ -258,7 +270,7 @@ def test_main_loops_all_subclauses(ic, clause_argv) -> None:
     """main invokes implement_subclause for each unchecked subclause."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", "4.2", None],
-    ) as (mock_inv, _):
+    ) as (mock_inv, _, ___):
         ic.main(clause_argv)
     assert mock_inv.call_count == 2
 
@@ -267,7 +279,7 @@ def test_main_first_subclause_no_continue(ic, clause_argv) -> None:
     """First invocation does not pass continue_session=True."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", None],
-    ) as (mock_inv, _):
+    ) as (mock_inv, _, ___):
         ic.main(clause_argv)
     assert mock_inv.call_args_list[0].kwargs.get("continue_session") is not True
 
@@ -276,7 +288,7 @@ def test_main_second_subclause_uses_continue(ic, clause_argv) -> None:
     """Second invocation passes continue_session=True."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", "4.2", None],
-    ) as (mock_inv, _):
+    ) as (mock_inv, _, ___):
         ic.main(clause_argv)
     assert mock_inv.call_args_list[1].kwargs["continue_session"] is True
 
@@ -285,7 +297,7 @@ def test_main_commits_after_each_subclause(ic, clause_argv) -> None:
     """commit_and_push is called after each subclause implementation."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", "4.2", None],
-    ) as (_, mock_cap):
+    ) as (_, mock_cap, __):
         ic.main(clause_argv)
     assert mock_cap.call_count == 2
 
@@ -294,7 +306,7 @@ def test_main_commits_with_subclause_number(ic, clause_argv) -> None:
     """commit_and_push receives the subclause number."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", None],
-    ) as (_, mock_cap):
+    ) as (_, mock_cap, __):
         ic.main(clause_argv)
     assert mock_cap.call_args[0][0] == "4.1"
 
