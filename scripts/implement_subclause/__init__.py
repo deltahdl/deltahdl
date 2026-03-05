@@ -224,7 +224,7 @@ def invoke_claude(
         "claude",
         "--model", model,
         "--verbose",
-        "--dangerously-skip-permissions",
+        "--permission-mode", "bypassPermissions",
     ]
 
     if continue_session:

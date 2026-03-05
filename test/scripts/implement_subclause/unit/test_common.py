@@ -246,6 +246,20 @@ def test_invoke_claude_passes_prompt_as_positional_arg(popen_ok):
     assert popen_ok.call_args[0][0][-1] == "test prompt"
 
 
+def test_invoke_claude_uses_bypass_permissions_mode(popen_ok):
+    """invoke_claude uses --permission-mode bypassPermissions."""
+    invoke_claude("test prompt", model="opus")
+    cmd = popen_ok.call_args[0][0]
+    idx = cmd.index("--permission-mode")
+    assert cmd[idx + 1] == "bypassPermissions"
+
+
+def test_invoke_claude_no_dangerously_skip_permissions(popen_ok):
+    """invoke_claude does not use --dangerously-skip-permissions."""
+    invoke_claude("test prompt", model="opus")
+    assert "--dangerously-skip-permissions" not in popen_ok.call_args[0][0]
+
+
 def test_invoke_claude_no_continue_by_default(popen_ok):
     """invoke_claude does not include --continue by default."""
     invoke_claude("test prompt", model="opus")
