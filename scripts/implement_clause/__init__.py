@@ -132,7 +132,7 @@ def commit_and_push(subclause: str) -> None:
         print(f"No changes to commit for §{subclause}.")
         return
     msg = (
-        f"Implement §{subclause} [skip ci]\n\n"
+        f"Implement §{subclause}\n\n"
         "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
     )
     subprocess.run(["git", "commit", "-m", msg], check=True)
