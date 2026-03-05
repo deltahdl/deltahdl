@@ -114,48 +114,6 @@ class TestBuildHierarchyAnnex:
         }
 
 
-# ---- _lrm_labels_for_subclause --------------------------------------------
-
-
-_LRM_MULTI_SUBCLAUSE = """\
-4. Scheduling semantics
-Table 4-1\u2014PLI callbacks
-
-4.1 General
-General text.
-Figure 4-1\u2014Overview diagram
-
-4.2 Events
-Table 4-2\u2014Event types
-
-4.3 Other
-No figures or tables.
-
-5. Data types
-"""
-
-
-def test_lrm_labels_subclause_has_no_refs(isc, tmp_path):
-    """Returns empty lists when subclause has no figure/table refs."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_MULTI_SUBCLAUSE)
-    assert isc._lrm_labels_for_subclause(lrm, "4.3") == ([], [])
-
-
-def test_lrm_labels_subclause_finds_table(isc, tmp_path):
-    """Finds table labels scoped to the target subclause."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_MULTI_SUBCLAUSE)
-    assert isc._lrm_labels_for_subclause(lrm, "4.2") == ([], ["4-2"])
-
-
-def test_lrm_labels_subclause_finds_figure(isc, tmp_path):
-    """Finds figure labels scoped to the target subclause."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_MULTI_SUBCLAUSE)
-    assert isc._lrm_labels_for_subclause(lrm, "4.1") == (["4-1"], [])
-
-
 # ---- format_prompt --------------------------------------------------------
 
 

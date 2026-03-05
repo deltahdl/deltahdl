@@ -201,6 +201,38 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
+def _run_subclause_loop(
+    args: argparse.Namespace,
+    lrm: Path,
+    impl_items: dict[str, str],
+) -> None:
+    """Sync the issue checklist and implement subclauses one at a time."""
+    first = True
+    while True:
+        body = fetch_issue_body(args.organization, args.repo, args.issue)
+        new_body = build_synced_body(body, impl_items)
+        print(f"Synced issue body:\n{new_body}")
+        update_issue_body(
+            args.organization, args.repo, args.issue, new_body,
+        )
+
+        subclause = next_unchecked(new_body)
+        if subclause is None:
+            print("All subclauses are done.")
+            return
+
+        print(f"Next unchecked: {subclause}")
+        sub_figs, sub_tbls = lrm_labels_for_subclause(lrm, subclause)
+        sub_figures = {k: v for k, v in args.figures.items() if k in sub_figs}
+        sub_tables = {k: v for k, v in args.tables.items() if k in sub_tbls}
+        invoke_implement_subclause(
+            args, subclause, continue_session=not first,
+            figures=sub_figures, tables=sub_tables,
+        )
+        commit_and_push(subclause)
+        first = False
+
+
 def main(argv: list[str] | None = None) -> None:
     """Orchestrate implementation of an LRM clause."""
     args = parse_args(argv)
@@ -228,27 +260,4 @@ def main(argv: list[str] | None = None) -> None:
     implementable = filter_implementable(clause_text, subclauses)
     impl_items = {k: subclauses[k] for k in implementable}
 
-    first = True
-    while True:
-        body = fetch_issue_body(args.organization, args.repo, args.issue)
-        new_body = build_synced_body(body, impl_items)
-        print(f"Synced issue body:\n{new_body}")
-        update_issue_body(
-            args.organization, args.repo, args.issue, new_body,
-        )
-
-        subclause = next_unchecked(new_body)
-        if subclause is None:
-            print("All subclauses are done.")
-            return
-
-        print(f"Next unchecked: {subclause}")
-        sub_figs, sub_tbls = lrm_labels_for_subclause(lrm, subclause)
-        sub_figures = {k: v for k, v in args.figures.items() if k in sub_figs}
-        sub_tables = {k: v for k, v in args.tables.items() if k in sub_tbls}
-        invoke_implement_subclause(
-            args, subclause, continue_session=not first,
-            figures=sub_figures, tables=sub_tables,
-        )
-        commit_and_push(subclause)
-        first = False
+    _run_subclause_loop(args, lrm, impl_items)
