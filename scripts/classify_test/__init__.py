@@ -19,6 +19,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from lib.classify import add_github_args, add_output_args, add_run_mode_args
 from lib.lrm import load_lrm_titles
 
 from ._github import (
@@ -747,33 +748,15 @@ def _parse_args():
     parser.add_argument(
         "--file", required=True, help="Path to the input test file",
     )
-    parser.add_argument(
-        "--output-dir", required=True, help="Directory for output files",
-    )
-    parser.add_argument(
-        "--lrm", required=True,
-        help="Path to IEEE 1800-2023 LRM text file",
-    )
-    parser.add_argument(
-        "--max-lines", type=int, required=True,
-        help="Maximum lines per output file; splits into _a, _b, ... suffixes",
-    )
+    add_output_args(parser)
     parser.add_argument(
         "--test", required=True,
         help="Name of the single test to classify",
     )
-    parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Classify only, don't write files",
-    )
     parser.add_argument("--issue", type=int, required=True,
                         help="GitHub issue number to update")
-    parser.add_argument("--organization", required=True,
-                        help="GitHub organization for the issue")
-    parser.add_argument("--repo", required=True,
-                        help="GitHub repository for the issue")
-    parser.add_argument("--no-commit", action="store_true",
-                        help="Skip git commit and push")
+    add_github_args(parser)
+    add_run_mode_args(parser)
     return parser.parse_args()
 
 

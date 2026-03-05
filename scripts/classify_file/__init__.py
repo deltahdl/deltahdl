@@ -9,7 +9,12 @@ from pathlib import Path
 
 from classify_test._git import commit_and_push
 from classify_test._github import fetch_issue_body, update_issue_body
-from lib.classify import add_github_args, add_output_args, add_run_mode_args
+from lib.classify import (
+    add_github_args,
+    add_output_args,
+    add_run_mode_args,
+    append_classify_cmd_flags,
+)
 
 
 _TEST_RE = re.compile(
@@ -108,18 +113,10 @@ def _build_command(
     cmd = [
         sys.executable, "-m", "classify_test",
         "--file", args.file,
-        "--output-dir", args.output_dir,
-        "--lrm", args.lrm,
         "--test", test_name,
         "--issue", str(args.issue),
-        "--organization", args.organization,
-        "--repo", args.repo,
-        "--max-lines", str(args.max_lines),
     ]
-    if args.dry_run:
-        cmd.append("--dry-run")
-    if args.no_commit:
-        cmd.append("--no-commit")
+    append_classify_cmd_flags(cmd, args)
     return cmd
 
 

@@ -11,7 +11,12 @@ from classify_test._github import (
     remove_checkbox,
     update_issue_body,
 )
-from lib.classify import add_github_args, add_output_args, add_run_mode_args
+from lib.classify import (
+    add_github_args,
+    add_output_args,
+    add_run_mode_args,
+    append_classify_cmd_flags,
+)
 from lib.github import fetch_issue_title
 
 _TITLE_RE = re.compile(r"^Classify tests in (.+)$")
@@ -102,17 +107,7 @@ def _build_command(
         cmd += ["--issue", str(sub_issue)]
     else:
         cmd.append("--create-issue")
-    cmd += [
-        "--output-dir", args.output_dir,
-        "--lrm", args.lrm,
-        "--organization", args.organization,
-        "--repo", args.repo,
-        "--max-lines", str(args.max_lines),
-    ]
-    if args.dry_run:
-        cmd.append("--dry-run")
-    if args.no_commit:
-        cmd.append("--no-commit")
+    append_classify_cmd_flags(cmd, args)
     return cmd
 
 

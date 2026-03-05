@@ -6,6 +6,7 @@ from lib.classify import (
     add_github_args,
     add_output_args,
     add_run_mode_args,
+    append_classify_cmd_flags,
 )
 
 
@@ -88,3 +89,83 @@ def test_add_run_mode_args_no_commit_set() -> None:
     add_run_mode_args(parser)
     args = parser.parse_args(["--no-commit"])
     assert args.no_commit is True
+
+
+# --- append_classify_cmd_flags ---
+
+
+_STUB_ARGS = argparse.Namespace(
+    output_dir="/out", lrm="/lrm.txt",
+    organization="org", repo="repo",
+    max_lines=100, dry_run=False, no_commit=False,
+)
+
+
+def test_append_classify_cmd_flags_output_dir() -> None:
+    """Appends --output-dir with correct value."""
+    cmd: list[str] = []
+    append_classify_cmd_flags(cmd, _STUB_ARGS)
+    idx = cmd.index("--output-dir")
+    assert cmd[idx + 1] == "/out"
+
+
+def test_append_classify_cmd_flags_lrm() -> None:
+    """Appends --lrm with correct value."""
+    cmd: list[str] = []
+    append_classify_cmd_flags(cmd, _STUB_ARGS)
+    idx = cmd.index("--lrm")
+    assert cmd[idx + 1] == "/lrm.txt"
+
+
+def test_append_classify_cmd_flags_organization() -> None:
+    """Appends --organization with correct value."""
+    cmd: list[str] = []
+    append_classify_cmd_flags(cmd, _STUB_ARGS)
+    idx = cmd.index("--organization")
+    assert cmd[idx + 1] == "org"
+
+
+def test_append_classify_cmd_flags_repo() -> None:
+    """Appends --repo with correct value."""
+    cmd: list[str] = []
+    append_classify_cmd_flags(cmd, _STUB_ARGS)
+    idx = cmd.index("--repo")
+    assert cmd[idx + 1] == "repo"
+
+
+def test_append_classify_cmd_flags_max_lines() -> None:
+    """Appends --max-lines as string."""
+    cmd: list[str] = []
+    append_classify_cmd_flags(cmd, _STUB_ARGS)
+    idx = cmd.index("--max-lines")
+    assert cmd[idx + 1] == "100"
+
+
+def test_append_classify_cmd_flags_dry_run_included() -> None:
+    """Appends --dry-run when set."""
+    args = argparse.Namespace(**{**_STUB_ARGS.__dict__, "dry_run": True})
+    cmd: list[str] = []
+    append_classify_cmd_flags(cmd, args)
+    assert "--dry-run" in cmd
+
+
+def test_append_classify_cmd_flags_dry_run_omitted() -> None:
+    """Omits --dry-run when not set."""
+    cmd: list[str] = []
+    append_classify_cmd_flags(cmd, _STUB_ARGS)
+    assert "--dry-run" not in cmd
+
+
+def test_append_classify_cmd_flags_no_commit_included() -> None:
+    """Appends --no-commit when set."""
+    args = argparse.Namespace(**{**_STUB_ARGS.__dict__, "no_commit": True})
+    cmd: list[str] = []
+    append_classify_cmd_flags(cmd, args)
+    assert "--no-commit" in cmd
+
+
+def test_append_classify_cmd_flags_no_commit_omitted() -> None:
+    """Omits --no-commit when not set."""
+    cmd: list[str] = []
+    append_classify_cmd_flags(cmd, _STUB_ARGS)
+    assert "--no-commit" not in cmd

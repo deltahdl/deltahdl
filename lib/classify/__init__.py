@@ -1,4 +1,4 @@
-"""Shared argparse helpers for classify_file and classify_files."""
+"""Shared argparse and command-building helpers for classify scripts."""
 
 import argparse
 
@@ -41,3 +41,20 @@ def add_run_mode_args(parser: argparse.ArgumentParser) -> None:
         "--no-commit", action="store_true",
         help="Skip git commit and push",
     )
+
+
+def append_classify_cmd_flags(
+    cmd: list[str], args: argparse.Namespace,
+) -> None:
+    """Append common classify flags to a subprocess command."""
+    cmd += [
+        "--output-dir", args.output_dir,
+        "--lrm", args.lrm,
+        "--organization", args.organization,
+        "--repo", args.repo,
+        "--max-lines", str(args.max_lines),
+    ]
+    if args.dry_run:
+        cmd.append("--dry-run")
+    if args.no_commit:
+        cmd.append("--no-commit")
