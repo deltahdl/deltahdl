@@ -282,12 +282,25 @@ def test_parse_supplementary_csv_args_strips_whitespace() -> None:
 # --- add_supplementary_args ---
 
 
-def test_add_supplementary_args_adds_three_arguments() -> None:
-    """add_supplementary_args registers --figures, --tables, --ignore-figures."""
+def test_add_supplementary_args_figures_default() -> None:
+    """add_supplementary_args registers --figures with empty default."""
     import argparse
     parser = argparse.ArgumentParser()
     add_supplementary_args(parser)
-    ns = parser.parse_args([])
-    assert ns.figures == ""
-    assert ns.tables == ""
-    assert ns.ignore_figures == ""
+    assert parser.parse_args([]).figures == ""
+
+
+def test_add_supplementary_args_tables_default() -> None:
+    """add_supplementary_args registers --tables with empty default."""
+    import argparse
+    parser = argparse.ArgumentParser()
+    add_supplementary_args(parser)
+    assert parser.parse_args([]).tables == ""
+
+
+def test_add_supplementary_args_ignore_figures_default() -> None:
+    """add_supplementary_args registers --ignore-figures with empty default."""
+    import argparse
+    parser = argparse.ArgumentParser()
+    add_supplementary_args(parser)
+    assert parser.parse_args([]).ignore_figures == ""
