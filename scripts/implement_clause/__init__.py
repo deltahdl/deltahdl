@@ -20,6 +20,7 @@ from lib.python.github import (
 )
 from lib.python.lrm import extract_clause_text, parse_subclauses
 from lib.python.supplementary import (
+    add_supplementary_args,
     check_supplementary_args,
     parse_supplementary_csv_args,
 )
@@ -137,18 +138,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--issue", type=int, required=True)
     parser.add_argument("--organization", required=True)
     parser.add_argument("--repo", required=True)
-    parser.add_argument(
-        "--figures", type=str, default="",
-        help="Comma-separated list of .gv figure files.",
-    )
-    parser.add_argument(
-        "--tables", type=str, default="",
-        help="Comma-separated list of .md table files.",
-    )
-    parser.add_argument(
-        "--ignore-figures", type=str, default="",
-        help="Comma-separated shorthand labels to skip.",
-    )
+    add_supplementary_args(parser)
 
     args = parser.parse_args(argv)
 

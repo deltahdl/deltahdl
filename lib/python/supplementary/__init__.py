@@ -105,6 +105,22 @@ def build_supplementary_lines(
     return "\n".join(lines)
 
 
+def add_supplementary_args(parser) -> None:
+    """Add --figures, --tables, and --ignore-figures to *parser*."""
+    parser.add_argument(
+        "--figures", type=str, default="",
+        help="Comma-separated list of .gv figure files.",
+    )
+    parser.add_argument(
+        "--tables", type=str, default="",
+        help="Comma-separated list of .md table files.",
+    )
+    parser.add_argument(
+        "--ignore-figures", type=str, default="",
+        help="Comma-separated shorthand labels to skip.",
+    )
+
+
 def parse_supplementary_csv_args(args) -> None:
     """Parse comma-separated --figures/--tables/--ignore-figures into lists."""
     args.figures = (

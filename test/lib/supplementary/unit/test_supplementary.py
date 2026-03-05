@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from lib.python.supplementary import (
+    add_supplementary_args,
     build_supplementary_lines,
     check_supplementary_args,
     label_from_gv,
@@ -276,3 +277,17 @@ def test_parse_supplementary_csv_args_strips_whitespace() -> None:
     args.ignore_figures = ""
     parse_supplementary_csv_args(args)
     assert args.figures == [Path("a.gv")]
+
+
+# --- add_supplementary_args ---
+
+
+def test_add_supplementary_args_adds_three_arguments() -> None:
+    """add_supplementary_args registers --figures, --tables, --ignore-figures."""
+    import argparse
+    parser = argparse.ArgumentParser()
+    add_supplementary_args(parser)
+    ns = parser.parse_args([])
+    assert ns.figures == ""
+    assert ns.tables == ""
+    assert ns.ignore_figures == ""

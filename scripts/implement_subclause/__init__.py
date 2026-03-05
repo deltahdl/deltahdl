@@ -13,6 +13,7 @@ from pathlib import Path
 
 from lib.python.lrm import extract_clause_text, load_lrm_titles
 from lib.python.supplementary import (
+    add_supplementary_args,
     build_supplementary_lines,
     check_supplementary_args,
     parse_supplementary_csv_args,
@@ -293,24 +294,7 @@ def parse_args(argv=None):
         default="opus",
         help="Claude model to use (default: opus).",
     )
-    parser.add_argument(
-        "--figures",
-        type=str,
-        default="",
-        help="Comma-separated list of .gv figure files.",
-    )
-    parser.add_argument(
-        "--tables",
-        type=str,
-        default="",
-        help="Comma-separated list of .md table files.",
-    )
-    parser.add_argument(
-        "--ignore-figures",
-        type=str,
-        default="",
-        help="Comma-separated shorthand labels (e.g. 4-1,16-5) to skip.",
-    )
+    add_supplementary_args(parser)
     parser.add_argument(
         "--continue",
         action="store_true",
