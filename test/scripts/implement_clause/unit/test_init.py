@@ -299,33 +299,57 @@ Table 4-1\u2014PLI callbacks
 """
 
 
-def test_lrm_labels_for_clause_finds_both(tmp_path) -> None:
-    """Finds figure and table labels for a clause."""
+def test_lrm_labels_for_clause_finds_figures(tmp_path) -> None:
+    """Finds figure labels for a clause."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
-    figs, tbls = _lrm_labels_for_clause(lrm, "4")
+    figs, _ = _lrm_labels_for_clause(lrm, "4")
     assert figs == ["4-1"]
+
+
+def test_lrm_labels_for_clause_finds_tables(tmp_path) -> None:
+    """Finds table labels for a clause."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
+    _, tbls = _lrm_labels_for_clause(lrm, "4")
     assert tbls == ["4-1"]
 
 
-def test_lrm_labels_for_clause_empty(tmp_path) -> None:
-    """Returns empty lists when no labels exist."""
+def test_lrm_labels_for_clause_empty_figures(tmp_path) -> None:
+    """Returns empty figure list when no labels exist."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("No figures or tables here.\n")
-    figs, tbls = _lrm_labels_for_clause(lrm, "99")
+    figs, _ = _lrm_labels_for_clause(lrm, "99")
     assert figs == []
+
+
+def test_lrm_labels_for_clause_empty_tables(tmp_path) -> None:
+    """Returns empty table list when no labels exist."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("No figures or tables here.\n")
+    _, tbls = _lrm_labels_for_clause(lrm, "99")
     assert tbls == []
 
 
-def test_lrm_labels_for_clause_ignores_other_clauses(tmp_path) -> None:
-    """Does not pick up labels from other clauses."""
+def test_lrm_labels_for_clause_ignores_other_clause_figures(tmp_path) -> None:
+    """Does not pick up figure labels from other clauses."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(
         "Figure 5-1\u2014Something\n"
         "Table 5-1\u2014Other\n"
     )
-    figs, tbls = _lrm_labels_for_clause(lrm, "4")
+    figs, _ = _lrm_labels_for_clause(lrm, "4")
     assert figs == []
+
+
+def test_lrm_labels_for_clause_ignores_other_clause_tables(tmp_path) -> None:
+    """Does not pick up table labels from other clauses."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(
+        "Figure 5-1\u2014Something\n"
+        "Table 5-1\u2014Other\n"
+    )
+    _, tbls = _lrm_labels_for_clause(lrm, "4")
     assert tbls == []
 
 

@@ -155,58 +155,116 @@ def test_build_supplementary_lines_empty() -> None:
     assert build_supplementary_lines(figures=[], tables=[]) == ""
 
 
-def test_build_supplementary_lines_figure() -> None:
-    """Includes figure reference line."""
+def test_build_supplementary_lines_figure_reference() -> None:
+    """Includes figure reference."""
     result = build_supplementary_lines(
         figures=[Path("Figure_4_1.gv")], tables=[],
     )
     assert "Consult Figure 4-1" in result
+
+
+def test_build_supplementary_lines_figure_format() -> None:
+    """Includes figure format annotation."""
+    result = build_supplementary_lines(
+        figures=[Path("Figure_4_1.gv")], tables=[],
+    )
     assert "(DOT GraphViz)" in result
 
 
-def test_build_supplementary_lines_table() -> None:
-    """Includes table reference line."""
+def test_build_supplementary_lines_table_reference() -> None:
+    """Includes table reference."""
     result = build_supplementary_lines(
         figures=[], tables=[Path("TABLE_4_1.md")],
     )
     assert "Consult Table 4-1" in result
+
+
+def test_build_supplementary_lines_table_format() -> None:
+    """Includes table format annotation."""
+    result = build_supplementary_lines(
+        figures=[], tables=[Path("TABLE_4_1.md")],
+    )
     assert "(Markdown)" in result
 
 
-def test_build_supplementary_lines_both() -> None:
-    """Includes both figure and table reference lines."""
+def test_build_supplementary_lines_both_figure() -> None:
+    """Both mode includes figure reference."""
     result = build_supplementary_lines(
         figures=[Path("Figure_4_1.gv")],
         tables=[Path("TABLE_4_1.md")],
     )
     assert "Figure 4-1" in result
+
+
+def test_build_supplementary_lines_both_table() -> None:
+    """Both mode includes table reference."""
+    result = build_supplementary_lines(
+        figures=[Path("Figure_4_1.gv")],
+        tables=[Path("TABLE_4_1.md")],
+    )
     assert "Table 4-1" in result
 
 
 # --- parse_supplementary_csv_args ---
 
 
-def test_parse_supplementary_csv_args_empty() -> None:
-    """Empty strings become empty lists."""
+def test_parse_supplementary_csv_args_empty_figures() -> None:
+    """Empty figures string becomes empty list."""
     args = MagicMock()
     args.figures = ""
     args.tables = ""
     args.ignore_figures = ""
     parse_supplementary_csv_args(args)
     assert not args.figures
+
+
+def test_parse_supplementary_csv_args_empty_tables() -> None:
+    """Empty tables string becomes empty list."""
+    args = MagicMock()
+    args.figures = ""
+    args.tables = ""
+    args.ignore_figures = ""
+    parse_supplementary_csv_args(args)
     assert not args.tables
+
+
+def test_parse_supplementary_csv_args_empty_ignore_figures() -> None:
+    """Empty ignore_figures string becomes empty list."""
+    args = MagicMock()
+    args.figures = ""
+    args.tables = ""
+    args.ignore_figures = ""
+    parse_supplementary_csv_args(args)
     assert not args.ignore_figures
 
 
-def test_parse_supplementary_csv_args_with_values() -> None:
-    """Comma-separated strings become lists."""
+def test_parse_supplementary_csv_args_figures() -> None:
+    """Comma-separated figures become Path list."""
     args = MagicMock()
     args.figures = "a.gv, b.gv"
     args.tables = "c.md"
     args.ignore_figures = "4-1, 4-2"
     parse_supplementary_csv_args(args)
     assert args.figures == [Path("a.gv"), Path("b.gv")]
+
+
+def test_parse_supplementary_csv_args_tables() -> None:
+    """Comma-separated tables become Path list."""
+    args = MagicMock()
+    args.figures = "a.gv, b.gv"
+    args.tables = "c.md"
+    args.ignore_figures = "4-1, 4-2"
+    parse_supplementary_csv_args(args)
     assert args.tables == [Path("c.md")]
+
+
+def test_parse_supplementary_csv_args_ignore_figures() -> None:
+    """Comma-separated ignore_figures become string list."""
+    args = MagicMock()
+    args.figures = "a.gv, b.gv"
+    args.tables = "c.md"
+    args.ignore_figures = "4-1, 4-2"
+    parse_supplementary_csv_args(args)
     assert args.ignore_figures == ["4-1", "4-2"]
 
 
