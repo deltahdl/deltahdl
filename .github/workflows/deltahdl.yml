@@ -967,42 +967,34 @@ jobs:
         name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
-          lib/run_tests_common/ scripts/run_sim_tests/
-          scripts/run_sv_tests/
+          lib/ scripts/
           --fail-on=C,R,W --fail-under=10.0
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint --recursive=y
-          test/lib/run_tests_common/
-          test/scripts/run_sim_tests/
-          test/scripts/run_sv_tests/
+          lib/test/ test/scripts/ test/lib/
           --fail-on=C,R,W --fail-under=10.0
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy
-          lib/run_tests_common/ scripts/run_sim_tests/
-          scripts/run_sv_tests/
+          lib/ scripts/
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts python3 -m mypy
-          test/lib/run_tests_common/
-          test/scripts/run_sim_tests/
-          test/scripts/run_sv_tests/
+          lib/test/ test/scripts/ test/lib/
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Detect copy-paste in source (Python)
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console lib/run_tests_common/
-          scripts/run_sim_tests/ scripts/run_sv_tests/
+          --reporters console lib/ scripts/
       - if: steps.detect.outputs.scripts_changed == 'true'
         name: Detect copy-paste in tests (Python)
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console test/lib/run_tests_common/
-          test/scripts/run_sim_tests/ test/scripts/run_sv_tests/
+          --reporters console lib/test/ test/scripts/ test/lib/
       # ── C++ formatting and limits ──
       - name: Check formatting
         run: |

@@ -57,32 +57,32 @@ jobs:
       - name: Run pylint on source
         run: >-
           PYTHONPATH=. python3 -m pylint
-          lib/lrm/ scripts/classify_test/
+          lib/ scripts/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts:test/scripts/classify_test/unit
           python3 -m pylint --recursive=y
-          test/lib/lrm/ test/scripts/classify_test/
+          lib/test/ test/scripts/ test/lib/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
           PYTHONPATH=. python3 -m mypy
-          lib/lrm/ scripts/classify_test/
+          lib/ scripts/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts:test/scripts/classify_test/unit
           python3 -m mypy --explicit-package-bases
-          test/lib/lrm/ test/scripts/classify_test/
+          lib/test/ test/scripts/ test/lib/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console lib/lrm/ scripts/classify_test/
+          --reporters console lib/ scripts/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
-          test/lib/lrm/ test/scripts/classify_test/
+          lib/test/ test/scripts/ test/lib/
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest

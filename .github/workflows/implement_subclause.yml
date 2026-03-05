@@ -58,36 +58,33 @@ jobs:
       - name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
-          lib/lrm/ lib/github/ scripts/implement_subclause/
+          lib/ scripts/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts:test/scripts/implement_subclause/unit
           python3 -m pylint --recursive=y
-          test/lib/lrm/ test/lib/github/
-          test/scripts/implement_subclause/
+          lib/test/ test/scripts/ test/lib/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy
-          lib/lrm/ lib/github/ scripts/implement_subclause/
+          lib/ scripts/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts:test/scripts/implement_subclause/unit
           python3 -m mypy --explicit-package-bases
-          test/lib/lrm/ test/lib/github/
-          test/scripts/implement_subclause/
+          lib/test/ test/scripts/ test/lib/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
-          lib/lrm/ lib/github/ scripts/implement_subclause/
+          lib/ scripts/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console
-          test/lib/lrm/ test/lib/github/
-          test/scripts/implement_subclause/
+          lib/test/ test/scripts/ test/lib/
       # DO NOT lower coverage thresholds. Uncovered code is untested code —
       # lowering it hides bugs and lets regressions slip through silently.
       - name: Run lib/github unit tests with 100% coverage gate

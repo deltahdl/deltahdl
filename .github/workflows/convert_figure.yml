@@ -55,12 +55,13 @@ jobs:
           ${{ github.workspace }}/test/scripts/convert_figure
       - name: Run pylint on source
         run: >-
-          PYTHONPATH=. python3 -m pylint scripts/convert_figure/
+          PYTHONPATH=. python3 -m pylint lib/ scripts/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts:test/scripts/convert_figure/unit
-          python3 -m pylint --recursive=y test/scripts/convert_figure/
+          python3 -m pylint --recursive=y
+          lib/test/ test/scripts/ test/lib/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         # pymupdf ships without py.typed and pymupdf-stubs is incomplete
@@ -69,22 +70,22 @@ jobs:
         run: >-
           PYTHONPATH=. python3 -m mypy
           --disable-error-code=import-untyped
-          scripts/convert_figure/
+          lib/ scripts/
       - name: Run mypy on tests
         # Tests import convert_figure which imports fitz (pymupdf).
         run: >-
           MYPYPATH=.:scripts:test/scripts/convert_figure/unit
           python3 -m mypy --explicit-package-bases
           --disable-error-code=import-untyped
-          test/scripts/convert_figure/
+          lib/test/ test/scripts/ test/lib/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console scripts/convert_figure/
+          --reporters console lib/ scripts/
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console test/scripts/convert_figure/
+          --reporters console lib/test/ test/scripts/ test/lib/
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
