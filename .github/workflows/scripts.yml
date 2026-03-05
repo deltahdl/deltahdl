@@ -61,7 +61,7 @@ jobs:
           --fail-on=C,R,W --fail-under=10.0
       - name: Run pylint on tests
         run: >-
-          PYTHONPATH=.:scripts:test/scripts/classify_test/unit:test/scripts/classify_file/unit:test/scripts/classify_files/unit:test/scripts/implement_clause/unit:test/scripts/implement_subclause/unit
+          PYTHONPATH=.:scripts
           python3 -m pylint --recursive=y
           test/scripts/ test/lib/python/
           --fail-on=C,R,W --fail-under=10.0
@@ -71,7 +71,7 @@ jobs:
           lib/python/ scripts/
       - name: Run mypy on tests
         run: >-
-          MYPYPATH=.:scripts:test/scripts/classify_test/unit:test/scripts/classify_file/unit:test/scripts/classify_files/unit:test/scripts/implement_clause/unit:test/scripts/implement_subclause/unit
+          MYPYPATH=.:scripts
           python3 -m mypy --explicit-package-bases
           test/scripts/ test/lib/python/
       - name: Detect copy-paste in source
