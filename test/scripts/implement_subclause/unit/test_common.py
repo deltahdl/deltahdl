@@ -380,6 +380,18 @@ def test_invoke_claude_passes_verbose(popen_ok):
     assert "--verbose" in popen_ok.call_args[0][0]
 
 
+def test_invoke_claude_no_continue_by_default(popen_ok):
+    """invoke_claude does not include --continue by default."""
+    invoke_claude("test prompt", model="opus")
+    assert "--continue" not in popen_ok.call_args[0][0]
+
+
+def test_invoke_claude_uses_continue_when_set(popen_ok):
+    """invoke_claude includes --continue when continue_session=True."""
+    invoke_claude("test prompt", model="opus", continue_session=True)
+    assert "--continue" in popen_ok.call_args[0][0]
+
+
 def test_invoke_claude_success(popen_ok):
     """invoke_claude streams prompt to Claude CLI and returns on success."""
     invoke_claude("test prompt", model="opus")
@@ -411,3 +423,16 @@ def test_run_prompt_calls_invoke(mock_invoke, tmp_path):
     build_fn = MagicMock(return_value="generated prompt")
     run_prompt(build_fn, lrm, "4.1", issue=6, model="sonnet")
     assert mock_invoke.call_args[0][0] == "generated prompt"
+
+
+@patch("implement_subclause.invoke_claude")
+def test_run_prompt_passes_continue_session(mock_invoke, tmp_path):
+    """run_prompt passes continue_session to invoke_claude."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("4. Scheduling semantics\n4.1 General\n")
+    build_fn = MagicMock(return_value="generated prompt")
+    run_prompt(
+        build_fn, lrm, "4.1", issue=6, model="sonnet",
+        continue_session=True,
+    )
+    assert mock_invoke.call_args[1]["continue_session"] is True

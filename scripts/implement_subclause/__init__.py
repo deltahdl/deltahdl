@@ -302,7 +302,9 @@ def build_prompt(
 # Claude CLI invocation
 # ---------------------------------------------------------------------------
 
-def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
+def invoke_claude(
+    prompt: str, *, model: str = "sonnet", continue_session: bool = False,
+) -> None:
     """Launch Claude CLI in print mode with the implementation prompt.
 
     Streams stdout/stderr to the terminal in real time.
@@ -316,6 +318,9 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
         "--verbose",
         "--dangerously-skip-permissions",
     ]
+
+    if continue_session:
+        cmd.append("--continue")
 
     print(f"Invoking Claude ({model})...")
     with subprocess.Popen(
@@ -338,14 +343,14 @@ def invoke_claude(prompt: str, *, model: str = "sonnet") -> None:
 
 def run_prompt(
     build_fn, lrm_path: Path, clause: str, *,
-    issue: int, model: str,
+    issue: int, model: str, continue_session: bool = False,
 ) -> None:
     """Load titles, build a prompt via *build_fn*, and invoke Claude."""
     titles = load_lrm_titles(lrm_path)
     print(f"Loaded {len(titles)} LRM clause titles from {lrm_path}")
     prompt = build_fn(clause, titles, str(lrm_path), issue=issue)
     print(f"Built prompt ({len(prompt)} characters)")
-    invoke_claude(prompt, model=model)
+    invoke_claude(prompt, model=model, continue_session=continue_session)
 
 
 # ---------------------------------------------------------------------------
@@ -398,6 +403,13 @@ def parse_args(argv=None):
         type=str,
         default="",
         help="Comma-separated shorthand labels (e.g. 4-1,16-5) to skip.",
+    )
+    parser.add_argument(
+        "--continue",
+        action="store_true",
+        default=False,
+        dest="continue_session",
+        help="Continue the previous Claude conversation.",
     )
     args = parser.parse_args(argv)
 
@@ -461,4 +473,5 @@ def main(argv=None):
     run_prompt(
         bound_handler, args.lrm, args.subclause,
         issue=args.issue, model=args.model,
+        continue_session=args.continue_session,
     )

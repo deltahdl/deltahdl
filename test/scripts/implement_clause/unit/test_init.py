@@ -19,11 +19,21 @@ def _patch_main_with_subclauses(
     *, subclauses=None, implementable=None,
     synced_body="body", next_sub="4.2",
 ):
-    """Patch all dependencies for main() with subclauses."""
+    """Patch all dependencies for main() with subclauses.
+
+    *next_sub* can be a string (single call then None) or a list
+    (successive return values via ``side_effect``).
+    """
     if subclauses is None:
         subclauses = {"4.1": "General", "4.2": "Exec"}
     if implementable is None:
         implementable = list(subclauses.keys())
+
+    if isinstance(next_sub, list):
+        next_kw = {"side_effect": next_sub}
+    else:
+        next_kw = {"side_effect": [next_sub, None]}
+
     with (
         patch("implement_clause.parse_subclauses",
               return_value=subclauses),
@@ -35,8 +45,7 @@ def _patch_main_with_subclauses(
         patch("implement_clause.build_synced_body",
               return_value=synced_body),
         patch("implement_clause.update_issue_body"),
-        patch("implement_clause.next_unchecked",
-              return_value=next_sub),
+        patch("implement_clause.next_unchecked", **next_kw),
         patch("implement_clause.invoke_implement_subclause") as mock_inv,
     ):
         yield mock_inv
@@ -234,6 +243,59 @@ def test_invoke_implement_subclause_failure() -> None:
                 organization="deltahdl",
                 repo="deltahdl",
             )
+
+
+def test_invoke_implement_subclause_passes_continue(
+    invoke_subprocess_ok,
+) -> None:
+    """--continue appears in subprocess command when continue_session=True."""
+    invoke_implement_subclause(
+        lrm="/path/lrm.txt", subclause="4.2", issue=123,
+        organization="deltahdl", repo="deltahdl",
+        continue_session=True,
+    )
+    assert "--continue" in invoke_subprocess_ok.call_args[0][0]
+
+
+def test_invoke_implement_subclause_no_continue_by_default(
+    invoke_subprocess_ok,
+) -> None:
+    """--continue not in subprocess command by default."""
+    invoke_implement_subclause(
+        lrm="/path/lrm.txt", subclause="4.2", issue=123,
+        organization="deltahdl", repo="deltahdl",
+    )
+    assert "--continue" not in invoke_subprocess_ok.call_args[0][0]
+
+
+# --- main loop ---
+
+
+def test_main_loops_all_subclauses(clause_argv) -> None:
+    """main invokes implement_subclause for each unchecked subclause."""
+    with _patch_main_with_subclauses(
+        next_sub=["4.1", "4.2", None],
+    ) as mock_inv:
+        main(clause_argv)
+    assert mock_inv.call_count == 2
+
+
+def test_main_first_subclause_no_continue(clause_argv) -> None:
+    """First invocation does not pass continue_session=True."""
+    with _patch_main_with_subclauses(
+        next_sub=["4.1", None],
+    ) as mock_inv:
+        main(clause_argv)
+    assert mock_inv.call_args_list[0].kwargs.get("continue_session") is not True
+
+
+def test_main_second_subclause_uses_continue(clause_argv) -> None:
+    """Second invocation passes continue_session=True."""
+    with _patch_main_with_subclauses(
+        next_sub=["4.1", "4.2", None],
+    ) as mock_inv:
+        main(clause_argv)
+    assert mock_inv.call_args_list[1].kwargs["continue_session"] is True
 
 
 # --- check_supplementary_args (whole-clause) ---

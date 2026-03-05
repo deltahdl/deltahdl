@@ -181,20 +181,21 @@ def invoke_implement_subclause(
     issue: int,
     organization: str,
     repo: str,
+    continue_session: bool = False,
 ) -> None:
     """Shell out to ``python -m implement_subclause``."""
     print(f"Invoking implement_subclause for {subclause}...")
-    result = subprocess.run(
-        [
-            sys.executable, "-m", "implement_subclause",
-            "--lrm", lrm,
-            "--subclause", subclause,
-            "--issue", str(issue),
-            "--organization", organization,
-            "--repo", repo,
-        ],
-        check=False,
-    )
+    cmd = [
+        sys.executable, "-m", "implement_subclause",
+        "--lrm", lrm,
+        "--subclause", subclause,
+        "--issue", str(issue),
+        "--organization", organization,
+        "--repo", repo,
+    ]
+    if continue_session:
+        cmd.append("--continue")
+    result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
         sys.exit(result.returncode)
 
@@ -269,19 +270,24 @@ def main(argv: list[str] | None = None) -> None:
     implementable = filter_implementable(clause_text, subclauses)
     impl_items = {k: subclauses[k] for k in implementable}
 
-    body = fetch_issue_body(args.organization, args.repo, args.issue)
-    new_body = build_synced_body(body, impl_items)
-    print(f"Synced issue body:\n{new_body}")
-    update_issue_body(args.organization, args.repo, args.issue, new_body)
+    first = True
+    while True:
+        body = fetch_issue_body(args.organization, args.repo, args.issue)
+        new_body = build_synced_body(body, impl_items)
+        print(f"Synced issue body:\n{new_body}")
+        update_issue_body(
+            args.organization, args.repo, args.issue, new_body,
+        )
 
-    subclause = next_unchecked(new_body)
-    if subclause is None:
-        print("All subclauses are done.")
-        return
+        subclause = next_unchecked(new_body)
+        if subclause is None:
+            print("All subclauses are done.")
+            return
 
-    print(f"Next unchecked: {subclause}")
-    invoke_implement_subclause(
-        lrm=args.lrm, subclause=subclause,
-        issue=args.issue, organization=args.organization,
-        repo=args.repo,
-    )
+        print(f"Next unchecked: {subclause}")
+        invoke_implement_subclause(
+            lrm=args.lrm, subclause=subclause,
+            issue=args.issue, organization=args.organization,
+            repo=args.repo, continue_session=not first,
+        )
+        first = False

@@ -110,6 +110,27 @@ def test_parse_args_accepts_annex_clause(tmp_path):
     assert (args.subclause, args.issue) == ("B", 44)
 
 
+def test_parse_args_continue_flag(tmp_path):
+    """--continue sets continue_session to True."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    args = parse_args([
+        "--lrm", str(lrm), "--subclause", "4.1", "--issue", "8",
+        "--continue",
+    ])
+    assert args.continue_session is True
+
+
+def test_parse_args_continue_default_false(tmp_path):
+    """continue_session defaults to False."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    args = parse_args([
+        "--lrm", str(lrm), "--subclause", "4.1", "--issue", "8",
+    ])
+    assert args.continue_session is False
+
+
 # ---- main ------------------------------------------------------------------
 
 
