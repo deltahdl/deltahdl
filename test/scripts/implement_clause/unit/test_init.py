@@ -10,6 +10,7 @@ import pytest
 
 from implement_clause import (
     _lrm_labels_for_clause,
+    commit_and_push,
     invoke_implement_subclause,
     main,
     parse_args,
@@ -53,8 +54,9 @@ def _patch_main_with_subclauses(
         patch("implement_clause.update_issue_body"),
         patch("implement_clause.next_unchecked", **next_kw),
         patch("implement_clause.invoke_implement_subclause") as mock_inv,
+        patch("implement_clause.commit_and_push") as mock_cap,
     ):
-        yield mock_inv
+        yield mock_inv, mock_cap
 
 
 def test_invoke_implement_subclause_calls_subprocess(
@@ -169,14 +171,14 @@ def test_main_no_subclauses_prints_leaf(clause_argv, capsys) -> None:
 
 def test_main_with_subclauses(clause_argv) -> None:
     """Next unchecked subclause is passed to implement_subclause."""
-    with _patch_main_with_subclauses() as mock_inv:
+    with _patch_main_with_subclauses() as (mock_inv, _):
         main(clause_argv)
     assert mock_inv.call_args[0][1] == "4.2"
 
 
 def test_main_prints_subclauses_found(clause_argv, capsys) -> None:
     """Prints how many subclauses were discovered."""
-    with _patch_main_with_subclauses():
+    with _patch_main_with_subclauses() as (_, __):
         main(clause_argv)
     assert "Found 2 subclauses" in capsys.readouterr().out
 
@@ -186,14 +188,14 @@ def test_main_prints_synced_body(clause_argv, capsys) -> None:
     with _patch_main_with_subclauses(
         synced_body="## Subclauses\n\n- [ ] 4.1 General\n",
         next_sub="4.1",
-    ):
+    ) as (_, __):
         main(clause_argv)
     assert "## Subclauses" in capsys.readouterr().out
 
 
 def test_main_prints_next_subclause(clause_argv, capsys) -> None:
     """Prints which subclause was picked as next."""
-    with _patch_main_with_subclauses():
+    with _patch_main_with_subclauses() as (_, __):
         main(clause_argv)
     assert "Next unchecked: 4.2" in capsys.readouterr().out
 
@@ -202,7 +204,7 @@ def test_main_all_done(clause_argv, capsys) -> None:
     """Prints all-done message when no unchecked subclauses remain."""
     with _patch_main_with_subclauses(
         subclauses={"4.1": "General"}, next_sub=None,
-    ):
+    ) as (_, __):
         main(clause_argv)
     assert "All subclauses are done" in capsys.readouterr().out
 
@@ -262,7 +264,7 @@ def test_main_loops_all_subclauses(clause_argv) -> None:
     """main invokes implement_subclause for each unchecked subclause."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", "4.2", None],
-    ) as mock_inv:
+    ) as (mock_inv, _):
         main(clause_argv)
     assert mock_inv.call_count == 2
 
@@ -271,7 +273,7 @@ def test_main_first_subclause_no_continue(clause_argv) -> None:
     """First invocation does not pass continue_session=True."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", None],
-    ) as mock_inv:
+    ) as (mock_inv, _):
         main(clause_argv)
     assert mock_inv.call_args_list[0].kwargs.get("continue_session") is not True
 
@@ -280,9 +282,84 @@ def test_main_second_subclause_uses_continue(clause_argv) -> None:
     """Second invocation passes continue_session=True."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", "4.2", None],
-    ) as mock_inv:
+    ) as (mock_inv, _):
         main(clause_argv)
     assert mock_inv.call_args_list[1].kwargs["continue_session"] is True
+
+
+def test_main_commits_after_each_subclause(clause_argv) -> None:
+    """commit_and_push is called after each subclause implementation."""
+    with _patch_main_with_subclauses(
+        next_sub=["4.1", "4.2", None],
+    ) as (_, mock_cap):
+        main(clause_argv)
+    assert mock_cap.call_count == 2
+
+
+def test_main_commits_with_subclause_number(clause_argv) -> None:
+    """commit_and_push receives the subclause number."""
+    with _patch_main_with_subclauses(
+        next_sub=["4.1", None],
+    ) as (_, mock_cap):
+        main(clause_argv)
+    assert mock_cap.call_args[0][0] == "4.1"
+
+
+# --- commit_and_push ---
+
+
+def test_commit_and_push_stages_all(tmp_path) -> None:
+    """commit_and_push runs git add -A."""
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(args=cmd, returncode=0)
+    with patch("implement_clause.subprocess.run", side_effect=fake_run):
+        commit_and_push("4.1")
+    assert ["git", "add", "-A"] in calls
+
+
+def test_commit_and_push_skips_when_nothing_staged() -> None:
+    """commit_and_push skips commit/push when nothing is staged."""
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        if cmd == ["git", "diff", "--cached", "--quiet"]:
+            return subprocess.CompletedProcess(args=cmd, returncode=0)
+        return subprocess.CompletedProcess(args=cmd, returncode=0)
+    with patch("implement_clause.subprocess.run", side_effect=fake_run):
+        commit_and_push("4.1")
+    assert not any("commit" in c for c in calls if isinstance(c, list) and len(c) > 1 and c[0] == "git" and c[1] == "commit")
+
+
+def test_commit_and_push_commits_and_pushes() -> None:
+    """commit_and_push runs git commit and git push when changes exist."""
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        if cmd == ["git", "diff", "--cached", "--quiet"]:
+            return subprocess.CompletedProcess(args=cmd, returncode=1)
+        return subprocess.CompletedProcess(args=cmd, returncode=0)
+    with patch("implement_clause.subprocess.run", side_effect=fake_run):
+        commit_and_push("4.1")
+    git_cmds = [c[1] for c in calls if isinstance(c, list) and c[0] == "git"]
+    assert "commit" in git_cmds
+    assert "push" in git_cmds
+
+
+def test_commit_and_push_message_contains_subclause() -> None:
+    """Commit message contains the subclause number."""
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append((cmd, kw))
+        if cmd == ["git", "diff", "--cached", "--quiet"]:
+            return subprocess.CompletedProcess(args=cmd, returncode=1)
+        return subprocess.CompletedProcess(args=cmd, returncode=0)
+    with patch("implement_clause.subprocess.run", side_effect=fake_run):
+        commit_and_push("4.1")
+    commit_call = [c for c, k in calls if c[0] == "git" and c[1] == "commit"][0]
+    msg_idx = commit_call.index("-m") + 1
+    assert "4.1" in commit_call[msg_idx]
 
 
 # --- _lrm_labels_for_clause (whole-clause) ---

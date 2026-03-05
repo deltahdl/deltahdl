@@ -122,6 +122,24 @@ def filter_implementable(
     return implementable
 
 
+def commit_and_push(subclause: str) -> None:
+    """Stage all changes, commit with subclause reference, and push."""
+    subprocess.run(["git", "add", "-A"], check=True)
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"], check=False,
+    )
+    if result.returncode == 0:
+        print(f"No changes to commit for §{subclause}.")
+        return
+    msg = (
+        f"Implement §{subclause} [skip ci]\n\n"
+        "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+    )
+    subprocess.run(["git", "commit", "-m", msg], check=True)
+    subprocess.run(["git", "push"], check=True)
+    print(f"Committed and pushed §{subclause}.")
+
+
 def invoke_implement_subclause(
     args: argparse.Namespace,
     subclause: str,
@@ -205,4 +223,5 @@ def main(argv: list[str] | None = None) -> None:
         invoke_implement_subclause(
             args, subclause, continue_session=not first,
         )
+        commit_and_push(subclause)
         first = False
