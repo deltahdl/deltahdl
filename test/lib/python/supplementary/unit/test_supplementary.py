@@ -1,5 +1,6 @@
 """Tests for lib.supplementary."""
 
+import argparse
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -284,7 +285,6 @@ def test_parse_supplementary_csv_args_strips_whitespace() -> None:
 
 def test_add_supplementary_args_figures_default() -> None:
     """add_supplementary_args registers --figures with empty default."""
-    import argparse
     parser = argparse.ArgumentParser()
     add_supplementary_args(parser)
     assert parser.parse_args([]).figures == ""
@@ -292,7 +292,6 @@ def test_add_supplementary_args_figures_default() -> None:
 
 def test_add_supplementary_args_tables_default() -> None:
     """add_supplementary_args registers --tables with empty default."""
-    import argparse
     parser = argparse.ArgumentParser()
     add_supplementary_args(parser)
     assert parser.parse_args([]).tables == ""
@@ -300,7 +299,6 @@ def test_add_supplementary_args_tables_default() -> None:
 
 def test_add_supplementary_args_ignore_figures_default() -> None:
     """add_supplementary_args registers --ignore-figures with empty default."""
-    import argparse
     parser = argparse.ArgumentParser()
     add_supplementary_args(parser)
     assert parser.parse_args([]).ignore_figures == ""
