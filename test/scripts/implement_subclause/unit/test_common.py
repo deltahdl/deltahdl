@@ -234,30 +234,24 @@ def test_invoke_claude_passes_verbose(popen_ok):
     assert "--verbose" in popen_ok.call_args[0][0]
 
 
-def test_invoke_claude_no_print_flag(popen_ok):
-    """invoke_claude does not use -p (print mode)."""
+def test_invoke_claude_uses_print_mode(popen_ok):
+    """invoke_claude uses -p (print mode)."""
     invoke_claude("test prompt", model="opus")
-    assert "-p" not in popen_ok.call_args[0][0]
+    assert "-p" in popen_ok.call_args[0][0]
 
 
-def test_invoke_claude_passes_prompt_as_positional_arg(popen_ok):
-    """invoke_claude passes the prompt as the last positional argument."""
-    invoke_claude("test prompt", model="opus")
-    assert popen_ok.call_args[0][0][-1] == "test prompt"
-
-
-def test_invoke_claude_uses_bypass_permissions_mode(popen_ok):
-    """invoke_claude uses --permission-mode bypassPermissions."""
+def test_invoke_claude_uses_stream_json(popen_ok):
+    """invoke_claude uses --output-format stream-json for real-time output."""
     invoke_claude("test prompt", model="opus")
     cmd = popen_ok.call_args[0][0]
-    idx = cmd.index("--permission-mode")
-    assert cmd[idx + 1] == "bypassPermissions"
+    idx = cmd.index("--output-format")
+    assert cmd[idx + 1] == "stream-json"
 
 
-def test_invoke_claude_no_dangerously_skip_permissions(popen_ok):
-    """invoke_claude does not use --dangerously-skip-permissions."""
+def test_invoke_claude_uses_dangerously_skip_permissions(popen_ok):
+    """invoke_claude uses --dangerously-skip-permissions."""
     invoke_claude("test prompt", model="opus")
-    assert "--dangerously-skip-permissions" not in popen_ok.call_args[0][0]
+    assert "--dangerously-skip-permissions" in popen_ok.call_args[0][0]
 
 
 def test_invoke_claude_no_continue_by_default(popen_ok):
@@ -273,18 +267,21 @@ def test_invoke_claude_uses_continue_when_set(popen_ok):
 
 
 def test_invoke_claude_success(popen_ok):
-    """invoke_claude calls subprocess.run and returns on success."""
+    """invoke_claude streams prompt to Claude CLI and returns on success."""
     invoke_claude("test prompt", model="opus")
-    assert popen_ok.called
+    assert popen_ok.return_value.communicate.called
 
 
 @patch("implement_subclause.sys.exit")
-@patch("implement_subclause.subprocess.run")
-def test_invoke_claude_failure_exits(mock_run, mock_exit):
+@patch("implement_subclause.subprocess.Popen")
+def test_invoke_claude_failure_exits(mock_popen, mock_exit):
     """invoke_claude calls sys.exit on non-zero return code."""
-    mock_run.return_value = subprocess.CompletedProcess(
-        args=[], returncode=1,
-    )
+    proc = MagicMock()
+    proc.communicate.return_value = (None, None)
+    proc.returncode = 1
+    proc.__enter__ = MagicMock(return_value=proc)
+    proc.__exit__ = MagicMock(return_value=False)
+    mock_popen.return_value = proc
     invoke_claude("test prompt")
     assert mock_exit.called
 

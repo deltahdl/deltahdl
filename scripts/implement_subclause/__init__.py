@@ -221,23 +221,30 @@ def invoke_claude(
     env.pop("CLAUDECODE", None)
 
     cmd = [
-        "claude",
+        "claude", "-p",
         "--model", model,
         "--verbose",
-        "--permission-mode", "bypassPermissions",
+        "--output-format", "stream-json",
+        "--dangerously-skip-permissions",
     ]
 
     if continue_session:
         cmd.append("--continue")
 
-    cmd.append(prompt)
-
     print(f"Invoking Claude ({model})...")
-    result = subprocess.run(cmd, check=False, env=env)
+    with subprocess.Popen(
+        cmd,
+        stdin=subprocess.PIPE,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        text=True,
+        env=env,
+    ) as proc:
+        proc.communicate(input=prompt)
 
-    if result.returncode != 0:
+    if proc.returncode != 0:
         print(
-            f"\nERROR: Claude exited with code {result.returncode}",
+            f"\nERROR: Claude exited with code {proc.returncode}",
             file=sys.stderr,
         )
         sys.exit(1)
