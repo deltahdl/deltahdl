@@ -140,11 +140,38 @@ def commit_and_push(subclause: str) -> None:
     print(f"Committed and pushed §{subclause}.")
 
 
+def _lrm_labels_for_subclause(
+    lrm_path: Path, clause: str,
+) -> tuple[list[str], list[str]]:
+    """Find figure/table labels within a subclause's LRM text."""
+    text = extract_clause_text(lrm_path, clause)
+    figures: list[str] = []
+    tables: list[str] = []
+    for line in text.splitlines():
+        m = FIGURE_LABEL_RE.match(line)
+        if m:
+            figures.append(m.group(1))
+            continue
+        m = TABLE_LABEL_RE.match(line)
+        if m:
+            tables.append(m.group(1))
+    return figures, tables
+
+
+def _format_key_path_csv(mapping: dict[str, Path]) -> str:
+    """Format a dict as 'key=path,key=path' for CLI forwarding."""
+    return ",".join(
+        f"{k.replace('-', '_')}={v}" for k, v in mapping.items()
+    )
+
+
 def invoke_implement_subclause(
     args: argparse.Namespace,
     subclause: str,
     *,
     continue_session: bool = False,
+    figures: dict[str, Path] | None = None,
+    tables: dict[str, Path] | None = None,
 ) -> None:
     """Shell out to ``python -m implement_subclause``."""
     print(f"Invoking implement_subclause for {subclause}...")
@@ -156,6 +183,10 @@ def invoke_implement_subclause(
     ]
     if continue_session:
         cmd.append("--continue")
+    if figures:
+        cmd.extend(["--figures", _format_key_path_csv(figures)])
+    if tables:
+        cmd.extend(["--tables", _format_key_path_csv(tables)])
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
         sys.exit(result.returncode)
@@ -192,6 +223,14 @@ def main(argv: list[str] | None = None) -> None:
     clause = args.clause or args.annex
     lrm = Path(args.lrm)
 
+    lrm_labels = _lrm_labels_for_clause(lrm, clause)
+    check_supplementary_args(
+        clause, lrm_labels,
+        figures=args.figures,
+        tables=args.tables,
+        ignore_figures=args.ignore_figures,
+    )
+
     subclauses = parse_subclauses(lrm, clause)
 
     if not subclauses:
@@ -220,8 +259,12 @@ def main(argv: list[str] | None = None) -> None:
             return
 
         print(f"Next unchecked: {subclause}")
+        sub_figs, sub_tbls = _lrm_labels_for_subclause(lrm, subclause)
+        sub_figures = {k: v for k, v in args.figures.items() if k in sub_figs}
+        sub_tables = {k: v for k, v in args.tables.items() if k in sub_tbls}
         invoke_implement_subclause(
             args, subclause, continue_session=not first,
+            figures=sub_figures, tables=sub_tables,
         )
         commit_and_push(subclause)
         first = False

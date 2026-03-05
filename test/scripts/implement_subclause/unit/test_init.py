@@ -150,11 +150,11 @@ def test_main_with_figures(_mock_labels, _mock_check, mock_run, isc, tmp_path):
     """main() builds supplementary string when --figures is provided."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
-    gv = tmp_path / "Figure_4_1.gv"
+    gv = tmp_path / "fig.gv"
     gv.write_text("digraph {}")
     isc.main([
         "--lrm", str(lrm), "--subclause", "4", "--issue", "6",
-        "--figures", str(gv),
+        "--figures", f"4_1={gv}",
     ])
     assert "Figure 4-1" in mock_run.call_args[0][0].keywords["supplementary"]
 

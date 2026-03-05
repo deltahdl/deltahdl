@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import sys
 from contextlib import contextmanager
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -11,6 +12,7 @@ import pytest
 _STUB_ARGS = argparse.Namespace(
     lrm="/path/lrm.txt", issue=123,
     organization="deltahdl", repo="deltahdl",
+    figures={}, tables={}, ignore_figures=[],
 )
 
 @contextmanager
@@ -424,31 +426,31 @@ def test_lrm_labels_for_clause_ignores_other_clause_tables(ic, tmp_path) -> None
 
 
 def test_parse_args_figures(ic, tmp_path) -> None:
-    """--figures flag is parsed as list of Paths."""
+    """--figures flag is parsed as dict of shorthand to Path."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
-    gv = tmp_path / "Figure_4_1.gv"
+    gv = tmp_path / "fig.gv"
     gv.write_text("digraph {}")
     args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
         "--issue", "1", "--organization", "o", "--repo", "r",
-        "--figures", str(gv),
+        "--figures", f"4_1={gv}",
     ])
-    assert len(args.figures) == 1
+    assert args.figures == {"4-1": gv}
 
 
 def test_parse_args_tables(ic, tmp_path) -> None:
-    """--tables flag is parsed as list of Paths."""
+    """--tables flag is parsed as dict of shorthand to Path."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
-    md = tmp_path / "TABLE_4_1.md"
+    md = tmp_path / "tbl.md"
     md.write_text("| col |\n")
     args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
         "--issue", "1", "--organization", "o", "--repo", "r",
-        "--tables", str(md),
+        "--tables", f"4_1={md}",
     ])
-    assert len(args.tables) == 1
+    assert args.tables == {"4-1": md}
 
 
 def test_parse_args_ignore_figures(ic, tmp_path) -> None:
@@ -461,3 +463,121 @@ def test_parse_args_ignore_figures(ic, tmp_path) -> None:
         "--ignore-figures", "4-1,4-2",
     ])
     assert args.ignore_figures == ["4-1", "4-2"]
+
+
+# --- early validation of supplementary args ---
+
+
+_LRM_WITH_TABLE = """\
+4. Scheduling semantics
+Table 4-1\u2014PLI callbacks
+
+4.1 General
+General text.
+
+5. Data types
+"""
+
+
+def test_main_exits_when_tables_missing(ic, tmp_path) -> None:
+    """main() exits early when LRM has tables but --tables not provided."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_WITH_TABLE)
+    with (
+        patch("implement_clause.parse_subclauses") as mock_ps,
+        pytest.raises(SystemExit),
+    ):
+        ic.main([
+            "--lrm", str(lrm), "--clause", "4",
+            "--issue", "1", "--organization", "o", "--repo", "r",
+        ])
+    mock_ps.assert_not_called()
+
+
+_LRM_WITH_FIGURE = """\
+4. Scheduling semantics
+Figure 4-1\u2014Overview diagram
+
+4.1 General
+General text.
+
+5. Data types
+"""
+
+
+def test_main_exits_when_figures_missing(ic, tmp_path) -> None:
+    """main() exits early when LRM has figures but --figures not provided."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_WITH_FIGURE)
+    with (
+        patch("implement_clause.parse_subclauses") as mock_ps,
+        pytest.raises(SystemExit),
+    ):
+        ic.main([
+            "--lrm", str(lrm), "--clause", "4",
+            "--issue", "1", "--organization", "o", "--repo", "r",
+        ])
+    mock_ps.assert_not_called()
+
+
+def test_main_no_exit_when_figures_ignored(ic, tmp_path) -> None:
+    """main() does not exit when missing figures are in --ignore-figures."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_WITH_FIGURE)
+    with (
+        patch("implement_clause.parse_subclauses", return_value={}),
+        patch("implement_clause.invoke_implement_subclause"),
+    ):
+        ic.main([
+            "--lrm", str(lrm), "--clause", "4",
+            "--issue", "1", "--organization", "o", "--repo", "r",
+            "--ignore-figures", "4-1",
+        ])
+
+
+# --- invoke_implement_subclause forwarding ---
+
+
+def test_invoke_forwards_tables_to_subclause(
+    ic, invoke_subprocess_ok,
+) -> None:
+    """invoke_implement_subclause forwards --tables in key=path format."""
+    args = argparse.Namespace(
+        lrm="/path/lrm.txt", issue=123,
+        organization="o", repo="r",
+        figures={}, tables={"4-1": Path("/t/tbl.md")},
+        ignore_figures=[],
+    )
+    ic.invoke_implement_subclause(
+        args, "4.1", tables={"4-1": Path("/t/tbl.md")},
+    )
+    cmd = invoke_subprocess_ok.call_args[0][0]
+    idx = cmd.index("--tables")
+    assert cmd[idx + 1] == "4_1=/t/tbl.md"
+
+
+def test_invoke_forwards_figures_to_subclause(
+    ic, invoke_subprocess_ok,
+) -> None:
+    """invoke_implement_subclause forwards --figures in key=path format."""
+    args = argparse.Namespace(
+        lrm="/path/lrm.txt", issue=123,
+        organization="o", repo="r",
+        figures={"4-1": Path("/f/fig.gv")}, tables={},
+        ignore_figures=[],
+    )
+    ic.invoke_implement_subclause(
+        args, "4.1", figures={"4-1": Path("/f/fig.gv")},
+    )
+    cmd = invoke_subprocess_ok.call_args[0][0]
+    idx = cmd.index("--figures")
+    assert cmd[idx + 1] == "4_1=/f/fig.gv"
+
+
+def test_invoke_no_tables_flag_when_empty(
+    ic, invoke_subprocess_ok,
+) -> None:
+    """invoke_implement_subclause omits --tables when no tables to forward."""
+    ic.invoke_implement_subclause(_STUB_ARGS, "4.1")
+    cmd = invoke_subprocess_ok.call_args[0][0]
+    assert "--tables" not in cmd
