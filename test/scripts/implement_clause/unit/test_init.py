@@ -326,8 +326,8 @@ def test_commit_and_push_skips_when_nothing_staged(ic) -> None:
     assert not any("commit" in c for c in calls if isinstance(c, list) and len(c) > 1 and c[0] == "git" and c[1] == "commit")
 
 
-def test_commit_and_push_commits_and_pushes(ic) -> None:
-    """commit_and_push runs git commit and git push when changes exist."""
+def test_commit_and_push_runs_commit(ic) -> None:
+    """commit_and_push runs git commit when changes exist."""
     calls = []
     def fake_run(cmd, **kw):
         calls.append(cmd)
@@ -338,6 +338,19 @@ def test_commit_and_push_commits_and_pushes(ic) -> None:
         ic.commit_and_push("4.1")
     git_cmds = [c[1] for c in calls if isinstance(c, list) and c[0] == "git"]
     assert "commit" in git_cmds
+
+
+def test_commit_and_push_runs_push(ic) -> None:
+    """commit_and_push runs git push when changes exist."""
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        if cmd == ["git", "diff", "--cached", "--quiet"]:
+            return subprocess.CompletedProcess(args=cmd, returncode=1)
+        return subprocess.CompletedProcess(args=cmd, returncode=0)
+    with patch("implement_clause.subprocess.run", side_effect=fake_run):
+        ic.commit_and_push("4.1")
+    git_cmds = [c[1] for c in calls if isinstance(c, list) and c[0] == "git"]
     assert "push" in git_cmds
 
 
@@ -525,7 +538,7 @@ def test_main_no_exit_when_figures_ignored(ic, tmp_path) -> None:
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_WITH_FIGURE)
     with (
-        patch("implement_clause.parse_subclauses", return_value={}),
+        patch("implement_clause.parse_subclauses", return_value={}) as mock_ps,
         patch("implement_clause.invoke_implement_subclause"),
     ):
         ic.main([
@@ -533,6 +546,7 @@ def test_main_no_exit_when_figures_ignored(ic, tmp_path) -> None:
             "--issue", "1", "--organization", "o", "--repo", "r",
             "--ignore-figures", "4-1",
         ])
+    assert mock_ps.called
 
 
 # --- invoke_implement_subclause forwarding ---
