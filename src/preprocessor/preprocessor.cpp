@@ -393,10 +393,18 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     return true;
   }
   if (StartsWithDirective(line, "begin_keywords") && IsActive()) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`begin_keywords illegal inside a design element");
+      return true;
+    }
     HandleBeginKeywords(AfterDirective(line, "begin_keywords"), loc, output);
     return true;
   }
   if (StartsWithDirective(line, "end_keywords") && IsActive()) {
+    if (design_element_depth_ > 0) {
+      diag_.Error(loc, "`end_keywords illegal inside a design element");
+      return true;
+    }
     HandleEndKeywords(loc, output);
     return true;
   }
