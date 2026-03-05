@@ -63,7 +63,7 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts
           python3 -m pylint --recursive=y
-          test/scripts/ test/lib/python/
+          lib/python/ test/scripts/ test/lib/python/
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
@@ -73,7 +73,7 @@ jobs:
         run: >-
           MYPYPATH=.:scripts
           python3 -m mypy --explicit-package-bases
-          test/scripts/ test/lib/python/
+          lib/python/ test/scripts/ test/lib/python/
       - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
@@ -81,7 +81,7 @@ jobs:
       - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
-          --reporters console test/scripts/ test/lib/python/
+          --reporters console lib/python/ test/scripts/ test/lib/python/
   test-classify-file:
     needs: test-lib-classify
     runs-on: ubuntu-24.04
