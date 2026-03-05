@@ -3,9 +3,9 @@
 import json
 import os
 import stat
-import subprocess
-import sys
 from pathlib import Path
+
+from lib.python.test_utils import invoke_module
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SCRIPTS_DIR = str(_REPO_ROOT / "scripts")
@@ -20,20 +20,14 @@ _ISSUE_FLAGS = ("--issue", "1", "--organization", "o", "--repo", "r",
 
 def _invoke(*args, cwd=None, env=None):
     """Run classify_test in a child process."""
-    run_env = (env or os.environ).copy()
-    pypath = run_env.get("PYTHONPATH", "")
+    if env is None:
+        env = os.environ.copy()
+    pypath = env.get("PYTHONPATH", "")
     base = str(_REPO_ROOT) + os.pathsep + _SCRIPTS_DIR
-    run_env["PYTHONPATH"] = (
+    env["PYTHONPATH"] = (
         base + os.pathsep + pypath if pypath else base
     )
-    return subprocess.run(
-        [sys.executable, "-m", "classify_test", *args],
-        capture_output=True,
-        text=True,
-        cwd=cwd,
-        env=run_env,
-        check=False,
-    )
+    return invoke_module("classify_test", *args, cwd=cwd, env=env)
 
 
 def _bootstrap_repo(tmp_path, cmake_body="# header\n"):
