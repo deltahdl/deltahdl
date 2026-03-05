@@ -6,6 +6,10 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import classify_file
+from lib.python.test.subprocess_stubs import (
+    stub_subprocess_failure,
+    stub_subprocess_success,
+)
 
 
 def make_test_file(tmp_path: Path, body: str) -> Path:
@@ -13,33 +17,6 @@ def make_test_file(tmp_path: Path, body: str) -> Path:
     f = tmp_path / "test_input.cpp"
     f.write_text(body, encoding="utf-8")
     return f
-
-
-def stub_subprocess_success(monkeypatch):
-    """Stub subprocess.run to succeed; return list of captured commands."""
-    captured: list[list[str]] = []
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = ""
-    mock_result.stderr = ""
-
-    def capture_run(cmd, **_kwargs):
-        captured.append(list(cmd))
-        return mock_result
-
-    monkeypatch.setattr(subprocess, "run", capture_run)
-    return captured
-
-
-def stub_subprocess_failure(monkeypatch):
-    """Stub subprocess.run to return a failure result."""
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-    mock_result.stderr = "error"
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_a, **_kw: mock_result,
-    )
 
 
 def stub_subprocess_mixed(monkeypatch, fail_names):

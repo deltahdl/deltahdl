@@ -123,6 +123,7 @@ on:
       - .github/workflows/implement_clause.yml
       - lib/python/github/**
       - lib/python/lrm/**
+      - lib/python/test/**
       - scripts/implement_clause/**
       - test/lib/github/**
       - test/lib/lrm/**
@@ -133,6 +134,7 @@ on:
       - .github/workflows/implement_clause.yml
       - lib/python/github/**
       - lib/python/lrm/**
+      - lib/python/test/**
       - scripts/implement_clause/**
       - test/lib/github/**
       - test/lib/lrm/**

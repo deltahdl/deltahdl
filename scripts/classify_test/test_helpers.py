@@ -1,9 +1,20 @@
 """Shared test helpers for classify_test unit tests."""
 
-import subprocess
-from unittest.mock import MagicMock
-
 import classify_test
+from lib.python.test.subprocess_stubs import (
+    stub_subprocess_failure,
+    stub_subprocess_success,
+)
+
+
+__all__ = [
+    "make_parsed_file",
+    "make_test_block",
+    "stub_classifier",
+    "stub_side_effects",
+    "stub_subprocess_failure",
+    "stub_subprocess_success",
+]
 
 
 def make_test_block(
@@ -38,33 +49,6 @@ def make_parsed_file(
         global_preamble=preamble or [],
         section_preamble=[],
         all_tests=tests or [],
-    )
-
-
-def stub_subprocess_success(monkeypatch):
-    """Stub subprocess.run to succeed; return list of captured commands."""
-    captured = []
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = ""
-    mock_result.stderr = ""
-
-    def capture_run(cmd, **_kwargs):
-        captured.append(list(cmd))
-        return mock_result
-
-    monkeypatch.setattr(subprocess, "run", capture_run)
-    return captured
-
-
-def stub_subprocess_failure(monkeypatch):
-    """Stub subprocess.run to return a failure result."""
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-    mock_result.stderr = "error"
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_a, **_kw: mock_result,
     )
 
 

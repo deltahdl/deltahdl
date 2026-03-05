@@ -1,38 +1,10 @@
 """Shared test helpers for classify_files unit tests."""
 
-import subprocess
-from unittest.mock import MagicMock
-
 import classify_files
-
-
-def stub_subprocess_success(monkeypatch):
-    """Stub subprocess.run to succeed; return captured command lists."""
-    captured: list[list[str]] = []
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = ""
-    mock_result.stderr = ""
-
-    def capture_run(cmd, **_kwargs):
-        captured.append(list(cmd))
-        return mock_result
-
-    monkeypatch.setattr(subprocess, "run", capture_run)
-    return captured
-
-
-def stub_subprocess_failure(monkeypatch):
-    """Stub subprocess.run to return exit code 1."""
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-    mock_result.stderr = "fake error"
-
-    def fail_run(_cmd, **_kwargs):
-        return mock_result
-
-    monkeypatch.setattr(subprocess, "run", fail_run)
+from lib.python.test.subprocess_stubs import (
+    stub_subprocess_failure,
+    stub_subprocess_success,
+)
 
 
 def stub_remove_file_checkbox(monkeypatch):

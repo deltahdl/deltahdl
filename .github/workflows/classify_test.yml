@@ -105,6 +105,7 @@ on:
     paths:
       - .github/workflows/classify_test.yml
       - lib/python/lrm/**
+      - lib/python/test/**
       - scripts/classify_test/**
       - test/lib/lrm/**
       - test/scripts/classify_test/**
@@ -113,6 +114,7 @@ on:
     paths:
       - .github/workflows/classify_test.yml
       - lib/python/lrm/**
+      - lib/python/test/**
       - scripts/classify_test/**
       - test/lib/lrm/**
       - test/scripts/classify_test/**

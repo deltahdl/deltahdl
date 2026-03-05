@@ -100,12 +100,14 @@ on:
   pull_request:
     paths:
       - .github/workflows/classify_file.yml
+      - lib/python/test/**
       - scripts/classify_file/**
       - test/scripts/classify_file/**
   push:
     branches: [main]
     paths:
       - .github/workflows/classify_file.yml
+      - lib/python/test/**
       - scripts/classify_file/**
       - test/scripts/classify_file/**
   workflow_dispatch:

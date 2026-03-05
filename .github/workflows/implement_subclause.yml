@@ -123,6 +123,7 @@ on:
       - .github/workflows/implement_subclause.yml
       - lib/python/github/**
       - lib/python/lrm/**
+      - lib/python/test/**
       - scripts/implement_subclause/**
       - test/lib/github/**
       - test/lib/lrm/**
@@ -133,6 +134,7 @@ on:
       - .github/workflows/implement_subclause.yml
       - lib/python/github/**
       - lib/python/lrm/**
+      - lib/python/test/**
       - scripts/implement_subclause/**
       - test/lib/github/**
       - test/lib/lrm/**
