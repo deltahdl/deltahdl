@@ -9,7 +9,7 @@ import pytest
 
 import classify_file
 
-from helpers import (
+from classify_file_helpers import (
     make_test_file,
     stub_close_issue,
     stub_create_issue,

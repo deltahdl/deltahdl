@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import pytest
 
 import classify_test
-from helpers import make_parsed_file as _parsed
-from helpers import make_test_block as _tb
-from helpers import stub_classifier, stub_side_effects
+from classify_test_helpers import make_parsed_file as _parsed
+from classify_test_helpers import make_test_block as _tb
+from classify_test_helpers import stub_classifier, stub_side_effects
 
 _parse_args = getattr(classify_test, "_parse_args")
 _group_tests = getattr(classify_test, "_group_tests")

@@ -4,7 +4,7 @@ from classify_test._output import (
     _format_clause,
     print_classification_table as _print_classification_table,
 )
-from helpers import make_test_block as _tb
+from classify_test_helpers import make_test_block as _tb
 
 
 # ---- _format_clause --------------------------------------------------------

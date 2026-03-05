@@ -16,7 +16,7 @@ from classify_test._github import (
     tick_checkbox,
     update_issue_body,
 )
-from helpers import (
+from classify_test_helpers import (
     make_test_block as _tb,
     stub_subprocess_failure,
     stub_subprocess_success,

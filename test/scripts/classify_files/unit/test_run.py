@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import classify_files
-from helpers import (
+from classify_files_helpers import (
     stub_fetch_issue_title,
     stub_subprocess_failure,
     stub_subprocess_success,

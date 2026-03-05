@@ -2,7 +2,7 @@
 
 import classify_file
 
-from helpers import make_test_file
+from classify_file_helpers import make_test_file
 
 
 # ---- extract_test_names ----------------------------------------------------
