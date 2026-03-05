@@ -8,6 +8,7 @@ import pytest
 
 import classify_files
 
+
 _run = getattr(classify_files, "_run")
 
 
@@ -36,11 +37,11 @@ def _pipeline_args(**overrides):
     return SimpleNamespace(**result)
 
 
-def _mock_run_ok(monkeypatch):
+def _mock_run_ok(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     """Stub subprocess.run to succeed; return command log."""
     log: list[list[str]] = []
 
-    def ok_run(cmd, **_kw):
+    def ok_run(cmd: list[str], **_kw: object) -> MagicMock:
         log.append(list(cmd))
         result = MagicMock()
         result.returncode, result.stdout, result.stderr = 0, "", ""
@@ -50,11 +51,11 @@ def _mock_run_ok(monkeypatch):
     return log
 
 
-def _mock_run_fail_first(monkeypatch):
+def _mock_run_fail_first(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub subprocess.run to fail on the first call only."""
     call_count: list[int] = [0]
 
-    def fail_first(_cmd, **_kw):
+    def fail_first(_cmd: list[str], **_kw: object) -> MagicMock:
         call_count[0] += 1
         result = MagicMock()
         result.stdout, result.stderr = "", "fail"
@@ -64,7 +65,7 @@ def _mock_run_fail_first(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fail_first)
 
 
-def _stub_remove(monkeypatch):
+def _stub_remove(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     """Stub remove_file_checkbox; return list of filenames removed."""
     removed: list[str] = []
     monkeypatch.setattr(

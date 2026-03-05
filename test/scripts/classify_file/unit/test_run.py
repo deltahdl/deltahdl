@@ -1,6 +1,7 @@
 """Unit tests for run-flow functions in classify_file."""
 
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -709,13 +710,18 @@ def test_run_close_reason_file_missing(tmp_path, monkeypatch, capsys):
            in capsys.readouterr().out
 
 
-def _stub_create_and_run(tmp_path, monkeypatch, **run_overrides):
+def _stub_create_and_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **run_overrides: object,
+) -> tuple[list[bool], list[list[str]]]:
     """Stub create_issue, subprocess, and close_issue; run pipeline."""
     make_test_file(tmp_path, "TEST(S, A) {\n}\n")
     create_log: list[bool] = []
+    def fake_create(_a: object, _n: object) -> int:
+        create_log.append(True)
+        return 42
+
     monkeypatch.setattr(
-        classify_file, "create_issue",
-        lambda _a, _n: (create_log.append(True), 42)[1],
+        classify_file, "create_issue", fake_create,
     )
     stub_ensure_unchecked(monkeypatch)
     captured = stub_subprocess_success(monkeypatch)
@@ -792,7 +798,7 @@ def test_main_enables_line_buffering(monkeypatch):
 ensure_unchecked = classify_file.ensure_unchecked
 
 
-def _stub_github(monkeypatch, body):
+def _stub_github(monkeypatch: pytest.MonkeyPatch, body: str) -> list[str]:
     """Stub fetch_issue_body and capture update_issue_body calls."""
     monkeypatch.setattr(
         classify_file, "fetch_issue_body",

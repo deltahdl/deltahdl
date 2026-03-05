@@ -1,5 +1,7 @@
 """Shared test helpers for classify_files unit tests."""
 
+import pytest
+
 import classify_files
 from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
@@ -14,7 +16,7 @@ __all__ = [
 ]
 
 
-def stub_remove_file_checkbox(monkeypatch):
+def stub_remove_file_checkbox(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     """Stub remove_file_checkbox; return list of filenames removed."""
     removed: list[str] = []
 

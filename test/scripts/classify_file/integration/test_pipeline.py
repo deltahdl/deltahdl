@@ -1,8 +1,11 @@
 """Integration tests for the classify_file pipeline."""
 
 import subprocess
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+
+import pytest
 
 import classify_file
 
@@ -19,7 +22,7 @@ _ARGS_DEFAULTS = {
 }
 
 
-def _pipeline_args(tmp_path, **overrides):
+def _pipeline_args(tmp_path: Path, **overrides: object) -> SimpleNamespace:
     """Build args pointing at test_input.cpp inside *tmp_path*."""
     result = {
         "file": str(tmp_path / "test_input.cpp"),
@@ -30,7 +33,7 @@ def _pipeline_args(tmp_path, **overrides):
     return SimpleNamespace(**result)
 
 
-def _write_and_args(tmp_path, body, **overrides):
+def _write_and_args(tmp_path: Path, body: str, **overrides: object) -> SimpleNamespace:
     """Write test_input.cpp and return args for _run."""
     (tmp_path / "test_input.cpp").write_text(
         body, encoding="utf-8",
@@ -38,11 +41,11 @@ def _write_and_args(tmp_path, body, **overrides):
     return _pipeline_args(tmp_path, **overrides)
 
 
-def _mock_run_ok(monkeypatch):
+def _mock_run_ok(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     """Stub subprocess.run to succeed; return command log."""
     log: list[list[str]] = []
 
-    def ok_run(cmd, **_kw):
+    def ok_run(cmd: list[str], **_kw: object) -> MagicMock:
         log.append(list(cmd))
         m = MagicMock()
         m.returncode, m.stdout, m.stderr = 0, "", ""
@@ -52,10 +55,10 @@ def _mock_run_ok(monkeypatch):
     return log
 
 
-def _mock_run_selective(monkeypatch, fail_set):
+def _mock_run_selective(monkeypatch: pytest.MonkeyPatch, fail_set: set[str]) -> None:
     """Stub subprocess.run to fail only for names in *fail_set*."""
 
-    def sel_run(cmd, **_kw):
+    def sel_run(cmd: list[str], **_kw: object) -> MagicMock:
         m = MagicMock()
         m.stdout, m.stderr = "", ""
         name = cmd[cmd.index("--test") + 1]
@@ -65,7 +68,7 @@ def _mock_run_selective(monkeypatch, fail_set):
     monkeypatch.setattr(subprocess, "run", sel_run)
 
 
-def _stub_close(monkeypatch):
+def _stub_close(monkeypatch: pytest.MonkeyPatch) -> list[bool]:
     """Stub close_issue; return True-appending call log."""
     called: list[bool] = []
     monkeypatch.setattr(
@@ -75,11 +78,11 @@ def _stub_close(monkeypatch):
     return called
 
 
-def _stub_create(monkeypatch, number=42):
+def _stub_create(monkeypatch: pytest.MonkeyPatch, number: int = 42) -> list[int]:
     """Stub create_issue; return number-appending call log."""
     called: list[int] = []
 
-    def fake(_args, _names):
+    def fake(_args: object, _names: object) -> int:
         called.append(number)
         return number
 
@@ -87,7 +90,7 @@ def _stub_create(monkeypatch, number=42):
     return called
 
 
-def _stub_ensure(monkeypatch):
+def _stub_ensure(monkeypatch: pytest.MonkeyPatch) -> list[bool]:
     """Stub ensure_unchecked; return call log."""
     called: list[bool] = []
     monkeypatch.setattr(
@@ -186,7 +189,7 @@ def test_create_issue_then_process(tmp_path, monkeypatch):
 # ---- ensure_unchecked integration -----------------------------------------
 
 
-def _ensure_order_log(tmp_path, monkeypatch):
+def _ensure_order_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[str]:
     """Run pipeline recording ensure vs subprocess call order."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     order: list[str] = []

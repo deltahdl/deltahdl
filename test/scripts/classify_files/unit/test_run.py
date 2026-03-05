@@ -288,15 +288,15 @@ def test_run_classify_file_does_not_capture_output(monkeypatch):
 # ---- remove_file_checkbox --------------------------------------------------
 
 
-def test_remove_file_checkbox_calls_fetch(monkeypatch):
+def test_remove_file_checkbox_calls_fetch(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fetches the issue body with correct arguments."""
-    calls: list[tuple] = []
+    calls: list[tuple[str, str, int]] = []
+    def fake_fetch(org: str, repo: str, issue: int) -> str:
+        calls.append((org, repo, issue))
+        return "- [ ] a.cpp\n"
+
     monkeypatch.setattr(
-        classify_files, "fetch_issue_body",
-        lambda org, repo, issue: (
-            calls.append((org, repo, issue))
-            or "- [ ] a.cpp\n"
-        ),
+        classify_files, "fetch_issue_body", fake_fetch,
     )
     monkeypatch.setattr(
         classify_files, "remove_checkbox",
@@ -310,16 +310,19 @@ def test_remove_file_checkbox_calls_fetch(monkeypatch):
     assert calls[0] == ("myorg", "myrepo", 61)
 
 
-def test_remove_file_checkbox_calls_remove(monkeypatch):
+def test_remove_file_checkbox_calls_remove(monkeypatch: pytest.MonkeyPatch) -> None:
     """Calls remove_checkbox for the given filename."""
     removed: list[str] = []
     monkeypatch.setattr(
         classify_files, "fetch_issue_body",
         lambda _o, _r, _i: "- [ ] a.cpp\n",
     )
+    def fake_remove(body: str, name: str) -> str:
+        removed.append(name)
+        return body
+
     monkeypatch.setattr(
-        classify_files, "remove_checkbox",
-        lambda body, name: (removed.append(name) or body),
+        classify_files, "remove_checkbox", fake_remove,
     )
     monkeypatch.setattr(
         classify_files, "update_issue_body",
@@ -329,7 +332,7 @@ def test_remove_file_checkbox_calls_remove(monkeypatch):
     assert removed[0] == "a.cpp"
 
 
-def test_remove_file_checkbox_calls_update(monkeypatch):
+def test_remove_file_checkbox_calls_update(monkeypatch: pytest.MonkeyPatch) -> None:
     """Updates the issue body after removal."""
     updated: list[str] = []
     monkeypatch.setattr(
@@ -348,7 +351,7 @@ def test_remove_file_checkbox_calls_update(monkeypatch):
     assert updated[0] == "- [ ] b.cpp\n"
 
 
-def _stub_not_found(monkeypatch):
+def _stub_not_found(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     """Stub helpers so remove_checkbox raises ValueError."""
     monkeypatch.setattr(
         classify_files, "fetch_issue_body",

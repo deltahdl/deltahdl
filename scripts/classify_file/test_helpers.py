@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 import classify_file
 from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
@@ -29,7 +31,9 @@ def make_test_file(tmp_path: Path, body: str) -> Path:
     return f
 
 
-def stub_subprocess_mixed(monkeypatch, fail_names):
+def stub_subprocess_mixed(
+    monkeypatch: pytest.MonkeyPatch, fail_names: set[str],
+) -> list[list[str]]:
     """Stub subprocess.run to fail for specific test names."""
     captured: list[list[str]] = []
 
@@ -47,9 +51,11 @@ def stub_subprocess_mixed(monkeypatch, fail_names):
     return captured
 
 
-def stub_close_issue(monkeypatch):
+def stub_close_issue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[tuple[str, str, int, str]]:
     """Stub classify_file.close_issue; return call log."""
-    log: list = []
+    log: list[tuple[str, str, int, str]] = []
     monkeypatch.setattr(
         classify_file, "close_issue",
         lambda org, repo, issue, reason: log.append((org, repo, issue, reason)),
@@ -57,9 +63,11 @@ def stub_close_issue(monkeypatch):
     return log
 
 
-def stub_create_issue(monkeypatch, issue_number=42):
+def stub_create_issue(
+    monkeypatch: pytest.MonkeyPatch, issue_number: int = 42,
+) -> list[dict[str, str]]:
     """Stub subprocess.run for create_issue; return captured calls."""
-    captured: list[dict] = []
+    captured: list[dict[str, str]] = []
 
     def capture_run(cmd, **kwargs):
         captured.append(
@@ -75,9 +83,9 @@ def stub_create_issue(monkeypatch, issue_number=42):
     return captured
 
 
-def stub_ensure_unchecked(monkeypatch):
+def stub_ensure_unchecked(monkeypatch: pytest.MonkeyPatch) -> list[bool]:
     """Stub classify_file.ensure_unchecked; return call log."""
-    log: list = []
+    log: list[bool] = []
     monkeypatch.setattr(
         classify_file, "ensure_unchecked",
         lambda _a, _n: log.append(True),

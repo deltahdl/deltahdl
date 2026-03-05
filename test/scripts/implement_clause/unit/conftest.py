@@ -2,6 +2,7 @@
 
 import subprocess
 from pathlib import Path
+from types import ModuleType
 from unittest.mock import patch
 
 import pytest
@@ -47,10 +48,10 @@ def commit_push_calls():
     back the list of recorded ``cmd`` lists.
     """
 
-    def _run(ic_mod, subclause="4.1"):
+    def _run(ic_mod: ModuleType, subclause: str = "4.1") -> list[list[str]]:
         calls: list[list[str]] = []
 
-        def fake_run(cmd, **_kw):
+        def fake_run(cmd: list[str], **_kw: object) -> subprocess.CompletedProcess[str]:
             calls.append(cmd)
             if cmd == ["git", "diff", "--cached", "--quiet"]:
                 return subprocess.CompletedProcess(args=cmd, returncode=1)
