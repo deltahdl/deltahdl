@@ -1,11 +1,7 @@
 """Unit tests for implement_subclause."""
 
 import argparse
-import subprocess
-from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 
 # ---- build_hierarchy --------------------------------------------------------

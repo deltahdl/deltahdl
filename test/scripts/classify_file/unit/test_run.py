@@ -1,9 +1,7 @@
 """Unit tests for run-flow functions in classify_file."""
 
-import subprocess
 import sys
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -18,6 +16,7 @@ from classify_file.test_helpers import (
     stub_subprocess_mixed,
     stub_subprocess_success,
 )
+from lib.python.test import capture_help_output
 from lib.python.test.subprocess_stubs import spy_subprocess_run
 
 _parse_args = getattr(classify_file, "_parse_args")
@@ -98,12 +97,9 @@ def test_parse_args_lrm(monkeypatch):
 
 def test_parse_args_prog_name(monkeypatch, capsys):
     """Usage line shows 'classify_file' as program name."""
-    monkeypatch.setattr(sys, "argv", ["prog", "--help"])
-    try:
-        _parse_args()
-    except SystemExit:
-        pass
-    assert "classify_file" in capsys.readouterr().out
+    assert "classify_file" in capture_help_output(
+        _parse_args, monkeypatch, capsys,
+    )
 
 
 def test_parse_args_issue(monkeypatch):
@@ -198,19 +194,6 @@ def test_parse_args_dry_run_default(monkeypatch):
     assert _parse_args().dry_run is False
 
 
-def test_parse_args_no_commit(monkeypatch):
-    """Parses --no-commit flag."""
-    monkeypatch.setattr(
-        sys, "argv", [*_BASE_ARGV, "--no-commit"],
-    )
-    assert _parse_args().no_commit is True
-
-
-def test_parse_args_no_commit_default(monkeypatch):
-    """Defaults --no-commit to False."""
-    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().no_commit is False
-
 
 def test_parse_args_max_lines(monkeypatch):
     """Parses --max-lines as integer."""
@@ -223,7 +206,7 @@ def test_parse_args_max_lines(monkeypatch):
 def _argv_without_flag(base, flag):
     """Return *base* with *flag* and its value removed."""
     return [v for i, v in enumerate(base)
-            if base[max(0, i - 1)] != flag and v != flag]
+            if flag not in (base[max(0, i - 1)], v)]
 
 
 def test_parse_args_max_lines_required(monkeypatch):

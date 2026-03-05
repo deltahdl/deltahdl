@@ -302,10 +302,10 @@ def test_main_commits_with_subclause_number(ic, clause_argv) -> None:
 # --- commit_and_push ---
 
 
-def test_commit_and_push_stages_all(ic, tmp_path) -> None:
+def test_commit_and_push_stages_all(ic) -> None:
     """commit_and_push runs git add -A."""
     calls = []
-    def fake_run(cmd, **kw):
+    def fake_run(cmd, **_kw):
         calls.append(cmd)
         return subprocess.CompletedProcess(args=cmd, returncode=0)
     with patch("implement_clause.subprocess.run", side_effect=fake_run):
@@ -316,20 +316,23 @@ def test_commit_and_push_stages_all(ic, tmp_path) -> None:
 def test_commit_and_push_skips_when_nothing_staged(ic) -> None:
     """commit_and_push skips commit/push when nothing is staged."""
     calls = []
-    def fake_run(cmd, **kw):
+    def fake_run(cmd, **_kw):
         calls.append(cmd)
         if cmd == ["git", "diff", "--cached", "--quiet"]:
             return subprocess.CompletedProcess(args=cmd, returncode=0)
         return subprocess.CompletedProcess(args=cmd, returncode=0)
     with patch("implement_clause.subprocess.run", side_effect=fake_run):
         ic.commit_and_push("4.1")
-    assert not any("commit" in c for c in calls if isinstance(c, list) and len(c) > 1 and c[0] == "git" and c[1] == "commit")
+    assert not any(
+        c[1] == "commit"
+        for c in calls if isinstance(c, list) and len(c) > 1
+    )
 
 
 def test_commit_and_push_runs_commit(ic) -> None:
     """commit_and_push runs git commit when changes exist."""
     calls = []
-    def fake_run(cmd, **kw):
+    def fake_run(cmd, **_kw):
         calls.append(cmd)
         if cmd == ["git", "diff", "--cached", "--quiet"]:
             return subprocess.CompletedProcess(args=cmd, returncode=1)
@@ -343,7 +346,7 @@ def test_commit_and_push_runs_commit(ic) -> None:
 def test_commit_and_push_runs_push(ic) -> None:
     """commit_and_push runs git push when changes exist."""
     calls = []
-    def fake_run(cmd, **kw):
+    def fake_run(cmd, **_kw):
         calls.append(cmd)
         if cmd == ["git", "diff", "--cached", "--quiet"]:
             return subprocess.CompletedProcess(args=cmd, returncode=1)
@@ -369,7 +372,7 @@ def test_commit_and_push_message_contains_subclause(ic) -> None:
     assert "4.1" in commit_call[msg_idx]
 
 
-# --- _lrm_labels_for_clause (whole-clause) ---
+# --- lrm_labels_for_clause (whole-clause) ---
 
 
 _LRM_CLAUSE_WITH_TABLE = """\
@@ -381,57 +384,57 @@ Table 4-1\u2014PLI callbacks
 """
 
 
-def test_lrm_labels_for_clause_finds_figures(ic, tmp_path) -> None:
+def testlrm_labels_for_clause_finds_figures(ic, tmp_path) -> None:
     """Finds figure labels for a clause."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
-    figs, _ = ic._lrm_labels_for_clause(lrm, "4")
+    figs, _ = ic.lrm_labels_for_clause(lrm, "4")
     assert figs == ["4-1"]
 
 
-def test_lrm_labels_for_clause_finds_tables(ic, tmp_path) -> None:
+def testlrm_labels_for_clause_finds_tables(ic, tmp_path) -> None:
     """Finds table labels for a clause."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
-    _, tbls = ic._lrm_labels_for_clause(lrm, "4")
+    _, tbls = ic.lrm_labels_for_clause(lrm, "4")
     assert tbls == ["4-1"]
 
 
-def test_lrm_labels_for_clause_empty_figures(ic, tmp_path) -> None:
+def testlrm_labels_for_clause_empty_figures(ic, tmp_path) -> None:
     """Returns empty figure list when no labels exist."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("No figures or tables here.\n")
-    figs, _ = ic._lrm_labels_for_clause(lrm, "99")
+    figs, _ = ic.lrm_labels_for_clause(lrm, "99")
     assert figs == []
 
 
-def test_lrm_labels_for_clause_empty_tables(ic, tmp_path) -> None:
+def testlrm_labels_for_clause_empty_tables(ic, tmp_path) -> None:
     """Returns empty table list when no labels exist."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("No figures or tables here.\n")
-    _, tbls = ic._lrm_labels_for_clause(lrm, "99")
+    _, tbls = ic.lrm_labels_for_clause(lrm, "99")
     assert tbls == []
 
 
-def test_lrm_labels_for_clause_ignores_other_clause_figures(ic, tmp_path) -> None:
+def testlrm_labels_for_clause_ignores_other_clause_figures(ic, tmp_path) -> None:
     """Does not pick up figure labels from other clauses."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(
         "Figure 5-1\u2014Something\n"
         "Table 5-1\u2014Other\n"
     )
-    figs, _ = ic._lrm_labels_for_clause(lrm, "4")
+    figs, _ = ic.lrm_labels_for_clause(lrm, "4")
     assert figs == []
 
 
-def test_lrm_labels_for_clause_ignores_other_clause_tables(ic, tmp_path) -> None:
+def testlrm_labels_for_clause_ignores_other_clause_tables(ic, tmp_path) -> None:
     """Does not pick up table labels from other clauses."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(
         "Figure 5-1\u2014Something\n"
         "Table 5-1\u2014Other\n"
     )
-    _, tbls = ic._lrm_labels_for_clause(lrm, "4")
+    _, tbls = ic.lrm_labels_for_clause(lrm, "4")
     assert tbls == []
 
 

@@ -1,10 +1,8 @@
 """End-to-end tests for the classify_file CLI."""
 
-import os
-import stat
 from pathlib import Path
 
-from lib.python.test import build_base_env, invoke_module
+from lib.python.test import build_base_env, install_fake_script, invoke_module
 
 _SCRIPTS_DIR = str(
     Path(__file__).resolve().parents[4] / "scripts",
@@ -69,11 +67,9 @@ def _install_fake_classify_test(tmp_path, exit_code=0):
 
 def _install_fake_gh(tmp_path, issue_body=""):
     """Install a fake gh that handles POST, PATCH, and --jq requests."""
-    fake_bin = tmp_path / "fake_bin"
-    fake_bin.mkdir(exist_ok=True)
-    gh_script = fake_bin / "gh"
     escaped_body = issue_body.replace("'", "'\\''")
-    gh_script.write_text(
+    return install_fake_script(
+        tmp_path, "gh",
         '#!/bin/sh\n'
         'for arg in "$@"; do\n'
         '  if [ "$arg" = "POST" ]; then\n'
@@ -88,10 +84,7 @@ def _install_fake_gh(tmp_path, issue_body=""):
         '  fi\n'
         'done\n'
         'exit 0\n',
-        encoding="utf-8",
     )
-    gh_script.chmod(gh_script.stat().st_mode | stat.S_IEXEC)
-    return str(fake_bin)
 
 
 def _base_env(tmp_path, fake_scripts_dir, issue_body=""):

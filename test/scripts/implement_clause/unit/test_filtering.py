@@ -8,17 +8,12 @@ import pytest
 THREE_SUBCLAUSES = {"4.1": "General", "4.2": "Exec", "4.3": "Sim"}
 
 
+@pytest.mark.usefixtures("patch_filter_ok")
 def test_filter_implementable_returns_list(ic) -> None:
     """Implementable subclauses from Claude response are returned."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout='{"4.1": false, "4.2": true, "4.3": true}\n',
-        stderr="",
-    )
-    with patch("implement_clause.subprocess.run", return_value=cp):
-        assert ic.filter_implementable(
-            "clause text", THREE_SUBCLAUSES,
-        ) == ["4.2", "4.3"]
+    assert ic.filter_implementable(
+        "clause text", THREE_SUBCLAUSES,
+    ) == ["4.2", "4.3"]
 
 
 def test_filter_implementable_prints_count(ic, capsys) -> None:

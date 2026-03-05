@@ -1,19 +1,19 @@
 """Unit tests for the classify_files module."""
 
-import subprocess
 import sys
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
 
 import classify_files
+
 from classify_files.test_helpers import (
     stub_fetch_issue_title,
     stub_subprocess_failure,
     stub_subprocess_success,
     stub_remove_file_checkbox,
 )
+from lib.python.test import capture_help_output
 from lib.python.test.subprocess_stubs import spy_subprocess_run
 
 _parse_args = getattr(classify_files, "_parse_args")
@@ -175,12 +175,9 @@ def test_parse_args_no_commit_default(monkeypatch):
 
 def test_parse_args_prog_name(monkeypatch, capsys):
     """Usage line shows classify_files as program name."""
-    monkeypatch.setattr(sys, "argv", ["prog", "--help"])
-    try:
-        _parse_args()
-    except SystemExit:
-        pass
-    assert "classify_files" in capsys.readouterr().out
+    assert "classify_files" in capture_help_output(
+        _parse_args, monkeypatch, capsys,
+    )
 
 
 # ---- _build_command --------------------------------------------------------

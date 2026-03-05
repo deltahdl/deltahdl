@@ -1,7 +1,5 @@
 """Unit tests for prompt generation across all clause depths."""
 
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers

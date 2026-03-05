@@ -170,7 +170,7 @@ def test_parse_supplementary_csv_args_empty_figures() -> None:
     args.tables = ""
     args.ignore_figures = ""
     parse_supplementary_csv_args(args)
-    assert args.figures == {}
+    assert not args.figures
 
 
 def test_parse_supplementary_csv_args_empty_tables() -> None:
@@ -180,7 +180,7 @@ def test_parse_supplementary_csv_args_empty_tables() -> None:
     args.tables = ""
     args.ignore_figures = ""
     parse_supplementary_csv_args(args)
-    assert args.tables == {}
+    assert not args.tables
 
 
 def test_parse_supplementary_csv_args_empty_ignore_figures() -> None:

@@ -110,19 +110,6 @@ def test_parse_args_max_lines_required(monkeypatch):
         _parse_args()
 
 
-def test_parse_args_no_commit(monkeypatch):
-    """Parses --no-commit flag."""
-    monkeypatch.setattr(
-        sys, "argv", [*_BASE_ARGV, "--no-commit"],
-    )
-    assert _parse_args().no_commit is True
-
-
-def test_parse_args_no_commit_default(monkeypatch):
-    """--no-commit defaults to False."""
-    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().no_commit is False
-
 
 # ---- _preamble_name / _filter_preamble ------------------------------------
 

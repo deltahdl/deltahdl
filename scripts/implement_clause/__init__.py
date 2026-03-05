@@ -32,7 +32,7 @@ from lib.python.supplementary import (
 )
 
 
-def _lrm_labels_for_clause(
+def lrm_labels_for_clause(
     lrm_path: Path, clause: str,
 ) -> tuple[list[str], list[str]]:
     """Find all figure/table labels for a top-level clause in the LRM."""
@@ -239,7 +239,7 @@ def main(argv: list[str] | None = None) -> None:
     clause = args.clause or args.annex
     lrm = Path(args.lrm)
 
-    lrm_labels = _lrm_labels_for_clause(lrm, clause)
+    lrm_labels = lrm_labels_for_clause(lrm, clause)
     check_supplementary_args(
         clause, lrm_labels,
         figures=args.figures,
