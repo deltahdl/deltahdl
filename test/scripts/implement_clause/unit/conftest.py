@@ -6,6 +6,17 @@ from unittest.mock import patch
 
 import pytest
 
+SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent / "scripts"
+
+
+@pytest.fixture()
+def ic(module_loader):
+    """Load the implement_clause module."""
+    return module_loader(
+        "implement_clause",
+        SCRIPTS_DIR / "implement_clause" / "__init__.py",
+    )
+
 
 @pytest.fixture()
 def clause_argv(tmp_path: Path) -> list[str]:

@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
+from lib.python.module_utils import load_module_from_path
+
 # Add repo root (for lib/) and scripts/ to sys.path so we can import
 # the modules under test.
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -15,6 +17,12 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
+
+
+@pytest.fixture()
+def module_loader():
+    """Return load_module_from_path for dynamically loading modules."""
+    return load_module_from_path
 
 
 def _shell_quote(s):
