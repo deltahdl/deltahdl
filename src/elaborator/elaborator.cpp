@@ -475,6 +475,10 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->net_delay_decay) {
     net.decay_ticks =
         static_cast<uint64_t>(ConstEvalInt(item->net_delay_decay).value_or(0));
+  } else if (net.net_type == NetType::kTrireg &&
+             !unit_->default_decay_time_infinite) {
+    // §E.2: apply `default_decay_time to trireg nets without explicit decay.
+    net.decay_ticks = unit_->default_decay_time;
   }
   // §5.12: Resolve attributes.
   net.attrs = ResolveAttributes(item->attrs, diag_);

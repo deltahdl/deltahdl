@@ -5,15 +5,47 @@ using namespace delta;
 
 namespace {
 
-// §E.2: `default_decay_time before module.
-TEST(ParserAnnexE, AnnexEDefaultDecayTime) {
+// §E.2: `default_decay_time integer before module.
+TEST(ParserAnnexE, AnnexEDefaultDecayTimeInteger) {
   auto r = ParseWithPreprocessor(
       "`default_decay_time 10\nmodule m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  if (r.cu->modules.size() >= 1u) {
-    EXPECT_EQ(r.cu->modules[0]->name, "m");
-  }
+  ASSERT_GE(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+// §E.2: `default_decay_time real before module.
+TEST(ParserAnnexE, AnnexEDefaultDecayTimeReal) {
+  auto r = ParseWithPreprocessor(
+      "`default_decay_time 3.5\nmodule m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+// §E.2: `default_decay_time infinite before module.
+TEST(ParserAnnexE, AnnexEDefaultDecayTimeInfinite) {
+  auto r = ParseWithPreprocessor(
+      "`default_decay_time infinite\nmodule m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+// §E.2: multiple modules after directive.
+TEST(ParserAnnexE, AnnexEDefaultDecayTimeMultipleModules) {
+  auto r = ParseWithPreprocessor(
+      "`default_decay_time 50\n"
+      "module a; endmodule\n"
+      "module b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->name, "a");
+  EXPECT_EQ(r.cu->modules[1]->name, "b");
 }
 
 }  // namespace

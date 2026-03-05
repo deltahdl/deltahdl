@@ -90,6 +90,55 @@ TEST(Preprocessor, DefaultDecayTime_LaterOverrides) {
   EXPECT_EQ(pp.DefaultDecayTime(), 200);
 }
 
+// --- §E.2: large integer value ---
+
+TEST(Preprocessor, DefaultDecayTime_LargeInteger) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_decay_time 1000000\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultDecayTime(), 1000000u);
+  EXPECT_FALSE(pp.DefaultDecayTimeInfinite());
+}
+
+// --- §E.2: switch from infinite back to finite ---
+
+TEST(Preprocessor, DefaultDecayTime_InfiniteToFinite) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`default_decay_time infinite\n"
+      "`default_decay_time 42\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultDecayTime(), 42u);
+  EXPECT_FALSE(pp.DefaultDecayTimeInfinite());
+}
+
+// --- §E.2: switch from finite to infinite ---
+
+TEST(Preprocessor, DefaultDecayTime_FiniteToInfinite) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`default_decay_time 42\n"
+      "`default_decay_time infinite\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(pp.DefaultDecayTimeInfinite());
+}
+
+// --- §E.2: real value with fractional part ---
+
+TEST(Preprocessor, DefaultDecayTime_RealFractional) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_decay_time 99.75\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_DOUBLE_EQ(pp.DefaultDecayTimeReal(), 99.75);
+  EXPECT_EQ(pp.DefaultDecayTime(), 99u);
+}
+
 // --- §E.2: illegal inside a design element ---
 
 TEST(Preprocessor, DefaultDecayTime_IllegalInsideDesignElement) {

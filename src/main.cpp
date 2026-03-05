@@ -328,6 +328,10 @@ std::string ReadFile(const std::string& path) {
 struct PreprocResult {
   std::string source;
   delta::NetType default_nettype = delta::NetType::kWire;
+  // §E.2
+  uint64_t default_decay_time = 0;
+  double default_decay_time_real = 0.0;
+  bool default_decay_time_infinite = true;
 };
 
 PreprocResult PreprocessSources(const CliOptions& opts,
@@ -348,6 +352,9 @@ PreprocResult PreprocessSources(const CliOptions& opts,
     result.source += preproc.Preprocess(file_id);
   }
   result.default_nettype = preproc.DefaultNetType();
+  result.default_decay_time = preproc.DefaultDecayTime();
+  result.default_decay_time_real = preproc.DefaultDecayTimeReal();
+  result.default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
   return result;
 }
 
@@ -504,6 +511,9 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   cu->default_nettype = pp.default_nettype;
+  cu->default_decay_time = pp.default_decay_time;
+  cu->default_decay_time_real = pp.default_decay_time_real;
+  cu->default_decay_time_infinite = pp.default_decay_time_infinite;
 
   if (opts.dump_ast) {
     DumpAst(cu);

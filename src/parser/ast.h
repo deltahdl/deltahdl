@@ -949,6 +949,11 @@ struct CompilationUnit {
   std::vector<ModuleItem*> cu_items;  // top-level functions/tasks (§3.12.1)
   NetType default_nettype = NetType::kWire;  // §6.10/§22.8
 
+  // §E.2: default decay time for trireg nets without explicit decay.
+  uint64_t default_decay_time = 0;
+  double default_decay_time_real = 0.0;
+  bool default_decay_time_infinite = true;
+
   // CU-scope timeunit/timeprecision (§3.14.2.3 rule c)
   TimeUnit cu_time_unit = TimeUnit::kNs;
   TimeUnit cu_time_prec = TimeUnit::kNs;

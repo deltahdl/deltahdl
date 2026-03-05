@@ -30,6 +30,28 @@ inline RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
   return ElaborateSrc(src, f, top);
 }
 
+inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
+                                               ElabFixture& f,
+                                               std::string_view top = "") {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Preprocessor preproc(f.mgr, f.diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = f.mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  // Propagate preprocessor state to CompilationUnit.
+  cu->default_nettype = preproc.DefaultNetType();
+  cu->default_decay_time = preproc.DefaultDecayTime();
+  cu->default_decay_time_real = preproc.DefaultDecayTimeReal();
+  cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto name = top.empty() ? cu->modules.back()->name : top;
+  auto* design = elab.Elaborate(name);
+  f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
 inline bool ElabOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
