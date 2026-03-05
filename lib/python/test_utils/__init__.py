@@ -1,13 +1,26 @@
 """Shared test utilities."""
 
+import importlib.util
 import os
 import stat
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 _REPO_ROOT = str(Path(__file__).resolve().parents[3])
 _SCRIPTS_DIR = str(Path(_REPO_ROOT) / "scripts")
+
+
+def load_module_from_path(module_name: str, path: Path) -> ModuleType:
+    """Load a Python module from a file path."""
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def build_base_env(tmp_path, fake_scripts_dir, fake_bin):

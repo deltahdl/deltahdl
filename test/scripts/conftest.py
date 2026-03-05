@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lib.python.module_utils import load_module_from_path
+from lib.python.test_utils import load_module_from_path
 
 
 
