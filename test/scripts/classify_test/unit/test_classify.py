@@ -8,9 +8,9 @@ from unittest.mock import MagicMock
 import pytest
 
 import classify_test
-from classify_test_helpers import make_parsed_file as _parsed
-from classify_test_helpers import make_test_block as _tb
-from classify_test_helpers import stub_subprocess_failure
+from classify_test.test_helpers import make_parsed_file as _parsed
+from classify_test.test_helpers import make_test_block as _tb
+from classify_test.test_helpers import stub_subprocess_failure
 
 _detect_prefix = getattr(classify_test, "_detect_prefix")
 _build_clause_prompt = getattr(classify_test, "_build_clause_prompt")

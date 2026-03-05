@@ -259,7 +259,10 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     auto inc_arg = AfterDirective(line, "include");
     // §22.4: expand macros in include argument before processing.
     auto expanded_arg = ExpandInlineMacros(inc_arg, file_id, line_num);
-    HandleInclude(expanded_arg, loc, depth, output);
+    // Determine bracket type before stripping quotes.
+    auto trimmed_arg = Trim(std::string_view(expanded_arg));
+    bool angle_bracket = !trimmed_arg.empty() && trimmed_arg.front() == '<';
+    HandleInclude(expanded_arg, loc, depth, output, angle_bracket);
     return true;
   }
   if (StartsWithDirective(line, "begin_keywords") && IsActive()) {
@@ -651,24 +654,47 @@ bool Preprocessor::EvalIfdefUnary(std::string_view& expr) {
 }
 
 void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
-                                 int depth, std::string& output) {
+                                 int depth, std::string& output,
+                                 bool angle_bracket) {
   auto fn = Trim(filename_raw);
   // Strip quotes properly: find matching closing " or >.
+  std::string_view after_close;
   if (fn.size() >= 2 && (fn.front() == '"' || fn.front() == '<')) {
     char close = (fn.front() == '"') ? '"' : '>';
     auto end = fn.find(close, 1);
     if (end != std::string_view::npos) {
+      after_close = Trim(fn.substr(end + 1));
       fn = fn.substr(1, end - 1);
     } else {
       fn = fn.substr(1, fn.size() - 2);
     }
   }
-  // §22.4: search relative to current source file's directory first.
+
+  // §22.4: Only whitespace or a comment may follow the include filename.
+  if (!after_close.empty() && !(after_close.size() >= 2 &&
+                                 after_close[0] == '/' &&
+                                 (after_close[1] == '/' ||
+                                  after_close[1] == '*'))) {
+    diag_.Error(loc,
+                "only whitespace or a comment may follow `include filename");
+  }
+
+  // §22.4: Absolute paths are only allowed with the double-quote form.
+  if (angle_bracket && !fn.empty() && fn[0] == '/') {
+    diag_.Error(loc,
+                "absolute path not allowed with angle-bracket `include");
+    return;
+  }
+
+  // §22.4: Double-quote form searches source dir then include_dirs.
+  // Angle-bracket form searches only include_dirs.
   auto src_path = src_mgr_.FilePath(loc.file_id);
   std::string src_dir;
-  auto slash = src_path.rfind('/');
-  if (slash != std::string_view::npos) {
-    src_dir = std::string(src_path.substr(0, slash));
+  if (!angle_bracket) {
+    auto slash = src_path.rfind('/');
+    if (slash != std::string_view::npos) {
+      src_dir = std::string(src_path.substr(0, slash));
+    }
   }
   auto resolved = ResolveInclude(fn, src_dir);
   if (resolved.empty()) {

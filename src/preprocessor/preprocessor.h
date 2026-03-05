@@ -50,7 +50,7 @@ class Preprocessor {
   void HandleElse();
   void HandleEndif();
   void HandleInclude(std::string_view filename, SourceLoc loc, int depth,
-                     std::string& output);
+                     std::string& output, bool angle_bracket);
   void HandleTimescale(std::string_view rest, SourceLoc loc);
   void HandleDefaultNettype(std::string_view rest, SourceLoc loc);
   void HandleUnconnectedDrive(std::string_view rest, SourceLoc loc);

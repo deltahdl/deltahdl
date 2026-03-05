@@ -13,7 +13,7 @@ from classify_test._git import (
     commit_and_push,
     commit_classification,
 )
-from classify_test_helpers import stub_subprocess_failure, stub_subprocess_success
+from classify_test.test_helpers import stub_subprocess_failure, stub_subprocess_success
 
 
 # ---- build_commit_message --------------------------------------------------

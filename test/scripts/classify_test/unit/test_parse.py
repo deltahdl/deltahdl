@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 import classify_test
-from classify_test_helpers import make_test_block as _tb
+from classify_test.test_helpers import make_test_block as _tb
 
 _update_brace_depth = getattr(classify_test, "_update_brace_depth")
 _parse_header = getattr(classify_test, "_parse_header")
