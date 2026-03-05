@@ -110,7 +110,7 @@ def test_check_supplementary_args_ignored_figure(tmp_path) -> None:
     assert result == ["4-1", "4-2"]
 
 
-def test_check_supplementary_args_missing_table_label(tmp_path) -> None:
+def test_check_supplementary_args_missing_table_label() -> None:
     """Exits when LRM requires a table not provided."""
     with pytest.raises(SystemExit):
         check_supplementary_args(
@@ -144,7 +144,7 @@ def test_check_supplementary_args_no_labels() -> None:
         tables=[],
         ignore_figures=[],
     )
-    assert result == []
+    assert not result
 
 
 # --- build_supplementary_lines ---
@@ -193,9 +193,9 @@ def test_parse_supplementary_csv_args_empty() -> None:
     args.tables = ""
     args.ignore_figures = ""
     parse_supplementary_csv_args(args)
-    assert args.figures == []
-    assert args.tables == []
-    assert args.ignore_figures == []
+    assert not args.figures
+    assert not args.tables
+    assert not args.ignore_figures
 
 
 def test_parse_supplementary_csv_args_with_values() -> None:
