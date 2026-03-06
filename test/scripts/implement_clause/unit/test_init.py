@@ -227,6 +227,28 @@ def test_main_no_subclauses(ic, clause_argv) -> None:
     assert mock_inv.call_args[0][1] == "4"
 
 
+def test_main_no_subclauses_forwards_tables(ic, tmp_path) -> None:
+    """No-subclauses path forwards --tables to invoke_implement_subclause."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    tbl = tmp_path / "tbl.md"
+    tbl.write_text("")
+    argv = [
+        "--lrm", str(lrm), "--clause", "4",
+        "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
+        "--tables", f"4_1={tbl}",
+    ]
+    with (
+        patch("implement_clause.parse_all_subclauses", return_value={}),
+        patch("implement_clause.invoke_implement_subclause") as mock_inv,
+        patch("implement_clause.close_issue"),
+        patch("implement_clause.mark_master_complete"),
+    ):
+        ic.main(argv)
+    assert mock_inv.call_args.kwargs["tables"] == {"4-1": tbl}
+
+
 def test_main_no_subclauses_prints_leaf(ic, clause_argv, capsys) -> None:
     """Prints that clause has no subclauses."""
     with (

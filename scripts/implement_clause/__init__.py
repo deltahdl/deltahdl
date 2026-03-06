@@ -288,7 +288,10 @@ def main(argv: list[str] | None = None) -> None:
 
     if not subclauses:
         print(f"No subclauses for {clause}; invoking directly.")
-        invoke_implement_subclause(args, clause)
+        invoke_implement_subclause(
+            args, clause,
+            figures=args.figures, tables=args.tables,
+        )
         close_issue(
             args.organization, args.repo, args.sub_issue,
             "all subclauses are implemented",
