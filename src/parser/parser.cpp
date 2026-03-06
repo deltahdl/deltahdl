@@ -338,9 +338,9 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     }
     return;
   }
+  // §3.12.1: CU-scope typedef declaration.
   if (Check(TokenKind::kKwTypedef)) {
-    std::vector<ModuleItem*> discard;
-    ParseModuleItem(discard);
+    unit->cu_items.push_back(ParseTypedef());
     return;
   }
   if (Check(TokenKind::kKwBind)) {
@@ -348,6 +348,22 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     return;
   }
   if (TryParseSecondaryTopLevel(unit)) return;
+  // §3.12.1: CU-scope localparam/parameter declarations.
+  if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
+    std::vector<ModuleItem*> items;
+    ParseParamDecl(items);
+    for (auto* item : items) unit->cu_items.push_back(item);
+    return;
+  }
+  // §3.12.1: CU-scope import declarations.
+  if (Check(TokenKind::kKwImport)) {
+    std::vector<ModuleItem*> items;
+    ParseImportDecl(items);
+    for (auto* item : items) unit->cu_items.push_back(item);
+    return;
+  }
+  // §3.12.1: CU-scope data declarations (variables/nets).
+  if (TryParseCuScopeDataDecl(unit)) return;
   // CU-scope timeunit/timeprecision (§3.14.2.3 rule c)
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
     ParseTimeunitDecl(nullptr, unit);
@@ -360,6 +376,41 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
   }
   diag_.Error(CurrentLoc(), "expected top-level declaration");
   Consume();
+}
+
+// §3.12.1: Parse a data/net declaration at CU scope.
+static bool IsCuScopeDataTypeKeyword(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwLogic:
+    case TokenKind::kKwReg:
+    case TokenKind::kKwBit:
+    case TokenKind::kKwByte:
+    case TokenKind::kKwShortint:
+    case TokenKind::kKwInt:
+    case TokenKind::kKwLongint:
+    case TokenKind::kKwInteger:
+    case TokenKind::kKwReal:
+    case TokenKind::kKwShortreal:
+    case TokenKind::kKwRealtime:
+    case TokenKind::kKwTime:
+    case TokenKind::kKwString:
+    case TokenKind::kKwVar:
+    case TokenKind::kKwWire:
+    case TokenKind::kKwTri:
+    case TokenKind::kKwEvent:
+    case TokenKind::kKwChandle:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool Parser::TryParseCuScopeDataDecl(CompilationUnit* unit) {
+  if (!IsCuScopeDataTypeKeyword(CurrentToken().kind)) return false;
+  std::vector<ModuleItem*> items;
+  ParseDataDeclItem(items, 0, {});
+  for (auto* item : items) unit->cu_items.push_back(item);
+  return true;
 }
 
 void Parser::ParseExternTopLevel(CompilationUnit* unit) {

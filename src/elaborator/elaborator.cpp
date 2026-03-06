@@ -94,6 +94,9 @@ Elaborator::Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit)
     : arena_(arena), diag_(diag), unit_(unit) {}
 
 RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
+  // §3.12.1: Register CU-scope typedefs and classes before module elaboration.
+  RegisterCuScopeItems();
+
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {
     diag_.Error({}, std::format("top module '{}' not found", top_module_name));
@@ -109,11 +112,42 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
 
   design->top_modules.push_back(top);
   design->all_modules[top->name] = top;
+  // §3.12.1: CU-scope functions/tasks available to all modules.
+  for (auto* item : unit_->cu_items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      design->cu_function_decls.push_back(item);
+    }
+  }
   // §20.6.2: Populate type widths for $bits(type) support.
   for (const auto& [name, dtype] : typedefs_) {
     design->type_widths[name] = EvalTypeWidth(dtype, typedefs_);
   }
   return design;
+}
+
+// §3.12.1: Register CU-scope typedefs, classes, and imports so they are
+// visible during module elaboration.
+void Elaborator::RegisterCuScopeItems() {
+  for (auto* item : unit_->cu_items) {
+    if (!item->name.empty()) cu_scope_names_.insert(item->name);
+    if (item->kind == ModuleItemKind::kTypedef) {
+      typedefs_[item->name] = item->typedef_type;
+    } else if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
+      class_names_.insert(item->class_decl->name);
+    }
+  }
+  for (auto* cls : unit_->classes) {
+    class_names_.insert(cls->name);
+    cu_scope_names_.insert(cls->name);
+  }
+}
+
+ModuleItem* Elaborator::FindCuScopeItem(std::string_view name) const {
+  for (auto* item : unit_->cu_items) {
+    if (item->name == name) return item;
+  }
+  return nullptr;
 }
 
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {

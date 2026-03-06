@@ -187,6 +187,8 @@ struct RtlirDesign {
   std::unordered_map<std::string_view, RtlirModule*> all_modules;
   // §20.6.2: type name → bit width, populated from typedefs for $bits(type).
   std::unordered_map<std::string_view, uint32_t> type_widths;
+  // §3.12.1: CU-scope function/task declarations visible to all modules.
+  std::vector<ModuleItem*> cu_function_decls;
 };
 
 }  // namespace delta

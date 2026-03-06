@@ -22,6 +22,7 @@ class Parser {
   bool TryParseAnonymousProgram();
   void ParseExternTopLevel(CompilationUnit* unit);
   bool TryParseSecondaryTopLevel(CompilationUnit* unit);
+  bool TryParseCuScopeDataDecl(CompilationUnit* unit);
   void ParseOutOfBlockConstraint(CompilationUnit* unit);
 
   // Module/package parsing

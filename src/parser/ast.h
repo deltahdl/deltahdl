@@ -53,6 +53,7 @@ struct Expr {
 
   // Literal values
   std::string_view text;
+  std::string_view scope_prefix;  // §3.12.1: $unit:: or pkg:: scope qualifier
   uint64_t int_val = 0;
   double real_val = 0.0;
 

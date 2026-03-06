@@ -178,6 +178,76 @@ TEST(ParserClause03, Cl3_12_1_CheckerAtCUScope) {
   ASSERT_EQ(r.cu->checkers.size(), 1u);
 }
 
+TEST(ParserClause03, Cl3_12_1_CuScopeTypedefStored) {
+  auto r = ParseWithPreprocessor(
+      "typedef logic [7:0] byte_t;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "byte_t");
+}
+
+TEST(ParserClause03, Cl3_12_1_CuScopeLocalparamStored) {
+  auto r = ParseWithPreprocessor(
+      "localparam int WIDTH = 8;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "WIDTH");
+}
+
+TEST(ParserClause03, Cl3_12_1_CuScopeImportStored) {
+  auto r = ParseWithPreprocessor(
+      "package pkg;\n"
+      "  typedef int myint;\n"
+      "endpackage\n"
+      "import pkg::*;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kImportDecl);
+}
+
+TEST(ParserClause03, Cl3_12_1_CuScopeVarDeclStored) {
+  auto r = ParseWithPreprocessor(
+      "int global_counter;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "global_counter");
+}
+
+TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
+  auto r = ParseWithPreprocessor(
+      "bit b;\n"
+      "task t;\n"
+      "  int b;\n"
+      "  b = 5 + $unit::b;\n"
+      "endtask\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserClause03, Cl3_12_1_ForwardRefOnlyDefinedNames) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  initial begin end\n"
+      "endmodule\n"
+      "int later_var;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "later_var");
+}
+
 TEST(SourceText, EmptySourceText) {
   auto r = ParseWithPreprocessor("");
   ASSERT_NE(r.cu, nullptr);

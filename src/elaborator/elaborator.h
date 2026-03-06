@@ -42,6 +42,9 @@ class Elaborator {
   RtlirDesign* Elaborate(std::string_view top_module_name);
 
  private:
+  /// §3.12.1: Register CU-scope typedefs/classes before module elaboration.
+  void RegisterCuScopeItems();
+
   /// Find a module declaration by name in the compilation unit.
   ModuleDecl* FindModule(std::string_view name) const;
 
@@ -178,11 +181,15 @@ class Elaborator {
   /// Check a single assignment statement for enum type violations.
   void CheckEnumAssignStmt(const Stmt* s);
 
+  /// §3.12.1: Find a CU-scope item by name.
+  ModuleItem* FindCuScopeItem(std::string_view name) const;
+
   Arena& arena_;
   DiagEngine& diag_;
   CompilationUnit* unit_;
   std::string gen_prefix_;
   TypedefMap typedefs_;
+  std::unordered_set<std::string_view> cu_scope_names_;  // §3.12.1
 
   // Per-module validation state (cleared in ElaborateItems).
   std::unordered_set<std::string_view> declared_names_;

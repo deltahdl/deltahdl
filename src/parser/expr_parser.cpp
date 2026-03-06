@@ -684,6 +684,17 @@ Expr* Parser::ParseSelectExpr(Expr* base) {
 
 Expr* Parser::ParseSystemCall() {
   auto tok = Consume();
+  // §3.12.1: $unit::identifier — scope-qualified reference to CU scope.
+  if (tok.text == "$unit" && Check(TokenKind::kColonColon)) {
+    Consume();  // ::
+    auto id = ExpectIdentifier();
+    auto* expr = arena_.Create<Expr>();
+    expr->kind = ExprKind::kIdentifier;
+    expr->text = id.text;
+    expr->scope_prefix = tok.text;
+    expr->range.start = tok.loc;
+    return expr;
+  }
   auto* call = arena_.Create<Expr>();
   call->kind = ExprKind::kSystemCall;
   call->callee = tok.text;

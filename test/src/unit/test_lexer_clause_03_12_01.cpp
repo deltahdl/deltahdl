@@ -27,4 +27,33 @@ TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
   EXPECT_EQ(t3.text, "b");
 }
 
+TEST(LexerClause03, Cl3_12_1_DollarUnitNotScopeResolution) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", "$unit(arg)");
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto t1 = lexer.Next();
+  EXPECT_EQ(t1.kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(t1.text, "$unit");
+  auto t2 = lexer.Next();
+  EXPECT_EQ(t2.kind, TokenKind::kLParen);
+}
+
+TEST(LexerClause03, Cl3_12_1_DollarUnitWithWhitespace) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", "$unit :: name");
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto t1 = lexer.Next();
+  EXPECT_EQ(t1.kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(t1.text, "$unit");
+  auto t2 = lexer.Next();
+  EXPECT_EQ(t2.kind, TokenKind::kColonColon);
+  auto t3 = lexer.Next();
+  EXPECT_EQ(t3.kind, TokenKind::kIdentifier);
+  EXPECT_EQ(t3.text, "name");
+}
+
 }  // namespace
