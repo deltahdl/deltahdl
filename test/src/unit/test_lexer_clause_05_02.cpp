@@ -4,10 +4,223 @@
 
 using namespace delta;
 
-TEST(LexerCh502, EachTokenHasOneOrMoreChars) {
+namespace {
+
+// --- §5.2: each token consists of one or more characters ---
+
+TEST(LexerClause05, Cl5_2_EachTokenHasOneOrMoreChars) {
   auto tokens = Lex("module m; logic [7:0] x = 8'hFF + 1; endmodule");
   for (size_t i = 0; i + 1 < tokens.size(); ++i) {
     EXPECT_GE(tokens[i].text.size(), 1u)
         << "token " << i << " (" << tokens[i].text << ") is empty";
   }
 }
+
+TEST(LexerClause05, Cl5_2_SingleCharTokensHaveSizeOne) {
+  auto tokens = Lex("+ ; , ( )");
+  for (size_t i = 0; i + 1 < tokens.size(); ++i) {
+    EXPECT_EQ(tokens[i].text.size(), 1u);
+  }
+}
+
+TEST(LexerClause05, Cl5_2_MultiCharTokensHaveSizeGreaterThanOne) {
+  auto r = LexOne("module");
+  EXPECT_GT(r.token.text.size(), 1u);
+
+  auto r2 = LexOne("8'hFF");
+  EXPECT_GT(r2.token.text.size(), 1u);
+}
+
+// --- §5.2: free format layout ---
+
+TEST(LexerClause05, Cl5_2_FreeFormatTokensOnOneLine) {
+  auto tokens = Lex("module m;logic a;endmodule");
+  bool has_module = false;
+  bool has_endmodule = false;
+  for (const auto& tok : tokens) {
+    if (tok.kind == TokenKind::kKwModule) has_module = true;
+    if (tok.kind == TokenKind::kKwEndmodule) has_endmodule = true;
+  }
+  EXPECT_TRUE(has_module);
+  EXPECT_TRUE(has_endmodule);
+}
+
+TEST(LexerClause05, Cl5_2_FreeFormatTokensSplitAcrossLines) {
+  auto tokens = Lex("module\nm\n;\nendmodule\n");
+  bool has_module = false;
+  bool has_semi = false;
+  bool has_ident = false;
+  for (const auto& tok : tokens) {
+    if (tok.kind == TokenKind::kKwModule) has_module = true;
+    if (tok.kind == TokenKind::kSemicolon) has_semi = true;
+    if (tok.kind == TokenKind::kIdentifier) has_ident = true;
+  }
+  EXPECT_TRUE(has_module);
+  EXPECT_TRUE(has_semi);
+  EXPECT_TRUE(has_ident);
+}
+
+TEST(LexerClause05, Cl5_2_WhitespaceVariationsProduceSameTokens) {
+  auto compact = Lex("a+b");
+  auto spaced = Lex("a + b");
+  auto tabbed = Lex("a\t+\tb");
+  auto newlined = Lex("a\n+\nb");
+
+  // All should produce: identifier, plus, identifier, EOF
+  ASSERT_EQ(compact.size(), 4u);
+  ASSERT_EQ(spaced.size(), 4u);
+  ASSERT_EQ(tabbed.size(), 4u);
+  ASSERT_EQ(newlined.size(), 4u);
+
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(compact[i].kind, spaced[i].kind);
+    EXPECT_EQ(compact[i].kind, tabbed[i].kind);
+    EXPECT_EQ(compact[i].kind, newlined[i].kind);
+  }
+}
+
+TEST(LexerClause05, Cl5_2_MultipleSpacesBetweenTokensCollapse) {
+  auto tokens = Lex("a      b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+}
+
+TEST(LexerClause05, Cl5_2_MixedWhitespaceAsTokenSeparators) {
+  auto tokens = Lex("a \t \n \r\n b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+// --- §5.2: exception for escaped identifiers (whitespace terminates them) ---
+
+TEST(LexerClause05, Cl5_2_EscapedIdentifierTerminatedBySpace) {
+  auto tokens = Lex("\\abc def");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "def");
+}
+
+TEST(LexerClause05, Cl5_2_EscapedIdentifierTerminatedByNewline) {
+  auto tokens = Lex("\\abc\ndef");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "def");
+}
+
+TEST(LexerClause05, Cl5_2_EscapedIdentifierTerminatedByTab) {
+  auto tokens = Lex("\\abc\tdef");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+}
+
+TEST(LexerClause05, Cl5_2_EscapedIdentifierIncludesSpecialChars) {
+  // Whitespace is significant for escaped identifiers: everything between
+  // the backslash and the terminating whitespace is the identifier.
+  auto r = LexOne("\\a+b*c ");
+  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
+}
+
+// --- §5.2: all seven token categories ---
+
+TEST(LexerClause05, Cl5_2_WhitespaceCategory) {
+  // Whitespace is consumed but not emitted as tokens
+  auto tokens = Lex("   ");
+  ASSERT_EQ(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
+}
+
+TEST(LexerClause05, Cl5_2_CommentCategory) {
+  // Comments are consumed but not emitted as tokens
+  auto tokens = Lex("a // line comment\nb");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexerClause05, Cl5_2_OperatorCategory) {
+  auto r = LexOne("<=");
+  EXPECT_EQ(r.token.kind, TokenKind::kLtEq);
+}
+
+TEST(LexerClause05, Cl5_2_NumberCategory) {
+  auto r = LexOne("42");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+TEST(LexerClause05, Cl5_2_StringLiteralCategory) {
+  auto r = LexOne("\"test\"");
+  EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
+}
+
+TEST(LexerClause05, Cl5_2_IdentifierCategory) {
+  auto r = LexOne("my_var");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+}
+
+TEST(LexerClause05, Cl5_2_KeywordCategory) {
+  auto r = LexOne("always");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwAlways);
+}
+
+TEST(LexerClause05, Cl5_2_AllSevenCategoriesInOneStream) {
+  // Whitespace (implicit), comment (stripped), operator, number,
+  // string literal, identifier, keyword
+  auto tokens =
+      Lex("module /* comment */ m; logic x = 42 + \"s\"; endmodule");
+  bool has_operator = false;
+  bool has_number = false;
+  bool has_string = false;
+  bool has_identifier = false;
+  bool has_keyword = false;
+
+  for (const auto& tok : tokens) {
+    if (tok.kind == TokenKind::kPlus) has_operator = true;
+    if (tok.kind == TokenKind::kIntLiteral) has_number = true;
+    if (tok.kind == TokenKind::kStringLiteral) has_string = true;
+    if (tok.kind == TokenKind::kIdentifier) has_identifier = true;
+    if (tok.kind == TokenKind::kKwModule) has_keyword = true;
+  }
+
+  EXPECT_TRUE(has_operator);
+  EXPECT_TRUE(has_number);
+  EXPECT_TRUE(has_string);
+  EXPECT_TRUE(has_identifier);
+  EXPECT_TRUE(has_keyword);
+}
+
+// --- §5.2: edge cases ---
+
+TEST(LexerClause05, Cl5_2_AdjacentOperatorsWithoutWhitespace) {
+  // Operators adjacent without whitespace should still be lexed correctly
+  auto tokens = Lex("a+b-c");
+  ASSERT_EQ(tokens.size(), 6u);  // a + b - c EOF
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kMinus);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kIdentifier);
+}
+
+TEST(LexerClause05, Cl5_2_TokensAdjacentToPunctuation) {
+  auto tokens = Lex("a(b)");
+  ASSERT_EQ(tokens.size(), 5u);  // a ( b ) EOF
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kLParen);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kRParen);
+}
+
+TEST(LexerClause05, Cl5_2_FormfeedIsWhitespace) {
+  // Formfeed (\f) is whitespace and should separate tokens
+  auto tokens = Lex("a\fb");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+}  // namespace
