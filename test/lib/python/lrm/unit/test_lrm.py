@@ -359,16 +359,22 @@ def test_lrm_labels_subclause_finds_figure(tmp_path: Path) -> None:
 
 def test_table_label_re_matches_dot_separator() -> None:
     """TABLE_LABEL_RE matches annex-style dot separator (e.g. Table B.1)."""
-    m = TABLE_LABEL_RE.match("Table B.1\u2014Keywords")
-    assert m is not None
-    assert m.group(1) == "B.1"
+    assert TABLE_LABEL_RE.match("Table B.1\u2014Keywords") is not None
+
+
+def test_table_label_re_captures_dot_separated_label() -> None:
+    """TABLE_LABEL_RE captures the dot-separated label (e.g. B.1)."""
+    assert TABLE_LABEL_RE.match("Table B.1\u2014Keywords").group(1) == "B.1"
 
 
 def test_figure_label_re_matches_dot_separator() -> None:
     """FIGURE_LABEL_RE matches annex-style dot separator (e.g. Figure A.1)."""
-    m = FIGURE_LABEL_RE.match("Figure A.1\u2014Syntax diagram")
-    assert m is not None
-    assert m.group(1) == "A.1"
+    assert FIGURE_LABEL_RE.match("Figure A.1\u2014Syntax diagram") is not None
+
+
+def test_figure_label_re_captures_dot_separated_label() -> None:
+    """FIGURE_LABEL_RE captures the dot-separated label (e.g. A.1)."""
+    assert FIGURE_LABEL_RE.match("Figure A.1\u2014Syntax diagram").group(1) == "A.1"
 
 
 # --- lrm_labels_for_subclause: annex ---
