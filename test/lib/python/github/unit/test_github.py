@@ -194,6 +194,34 @@ def test_build_synced_body_removes_stale() -> None:
     )
 
 
+def test_build_synced_body_indents_by_depth() -> None:
+    """Deeper subclauses are indented relative to the shallowest."""
+    items = {
+        "6.3": "Value set",
+        "6.3.1": "Logic values",
+        "6.3.2": "Strengths",
+        "6.3.2.1": "Charge strength",
+    }
+    assert build_synced_body("", items) == (
+        "## Subclauses\n\n"
+        "- [ ] 6.3 Value set\n"
+        "  - [ ] 6.3.1 Logic values\n"
+        "  - [ ] 6.3.2 Strengths\n"
+        "    - [ ] 6.3.2.1 Charge strength\n"
+    )
+
+
+def test_build_synced_body_preserves_checked_indented() -> None:
+    """Checked items remain checked in indented checklists."""
+    body = (
+        "## Subclauses\n\n"
+        "- [x] 6.3 Value set\n"
+        "  - [ ] 6.3.1 Logic values\n"
+    )
+    result = build_synced_body(body, {"6.3": "Value set", "6.3.1": "Logic values"})
+    assert result == body
+
+
 # --- sync_checklist ---
 
 
@@ -232,3 +260,14 @@ def test_next_unchecked_all_checked() -> None:
 def test_next_unchecked_no_checkboxes() -> None:
     """None when body has no checkboxes."""
     assert next_unchecked("Some text without checkboxes") is None
+
+
+def test_next_unchecked_indented() -> None:
+    """First unchecked item is found even when indented."""
+    body = (
+        "## Subclauses\n\n"
+        "- [x] 6.3 Value set\n"
+        "  - [ ] 6.3.1 Logic values\n"
+        "  - [ ] 6.3.2 Strengths\n"
+    )
+    assert next_unchecked(body) == "6.3.1"
