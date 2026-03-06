@@ -4,6 +4,9 @@
 
 namespace delta {
 
+// Defined in elaborator.cpp.
+uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
+
 /// Build a binary expression tree from left-folding the given operand over
 /// all inputs with the given operator.
 static Expr* BuildBinaryChain(Arena& arena, TokenKind op,
@@ -91,20 +94,6 @@ static Expr* BuildOutputGateExpr(Arena& arena, GateKind kind,
   }
 }
 
-static uint32_t LookupLhsWidthForGate(const Expr* lhs, const RtlirModule* mod) {
-  if (!lhs || lhs->kind != ExprKind::kIdentifier) return 0;
-  for (const auto& v : mod->variables) {
-    if (v.name == lhs->text) return v.width;
-  }
-  for (const auto& n : mod->nets) {
-    if (n.name == lhs->text) return n.width;
-  }
-  for (const auto& p : mod->ports) {
-    if (p.name == lhs->text) return p.width;
-  }
-  return 0;
-}
-
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   auto kind = item->gate_kind;
   auto& terms = item->gate_terminals;
@@ -130,7 +119,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   RtlirContAssign ca;
   ca.lhs = terms[0];
   ca.rhs = rhs;
-  ca.width = LookupLhsWidthForGate(ca.lhs, mod);
+  ca.width = LookupLhsWidth(ca.lhs, mod);
   mod->assigns.push_back(ca);
 }
 

@@ -204,7 +204,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
 
 // --- Module item elaboration ---
 
-static uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod) {
+uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod) {
   if (!lhs || lhs->kind != ExprKind::kIdentifier) return 0;
   for (const auto& v : mod->variables) {
     if (v.name == lhs->text) return v.width;
