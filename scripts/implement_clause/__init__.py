@@ -45,8 +45,8 @@ def lrm_labels_for_clause(
 ) -> tuple[list[str], list[str]]:
     """Find all figure/table labels for a top-level clause in the LRM."""
     top = clause.split(".")[0]
-    prefix_fig = f"Figure {top}-"
-    prefix_tbl = f"Table {top}-"
+    prefix_fig = f"Figure {top}"
+    prefix_tbl = f"Table {top}"
     figures: list[str] = []
     tables: list[str] = []
 

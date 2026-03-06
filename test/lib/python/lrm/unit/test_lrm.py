@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 
 from lib.python.lrm import (
+    FIGURE_LABEL_RE,
+    TABLE_LABEL_RE,
     extract_clause_text,
     load_lrm_titles,
     lrm_labels_for_subclause,
@@ -350,3 +352,45 @@ def test_lrm_labels_subclause_finds_figure(tmp_path: Path) -> None:
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_WITH_LABELS)
     assert lrm_labels_for_subclause(lrm, "4.1") == (["4-1"], [])
+
+
+# --- regex: dot-separated annex labels ---
+
+
+def test_table_label_re_matches_dot_separator() -> None:
+    """TABLE_LABEL_RE matches annex-style dot separator (e.g. Table B.1)."""
+    m = TABLE_LABEL_RE.match("Table B.1\u2014Keywords")
+    assert m is not None
+    assert m.group(1) == "B.1"
+
+
+def test_figure_label_re_matches_dot_separator() -> None:
+    """FIGURE_LABEL_RE matches annex-style dot separator (e.g. Figure A.1)."""
+    m = FIGURE_LABEL_RE.match("Figure A.1\u2014Syntax diagram")
+    assert m is not None
+    assert m.group(1) == "A.1"
+
+
+# --- lrm_labels_for_subclause: annex ---
+
+
+_LRM_ANNEX_WITH_TABLE = """\
+Annex B
+(normative)
+
+Keywords
+SystemVerilog reserves the keywords listed in Table B.1.
+Table B.1\u2014Keywords
+
+B.1 Reserved keywords
+Reserved keyword text.
+
+Annex C
+"""
+
+
+def test_lrm_labels_subclause_finds_annex_table(tmp_path: Path) -> None:
+    """Finds dot-separated table labels within an annex."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_LRM_ANNEX_WITH_TABLE)
+    assert lrm_labels_for_subclause(lrm, "B") == ([], ["B.1"])

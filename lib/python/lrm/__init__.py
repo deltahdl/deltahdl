@@ -104,8 +104,8 @@ def extract_clause_text(lrm_path: Path, clause: str) -> str:
     return "\n".join(lines[start:end]).rstrip()
 
 
-FIGURE_LABEL_RE = re.compile(r"^Figure ([\d\w]+-[\d\w]+)")
-TABLE_LABEL_RE = re.compile(r"^Table ([\d\w]+-[\d\w]+)")
+FIGURE_LABEL_RE = re.compile(r"^Figure ([\d\w]+[.-][\d\w]+)")
+TABLE_LABEL_RE = re.compile(r"^Table ([\d\w]+[.-][\d\w]+)")
 
 
 def lrm_labels_for_subclause(
