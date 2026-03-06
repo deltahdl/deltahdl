@@ -103,4 +103,91 @@ TEST(ParserA84, PrimaryParenthesizedExpr) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
 }
 
+TEST(ParserA84, PrimaryLiteralInteger) {
+  auto r = Parse("module m; initial x = 42; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+TEST(ParserA84, PrimaryLiteralString) {
+  auto r = Parse("module m; initial x = \"hello\"; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
+}
+
+TEST(ParserA84, PrimaryLiteralReal) {
+  auto r = Parse("module m; initial x = 3.14; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
+TEST(ParserA84, PrimaryLiteralTimeLiteral) {
+  auto r = Parse("module m; initial #10ns; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA84, PrimaryUnbasedUnsizedLiteral0) {
+  auto r = Parse("module m; initial x = '0; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
+}
+
+TEST(ParserA84, PrimaryUnbasedUnsizedLiteral1) {
+  auto r = Parse("module m; initial x = '1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
+}
+
+TEST(ParserA84, CastExpression) {
+  auto r = Parse("module m; initial x = int'(3.14); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCast);
+}
+
+TEST(ParserA84, PrimaryThis) {
+  auto r = Parse(
+      "class C;\n"
+      "  function void f();\n"
+      "    this.x = 1;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA84, PrimaryDollarSign) {
+  auto r = Parse(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial x = q[$];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA84, PrimaryConcatenationWithRange) {
+  auto r = Parse("module m; initial x = {a, b}[3:0]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

@@ -1,14 +1,458 @@
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
+
+// §A.8.6 — unary_operator
+
+TEST(ParserA86, UnaryPlus) {
+  auto r = Parse("module m; initial x = +a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+}
+
+TEST(ParserA86, UnaryMinus) {
+  auto r = Parse("module m; initial x = -a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kMinus);
+}
+
+TEST(ParserA86, UnaryLogicalNot) {
+  auto r = Parse("module m; initial x = !a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kBang);
+}
+
+TEST(ParserA86, UnaryBitwiseNot) {
+  auto r = Parse("module m; initial x = ~a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kTilde);
+}
+
+TEST(ParserA86, UnaryReductionAnd) {
+  auto r = Parse("module m; initial x = &a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kAmp);
+}
+
+TEST(ParserA86, UnaryReductionNand) {
+  auto r = Parse("module m; initial x = ~&a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kTildeAmp);
+}
+
+TEST(ParserA86, UnaryReductionOr) {
+  auto r = Parse("module m; initial x = |a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kPipe);
+}
+
+TEST(ParserA86, UnaryReductionNor) {
+  auto r = Parse("module m; initial x = ~|a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kTildePipe);
+}
+
+TEST(ParserA86, UnaryReductionXor) {
+  auto r = Parse("module m; initial x = ^a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kCaret);
+}
+
+TEST(ParserA86, UnaryReductionXnor) {
+  auto r = Parse("module m; initial x = ~^a; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
+}
+
+// §A.8.6 — binary_operator
+
+TEST(ParserA86, BinaryAdd) {
+  auto r = Parse("module m; initial x = a + b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+}
+
+TEST(ParserA86, BinarySub) {
+  auto r = Parse("module m; initial x = a - b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kMinus);
+}
+
+TEST(ParserA86, BinaryMul) {
+  auto r = Parse("module m; initial x = a * b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kStar);
+}
+
+TEST(ParserA86, BinaryDiv) {
+  auto r = Parse("module m; initial x = a / b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kSlash);
+}
+
+TEST(ParserA86, BinaryMod) {
+  auto r = Parse("module m; initial x = a % b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPercent);
+}
+
+TEST(ParserA86, BinaryEqEq) {
+  auto r = Parse("module m; initial x = a == b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kEqEq);
+}
+
+TEST(ParserA86, BinaryNotEq) {
+  auto r = Parse("module m; initial x = a != b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kBangEq);
+}
+
+TEST(ParserA86, BinaryCaseEq) {
+  auto r = Parse("module m; initial x = a === b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
+}
+
+TEST(ParserA86, BinaryCaseNotEq) {
+  auto r = Parse("module m; initial x = a !== b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kBangEqEq);
+}
+
+TEST(ParserA86, BinaryWildcardEq) {
+  auto r = Parse("module m; initial x = a ==? b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kEqEqQuestion);
+}
+
+TEST(ParserA86, BinaryWildcardNotEq) {
+  auto r = Parse("module m; initial x = a !=? b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
+}
+
+TEST(ParserA86, BinaryLogicalAnd) {
+  auto r = Parse("module m; initial x = a && b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
+}
+
+TEST(ParserA86, BinaryLogicalOr) {
+  auto r = Parse("module m; initial x = a || b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
+}
+
+TEST(ParserA86, BinaryPower) {
+  auto r = Parse("module m; initial x = a ** b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPower);
+}
+
+TEST(ParserA86, BinaryLessThan) {
+  auto r = Parse("module m; initial x = a < b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kLt);
+}
+
+TEST(ParserA86, BinaryLessEq) {
+  auto r = Parse("module m; initial x = a <= b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, BinaryGreaterThan) {
+  auto r = Parse("module m; initial x = a > b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kGt);
+}
+
+TEST(ParserA86, BinaryGreaterEq) {
+  auto r = Parse("module m; initial x = a >= b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kGtEq);
+}
+
+TEST(ParserA86, BinaryBitwiseAnd) {
+  auto r = Parse("module m; initial x = a & b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kAmp);
+}
+
+TEST(ParserA86, BinaryBitwiseOr) {
+  auto r = Parse("module m; initial x = a | b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPipe);
+}
+
+TEST(ParserA86, BinaryBitwiseXor) {
+  auto r = Parse("module m; initial x = a ^ b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kCaret);
+}
+
+TEST(ParserA86, BinaryXnor) {
+  auto r = Parse("module m; initial x = a ^~ b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+}
+
+TEST(ParserA86, BinaryShiftRight) {
+  auto r = Parse("module m; initial x = a >> b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kGtGt);
+}
+
+TEST(ParserA86, BinaryShiftLeft) {
+  auto r = Parse("module m; initial x = a << b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kLtLt);
+}
+
+TEST(ParserA86, BinaryArithShiftRight) {
+  auto r = Parse("module m; initial x = a >>> b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kGtGtGt);
+}
+
+TEST(ParserA86, BinaryArithShiftLeft) {
+  auto r = Parse("module m; initial x = a <<< b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kLtLtLt);
+}
+
+TEST(ParserA86, BinaryImplication) {
+  auto r = Parse("module m; initial x = a -> b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, BinaryEquivalence) {
+  auto r = Parse("module m; initial x = a <-> b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.6 — inc_or_dec_operator
+
+TEST(ParserA86, PostfixIncrement) {
+  auto r = Parse("module m; initial begin i++; end endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, PostfixDecrement) {
+  auto r = Parse("module m; initial begin i--; end endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, PrefixIncrement) {
+  auto r = Parse("module m; initial begin ++i; end endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, PrefixDecrement) {
+  auto r = Parse("module m; initial begin --i; end endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.6 — binary_module_path_operator
 
 TEST(ParserA86, BinaryModulePathEq) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
       "    if (a == b) (a => y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, BinaryModulePathNotEq) {
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a != b) (a => y) = 2;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, BinaryModulePathLogicalAnd) {
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a && b) (a => y) = 3;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, BinaryModulePathLogicalOr) {
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a || b) (a => y) = 4;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, BinaryModulePathBitwiseAnd) {
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a & b) (a => y) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -42,6 +486,41 @@ TEST(ParserA86, BinaryModulePathXnor) {
       "module m(input a, input b, output y);\n"
       "  specify\n"
       "    if (a ^~ b) (a => y) = 8;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §A.8.6 — unary_module_path_operator
+
+TEST(ParserA86, UnaryModulePathNot) {
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  specify\n"
+      "    if (!a) (a => y) = 9;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, UnaryModulePathBitwiseNot) {
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  specify\n"
+      "    if (~a) (a => y) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserA86, UnaryModulePathReductionAnd) {
+  auto r = Parse(
+      "module m(input [3:0] a, output y);\n"
+      "  specify\n"
+      "    if (&a) (a[0] => y) = 11;\n"
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
