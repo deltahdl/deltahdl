@@ -360,6 +360,8 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   if (IsAtGateKeyword()) {
+    if (InProgramBlock())  // §3.4
+      diag_.Error(CurrentLoc(), "primitive instances not allowed in programs");
     ParseGateInst(items);
     return;
   }
@@ -407,6 +409,8 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   if (known_udps_.count(name_tok.text) != 0) {
+    if (InProgramBlock())  // §3.4
+      diag_.Error(name_tok.loc, "primitive instances not allowed in programs");
     ParseUdpInstList(name_tok, items);
     return;
   }
