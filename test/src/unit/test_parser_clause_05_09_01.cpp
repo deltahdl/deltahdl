@@ -4,24 +4,40 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserCh50901, StringEscape_Newline) {
+// --- §5.9.1: strings with escape sequences parse correctly ---
+
+TEST(ParserClause05, Cl5_9_1_StringWithNewlineEscape) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial $display(\"line1\\nline2\");\n"
               "endmodule"));
 }
 
-TEST(ParserCh50901, StringEscape_Tab) {
+TEST(ParserClause05, Cl5_9_1_StringWithTabEscape) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial $display(\"col1\\tcol2\");\n"
               "endmodule"));
 }
 
-TEST(ParserCh50901, StringEscape_Quote) {
+TEST(ParserClause05, Cl5_9_1_StringWithQuoteEscape) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial $display(\"say \\\"hello\\\"\");\n"
+              "endmodule"));
+}
+
+TEST(ParserClause05, Cl5_9_1_StringWithOctalEscape) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $display(\"\\101\");\n"
+              "endmodule"));
+}
+
+TEST(ParserClause05, Cl5_9_1_StringWithHexEscape) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $display(\"\\x41\");\n"
               "endmodule"));
 }
 

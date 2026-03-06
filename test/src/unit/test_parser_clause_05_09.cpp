@@ -5,8 +5,10 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA84, PrimaryLiteralStringLiteral) {
-  auto r = Parse("module m; initial x = \"world\"; endmodule\n");
+// --- §5.9: string literal in primary expression ---
+
+TEST(ParserClause05, Cl5_9_PrimaryStringLiteral) {
+  auto r = Parse("module m; initial x = \"hello\"; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);
@@ -14,7 +16,18 @@ TEST(ParserA84, PrimaryLiteralStringLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-TEST(ParserCh509, StringLiteral_Basic) {
+TEST(ParserClause05, Cl5_9_ConstantPrimaryStringLiteral) {
+  auto r = Parse("module m; parameter string S = \"hello\"; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* param = r.cu->modules[0]->items[0];
+  ASSERT_NE(param->init_expr, nullptr);
+  EXPECT_EQ(param->init_expr->kind, ExprKind::kStringLiteral);
+}
+
+// --- §5.9: string literal in system call ---
+
+TEST(ParserClause05, Cl5_9_StringInSystemCall) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"hello world\");\n"
@@ -28,7 +41,9 @@ TEST(ParserCh509, StringLiteral_Basic) {
   EXPECT_EQ(stmt->expr->args[0]->kind, ExprKind::kStringLiteral);
 }
 
-TEST(ParserCh509, StringLiteral_Assignment) {
+// --- §5.9: string literal assignment ---
+
+TEST(ParserClause05, Cl5_9_StringAssignment) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  byte c1;\n"
@@ -36,31 +51,26 @@ TEST(ParserCh509, StringLiteral_Assignment) {
               "endmodule"));
 }
 
-TEST(ParserCh509, StringLiteral_PackedArray) {
+TEST(ParserClause05, Cl5_9_StringPackedArray) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  bit [8*12:1] stringvar = \"Hello world\\n\";\n"
               "endmodule"));
 }
 
-TEST(ParserCh509, StringLiteral_InConcatenation) {
+// --- §5.9: string in concatenation ---
+
+TEST(ParserClause05, Cl5_9_StringInConcatenation) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial $display({\"A\", \"B\"});\n"
               "endmodule"));
 }
 
-TEST(ParserA84, ConstantPrimaryStringLiteral) {
-  auto r = Parse("module m; parameter string S = \"hello\"; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* param = r.cu->modules[0]->items[0];
-  ASSERT_NE(param->init_expr, nullptr);
-  EXPECT_EQ(param->init_expr->kind, ExprKind::kStringLiteral);
-}
+// --- §5.9: string literal with escaped content ---
 
-TEST(ParserA84, PrimaryStringLiteral) {
-  auto r = Parse("module m; initial x = \"hello\"; endmodule\n");
+TEST(ParserClause05, Cl5_9_StringWithWorld) {
+  auto r = Parse("module m; initial x = \"world\"; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);

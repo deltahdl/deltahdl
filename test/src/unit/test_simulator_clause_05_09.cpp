@@ -1,35 +1,38 @@
-#include <cstring>
-
-#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
 
-TEST(SimCh509, StrLitSingleChar) {
+namespace {
+
+// --- §5.9: string literal as unsigned integer constant ---
+
+TEST(SimClause05, Cl5_9_SingleCharValue) {
   auto v =
       RunAndGet("module t;\n  byte c;\n  initial c = \"A\";\nendmodule\n", "c");
   EXPECT_EQ(v, 0x41u);
 }
 
-TEST(SimCh509, StrLitMultiChar) {
+TEST(SimClause05, Cl5_9_MultiCharValue) {
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n  initial s = \"ABC\";\nendmodule\n", "s");
   EXPECT_EQ(v, 0x414243u);
 }
 
-TEST(SimCh509, StrLitZeroPad) {
+TEST(SimClause05, Cl5_9_ZeroPadLeft) {
   auto v = RunAndGet(
       "module t;\n  bit [15:0] s;\n  initial s = \"A\";\nendmodule\n", "s");
   EXPECT_EQ(v, 0x0041u);
 }
 
-TEST(SimCh509, StrLitTruncateLeft) {
+TEST(SimClause05, Cl5_9_TruncateLeft) {
   auto v = RunAndGet(
       "module t;\n  byte s;\n  initial s = \"ABCD\";\nendmodule\n", "s");
   EXPECT_EQ(v, 0x44u);
 }
 
-TEST(SimCh509, StrLitTripleBasic) {
+// --- §5.9: triple-quoted string simulation ---
+
+TEST(SimClause05, Cl5_9_TripleQuotedBasic) {
   auto v = RunAndGet(
       "module t;\n  bit [15:0] s;\n"
       "  initial s = \"\"\"AB\"\"\";\nendmodule\n",
@@ -37,7 +40,7 @@ TEST(SimCh509, StrLitTripleBasic) {
   EXPECT_EQ(v, 0x4142u);
 }
 
-TEST(SimCh509, StrLitTripleNewline) {
+TEST(SimClause05, Cl5_9_TripleQuotedNewline) {
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n"
       "  initial s = \"\"\"A\nB\"\"\";\nendmodule\n",
@@ -45,7 +48,7 @@ TEST(SimCh509, StrLitTripleNewline) {
   EXPECT_EQ(v, 0x410A42u);
 }
 
-TEST(SimCh509, StrLitTripleQuote) {
+TEST(SimClause05, Cl5_9_TripleQuotedEmbeddedQuote) {
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n"
       "  initial s = \"\"\"A\"B\"\"\";\nendmodule\n",
@@ -53,7 +56,9 @@ TEST(SimCh509, StrLitTripleQuote) {
   EXPECT_EQ(v, 0x412242u);
 }
 
-TEST(SimCh509, StrLitLineContinuation) {
+// --- §5.9: line continuation in simulation ---
+
+TEST(SimClause05, Cl5_9_LineContinuation) {
   auto v = RunAndGet(
       "module t;\n  bit [31:0] s;\n"
       "  initial s = \"AB\\\nCD\";\nendmodule\n",
@@ -61,7 +66,7 @@ TEST(SimCh509, StrLitLineContinuation) {
   EXPECT_EQ(v, 0x41424344u);
 }
 
-TEST(SimCh509, StrLitDoubleBackslashNewline) {
+TEST(SimClause05, Cl5_9_DoubleBackslashNewline) {
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n"
       "  initial s = \"A\\\\\\\nB\";\nendmodule\n",
@@ -69,10 +74,12 @@ TEST(SimCh509, StrLitDoubleBackslashNewline) {
   EXPECT_EQ(v, 0x415C42u);
 }
 
-TEST(SimCh509, StrLitTripleContinuation) {
+TEST(SimClause05, Cl5_9_TripleQuotedLineContinuation) {
   auto v = RunAndGet(
       "module t;\n  bit [31:0] s;\n"
       "  initial s = \"\"\"AB\\\nCD\"\"\";\nendmodule\n",
       "s");
   EXPECT_EQ(v, 0x41424344u);
 }
+
+}  // namespace
