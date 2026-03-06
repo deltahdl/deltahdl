@@ -5,6 +5,7 @@ add_library(deltahdl_lib STATIC
     preprocessor/macro_table.cpp
     preprocessor/preprocessor.cpp
     preprocessor/preprocessor_directives.cpp
+    preprocessor/preprocessor_macros.cpp
     lexer/keywords.cpp
     lexer/lexer.cpp
     lexer/string_escape.cpp
@@ -26,6 +27,7 @@ add_library(deltahdl_lib STATIC
     parser/time_resolve.cpp
     elaborator/elaborator.cpp
     elaborator/elaborator_defparam.cpp
+    elaborator/elaborator_gates.cpp
     elaborator/elaborator_validate.cpp
     elaborator/type_eval.cpp
     elaborator/const_eval.cpp

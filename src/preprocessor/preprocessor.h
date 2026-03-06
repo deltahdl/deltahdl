@@ -31,6 +31,7 @@ class Preprocessor {
   Preprocessor(SourceManager& src_mgr, DiagEngine& diag, PreprocConfig config);
 
   std::string Preprocess(uint32_t file_id);
+  static std::string_view Trim(std::string_view s);
 
  private:
   std::string ProcessSource(std::string_view src, uint32_t file_id, int depth);
