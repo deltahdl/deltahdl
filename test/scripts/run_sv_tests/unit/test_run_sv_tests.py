@@ -7,13 +7,11 @@ import subprocess
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
 
-import run_sv_tests
-
 
 class TestCollectTests:
     """Tests for the collect_tests() function."""
 
-    def test_returns_naturally_sorted_paths(self):
+    def test_returns_naturally_sorted_paths(self, rst):
         """collect_tests() should use natural sort: chapter-5 before chapter-25."""
         fake_paths = [
             "/x/chapter-25/3-interface.sv",
@@ -21,8 +19,8 @@ class TestCollectTests:
             "/x/chapter-5/3-types.sv",
             "/x/chapter-26/1-pkg.sv",
         ]
-        with patch("run_sv_tests.glob.glob", return_value=fake_paths):
-            result = run_sv_tests.collect_tests()
+        with patch.object(rst.glob, "glob", return_value=fake_paths):
+            result = rst.collect_tests()
         assert result == [
             "/x/chapter-5/3-types.sv",
             "/x/chapter-5/10-arrays.sv",
@@ -30,71 +28,71 @@ class TestCollectTests:
             "/x/chapter-26/1-pkg.sv",
         ]
 
-    def test_returns_empty_when_no_files(self):
+    def test_returns_empty_when_no_files(self, rst):
         """collect_tests() should return an empty list when nothing matches."""
-        with patch("run_sv_tests.glob.glob", return_value=[]):
-            result = run_sv_tests.collect_tests()
+        with patch.object(rst.glob, "glob", return_value=[]):
+            result = rst.collect_tests()
         assert result == []
 
 
 class TestRunTest:
     """Tests for the run_test() function."""
 
-    def test_returns_true_on_exit_zero(self):
+    def test_returns_true_on_exit_zero(self, rst):
         """run_test() should return (True, '') when subprocess exits 0."""
         mock_result = MagicMock(returncode=0, stderr="")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            actual = run_sv_tests.run_test("/fake/test.sv")
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            actual = rst.run_test("/fake/test.sv")
         assert actual == (True, "")
 
-    def test_returns_false_on_nonzero_exit(self):
+    def test_returns_false_on_nonzero_exit(self, rst):
         """run_test() should return (False, stderr) on non-zero exit."""
         mock_result = MagicMock(returncode=1, stderr="parse error\n")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            actual = run_sv_tests.run_test("/fake/test.sv")
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            actual = rst.run_test("/fake/test.sv")
         assert actual == (False, "parse error\n")
 
-    def test_timeout_propagates(self):
+    def test_timeout_propagates(self, rst):
         """run_test() does not catch TimeoutExpired; it propagates."""
         raised = False
-        with patch(
-            "run_sv_tests.subprocess.run",
+        with patch.object(
+            rst.subprocess, "run",
             side_effect=subprocess.TimeoutExpired(cmd="x", timeout=30),
         ):
             try:
-                run_sv_tests.run_test("/fake/test.sv")
+                rst.run_test("/fake/test.sv")
             except subprocess.TimeoutExpired:
                 raised = True
         assert raised
 
-    def test_simulate_pass_with_assertions(self):
+    def test_simulate_pass_with_assertions(self, rst):
         """run_test(simulate=True) should pass when exit 0 and assertions pass."""
         mock_result = MagicMock(returncode=0, stdout=":assert: (True)\n", stderr="")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            actual = run_sv_tests.run_test("/fake/test.sv", simulate=True)
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            actual = rst.run_test("/fake/test.sv", simulate=True)
         assert actual == (True, "")
 
-    def test_simulate_fail_on_assertion(self):
+    def test_simulate_fail_on_assertion(self, rst):
         """run_test(simulate=True) should fail when assertion fails."""
         mock_result = MagicMock(
             returncode=0, stdout=":assert: (1 == 2)\n", stderr=""
         )
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            ok, detail = run_sv_tests.run_test("/fake/test.sv", simulate=True)
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            ok, detail = rst.run_test("/fake/test.sv", simulate=True)
         assert ok is False and "Assertion failed" in detail
 
-    def test_simulate_fail_on_nonzero_exit(self):
+    def test_simulate_fail_on_nonzero_exit(self, rst):
         """run_test(simulate=True) should fail when exit code is non-zero."""
         mock_result = MagicMock(returncode=1, stdout="", stderr="error\n")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            actual = run_sv_tests.run_test("/fake/test.sv", simulate=True)
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            actual = rst.run_test("/fake/test.sv", simulate=True)
         assert actual == (False, "error\n")
 
-    def test_defines_passed_as_dash_d_flags(self):
+    def test_defines_passed_as_dash_d_flags(self, rst):
         """run_test(defines=...) should include -D flags in the command."""
         mock_result = MagicMock(returncode=0, stderr="")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result) as mock_run:
-            run_sv_tests.run_test("/fake/test.sv", defines=["FOO", "BAR=2"])
+        with patch.object(rst.subprocess, "run", return_value=mock_result) as mock_run:
+            rst.run_test("/fake/test.sv", defines=["FOO", "BAR=2"])
         cmd = mock_run.call_args[0][0]
         d_pairs = [
             cmd[i + 1] for i, v in enumerate(cmd) if v == "-D" and i + 1 < len(cmd)
@@ -105,7 +103,7 @@ class TestRunTest:
 class TestParseMetadata:
     """Tests for the parse_metadata() function."""
 
-    def test_extracts_all_fields(self, tmp_path):
+    def test_extracts_all_fields(self, rst, tmp_path):
         """parse_metadata() should extract all key-value pairs."""
         sv = tmp_path / "test.sv"
         sv.write_text(
@@ -113,7 +111,7 @@ class TestParseMetadata:
             ":tags: 7.3.2\n:should_fail_because: bad code\n*/\n"
             "module top; endmodule\n"
         )
-        meta = run_sv_tests.parse_metadata(str(sv))
+        meta = rst.parse_metadata(str(sv))
         assert (
             meta["name"] == "foo"
             and meta["type"] == "simulation elaboration parsing"
@@ -121,71 +119,71 @@ class TestParseMetadata:
             and meta["should_fail_because"] == "bad code"
         )
 
-    def test_returns_empty_dict_when_no_comment(self, tmp_path):
+    def test_returns_empty_dict_when_no_comment(self, rst, tmp_path):
         """parse_metadata() should return {} when no block comment exists."""
         sv = tmp_path / "bare.sv"
         sv.write_text("module bare; endmodule\n")
-        assert not run_sv_tests.parse_metadata(str(sv))
+        assert not rst.parse_metadata(str(sv))
 
-    def test_returns_empty_type_when_absent(self, tmp_path):
+    def test_returns_empty_type_when_absent(self, rst, tmp_path):
         """parse_metadata() should omit 'type' key when not present."""
         sv = tmp_path / "no_type.sv"
         sv.write_text("/*\n:name: no_type\n:tags: 5.10\n*/\nmodule m; endmodule\n")
-        meta = run_sv_tests.parse_metadata(str(sv))
+        meta = rst.parse_metadata(str(sv))
         assert "name" in meta and "type" not in meta
 
 
 class TestEvalNode:
     """Tests for the eval_node() AST evaluator."""
 
-    def test_constant_true(self):
+    def test_constant_true(self, rst):
         """eval_node() should return True for ast.Constant(True)."""
-        assert run_sv_tests.eval_node(ast.Constant(value=True)) is True
+        assert rst.eval_node(ast.Constant(value=True)) is True
 
-    def test_constant_integer(self):
+    def test_constant_integer(self, rst):
         """eval_node() should return the integer value."""
-        assert run_sv_tests.eval_node(ast.Constant(value=42)) == 42
+        assert rst.eval_node(ast.Constant(value=42)) == 42
 
-    def test_equality_pass(self):
+    def test_equality_pass(self, rst):
         """eval_node() should return True for equal constants."""
         tree = ast.parse("('hello' == 'hello')", mode="eval")
-        assert run_sv_tests.eval_node(tree.body) is True
+        assert rst.eval_node(tree.body) is True
 
-    def test_equality_fail(self):
+    def test_equality_fail(self, rst):
         """eval_node() should return False for unequal constants."""
         tree = ast.parse("(1 == 2)", mode="eval")
-        assert run_sv_tests.eval_node(tree.body) is False
+        assert rst.eval_node(tree.body) is False
 
-    def test_in_operator(self):
+    def test_in_operator(self, rst):
         """eval_node() should handle the 'in' operator."""
         tree = ast.parse("('est' in 'Test')", mode="eval")
-        assert run_sv_tests.eval_node(tree.body) is True
+        assert rst.eval_node(tree.body) is True
 
-    def test_not_in_operator(self):
+    def test_not_in_operator(self, rst):
         """eval_node() should handle the 'not in' operator."""
         tree = ast.parse("('xyz' not in 'Test')", mode="eval")
-        assert run_sv_tests.eval_node(tree.body) is True
+        assert rst.eval_node(tree.body) is True
 
-    def test_bool_and(self):
+    def test_bool_and(self, rst):
         """eval_node() should handle 'and' boolean operator."""
         tree = ast.parse("(True and True)", mode="eval")
-        assert run_sv_tests.eval_node(tree.body) is True
+        assert rst.eval_node(tree.body) is True
 
-    def test_bool_or(self):
+    def test_bool_or(self, rst):
         """eval_node() should handle 'or' boolean operator."""
         tree = ast.parse("(False or True)", mode="eval")
-        assert run_sv_tests.eval_node(tree.body) is True
+        assert rst.eval_node(tree.body) is True
 
-    def test_unary_not(self):
+    def test_unary_not(self, rst):
         """eval_node() should handle unary 'not' operator."""
         tree = ast.parse("(not False)", mode="eval")
-        assert run_sv_tests.eval_node(tree.body) is True
+        assert rst.eval_node(tree.body) is True
 
-    def test_unsupported_node_raises(self):
+    def test_unsupported_node_raises(self, rst):
         """eval_node() should raise ValueError for unsupported nodes."""
         raised = False
         try:
-            run_sv_tests.eval_node(ast.Name(id="x"))
+            rst.eval_node(ast.Name(id="x"))
         except ValueError:
             raised = True
         assert raised
@@ -194,74 +192,74 @@ class TestEvalNode:
 class TestCheckAssertions:
     """Tests for the check_assertions() function."""
 
-    def test_passing_assertion(self):
+    def test_passing_assertion(self, rst):
         """check_assertions() should return (True, '') for passing assert."""
-        assert run_sv_tests.check_assertions(":assert: (True)") == (True, "")
+        assert rst.check_assertions(":assert: (True)") == (True, "")
 
-    def test_failing_assertion(self):
+    def test_failing_assertion(self, rst):
         """check_assertions() should return (False, detail) for failing assert."""
-        ok, detail = run_sv_tests.check_assertions(":assert: (1 == 2)")
+        ok, detail = rst.check_assertions(":assert: (1 == 2)")
         assert ok is False and "Assertion failed" in detail
 
-    def test_no_assertions_passes(self):
+    def test_no_assertions_passes(self, rst):
         """check_assertions() should pass when stdout has no :assert: lines."""
-        assert run_sv_tests.check_assertions("hello world\n") == (True, "")
+        assert rst.check_assertions("hello world\n") == (True, "")
 
-    def test_multiple_assertions_all_pass(self):
+    def test_multiple_assertions_all_pass(self, rst):
         """check_assertions() should pass when all assertions pass."""
         stdout = ":assert: (True)\n:assert: (1 == 1)\n"
-        assert run_sv_tests.check_assertions(stdout) == (True, "")
+        assert rst.check_assertions(stdout) == (True, "")
 
-    def test_multiple_assertions_one_fails(self):
+    def test_multiple_assertions_one_fails(self, rst):
         """check_assertions() should fail on the first failing assertion."""
         stdout = ":assert: (True)\n:assert: (1 == 2)\n"
-        ok, _ = run_sv_tests.check_assertions(stdout)
+        ok, _ = rst.check_assertions(stdout)
         assert ok is False
 
-    def test_syntax_error_fails(self):
+    def test_syntax_error_fails(self, rst):
         """check_assertions() should fail on malformed expression."""
-        ok, detail = run_sv_tests.check_assertions(":assert: (!!!)")
+        ok, detail = rst.check_assertions(":assert: (!!!)")
         assert ok is False and "Assertion parse error" in detail
 
-    def test_string_equality_pass(self):
+    def test_string_equality_pass(self, rst):
         """try_string_equality() should return True for matching strings."""
-        assert run_sv_tests.try_string_equality("('hello' == 'hello')") is True
+        assert rst.try_string_equality("('hello' == 'hello')") is True
 
-    def test_string_equality_fail(self):
+    def test_string_equality_fail(self, rst):
         """try_string_equality() should return False for mismatched strings."""
-        assert run_sv_tests.try_string_equality("('hello' == 'world')") is False
+        assert rst.try_string_equality("('hello' == 'world')") is False
 
-    @patch("ast.parse", side_effect=SyntaxError)
-    def test_string_equality_fallback_pass(self, _mock_parse):
+    def test_string_equality_fallback_pass(self, rst):
         """check_assertions() should pass via string fallback on ast failure."""
-        ok, detail = run_sv_tests.check_assertions(
-            ":assert: ('same' == 'same')"
-        )
+        with patch("ast.parse", side_effect=SyntaxError):
+            ok, detail = rst.check_assertions(
+                ":assert: ('same' == 'same')"
+            )
         assert ok is True and detail == ""
 
-    @patch("ast.parse", side_effect=SyntaxError)
-    def test_string_equality_fallback_fail(self, _mock_parse):
+    def test_string_equality_fallback_fail(self, rst):
         """check_assertions() should fail via string fallback on mismatch."""
-        ok, detail = run_sv_tests.check_assertions(
-            ":assert: ('abc' == 'xyz')"
-        )
+        with patch("ast.parse", side_effect=SyntaxError):
+            ok, detail = rst.check_assertions(
+                ":assert: ('abc' == 'xyz')"
+            )
         assert ok is False and "Assertion failed" in detail
 
 
-def test_chapter_from_path_extracts_chapter_directory():
+def test_chapter_from_path_extracts_chapter_directory(rst):
     """chapter_from_path() should return the parent directory name."""
-    assert run_sv_tests.chapter_from_path("/a/chapter-5/foo.sv") == "chapter-5"
+    assert rst.chapter_from_path("/a/chapter-5/foo.sv") == "chapter-5"
 
 
-def test_chapter_from_path_falls_back_to_parent_name():
+def test_chapter_from_path_falls_back_to_parent_name(rst):
     """chapter_from_path() should return parent dir when no chapter- part."""
-    assert run_sv_tests.chapter_from_path("/some/other/foo.sv") == "other"
+    assert rst.chapter_from_path("/some/other/foo.sv") == "other"
 
 
-def test_print_chapter_breakdown_has_box_drawing_table(capsys):
+def test_print_chapter_breakdown_has_box_drawing_table(rst, capsys):
     """print_chapter_breakdown() should print a box-drawing table."""
     results = [{"chapter": "chapter-5", "status": "pass"}]
-    run_sv_tests.print_chapter_breakdown(results)
+    rst.print_chapter_breakdown(results)
     captured = capsys.readouterr().out
     assert all(
         s in captured
@@ -270,25 +268,25 @@ def test_print_chapter_breakdown_has_box_drawing_table(capsys):
     )
 
 
-def test_print_chapter_breakdown_shows_correct_values(capsys):
+def test_print_chapter_breakdown_shows_correct_values(rst, capsys):
     """print_chapter_breakdown() should show passed, total, and percentage."""
     results = [
         {"chapter": "chapter-5", "status": "pass"},
         {"chapter": "chapter-5", "status": "fail"},
         {"chapter": "chapter-6", "status": "pass"},
     ]
-    run_sv_tests.print_chapter_breakdown(results)
+    rst.print_chapter_breakdown(results)
     captured = capsys.readouterr().out
     assert "50.0%" in captured and "100.0%" in captured
 
 
-def test_print_chapter_breakdown_uses_natural_order(capsys):
+def test_print_chapter_breakdown_uses_natural_order(rst, capsys):
     """print_chapter_breakdown() should list 5 before 25 (natural order)."""
     results = [
         {"chapter": "chapter-25", "status": "pass"},
         {"chapter": "chapter-5", "status": "pass"},
     ]
-    run_sv_tests.print_chapter_breakdown(results)
+    rst.print_chapter_breakdown(results)
     captured = re.sub(r"\033\[[0-9;]*m", "", capsys.readouterr().out)
     # Chapter column shows just the number, not "chapter-N".
     assert captured.index("│ 5") < captured.index("│ 25")
@@ -297,14 +295,14 @@ def test_print_chapter_breakdown_uses_natural_order(capsys):
 class TestBuildResult:
     """Tests for the build_result() function."""
 
-    def test_pass_returns_correct_dict(self, tmp_path):
+    def test_pass_returns_correct_dict(self, rst, tmp_path):
         """build_result() should return result dict with status=pass."""
         sv = tmp_path / "chapter-5" / "foo.sv"
         sv.parent.mkdir(parents=True)
         sv.write_text("/*\n:name: foo\n:tags: 5.10\n*/\nmodule m; endmodule\n")
         mock_result = MagicMock(returncode=0, stderr="")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            result, ok = run_sv_tests.build_result(str(sv))
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            result, ok = rst.build_result(str(sv))
         assert (
             ok == 1
             and result["name"] == "5.10--foo.sv"
@@ -312,29 +310,29 @@ class TestBuildResult:
             and result["status"] == "pass"
         )
 
-    def test_fail_returns_correct_dict(self, tmp_path):
+    def test_fail_returns_correct_dict(self, rst, tmp_path):
         """build_result() should return result dict with status=fail."""
         sv = tmp_path / "chapter-5" / "bar.sv"
         sv.parent.mkdir(parents=True)
         sv.write_text("/*\n:name: bar\n:tags: 5.10\n*/\nmodule m; endmodule\n")
         mock_result = MagicMock(returncode=1, stderr="error\n")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            result, ok = run_sv_tests.build_result(str(sv))
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            result, ok = rst.build_result(str(sv))
         assert ok == 0 and result["status"] == "fail"
 
-    def test_timeout_returns_timeout_status(self, tmp_path):
+    def test_timeout_returns_timeout_status(self, rst, tmp_path):
         """build_result() should return status=timeout on TimeoutExpired."""
         sv = tmp_path / "chapter-5" / "slow.sv"
         sv.parent.mkdir(parents=True)
         sv.write_text("/*\n:name: slow\n:tags: 5.10\n*/\nmodule m; endmodule\n")
-        with patch(
-            "run_sv_tests.subprocess.run",
+        with patch.object(
+            rst.subprocess, "run",
             side_effect=subprocess.TimeoutExpired(cmd="x", timeout=30),
         ):
-            result, ok = run_sv_tests.build_result(str(sv))
+            result, ok = rst.build_result(str(sv))
         assert ok == 0 and result["status"] == "timeout"
 
-    def test_should_fail_inverts_failure_to_pass(self, tmp_path):
+    def test_should_fail_inverts_failure_to_pass(self, rst, tmp_path):
         """build_result() should invert fail→pass when should_fail_because set."""
         sv = tmp_path / "chapter-5" / "xfail.sv"
         sv.parent.mkdir(parents=True)
@@ -343,11 +341,11 @@ class TestBuildResult:
             ":should_fail_because: bad code\n*/\nmodule m; endmodule\n"
         )
         mock_result = MagicMock(returncode=1, stderr="error\n")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            result, ok = run_sv_tests.build_result(str(sv))
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            result, ok = rst.build_result(str(sv))
         assert ok == 1 and result["status"] == "pass"
 
-    def test_should_fail_inverts_pass_to_failure(self, tmp_path):
+    def test_should_fail_inverts_pass_to_failure(self, rst, tmp_path):
         """build_result() should invert pass→fail when should_fail_because set."""
         sv = tmp_path / "chapter-5" / "xpass.sv"
         sv.parent.mkdir(parents=True)
@@ -356,11 +354,11 @@ class TestBuildResult:
             ":should_fail_because: bad code\n*/\nmodule m; endmodule\n"
         )
         mock_result = MagicMock(returncode=0, stderr="")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            result, ok = run_sv_tests.build_result(str(sv))
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            result, ok = rst.build_result(str(sv))
         assert ok == 0 and result["status"] == "fail"
 
-    def test_defines_passed_to_command(self, tmp_path):
+    def test_defines_passed_to_command(self, rst, tmp_path):
         """build_result() should pass :defines: metadata as -D flags."""
         sv = tmp_path / "chapter-5" / "defs.sv"
         sv.parent.mkdir(parents=True)
@@ -369,15 +367,15 @@ class TestBuildResult:
             ":defines: TEST_VAR VAR_1=2\n*/\nmodule m; endmodule\n"
         )
         mock_result = MagicMock(returncode=0, stderr="")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result) as mock_run:
-            run_sv_tests.build_result(str(sv))
+        with patch.object(rst.subprocess, "run", return_value=mock_result) as mock_run:
+            rst.build_result(str(sv))
         cmd = mock_run.call_args[0][0]
         d_pairs = [
             cmd[i + 1] for i, v in enumerate(cmd) if v == "-D" and i + 1 < len(cmd)
         ]
         assert d_pairs == ["TEST_VAR", "VAR_1=2"]
 
-    def test_simulation_mode_used_for_simulation_type(self, tmp_path):
+    def test_simulation_mode_used_for_simulation_type(self, rst, tmp_path):
         """build_result() should run simulation when type contains 'simulation'."""
         sv = tmp_path / "chapter-7" / "sim.sv"
         sv.parent.mkdir(parents=True)
@@ -388,28 +386,28 @@ class TestBuildResult:
         mock_result = MagicMock(
             returncode=0, stdout=":assert: (True)\n", stderr=""
         )
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result) as mock_run:
-            result, ok = run_sv_tests.build_result(str(sv))
+        with patch.object(rst.subprocess, "run", return_value=mock_result) as mock_run:
+            result, ok = rst.build_result(str(sv))
         assert (
             ok == 1
             and result["status"] == "pass"
             and "--lint-only" not in mock_run.call_args[0][0]
         )
 
-    def test_name_includes_clause_number_from_tags(self, tmp_path):
+    def test_name_includes_clause_number_from_tags(self, rst, tmp_path):
         """build_result() should prepend first tag when name lacks clause number."""
         sv = tmp_path / "chapter-7" / "arrays" / "unpacked" / "slice.sv"
         sv.parent.mkdir(parents=True)
         sv.write_text("/*\n:name: slice\n:tags: 7.4.3\n*/\nmodule m; endmodule\n")
         mock_result = MagicMock(returncode=0, stderr="")
         with (
-            patch("run_sv_tests.subprocess.run", return_value=mock_result),
-            patch("run_sv_tests.TEST_DIR", tmp_path),
+            patch.object(rst.subprocess, "run", return_value=mock_result),
+            patch.object(rst, "TEST_DIR", tmp_path),
         ):
-            result, _ = run_sv_tests.build_result(str(sv))
+            result, _ = rst.build_result(str(sv))
         assert result["name"] == "7.4.3--arrays/unpacked/slice.sv"
 
-    def test_name_skips_clause_when_already_present(self, tmp_path):
+    def test_name_skips_clause_when_already_present(self, rst, tmp_path):
         """build_result() should not double-prefix when filename starts with clause."""
         sv = tmp_path / "chapter-5" / "5.6.4--compiler-directives-define.sv"
         sv.parent.mkdir(parents=True)
@@ -417,69 +415,68 @@ class TestBuildResult:
             "/*\n:name: define\n:tags: 5.6.4\n*/\nmodule m; endmodule\n"
         )
         mock_result = MagicMock(returncode=0, stderr="")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            result, _ = run_sv_tests.build_result(str(sv))
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            result, _ = rst.build_result(str(sv))
         assert result["name"] == "5.6.4--compiler-directives-define.sv"
 
-    def test_name_omits_clause_when_no_tags(self, tmp_path):
+    def test_name_omits_clause_when_no_tags(self, rst, tmp_path):
         """build_result() should use bare path when no tags metadata."""
         sv = tmp_path / "chapter-5" / "bare.sv"
         sv.parent.mkdir(parents=True)
         sv.write_text("/*\n:name: bare\n*/\nmodule m; endmodule\n")
         mock_result = MagicMock(returncode=0, stderr="")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result):
-            result, _ = run_sv_tests.build_result(str(sv))
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            result, _ = rst.build_result(str(sv))
         assert result["name"] == "bare.sv"
 
-    @staticmethod
-    def _build_result_with_oserror(tmp_path):
+    def _build_result_with_oserror(self, rst, tmp_path):
         """Run build_result with parse_metadata raising OSError."""
         sv = tmp_path / "chapter-5" / "bad.sv"
         sv.parent.mkdir(parents=True)
         sv.write_text("/*\n:name: bad\n*/\nmodule m; endmodule\n")
-        with patch(
-            "run_sv_tests.parse_metadata",
+        with patch.object(
+            rst, "parse_metadata",
             side_effect=OSError("read error"),
         ):
-            return run_sv_tests.build_result(str(sv))
+            return rst.build_result(str(sv))
 
-    def test_exception_returns_ok_zero(self, tmp_path):
+    def test_exception_returns_ok_zero(self, rst, tmp_path):
         """build_result() should return ok=0 when an exception is caught."""
-        _, ok = self._build_result_with_oserror(tmp_path)
+        _, ok = self._build_result_with_oserror(rst, tmp_path)
         assert ok == 0
 
-    def test_exception_returns_fail_status(self, tmp_path):
+    def test_exception_returns_fail_status(self, rst, tmp_path):
         """build_result() should return fail status when an exception is caught."""
-        result, _ = self._build_result_with_oserror(tmp_path)
+        result, _ = self._build_result_with_oserror(rst, tmp_path)
         assert result["status"] == "fail"
 
-    def test_exception_captures_stderr(self, tmp_path):
+    def test_exception_captures_stderr(self, rst, tmp_path):
         """build_result() should capture exception details in stderr field."""
-        result, _ = self._build_result_with_oserror(tmp_path)
+        result, _ = self._build_result_with_oserror(rst, tmp_path)
         assert "OSError: read error" in result["stderr"]
 
-    def test_exception_logs_to_stderr(self, tmp_path, capsys):
+    def test_exception_logs_to_stderr(self, rst, tmp_path, capsys):
         """build_result() should log caught exceptions to stderr."""
-        self._build_result_with_oserror(tmp_path)
+        self._build_result_with_oserror(rst, tmp_path)
         assert "read error" in capsys.readouterr().err
 
 
 class TestPrintStatus:
     """Tests for the print_status() function."""
 
-    def test_prints_pass(self, capsys):
+    def test_prints_pass(self, rst, capsys):
         """print_status() should print PASS for passing tests."""
-        run_sv_tests.print_status({"name": "x.sv", "status": "pass"}, 1)
+        rst.print_status({"name": "x.sv", "status": "pass"}, 1)
         assert "PASS" in capsys.readouterr().out
 
-    def test_prints_fail(self, capsys):
+    def test_prints_fail(self, rst, capsys):
         """print_status() should print FAIL for failing tests."""
-        run_sv_tests.print_status({"name": "x.sv", "status": "fail"}, 0)
+        rst.print_status({"name": "x.sv", "status": "fail"}, 0)
         assert "FAIL" in capsys.readouterr().out
 
-    def test_prints_timeout(self, capsys):
+    def test_prints_timeout(self, rst, capsys):
         """print_status() should print TIMEOUT for timed-out tests."""
-        run_sv_tests.print_status({"name": "x.sv", "status": "timeout"}, 0)
+        rst.print_status({"name": "x.sv", "status": "timeout"}, 0)
         assert "TIMEOUT" in capsys.readouterr().out
 
 
@@ -497,11 +494,11 @@ class TestWriteJunitXml:
              "time": 30.0, "stderr": ""},
         ]
 
-    def test_correct_suite_attributes(self, tmp_path):
+    def test_correct_suite_attributes(self, rst, tmp_path):
         """write_junit_xml() should set tests/failures/errors attributes."""
         results = self._make_results()
         filepath = str(tmp_path / "report.xml")
-        run_sv_tests.write_junit_xml(results, 5.0, filepath)
+        rst.write_junit_xml(results, 5.0, filepath)
 
         tree = ET.parse(filepath)
         root = tree.getroot()
@@ -512,11 +509,11 @@ class TestWriteJunitXml:
             root.attrib["errors"],
         ) == ("testsuite", "3", "1", "1")
 
-    def test_failure_elements_present(self, tmp_path):
+    def test_failure_elements_present(self, rst, tmp_path):
         """write_junit_xml() should include <failure> for failed tests."""
         results = self._make_results()
         filepath = str(tmp_path / "report.xml")
-        run_sv_tests.write_junit_xml(results, 5.0, filepath)
+        rst.write_junit_xml(results, 5.0, filepath)
 
         tree = ET.parse(filepath)
         failures = tree.findall(".//failure")
@@ -526,11 +523,11 @@ class TestWriteJunitXml:
             and failures[0].text == "error msg"
         )
 
-    def test_error_elements_present(self, tmp_path):
+    def test_error_elements_present(self, rst, tmp_path):
         """write_junit_xml() should include <error> for timed-out tests."""
         results = self._make_results()
         filepath = str(tmp_path / "report.xml")
-        run_sv_tests.write_junit_xml(results, 5.0, filepath)
+        rst.write_junit_xml(results, 5.0, filepath)
 
         tree = ET.parse(filepath)
         errors = tree.findall(".//error")
@@ -550,41 +547,41 @@ class TestMainBrokenPipe:
         1,
     )
 
-    def _run_with_broken_pipe(self, argv):
+    def _run_with_broken_pipe(self, rst, argv):
         """Run main() with print_status raising BrokenPipeError."""
         with patch("sys.argv", argv), \
-             patch("run_sv_tests.check_binary"), \
-             patch("run_sv_tests.glob.glob", return_value=["/x/a.sv"]), \
-             patch("run_sv_tests.build_result", return_value=self._FAKE_RESULT), \
-             patch("run_sv_tests.print_status", side_effect=BrokenPipeError), \
-             patch("run_sv_tests.os.open", return_value=99), \
-             patch("run_sv_tests.os.dup2"), \
-             patch("run_sv_tests.os.close"):
-            run_sv_tests.main()
+             patch.object(rst, "check_binary"), \
+             patch.object(rst.glob, "glob", return_value=["/x/a.sv"]), \
+             patch.object(rst, "build_result", return_value=self._FAKE_RESULT), \
+             patch.object(rst, "print_status", side_effect=BrokenPipeError), \
+             patch.object(rst.os, "open", return_value=99), \
+             patch.object(rst.os, "dup2"), \
+             patch.object(rst.os, "close"):
+            rst.main()
 
-    def test_main_exits_one_on_broken_pipe(self, get_exit_code):
+    def test_main_exits_one_on_broken_pipe(self, rst, get_exit_code):
         """main() should exit 1 when stdout pipe breaks."""
         assert get_exit_code(
-            lambda: self._run_with_broken_pipe(["run_sv_tests.py"])
+            lambda: self._run_with_broken_pipe(rst, ["run_sv_tests.py"])
         ) == 1
 
-    def test_main_prints_diagnostic_on_broken_pipe(self, get_exit_code):
+    def test_main_prints_diagnostic_on_broken_pipe(self, rst, get_exit_code):
         """main() should print runner bug diagnostic to stderr."""
         stderr = io.StringIO()
         with patch("sys.stderr", stderr):
             get_exit_code(
-                lambda: self._run_with_broken_pipe(["run_sv_tests.py"])
+                lambda: self._run_with_broken_pipe(rst, ["run_sv_tests.py"])
             )
         assert "actions/runner/issues/2684" in stderr.getvalue()
 
     def test_main_skips_junit_xml_on_broken_pipe(
-        self, tmp_path, get_exit_code
+        self, rst, tmp_path, get_exit_code
     ):
         """main() should not write JUnit XML when stdout pipe breaks."""
         xml_path = str(tmp_path / "pipe-report.xml")
         get_exit_code(
             lambda: self._run_with_broken_pipe(
-                ["run_sv_tests.py", "--junit-xml", xml_path]
+                rst, ["run_sv_tests.py", "--junit-xml", xml_path]
             )
         )
         assert not tmp_path.joinpath("pipe-report.xml").exists()

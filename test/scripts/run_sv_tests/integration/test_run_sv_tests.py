@@ -5,18 +5,16 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
 
-import run_sv_tests
-
 
 class TestExecuteSingleTest:
     """Tests for execute_single_test() wiring run_test to print_result."""
 
-    def test_returns_dict_with_all_required_keys(self, capsys):
+    def test_returns_dict_with_all_required_keys(self, rst, capsys):
         """execute_single_test() should return a dict with all required keys."""
         mock_result = MagicMock(returncode=0, stderr="")
-        with patch("run_sv_tests.subprocess.run", return_value=mock_result), \
-             patch("run_sv_tests.parse_metadata", return_value={}):
-            result, ok = run_sv_tests.execute_single_test(
+        with patch.object(rst.subprocess, "run", return_value=mock_result), \
+             patch.object(rst, "parse_metadata", return_value={}):
+            result, ok = rst.execute_single_test(
                 "/tests/chapter-5/foo.sv"
             )
         captured = capsys.readouterr().out
@@ -31,13 +29,13 @@ class TestExecuteSingleTest:
             and "PASS" in captured
         )
 
-    def test_timeout_produces_timeout_status(self, capsys):
+    def test_timeout_produces_timeout_status(self, rst, capsys):
         """execute_single_test() should catch TimeoutExpired and set status."""
-        with patch(
-            "run_sv_tests.subprocess.run",
+        with patch.object(
+            rst.subprocess, "run",
             side_effect=subprocess.TimeoutExpired(cmd="x", timeout=30),
-        ), patch("run_sv_tests.parse_metadata", return_value={}):
-            result, ok = run_sv_tests.execute_single_test(
+        ), patch.object(rst, "parse_metadata", return_value={}):
+            result, ok = rst.execute_single_test(
                 "/tests/chapter-5/bar.sv"
             )
         captured = capsys.readouterr().out
@@ -49,18 +47,18 @@ class TestExecuteSingleTest:
         )
 
 
-def test_pipeline_produces_correct_result_list():
+def test_pipeline_produces_correct_result_list(rst):
     """Collecting tests and executing them yields correct result dicts."""
     fake_paths = ["/tests/chapter-5/a.sv", "/tests/chapter-6/b.sv"]
     mock_result = MagicMock(returncode=0, stderr="")
 
-    with patch("run_sv_tests.glob.glob", return_value=fake_paths), \
-         patch("run_sv_tests.subprocess.run", return_value=mock_result), \
-         patch("run_sv_tests.parse_metadata", return_value={}):
-        tests = run_sv_tests.collect_tests()
+    with patch.object(rst.glob, "glob", return_value=fake_paths), \
+         patch.object(rst.subprocess, "run", return_value=mock_result), \
+         patch.object(rst, "parse_metadata", return_value={}):
+        tests = rst.collect_tests()
         results = []
         for path in tests:
-            result, _ = run_sv_tests.execute_single_test(path)
+            result, _ = rst.execute_single_test(path)
             results.append(result)
 
     assert (
@@ -72,7 +70,7 @@ def test_pipeline_produces_correct_result_list():
     )
 
 
-def test_write_junit_xml_round_trip_preserves_structure(tmp_path):
+def test_write_junit_xml_round_trip_preserves_structure(rst, tmp_path):
     """Write XML, parse it back, verify full structure."""
     results = [
         {"name": "x.sv", "chapter": "chapter-5", "status": "pass",
@@ -81,7 +79,7 @@ def test_write_junit_xml_round_trip_preserves_structure(tmp_path):
          "time": 0.3, "stderr": "lint error"},
     ]
     filepath = str(tmp_path / "results.xml")
-    run_sv_tests.write_junit_xml(results, 1.0, filepath)
+    rst.write_junit_xml(results, 1.0, filepath)
 
     tree = ET.parse(filepath)
     root = tree.getroot()
@@ -103,71 +101,69 @@ def test_write_junit_xml_round_trip_preserves_structure(tmp_path):
 class TestParseArgs:
     """Tests for the parse_args() function."""
 
-    def test_junit_xml_flag(self):
+    def test_junit_xml_flag(self, rst):
         """parse_args() should set junit_xml when --junit-xml is given."""
         with patch("sys.argv", ["run_sv_tests.py", "--junit-xml", "out.xml"]):
-            args = run_sv_tests.parse_args()
+            args = rst.parse_args()
         assert args.junit_xml == "out.xml"
 
-    def test_no_flags_defaults_to_none(self):
+    def test_no_flags_defaults_to_none(self, rst):
         """parse_args() with no flags should leave junit_xml as None."""
         with patch("sys.argv", ["run_sv_tests.py"]):
-            args = run_sv_tests.parse_args()
+            args = rst.parse_args()
         assert args.junit_xml is None
 
 
 class TestMain:
     """Tests for the main() function."""
 
-    def test_all_pass_exits_zero_with_percentage(self, capsys, get_exit_code):
+    def test_all_pass_exits_zero_with_percentage(self, rst, capsys, get_exit_code):
         """main() exits 0 and summary includes pass percentage."""
         fake_paths = ["/tests/chapter-5/a.sv"]
         mock_result = MagicMock(returncode=0, stderr="")
 
         def run():
             with patch("sys.argv", ["run_sv_tests.py"]), \
-                 patch("run_sv_tests.check_binary"), \
-                 patch("run_sv_tests.glob.glob", return_value=fake_paths), \
-                 patch("run_sv_tests.subprocess.run", return_value=mock_result), \
-                 patch("run_sv_tests.parse_metadata", return_value={}):
-                run_sv_tests.main()
+                 patch.object(rst, "check_binary"), \
+                 patch.object(rst.glob, "glob", return_value=fake_paths), \
+                 patch.object(rst.subprocess, "run", return_value=mock_result), \
+                 patch.object(rst, "parse_metadata", return_value={}):
+                rst.main()
 
         assert get_exit_code(run) == 0 and "100.0%" in capsys.readouterr().out
 
-    def test_no_tests_exits_one(self, get_exit_code):
+    def test_no_tests_exits_one(self, rst, get_exit_code):
         """main() exits 1 when no .sv files are found."""
 
         def run():
             with patch("sys.argv", ["run_sv_tests.py"]), \
-                 patch("run_sv_tests.check_binary"), \
-                 patch("run_sv_tests.glob.glob", return_value=[]):
-                run_sv_tests.main()
+                 patch.object(rst, "check_binary"), \
+                 patch.object(rst.glob, "glob", return_value=[]):
+                rst.main()
 
         assert get_exit_code(run) == 1
 
     def test_pool_map_exception_prints_error_and_continues(
-        self, capsys, get_exit_code
+        self, rst, capsys, get_exit_code
     ):
         """main() prints diagnostic and still exits when pool.map raises."""
         fake_paths = ["/tests/chapter-5/a.sv"]
 
         def run():
             with patch("sys.argv", ["run_sv_tests.py"]), \
-                 patch("run_sv_tests.check_binary"), \
-                 patch("run_sv_tests.glob.glob", return_value=fake_paths), \
-                 patch(
-                     "run_sv_tests.ThreadPoolExecutor"
-                 ) as mock_pool_cls:
+                 patch.object(rst, "check_binary"), \
+                 patch.object(rst.glob, "glob", return_value=fake_paths), \
+                 patch.object(rst, "ThreadPoolExecutor") as mock_pool_cls:
                 mock_pool_cls.return_value.__enter__.return_value \
                     .map.side_effect = OSError("too many open files")
-                run_sv_tests.main()
+                rst.main()
 
         assert (
             get_exit_code(run) == 0
             and "pool.map failed after 0/1" in capsys.readouterr().err
         )
 
-    def test_writes_junit_xml(self, tmp_path, get_exit_code):
+    def test_writes_junit_xml(self, rst, tmp_path, get_exit_code):
         """main() writes JUnit XML when --junit-xml is given."""
         xml_path = str(tmp_path / "report.xml")
         fake_paths = ["/tests/chapter-5/a.sv"]
@@ -175,11 +171,11 @@ class TestMain:
 
         def run():
             with patch("sys.argv", ["run_sv_tests.py", "--junit-xml", xml_path]), \
-                 patch("run_sv_tests.check_binary"), \
-                 patch("run_sv_tests.glob.glob", return_value=fake_paths), \
-                 patch("run_sv_tests.subprocess.run", return_value=mock_result), \
-                 patch("run_sv_tests.parse_metadata", return_value={}):
-                run_sv_tests.main()
+                 patch.object(rst, "check_binary"), \
+                 patch.object(rst.glob, "glob", return_value=fake_paths), \
+                 patch.object(rst.subprocess, "run", return_value=mock_result), \
+                 patch.object(rst, "parse_metadata", return_value={}):
+                rst.main()
 
         get_exit_code(run)
         assert Path(xml_path).exists()

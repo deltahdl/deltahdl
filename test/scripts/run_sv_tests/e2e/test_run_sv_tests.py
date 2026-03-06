@@ -8,9 +8,7 @@ import textwrap
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from lib.python import run_tests_common
-
-REPO_ROOT = run_tests_common.REPO_ROOT
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
