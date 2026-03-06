@@ -54,11 +54,11 @@ def lrm_labels_for_clause(
     for line in text.splitlines():
         m = FIGURE_LABEL_RE.match(line)
         if m and line.startswith(prefix_fig):
-            figures.append(m.group(1))
+            figures.append(m.group(1).replace(".", "-"))
             continue
         m = TABLE_LABEL_RE.match(line)
         if m and line.startswith(prefix_tbl):
-            tables.append(m.group(1))
+            tables.append(m.group(1).replace(".", "-"))
 
     return figures, tables
 

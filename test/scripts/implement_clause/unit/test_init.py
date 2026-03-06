@@ -533,7 +533,7 @@ def testlrm_labels_for_clause_finds_annex_tables(ic, tmp_path) -> None:
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_ANNEX_WITH_TABLE)
     _, tbls = ic.lrm_labels_for_clause(lrm, "B")
-    assert tbls == ["B.1"]
+    assert tbls == ["B-1"]
 
 
 def testlrm_labels_for_clause_ignores_other_clause_figures(ic, tmp_path) -> None:

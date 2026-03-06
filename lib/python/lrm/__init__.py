@@ -118,11 +118,11 @@ def lrm_labels_for_subclause(
     for line in text.splitlines():
         m = FIGURE_LABEL_RE.match(line)
         if m:
-            figures.append(m.group(1))
+            figures.append(m.group(1).replace(".", "-"))
             continue
         m = TABLE_LABEL_RE.match(line)
         if m:
-            tables.append(m.group(1))
+            tables.append(m.group(1).replace(".", "-"))
     return figures, tables
 
 
