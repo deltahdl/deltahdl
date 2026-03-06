@@ -20,16 +20,16 @@ def load_lrm_titles(lrm_path: Path) -> dict[str, str]:
 
     for i, line in enumerate(lines):
         m = re.match(r"^(\d+(?:\.\d+)+)\s+(.+)$", line)
-        if m:
+        if m and m.group(1) not in titles:
             titles[m.group(1)] = m.group(2).strip()
             continue
         m = re.match(r"^([A-Z]\.\d+(?:\.\d+)*)\s+(.+)$", line)
-        if m:
+        if m and m.group(1) not in titles:
             titles[m.group(1)] = m.group(2).strip()
             continue
 
         m = re.match(r"^(\d+)\.\s+(.+)$", line)
-        if m:
+        if m and m.group(1) not in titles:
             titles[m.group(1)] = m.group(2).strip()
             continue
 
