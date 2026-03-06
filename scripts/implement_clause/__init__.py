@@ -23,14 +23,21 @@ from lib.python.lrm import (
     FIGURE_LABEL_RE,
     TABLE_LABEL_RE,
     extract_clause_text,
+    load_lrm_titles,
     lrm_labels_for_subclause,
-    parse_subclauses,
 )
 from lib.python.supplementary import (
     add_supplementary_args,
     check_supplementary_args,
     parse_supplementary_csv_args,
 )
+
+
+def parse_all_subclauses(lrm_path: Path, clause: str) -> dict[str, str]:
+    """Return all descendant subclauses of *clause*."""
+    all_titles = load_lrm_titles(lrm_path)
+    prefix = clause + "."
+    return {k: v for k, v in all_titles.items() if k.startswith(prefix)}
 
 
 def lrm_labels_for_clause(
@@ -276,7 +283,7 @@ def main(argv: list[str] | None = None) -> None:
         ignore_figures=args.ignore_figures,
     )
 
-    subclauses = parse_subclauses(lrm, clause)
+    subclauses = parse_all_subclauses(lrm, clause)
 
     if not subclauses:
         print(f"No subclauses for {clause}; invoking directly.")

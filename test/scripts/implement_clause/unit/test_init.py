@@ -36,7 +36,7 @@ def _patch_main_with_subclauses(
         next_kw = {"side_effect": [next_sub, None]}
 
     with (
-        patch("implement_clause.parse_subclauses",
+        patch("implement_clause.parse_all_subclauses",
               return_value=subclauses),
         patch("implement_clause.extract_clause_text",
               return_value="text"),
@@ -160,10 +160,65 @@ def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
 # --- main ---
 
 
+# --- parse_all_subclauses ---
+
+
+_SAMPLE_LRM = """\
+6. Data types
+
+6.1 General
+General text.
+
+6.7 Net declarations
+Net text.
+
+6.7.1 Net data types
+Data types text.
+
+6.7.2 Drive strength
+Drive text.
+
+7. Aggregate data types
+"""
+
+
+def test_parse_all_subclauses_returns_all_descendants(ic, tmp_path) -> None:
+    """All descendants at every depth are returned."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_SAMPLE_LRM)
+    result = ic.parse_all_subclauses(lrm, "6")
+    assert result == {
+        "6.1": "General",
+        "6.7": "Net declarations",
+        "6.7.1": "Net data types",
+        "6.7.2": "Drive strength",
+    }
+
+
+def test_parse_all_subclauses_leaf_returns_empty(ic, tmp_path) -> None:
+    """Leaf clause with no children returns empty dict."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_SAMPLE_LRM)
+    assert ic.parse_all_subclauses(lrm, "6.1") == {}
+
+
+def test_parse_all_subclauses_mid_level(ic, tmp_path) -> None:
+    """Mid-level clause returns its children."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_SAMPLE_LRM)
+    assert ic.parse_all_subclauses(lrm, "6.7") == {
+        "6.7.1": "Net data types",
+        "6.7.2": "Drive strength",
+    }
+
+
+# --- main ---
+
+
 def test_main_no_subclauses(ic, clause_argv) -> None:
     """Clause without subclauses invokes implement_subclause directly."""
     with (
-        patch("implement_clause.parse_subclauses", return_value={}),
+        patch("implement_clause.parse_all_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause") as mock_inv,
         patch("implement_clause.close_issue"),
         patch("implement_clause.mark_master_complete"),
@@ -175,7 +230,7 @@ def test_main_no_subclauses(ic, clause_argv) -> None:
 def test_main_no_subclauses_prints_leaf(ic, clause_argv, capsys) -> None:
     """Prints that clause has no subclauses."""
     with (
-        patch("implement_clause.parse_subclauses", return_value={}),
+        patch("implement_clause.parse_all_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause"),
         patch("implement_clause.close_issue"),
         patch("implement_clause.mark_master_complete"),
@@ -187,7 +242,7 @@ def test_main_no_subclauses_prints_leaf(ic, clause_argv, capsys) -> None:
 def test_no_subclauses_closes_sub_issue(ic, clause_argv) -> None:
     """No-subclauses path closes the sub-issue."""
     with (
-        patch("implement_clause.parse_subclauses", return_value={}),
+        patch("implement_clause.parse_all_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause"),
         patch("implement_clause.close_issue") as mock_close,
         patch("implement_clause.mark_master_complete"),
@@ -201,7 +256,7 @@ def test_no_subclauses_closes_sub_issue(ic, clause_argv) -> None:
 def test_no_subclauses_marks_master(ic, clause_argv) -> None:
     """No-subclauses path marks master issue complete."""
     with (
-        patch("implement_clause.parse_subclauses", return_value={}),
+        patch("implement_clause.parse_all_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause"),
         patch("implement_clause.close_issue"),
         patch("implement_clause.mark_master_complete") as mock_mark,
@@ -282,7 +337,7 @@ def test_main_annex(ic, tmp_path) -> None:
         "--organization", "o", "--repo", "r",
     ]
     with (
-        patch("implement_clause.parse_subclauses",
+        patch("implement_clause.parse_all_subclauses",
               return_value={}) as mock_ps,
         patch("implement_clause.invoke_implement_subclause"),
         patch("implement_clause.close_issue"),
@@ -572,7 +627,7 @@ def test_main_exits_when_supplementary_missing(
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(lrm_content)
     with (
-        patch("implement_clause.parse_subclauses") as mock_ps,
+        patch("implement_clause.parse_all_subclauses") as mock_ps,
         pytest.raises(SystemExit),
     ):
         ic.main([
@@ -588,7 +643,7 @@ def test_main_no_exit_when_figures_ignored(ic, tmp_path) -> None:
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_WITH_FIGURE)
     with (
-        patch("implement_clause.parse_subclauses", return_value={}) as mock_ps,
+        patch("implement_clause.parse_all_subclauses", return_value={}) as mock_ps,
         patch("implement_clause.invoke_implement_subclause"),
         patch("implement_clause.close_issue"),
         patch("implement_clause.mark_master_complete"),
