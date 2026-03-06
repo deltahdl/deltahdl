@@ -26,7 +26,8 @@ def clause_argv(tmp_path: Path) -> list[str]:
     lrm.write_text("")
     return [
         "--lrm", str(lrm), "--clause", "4",
-        "--issue", "1", "--organization", "o", "--repo", "r",
+        "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
     ]
 
 

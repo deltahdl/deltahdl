@@ -143,6 +143,25 @@ def commit_and_push(subclause: str) -> None:
     print(f"Committed and pushed §{subclause}.")
 
 
+def mark_master_complete(
+    organization: str, repo: str, master_issue: int,
+    sub_issue: int,
+) -> None:
+    """Mark a sub-issue's row as complete on the master issue table."""
+    body = fetch_issue_body(organization, repo, master_issue)
+    pattern = re.compile(
+        r"^(\|[^|]+\|[^|]+\| #" + str(sub_issue) + r" \|)\s*[^|]*\|",
+        re.MULTILINE,
+    )
+    new_body, count = pattern.subn(r"\1 :white_check_mark: |", body)
+    if count == 0:
+        print(f"WARNING: No table row found for #{sub_issue}"
+              f" on issue #{master_issue}.", file=sys.stderr)
+        return
+    update_issue_body(organization, repo, master_issue, new_body)
+    print(f"Marked #{sub_issue} complete on master issue #{master_issue}.")
+
+
 def _format_key_path_csv(mapping: dict[str, Path]) -> str:
     """Format a dict as 'key=path,key=path' for CLI forwarding."""
     return ",".join(
@@ -164,7 +183,7 @@ def invoke_implement_subclause(
         sys.executable, "-m", "implement_subclause",
         "--lrm", args.lrm,
         "--subclause", subclause,
-        "--issue", str(args.issue),
+        "--issue", str(args.sub_issue),
     ]
     if continue_session:
         cmd.append("--continue")
@@ -186,7 +205,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--clause", help="Numeric clause (e.g. 4)")
     group.add_argument("--annex", help="Annex letter (e.g. A)")
-    parser.add_argument("--issue", type=int, required=True)
+    parser.add_argument("--sub-issue", type=int, required=True)
+    parser.add_argument("--master-issue", type=int, required=True)
     parser.add_argument("--organization", required=True)
     parser.add_argument("--repo", required=True)
     add_supplementary_args(parser)
@@ -210,19 +230,23 @@ def _run_subclause_loop(
     """Sync the issue checklist and implement subclauses one at a time."""
     first = True
     while True:
-        body = fetch_issue_body(args.organization, args.repo, args.issue)
+        body = fetch_issue_body(args.organization, args.repo, args.sub_issue)
         new_body = build_synced_body(body, impl_items)
         print(f"Synced issue body:\n{new_body}")
         update_issue_body(
-            args.organization, args.repo, args.issue, new_body,
+            args.organization, args.repo, args.sub_issue, new_body,
         )
 
         subclause = next_unchecked(new_body)
         if subclause is None:
             print("All subclauses are done.")
             close_issue(
-                args.organization, args.repo, args.issue,
+                args.organization, args.repo, args.sub_issue,
                 "all subclauses are implemented",
+            )
+            mark_master_complete(
+                args.organization, args.repo,
+                args.master_issue, args.sub_issue,
             )
             return
 
@@ -257,6 +281,14 @@ def main(argv: list[str] | None = None) -> None:
     if not subclauses:
         print(f"No subclauses for {clause}; invoking directly.")
         invoke_implement_subclause(args, clause)
+        close_issue(
+            args.organization, args.repo, args.sub_issue,
+            "all subclauses are implemented",
+        )
+        mark_master_complete(
+            args.organization, args.repo,
+            args.master_issue, args.sub_issue,
+        )
         return
 
     print(f"Found {len(subclauses)} subclauses for {clause}.")

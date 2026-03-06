@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 _STUB_ARGS = argparse.Namespace(
-    lrm="/path/lrm.txt", issue=123,
+    lrm="/path/lrm.txt", sub_issue=123, master_issue=99,
     organization="deltahdl", repo="deltahdl",
     figures={}, tables={}, ignore_figures=[],
 )
@@ -50,8 +50,9 @@ def _patch_main_with_subclauses(
         patch("implement_clause.invoke_implement_subclause") as mock_inv,
         patch("implement_clause.commit_and_push") as mock_cap,
         patch("implement_clause.close_issue") as mock_close,
+        patch("implement_clause.mark_master_complete") as mock_mark,
     ):
-        yield mock_inv, mock_cap, mock_close
+        yield mock_inv, mock_cap, mock_close, mock_mark
 
 
 def test_invoke_implement_subclause_calls_subprocess(
@@ -83,7 +84,8 @@ def test_parse_args_clause(ic, tmp_path) -> None:
     lrm.write_text("")
     args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
-        "--issue", "1", "--organization", "o", "--repo", "r",
+        "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
     ])
     assert args.clause == "4"
 
@@ -94,7 +96,8 @@ def test_parse_args_annex(ic, tmp_path) -> None:
     lrm.write_text("")
     args = ic.parse_args([
         "--lrm", str(lrm), "--annex", "A",
-        "--issue", "1", "--organization", "o", "--repo", "r",
+        "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
     ])
     assert args.annex == "A"
 
@@ -106,7 +109,8 @@ def test_parse_args_clause_and_annex_exclusive(ic, tmp_path) -> None:
     with pytest.raises(SystemExit):
         ic.parse_args([
             "--lrm", str(lrm), "--clause", "4", "--annex", "A",
-            "--issue", "1", "--organization", "o", "--repo", "r",
+            "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
         ])
 
 
@@ -115,19 +119,33 @@ def test_parse_args_missing_lrm(ic) -> None:
     with pytest.raises(SystemExit):
         ic.parse_args([
             "--lrm", "/no/such/file", "--clause", "4",
-            "--issue", "1", "--organization", "o", "--repo", "r",
+            "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
         ])
 
 
-def test_parse_args_issue_is_int(ic, tmp_path) -> None:
-    """--issue is parsed as an integer."""
+def test_parse_args_sub_issue_is_int(ic, tmp_path) -> None:
+    """--sub-issue is parsed as an integer."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
     args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
-        "--issue", "42", "--organization", "o", "--repo", "r",
+        "--sub-issue", "42", "--master-issue", "1",
+        "--organization", "o", "--repo", "r",
     ])
-    assert args.issue == 42
+    assert args.sub_issue == 42
+
+
+def test_parse_args_master_issue_is_int(ic, tmp_path) -> None:
+    """--master-issue is parsed as an integer."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    args = ic.parse_args([
+        "--lrm", str(lrm), "--clause", "4",
+        "--sub-issue", "42", "--master-issue", "1",
+        "--organization", "o", "--repo", "r",
+    ])
+    assert args.master_issue == 1
 
 
 def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
@@ -137,7 +155,8 @@ def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
     with pytest.raises(SystemExit):
         ic.parse_args([
             "--lrm", str(lrm),
-            "--issue", "1", "--organization", "o", "--repo", "r",
+            "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
         ])
 
 
@@ -149,6 +168,8 @@ def test_main_no_subclauses(ic, clause_argv) -> None:
     with (
         patch("implement_clause.parse_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause") as mock_inv,
+        patch("implement_clause.close_issue"),
+        patch("implement_clause.mark_master_complete"),
     ):
         ic.main(clause_argv)
     assert mock_inv.call_args[0][1] == "4"
@@ -159,21 +180,38 @@ def test_main_no_subclauses_prints_leaf(ic, clause_argv, capsys) -> None:
     with (
         patch("implement_clause.parse_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause"),
+        patch("implement_clause.close_issue"),
+        patch("implement_clause.mark_master_complete"),
     ):
         ic.main(clause_argv)
     assert "No subclauses" in capsys.readouterr().out
 
 
+def test_no_subclauses_closes_and_marks_master(ic, clause_argv) -> None:
+    """No-subclauses path closes sub-issue and marks master."""
+    with (
+        patch("implement_clause.parse_subclauses", return_value={}),
+        patch("implement_clause.invoke_implement_subclause"),
+        patch("implement_clause.close_issue") as mock_close,
+        patch("implement_clause.mark_master_complete") as mock_mark,
+    ):
+        ic.main(clause_argv)
+    mock_close.assert_called_once_with(
+        "o", "r", 1, "all subclauses are implemented",
+    )
+    mock_mark.assert_called_once_with("o", "r", 99, 1)
+
+
 def test_main_with_subclauses(ic, clause_argv) -> None:
     """Next unchecked subclause is passed to implement_subclause."""
-    with _patch_main_with_subclauses() as (mock_inv, _, ___):
+    with _patch_main_with_subclauses() as (mock_inv, _, __, ___):
         ic.main(clause_argv)
     assert mock_inv.call_args[0][1] == "4.2"
 
 
 def test_main_prints_subclauses_found(ic, clause_argv, capsys) -> None:
     """Prints how many subclauses were discovered."""
-    with _patch_main_with_subclauses() as (_, __, ___):
+    with _patch_main_with_subclauses() as (_, __, ___, ____):
         ic.main(clause_argv)
     assert "Found 2 subclauses" in capsys.readouterr().out
 
@@ -183,14 +221,14 @@ def test_main_prints_synced_body(ic, clause_argv, capsys) -> None:
     with _patch_main_with_subclauses(
         synced_body="## Subclauses\n\n- [ ] 4.1 General\n",
         next_sub="4.1",
-    ) as (_, __, ___):
+    ) as (_, __, ___, ____):
         ic.main(clause_argv)
     assert "## Subclauses" in capsys.readouterr().out
 
 
 def test_main_prints_next_subclause(ic, clause_argv, capsys) -> None:
     """Prints which subclause was picked as next."""
-    with _patch_main_with_subclauses() as (_, __, ___):
+    with _patch_main_with_subclauses() as (_, __, ___, ____):
         ic.main(clause_argv)
     assert "Next unchecked: 4.2" in capsys.readouterr().out
 
@@ -199,19 +237,30 @@ def test_main_all_done(ic, clause_argv, capsys) -> None:
     """Prints all-done message when no unchecked subclauses remain."""
     with _patch_main_with_subclauses(
         subclauses={"4.1": "General"}, next_sub=None,
-    ) as (_, __, ___):
+    ) as (_, __, ___, ____):
         ic.main(clause_argv)
     assert "All subclauses are done" in capsys.readouterr().out
 
 
 def test_main_closes_issue_when_all_done(ic, clause_argv) -> None:
-    """Issue is closed when all subclauses are implemented."""
+    """Sub-issue is closed when all subclauses are implemented."""
     with _patch_main_with_subclauses(
         subclauses={"4.1": "General"}, next_sub=None,
-    ) as (_, __, mock_close):
+    ) as (_, __, mock_close, ___):
         ic.main(clause_argv)
     assert mock_close.call_args == (
         ("o", "r", 1, "all subclauses are implemented"),
+    )
+
+
+def test_main_marks_master_after_close(ic, clause_argv) -> None:
+    """Master issue is marked complete after sub-issue is closed."""
+    with _patch_main_with_subclauses(
+        subclauses={"4.1": "General"}, next_sub=None,
+    ) as (_, __, ___, mock_mark):
+        ic.main(clause_argv)
+    assert mock_mark.call_args == (
+        ("o", "r", 99, 1),
     )
 
 
@@ -221,12 +270,15 @@ def test_main_annex(ic, tmp_path) -> None:
     lrm.write_text("")
     argv = [
         "--lrm", str(lrm), "--annex", "A",
-        "--issue", "1", "--organization", "o", "--repo", "r",
+        "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
     ]
     with (
         patch("implement_clause.parse_subclauses",
               return_value={}) as mock_ps,
         patch("implement_clause.invoke_implement_subclause"),
+        patch("implement_clause.close_issue"),
+        patch("implement_clause.mark_master_complete"),
     ):
         ic.main(argv)
     assert mock_ps.call_args[0][1] == "A"
@@ -270,7 +322,7 @@ def test_main_loops_all_subclauses(ic, clause_argv) -> None:
     """main invokes implement_subclause for each unchecked subclause."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", "4.2", None],
-    ) as (mock_inv, _, ___):
+    ) as (mock_inv, _, __, ___):
         ic.main(clause_argv)
     assert mock_inv.call_count == 2
 
@@ -279,7 +331,7 @@ def test_main_first_subclause_no_continue(ic, clause_argv) -> None:
     """First invocation does not pass continue_session=True."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", None],
-    ) as (mock_inv, _, ___):
+    ) as (mock_inv, _, __, ___):
         ic.main(clause_argv)
     assert mock_inv.call_args_list[0].kwargs.get("continue_session") is not True
 
@@ -288,7 +340,7 @@ def test_main_second_subclause_uses_continue(ic, clause_argv) -> None:
     """Second invocation passes continue_session=True."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", "4.2", None],
-    ) as (mock_inv, _, ___):
+    ) as (mock_inv, _, __, ___):
         ic.main(clause_argv)
     assert mock_inv.call_args_list[1].kwargs["continue_session"] is True
 
@@ -297,7 +349,7 @@ def test_main_commits_after_each_subclause(ic, clause_argv) -> None:
     """commit_and_push is called after each subclause implementation."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", "4.2", None],
-    ) as (_, mock_cap, __):
+    ) as (_, mock_cap, __, ___):
         ic.main(clause_argv)
     assert mock_cap.call_count == 2
 
@@ -306,7 +358,7 @@ def test_main_commits_with_subclause_number(ic, clause_argv) -> None:
     """commit_and_push receives the subclause number."""
     with _patch_main_with_subclauses(
         next_sub=["4.1", None],
-    ) as (_, mock_cap, __):
+    ) as (_, mock_cap, __, ___):
         ic.main(clause_argv)
     assert mock_cap.call_args[0][0] == "4.1"
 
@@ -440,7 +492,8 @@ def test_parse_args_figures(ic, tmp_path) -> None:
     gv.write_text("digraph {}")
     args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
-        "--issue", "1", "--organization", "o", "--repo", "r",
+        "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
         "--figures", f"4_1={gv}",
     ])
     assert args.figures == {"4-1": gv}
@@ -454,7 +507,8 @@ def test_parse_args_tables(ic, tmp_path) -> None:
     md.write_text("| col |\n")
     args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
-        "--issue", "1", "--organization", "o", "--repo", "r",
+        "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
         "--tables", f"4_1={md}",
     ])
     assert args.tables == {"4-1": md}
@@ -466,7 +520,8 @@ def test_parse_args_ignore_figures(ic, tmp_path) -> None:
     lrm.write_text("")
     args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
-        "--issue", "1", "--organization", "o", "--repo", "r",
+        "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
         "--ignore-figures", "4-1,4-2",
     ])
     assert args.ignore_figures == ["4-1", "4-2"]
@@ -514,7 +569,8 @@ def test_main_exits_when_supplementary_missing(
     ):
         ic.main([
             "--lrm", str(lrm), "--clause", "4",
-            "--issue", "1", "--organization", "o", "--repo", "r",
+            "--sub-issue", "1", "--master-issue", "99",
+        "--organization", "o", "--repo", "r",
         ])
     mock_ps.assert_not_called()
 
@@ -526,10 +582,13 @@ def test_main_no_exit_when_figures_ignored(ic, tmp_path) -> None:
     with (
         patch("implement_clause.parse_subclauses", return_value={}) as mock_ps,
         patch("implement_clause.invoke_implement_subclause"),
+        patch("implement_clause.close_issue"),
+        patch("implement_clause.mark_master_complete"),
     ):
         ic.main([
             "--lrm", str(lrm), "--clause", "4",
-            "--issue", "1", "--organization", "o", "--repo", "r",
+            "--sub-issue", "1", "--master-issue", "99",
+            "--organization", "o", "--repo", "r",
             "--ignore-figures", "4-1",
         ])
     assert mock_ps.called
@@ -543,7 +602,7 @@ def test_invoke_forwards_tables_to_subclause(
 ) -> None:
     """invoke_implement_subclause forwards --tables in key=path format."""
     args = argparse.Namespace(
-        lrm="/path/lrm.txt", issue=123,
+        lrm="/path/lrm.txt", sub_issue=123, master_issue=99,
         organization="o", repo="r",
         figures={}, tables={"4-1": Path("/t/tbl.md")},
         ignore_figures=[],
@@ -561,7 +620,7 @@ def test_invoke_forwards_figures_to_subclause(
 ) -> None:
     """invoke_implement_subclause forwards --figures in key=path format."""
     args = argparse.Namespace(
-        lrm="/path/lrm.txt", issue=123,
+        lrm="/path/lrm.txt", sub_issue=123, master_issue=99,
         organization="o", repo="r",
         figures={"4-1": Path("/f/fig.gv")}, tables={},
         ignore_figures=[],
@@ -581,3 +640,59 @@ def test_invoke_no_tables_flag_when_empty(
     ic.invoke_implement_subclause(_STUB_ARGS, "4.1")
     cmd = invoke_subprocess_ok.call_args[0][0]
     assert "--tables" not in cmd
+
+
+# --- mark_master_complete ---
+
+
+_MASTER_BODY = """\
+## Phase 1
+
+| Section | Title | Issue | Status |
+|---------|-------|-------|--------|
+| §3 | Building blocks | #5 | :white_check_mark: |
+| §4 | Scheduling semantics | #6 | |
+"""
+
+
+def test_mark_master_complete_ticks_status(ic, monkeypatch) -> None:
+    """Row matching the sub-issue gets :white_check_mark: in Status."""
+    monkeypatch.setattr(
+        "implement_clause.fetch_issue_body", lambda *_a: _MASTER_BODY,
+    )
+    updated = []
+    monkeypatch.setattr(
+        "implement_clause.update_issue_body",
+        lambda _o, _r, _i, body: updated.append(body),
+    )
+    ic.mark_master_complete("o", "r", 1, 6)
+    assert "| #6 | :white_check_mark: |" in updated[0]
+
+
+def test_mark_master_complete_preserves_other_rows(ic, monkeypatch) -> None:
+    """Other rows are unchanged after marking."""
+    monkeypatch.setattr(
+        "implement_clause.fetch_issue_body", lambda *_a: _MASTER_BODY,
+    )
+    updated = []
+    monkeypatch.setattr(
+        "implement_clause.update_issue_body",
+        lambda _o, _r, _i, body: updated.append(body),
+    )
+    ic.mark_master_complete("o", "r", 1, 6)
+    assert "| #5 | :white_check_mark: |" in updated[0]
+
+
+def test_mark_master_complete_warns_when_not_found(
+    ic, monkeypatch, capsys,
+) -> None:
+    """Prints warning when no matching row found."""
+    monkeypatch.setattr(
+        "implement_clause.fetch_issue_body", lambda *_a: _MASTER_BODY,
+    )
+    monkeypatch.setattr(
+        "implement_clause.update_issue_body",
+        lambda *_a: None,
+    )
+    ic.mark_master_complete("o", "r", 1, 999)
+    assert "WARNING" in capsys.readouterr().err
