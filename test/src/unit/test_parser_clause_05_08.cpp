@@ -6,7 +6,9 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserCh508, TimeLiteral_IntegerNs) {
+// --- §5.8: time literals in delay statements ---
+
+TEST(ParserClause05, Cl5_8_IntegerNs) {
   auto r = Parse(
       "module m;\n"
       "  initial #40ns;\n"
@@ -17,57 +19,37 @@ TEST(ParserCh508, TimeLiteral_IntegerNs) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-TEST(ParserA84, PrimaryLiteralTimeLiteral) {
-  auto r = Parse("module m; initial #10ns; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParserCh508, TimeLiteral_FixedPointNs) {
+TEST(ParserClause05, Cl5_8_FixedPointNs) {
   EXPECT_TRUE(ParseOk("module m; initial #2.1ns; endmodule"));
 }
 
-TEST(ParserCh508, TimeLiteral_Ps) {
+TEST(ParserClause05, Cl5_8_Ps) {
   EXPECT_TRUE(ParseOk("module m; initial #40ps; endmodule"));
 }
 
-TEST(ParserCh508, TimeLiteral_Us) {
+TEST(ParserClause05, Cl5_8_Us) {
   EXPECT_TRUE(ParseOk("module m; initial #100us; endmodule"));
 }
 
-TEST(ParserA84, TimeLiteralNs) {
-  auto r = Parse("module m; initial #5ns; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParserCh508, TimeLiteral_Ms) {
+TEST(ParserClause05, Cl5_8_Ms) {
   EXPECT_TRUE(ParseOk("module m; initial #1ms; endmodule"));
 }
 
-TEST(ParserCh508, TimeLiteral_Fs) {
+TEST(ParserClause05, Cl5_8_Fs) {
   EXPECT_TRUE(ParseOk("module m; initial #500fs; endmodule"));
 }
 
-TEST(ParserA84, TimeLiteralUs) {
-  auto r = Parse("module m; initial #1us; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+TEST(ParserClause05, Cl5_8_S) {
+  EXPECT_TRUE(ParseOk("module m; initial #1s; endmodule"));
 }
 
-TEST(ParserA84, TimeLiteralMs) {
-  auto r = Parse("module m; initial #2ms; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+TEST(ParserClause05, Cl5_8_FixedPointUs) {
+  EXPECT_TRUE(ParseOk("module m; initial #1.5ns; endmodule"));
 }
 
-TEST(ParserA84, TimeLiteralS) {
-  auto r = Parse("module m; initial #1s; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
+// --- §5.8: time literal in wire delay ---
 
-TEST(ParserA223, DelayValueAllTimeLiterals) {
+TEST(ParserClause05, Cl5_8_AllUnitsInWireDelay) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire #1fs w1;\n"
@@ -79,25 +61,9 @@ TEST(ParserA223, DelayValueAllTimeLiterals) {
               "endmodule"));
 }
 
-TEST(ParserA84, TimeLiteralPs) {
-  auto r = Parse("module m; initial #100ps; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
+// --- §5.8: timeunit declaration with all six units ---
 
-TEST(ParserA84, TimeLiteralFs) {
-  auto r = Parse("module m; initial #50fs; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParserA84, TimeLiteralFixedPoint) {
-  auto r = Parse("module m; initial #1.5ns; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParserClause03, Cl3_14_2_2_AllSixUnitsAccepted) {
+TEST(ParserClause05, Cl5_8_TimeunitAllSixUnits) {
   EXPECT_EQ(ParseTimescale31402("module m; timeunit 1s; endmodule")
                 .cu->modules[0]
                 ->time_unit,
