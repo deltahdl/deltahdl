@@ -6,119 +6,142 @@
 
 using namespace delta;
 
-TEST(LexerCh504, BasicLineComment) {
+namespace {
+
+// --- §5.4: line comments start with // and end with newline ---
+
+TEST(LexerClause05, Cl5_4_BasicLineComment) {
   auto tokens = Lex("a // this is a comment\nb");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
-TEST(LexerCh504, LineCommentAtEndOfFile) {
+TEST(LexerClause05, Cl5_4_LineCommentAtEndOfFile) {
   auto tokens = Lex("a // comment at end");
-  ASSERT_EQ(tokens.size(), 2);
+  ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
-TEST(LexerCh504, EmptyLineComment) {
+TEST(LexerClause05, Cl5_4_EmptyLineComment) {
   auto tokens = Lex("a //\nb");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, LineCommentOnlyInput) {
+TEST(LexerClause05, Cl5_4_LineCommentOnlyInput) {
   auto tokens = Lex("// entire file is comment");
-  ASSERT_EQ(tokens.size(), 1);
+  ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexerCh504, MultipleConsecutiveLineComments) {
+TEST(LexerClause05, Cl5_4_MultipleConsecutiveLineComments) {
   auto tokens = Lex("a\n// line 1\n// line 2\n// line 3\nb");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, BlockCommentTokensInsideLineComment) {
-  auto tokens = Lex("a // /* not a block comment */ still line comment\nb");
-  ASSERT_EQ(tokens.size(), 3);
+TEST(LexerClause05, Cl5_4_LineCommentWithSpecialChars) {
+  auto tokens = Lex("a // ~!@#$%^&*()_+-=[]{}|;':\",./<>?\nb");
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, BlockOpenInsideLineCommentDoesNotStartBlock) {
-  auto tokens = Lex("a // has /* here\nb // no block\nc");
-  ASSERT_EQ(tokens.size(), 4);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-  EXPECT_EQ(tokens[2].text, "c");
-}
+// --- §5.4: block comments start with /* and end with */ ---
 
-TEST(LexerCh504, BasicBlockComment) {
+TEST(LexerClause05, Cl5_4_BasicBlockComment) {
   auto tokens = Lex("a /* comment */ b");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, EmptyBlockComment) {
+TEST(LexerClause05, Cl5_4_EmptyBlockComment) {
   auto tokens = Lex("a /**/ b");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, MultiLineBlockComment) {
+TEST(LexerClause05, Cl5_4_MultiLineBlockComment) {
   auto tokens = Lex("a /* line1\nline2\nline3 */ b");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, BlockCommentOnlyInput) {
+TEST(LexerClause05, Cl5_4_BlockCommentOnlyInput) {
   auto tokens = Lex("/* entire file */");
-  ASSERT_EQ(tokens.size(), 1);
+  ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexerCh504, MultipleBlockComments) {
+TEST(LexerClause05, Cl5_4_MultipleBlockComments) {
   auto tokens = Lex("a /* c1 */ /* c2 */ /* c3 */ b");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, AdjacentBlockComments) {
+TEST(LexerClause05, Cl5_4_AdjacentBlockComments) {
   auto tokens = Lex("a /* c1 *//* c2 */ b");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, StarsInsideBlockComment) {
+TEST(LexerClause05, Cl5_4_StarsInsideBlockComment) {
   auto tokens = Lex("a /* ** * *** */ b");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, SlashesInsideBlockComment) {
+TEST(LexerClause05, Cl5_4_SlashesInsideBlockComment) {
   auto tokens = Lex("a /* / // /// */ b");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, BlockCommentsDoNotNest) {
+TEST(LexerClause05, Cl5_4_BlockCommentWithSpecialChars) {
+  auto tokens = Lex("a /* ~!@#$%^&()_+-=[]{}|;':\",./<>? */ b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexerClause05, Cl5_4_BlockCommentWithTabsAndFormFeed) {
+  auto tokens = Lex("a /* \t\t\f */ b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexerClause05, Cl5_4_BlockCommentContainingNewlines) {
+  auto tokens = Lex("a /*\n\n\n*/ b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+// --- §5.4: block comments shall not be nested ---
+
+TEST(LexerClause05, Cl5_4_BlockCommentsDoNotNest) {
+  // /* outer /* inner */ closes at first */, leaving "b" as a token
   auto tokens = Lex("a /* outer /* inner */ b");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, NestedBlockCommentLeavesDangling) {
+TEST(LexerClause05, Cl5_4_NestedBlockCommentLeavesDangling) {
+  // First */ closes the block comment; "z */" remains as tokens
   auto tokens = Lex("a /* x /* y */ z */");
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "z");
@@ -126,55 +149,133 @@ TEST(LexerCh504, NestedBlockCommentLeavesDangling) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kSlash);
 }
 
-TEST(LexerCh504, UnterminatedBlockCommentError) {
+// --- §5.4: // has no special meaning inside block comment ---
+
+TEST(LexerClause05, Cl5_4_LineCommentTokenInsideBlockComment) {
+  auto tokens = Lex("a /* // not special */ b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+// --- §5.4: /* and */ have no special meaning inside line comment ---
+
+TEST(LexerClause05, Cl5_4_BlockCommentTokensInsideLineComment) {
+  auto tokens = Lex("a // /* not a block comment */ still line comment\nb");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexerClause05, Cl5_4_BlockOpenInsideLineCommentDoesNotStartBlock) {
+  auto tokens = Lex("a // has /* here\nb // no block\nc");
+  ASSERT_EQ(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+  EXPECT_EQ(tokens[2].text, "c");
+}
+
+// --- §5.4: error conditions ---
+
+TEST(LexerClause05, Cl5_4_UnterminatedBlockCommentError) {
   auto [tokens, errors] = LexWithDiag("/* no end");
   EXPECT_TRUE(errors);
 }
 
-TEST(LexerCh504, UnterminatedBlockCommentAtEof) {
+TEST(LexerClause05, Cl5_4_UnterminatedBlockCommentAtEof) {
   auto [tokens, errors] = LexWithDiag("a /* unterminated");
   EXPECT_TRUE(errors);
 }
 
-TEST(LexerCh504, UnterminatedBlockCommentWithStars) {
+TEST(LexerClause05, Cl5_4_UnterminatedBlockCommentWithStars) {
   auto [tokens, errors] = LexWithDiag("/* almost ***");
   EXPECT_TRUE(errors);
 }
 
-TEST(LexerCh504, LineCommentFollowedByBlockComment) {
+TEST(LexerClause05, Cl5_4_SlashStarSlashIsUnterminated) {
+  // /*/ is NOT a valid block comment (no closing */)
+  auto [tokens, errors] = LexWithDiag("/*/");
+  EXPECT_TRUE(errors);
+}
+
+// --- §5.4: mixed comment forms ---
+
+TEST(LexerClause05, Cl5_4_LineCommentFollowedByBlockComment) {
   auto tokens = Lex("a // line\n/* block */ b");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, BlockCommentFollowedByLineComment) {
+TEST(LexerClause05, Cl5_4_BlockCommentFollowedByLineComment) {
   auto tokens = Lex("a /* block */ // line\nb");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, MixedCommentsMultipleLines) {
+TEST(LexerClause05, Cl5_4_MixedCommentsMultipleLines) {
   auto tokens =
       Lex("a // line comment\n"
           "/* block spanning\n"
           "   multiple lines */\n"
           "b // trailing\n");
-  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerCh504, SingleSlashIsDivide) {
+TEST(LexerClause05, Cl5_4_CommentOnlyInputMultipleTypes) {
+  auto tokens = Lex("// line\n/* block */\n// another line");
+  ASSERT_EQ(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
+}
+
+// --- §5.4: comments as token separators ---
+
+TEST(LexerClause05, Cl5_4_SingleSlashIsDivide) {
   auto tokens = Lex("a / b");
-  ASSERT_EQ(tokens.size(), 4);
+  ASSERT_EQ(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].kind, TokenKind::kSlash);
   EXPECT_EQ(tokens[2].text, "b");
 }
 
-TEST(LexerCh504, LineCommentAdvancesLineNumber) {
+TEST(LexerClause05, Cl5_4_CommentBetweenModuleKeywordAndName) {
+  auto tokens = Lex("module /* comment */ m;");
+  ASSERT_EQ(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "m");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
+}
+
+TEST(LexerClause05, Cl5_4_LineCommentBetweenTokens) {
+  auto tokens = Lex("module // comment\nm;");
+  ASSERT_EQ(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(tokens[1].text, "m");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
+}
+
+TEST(LexerClause05, Cl5_4_CommentBetweenOperatorAndOperand) {
+  auto tokens = Lex("a + /* comment */ b");
+  ASSERT_EQ(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[2].text, "b");
+}
+
+TEST(LexerClause05, Cl5_4_MinimalBlockComment) {
+  auto tokens = Lex("a /**/ b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+// --- §5.4: source location tracking through comments ---
+
+TEST(LexerClause05, Cl5_4_LineCommentAdvancesLineNumber) {
   auto [tokens, errors] = LexWithDiag("a\n// comment\nb");
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 3u);
@@ -182,7 +283,7 @@ TEST(LexerCh504, LineCommentAdvancesLineNumber) {
   EXPECT_EQ(tokens[1].loc.line, 3u);
 }
 
-TEST(LexerCh504, MultiLineBlockCommentAdvancesLineNumber) {
+TEST(LexerClause05, Cl5_4_MultiLineBlockCommentAdvancesLineNumber) {
   auto [tokens, errors] = LexWithDiag("a /* line1\nline2\nline3 */ b");
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 3u);
@@ -190,7 +291,7 @@ TEST(LexerCh504, MultiLineBlockCommentAdvancesLineNumber) {
   EXPECT_EQ(tokens[1].loc.line, 3u);
 }
 
-TEST(LexerCh504, BlockCommentSameLinePreservesColumn) {
+TEST(LexerClause05, Cl5_4_BlockCommentSameLinePreservesColumn) {
   auto [tokens, errors] = LexWithDiag("a /* x */ b");
   EXPECT_FALSE(errors);
   ASSERT_GE(tokens.size(), 3u);
@@ -200,84 +301,7 @@ TEST(LexerCh504, BlockCommentSameLinePreservesColumn) {
   EXPECT_EQ(tokens[1].loc.column, 11u);
 }
 
-TEST(LexerCh504, LineCommentWithSpecialChars) {
-  auto tokens = Lex("a // ~!@#$%^&*()_+-=[]{}|;':\",./<>?\nb");
-  ASSERT_EQ(tokens.size(), 3);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexerCh504, BlockCommentWithSpecialChars) {
-  auto tokens = Lex("a /* ~!@#$%^&()_+-=[]{}|;':\",./<>? */ b");
-  ASSERT_EQ(tokens.size(), 3);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexerCh504, BlockCommentWithTabsAndFormFeed) {
-  auto tokens = Lex("a /* \t\t\f */ b");
-  ASSERT_EQ(tokens.size(), 3);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexerCh504, CommentBetweenModuleKeywordAndName) {
-  auto tokens = Lex("module /* comment */ m;");
-  ASSERT_EQ(tokens.size(), 4);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "m");
-  EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
-}
-
-TEST(LexerCh504, LineCommentBetweenTokens) {
-  auto tokens = Lex("module // comment\nm;");
-  ASSERT_EQ(tokens.size(), 4);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
-  EXPECT_EQ(tokens[1].text, "m");
-  EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
-}
-
-TEST(LexerCh504, CommentBetweenOperatorAndOperand) {
-  auto tokens = Lex("a + /* comment */ b");
-  ASSERT_EQ(tokens.size(), 4);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
-  EXPECT_EQ(tokens[2].text, "b");
-}
-
-TEST(LexerCh504, CommentOnlyInputMultipleTypes) {
-  auto tokens = Lex("// line\n/* block */\n// another line");
-  ASSERT_EQ(tokens.size(), 1);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
-}
-
-TEST(LexerCh504, EmptyInput) {
-  auto tokens = Lex("");
-  ASSERT_EQ(tokens.size(), 1);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
-}
-
-TEST(LexerCh504, BlockCommentContainingNewlines) {
-  auto tokens = Lex("a /*\n\n\n*/ b");
-  ASSERT_EQ(tokens.size(), 3);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexerCh504, SlashStarSlashIsValidBlockComment) {
-  auto [tokens, errors] = LexWithDiag("/*/");
-  EXPECT_TRUE(errors);
-}
-
-TEST(LexerCh504, SlashStarStarSlashIsMinimalBlockComment) {
-  auto tokens = Lex("a /**/ b");
-  ASSERT_EQ(tokens.size(), 3);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexerCh504, NoErrorsForValidComments) {
+TEST(LexerClause05, Cl5_4_NoErrorsForValidComments) {
   auto [tokens, errors] = LexWithDiag(
       "module m; // line comment\n"
       "  /* block comment */\n"
@@ -285,3 +309,5 @@ TEST(LexerCh504, NoErrorsForValidComments) {
       "endmodule\n");
   EXPECT_FALSE(errors);
 }
+
+}  // namespace
