@@ -294,6 +294,14 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateSpecparamInParams(decl);
   ValidateEnumAssignments(decl);
   ValidateConstAssignments(decl);
+  // §3.14: Precision shall be at least as precise as the time unit.
+  if (decl->has_timeunit && decl->has_timeprecision) {
+    if (static_cast<int>(decl->time_prec) >
+        static_cast<int>(decl->time_unit)) {
+      diag_.Error(decl->range.start,
+                  "time precision is less precise than the time unit");
+    }
+  }
 }
 
 // §6.19 enum validation helpers

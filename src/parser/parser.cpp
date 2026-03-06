@@ -624,6 +624,11 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
     auto prec_tok = Consume();
     TimeUnit prec = TimeUnit::kNs;
     TryParseTimeUnit(prec_tok.text, prec);
+    // §3.14: Precision shall be at least as precise as the unit.
+    if (static_cast<int>(prec) > static_cast<int>(tu)) {
+      diag_.Error(prec_tok.loc,
+                  "time precision is less precise than the time unit");
+    }
     if (mod != nullptr && is_unit) {
       mod->time_prec = prec;
       mod->has_timeprecision = true;

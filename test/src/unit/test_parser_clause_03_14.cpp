@@ -57,4 +57,19 @@ TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
             static_cast<int8_t>(TimeUnit::kS));
 }
 
+// §3.14: Slash syntax with precision less precise than unit is an error.
+TEST(ParserClause03, Cl3_14_SlashPrecisionLessPreciseThanUnit) {
+  EXPECT_FALSE(ParseOk("module m; timeunit 1ps / 1ns; endmodule\n"));
+}
+
+// §3.14: Slash syntax with valid precision is ok.
+TEST(ParserClause03, Cl3_14_SlashPrecisionValid) {
+  EXPECT_TRUE(ParseOk("module m; timeunit 1ns / 1ps; endmodule\n"));
+}
+
+// §3.14: Slash syntax with equal precision is ok.
+TEST(ParserClause03, Cl3_14_SlashPrecisionEqualToUnit) {
+  EXPECT_TRUE(ParseOk("module m; timeunit 1ns / 1ns; endmodule\n"));
+}
+
 }  // namespace
