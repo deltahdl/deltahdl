@@ -98,7 +98,23 @@ TEST(LexerClause05, Cl5_1_UnbasedUnsizedLiteralRecognized) {
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-// --- Area 3: Built-in method calls (system identifiers) ---
+TEST(LexerClause05, Cl5_1_ArrayStructLiteralTokenRecognized) {
+  // '{ is the prefix for array and structure literals (§5.10/§5.11)
+  auto r = LexOne("'{");
+  EXPECT_EQ(r.token.kind, TokenKind::kApostropheLBrace);
+}
+
+TEST(LexerClause05, Cl5_1_TripleQuotedStringLiteralRecognized) {
+  auto r = LexOne("\"\"\"hello\"\"\"");
+  EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
+}
+
+TEST(LexerClause05, Cl5_1_EscapedIdentifierRecognized) {
+  auto r = LexOne("\\busa+index ");
+  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
+}
+
+// --- Area 3: Built-in method calls ---
 
 TEST(LexerClause05, Cl5_1_SystemIdentifierRecognized) {
   auto r = LexOne("$display");
@@ -109,6 +125,15 @@ TEST(LexerClause05, Cl5_1_SystemIdentifierPreservesDollarPrefix) {
   auto r = LexOne("$finish");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$finish");
+}
+
+TEST(LexerClause05, Cl5_1_DotTokenForBuiltinMethodCalls) {
+  // §5.13: built-in methods use dot notation (object.method)
+  auto tokens = Lex("arr.size");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kDot);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
 // --- Area 4: Attributes ---

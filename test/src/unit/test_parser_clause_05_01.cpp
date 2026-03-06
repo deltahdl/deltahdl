@@ -67,6 +67,65 @@ TEST(ParserClause05, Cl5_1_TimeLiteralInExpression) {
               "endmodule\n"));
 }
 
+TEST(ParserClause05, Cl5_1_UnbasedUnsizedLiteralInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic [15:0] x;\n"
+              "  assign x = '1;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_1_ArrayLiteralParses) {
+  // §5.11: array literals use assignment pattern syntax '{...}
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  int arr [0:1];\n"
+              "  initial arr = '{0, 1};\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_1_StructureLiteralParses) {
+  // §5.10: structure literals use assignment pattern syntax '{...}
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int a; int b; } ab_t;\n"
+              "  ab_t s;\n"
+              "  initial s = '{0, 1};\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_1_StructureLiteralWithNamedMembersParses) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int a; int b; } ab_t;\n"
+              "  ab_t s;\n"
+              "  initial s = '{a:0, b:1};\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_1_StructureLiteralWithDefaultParses) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef struct { int a; int b; } ab_t;\n"
+              "  ab_t s;\n"
+              "  initial s = '{default:0};\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_1_TripleQuotedStringInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $display(\"\"\"hello\"\"\");\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_1_EscapedIdentifierInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic \\bus+a ;\n"
+              "endmodule\n"));
+}
+
 // --- Area 3: Built-in method calls ---
 
 TEST(ParserClause05, Cl5_1_SystemTaskCallParses) {
@@ -84,6 +143,26 @@ TEST(ParserClause05, Cl5_1_SystemFunctionInExpression) {
       ParseOk("module t;\n"
               "  logic [31:0] x;\n"
               "  initial x = $random;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_1_BuiltinMethodCallParses) {
+  // §5.13: built-in methods use dot notation
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  int q[$];\n"
+              "  int sz;\n"
+              "  initial sz = q.size();\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_1_BuiltinMethodCallWithoutParensParses) {
+  // §5.13: empty parentheses are optional for no-argument methods
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  int q[$];\n"
+              "  int sz;\n"
+              "  initial sz = q.size;\n"
               "endmodule\n"));
 }
 

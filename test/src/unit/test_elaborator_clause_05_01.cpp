@@ -34,6 +34,58 @@ TEST(ElabClause05, Cl5_1_ModuleWithAttributeElaborates) {
              "endmodule\n"));
 }
 
+TEST(ElabClause05, Cl5_1_ModuleWithTimeLiteralElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  initial #10ns;\n"
+             "endmodule\n"));
+}
+
+TEST(ElabClause05, Cl5_1_ModuleWithUnbasedUnsizedLiteralElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [15:0] x;\n"
+             "  assign x = '1;\n"
+             "endmodule\n"));
+}
+
+TEST(ElabClause05, Cl5_1_ModuleWithArrayLiteralElaborates) {
+  // §5.11: array literals use '{ } syntax
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int arr [0:1];\n"
+             "  initial arr = '{0, 1};\n"
+             "endmodule\n"));
+}
+
+TEST(ElabClause05, Cl5_1_ModuleWithStructureLiteralElaborates) {
+  // §5.10: structure literals use '{ } syntax
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef struct { int a; int b; } ab_t;\n"
+             "  ab_t s;\n"
+             "  initial s = '{0, 1};\n"
+             "endmodule\n"));
+}
+
+TEST(ElabClause05, Cl5_1_ModuleWithBuiltinMethodElaborates) {
+  // §5.13: built-in methods use dot notation
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int q[$];\n"
+             "  int sz;\n"
+             "  initial sz = q.size();\n"
+             "endmodule\n"));
+}
+
+TEST(ElabClause05, Cl5_1_ModuleWithEscapedIdentifierElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic \\bus+a ;\n"
+             "  assign \\bus+a = 1'b0;\n"
+             "endmodule\n"));
+}
+
 TEST(ElabClause05, Cl5_1_AllFourAreasElaborate) {
   EXPECT_TRUE(
       ElabOk("(* optimize *) module t;\n"
