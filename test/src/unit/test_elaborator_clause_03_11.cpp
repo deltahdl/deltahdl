@@ -1,0 +1,66 @@
+#include "fixture_elaborator.h"
+
+namespace {
+
+// §3.11: Hierarchy is created by instantiation.
+
+TEST(ElabClause03, Cl3_11_TwoLevelHierarchyElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub(input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x, y;\n"
+      "  sub u0(.a(x), .b(y));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  EXPECT_FALSE(design->top_modules[0]->children.empty());
+}
+
+TEST(ElabClause03, Cl3_11_ThreeLevelHierarchyElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module leaf; endmodule\n"
+      "module mid; leaf u0(); endmodule\n"
+      "module top; mid u0(); endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ElabClause03, Cl3_11_GateLevelMux2to1Elaborates) {
+  EXPECT_TRUE(
+      ElabOk("module mux2to1 (input wire a, b, sel,\n"
+             "                output logic y);\n"
+             "  not g1 (sel_n, sel);\n"
+             "  and g2 (a_s, a, sel_n);\n"
+             "  and g3 (b_s, b, sel);\n"
+             "  or  g4 (y, a_s, b_s);\n"
+             "endmodule\n"
+             "module top;\n"
+             "  logic in1, in2, select;\n"
+             "  wire out1;\n"
+             "  mux2to1 m1 (.a(in1), .b(in2), .sel(select), .y(out1));\n"
+             "endmodule\n"));
+}
+
+TEST(ElabClause03, Cl3_11_PortCommunicationElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module inv(input logic a, output logic y);\n"
+      "  assign y = ~a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x, y;\n"
+      "  inv u0(.a(x), .y(y));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+}  // namespace
