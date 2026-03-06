@@ -124,28 +124,25 @@ def test_parse_args_missing_lrm(ic) -> None:
         ])
 
 
-def test_parse_args_sub_issue_is_int(ic, tmp_path) -> None:
-    """--sub-issue is parsed as an integer."""
+def _parse_issue_args(ic, tmp_path):
+    """Parse args with --sub-issue 42 --master-issue 1."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
-    args = ic.parse_args([
+    return ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
         "--sub-issue", "42", "--master-issue", "1",
         "--organization", "o", "--repo", "r",
     ])
-    assert args.sub_issue == 42
+
+
+def test_parse_args_sub_issue_is_int(ic, tmp_path) -> None:
+    """--sub-issue is parsed as an integer."""
+    assert _parse_issue_args(ic, tmp_path).sub_issue == 42
 
 
 def test_parse_args_master_issue_is_int(ic, tmp_path) -> None:
     """--master-issue is parsed as an integer."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    args = ic.parse_args([
-        "--lrm", str(lrm), "--clause", "4",
-        "--sub-issue", "42", "--master-issue", "1",
-        "--organization", "o", "--repo", "r",
-    ])
-    assert args.master_issue == 1
+    assert _parse_issue_args(ic, tmp_path).master_issue == 1
 
 
 def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
@@ -666,8 +663,8 @@ _MASTER_BODY = """\
 """
 
 
-def test_mark_master_complete_ticks_status(ic, monkeypatch) -> None:
-    """Row matching the sub-issue gets :white_check_mark: in Status."""
+def _mark_master_and_capture(ic, monkeypatch, sub_issue=6):
+    """Call mark_master_complete and return the updated body."""
     monkeypatch.setattr(
         "implement_clause.fetch_issue_body", lambda *_a: _MASTER_BODY,
     )
@@ -676,22 +673,20 @@ def test_mark_master_complete_ticks_status(ic, monkeypatch) -> None:
         "implement_clause.update_issue_body",
         lambda _o, _r, _i, body: updated.append(body),
     )
-    ic.mark_master_complete("o", "r", 1, 6)
-    assert "| #6 | :white_check_mark: |" in updated[0]
+    ic.mark_master_complete("o", "r", 1, sub_issue)
+    return updated[0] if updated else None
+
+
+def test_mark_master_complete_ticks_status(ic, monkeypatch) -> None:
+    """Row matching the sub-issue gets :white_check_mark: in Status."""
+    body = _mark_master_and_capture(ic, monkeypatch)
+    assert "| #6 | :white_check_mark: |" in body
 
 
 def test_mark_master_complete_preserves_other_rows(ic, monkeypatch) -> None:
     """Other rows are unchanged after marking."""
-    monkeypatch.setattr(
-        "implement_clause.fetch_issue_body", lambda *_a: _MASTER_BODY,
-    )
-    updated = []
-    monkeypatch.setattr(
-        "implement_clause.update_issue_body",
-        lambda _o, _r, _i, body: updated.append(body),
-    )
-    ic.mark_master_complete("o", "r", 1, 6)
-    assert "| #5 | :white_check_mark: |" in updated[0]
+    body = _mark_master_and_capture(ic, monkeypatch)
+    assert "| #5 | :white_check_mark: |" in body
 
 
 def test_mark_master_complete_warns_when_not_found(
