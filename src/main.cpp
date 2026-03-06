@@ -336,7 +336,8 @@ struct PreprocResult {
   uint32_t default_trireg_strength = 0;
   bool has_default_trireg_strength = false;
   // §E.4-E.7
-  delta::DelayModeDirective delay_mode_directive = delta::DelayModeDirective::kNone;
+  delta::DelayModeDirective delay_mode_directive =
+      delta::DelayModeDirective::kNone;
 };
 
 PreprocResult PreprocessSources(const CliOptions& opts,

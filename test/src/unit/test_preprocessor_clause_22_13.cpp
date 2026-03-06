@@ -61,8 +61,7 @@ TEST(Preprocessor, Line_InlineInExpression) {
 
 TEST(Preprocessor, FileAndLine_SameLine) {
   PreprocFixture f;
-  auto result =
-      Preprocess("$display(`__FILE__, `__LINE__);\n", f);
+  auto result = Preprocess("$display(`__FILE__, `__LINE__);\n", f);
   EXPECT_NE(result.find("\"<test>\""), std::string::npos);
   EXPECT_NE(result.find("1"), std::string::npos);
 }
@@ -90,8 +89,7 @@ TEST(Preprocessor, LineDirective_AffectsLineMacro) {
 
 TEST(Preprocessor, LineDirective_AffectsFileMacro) {
   PreprocFixture f;
-  auto result =
-      Preprocess("`line 1 \"overridden.sv\" 0\n`__FILE__\n", f);
+  auto result = Preprocess("`line 1 \"overridden.sv\" 0\n`__FILE__\n", f);
   EXPECT_NE(result.find("\"overridden.sv\""), std::string::npos);
 }
 
@@ -203,8 +201,7 @@ TEST(Preprocessor, FileAndLine_InsideIfdef) {
 
 TEST(Preprocessor, FileAndLine_InsideInactiveIfdef) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "`ifdef UNDEF\n`__FILE__\n`__LINE__\n`endif\n", f);
+  auto result = Preprocess("`ifdef UNDEF\n`__FILE__\n`__LINE__\n`endif\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   // Should not appear in output since branch is inactive.
   EXPECT_EQ(result.find("\"<test>\""), std::string::npos);

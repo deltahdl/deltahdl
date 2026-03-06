@@ -61,8 +61,7 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
 
   // §22.7: precision shall be at least as precise as the unit.
   if (static_cast<int>(ts.precision) > static_cast<int>(ts.unit)) {
-    diag_.Error(loc,
-                "`timescale precision is less precise than the time unit");
+    diag_.Error(loc, "`timescale precision is less precise than the time unit");
     return;
   }
 
@@ -331,7 +330,8 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
   for (char c : arg) val = val * 10 + (c - '0');
   // §E.3: value must be between 0 and 250.
   if (val > 250) {
-    diag_.Error(loc, "`default_trireg_strength value must be between 0 and 250");
+    diag_.Error(loc,
+                "`default_trireg_strength value must be between 0 and 250");
     return;
   }
   default_trireg_strength_ = val;

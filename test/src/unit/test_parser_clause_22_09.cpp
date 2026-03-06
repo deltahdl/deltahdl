@@ -22,7 +22,8 @@ TEST(ParserSection22, UnconnectedDrivePull0) {
                               "`nounconnected_drive\n"));
 }
 
-// --- §22.9: Directive without `nounconnected_drive (independent directives) ---
+// --- §22.9: Directive without `nounconnected_drive (independent directives)
+// ---
 
 TEST(ParserSection22, UnconnectedDrive_NoPairing) {
   EXPECT_TRUE(

@@ -81,8 +81,10 @@ TEST(Preprocessor, Celldefine_MostRecentWins) {
 TEST(Preprocessor, Celldefine_MultiplePairs) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("`celldefine\n`endcelldefine\n"
-                   "`celldefine\n`endcelldefine\n", f, pp);
+  PreprocessWithPP(
+      "`celldefine\n`endcelldefine\n"
+      "`celldefine\n`endcelldefine\n",
+      f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_FALSE(pp.InCelldefine());
 }
@@ -100,8 +102,8 @@ TEST(Preprocessor, Celldefine_InsideModule_NoError) {
 TEST(Preprocessor, Endcelldefine_InsideModule_NoError) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("`celldefine\nmodule t;\n`endcelldefine\nendmodule\n",
-                   f, pp);
+  PreprocessWithPP("`celldefine\nmodule t;\n`endcelldefine\nendmodule\n", f,
+                   pp);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_FALSE(pp.InCelldefine());
 }

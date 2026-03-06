@@ -15,7 +15,8 @@ struct IncludeTestDir {
   fs::path dir;
 
   IncludeTestDir() {
-    dir = fs::temp_directory_path() / ("delta_test_" + std::to_string(getpid()));
+    dir =
+        fs::temp_directory_path() / ("delta_test_" + std::to_string(getpid()));
     fs::create_directories(dir);
   }
 
@@ -39,7 +40,7 @@ TEST(Preprocessor, Include_DoubleQuote_ContentInsertion) {
 
   PreprocFixture f;
   auto fid = f.mgr.AddFile(tmp.dir / "top.sv",
-                            "`include \"defs.svh\"\nmodule m; endmodule\n");
+                           "`include \"defs.svh\"\nmodule m; endmodule\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
@@ -72,8 +73,8 @@ TEST(Preprocessor, Include_AngleBracket_DoesNotSearchSourceDir) {
   tmp.WriteFile("local.svh", "wire local_wire;\n");
 
   PreprocFixture f;
-  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
-                            "`include <local.svh>\n");
+  auto fid =
+      f.mgr.AddFile((tmp.dir / "top.sv").string(), "`include <local.svh>\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
@@ -115,7 +116,7 @@ TEST(Preprocessor, Include_RelativeToSourceDir) {
 
   PreprocFixture f;
   auto fid = f.mgr.AddFile((tmp.dir / "sub" / "top.sv").string(),
-                            "`include \"header.svh\"\n");
+                           "`include \"header.svh\"\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
@@ -153,7 +154,7 @@ TEST(Preprocessor, Include_NestedIncludes) {
 
   PreprocFixture f;
   auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
-                            "`include \"outer.svh\"\nmodule m; endmodule\n");
+                           "`include \"outer.svh\"\nmodule m; endmodule\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
@@ -169,8 +170,8 @@ TEST(Preprocessor, Include_MaxDepthExceeded) {
   auto path = tmp.WriteFile("self.svh", "`include \"self.svh\"\n");
 
   PreprocFixture f;
-  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
-                            "`include \"self.svh\"\n");
+  auto fid =
+      f.mgr.AddFile((tmp.dir / "top.sv").string(), "`include \"self.svh\"\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
@@ -201,8 +202,7 @@ TEST(Preprocessor, Include_MissingFilename) {
 
 TEST(Preprocessor, Include_CommentAfterFilename_OK) {
   PreprocFixture f;
-  auto result =
-      Preprocess("`include \"/dev/null\" // this is a comment\n", f);
+  auto result = Preprocess("`include \"/dev/null\" // this is a comment\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
@@ -218,7 +218,7 @@ TEST(Preprocessor, Include_NonCommentTextAfterFilename_Error) {
 
   PreprocFixture f;
   auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
-                            "`include \"ok.svh\" wire extra;\n");
+                           "`include \"ok.svh\" wire extra;\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
@@ -229,11 +229,11 @@ TEST(Preprocessor, Include_NonCommentTextAfterFilename_Error) {
 
 TEST(Preprocessor, Include_MacroExpansionInFilename) {
   PreprocFixture f;
-  auto result =
-      Preprocess("`define NULL_FILE \"/dev/null\"\n"
-                 "`include `NULL_FILE\n"
-                 "module m; endmodule\n",
-                 f);
+  auto result = Preprocess(
+      "`define NULL_FILE \"/dev/null\"\n"
+      "`include `NULL_FILE\n"
+      "module m; endmodule\n",
+      f);
 
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("module m;"), std::string::npos);
@@ -243,13 +243,13 @@ TEST(Preprocessor, Include_MacroExpansionInFilename) {
 
 TEST(Preprocessor, Include_InsideIfdef_Active) {
   PreprocFixture f;
-  auto result =
-      Preprocess("`define HAVE_INC\n"
-                 "`ifdef HAVE_INC\n"
-                 "`include \"/dev/null\"\n"
-                 "`endif\n"
-                 "module m; endmodule\n",
-                 f);
+  auto result = Preprocess(
+      "`define HAVE_INC\n"
+      "`ifdef HAVE_INC\n"
+      "`include \"/dev/null\"\n"
+      "`endif\n"
+      "module m; endmodule\n",
+      f);
 
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("module m;"), std::string::npos);
@@ -257,12 +257,12 @@ TEST(Preprocessor, Include_InsideIfdef_Active) {
 
 TEST(Preprocessor, Include_InsideIfdef_Inactive) {
   PreprocFixture f;
-  auto result =
-      Preprocess("`ifdef UNDEFINED_MACRO\n"
-                 "`include \"nonexistent_file.svh\"\n"
-                 "`endif\n"
-                 "module m; endmodule\n",
-                 f);
+  auto result = Preprocess(
+      "`ifdef UNDEFINED_MACRO\n"
+      "`include \"nonexistent_file.svh\"\n"
+      "`endif\n"
+      "module m; endmodule\n",
+      f);
 
   // Should NOT error because include is inside inactive branch.
   EXPECT_FALSE(f.diag.HasErrors());
@@ -277,9 +277,10 @@ TEST(Preprocessor, Include_AnywhereInSource) {
   tmp.WriteFile("body.svh", "assign b = a;\n");
 
   PreprocFixture f;
-  auto fid = f.mgr.AddFile(
-      (tmp.dir / "top.sv").string(),
-      "module m(\n`include \"port_list.svh\"\n);\n`include \"body.svh\"\nendmodule\n");
+  auto fid =
+      f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                    "module m(\n`include \"port_list.svh\"\n);\n`include "
+                    "\"body.svh\"\nendmodule\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
@@ -292,8 +293,7 @@ TEST(Preprocessor, Include_AnywhereInSource) {
 
 TEST(Preprocessor, Include_BlockCommentAfterFilename_OK) {
   PreprocFixture f;
-  auto result =
-      Preprocess("`include \"/dev/null\" /* block comment */\n", f);
+  auto result = Preprocess("`include \"/dev/null\" /* block comment */\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
@@ -310,7 +310,7 @@ TEST(Preprocessor, Include_SourceDirBeforeIncludeDirs) {
   PreprocConfig cfg;
   cfg.include_dirs.push_back((tmp.dir / "inc_dir").string());
   auto fid = f.mgr.AddFile((tmp.dir / "src_dir" / "top.sv").string(),
-                            "`include \"priority.svh\"\n");
+                           "`include \"priority.svh\"\n");
   Preprocessor pp(f.mgr, f.diag, std::move(cfg));
   auto result = pp.Preprocess(fid);
 
@@ -328,8 +328,8 @@ TEST(Preprocessor, Include_DefinedMacrosAvailableAfterInclude) {
 
   PreprocFixture f;
   auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
-                            "`include \"macros.svh\"\n"
-                            "logic [`WIDTH-1:0] data;\n");
+                           "`include \"macros.svh\"\n"
+                           "logic [`WIDTH-1:0] data;\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
@@ -344,10 +344,9 @@ TEST(Preprocessor, Include_FromMacroBodyExpansion) {
   tmp.WriteFile("via_macro.svh", "wire via_macro;\n");
 
   PreprocFixture f;
-  auto fid = f.mgr.AddFile(
-      (tmp.dir / "top.sv").string(),
-      "`define DO_INCLUDE `include \"via_macro.svh\"\n"
-      "`DO_INCLUDE\n");
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`define DO_INCLUDE `include \"via_macro.svh\"\n"
+                           "`DO_INCLUDE\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
@@ -391,7 +390,7 @@ TEST(Preprocessor, Include_SubdirectoryRelativePath) {
 
   PreprocFixture f;
   auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
-                            "`include \"parts/count.v\"\n");
+                           "`include \"parts/count.v\"\n");
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 

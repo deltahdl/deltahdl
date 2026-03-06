@@ -100,16 +100,15 @@ TEST(Preprocessor, NounconnectedDrive_InsideModule_Error) {
 TEST(Preprocessor, UnconnectedDrive_InsideInterface_Error) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("interface t;\n`unconnected_drive pull1\nendinterface\n",
-                   f, pp);
+  PreprocessWithPP("interface t;\n`unconnected_drive pull1\nendinterface\n", f,
+                   pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(Preprocessor, UnconnectedDrive_InsideProgram_Error) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("program t;\n`unconnected_drive pull1\nendprogram\n",
-                   f, pp);
+  PreprocessWithPP("program t;\n`unconnected_drive pull1\nendprogram\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 

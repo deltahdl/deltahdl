@@ -214,7 +214,8 @@ TEST(Preprocessor, Timescale_GlobalPrecisionTracksFines) {
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP(
       "`timescale 1ns / 1ps\n"
-      "`timescale 1us / 1ns\n", f, pp);
+      "`timescale 1us / 1ns\n",
+      f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
 }

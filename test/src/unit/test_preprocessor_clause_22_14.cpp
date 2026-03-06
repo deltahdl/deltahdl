@@ -14,9 +14,11 @@ namespace {
 
 TEST(PreprocSection22_14, BeginKeywordsEmitsMarker) {
   PreprocFixture f;
-  auto out = Preprocess("`begin_keywords \"1800-2023\"\n"
-                        "module t; endmodule\n"
-                        "`end_keywords\n", f);
+  auto out = Preprocess(
+      "`begin_keywords \"1800-2023\"\n"
+      "module t; endmodule\n"
+      "`end_keywords\n",
+      f);
   // Output should contain at least two keyword markers.
   size_t first = out.find(kKeywordMarker);
   ASSERT_NE(first, std::string::npos);
@@ -26,10 +28,12 @@ TEST(PreprocSection22_14, BeginKeywordsEmitsMarker) {
 
 TEST(PreprocSection22_14, EndKeywordsRestoresDefault) {
   PreprocFixture f;
-  auto out = Preprocess("`begin_keywords \"1364-1995\"\n"
-                        "x\n"
-                        "`end_keywords\n"
-                        "y\n", f);
+  auto out = Preprocess(
+      "`begin_keywords \"1364-1995\"\n"
+      "x\n"
+      "`end_keywords\n"
+      "y\n",
+      f);
   // After `end_keywords, a second marker should restore to 1800-2023.
   size_t first = out.find(kKeywordMarker);
   ASSERT_NE(first, std::string::npos);
@@ -61,7 +65,8 @@ TEST(PreprocSection22_14, AllVersionSpecifiersRecognized) {
   };
   for (const auto& c : kCases) {
     PreprocFixture f;
-    std::string src = "`begin_keywords \"" + std::string(c.spec) + "\"\n"
+    std::string src = "`begin_keywords \"" + std::string(c.spec) +
+                      "\"\n"
                       "x\n`end_keywords\n";
     auto out = Preprocess(src, f);
     EXPECT_FALSE(f.diag.HasErrors()) << c.spec;
@@ -112,13 +117,15 @@ TEST(PreprocSection22_14, ErrorEmptyVersionString) {
 
 TEST(PreprocSection22_14, NestedBeginKeywords) {
   PreprocFixture f;
-  auto out = Preprocess("`begin_keywords \"1800-2005\"\n"
-                        "a\n"
-                        "`begin_keywords \"1364-1995\"\n"
-                        "b\n"
-                        "`end_keywords\n"
-                        "c\n"
-                        "`end_keywords\n", f);
+  auto out = Preprocess(
+      "`begin_keywords \"1800-2005\"\n"
+      "a\n"
+      "`begin_keywords \"1364-1995\"\n"
+      "b\n"
+      "`end_keywords\n"
+      "c\n"
+      "`end_keywords\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
 
   // Expect markers: 1800-2005, then 1364-1995, then 1800-2005, then 1800-2023.
@@ -146,13 +153,15 @@ TEST(PreprocSection22_14, NestedBeginKeywords) {
 
 TEST(PreprocSection22_14, DoubleNestedBeginKeywords) {
   PreprocFixture f;
-  auto out = Preprocess("`begin_keywords \"1800-2012\"\n"
-                        "`begin_keywords \"1800-2005\"\n"
-                        "`begin_keywords \"1364-2001\"\n"
-                        "x\n"
-                        "`end_keywords\n"
-                        "`end_keywords\n"
-                        "`end_keywords\n", f);
+  auto out = Preprocess(
+      "`begin_keywords \"1800-2012\"\n"
+      "`begin_keywords \"1800-2005\"\n"
+      "`begin_keywords \"1364-2001\"\n"
+      "x\n"
+      "`end_keywords\n"
+      "`end_keywords\n"
+      "`end_keywords\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
@@ -162,10 +171,12 @@ TEST(PreprocSection22_14, DoubleNestedBeginKeywords) {
 
 TEST(PreprocSection22_14, ResetallDoesNotAffectKeywordVersion) {
   PreprocFixture f;
-  auto out = Preprocess("`begin_keywords \"1364-1995\"\n"
-                        "`resetall\n"
-                        "x\n"
-                        "`end_keywords\n", f);
+  auto out = Preprocess(
+      "`begin_keywords \"1364-1995\"\n"
+      "`resetall\n"
+      "x\n"
+      "`end_keywords\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
   // end_keywords should still work (stack was not cleared by resetall).
 }
@@ -176,19 +187,23 @@ TEST(PreprocSection22_14, ResetallDoesNotAffectKeywordVersion) {
 
 TEST(PreprocSection22_14, ErrorBeginKeywordsInsideDesignElement) {
   PreprocFixture f;
-  Preprocess("module m;\n"
-             "`begin_keywords \"1800-2023\"\n"
-             "`end_keywords\n"
-             "endmodule\n", f);
+  Preprocess(
+      "module m;\n"
+      "`begin_keywords \"1800-2023\"\n"
+      "`end_keywords\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(PreprocSection22_14, ErrorEndKeywordsInsideDesignElement) {
   PreprocFixture f;
-  Preprocess("`begin_keywords \"1800-2023\"\n"
-             "module m;\n"
-             "`end_keywords\n"
-             "endmodule\n", f);
+  Preprocess(
+      "`begin_keywords \"1800-2023\"\n"
+      "module m;\n"
+      "`end_keywords\n"
+      "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
@@ -198,10 +213,12 @@ TEST(PreprocSection22_14, ErrorEndKeywordsInsideDesignElement) {
 
 TEST(PreprocSection22_14, BeginKeywordsInFalseIfdef) {
   PreprocFixture f;
-  auto out = Preprocess("`ifdef UNDEFINED\n"
-                        "`begin_keywords \"1364-1995\"\n"
-                        "`endif\n"
-                        "logic x;\n", f);
+  auto out = Preprocess(
+      "`ifdef UNDEFINED\n"
+      "`begin_keywords \"1364-1995\"\n"
+      "`endif\n"
+      "logic x;\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
   // No keyword marker should be emitted when skipped by ifdef.
   EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
@@ -213,12 +230,15 @@ TEST(PreprocSection22_14, BeginKeywordsInFalseIfdef) {
 
 TEST(PreprocSection22_14, LexerSeesVersionSwitch) {
   PreprocFixture f;
-  auto out = Preprocess("`begin_keywords \"1364-2001\"\n"
-                        "logic\n"
-                        "`end_keywords\n", f);
+  auto out = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "logic\n"
+      "`end_keywords\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
 
-  // Lex the preprocessed output; "logic" should be an identifier under 1364-2001.
+  // Lex the preprocessed output; "logic" should be an identifier under
+  // 1364-2001.
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", out);
@@ -237,10 +257,12 @@ TEST(PreprocSection22_14, LexerSeesVersionSwitch) {
 
 TEST(PreprocSection22_14, LexerSeesKeywordAfterEndKeywords) {
   PreprocFixture f;
-  auto out = Preprocess("`begin_keywords \"1364-2001\"\n"
-                        "logic\n"
-                        "`end_keywords\n"
-                        "logic\n", f);
+  auto out = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "logic\n"
+      "`end_keywords\n"
+      "logic\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
 
   SourceManager mgr;
@@ -267,9 +289,11 @@ TEST(PreprocSection22_14, LexerSeesKeywordAfterEndKeywords) {
 
 TEST(PreprocSection22_14, LogicAsIdentifierUnder1364_2001) {
   PreprocFixture f;
-  auto out = Preprocess("`begin_keywords \"1364-2001\"\n"
-                        "logic\n"
-                        "`end_keywords\n", f);
+  auto out = Preprocess(
+      "`begin_keywords \"1364-2001\"\n"
+      "logic\n"
+      "`end_keywords\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
 
   SourceManager mgr;
@@ -294,9 +318,11 @@ TEST(PreprocSection22_14, LogicAsIdentifierUnder1364_2001) {
 
 TEST(PreprocSection22_14, InterfaceNotKeywordUnder1364_2005) {
   PreprocFixture f;
-  auto out = Preprocess("`begin_keywords \"1364-2005\"\n"
-                        "interface\n"
-                        "`end_keywords\n", f);
+  auto out = Preprocess(
+      "`begin_keywords \"1364-2005\"\n"
+      "interface\n"
+      "`end_keywords\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
 
   SourceManager mgr;
@@ -321,8 +347,10 @@ TEST(PreprocSection22_14, InterfaceNotKeywordUnder1364_2005) {
 
 TEST(PreprocSection22_14, MarkerFormatCorrect) {
   PreprocFixture f;
-  auto out = Preprocess("`begin_keywords \"1800-2009\"\n"
-                        "`end_keywords\n", f);
+  auto out = Preprocess(
+      "`begin_keywords \"1800-2009\"\n"
+      "`end_keywords\n",
+      f);
   auto pos = out.find(kKeywordMarker);
   ASSERT_NE(pos, std::string::npos);
   ASSERT_LT(pos + 2, out.size());

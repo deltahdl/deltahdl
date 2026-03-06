@@ -26,16 +26,22 @@ TEST(Lexer, KeywordVersion_1364_2005_LogicIsNotKeyword) {
 
 TEST(Lexer, KeywordVersion_1364_2005_Includes1364_2001Keywords) {
   // Table 22-2 keywords should be present.
-  EXPECT_TRUE(LookupKeyword("automatic", KeywordVersion::kVer13642005).has_value());
-  EXPECT_TRUE(LookupKeyword("generate", KeywordVersion::kVer13642005).has_value());
-  EXPECT_TRUE(LookupKeyword("localparam", KeywordVersion::kVer13642005).has_value());
-  EXPECT_TRUE(LookupKeyword("signed", KeywordVersion::kVer13642005).has_value());
-  EXPECT_TRUE(LookupKeyword("unsigned", KeywordVersion::kVer13642005).has_value());
+  EXPECT_TRUE(
+      LookupKeyword("automatic", KeywordVersion::kVer13642005).has_value());
+  EXPECT_TRUE(
+      LookupKeyword("generate", KeywordVersion::kVer13642005).has_value());
+  EXPECT_TRUE(
+      LookupKeyword("localparam", KeywordVersion::kVer13642005).has_value());
+  EXPECT_TRUE(
+      LookupKeyword("signed", KeywordVersion::kVer13642005).has_value());
+  EXPECT_TRUE(
+      LookupKeyword("unsigned", KeywordVersion::kVer13642005).has_value());
 }
 
 TEST(Lexer, KeywordVersion_1364_2005_Includes1364_1995Keywords) {
   // Table 22-1 keywords should be present.
-  EXPECT_TRUE(LookupKeyword("module", KeywordVersion::kVer13642005).has_value());
+  EXPECT_TRUE(
+      LookupKeyword("module", KeywordVersion::kVer13642005).has_value());
   EXPECT_TRUE(LookupKeyword("wire", KeywordVersion::kVer13642005).has_value());
   EXPECT_TRUE(LookupKeyword("reg", KeywordVersion::kVer13642005).has_value());
 }

@@ -87,8 +87,9 @@ TEST(ParserClause03, Cl3_1_PrimitiveIsParsedAsUdp) {
 }
 
 TEST(ParserClause03, Cl3_1_ConfigIsParsedAsConfig) {
-  auto r = Parse("module m; endmodule\n"
-                  "config cfg; design m; endconfig\n");
+  auto r = Parse(
+      "module m; endmodule\n"
+      "config cfg; design m; endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
@@ -112,8 +113,9 @@ TEST(ParserClause03, Cl3_1_DesignElementsSortedIntoCorrectCollections) {
 }
 
 TEST(ParserClause03, Cl3_1_MultipleModulesInOneCU) {
-  auto r = Parse("module a; endmodule\nmodule b; endmodule\n"
-                  "module c; endmodule\n");
+  auto r = Parse(
+      "module a; endmodule\nmodule b; endmodule\n"
+      "module c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 3u);

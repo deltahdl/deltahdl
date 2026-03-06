@@ -114,10 +114,10 @@ TEST(Preprocessor, Clause22_2_ResetallInBlockCommentIgnored) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
-      "`timescale 1ns / 1ps\n"
-      "/*\n"
-      "`resetall\n"
-      "*/\n");
+                           "`timescale 1ns / 1ps\n"
+                           "/*\n"
+                           "`resetall\n"
+                           "*/\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   // `resetall inside block comment should NOT reset the timescale.
@@ -128,9 +128,7 @@ TEST(Preprocessor, Clause22_2_ResetallInBlockCommentIgnored) {
 
 TEST(Preprocessor, Clause22_2_DirectiveInStringLiteralIgnored) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "string s = \"`define FOO 1\";\n",
-      f);
+  auto result = Preprocess("string s = \"`define FOO 1\";\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   // `define inside a string literal should NOT create a macro.
   EXPECT_NE(result.find("\"`define FOO 1\""), std::string::npos);
@@ -192,9 +190,9 @@ TEST(Preprocessor, Clause22_2_DirectiveInInactiveConditionalBlockSkipped) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
-      "`ifdef UNDEFINED_MACRO\n"
-      "`timescale 1us / 1ns\n"
-      "`endif\n");
+                           "`ifdef UNDEFINED_MACRO\n"
+                           "`timescale 1us / 1ns\n"
+                           "`endif\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   // The timescale directive in the inactive branch should NOT be processed.
@@ -207,8 +205,8 @@ TEST(Preprocessor, Clause22_2_DirectiveInMacroTextProcessedOnExpansion) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
-      "`define SET_TIMESCALE `timescale 1ns / 1ps\n"
-      "`SET_TIMESCALE\n");
+                           "`define SET_TIMESCALE `timescale 1ns / 1ps\n"
+                           "`SET_TIMESCALE\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(pp.HasTimescale());
@@ -331,27 +329,21 @@ TEST(Preprocessor, Clause22_2_CodeAfterEndcelldefineOnSameLine) {
 
 TEST(Preprocessor, Clause22_2_CodeAfterResetallOnSameLine) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "`resetall int x = 1;\n",
-      f);
+  auto result = Preprocess("`resetall int x = 1;\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
 TEST(Preprocessor, Clause22_2_CodeAfterNounconnectedDriveOnSameLine) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "`nounconnected_drive int x = 1;\n",
-      f);
+  auto result = Preprocess("`nounconnected_drive int x = 1;\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
 TEST(Preprocessor, Clause22_2_CodeAfterUndefineallOnSameLine) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "`undefineall int x = 1;\n",
-      f);
+  auto result = Preprocess("`undefineall int x = 1;\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
@@ -375,8 +367,8 @@ TEST(Preprocessor, Clause22_2_DirectiveSupersededByAnother) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
-      "`default_nettype none\n"
-      "`default_nettype wire\n");
+                           "`default_nettype none\n"
+                           "`default_nettype wire\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
@@ -412,8 +404,7 @@ TEST(Preprocessor, Clause22_2_TimescaleOnSingleLine) {
 TEST(Preprocessor, Clause22_2_BlockCommentEndFollowedByDirective) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  auto fid = f.mgr.AddFile("<test>",
-      "/* comment */ `timescale 1ns / 1ps\n");
+  auto fid = f.mgr.AddFile("<test>", "/* comment */ `timescale 1ns / 1ps\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(pp.HasTimescale());
@@ -423,9 +414,9 @@ TEST(Preprocessor, Clause22_2_MultilineBlockCommentEndFollowedByDirective) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
-      "/*\n"
-      "multi-line comment\n"
-      "*/ `timescale 1ns / 1ps\n");
+                           "/*\n"
+                           "multi-line comment\n"
+                           "*/ `timescale 1ns / 1ps\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(pp.HasTimescale());
@@ -435,9 +426,7 @@ TEST(Preprocessor, Clause22_2_MultilineBlockCommentEndFollowedByDirective) {
 
 TEST(Preprocessor, Clause22_2_EscapedBacktickInStringNotDirective) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "string s = \"value is \\`FOO\";\n",
-      f);
+  auto result = Preprocess("string s = \"value is \\`FOO\";\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
@@ -447,9 +436,9 @@ TEST(Preprocessor, Clause22_2_MultipleDirectivesScopeChaining) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
-      "`default_nettype none\n"
-      "`celldefine\n"
-      "`timescale 1ns / 1ps\n");
+                           "`default_nettype none\n"
+                           "`celldefine\n"
+                           "`timescale 1ns / 1ps\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);

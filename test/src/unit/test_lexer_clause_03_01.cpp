@@ -78,9 +78,8 @@ TEST(LexerClause03, Cl3_1_EndconfigKeyword) {
 }
 
 TEST(LexerClause03, Cl3_1_DesignElementKeywordsAreNotIdentifiers) {
-  const char* keywords[] = {"module",    "program",   "interface",
-                             "checker",  "package",   "primitive",
-                             "config"};
+  const char* keywords[] = {"module",  "program",   "interface", "checker",
+                            "package", "primitive", "config"};
   for (const auto* kw : keywords) {
     auto r = LexOne(kw);
     EXPECT_NE(r.token.kind, TokenKind::kIdentifier)

@@ -327,8 +327,8 @@ TEST(Preprocessor, Clause22_5_1_DirectiveInMacroTextProcessedOnExpansion) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
-      "`define SET_TS `timescale 1ns / 1ps\n"
-      "`SET_TS\n");
+                           "`define SET_TS `timescale 1ns / 1ps\n"
+                           "`SET_TS\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(pp.HasTimescale());

@@ -245,8 +245,7 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
             ProcessDirective(remainder, file_id, line_num, depth, output);
         if (!handled && IsActive()) {
           auto stripped = StripComments(remainder, in_block_comment_);
-          auto expanded =
-              ExpandInlineMacros(stripped, file_id, line_num);
+          auto expanded = ExpandInlineMacros(stripped, file_id, line_num);
           TrackDesignElement(Trim(expanded));
           output.append(expanded);
         }
@@ -279,9 +278,8 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 // §22.2: Output text that follows a directive with a defined end on the
 // same line.  Applies macro expansion and comment stripping.
 void Preprocessor::OutputRemainder(std::string_view line,
-                                   std::string_view directive,
-                                   uint32_t file_id, uint32_t line_num,
-                                   std::string& output) {
+                                   std::string_view directive, uint32_t file_id,
+                                   uint32_t line_num, std::string& output) {
   auto rest = AfterDirective(line, directive);
   if (rest.empty()) return;
   auto stripped = StripComments(rest, in_block_comment_);
@@ -385,8 +383,8 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
                   "`default_trireg_strength illegal inside a design element");
       return true;
     }
-    HandleDefaultTriregStrength(
-        AfterDirective(line, "default_trireg_strength"), loc);
+    HandleDefaultTriregStrength(AfterDirective(line, "default_trireg_strength"),
+                                loc);
     return true;
   }
   if (StartsWithDirective(line, "delay_mode_distributed")) {
@@ -483,9 +481,9 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
 }
 
 bool Preprocessor::ProcessConditionalDirective(std::string_view line,
-                                                uint32_t file_id,
-                                                uint32_t line_num,
-                                                std::string& output) {
+                                               uint32_t file_id,
+                                               uint32_t line_num,
+                                               std::string& output) {
   if (StartsWithDirective(line, "ifdef")) {
     HandleIfdef(AfterDirective(line, "ifdef"), false);
     return true;
@@ -674,8 +672,7 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
       return i;
     }
     args_text = balanced.substr(1, balanced.size() - 2);
-    if (!ValidateMacroArgCount(*def, args_text, {file_id, line_num, 1},
-                               name)) {
+    if (!ValidateMacroArgCount(*def, args_text, {file_id, line_num, 1}, name)) {
       result.append(line.substr(pos, i - pos));
       return i;
     }
@@ -893,7 +890,8 @@ bool Preprocessor::EvalIfdefExpr(std::string_view expr) {
 bool Preprocessor::EvalIfdefEquiv(std::string_view& expr) {
   bool result = EvalIfdefImpl(expr);
   SkipSpaces(expr);
-  while (expr.size() >= 3 && expr[0] == '<' && expr[1] == '-' && expr[2] == '>') {
+  while (expr.size() >= 3 && expr[0] == '<' && expr[1] == '-' &&
+         expr[2] == '>') {
     expr.remove_prefix(3);
     bool rhs = EvalIfdefImpl(expr);
     result = (result == rhs);
@@ -980,10 +978,9 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
   }
 
   // §22.4: Only whitespace or a comment may follow the include filename.
-  if (!after_close.empty() && !(after_close.size() >= 2 &&
-                                 after_close[0] == '/' &&
-                                 (after_close[1] == '/' ||
-                                  after_close[1] == '*'))) {
+  if (!after_close.empty() &&
+      !(after_close.size() >= 2 && after_close[0] == '/' &&
+        (after_close[1] == '/' || after_close[1] == '*'))) {
     diag_.Error(loc,
                 "only whitespace or a comment may follow `include filename");
   }
@@ -995,8 +992,7 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
 
   // §22.4: Absolute paths are only allowed with the double-quote form.
   if (angle_bracket && !fn.empty() && fn[0] == '/') {
-    diag_.Error(loc,
-                "absolute path not allowed with angle-bracket `include");
+    diag_.Error(loc, "absolute path not allowed with angle-bracket `include");
     return;
   }
 

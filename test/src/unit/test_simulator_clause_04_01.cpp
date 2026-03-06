@@ -64,9 +64,7 @@ TEST(SimCh41, EmptySchedulerTerminatesImmediately) {
 
 // --- Area 2: Stratified event scheduling algorithm ---
 
-TEST(SimCh41, AllSeventeenRegionsPresent) {
-  EXPECT_EQ(kRegionCount, 17u);
-}
+TEST(SimCh41, AllSeventeenRegionsPresent) { EXPECT_EQ(kRegionCount, 17u); }
 
 TEST(SimCh41, StratifiedRegionsExecuteInOrder) {
   VerifyAllRegionsExecuteInOrder();
@@ -81,9 +79,7 @@ TEST(SimCh41, ActiveSetIteratesBeforeReactiveSet) {
   active->callback = [&]() {
     order.push_back("active");
     auto* inactive = sched.GetEventPool().Acquire();
-    inactive->callback = [&]() {
-      order.push_back("inactive");
-    };
+    inactive->callback = [&]() { order.push_back("inactive"); };
     sched.ScheduleEvent(sched.CurrentTime(), Region::kInactive, inactive);
   };
   sched.ScheduleEvent({0}, Region::kActive, active);
@@ -209,21 +205,19 @@ TEST(SimCh41, PLIRegionsExistInEnum) {
   // PLI regions: PreActive, PreNBA, PostNBA, PreObserved,
   // PostObserved, PreReNBA, PostReNBA, PrePostponed
   EXPECT_LT(static_cast<int>(Region::kPreActive),
-             static_cast<int>(Region::kActive));
-  EXPECT_LT(static_cast<int>(Region::kPreNBA),
-             static_cast<int>(Region::kNBA));
-  EXPECT_GT(static_cast<int>(Region::kPostNBA),
-             static_cast<int>(Region::kNBA));
+            static_cast<int>(Region::kActive));
+  EXPECT_LT(static_cast<int>(Region::kPreNBA), static_cast<int>(Region::kNBA));
+  EXPECT_GT(static_cast<int>(Region::kPostNBA), static_cast<int>(Region::kNBA));
   EXPECT_LT(static_cast<int>(Region::kPreObserved),
-             static_cast<int>(Region::kObserved));
+            static_cast<int>(Region::kObserved));
   EXPECT_GT(static_cast<int>(Region::kPostObserved),
-             static_cast<int>(Region::kObserved));
+            static_cast<int>(Region::kObserved));
   EXPECT_LT(static_cast<int>(Region::kPreReNBA),
-             static_cast<int>(Region::kReNBA));
+            static_cast<int>(Region::kReNBA));
   EXPECT_GT(static_cast<int>(Region::kPostReNBA),
-             static_cast<int>(Region::kReNBA));
+            static_cast<int>(Region::kReNBA));
   EXPECT_LT(static_cast<int>(Region::kPrePostponed),
-             static_cast<int>(Region::kPostponed));
+            static_cast<int>(Region::kPostponed));
 }
 
 TEST(SimCh41, PLIPreActiveBeforeSimulationActive) {
@@ -237,8 +231,7 @@ TEST(SimCh41, PLIPrePostponedBeforePostponed) {
 }
 
 TEST(SimCh41, PLIPostNBAAfterNBABeforePreObserved) {
-  VerifyThreeRegionOrder({Region::kNBA, "nba"},
-                         {Region::kPostNBA, "post_nba"},
+  VerifyThreeRegionOrder({Region::kNBA, "nba"}, {Region::kPostNBA, "post_nba"},
                          {Region::kPreObserved, "pre_observed"});
 }
 

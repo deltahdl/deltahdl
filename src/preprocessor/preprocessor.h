@@ -134,7 +134,7 @@ class Preprocessor {
   std::string line_file_override_;
   std::vector<KeywordVersion> keyword_version_stack_;
   uint32_t design_element_depth_ = 0;  // §22.3: for resetall validation.
-  bool in_block_comment_ = false;       // §22.2: track /* */ across lines.
+  bool in_block_comment_ = false;      // §22.2: track /* */ across lines.
   // Annex E state.
   uint64_t default_decay_time_ = 0;
   double default_decay_time_real_ = 0.0;

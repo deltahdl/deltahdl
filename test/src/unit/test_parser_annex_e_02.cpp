@@ -7,8 +7,8 @@ namespace {
 
 // §E.2: `default_decay_time integer before module.
 TEST(ParserAnnexE, AnnexEDefaultDecayTimeInteger) {
-  auto r = ParseWithPreprocessor(
-      "`default_decay_time 10\nmodule m; endmodule\n");
+  auto r =
+      ParseWithPreprocessor("`default_decay_time 10\nmodule m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules.size(), 1u);
@@ -17,8 +17,8 @@ TEST(ParserAnnexE, AnnexEDefaultDecayTimeInteger) {
 
 // §E.2: `default_decay_time real before module.
 TEST(ParserAnnexE, AnnexEDefaultDecayTimeReal) {
-  auto r = ParseWithPreprocessor(
-      "`default_decay_time 3.5\nmodule m; endmodule\n");
+  auto r =
+      ParseWithPreprocessor("`default_decay_time 3.5\nmodule m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules.size(), 1u);

@@ -198,8 +198,7 @@ TEST(Preprocessor, Line_AffectsUnderscoreFileMacro) {
 TEST(Preprocessor, Line_IncrementAfterDirective) {
   PreprocFixture f;
   // `line 10 sets the *following* line to 10. Lines after increment.
-  auto out =
-      Preprocess("`line 10 \"f.sv\" 0\nfirst\n`__LINE__\n", f);
+  auto out = Preprocess("`line 10 \"f.sv\" 0\nfirst\n`__LINE__\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   // `__LINE__ is on source line 3. Override at source line 1.
   // Effective = 10 + (3 - 2) = 11.
@@ -230,8 +229,8 @@ TEST(Preprocessor, Line_InsideIfdef_Active) {
 TEST(Preprocessor, Line_InsideIfdef_Inactive) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP(
-      "`ifdef UNDEF_FLAG\n`line 99 \"cond.sv\" 0\n`endif\n", f, pp);
+  PreprocessWithPP("`ifdef UNDEF_FLAG\n`line 99 \"cond.sv\" 0\n`endif\n", f,
+                   pp);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_FALSE(pp.HasLineOverride());
 }

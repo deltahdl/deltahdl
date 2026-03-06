@@ -130,12 +130,12 @@ TEST(LexerClause05, Cl5_1_AttributeEndTokenRecognized) {
 // --- Integration: all four areas in one token stream ---
 
 TEST(LexerClause05, Cl5_1_AllFourAreasInOneStream) {
-  auto tokens = Lex(
-      "(* full_case *) module t; // comment\n"
-      "  logic [7:0] x = 8'hFF + 1;\n"
-      "  real r = 3.14;\n"
-      "  initial $display(\"msg\");\n"
-      "endmodule\n");
+  auto tokens =
+      Lex("(* full_case *) module t; // comment\n"
+          "  logic [7:0] x = 8'hFF + 1;\n"
+          "  real r = 3.14;\n"
+          "  initial $display(\"msg\");\n"
+          "endmodule\n");
 
   // Should contain: attribute tokens, keywords, operators, integer literal,
   // real literal, string literal, system identifier, identifiers

@@ -895,7 +895,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format-18
+          sudo apt-get install -y clang-format-19
           pip install \
             assert-no-inline-directives \
             assert-no-linter-config-files \
@@ -942,7 +942,7 @@ jobs:
       - name: Check formatting
         run: |
           find src test -name '*.cpp' -o -name '*.h' | \
-            xargs clang-format-18 \
+            xargs clang-format-19 \
             --dry-run --Werror --style=google
       - name: Check file line limits
         run: |

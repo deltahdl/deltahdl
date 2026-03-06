@@ -474,8 +474,10 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
     net.charge_strength =
         static_cast<Strength>(item->data_type.charge_strength);
   }
-  // §E.3: apply `default_trireg_strength to trireg nets without explicit strength.
-  if (net.net_type == NetType::kTrireg && item->data_type.charge_strength == 0 &&
+  // §E.3: apply `default_trireg_strength to trireg nets without explicit
+  // strength.
+  if (net.net_type == NetType::kTrireg &&
+      item->data_type.charge_strength == 0 &&
       unit_->has_default_trireg_strength) {
     net.trireg_capacitance = unit_->default_trireg_strength;
   }
