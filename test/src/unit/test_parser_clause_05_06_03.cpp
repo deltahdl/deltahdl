@@ -1,13 +1,26 @@
 #include "fixture_parser.h"
-#include "fixture_program.h"
 #include "helpers_parser_verify.h"
-#include "simulator/vpi.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(ParserA609, SystemTfCallEmptyParens) {
+// --- §5.6.3: system task/function calls ---
+
+TEST(ParserClause05, Cl5_6_3_SystemTaskDisplay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial $display(\"hello\");\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+  ASSERT_NE(stmt->expr, nullptr);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
+}
+
+TEST(ParserClause05, Cl5_6_3_SystemTfCallEmptyParens) {
   auto r = Parse(
       "module m;\n"
       "  initial $finish();\n"
@@ -21,7 +34,7 @@ TEST(ParserA609, SystemTfCallEmptyParens) {
   EXPECT_TRUE(expr->args.empty());
 }
 
-TEST(ParserA609, SystemTfCallWithArgs) {
+TEST(ParserClause05, Cl5_6_3_SystemTfCallWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] x;\n"
@@ -36,7 +49,7 @@ TEST(ParserA609, SystemTfCallWithArgs) {
   EXPECT_EQ(expr->args.size(), 2u);
 }
 
-TEST(ParserA609, SystemTfCallEmptyArgs) {
+TEST(ParserClause05, Cl5_6_3_SystemTfCallEmptyArgs) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(,,1);\n"
@@ -52,7 +65,7 @@ TEST(ParserA609, SystemTfCallEmptyArgs) {
   ASSERT_NE(expr->args[2], nullptr);
 }
 
-TEST(ParserSection38, VpiSystemCallDeposit) {
+TEST(ParserClause05, Cl5_6_3_SystemDeposit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -63,17 +76,15 @@ TEST(ParserSection38, VpiSystemCallDeposit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserCh50603, SystemTask_Display) {
+// --- §5.6.3: system function in expression ---
+
+TEST(ParserClause05, Cl5_6_3_SystemFunctionInExpression) {
   auto r = Parse(
       "module m;\n"
-      "  initial $display(\"hello\");\n"
-      "endmodule");
+      "  initial x = $time;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  ASSERT_NE(stmt->expr, nullptr);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

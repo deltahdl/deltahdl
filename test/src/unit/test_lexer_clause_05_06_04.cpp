@@ -6,11 +6,17 @@
 
 using namespace delta;
 
-TEST(LexerCh50604, BacktickIsUnexpected) {
+namespace {
+
+// --- §5.6.4: compiler directives begin with backtick ---
+
+TEST(LexerClause05, Cl5_6_4_BacktickIsUnexpectedInLexer) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", "`define FOO 1");
   Lexer lexer(mgr.FileContent(fid), fid, diag);
-  auto tokens = lexer.LexAll();
+  lexer.LexAll();
   EXPECT_TRUE(diag.HasErrors());
 }
+
+}  // namespace

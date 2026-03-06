@@ -1,18 +1,43 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetIdentifier_Escaped) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  let \\my+let = 1;\n"
-              "endmodule\n"));
+// --- §5.6.1: escaped identifiers as declaration names ---
+
+TEST(ParserClause05, Cl5_6_1_EscapedIdentifierAsName) {
+  EXPECT_TRUE(ParseOk("module t; wire \\bus+index ; endmodule"));
 }
 
-TEST(ParserA84, PrimaryEscapedIdentifier) {
+TEST(ParserClause05, Cl5_6_1_EscapedKeywordAsIdentifier) {
+  EXPECT_TRUE(ParseOk("module t; wire \\module ; endmodule"));
+}
+
+TEST(ParserClause05, Cl5_6_1_EscapedIdentBasic) {
+  EXPECT_TRUE(ParseOk("module m; wire \\busa+index ; endmodule"));
+}
+
+TEST(ParserClause05, Cl5_6_1_EscapedIdentKeyword) {
+  EXPECT_TRUE(ParseOk("module m; wire \\net ; endmodule"));
+}
+
+TEST(ParserClause05, Cl5_6_1_EscapedIdentSpecialChars) {
+  EXPECT_TRUE(
+      ParseOk("module m; wire \\***error-condition*** ; endmodule"));
+}
+
+TEST(ParserClause05, Cl5_6_1_EscapedIdentForwardSlash) {
+  EXPECT_TRUE(ParseOk("module m; wire \\net1/\\net2 ; endmodule"));
+}
+
+TEST(ParserClause05, Cl5_6_1_EscapedIdentBraces) {
+  EXPECT_TRUE(ParseOk("module m; wire \\{a,b} ; endmodule"));
+}
+
+// --- §5.6.1: escaped identifier in expression context ---
+
+TEST(ParserClause05, Cl5_6_1_EscapedIdentInExpression) {
   auto r = Parse(
       "module m;\n"
       "  logic \\my-signal ;\n"
@@ -22,36 +47,13 @@ TEST(ParserA84, PrimaryEscapedIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserCh50601, EscapedIdentifierAsName) {
-  EXPECT_TRUE(ParseOk("module t; wire \\bus+index ; endmodule"));
-}
+// --- §5.6.1: escaped identifier in let declaration ---
 
-TEST(ParserCh50601, EscapedKeywordAsIdentifier) {
-  EXPECT_TRUE(ParseOk("module t; wire \\module ; endmodule"));
-}
-
-TEST(ParserCh50601, EscapedIdent_Basic) {
-  EXPECT_TRUE(ParseOk("module m; wire \\busa+index ; endmodule"));
-}
-
-TEST(ParserCh50601, EscapedIdent_Keyword) {
-  EXPECT_TRUE(ParseOk("module m; wire \\net ; endmodule"));
-}
-
-TEST(ParserCh50601, EscapedIdent_SpecialChars) {
-  EXPECT_TRUE(ParseOk("module m; wire \\***error-condition*** ; endmodule"));
-}
-
-TEST(ParserCh50601, EscapedIdent_ForwardSlash) {
-  EXPECT_TRUE(ParseOk("module m; wire \\net1/\\net2 ; endmodule"));
-}
-
-TEST(ParserCh50601, EscapedIdent_Braces) {
-  EXPECT_TRUE(ParseOk("module m; wire \\{a,b} ; endmodule"));
-}
-
-TEST(ParserCh50602, Keyword_EscapedAsIdentifier) {
-  EXPECT_TRUE(ParseOk("module m; logic \\begin ; endmodule"));
+TEST(ParserClause05, Cl5_6_1_EscapedIdentInLetDecl) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  let \\my+let = 1;\n"
+              "endmodule\n"));
 }
 
 }  // namespace
