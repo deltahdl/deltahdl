@@ -90,21 +90,29 @@ class TestLoadLrmTitles:
         assert titles[key] == expected
 
 
-def test_load_first_match_wins(tmp_path):
-    """Cross-references in body text do not overwrite real headings."""
+_CROSSREF_LRM = (
+    "6. Data types\n"
+    "6.5 Nets and variables\n"
+    "Some body text.\n"
+    "6.8 Variable declarations\n"
+    "More body text referencing\n"
+    "6.5 for more details.\n"
+    "6.8 on variable initialization).\n"
+)
+
+
+def test_load_first_match_wins_short_ref(tmp_path):
+    """Short cross-reference does not overwrite real heading."""
     lrm = tmp_path / "lrm.txt"
-    lrm.write_text(
-        "6. Data types\n"
-        "6.5 Nets and variables\n"
-        "Some body text.\n"
-        "6.8 Variable declarations\n"
-        "More body text referencing\n"
-        "6.5 for more details.\n"
-        "6.8 on variable initialization).\n"
-    )
-    titles = load_lrm_titles(lrm)
-    assert titles["6.5"] == "Nets and variables"
-    assert titles["6.8"] == "Variable declarations"
+    lrm.write_text(_CROSSREF_LRM)
+    assert load_lrm_titles(lrm)["6.5"] == "Nets and variables"
+
+
+def test_load_first_match_wins_long_ref(tmp_path):
+    """Long cross-reference does not overwrite real heading."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text(_CROSSREF_LRM)
+    assert load_lrm_titles(lrm)["6.8"] == "Variable declarations"
 
 
 def test_load_missing_file(tmp_path):
