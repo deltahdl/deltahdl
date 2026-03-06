@@ -81,4 +81,50 @@ TEST(ParserSection6, TriregChargeStrengthLarge) {
   EXPECT_EQ(item->data_type.charge_strength, 4);
 }
 
+// §6.3.2.1: trireg with charge strength and delay.
+TEST(ParserSection6, TriregChargeStrengthWithDelay) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) #(0, 0, 50) cap1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
+  EXPECT_EQ(item->data_type.charge_strength, 4);
+  EXPECT_EQ(item->name, "cap1");
+  EXPECT_NE(item->net_delay_decay, nullptr);
+}
+
+// §6.3.2.1: trireg with charge strength and signed vector.
+TEST(ParserSection6, TriregChargeStrengthSignedVector) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (small) signed [3:0] cap2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
+  EXPECT_EQ(item->data_type.charge_strength, 1);
+  EXPECT_TRUE(item->data_type.is_signed);
+  EXPECT_EQ(item->name, "cap2");
+}
+
+// §6.3.2.1: trireg without explicit charge strength (parser stores 0).
+TEST(ParserSection6, TriregNoChargeStrengthParserDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
+  EXPECT_EQ(item->data_type.charge_strength, 0);
+}
+
 }  // namespace
