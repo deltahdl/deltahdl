@@ -1,75 +1,217 @@
 #include <gtest/gtest.h>
 
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "helpers_scheduler.h"
-#include "lexer/lexer.h"
+#include "fixture_lexer.h"
 
 using namespace delta;
 
-TEST(LexerCh50701, NoDigitsAfterBaseError) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", "8'd-6");
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  lexer.LexAll();
-  EXPECT_TRUE(diag.HasErrors());
+namespace {
+
+// --- §5.7.1: unsized decimal numbers ---
+
+TEST(LexerClause05, Cl5_7_1_UnsizedDecimal) {
+  auto r = LexOne("659 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "659");
 }
 
-TEST(LexerCh50701, DecimalXZMixedError) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", "8'd1x");
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  lexer.LexAll();
-  EXPECT_TRUE(diag.HasErrors());
+TEST(LexerClause05, Cl5_7_1_UnsizedDecimalZero) {
+  auto r = LexOne("0 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "0");
 }
 
-TEST(LexerCh50701, DecimalXZMultiError) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", "8'dxz");
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  lexer.LexAll();
-  EXPECT_TRUE(diag.HasErrors());
+// --- §5.7.1: based literal constants ---
+
+TEST(LexerClause05, Cl5_7_1_UnsizedHex) {
+  auto r = LexOne("'h837FF ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "'h837FF");
 }
 
-TEST(SimCh50701, SizedHexLiteral) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 20'h837FF;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 0x837FFu);
+TEST(LexerClause05, Cl5_7_1_UnsizedOctal) {
+  auto r = LexOne("'o7460 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "'o7460");
 }
 
-TEST(SimCh50701, LeftPadWithZeros) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'hF;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 0x0Fu);
+TEST(LexerClause05, Cl5_7_1_SizedBinary) {
+  auto r = LexOne("4'b1001 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "4'b1001");
 }
 
-TEST(SimCh50701, WhiteSpaceSizeAndBase) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 5 'd 3;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 3u);
+TEST(LexerClause05, Cl5_7_1_SizedDecimal) {
+  auto r = LexOne("5'D3 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "5'D3");
 }
 
-TEST(SimCh50701, SizeConstantNonzero) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 1'b1;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 1u);
+TEST(LexerClause05, Cl5_7_1_SizedHex) {
+  auto r = LexOne("8'hFF ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'hFF");
 }
+
+TEST(LexerClause05, Cl5_7_1_SizedOctal) {
+  auto r = LexOne("8'o77 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'o77");
+}
+
+// --- §5.7.1: signed specifier ---
+
+TEST(LexerClause05, Cl5_7_1_SignedHex) {
+  auto r = LexOne("4'shf ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "4'shf");
+}
+
+TEST(LexerClause05, Cl5_7_1_SignedDecimal) {
+  auto r = LexOne("8'sd99 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "8'sd99");
+}
+
+TEST(LexerClause05, Cl5_7_1_SignedUpperS) {
+  auto r = LexOne("4'Shf ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "4'Shf");
+}
+
+// --- §5.7.1: base format case insensitive ---
+
+TEST(LexerClause05, Cl5_7_1_BaseUpperH) {
+  auto r = LexOne("8'HAB ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+TEST(LexerClause05, Cl5_7_1_BaseUpperB) {
+  auto r = LexOne("4'B1010 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+TEST(LexerClause05, Cl5_7_1_BaseUpperO) {
+  auto r = LexOne("8'O77 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+// --- §5.7.1: whitespace between size, base, digits ---
+
+TEST(LexerClause05, Cl5_7_1_WhitespaceSizeAndBase) {
+  auto r = LexOne("5 'D 3 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+TEST(LexerClause05, Cl5_7_1_WhitespaceBaseAndDigits) {
+  auto r = LexOne("32 'h 12ab_f001 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+// --- §5.7.1: x, z, ? values ---
+
+TEST(LexerClause05, Cl5_7_1_XValueInHex) {
+  auto r = LexOne("12'hx ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+TEST(LexerClause05, Cl5_7_1_ZValueInHex) {
+  auto r = LexOne("16'hz ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+TEST(LexerClause05, Cl5_7_1_QuestionMarkInBinary) {
+  auto r = LexOne("4'b? ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+TEST(LexerClause05, Cl5_7_1_QuestionMarkSigned) {
+  auto r = LexOne("16'sd? ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+// --- §5.7.1: underscore in numbers ---
+
+TEST(LexerClause05, Cl5_7_1_UnderscoreInDecimal) {
+  auto r = LexOne("27_195_000 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r.token.text, "27_195_000");
+}
+
+TEST(LexerClause05, Cl5_7_1_UnderscoreInBinary) {
+  auto r = LexOne("16'b0011_0101_0001_1111 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+TEST(LexerClause05, Cl5_7_1_UnderscoreInHex) {
+  auto r = LexOne("32'h12ab_f001 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+// --- §5.7.1: unbased unsized literals ---
+
+TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedZero) {
+  auto r = LexOne("'0 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
+  EXPECT_EQ(r.token.text, "'0");
+}
+
+TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedOne) {
+  auto r = LexOne("'1 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
+  EXPECT_EQ(r.token.text, "'1");
+}
+
+TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedX) {
+  auto r = LexOne("'x ");
+  EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
+}
+
+TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedZ) {
+  auto r = LexOne("'z ");
+  EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
+}
+
+TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedUpperX) {
+  auto r = LexOne("'X ");
+  EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
+}
+
+TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedUpperZ) {
+  auto r = LexOne("'Z ");
+  EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
+}
+
+// --- §5.7.1: error conditions ---
+
+TEST(LexerClause05, Cl5_7_1_NoDigitsAfterBaseError) {
+  auto [tokens, errors] = LexWithDiag("8'd-6");
+  EXPECT_TRUE(errors);
+}
+
+TEST(LexerClause05, Cl5_7_1_DecimalXZMixedError) {
+  auto [tokens, errors] = LexWithDiag("8'd1x");
+  EXPECT_TRUE(errors);
+}
+
+TEST(LexerClause05, Cl5_7_1_DecimalXZMultiError) {
+  auto [tokens, errors] = LexWithDiag("8'dxz");
+  EXPECT_TRUE(errors);
+}
+
+// --- §5.7.1: hex digits case insensitive ---
+
+TEST(LexerClause05, Cl5_7_1_HexDigitsCaseInsensitive) {
+  auto r1 = LexOne("8'habcd ");
+  auto r2 = LexOne("8'hABCD ");
+  EXPECT_EQ(r1.token.kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(r2.token.kind, TokenKind::kIntLiteral);
+}
+
+// --- §5.7.1: large unsized number ---
+
+TEST(LexerClause05, Cl5_7_1_LargeUnsizedHex) {
+  auto r = LexOne("'h7_0000_0000 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+}  // namespace

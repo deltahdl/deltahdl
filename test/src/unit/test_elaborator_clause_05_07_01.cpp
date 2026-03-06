@@ -1,12 +1,15 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/eval.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(ElabA84, PrimaryUnbasedUnsizedElaborates) {
+// --- §5.7.1: elaboration of integer literal forms ---
+
+TEST(ElabClause05, Cl5_7_1_UnbasedUnsizedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -18,7 +21,7 @@ TEST(ElabA84, PrimaryUnbasedUnsizedElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, NumberIntegralElaborates) {
+TEST(ElabClause05, Cl5_7_1_NumberIntegralElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +33,7 @@ TEST(ElabA87, NumberIntegralElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, DecimalUnsizedElaborates) {
+TEST(ElabClause05, Cl5_7_1_DecimalUnsizedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -41,7 +44,7 @@ TEST(ElabA87, DecimalUnsizedElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, BinaryNumberElaborates) {
+TEST(ElabClause05, Cl5_7_1_BinaryNumberElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -53,7 +56,7 @@ TEST(ElabA87, BinaryNumberElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, OctalNumberElaborates) {
+TEST(ElabClause05, Cl5_7_1_OctalNumberElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -65,7 +68,7 @@ TEST(ElabA87, OctalNumberElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, HexNumberElaborates) {
+TEST(ElabClause05, Cl5_7_1_HexNumberElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -77,7 +80,7 @@ TEST(ElabA87, HexNumberElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, DecimalSizedBaseElaborates) {
+TEST(ElabClause05, Cl5_7_1_DecimalSizedBaseElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -89,7 +92,7 @@ TEST(ElabA87, DecimalSizedBaseElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, DecimalXDigitElaborates) {
+TEST(ElabClause05, Cl5_7_1_DecimalXDigitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -101,7 +104,7 @@ TEST(ElabA87, DecimalXDigitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, DecimalZDigitElaborates) {
+TEST(ElabClause05, Cl5_7_1_DecimalZDigitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -113,7 +116,7 @@ TEST(ElabA87, DecimalZDigitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, SignedDecimalElaborates) {
+TEST(ElabClause05, Cl5_7_1_SignedDecimalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -125,7 +128,7 @@ TEST(ElabA87, SignedDecimalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, SignedBinaryElaborates) {
+TEST(ElabClause05, Cl5_7_1_SignedBinaryElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -137,7 +140,7 @@ TEST(ElabA87, SignedBinaryElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, SignedOctalElaborates) {
+TEST(ElabClause05, Cl5_7_1_SignedOctalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -149,7 +152,7 @@ TEST(ElabA87, SignedOctalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, SignedHexElaborates) {
+TEST(ElabClause05, Cl5_7_1_SignedHexElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -161,7 +164,7 @@ TEST(ElabA87, SignedHexElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, UnbasedUnsizedZeroElaborates) {
+TEST(ElabClause05, Cl5_7_1_UnbasedUnsizedZeroElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -173,7 +176,7 @@ TEST(ElabA87, UnbasedUnsizedZeroElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, UnbasedUnsizedOneElaborates) {
+TEST(ElabClause05, Cl5_7_1_UnbasedUnsizedOneElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -185,7 +188,7 @@ TEST(ElabA87, UnbasedUnsizedOneElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, UnbasedUnsizedXElaborates) {
+TEST(ElabClause05, Cl5_7_1_UnbasedUnsizedXElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -197,7 +200,7 @@ TEST(ElabA87, UnbasedUnsizedXElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA87, UnbasedUnsizedZElaborates) {
+TEST(ElabClause05, Cl5_7_1_UnbasedUnsizedZElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -209,7 +212,34 @@ TEST(ElabA87, UnbasedUnsizedZElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimA87, DecimalXDigitAllBits) {
+TEST(ElabClause05, Cl5_7_1_UnderscoredDecimalElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = 1_000;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// --- §5.7.1: simulator tests for x/z bit patterns ---
+
+static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
+                                          uint32_t mask) {
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.words[0].aval & mask, vb->value.words[0].aval & mask);
+  EXPECT_EQ(va->value.words[0].bval & mask, vb->value.words[0].bval & mask);
+}
+
+TEST(SimClause05, Cl5_7_1_DecimalXDigitAllBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -223,11 +253,10 @@ TEST(SimA87, DecimalXDigitAllBits) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-TEST(SimA87, OctalValueUnderscores) {
+TEST(SimClause05, Cl5_7_1_OctalValueUnderscores) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -244,7 +273,7 @@ TEST(SimA87, OctalValueUnderscores) {
   EXPECT_EQ(var->value.ToUint64(), 07777u);
 }
 
-TEST(SimA87, HexValueUnderscores) {
+TEST(SimClause05, Cl5_7_1_HexValueUnderscores) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -261,19 +290,7 @@ TEST(SimA87, HexValueUnderscores) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-TEST(ElabA87, UnderscoredDecimalElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int x;\n"
-      "  initial x = 1_000;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(SimCh50701, HexDigitsCaseInsensitive) {
+TEST(SimClause05, Cl5_7_1_HexDigitsCaseInsensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -296,7 +313,7 @@ TEST(SimCh50701, HexDigitsCaseInsensitive) {
   EXPECT_EQ(va->value.ToUint64(), 0xABCDu);
 }
 
-TEST(SimCh50701, UnderscoreInNumber) {
+TEST(SimClause05, Cl5_7_1_UnderscoreInNumber) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -323,7 +340,7 @@ TEST(SimCh50701, UnderscoreInNumber) {
   EXPECT_EQ(vc->value.ToUint64(), 0x12ABF001u);
 }
 
-TEST(SimCh50701, XValueInHexLiteral) {
+TEST(SimClause05, Cl5_7_1_XValueInHexLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -340,7 +357,7 @@ TEST(SimCh50701, XValueInHexLiteral) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-TEST(SimCh50701, ZValueInHexLiteral) {
+TEST(SimClause05, Cl5_7_1_ZValueInHexLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -354,13 +371,12 @@ TEST(SimCh50701, ZValueInHexLiteral) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-
   uint16_t mask = 0xFFFF;
   EXPECT_EQ(var->value.words[0].aval & mask, 0u);
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-TEST(SimCh50701, XInBinaryLiteral) {
+TEST(SimClause05, Cl5_7_1_XInBinaryLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -374,25 +390,11 @@ TEST(SimCh50701, XInBinaryLiteral) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-
   EXPECT_EQ(var->value.words[0].aval & 0x7, 0b011u);
   EXPECT_EQ(var->value.words[0].bval & 0x7, 0b001u);
 }
 
-static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
-                                          uint32_t mask) {
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.words[0].aval & mask, vb->value.words[0].aval & mask);
-  EXPECT_EQ(va->value.words[0].bval & mask, vb->value.words[0].bval & mask);
-}
-
-TEST(SimCh50701, QuestionMarkAsZ) {
+TEST(SimClause05, Cl5_7_1_QuestionMarkAsZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -407,7 +409,7 @@ TEST(SimCh50701, QuestionMarkAsZ) {
   LowerRunAndCompareBitPatterns(f, design, 0xF);
 }
 
-TEST(SimCh50701, UnbasedUnsizedLiteral01) {
+TEST(SimClause05, Cl5_7_1_UnbasedUnsizedLiteral01) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -430,7 +432,7 @@ TEST(SimCh50701, UnbasedUnsizedLiteral01) {
   EXPECT_EQ(vb->value.ToUint64(), 0xFFFFu);
 }
 
-TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
+TEST(SimClause05, Cl5_7_1_UnbasedUnsizedLiteralXZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -449,7 +451,6 @@ TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
   auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
   ASSERT_NE(vb, nullptr);
-
   uint16_t mask = 0xFFFF;
   EXPECT_EQ(va->value.words[0].aval & mask, mask);
   EXPECT_EQ(va->value.words[0].bval & mask, mask);
@@ -457,7 +458,7 @@ TEST(SimCh50701, UnbasedUnsizedLiteralXZ) {
   EXPECT_EQ(vb->value.words[0].bval & mask, mask);
 }
 
-TEST(SimCh50701, LeftPadWithX) {
+TEST(SimClause05, Cl5_7_1_LeftPadWithX) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -471,13 +472,12 @@ TEST(SimCh50701, LeftPadWithX) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-
   uint16_t mask = 0xFFF;
   EXPECT_EQ(var->value.words[0].aval & mask, mask);
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-TEST(SimCh50701, LeftPadWithZ) {
+TEST(SimClause05, Cl5_7_1_LeftPadWithZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -491,13 +491,12 @@ TEST(SimCh50701, LeftPadWithZ) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-
   uint16_t mask = 0xFFF;
   EXPECT_EQ(var->value.words[0].aval & mask, 0u);
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-TEST(SimCh50701, SignedDesignatorBitPattern) {
+TEST(SimClause05, Cl5_7_1_SignedDesignatorBitPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -514,7 +513,7 @@ TEST(SimCh50701, SignedDesignatorBitPattern) {
   EXPECT_EQ(va->value.words[0].aval & 0xF, 0xFu);
 }
 
-TEST(SimCh50701, XZCaseInsensitive) {
+TEST(SimClause05, Cl5_7_1_XZCaseInsensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -529,7 +528,7 @@ TEST(SimCh50701, XZCaseInsensitive) {
   LowerRunAndCompareBitPatterns(f, design, 0xF);
 }
 
-TEST(SimCh50701, XInOctalLiteral) {
+TEST(SimClause05, Cl5_7_1_XInOctalLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -547,7 +546,7 @@ TEST(SimCh50701, XInOctalLiteral) {
   EXPECT_EQ(var->value.words[0].bval & 0x07, 0x07u);
 }
 
-TEST(SimCh50701, BaseFormatCaseInsensitive) {
+TEST(SimClause05, Cl5_7_1_BaseFormatCaseInsensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -578,7 +577,7 @@ TEST(SimCh50701, BaseFormatCaseInsensitive) {
   EXPECT_EQ(vd->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimCh50701, LeftPadKnownHex) {
+TEST(SimClause05, Cl5_7_1_LeftPadKnownHex) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -592,13 +591,12 @@ TEST(SimCh50701, LeftPadKnownHex) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-
   EXPECT_EQ(var->value.words[0].aval & 0xFFF, 0x03Fu);
   EXPECT_EQ(var->value.words[0].bval & 0x00F, 0x00Fu);
   EXPECT_EQ(var->value.words[0].bval & 0xF00, 0x000u);
 }
 
-TEST(SimCh50701, DecimalSingleDigitX) {
+TEST(SimClause05, Cl5_7_1_DecimalSingleDigitX) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -616,6 +614,8 @@ TEST(SimCh50701, DecimalSingleDigitX) {
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
+// --- §5.7.1: signed designator affects is_signed in eval ---
+
 static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
                               uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -625,9 +625,8 @@ static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
   return e;
 }
 
-TEST(EvalAdv, SignedBaseLiteralIsSigned) {
+TEST(SimClause05, Cl5_7_1_SignedBaseLiteralIsSigned) {
   SimFixture f;
-
   auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
   auto result = EvalExpr(lit, f.ctx, f.arena);
   EXPECT_TRUE(result.is_signed);
@@ -635,9 +634,8 @@ TEST(EvalAdv, SignedBaseLiteralIsSigned) {
   EXPECT_EQ(result.ToUint64(), 3u);
 }
 
-TEST(EvalAdv, UnsignedBaseLiteralNotSigned) {
+TEST(SimClause05, Cl5_7_1_UnsignedBaseLiteralNotSigned) {
   SimFixture f;
-
   auto* lit = MakeSizedLiteral(f.arena, "4'd3", 3);
   auto result = EvalExpr(lit, f.ctx, f.arena);
   EXPECT_FALSE(result.is_signed);
@@ -645,14 +643,55 @@ TEST(EvalAdv, UnsignedBaseLiteralNotSigned) {
   EXPECT_EQ(result.ToUint64(), 3u);
 }
 
-TEST(EvalAdv, SignedHexLiteralIsSigned) {
+TEST(SimClause05, Cl5_7_1_SignedHexLiteralIsSigned) {
   SimFixture f;
-
   auto* lit = MakeSizedLiteral(f.arena, "8'shFF", 0xFF);
   auto result = EvalExpr(lit, f.ctx, f.arena);
   EXPECT_TRUE(result.is_signed);
   EXPECT_EQ(result.width, 8u);
   EXPECT_EQ(result.ToUint64(), 0xFFu);
+}
+
+// --- §5.7.1: whitespace between size and base, sized hex ---
+
+TEST(SimClause05, Cl5_7_1_SizedHexLiteral) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 20'h837FF;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x837FFu);
+}
+
+TEST(SimClause05, Cl5_7_1_LeftPadWithZeros) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'hF;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x0Fu);
+}
+
+TEST(SimClause05, Cl5_7_1_WhiteSpaceSizeAndBase) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 5 'd 3;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 3u);
+}
+
+TEST(SimClause05, Cl5_7_1_SizeConstantNonzero) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 1'b1;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 1u);
 }
 
 }  // namespace

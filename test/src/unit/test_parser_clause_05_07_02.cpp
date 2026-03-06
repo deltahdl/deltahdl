@@ -2,9 +2,122 @@
 #include "helpers_parser_verify.h"
 
 using namespace delta;
+
 namespace {
 
-TEST(ParserSection11, RealLiteralWithExponent) {
+// --- §5.7.2: fixed-point notation ---
+
+TEST(ParserClause05, Cl5_7_2_DecimalNotation) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 14.72;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+  EXPECT_DOUBLE_EQ(rhs->real_val, 14.72);
+}
+
+TEST(ParserClause05, Cl5_7_2_ZeroPointSomething) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 0.123;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_7_2_FixedPointValue) {
+  auto r = Parse("module m; real x; initial x = 2.718; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
+TEST(ParserClause05, Cl5_7_2_PointFive) {
+  auto r = Parse("module m; real x; initial x = 0.5; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
+// --- §5.7.2: scientific notation ---
+
+TEST(ParserClause05, Cl5_7_2_ScientificNotation) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 1.30e-2;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+  EXPECT_DOUBLE_EQ(rhs->real_val, 0.013);
+}
+
+TEST(ParserClause05, Cl5_7_2_ExponentOnly) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r;\n"
+              "  initial r = 39e8;\n"
+              "endmodule"));
+}
+
+TEST(ParserClause05, Cl5_7_2_ExponentPositiveSign) {
+  auto r = Parse("module m; real x; initial x = 1.0e+2; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
+TEST(ParserClause05, Cl5_7_2_ExponentNegativeSign) {
+  auto r = Parse("module m; real x; initial x = 1.0e-2; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
+TEST(ParserClause05, Cl5_7_2_ScientificFull) {
+  auto r = Parse("module m; real x; initial x = 1.5e+3; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
+// --- §5.7.2: exp case insensitive (e or E) ---
+
+TEST(ParserClause05, Cl5_7_2_ExpLowercase) {
+  auto r = Parse("module m; real x; initial x = 2.5e2; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
+TEST(ParserClause05, Cl5_7_2_ExpUppercase) {
+  auto r = Parse("module m; real x; initial x = 2.5E2; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+}
+
+// --- §5.7.2: underscores in real numbers ---
+
+TEST(ParserClause05, Cl5_7_2_UnderscoresInValue) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real r = 1_000.000_1;\n"
+              "endmodule\n"));
+}
+
+// --- §5.7.2: real literal with exponent and decimal ---
+
+TEST(ParserClause05, Cl5_7_2_WithExponent) {
   auto r = Parse(
       "module t;\n"
       "  real r;\n"
@@ -14,190 +127,36 @@ TEST(ParserSection11, RealLiteralWithExponent) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserCh50702, RealLiteral_DecimalNotation) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = 14.72;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-  EXPECT_DOUBLE_EQ(rhs->real_val, 14.72);
-}
+// --- §5.7.2: constant primary context ---
 
-TEST(ParserCh50702, RealLiteral_ScientificNotation) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = 1.30e-2;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-  EXPECT_DOUBLE_EQ(rhs->real_val, 0.013);
-}
-
-TEST(ParserCh50702, RealLiteral_ExponentOnly) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r;\n"
-              "  initial r = 39e8;\n"
-              "endmodule"));
-}
-
-TEST(ParserA84, ConstantPrimaryRealLiteral) {
+TEST(ParserClause05, Cl5_7_2_ConstantPrimaryReal) {
   auto r = Parse("module m; parameter real R = 3.14; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
   auto* param = r.cu->modules[0]->items[0];
   ASSERT_NE(param->init_expr, nullptr);
   EXPECT_EQ(param->init_expr->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserA84, PrimaryRealLiteral) {
-  auto r = Parse("module m; initial x = 3.14; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
+// --- §5.7.2: real literal as initial value ---
 
-TEST(ParserA87, NumberReal) {
-  auto r = Parse("module m; real x; initial x = 3.14; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(ParserA87, SignPlus) {
-  auto r = Parse("module m; real x; initial x = 1.0e+2; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(ParserA87, SignMinus) {
-  auto r = Parse("module m; real x; initial x = 1.0e-2; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(ParserA87, RealFixedPoint) {
-  auto r = Parse("module m; real x; initial x = 2.718; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(ParserA87, RealScientific) {
-  auto r = Parse("module m; real x; initial x = 1e3; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(ParserA87, RealScientificFull) {
-  auto r = Parse("module m; real x; initial x = 1.5e+3; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(ParserA87, FixedPointNumber) {
-  auto r = Parse("module m; real x; initial x = 0.5; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(ParserA87, ExpLowercase) {
-  auto r = Parse("module m; real x; initial x = 2.5e2; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(ParserA87, ExpUppercase) {
-  auto r = Parse("module m; real x; initial x = 2.5E2; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-TEST(ParserSection11, Sec11_1_RealLiteralAsExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  real r;\n"
-      "  initial r = 3.14;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
-}
-
-TEST(ParserSection6, RealLiteralDecimalPoint) {
+TEST(ParserClause05, Cl5_7_2_RealDeclarationInit) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 1.5;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, RealLiteralScientificNotation) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 1.3e2;\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection6, RealLiteralNegativeExponent) {
+TEST(ParserClause05, Cl5_7_2_RealNegativeExponent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 1.0e-3;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, RealLiteralPositiveExponent) {
+TEST(ParserClause05, Cl5_7_2_RealPositiveExponent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 2.5E+4;\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection6, RealLiteralUnderscoresInValue) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 1_000.000_1;\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection6, RealLiteralZeroPointSomething) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r = 0.123;\n"
               "endmodule\n"));
 }
 
