@@ -1,18 +1,20 @@
-#include <cstring>
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
 using namespace delta;
 
-TEST(SimCh512, AttrOnVarDecl) {
-  std::string src =
+namespace {
+
+// --- §5.12: attributes do not affect simulation behavior ---
+
+TEST(SimClause05, Cl5_12_AttrOnVarDecl) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  (* fsm_state *) logic [7:0] x = 8'hAB;\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -20,13 +22,13 @@ TEST(SimCh512, AttrOnVarDecl) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0xAB);
 }
 
-TEST(SimCh512, AttrWithValueOnDecl) {
-  std::string src =
+TEST(SimClause05, Cl5_12_AttrWithValueOnDecl) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  (* fsm_state = 1 *) logic [7:0] y = 8'hCD;\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -34,13 +36,13 @@ TEST(SimCh512, AttrWithValueOnDecl) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 0xCD);
 }
 
-TEST(SimCh512, AttrMultipleSpecs) {
-  std::string src =
+TEST(SimClause05, Cl5_12_MultipleAttrSpecs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  (* full_case, parallel_case *) logic [7:0] z = 8'hEF;\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -48,15 +50,15 @@ TEST(SimCh512, AttrMultipleSpecs) {
   EXPECT_EQ(f.ctx.FindVariable("z")->value.ToUint64(), 0xEF);
 }
 
-TEST(SimCh512, AttrMultipleInstances) {
-  std::string src =
+TEST(SimClause05, Cl5_12_MultipleSeparateInstances) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  (* full_case = 1 *)\n"
       "  (* parallel_case = 1 *)\n"
       "  logic [7:0] w = 8'h77;\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -64,16 +66,16 @@ TEST(SimCh512, AttrMultipleInstances) {
   EXPECT_EQ(f.ctx.FindVariable("w")->value.ToUint64(), 0x77);
 }
 
-TEST(SimCh512, AttrOnInitialBlock) {
-  std::string src =
+TEST(SimClause05, Cl5_12_AttrOnInitialBlock) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] a;\n"
       "  (* synthesis_off *) initial begin\n"
       "    a = 8'h55;\n"
       "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -81,16 +83,16 @@ TEST(SimCh512, AttrOnInitialBlock) {
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0x55);
 }
 
-TEST(SimCh512, AttrOnAssignStmt) {
-  std::string src =
+TEST(SimClause05, Cl5_12_AttrOnAssignStmt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] b;\n"
       "  initial begin\n"
       "    (* mark *) b = 8'hDD;\n"
       "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -98,17 +100,17 @@ TEST(SimCh512, AttrOnAssignStmt) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xDD);
 }
 
-TEST(SimCh512, AttrOnIfStmt) {
-  std::string src =
+TEST(SimClause05, Cl5_12_AttrOnIfStmt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] c;\n"
       "  initial begin\n"
       "    (* high_pri *) if (1) c = 8'hAA;\n"
       "    else c = 8'h00;\n"
       "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -116,8 +118,9 @@ TEST(SimCh512, AttrOnIfStmt) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0xAA);
 }
 
-TEST(SimCh512, AttrOnCaseStmt) {
-  std::string src =
+TEST(SimClause05, Cl5_12_AttrOnCaseStmt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] d;\n"
       "  initial begin\n"
@@ -128,9 +131,8 @@ TEST(SimCh512, AttrOnCaseStmt) {
       "      default: d = 8'h00;\n"
       "    endcase\n"
       "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -138,8 +140,9 @@ TEST(SimCh512, AttrOnCaseStmt) {
   EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 0x22);
 }
 
-TEST(SimCh512, AttrOnForLoop) {
-  std::string src =
+TEST(SimClause05, Cl5_12_AttrOnForLoop) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] e;\n"
       "  initial begin\n"
@@ -147,9 +150,8 @@ TEST(SimCh512, AttrOnForLoop) {
       "    (* unroll *) for (int i = 0; i < 3; i = i + 1)\n"
       "      e = e + 8'd1;\n"
       "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -157,16 +159,18 @@ TEST(SimCh512, AttrOnForLoop) {
   EXPECT_EQ(f.ctx.FindVariable("e")->value.ToUint64(), 3);
 }
 
-TEST(SimCh512, AttrWithStringValue) {
-  std::string src =
+TEST(SimClause05, Cl5_12_AttrWithStringValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  (* mode = \"fast\" *) logic [7:0] g = 8'h99;\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("g")->value.ToUint64(), 0x99);
 }
+
+}  // namespace
