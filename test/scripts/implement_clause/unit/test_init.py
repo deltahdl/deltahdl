@@ -663,18 +663,19 @@ _MASTER_BODY = """\
 """
 
 
-def _mark_master_and_capture(ic, monkeypatch, sub_issue=6):
+def _mark_master_and_capture(ic, monkeypatch, sub_issue=6) -> str:
     """Call mark_master_complete and return the updated body."""
     monkeypatch.setattr(
         "implement_clause.fetch_issue_body", lambda *_a: _MASTER_BODY,
     )
-    updated = []
+    updated: list[str] = []
     monkeypatch.setattr(
         "implement_clause.update_issue_body",
         lambda _o, _r, _i, body: updated.append(body),
     )
     ic.mark_master_complete("o", "r", 1, sub_issue)
-    return updated[0] if updated else None
+    assert updated, "update_issue_body was not called"
+    return updated[0]
 
 
 def test_mark_master_complete_ticks_status(ic, monkeypatch) -> None:
