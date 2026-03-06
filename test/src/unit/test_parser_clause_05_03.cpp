@@ -5,11 +5,13 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserCh501, Sec5_1_WhitespaceTabDelimiter) {
+// --- §5.3: whitespace characters as token separators ---
+
+TEST(ParserClause05, Cl5_3_TabDelimiter) {
   EXPECT_TRUE(ParseOk("module\tt;\tlogic\ta;\tendmodule"));
 }
 
-TEST(ParserCh501, Sec5_1_WhitespaceNewlineDelimiter) {
+TEST(ParserClause05, Cl5_3_NewlineDelimiter) {
   EXPECT_TRUE(
       ParseOk("module\n"
               "t\n"
@@ -20,11 +22,51 @@ TEST(ParserCh501, Sec5_1_WhitespaceNewlineDelimiter) {
               "endmodule\n"));
 }
 
-TEST(ParserCh501, Sec5_1_WhitespaceSpaceDelimiter) {
+TEST(ParserClause05, Cl5_3_SpaceDelimiter) {
   EXPECT_TRUE(ParseOk("module t ; logic a ; endmodule"));
 }
 
-TEST(ParserCh501, Sec5_1_WhitespaceInsideStringPreserved) {
+TEST(ParserClause05, Cl5_3_FormfeedDelimiter) {
+  EXPECT_TRUE(ParseOk("module\ft\f;\flogic\fa\f;\fendmodule"));
+}
+
+TEST(ParserClause05, Cl5_3_CarriageReturnLineFeed) {
+  EXPECT_TRUE(
+      ParseOk("module t;\r\n"
+              "  logic a;\r\n"
+              "endmodule\r\n"));
+}
+
+TEST(ParserClause05, Cl5_3_MultipleConsecutiveWhitespace) {
+  EXPECT_TRUE(
+      ParseOk("module   \t\t   t  \n\n\n ;   logic   a  ;   endmodule"));
+}
+
+// --- §5.3: whitespace ignored (same AST regardless of formatting) ---
+
+TEST(ParserClause05, Cl5_3_MinimalWhitespace) {
+  EXPECT_TRUE(ParseOk("module t;endmodule"));
+}
+
+TEST(ParserClause05, Cl5_3_ExcessiveWhitespace) {
+  EXPECT_TRUE(
+      ParseOk("  \t\n  module  \t  t  \n  ;  \n\n\t  endmodule  \n\n  "));
+}
+
+TEST(ParserClause05, Cl5_3_WhitespaceOnlyInputParsesEmpty) {
+  auto r = Parse("   \t\n\n  \t  ");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->modules.empty());
+  EXPECT_TRUE(r.cu->packages.empty());
+}
+
+TEST(ParserClause05, Cl5_3_MixedTokensNoWhitespace) {
+  EXPECT_TRUE(ParseOk("module m;logic a;assign a=1'b0;endmodule"));
+}
+
+// --- §5.3: blanks and tabs significant inside string literals ---
+
+TEST(ParserClause05, Cl5_3_WhitespaceInsideStringPreserved) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"  hello   world  \");\n"
@@ -35,26 +77,13 @@ TEST(ParserCh501, Sec5_1_WhitespaceInsideStringPreserved) {
   ASSERT_NE(stmt->expr, nullptr);
   ASSERT_GE(stmt->expr->args.size(), 1u);
   EXPECT_EQ(stmt->expr->args[0]->kind, ExprKind::kStringLiteral);
-
   EXPECT_NE(stmt->expr->args[0]->text.find("  hello   world  "),
             std::string_view::npos);
 }
 
-TEST(ParserCh501, Sec5_1_MultipleConsecutiveWhitespace) {
-  EXPECT_TRUE(
-      ParseOk("module   \t\t   t  \n\n\n ;   logic   a  ;   endmodule"));
-}
+// --- §5.3: free format across statements ---
 
-TEST(ParserCh501, Sec5_1_EmptyModuleMinimalWhitespace) {
-  EXPECT_TRUE(ParseOk("module t;endmodule"));
-}
-
-TEST(ParserCh501, Sec5_1_EmptyModuleExcessiveWhitespace) {
-  EXPECT_TRUE(
-      ParseOk("  \t\n  module  \t  t  \n  ;  \n\n\t  endmodule  \n\n  "));
-}
-
-TEST(ParserCh501, Sec5_1_OperatorFollowedByNumber) {
+TEST(ParserClause05, Cl5_3_OperatorFollowedByNumber) {
   auto r = Parse(
       "module m;\n"
       "  initial x = a+1;\n"
@@ -71,11 +100,7 @@ TEST(ParserCh501, Sec5_1_OperatorFollowedByNumber) {
   EXPECT_EQ(rhs->rhs->int_val, 1u);
 }
 
-TEST(ParserCh501, Sec5_1_MixedTokensNoWhitespace) {
-  EXPECT_TRUE(ParseOk("module m;logic a;assign a=1'b0;endmodule"));
-}
-
-TEST(ParserCh501, Sec5_1_MultipleStatementsOnOneLine) {
+TEST(ParserClause05, Cl5_3_MultipleStatementsOnOneLine) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = 1; y = 2; z = 3; end\n"
@@ -88,7 +113,7 @@ TEST(ParserCh501, Sec5_1_MultipleStatementsOnOneLine) {
   EXPECT_EQ(item->body->stmts.size(), 3u);
 }
 
-TEST(ParserCh501, Sec5_1_StatementSpanningManyLines) {
+TEST(ParserClause05, Cl5_3_StatementSpanningManyLines) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c, d;\n"
@@ -109,26 +134,12 @@ TEST(ParserCh501, Sec5_1_StatementSpanningManyLines) {
   EXPECT_EQ(assign_item->kind, ModuleItemKind::kContAssign);
 }
 
-TEST(ParserCh501, Sec5_1_TabCharactersAsWhitespace) {
+TEST(ParserClause05, Cl5_3_TabCharactersInDeclarations) {
   EXPECT_TRUE(
       ParseOk("module\tm;\n"
               "\tlogic\ta;\n"
               "\tassign\ta\t=\t1'b1;\n"
               "endmodule\n"));
-}
-
-TEST(ParserCh501, Sec5_1_CarriageReturnLineFeed) {
-  EXPECT_TRUE(
-      ParseOk("module t;\r\n"
-              "  logic a;\r\n"
-              "endmodule\r\n"));
-}
-
-TEST(ParserCh501, Sec5_1_EmptyCuWhitespaceOnly) {
-  auto r = Parse("   \t\n\n  \t  ");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
 }
 
 }  // namespace
