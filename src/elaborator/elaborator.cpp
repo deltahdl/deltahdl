@@ -93,7 +93,36 @@ static std::vector<ResolvedAttribute> ResolveAttributes(
 Elaborator::Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit)
     : arena_(arena), diag_(diag), unit_(unit) {}
 
+void Elaborator::ValidateNameSpaces() {
+  // §3.13(a): Definitions name space — module, primitive, program, interface
+  // names must be unique across all design elements.
+  std::unordered_map<std::string_view, SourceRange> def_names;
+  auto check_def = [&](std::string_view name, SourceRange range) {
+    auto [it, inserted] = def_names.try_emplace(name, range);
+    if (!inserted) {
+      diag_.Error(range.start,
+                  std::format("duplicate definition of '{}'", name));
+    }
+  };
+  for (auto* m : unit_->modules) check_def(m->name, m->range);
+  for (auto* p : unit_->programs) check_def(p->name, p->range);
+  for (auto* i : unit_->interfaces) check_def(i->name, i->range);
+  for (auto* c : unit_->checkers) check_def(c->name, c->range);
+  for (auto* u : unit_->udps) check_def(u->name, u->range);
+
+  // §3.13(b): Package name space — package names must be unique.
+  std::unordered_set<std::string_view> pkg_names;
+  for (auto* pkg : unit_->packages) {
+    if (!pkg_names.insert(pkg->name).second) {
+      diag_.Error(pkg->range.start,
+                  std::format("duplicate package '{}'", pkg->name));
+    }
+  }
+}
+
 RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
+  // §3.13: Validate definitions and package name spaces.
+  ValidateNameSpaces();
   // §3.12.1: Register CU-scope typedefs and classes before module elaboration.
   RegisterCuScopeItems();
 

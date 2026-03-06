@@ -50,4 +50,59 @@ TEST(ElabClause03, Cl3_13_RedeclNetInModuleScope) {
              "endmodule\n"));
 }
 
+// §3.13(a): Definitions name space — duplicate module names are illegal.
+TEST(ElabClause03, Cl3_13_DuplicateModuleDefinition) {
+  EXPECT_FALSE(
+      ElabOk("module m; endmodule\n"
+             "module m; endmodule\n"));
+}
+
+// §3.13(a): Definitions name space — module and interface share same space.
+TEST(ElabClause03, Cl3_13_ModuleAndInterfaceSameName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module foo; endmodule\n"
+      "interface foo; endinterface\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §3.13(a): Definitions name space — module and program share same space.
+TEST(ElabClause03, Cl3_13_ModuleAndProgramSameName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module bar; endmodule\n"
+      "program bar; endprogram\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §3.13(b): Package name space — duplicate package names are illegal.
+TEST(ElabClause03, Cl3_13_DuplicatePackageDefinition) {
+  EXPECT_FALSE(
+      ElabOk("package p; endpackage\n"
+             "package p; endpackage\n"
+             "module m; endmodule\n"));
+}
+
+// §3.13(a): Distinct design element names are legal.
+TEST(ElabClause03, Cl3_13_DistinctDefinitionNamesOk) {
+  EXPECT_TRUE(
+      ElabOk("module m; endmodule\n"
+             "interface ifc; endinterface\n"
+             "program p; endprogram\n"));
+}
+
+// §3.13(e): Module name space — instance names, params, vars coexist.
+TEST(ElabClause03, Cl3_13_ModuleNameSpaceCoexist) {
+  EXPECT_TRUE(
+      ElabOk("module sub; endmodule\n"
+             "module m;\n"
+             "  parameter P = 1;\n"
+             "  logic data;\n"
+             "  wire net;\n"
+             "  sub u0();\n"
+             "endmodule\n"));
+}
+
 }  // namespace

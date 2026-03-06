@@ -85,4 +85,61 @@ TEST(ParserClause03, Cl3_13_NestedClassInModule) {
               "endmodule\n"));
 }
 
+// §3.13(f): Block name space — named blocks create subscopes.
+TEST(ParserClause03, Cl3_13_NamedBlockSubscope) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : blk1\n"
+      "    int x;\n"
+      "    x = 1;\n"
+      "  end\n"
+      "  initial begin : blk2\n"
+      "    int x;\n"
+      "    x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §3.13(g): Port name space — ports overlap module name space.
+TEST(ParserClause03, Cl3_13_PortOverlapsModuleScope) {
+  EXPECT_TRUE(
+      ParseOk("module m (input logic data);\n"
+              "endmodule\n"));
+}
+
+// §3.13(h): Attribute names are independent of other name spaces.
+TEST(ParserClause03, Cl3_13_AttributeNameSameAsVar) {
+  auto r = Parse(
+      "module m;\n"
+      "  (* flag *) logic flag;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §3.13(c): Compilation-unit scope items.
+TEST(ParserClause03, Cl3_13_CuScopeFunction) {
+  auto r = ParseWithPreprocessor(
+      "function automatic int helper(int x); return x + 1; endfunction\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "helper");
+}
+
+// §3.13(d): Text macro redefinition overrides previous.
+TEST(ParserClause03, Cl3_13_MacroRedefinition) {
+  auto r = ParseWithPreprocessor(
+      "`define VAL 1\n"
+      "`define VAL 2\n"
+      "module m;\n"
+      "  logic [`VAL:0] data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

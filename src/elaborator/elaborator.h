@@ -42,6 +42,9 @@ class Elaborator {
   RtlirDesign* Elaborate(std::string_view top_module_name);
 
  private:
+  /// §3.13: Check definitions and package name spaces for duplicates.
+  void ValidateNameSpaces();
+
   /// §3.12.1: Register CU-scope typedefs/classes before module elaboration.
   void RegisterCuScopeItems();
 
