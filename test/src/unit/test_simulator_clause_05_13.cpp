@@ -1,22 +1,22 @@
-#include <cstring>
-
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
 using namespace delta;
 
-TEST(SimCh513, BuiltinMethodCallWithParens) {
-  std::string src =
+namespace {
+
+// --- §5.13: array.size() with and without parens ---
+
+TEST(SimClause05, Cl5_13_ArraySizeWithParens) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] arr [0:3];\n"
       "  logic [31:0] s;\n"
-      "  initial begin\n"
-      "    s = arr.size();\n"
-      "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "  initial s = arr.size();\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -24,17 +24,15 @@ TEST(SimCh513, BuiltinMethodCallWithParens) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 4u);
 }
 
-TEST(SimCh513, BuiltinMethodNoParens) {
-  std::string src =
+TEST(SimClause05, Cl5_13_ArraySizeNoParens) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] arr [0:2];\n"
       "  logic [31:0] s;\n"
-      "  initial begin\n"
-      "    s = arr.size;\n"
-      "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "  initial s = arr.size;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -42,17 +40,17 @@ TEST(SimCh513, BuiltinMethodNoParens) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 3u);
 }
 
-TEST(SimCh513, BuiltinMethodInExpr) {
-  std::string src =
+// --- §5.13: method call in expression ---
+
+TEST(SimClause05, Cl5_13_MethodInExpression) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] arr [0:4];\n"
       "  logic [31:0] r;\n"
-      "  initial begin\n"
-      "    r = arr.size() + 32'd1;\n"
-      "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "  initial r = arr.size() + 32'd1;\n"
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -60,8 +58,11 @@ TEST(SimCh513, BuiltinMethodInExpr) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 6u);
 }
 
-TEST(SimCh513, BuiltinMethodOnQueue) {
-  std::string src =
+// --- §5.13: queue methods ---
+
+TEST(SimClause05, Cl5_13_QueuePushBackAndSize) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] q [$];\n"
       "  logic [31:0] s;\n"
@@ -70,9 +71,8 @@ TEST(SimCh513, BuiltinMethodOnQueue) {
       "    q.push_back(8'hBB);\n"
       "    s = q.size();\n"
       "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -80,8 +80,9 @@ TEST(SimCh513, BuiltinMethodOnQueue) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
 }
 
-TEST(SimCh513, BuiltinMethodWithArg) {
-  std::string src =
+TEST(SimClause05, Cl5_13_QueuePushBackElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] q [$];\n"
       "  initial begin\n"
@@ -89,9 +90,8 @@ TEST(SimCh513, BuiltinMethodWithArg) {
       "    q.push_back(8'h43);\n"
       "    q.push_back(8'h44);\n"
       "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -104,82 +104,9 @@ TEST(SimCh513, BuiltinMethodWithArg) {
   EXPECT_EQ(q->elements[2].ToUint64(), 0x44u);
 }
 
-TEST(SimCh513, BuiltinMethodReduction) {
-  std::string src =
-      "module m;\n"
-      "  logic [7:0] arr [0:2] = '{8'd10, 8'd20, 8'd30};\n"
-      "  logic [31:0] total;\n"
-      "  initial begin\n"
-      "    total = arr.sum();\n"
-      "  end\n"
-      "endmodule\n";
+TEST(SimClause05, Cl5_13_QueuePopFront) {
   SimFixture f;
-  auto* design = ElaborateSrc(src, f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
-}
-
-TEST(SimCh513, BuiltinMethodMutating) {
-  std::string src =
-      "module m;\n"
-      "  logic [7:0] arr [0:2] = '{8'hAA, 8'hBB, 8'hCC};\n"
-      "  initial begin\n"
-      "    arr.reverse();\n"
-      "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0xCC);
-  EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0xBB);
-  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
-}
-
-TEST(SimCh513, BuiltinMethodMutatingNoParens) {
-  std::string src =
-      "module m;\n"
-      "  logic [7:0] arr [0:2] = '{8'h11, 8'h22, 8'h33};\n"
-      "  initial begin\n"
-      "    arr.reverse;\n"
-      "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0x33);
-  EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0x22);
-  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x11);
-}
-
-TEST(SimCh513, BuiltinMethodDynArray) {
-  std::string src =
-      "module m;\n"
-      "  logic [7:0] dyn [] = '{8'hDE, 8'hAD};\n"
-      "  logic [31:0] s;\n"
-      "  initial begin\n"
-      "    s = dyn.size();\n"
-      "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
-}
-
-TEST(SimCh513, BuiltinMethodQueuePopFront) {
-  std::string src =
+  auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [7:0] q [$];\n"
       "  logic [31:0] s;\n"
@@ -190,9 +117,8 @@ TEST(SimCh513, BuiltinMethodQueuePopFront) {
       "    q.pop_front();\n"
       "    s = q.size();\n"
       "  end\n"
-      "endmodule\n";
-  SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+      "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -203,3 +129,77 @@ TEST(SimCh513, BuiltinMethodQueuePopFront) {
   EXPECT_EQ(q->elements[0].ToUint64(), 0x20u);
   EXPECT_EQ(q->elements[1].ToUint64(), 0x30u);
 }
+
+// --- §5.13: reduction methods ---
+
+TEST(SimClause05, Cl5_13_ArraySum) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr [0:2] = '{8'd10, 8'd20, 8'd30};\n"
+      "  logic [31:0] total;\n"
+      "  initial total = arr.sum();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
+}
+
+// --- §5.13: mutating methods ---
+
+TEST(SimClause05, Cl5_13_ArrayReverseWithParens) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr [0:2] = '{8'hAA, 8'hBB, 8'hCC};\n"
+      "  initial arr.reverse();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0xCC);
+  EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0xBB);
+  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
+}
+
+TEST(SimClause05, Cl5_13_ArrayReverseNoParens) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr [0:2] = '{8'h11, 8'h22, 8'h33};\n"
+      "  initial arr.reverse;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0x33);
+  EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0x22);
+  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x11);
+}
+
+// --- §5.13: dynamic array methods ---
+
+TEST(SimClause05, Cl5_13_DynArraySize) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] dyn [] = '{8'hDE, 8'hAD};\n"
+      "  logic [31:0] s;\n"
+      "  initial s = dyn.size();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
+}
+
+}  // namespace

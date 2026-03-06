@@ -5,25 +5,124 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserCh513, BuiltInMethodCall_ChainedAccess) {
+// --- §5.13: built-in method call with dot notation ---
+
+TEST(ParserClause05, Cl5_13_MethodCallWithParens) {
   auto r = Parse(
-      "module t;\n"
-      "  initial x = obj.arr.size();\n"
+      "module m;\n"
+      "  int arr [0:3];\n"
+      "  int s;\n"
+      "  initial s = arr.size();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserCh513, BuiltInMethod_NoParens) {
+// --- §5.13: empty parentheses are optional ---
+
+TEST(ParserClause05, Cl5_13_MethodCallNoParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
               "  initial x = q.size;\n"
-              "endmodule"));
+              "endmodule\n"));
+}
+
+// --- §5.13: chained member access ---
+
+TEST(ParserClause05, Cl5_13_ChainedAccess) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = obj.arr.size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kCall);
+}
+
+// --- §5.13: method call with arguments ---
+
+TEST(ParserClause05, Cl5_13_MethodWithArg) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [7:0] q [$];\n"
+              "  initial q.push_back(8'hAA);\n"
+              "endmodule\n"));
+}
+
+// --- §5.13: method call in expression ---
+
+TEST(ParserClause05, Cl5_13_MethodInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int arr [0:3];\n"
+              "  int r;\n"
+              "  initial r = arr.size() + 1;\n"
+              "endmodule\n"));
+}
+
+// --- §5.13: mutating method as statement ---
+
+TEST(ParserClause05, Cl5_13_MutatingMethodStatement) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int arr [0:2];\n"
+              "  initial arr.reverse();\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_13_MutatingMethodStatementNoParens) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int arr [0:2];\n"
+              "  initial arr.reverse;\n"
+              "endmodule\n"));
+}
+
+// --- §5.13: queue methods ---
+
+TEST(ParserClause05, Cl5_13_QueueDelete) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q [$];\n"
+              "  initial q.delete();\n"
+              "endmodule\n"));
+}
+
+TEST(ParserClause05, Cl5_13_QueuePopFront) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q [$];\n"
+              "  int v;\n"
+              "  initial v = q.pop_front();\n"
+              "endmodule\n"));
+}
+
+// --- §5.13: reduction methods ---
+
+TEST(ParserClause05, Cl5_13_ReductionSum) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int arr [0:2];\n"
+              "  int total;\n"
+              "  initial total = arr.sum();\n"
+              "endmodule\n"));
+}
+
+// --- §5.13: dynamic array method ---
+
+TEST(ParserClause05, Cl5_13_DynArraySize) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int dyn [];\n"
+              "  int s;\n"
+              "  initial s = dyn.size();\n"
+              "endmodule\n"));
 }
 
 }  // namespace
