@@ -1,11 +1,11 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
-#include "fixture_specify.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
+
+// §A.1.2 source_text ::= [ timeunits_declaration ] { description }
 
 TEST(SourceText, DescriptionPackageItem) {
   auto r = Parse("function int add(int a, int b); return a + b; endfunction\n");
@@ -173,6 +173,192 @@ TEST(ParserCh501, Sec5_1_EmptyCuCompletelyEmpty) {
   auto r = Parse("");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->modules.empty());
+}
+
+// --- Additional §A.1.2 coverage ---
+
+// module_keyword ::= module | macromodule
+TEST(SourceText, MacromoduleKeyword) {
+  auto r = Parse("macromodule m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+// module_declaration with (.*)
+TEST(SourceText, ModuleWildcardPorts) {
+  auto r = Parse("module m(.*); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
+}
+
+// extern module_nonansi_header / extern module_ansi_header
+TEST(SourceText, ExternModuleDecl) {
+  auto r = Parse("extern module m(input a, output b);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->is_extern);
+}
+
+// interface_declaration with (.*)
+TEST(SourceText, InterfaceWildcardPorts) {
+  auto r = Parse("interface ifc(.*); endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->has_wildcard_ports);
+}
+
+// extern interface
+TEST(SourceText, ExternInterfaceDecl) {
+  auto r = Parse("extern interface ifc(input logic clk);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
+}
+
+// program_declaration with (.*)
+TEST(SourceText, ProgramWildcardPorts) {
+  auto r = Parse("program prg(.*); endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->has_wildcard_ports);
+}
+
+// extern program
+TEST(SourceText, ExternProgramDecl) {
+  auto r = Parse("extern program prg(input logic clk);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(r.cu->programs[0]->is_extern);
+}
+
+// checker_declaration
+TEST(SourceText, CheckerDecl) {
+  auto r = Parse(
+      "checker my_chk(input clk, input rst);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "my_chk");
+}
+
+TEST(SourceText, CheckerDeclEmptyPorts) {
+  auto r = Parse("checker chk; endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+}
+
+TEST(SourceText, CheckerDeclEndLabel) {
+  auto r = Parse("checker chk; endchecker : chk\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// class_declaration — virtual, extends, implements
+TEST(SourceText, VirtualClass) {
+  auto r = Parse("virtual class base; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_virtual);
+}
+
+TEST(SourceText, ClassWithExtends) {
+  auto r = Parse(
+      "class Derived extends Base;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->base_class, "Base");
+}
+
+TEST(SourceText, ClassWithParameterPortList) {
+  auto r = Parse(
+      "class Param #(parameter int W = 8);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
+}
+
+// interface_class_declaration
+TEST(SourceText, InterfaceClassDecl) {
+  auto r = Parse(
+      "interface class iface_cls;\n"
+      "  pure virtual function void do_work();\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_interface);
+}
+
+// package_declaration
+TEST(SourceText, PackageDecl) {
+  auto r = Parse(
+      "package my_pkg;\n"
+      "  typedef int myint;\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "my_pkg");
+}
+
+TEST(SourceText, PackageDeclEndLabel) {
+  auto r = Parse("package p; endpackage : p\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// timeunits_declaration
+TEST(SourceText, TimeunitsDeclaration) {
+  auto r = Parse(
+      "timeunit 1ns;\n"
+      "timeprecision 1ps;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SourceText, TimeunitWithPrecisionSlash) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns / 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// description ::= { attribute_instance } bind_directive
+TEST(SourceText, BindDirectiveWithAttributes) {
+  auto r = Parse(
+      "module m; endmodule\n"
+      "module checker_m; endmodule\n"
+      "(* synthesis *) bind m checker_m inst(.*);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->bind_directives.size(), 1u);
+}
+
+// module with lifetime
+TEST(SourceText, ModuleWithLifetime) {
+  auto r = Parse("module automatic m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
 }  // namespace
