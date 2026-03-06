@@ -114,6 +114,17 @@ class TestParseArgs:
         assert args.junit_xml is None
 
 
+def _run_main_patched(rst, fake_paths, mock_result, extra_argv=None):
+    """Run rst.main() with standard patches for check_binary/glob/subprocess/metadata."""
+    argv = ["run_sv_tests.py"] + (extra_argv or [])
+    with patch("sys.argv", argv), \
+         patch.object(rst, "check_binary"), \
+         patch.object(rst.glob, "glob", return_value=fake_paths), \
+         patch.object(rst.subprocess, "run", return_value=mock_result), \
+         patch.object(rst, "parse_metadata", return_value={}):
+        rst.main()
+
+
 class TestMain:
     """Tests for the main() function."""
 
@@ -123,12 +134,7 @@ class TestMain:
         mock_result = MagicMock(returncode=0, stderr="")
 
         def run():
-            with patch("sys.argv", ["run_sv_tests.py"]), \
-                 patch.object(rst, "check_binary"), \
-                 patch.object(rst.glob, "glob", return_value=fake_paths), \
-                 patch.object(rst.subprocess, "run", return_value=mock_result), \
-                 patch.object(rst, "parse_metadata", return_value={}):
-                rst.main()
+            _run_main_patched(rst, fake_paths, mock_result)
 
         assert get_exit_code(run) == 0 and "100.0%" in capsys.readouterr().out
 
@@ -170,12 +176,10 @@ class TestMain:
         mock_result = MagicMock(returncode=0, stderr="")
 
         def run():
-            with patch("sys.argv", ["run_sv_tests.py", "--junit-xml", xml_path]), \
-                 patch.object(rst, "check_binary"), \
-                 patch.object(rst.glob, "glob", return_value=fake_paths), \
-                 patch.object(rst.subprocess, "run", return_value=mock_result), \
-                 patch.object(rst, "parse_metadata", return_value={}):
-                rst.main()
+            _run_main_patched(
+                rst, fake_paths, mock_result,
+                extra_argv=["--junit-xml", xml_path],
+            )
 
         get_exit_code(run)
         assert Path(xml_path).exists()

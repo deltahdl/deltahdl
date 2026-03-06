@@ -47,6 +47,14 @@ class TestCollectAndRunPipeline:
         assert (pass_count, fail_count) == (1, 1)
 
 
+def _run_main_with_fake(rst, test_dir, fake_run):
+    """Run rst.main() with TEST_DIR, check_binary, and subprocess.run patched."""
+    with patch.object(rst, "TEST_DIR", test_dir), \
+         patch.object(rst, "check_binary"), \
+         patch.object(rst.subprocess, "run", side_effect=fake_run):
+        rst.main()
+
+
 class TestMain:
     """Tests for the main() function."""
 
@@ -62,10 +70,7 @@ class TestMain:
             return mock
 
         def run():
-            with patch.object(rst, "TEST_DIR", sim_test_tree), \
-                 patch.object(rst, "check_binary"), \
-                 patch.object(rst.subprocess, "run", side_effect=fake_run):
-                rst.main()
+            _run_main_with_fake(rst, sim_test_tree, fake_run)
 
         assert get_exit_code(run) == 0
 
@@ -88,10 +93,7 @@ class TestMain:
             return mock
 
         def run():
-            with patch.object(rst, "TEST_DIR", sim_test_tree), \
-                 patch.object(rst, "check_binary"), \
-                 patch.object(rst.subprocess, "run", side_effect=fake_run):
-                rst.main()
+            _run_main_with_fake(rst, sim_test_tree, fake_run)
 
         get_exit_code(run)
         assert "    expected:" in capsys.readouterr().out
