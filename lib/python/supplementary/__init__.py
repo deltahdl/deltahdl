@@ -110,7 +110,12 @@ def parse_supplementary_csv_args(args) -> None:
 
 
 def _parse_key_path_csv(raw: str) -> dict[str, Path]:
-    """Parse 'key=path,key=path' into {shorthand: Path}."""
+    """Parse 'key=path,key=path' into {shorthand: Path}.
+
+    Annex keys (starting with an uppercase letter) use dot separators
+    (e.g. ``B_1`` → ``B.1``).  Numeric keys use dashes
+    (e.g. ``4_1`` → ``4-1``).
+    """
     if not raw:
         return {}
     result: dict[str, Path] = {}
@@ -119,6 +124,8 @@ def _parse_key_path_csv(raw: str) -> dict[str, Path]:
         if not item:
             continue
         key, path = item.split("=", 1)
-        shorthand = key.strip().replace("_", "-")
+        key = key.strip()
+        sep = "." if key[0].isalpha() else "-"
+        shorthand = key.replace("_", sep)
         result[shorthand] = Path(path.strip())
     return result

@@ -533,7 +533,7 @@ def testlrm_labels_for_clause_finds_annex_tables(ic, tmp_path) -> None:
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_ANNEX_WITH_TABLE)
     _, tbls = ic.lrm_labels_for_clause(lrm, "B")
-    assert tbls == ["B-1"]
+    assert tbls == ["B.1"]
 
 
 def testlrm_labels_for_clause_ignores_other_clause_figures(ic, tmp_path) -> None:
@@ -708,6 +708,24 @@ def test_invoke_forwards_figures_to_subclause(
     cmd = invoke_subprocess_ok.call_args[0][0]
     idx = cmd.index("--figures")
     assert cmd[idx + 1] == "4_1=/f/fig.gv"
+
+
+def test_invoke_forwards_annex_tables_to_subclause(
+    ic, invoke_subprocess_ok,
+) -> None:
+    """invoke_implement_subclause forwards annex --tables with dot-to-underscore."""
+    args = argparse.Namespace(
+        lrm="/path/lrm.txt", sub_issue=123, master_issue=99,
+        organization="o", repo="r",
+        figures={}, tables={"B.1": Path("/t/tbl.md")},
+        ignore_figures=[],
+    )
+    ic.invoke_implement_subclause(
+        args, "B", tables={"B.1": Path("/t/tbl.md")},
+    )
+    cmd = invoke_subprocess_ok.call_args[0][0]
+    idx = cmd.index("--tables")
+    assert cmd[idx + 1] == "B_1=/t/tbl.md"
 
 
 def test_invoke_no_tables_flag_when_empty(

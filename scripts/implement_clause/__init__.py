@@ -54,11 +54,11 @@ def lrm_labels_for_clause(
     for line in text.splitlines():
         m = FIGURE_LABEL_RE.match(line)
         if m and line.startswith(prefix_fig):
-            figures.append(m.group(1).replace(".", "-"))
+            figures.append(m.group(1))
             continue
         m = TABLE_LABEL_RE.match(line)
         if m and line.startswith(prefix_tbl):
-            tables.append(m.group(1).replace(".", "-"))
+            tables.append(m.group(1))
 
     return figures, tables
 
@@ -172,7 +172,8 @@ def mark_master_complete(
 def _format_key_path_csv(mapping: dict[str, Path]) -> str:
     """Format a dict as 'key=path,key=path' for CLI forwarding."""
     return ",".join(
-        f"{k.replace('-', '_')}={v}" for k, v in mapping.items()
+        f"{k.replace('-', '_').replace('.', '_')}={v}"
+        for k, v in mapping.items()
     )
 
 

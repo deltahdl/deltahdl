@@ -203,6 +203,16 @@ def test_parse_supplementary_csv_args_figures() -> None:
     assert args.figures == {"4-1": Path("a.gv"), "4-2": Path("b.gv")}
 
 
+def test_parse_supplementary_csv_args_annex_tables() -> None:
+    """Annex key uses dot separator (B_1 becomes B.1)."""
+    args = MagicMock()
+    args.figures = ""
+    args.tables = "B_1=tbl.md"
+    args.ignore_figures = ""
+    parse_supplementary_csv_args(args)
+    assert args.tables == {"B.1": Path("tbl.md")}
+
+
 def test_parse_supplementary_csv_args_tables() -> None:
     """Comma-separated key=path tables become dict with dash keys."""
     args = MagicMock()

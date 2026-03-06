@@ -401,4 +401,4 @@ def test_lrm_labels_subclause_finds_annex_table(tmp_path: Path) -> None:
     """Finds dot-separated table labels within an annex."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text(_LRM_ANNEX_WITH_TABLE)
-    assert lrm_labels_for_subclause(lrm, "B") == ([], ["B-1"])
+    assert lrm_labels_for_subclause(lrm, "B") == ([], ["B.1"])
