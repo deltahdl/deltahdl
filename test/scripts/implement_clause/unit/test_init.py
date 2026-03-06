@@ -187,19 +187,30 @@ def test_main_no_subclauses_prints_leaf(ic, clause_argv, capsys) -> None:
     assert "No subclauses" in capsys.readouterr().out
 
 
-def test_no_subclauses_closes_and_marks_master(ic, clause_argv) -> None:
-    """No-subclauses path closes sub-issue and marks master."""
+def test_no_subclauses_closes_sub_issue(ic, clause_argv) -> None:
+    """No-subclauses path closes the sub-issue."""
     with (
         patch("implement_clause.parse_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause"),
         patch("implement_clause.close_issue") as mock_close,
+        patch("implement_clause.mark_master_complete"),
+    ):
+        ic.main(clause_argv)
+    assert mock_close.call_args == (
+        ("o", "r", 1, "all subclauses are implemented"),
+    )
+
+
+def test_no_subclauses_marks_master(ic, clause_argv) -> None:
+    """No-subclauses path marks master issue complete."""
+    with (
+        patch("implement_clause.parse_subclauses", return_value={}),
+        patch("implement_clause.invoke_implement_subclause"),
+        patch("implement_clause.close_issue"),
         patch("implement_clause.mark_master_complete") as mock_mark,
     ):
         ic.main(clause_argv)
-    mock_close.assert_called_once_with(
-        "o", "r", 1, "all subclauses are implemented",
-    )
-    mock_mark.assert_called_once_with("o", "r", 99, 1)
+    assert mock_mark.call_args == (("o", "r", 99, 1),)
 
 
 def test_main_with_subclauses(ic, clause_argv) -> None:
