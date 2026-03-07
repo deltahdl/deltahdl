@@ -416,4 +416,39 @@ ClassObject* SimContext::CurrentThis() const {
   return this_stack_.empty() ? nullptr : this_stack_.back();
 }
 
+// §12.4.2.1: Deferred violation reports.
+
+void SimContext::AddPendingViolation(std::string msg) {
+  if (current_process_) {
+    current_process_->pending_violations.push_back(std::move(msg));
+    // Schedule Observed region event to mature violations.
+    auto* ev = scheduler_.GetEventPool().Acquire();
+    Process* proc = current_process_;
+    ev->callback = [this, proc]() {
+      for (auto& v : proc->pending_violations) {
+        diag_.Warning({}, std::move(v));
+      }
+      proc->pending_violations.clear();
+    };
+    scheduler_.ScheduleEvent(scheduler_.CurrentTime(), Region::kObserved, ev);
+  } else {
+    diag_.Warning({}, std::move(msg));
+  }
+}
+
+void SimContext::FlushPendingViolations() {
+  if (current_process_) {
+    current_process_->pending_violations.clear();
+  }
+}
+
+void SimContext::MaturePendingViolations() {
+  if (current_process_) {
+    for (auto& v : current_process_->pending_violations) {
+      diag_.Warning({}, std::move(v));
+    }
+    current_process_->pending_violations.clear();
+  }
+}
+
 }  // namespace delta

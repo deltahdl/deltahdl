@@ -238,7 +238,7 @@ static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
 
     if (match_count > 1) {
-      ctx.GetDiag().Warning({}, "unique if: multiple conditions matched");
+      ctx.AddPendingViolation("unique if: multiple conditions matched");
     }
 
     if (first_match) {
@@ -259,7 +259,7 @@ static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
     // No match, no else: unique → violation, unique0 → no violation.
     if (!has_final_else && qual == CaseQualifier::kUnique) {
-      ctx.GetDiag().Warning({}, "unique if: no condition matched");
+      ctx.AddPendingViolation("unique if: no condition matched");
     }
     co_return StmtResult::kDone;
   }
@@ -273,7 +273,7 @@ static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
   }
   if (qual == CaseQualifier::kPriority) {
-    ctx.GetDiag().Warning({}, "priority if: no condition matched");
+    ctx.AddPendingViolation("priority if: no condition matched");
   }
   co_return StmtResult::kDone;
 }

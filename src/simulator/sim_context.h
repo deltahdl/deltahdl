@@ -169,6 +169,11 @@ class SimContext {
   Process* CurrentProcess() const { return current_process_; }
   bool IsReactiveContext() const;
 
+  // §12.4.2.1: Deferred violation reports.
+  void AddPendingViolation(std::string msg);
+  void FlushPendingViolations();
+  void MaturePendingViolations();
+
   const std::unordered_map<std::string_view, Variable*>& GetVariables() const {
     return variables_;
   }

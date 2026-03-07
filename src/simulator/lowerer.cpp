@@ -43,6 +43,8 @@ static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
                                             SimContext& ctx, Arena& arena) {
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, sens};
+    // §12.4.2.1: Flush pending violation reports on process re-trigger.
+    ctx.FlushPendingViolations();
     auto result = co_await ExecStmt(body, ctx, arena);
     if (result != StmtResult::kDone) break;
   }
@@ -56,6 +58,8 @@ static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body, SimContext& ctx,
     co_await ExecStmt(body, ctx, arena);
     if (read_vars.empty()) break;
     co_await AnyChangeAwaiter{ctx, read_vars};
+    // §12.4.2.1: Flush pending violation reports on process re-trigger.
+    ctx.FlushPendingViolations();
   }
 }
 

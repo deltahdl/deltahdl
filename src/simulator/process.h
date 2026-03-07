@@ -3,6 +3,8 @@
 #include <coroutine>
 #include <cstdint>
 #include <exception>
+#include <string>
+#include <vector>
 
 #include "common/types.h"
 
@@ -97,6 +99,9 @@ struct Process {
   uint32_t id = 0;
   bool active = true;
   bool is_reactive = false;
+
+  // §12.4.2.1: Pending violation reports awaiting Observed region maturation.
+  std::vector<std::string> pending_violations;
 
   ~Process() {
     if (coro) coro.destroy();
