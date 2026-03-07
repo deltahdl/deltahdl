@@ -328,13 +328,26 @@ static bool CaseInsideMatch(uint64_t sel_val, const Logic4Vec& pat) {
   return sel_val == pat.ToUint64();
 }
 
+// §12.5: 4-state exact comparison — each bit must match exactly (0, 1, x, z).
+static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
+  uint32_t nw = (sel.nwords > pat.nwords) ? sel.nwords : pat.nwords;
+  for (uint32_t i = 0; i < nw; ++i) {
+    uint64_t sa = (i < sel.nwords) ? sel.words[i].aval : 0;
+    uint64_t sb = (i < sel.nwords) ? sel.words[i].bval : 0;
+    uint64_t pa = (i < pat.nwords) ? pat.words[i].aval : 0;
+    uint64_t pb = (i < pat.nwords) ? pat.words[i].bval : 0;
+    if (sa != pa || sb != pb) return false;
+  }
+  return true;
+}
+
 // Check if a case item matches based on case_kind and case_inside.
 static bool CaseItemMatches(const Logic4Vec& sel, const Logic4Vec& pat,
                             TokenKind case_kind, bool case_inside) {
   if (case_inside) return CaseInsideMatch(sel.ToUint64(), pat);
   if (case_kind == TokenKind::kKwCasex) return CasexMatch(sel, pat);
   if (case_kind == TokenKind::kKwCasez) return CasezMatch(sel, pat);
-  return sel.ToUint64() == pat.ToUint64();
+  return CaseExactMatch(sel, pat);
 }
 
 // --- Case with casex/casez/inside and qualifiers ---

@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <string_view>
 
 #include "builders_ast.h"
@@ -6,12 +5,8 @@
 #include "fixture_simulator.h"
 #include "helpers_stmt_exec.h"
 #include "parser/ast.h"
-#include "simulator/awaiters.h"
-#include "simulator/exec_task.h"
 #include "simulator/lowerer.h"
-#include "simulator/process.h"
 #include "simulator/stmt_exec.h"
-#include "simulator/stmt_result.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -266,6 +261,108 @@ TEST(SimA607, CaseWithBlockBody) {
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 5u);
   EXPECT_EQ(y->value.ToUint64(), 6u);
+}
+
+// §12.5: 4-state exact comparison — x only matches x, z only matches z.
+TEST(SimA607, CaseExactXMatchesX) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'bxxxxxxxx;\n"
+      "    case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'bxxxxxxxx: x = 8'd20;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// §12.5: 4-state exact comparison — z only matches z, not 0.
+TEST(SimA607, CaseExactZMatchesZ) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'bzzzzzzzz;\n"
+      "    case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'bzzzzzzzz: x = 8'd30;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 30u);
+}
+
+// §12.5: 4-state exact comparison — x does NOT match 0 in plain case.
+TEST(SimA607, CaseXDoesNotMatchZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'bxxxxxxxx;\n"
+      "    x = 8'd42;\n"
+      "    case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // x should remain 42 — no case item matches.
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// §12.5: case_expression evaluated once, linear search terminates at first match.
+TEST(SimA607, CaseLinearSearchFirstMatch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd1;\n"
+      "    case(sel)\n"
+      "      8'd1: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // First matching item wins — linear search.
+  EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 }  // namespace
