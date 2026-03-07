@@ -12,6 +12,8 @@ Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
   // §19.4: semaphore and mailbox are built-in class types
   known_types_.insert("semaphore");
   known_types_.insert("mailbox");
+  // §8.30: weak_reference is a built-in parameterized class
+  known_types_.insert("weak_reference");
 }
 
 Token Parser::CurrentToken() { return lexer_.Peek(); }

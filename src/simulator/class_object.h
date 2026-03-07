@@ -84,4 +84,15 @@ struct ClassObject {
 // Sentinel value: null class handle is encoded as handle_id == 0.
 inline constexpr uint64_t kNullClassHandle = 0;
 
+// §8.30: Weak reference — stores a referent handle without preventing GC.
+struct WeakReference {
+  uint64_t referent_handle = kNullClassHandle;
+
+  // §8.30.3: get() — returns referent handle, or 0 if cleared.
+  uint64_t Get() const { return referent_handle; }
+
+  // §8.30.4: clear() — sets referent to null.
+  void Clear() { referent_handle = kNullClassHandle; }
+};
+
 }  // namespace delta
