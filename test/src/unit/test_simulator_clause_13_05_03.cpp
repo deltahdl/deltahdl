@@ -75,4 +75,32 @@ TEST(SimA609, FunctionDefaultArg) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
+// §13.5.3: Default arg with explicit override in full integration.
+TEST(Sim1353, DefaultArgOverride) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, y;\n"
+      "  function logic [7:0] scale(input logic [7:0] v,\n"
+      "                             input logic [7:0] factor = 8'd2);\n"
+      "    return v * factor;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = scale(8'd5);\n"
+      "    y = scale(8'd5, 8'd3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* xv = f.ctx.FindVariable("x");
+  auto* yv = f.ctx.FindVariable("y");
+  ASSERT_NE(xv, nullptr);
+  ASSERT_NE(yv, nullptr);
+  EXPECT_EQ(xv->value.ToUint64(), 10u);
+  EXPECT_EQ(yv->value.ToUint64(), 15u);
+}
+
 }  // namespace
