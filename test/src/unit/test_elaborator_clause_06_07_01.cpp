@@ -192,4 +192,11 @@ TEST(NetDecl, VectoredWithPackedDimensionOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
+TEST(NetDecl, ScalaredWithPackedDimensionOk) {
+  NetDeclInfo info;
+  info.is_scalared = true;
+  info.packed_dim_count = 1;
+  EXPECT_TRUE(ValidateNetDecl(info));
+}
+
 }  // namespace

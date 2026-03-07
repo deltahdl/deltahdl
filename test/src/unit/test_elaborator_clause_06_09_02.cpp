@@ -8,13 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(NetDecl, ScalaredWithPackedDimensionOk) {
-  NetDeclInfo info;
-  info.is_scalared = true;
-  info.packed_dim_count = 1;
-  EXPECT_TRUE(ValidateNetDecl(info));
-}
-
 // §6.9.2: Vectored net elaborates without error.
 TEST(NetDecl, VectoredNetElaboratesOk) {
   ElabFixture f;
