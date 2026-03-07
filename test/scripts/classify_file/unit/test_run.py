@@ -6,23 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import classify_file
-
-from classify_file.test_helpers import (
-    make_test_file,
-    stub_close_issue,
-    stub_create_issue,
-    stub_ensure_unchecked,
-    stub_subprocess_failure,
-    stub_subprocess_mixed,
-    stub_subprocess_success,
-)
 from lib.python.test_fixtures import capture_help_output
 from lib.python.test_fixtures.subprocess_stubs import spy_subprocess_run
-
-_parse_args = getattr(classify_file, "_parse_args")
-_build_command = getattr(classify_file, "_build_command")
-_run = getattr(classify_file, "_run")
 
 
 # ---- Shared helpers --------------------------------------------------------
@@ -78,130 +63,130 @@ def _make_run_args(tmp_path, **overrides):
 # ---- _parse_args -----------------------------------------------------------
 
 
-def test_parse_args_file(monkeypatch):
+def test_parse_args_file(monkeypatch, cf):
     """Parses --file flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().file == "f.cpp"
+    assert getattr(cf, "_parse_args")().file == "f.cpp"
 
 
-def test_parse_args_output_dir(monkeypatch):
+def test_parse_args_output_dir(monkeypatch, cf):
     """Parses --output-dir flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().output_dir == "/out"
+    assert getattr(cf, "_parse_args")().output_dir == "/out"
 
 
-def test_parse_args_lrm(monkeypatch):
+def test_parse_args_lrm(monkeypatch, cf):
     """Parses --lrm flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().lrm == "/lrm.txt"
+    assert getattr(cf, "_parse_args")().lrm == "/lrm.txt"
 
 
-def test_parse_args_prog_name(monkeypatch, capsys):
+def test_parse_args_prog_name(monkeypatch, cf, capsys):
     """Usage line shows 'classify_file' as program name."""
     assert "classify_file" in capture_help_output(
-        _parse_args, monkeypatch, capsys,
+        getattr(cf, "_parse_args"), monkeypatch, capsys,
     )
 
 
-def test_parse_args_issue(monkeypatch):
+def test_parse_args_issue(monkeypatch, cf):
     """Parses --issue as integer."""
     monkeypatch.setattr(
         sys, "argv", [*_BASE_ARGV, "--issue", "42"],
     )
-    assert _parse_args().issue == 42
+    assert getattr(cf, "_parse_args")().issue == 42
 
 
-def test_parse_args_create_issue(monkeypatch):
+def test_parse_args_create_issue(monkeypatch, cf):
     """Parses --create-issue flag."""
     argv = [v for i, v in enumerate(_BASE_ARGV)
             if _BASE_ARGV[max(0, i - 1)] != "--issue" and v != "--issue"]
     monkeypatch.setattr(
         sys, "argv", [*argv, "--create-issue"],
     )
-    assert _parse_args().create_issue is True
+    assert getattr(cf, "_parse_args")().create_issue is True
 
 
-def test_parse_args_create_issue_default_false(monkeypatch):
+def test_parse_args_create_issue_default_false(monkeypatch, cf):
     """Defaults --create-issue to False when --issue is given."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().create_issue is False
+    assert getattr(cf, "_parse_args")().create_issue is False
 
 
-def test_parse_args_neither_issue_flag_rejects(monkeypatch):
+def test_parse_args_neither_issue_flag_rejects(monkeypatch, cf):
     """Rejects when neither --issue nor --create-issue is given."""
     argv = [v for i, v in enumerate(_BASE_ARGV)
             if _BASE_ARGV[max(0, i - 1)] != "--issue" and v != "--issue"]
     monkeypatch.setattr(sys, "argv", argv)
     with pytest.raises(SystemExit):
-        _parse_args()
+        getattr(cf, "_parse_args")()
 
 
-def test_parse_args_both_issue_flags_reject(monkeypatch):
+def test_parse_args_both_issue_flags_reject(monkeypatch, cf):
     """Rejects when both --issue and --create-issue are given."""
     monkeypatch.setattr(
         sys, "argv", [*_BASE_ARGV, "--create-issue"],
     )
     with pytest.raises(SystemExit):
-        _parse_args()
+        getattr(cf, "_parse_args")()
 
 
-def test_parse_args_organization(monkeypatch):
+def test_parse_args_organization(monkeypatch, cf):
     """Parses --organization flag."""
     monkeypatch.setattr(
         sys, "argv", [*_BASE_ARGV, "--organization", "myorg"],
     )
-    assert _parse_args().organization == "myorg"
+    assert getattr(cf, "_parse_args")().organization == "myorg"
 
 
-def test_parse_args_organization_required(monkeypatch):
+def test_parse_args_organization_required(monkeypatch, cf):
     """Rejects missing --organization flag."""
     argv = [v for i, v in enumerate(_BASE_ARGV)
             if _BASE_ARGV[max(0, i - 1)] != "--organization"
             and v != "--organization"]
     monkeypatch.setattr(sys, "argv", argv)
     with pytest.raises(SystemExit):
-        _parse_args()
+        getattr(cf, "_parse_args")()
 
 
-def test_parse_args_repo(monkeypatch):
+def test_parse_args_repo(monkeypatch, cf):
     """Parses --repo flag."""
     monkeypatch.setattr(
         sys, "argv", [*_BASE_ARGV, "--repo", "myrepo"],
     )
-    assert _parse_args().repo == "myrepo"
+    assert getattr(cf, "_parse_args")().repo == "myrepo"
 
 
-def test_parse_args_repo_required(monkeypatch):
+def test_parse_args_repo_required(monkeypatch, cf):
     """Rejects missing --repo flag."""
     argv = [v for i, v in enumerate(_BASE_ARGV)
             if _BASE_ARGV[max(0, i - 1)] != "--repo"
             and v != "--repo"]
     monkeypatch.setattr(sys, "argv", argv)
     with pytest.raises(SystemExit):
-        _parse_args()
+        getattr(cf, "_parse_args")()
 
 
-def test_parse_args_dry_run(monkeypatch):
+def test_parse_args_dry_run(monkeypatch, cf):
     """Parses --dry-run flag."""
     monkeypatch.setattr(
         sys, "argv", [*_BASE_ARGV, "--dry-run"],
     )
-    assert _parse_args().dry_run is True
+    assert getattr(cf, "_parse_args")().dry_run is True
 
 
-def test_parse_args_dry_run_default(monkeypatch):
+def test_parse_args_dry_run_default(monkeypatch, cf):
     """Defaults --dry-run to False."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
-    assert _parse_args().dry_run is False
+    assert getattr(cf, "_parse_args")().dry_run is False
 
 
 
-def test_parse_args_max_lines(monkeypatch):
+def test_parse_args_max_lines(monkeypatch, cf):
     """Parses --max-lines as integer."""
     monkeypatch.setattr(
         sys, "argv", [*_BASE_ARGV, "--max-lines", "500"],
     )
-    assert _parse_args().max_lines == 500
+    assert getattr(cf, "_parse_args")().max_lines == 500
 
 
 def _argv_without_flag(base, flag):
@@ -210,227 +195,224 @@ def _argv_without_flag(base, flag):
             if flag not in (base[max(0, i - 1)], v)]
 
 
-def test_parse_args_max_lines_required(monkeypatch):
+def test_parse_args_max_lines_required(monkeypatch, cf):
     """Rejects missing --max-lines flag."""
     monkeypatch.setattr(
         sys, "argv", _argv_without_flag(_BASE_ARGV, "--max-lines"),
     )
     with pytest.raises(SystemExit):
-        _parse_args()
+        getattr(cf, "_parse_args")()
 
 
-def test_parse_args_no_test_flag(monkeypatch):
+def test_parse_args_no_test_flag(monkeypatch, cf):
     """Rejects the --test flag since classify_file does not accept it."""
     monkeypatch.setattr(
         sys, "argv", [*_BASE_ARGV, "--test", "T"],
     )
     with pytest.raises(SystemExit):
-        _parse_args()
+        getattr(cf, "_parse_args")()
 
 
 # ---- _build_command --------------------------------------------------------
 
 
-def test_build_command_basic():
+def test_build_command_basic(cf):
     """Command starts with python -m classify_test."""
-    cmd = _build_command(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), "T")
     assert cmd[:3] == [sys.executable, "-m", "classify_test"]
 
 
-def test_build_command_file_flag():
+def test_build_command_file_flag(cf):
     """Command includes --file with correct value."""
-    cmd = _build_command(_make_args(file="/a/b.cpp"), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(file="/a/b.cpp"), "T")
     assert cmd[cmd.index("--file") + 1] == "/a/b.cpp"
 
 
-def test_build_command_output_dir_flag():
+def test_build_command_output_dir_flag(cf):
     """Command includes --output-dir with correct value."""
-    cmd = _build_command(_make_args(output_dir="/out"), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(output_dir="/out"), "T")
     assert cmd[cmd.index("--output-dir") + 1] == "/out"
 
 
-def test_build_command_lrm_flag():
+def test_build_command_lrm_flag(cf):
     """Command includes --lrm with correct value."""
-    cmd = _build_command(_make_args(lrm="/lrm.txt"), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(lrm="/lrm.txt"), "T")
     assert cmd[cmd.index("--lrm") + 1] == "/lrm.txt"
 
 
-def test_build_command_test_flag():
+def test_build_command_test_flag(cf):
     """Command includes --test with the given test name."""
-    cmd = _build_command(_make_args(), "FooBar")
+    cmd = getattr(cf, "_build_command")(_make_args(), "FooBar")
     assert cmd[cmd.index("--test") + 1] == "FooBar"
 
 
-def test_build_command_issue_included():
+def test_build_command_issue_included(cf):
     """Command includes --issue with correct value."""
-    cmd = _build_command(_make_args(issue=42), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(issue=42), "T")
     assert cmd[cmd.index("--issue") + 1] == "42"
 
 
-def test_build_command_organization_included():
+def test_build_command_organization_included(cf):
     """Command includes --organization."""
-    cmd = _build_command(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), "T")
     assert cmd[cmd.index("--organization") + 1] == "testorg"
 
 
-def test_build_command_repo_included():
+def test_build_command_repo_included(cf):
     """Command includes --repo."""
-    cmd = _build_command(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), "T")
     assert cmd[cmd.index("--repo") + 1] == "testrepo"
 
 
-def test_build_command_dry_run_included():
+def test_build_command_dry_run_included(cf):
     """Command includes --dry-run when set."""
-    cmd = _build_command(_make_args(dry_run=True), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(dry_run=True), "T")
     assert "--dry-run" in cmd
 
 
-def test_build_command_dry_run_omitted():
+def test_build_command_dry_run_omitted(cf):
     """Command omits --dry-run when not set."""
-    cmd = _build_command(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), "T")
     assert "--dry-run" not in cmd
 
 
-def test_build_command_no_commit_included():
+def test_build_command_no_commit_included(cf):
     """Command includes --no-commit when set."""
-    cmd = _build_command(_make_args(no_commit=True), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(no_commit=True), "T")
     assert "--no-commit" in cmd
 
 
-def test_build_command_no_commit_omitted():
+def test_build_command_no_commit_omitted(cf):
     """Command omits --no-commit when not set."""
-    cmd = _build_command(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), "T")
     assert "--no-commit" not in cmd
 
 
-def test_build_command_max_lines_included():
+def test_build_command_max_lines_included(cf):
     """Command includes --max-lines."""
-    cmd = _build_command(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), "T")
     assert cmd[cmd.index("--max-lines") + 1] == "1000"
 
 
-def test_build_command_max_lines_value():
+def test_build_command_max_lines_value(cf):
     """Command passes --max-lines with correct string value."""
-    cmd = _build_command(_make_args(max_lines=500), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(max_lines=500), "T")
     assert cmd[cmd.index("--max-lines") + 1] == "500"
 
 
 # ---- run_classify_test -----------------------------------------------------
 
 
-def test_run_classify_test_returns_true_on_success(monkeypatch):
+def test_run_classify_test_returns_true_on_success(monkeypatch, cf, cf_helpers):
     """Returns True when subprocess exits with 0."""
-    stub_subprocess_success(monkeypatch)
-    assert classify_file.run_classify_test(
+    cf_helpers.stub_subprocess_success(monkeypatch)
+    assert cf.run_classify_test(
         _make_args(), "T", 1, 1,
     ) is True
 
 
-def test_run_classify_test_returns_false_on_failure(monkeypatch):
+def test_run_classify_test_returns_false_on_failure(monkeypatch, cf, cf_helpers):
     """Returns False when subprocess exits with non-zero."""
-    stub_subprocess_failure(monkeypatch)
-    assert classify_file.run_classify_test(
+    cf_helpers.stub_subprocess_failure(monkeypatch)
+    assert cf.run_classify_test(
         _make_args(), "T", 1, 1,
     ) is False
 
 
-def test_run_classify_test_prints_progress(monkeypatch, capsys):
+def test_run_classify_test_prints_progress(monkeypatch, cf, cf_helpers, capsys):
     """Prints progress line with index and name."""
-    stub_subprocess_success(monkeypatch)
-    classify_file.run_classify_test(_make_args(), "Alpha", 3, 10)
+    cf_helpers.stub_subprocess_success(monkeypatch)
+    cf.run_classify_test(_make_args(), "Alpha", 3, 10)
     assert "Processing test 3/10: Alpha\n" in capsys.readouterr().out
 
 
-def test_run_classify_test_passes_test_name(monkeypatch):
+def test_run_classify_test_passes_test_name(monkeypatch, cf, cf_helpers):
     """Subprocess receives --test with the correct name."""
-    captured = stub_subprocess_success(monkeypatch)
-    classify_file.run_classify_test(_make_args(), "FooBar", 1, 1)
+    captured = cf_helpers.stub_subprocess_success(monkeypatch)
+    cf.run_classify_test(_make_args(), "FooBar", 1, 1)
     assert captured[0][captured[0].index("--test") + 1] == "FooBar"
 
 
-def test_run_classify_test_does_not_capture_output(monkeypatch):
+def test_run_classify_test_does_not_capture_output(monkeypatch, cf):
     """Subprocess inherits stdout/stderr (no capture_output)."""
     kwargs_log = spy_subprocess_run(monkeypatch)
-    classify_file.run_classify_test(_make_args(), "T", 1, 1)
+    cf.run_classify_test(_make_args(), "T", 1, 1)
     assert "capture_output" not in kwargs_log[0]
 
 
 # ---- build_issue_body ------------------------------------------------------
 
 
-build_issue_body = classify_file.build_issue_body
-
-
-def test_build_issue_body_summary_section():
+def test_build_issue_body_summary_section(cf):
     """Body contains the summary heading."""
-    assert "## Summary" in build_issue_body("f.cpp", ["A"])
+    assert "## Summary" in cf.build_issue_body("f.cpp", ["A"])
 
 
-def test_build_issue_body_filename_in_path():
+def test_build_issue_body_filename_in_path(cf):
     """Body embeds filename in the test/src/unit path."""
-    assert "test/src/unit/foo.cpp" in build_issue_body(
+    assert "test/src/unit/foo.cpp" in cf.build_issue_body(
         "foo.cpp", ["A"],
     )
 
 
-def test_build_issue_body_progress_line():
+def test_build_issue_body_progress_line(cf):
     """Body shows Progress: 0/N for N tests."""
-    assert "Progress: 0/3" in build_issue_body(
+    assert "Progress: 0/3" in cf.build_issue_body(
         "f.cpp", ["A", "B", "C"],
     )
 
 
-def test_build_issue_body_checkboxes():
+def test_build_issue_body_checkboxes(cf):
     """Body contains unchecked checkboxes for each test name."""
-    body = build_issue_body("f.cpp", ["Alpha", "Beta"])
+    body = cf.build_issue_body("f.cpp", ["Alpha", "Beta"])
     assert "- [ ] Alpha" in body
 
 
-def test_build_issue_body_tests_header():
+def test_build_issue_body_tests_header(cf):
     """Body contains the Tests heading."""
-    assert "## Tests" in build_issue_body("f.cpp", ["A"])
+    assert "## Tests" in cf.build_issue_body("f.cpp", ["A"])
 
 
-def test_build_issue_body_single_test():
+def test_build_issue_body_single_test(cf):
     """Body works correctly with a single test."""
-    assert "Progress: 0/1" in build_issue_body("f.cpp", ["Only"])
+    assert "Progress: 0/1" in cf.build_issue_body("f.cpp", ["Only"])
 
 
 # ---- create_issue ----------------------------------------------------------
 
 
-def test_create_issue_calls_gh_api_post(monkeypatch):
+def test_create_issue_calls_gh_api_post(monkeypatch, cf, cf_helpers):
     """Invokes gh api with POST method and correct endpoint."""
-    captured = stub_create_issue(monkeypatch, 42)
-    classify_file.create_issue(
+    captured = cf_helpers.stub_create_issue(monkeypatch, 42)
+    cf.create_issue(
         _make_args(file="/p/test_foo.cpp"), ["A"],
     )
     assert "-X" in captured[0]["cmd"]
 
 
-def test_create_issue_returns_number(monkeypatch):
+def test_create_issue_returns_number(monkeypatch, cf, cf_helpers):
     """Returns the issue number from the API response."""
-    stub_create_issue(monkeypatch, 77)
-    result = classify_file.create_issue(
+    cf_helpers.stub_create_issue(monkeypatch, 77)
+    result = cf.create_issue(
         _make_args(file="/p/test_foo.cpp"), ["A"],
     )
     assert result == 77
 
 
-def test_create_issue_prints_confirmation(monkeypatch, capsys):
+def test_create_issue_prints_confirmation(monkeypatch, cf, cf_helpers, capsys):
     """Prints confirmation with the created issue number."""
-    stub_create_issue(monkeypatch, 42)
-    classify_file.create_issue(
+    cf_helpers.stub_create_issue(monkeypatch, 42)
+    cf.create_issue(
         _make_args(file="/p/test_foo.cpp"), ["A"],
     )
     assert "Created issue #42" in capsys.readouterr().out
 
 
-def test_create_issue_exits_on_failure(monkeypatch):
+def test_create_issue_exits_on_failure(monkeypatch, cf, cf_helpers):
     """Exits when gh api returns non-zero."""
-    stub_subprocess_failure(monkeypatch)
+    cf_helpers.stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
-        classify_file.create_issue(
+        cf.create_issue(
             _make_args(file="/p/test_foo.cpp"), ["A"],
         )
 
@@ -438,18 +420,18 @@ def test_create_issue_exits_on_failure(monkeypatch):
 # ---- _run ------------------------------------------------------------------
 
 
-def test_run_file_not_found(tmp_path):
+def test_run_file_not_found(tmp_path, cf):
     """Returns cleanly when input file does not exist."""
     args = _make_run_args(
         tmp_path, file=str(tmp_path / "missing.cpp"),
         create_issue=True, issue=None,
     )
-    assert _run(args) is None
+    assert getattr(cf, "_run")(args) is None
 
 
-def test_run_missing_file_prints_not_found(tmp_path, capsys):
+def test_run_missing_file_prints_not_found(tmp_path, cf, capsys):
     """Missing file prints 'not found' message to stdout."""
-    _run(_make_run_args(
+    getattr(cf, "_run")(_make_run_args(
         tmp_path, file=str(tmp_path / "missing.cpp"),
         create_issue=True, issue=None,
     ))
@@ -457,253 +439,263 @@ def test_run_missing_file_prints_not_found(tmp_path, capsys):
 
 
 def test_run_missing_file_with_issue_closes_issue(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Missing file + --issue → close_issue called."""
-    log = stub_close_issue(monkeypatch)
-    _run(_make_run_args(
+    log = cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(
         tmp_path, file=str(tmp_path / "missing.cpp"),
     ))
     assert len(log) == 1
 
 
 def test_run_missing_file_with_issue_returns(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Missing file + --issue → returns without SystemExit."""
-    stub_close_issue(monkeypatch)
-    assert _run(_make_run_args(
+    cf_helpers.stub_close_issue(monkeypatch)
+    assert getattr(cf, "_run")(_make_run_args(
         tmp_path, file=str(tmp_path / "missing.cpp"),
     )) is None
 
 
-def test_run_missing_file_with_create_issue_returns(tmp_path):
+def test_run_missing_file_with_create_issue_returns(tmp_path, cf):
     """Missing file + --create-issue → returns without SystemExit."""
-    assert _run(_make_run_args(
+    assert getattr(cf, "_run")(_make_run_args(
         tmp_path, file=str(tmp_path / "missing.cpp"),
         create_issue=True, issue=None,
     )) is None
 
 
 def test_run_no_tests_with_issue_deletes_file(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Empty file + --issue → file is deleted."""
-    f = make_test_file(tmp_path, "")
-    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    f = cf_helpers.make_test_file(tmp_path, "")
+    monkeypatch.setattr(cf, "commit_and_push", lambda *a: None)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert not f.exists()
 
 
 def test_run_no_tests_with_issue_closes_issue(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Empty file + --issue → close_issue called."""
-    make_test_file(tmp_path, "")
-    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
-    log = stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    cf_helpers.make_test_file(tmp_path, "")
+    monkeypatch.setattr(cf, "commit_and_push", lambda *a: None)
+    log = cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert len(log) == 1
 
 
 def test_run_no_tests_with_issue_returns(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Empty file + --issue → returns without SystemExit."""
-    make_test_file(tmp_path, "")
-    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
-    stub_close_issue(monkeypatch)
-    assert _run(_make_run_args(tmp_path)) is None
+    cf_helpers.make_test_file(tmp_path, "")
+    monkeypatch.setattr(cf, "commit_and_push", lambda *a: None)
+    cf_helpers.stub_close_issue(monkeypatch)
+    assert getattr(cf, "_run")(_make_run_args(tmp_path)) is None
 
 
 def test_run_no_tests_with_create_issue_deletes_file(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Empty file + --create-issue → file is deleted."""
-    f = make_test_file(tmp_path, "")
-    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
-    _run(_make_run_args(
+    f = cf_helpers.make_test_file(tmp_path, "")
+    monkeypatch.setattr(cf, "commit_and_push", lambda *a: None)
+    getattr(cf, "_run")(_make_run_args(
         tmp_path, create_issue=True, issue=None,
     ))
     assert not f.exists()
 
 
 def test_run_no_tests_with_create_issue_returns(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Empty file + --create-issue → returns without SystemExit."""
-    make_test_file(tmp_path, "")
-    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
-    assert _run(_make_run_args(
+    cf_helpers.make_test_file(tmp_path, "")
+    monkeypatch.setattr(cf, "commit_and_push", lambda *a: None)
+    assert getattr(cf, "_run")(_make_run_args(
         tmp_path, create_issue=True, issue=None,
     )) is None
 
 
-def test_run_no_tests_prints_deleting(tmp_path, capsys, monkeypatch):
+def test_run_no_tests_prints_deleting(
+    tmp_path, capsys, monkeypatch, cf, cf_helpers,
+):
     """Empty file → stdout explains why file is being deleted."""
-    make_test_file(tmp_path, "")
-    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    cf_helpers.make_test_file(tmp_path, "")
+    monkeypatch.setattr(cf, "commit_and_push", lambda *a: None)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert "because it contains no tests" in capsys.readouterr().out
 
 
-def test_run_no_tests_prints_deleted(tmp_path, capsys, monkeypatch):
+def test_run_no_tests_prints_deleted(
+    tmp_path, capsys, monkeypatch, cf, cf_helpers,
+):
     """Empty file → stdout contains 'Deleted'."""
-    make_test_file(tmp_path, "")
-    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    cf_helpers.make_test_file(tmp_path, "")
+    monkeypatch.setattr(cf, "commit_and_push", lambda *a: None)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert "Deleted" in capsys.readouterr().out
 
 
 def test_run_no_tests_with_issue_commits_deletion(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Empty file + --issue → commit_and_push called with deleted filepath."""
-    make_test_file(tmp_path, "")
+    cf_helpers.make_test_file(tmp_path, "")
     log = []
     monkeypatch.setattr(
-        "classify_file.commit_and_push",
+        cf, "commit_and_push",
         lambda changed, deleted, msg: log.append((changed, deleted, msg)),
     )
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert len(log) == 1
 
 
 def test_run_no_tests_with_issue_dry_run_skips_commit(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Empty file + --issue + --dry-run → commit_and_push not called."""
-    make_test_file(tmp_path, "")
+    cf_helpers.make_test_file(tmp_path, "")
     log = []
     monkeypatch.setattr(
-        "classify_file.commit_and_push",
+        cf, "commit_and_push",
         lambda changed, deleted, msg: log.append(1),
     )
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path, dry_run=True))
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path, dry_run=True))
     assert len(log) == 0
 
 
 def test_run_no_tests_with_issue_no_commit_skips_commit(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Empty file + --issue + --no-commit → commit_and_push not called."""
-    make_test_file(tmp_path, "")
+    cf_helpers.make_test_file(tmp_path, "")
     log = []
     monkeypatch.setattr(
-        "classify_file.commit_and_push",
+        cf, "commit_and_push",
         lambda changed, deleted, msg: log.append(1),
     )
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path, no_commit=True))
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path, no_commit=True))
     assert len(log) == 0
 
 
-def test_run_all_succeed(tmp_path, monkeypatch):
+def test_run_all_succeed(tmp_path, monkeypatch, cf, cf_helpers):
     """Does not exit when all tests succeed."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
-    make_test_file(tmp_path, body)
-    stub_ensure_unchecked(monkeypatch)
-    captured = stub_subprocess_success(monkeypatch)
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    cf_helpers.make_test_file(tmp_path, body)
+    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    captured = cf_helpers.stub_subprocess_success(monkeypatch)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert len(captured) == 2
 
 
-def test_run_some_fail_exits(tmp_path, monkeypatch):
+def test_run_some_fail_exits(tmp_path, monkeypatch, cf, cf_helpers):
     """Exits when any test fails."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
-    make_test_file(tmp_path, body)
-    stub_ensure_unchecked(monkeypatch)
-    stub_subprocess_mixed(monkeypatch, {"B"})
+    cf_helpers.make_test_file(tmp_path, body)
+    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_subprocess_mixed(monkeypatch, {"B"})
     with pytest.raises(SystemExit):
-        _run(_make_run_args(tmp_path))
+        getattr(cf, "_run")(_make_run_args(tmp_path))
 
 
-def test_run_stops_after_failure(tmp_path, monkeypatch):
+def test_run_stops_after_failure(tmp_path, monkeypatch, cf, cf_helpers):
     """Stops immediately when a test fails."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\nTEST(S, C) {\n}\n"
-    make_test_file(tmp_path, body)
-    stub_ensure_unchecked(monkeypatch)
-    captured = stub_subprocess_mixed(monkeypatch, {"A"})
+    cf_helpers.make_test_file(tmp_path, body)
+    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    captured = cf_helpers.stub_subprocess_mixed(monkeypatch, {"A"})
     try:
-        _run(_make_run_args(tmp_path))
+        getattr(cf, "_run")(_make_run_args(tmp_path))
     except SystemExit:
         pass
     assert len(captured) == 1
 
 
-def test_run_invokes_per_test(tmp_path, monkeypatch):
+def test_run_invokes_per_test(tmp_path, monkeypatch, cf, cf_helpers):
     """Invokes classify_test once per test name."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\nTEST(S, C) {\n}\n"
-    make_test_file(tmp_path, body)
-    stub_ensure_unchecked(monkeypatch)
-    captured = stub_subprocess_success(monkeypatch)
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    cf_helpers.make_test_file(tmp_path, body)
+    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    captured = cf_helpers.stub_subprocess_success(monkeypatch)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert len(captured) == 3
 
 
-def test_run_closes_issue_on_success(tmp_path, monkeypatch):
+def test_run_closes_issue_on_success(tmp_path, monkeypatch, cf, cf_helpers):
     """Closes issue when all tests succeed."""
-    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    stub_ensure_unchecked(monkeypatch)
-    stub_subprocess_success(monkeypatch)
-    log = stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_subprocess_success(monkeypatch)
+    log = cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert len(log) == 1
 
 
-def test_run_skips_close_on_failure(tmp_path, monkeypatch):
+def test_run_skips_close_on_failure(tmp_path, monkeypatch, cf, cf_helpers):
     """Does not close issue when tests fail."""
-    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    stub_ensure_unchecked(monkeypatch)
-    stub_subprocess_failure(monkeypatch)
-    log = stub_close_issue(monkeypatch)
+    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_subprocess_failure(monkeypatch)
+    log = cf_helpers.stub_close_issue(monkeypatch)
     try:
-        _run(_make_run_args(tmp_path))
+        getattr(cf, "_run")(_make_run_args(tmp_path))
     except SystemExit:
         pass
     assert len(log) == 0
 
 
-def test_run_skips_close_on_dry_run(tmp_path, monkeypatch):
+def test_run_skips_close_on_dry_run(tmp_path, monkeypatch, cf, cf_helpers):
     """Does not close issue in dry-run mode."""
-    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    stub_ensure_unchecked(monkeypatch)
-    stub_subprocess_success(monkeypatch)
-    log = stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path, dry_run=True))
+    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_subprocess_success(monkeypatch)
+    log = cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path, dry_run=True))
     assert len(log) == 0
 
 
-def test_run_close_reason_all_classified(tmp_path, monkeypatch, capsys):
+def test_run_close_reason_all_classified(
+    tmp_path, monkeypatch, cf, cf_helpers, capsys,
+):
     """Closes with 'all tests have been classified' on success."""
-    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    stub_ensure_unchecked(monkeypatch)
-    stub_subprocess_success(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_subprocess_success(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert "because all tests have been classified" \
            in capsys.readouterr().out
 
 
-def test_run_close_reason_no_tests(tmp_path, monkeypatch, capsys):
+def test_run_close_reason_no_tests(
+    tmp_path, monkeypatch, cf, cf_helpers, capsys,
+):
     """Closes with 'the file has no tests' when file is empty."""
-    make_test_file(tmp_path, "")
-    monkeypatch.setattr("classify_file.commit_and_push", lambda *a: None)
-    stub_subprocess_success(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    cf_helpers.make_test_file(tmp_path, "")
+    monkeypatch.setattr(cf, "commit_and_push", lambda *a: None)
+    cf_helpers.stub_subprocess_success(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert "because the file has no tests" in capsys.readouterr().out
 
 
-def test_run_close_reason_file_missing(tmp_path, monkeypatch, capsys):
+def test_run_close_reason_file_missing(
+    tmp_path, monkeypatch, cf, cf_helpers, capsys,
+):
     """Closes with 'the source file no longer exists' when missing."""
-    stub_subprocess_success(monkeypatch)
-    _run(_make_run_args(
+    cf_helpers.stub_subprocess_success(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(
         tmp_path, file=str(tmp_path / "missing.cpp"),
     ))
     assert "because the source file no longer exists" \
@@ -711,70 +703,72 @@ def test_run_close_reason_file_missing(tmp_path, monkeypatch, capsys):
 
 
 def _stub_create_and_run(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **run_overrides: object,
+    cf, cf_helpers, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch, **run_overrides: object,
 ) -> tuple[list[bool], list[list[str]]]:
     """Stub create_issue, subprocess, and close_issue; run pipeline."""
-    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
     create_log: list[bool] = []
     def fake_create(_a: object, _n: object) -> int:
         create_log.append(True)
         return 42
 
-    monkeypatch.setattr(
-        classify_file, "create_issue", fake_create,
-    )
-    stub_ensure_unchecked(monkeypatch)
-    captured = stub_subprocess_success(monkeypatch)
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path, **run_overrides))
+    monkeypatch.setattr(cf, "create_issue", fake_create)
+    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    captured = cf_helpers.stub_subprocess_success(monkeypatch)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path, **run_overrides))
     return create_log, captured
 
 
-def test_run_creates_issue_when_flag_set(tmp_path, monkeypatch):
+def test_run_creates_issue_when_flag_set(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
     """Calls create_issue when --create-issue is set."""
     create_log, _ = _stub_create_and_run(
-        tmp_path, monkeypatch, issue=None, create_issue=True,
+        cf, cf_helpers, tmp_path, monkeypatch,
+        issue=None, create_issue=True,
     )
     assert len(create_log) == 1
 
 
-def test_run_sets_issue_from_creation(tmp_path, monkeypatch):
+def test_run_sets_issue_from_creation(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
     """Subprocess commands use the issue number from create_issue."""
-    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    monkeypatch.setattr(
-        classify_file, "create_issue",
-        lambda _a, _n: 77,
-    )
-    captured = stub_subprocess_success(monkeypatch)
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path, issue=None, create_issue=True))
+    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    monkeypatch.setattr(cf, "create_issue", lambda _a, _n: 77)
+    captured = cf_helpers.stub_subprocess_success(monkeypatch)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(
+        tmp_path, issue=None, create_issue=True,
+    ))
     assert captured[0][captured[0].index("--issue") + 1] == "77"
 
 
-def test_run_skips_create_when_issue_given(tmp_path, monkeypatch):
+def test_run_skips_create_when_issue_given(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
     """Does not call create_issue when --issue is provided."""
-    create_log, _ = _stub_create_and_run(tmp_path, monkeypatch)
+    create_log, _ = _stub_create_and_run(
+        cf, cf_helpers, tmp_path, monkeypatch,
+    )
     assert len(create_log) == 0
 
 
 # ---- main ------------------------------------------------------------------
 
 
-def test_main_calls_run(monkeypatch):
+def test_main_calls_run(monkeypatch, cf):
     """Calls _run with parsed args."""
     ran = []
-    monkeypatch.setattr(
-        classify_file, "_run",
-        lambda args: ran.append(True),
-    )
-    monkeypatch.setattr(
-        classify_file, "_parse_args", _make_args,
-    )
-    classify_file.main()
+    monkeypatch.setattr(cf, "_run", lambda args: ran.append(True))
+    monkeypatch.setattr(cf, "_parse_args", _make_args)
+    cf.main()
     assert ran == [True]
 
 
-def test_main_enables_line_buffering(monkeypatch):
+def test_main_enables_line_buffering(monkeypatch, cf):
     """Reconfigures stdout to line-buffered mode."""
     configured = []
     original = sys.stdout.reconfigure
@@ -784,87 +778,82 @@ def test_main_enables_line_buffering(monkeypatch):
         return original(**kwargs)
 
     monkeypatch.setattr(sys.stdout, "reconfigure", mock_reconfigure)
-    monkeypatch.setattr(classify_file, "_run", lambda _: None)
-    monkeypatch.setattr(
-        classify_file, "_parse_args", _make_args,
-    )
-    classify_file.main()
+    monkeypatch.setattr(cf, "_run", lambda _: None)
+    monkeypatch.setattr(cf, "_parse_args", _make_args)
+    cf.main()
     assert any(k.get("line_buffering") for k in configured)
 
 
 # ---- ensure_unchecked ------------------------------------------------------
 
 
-ensure_unchecked = classify_file.ensure_unchecked
-
-
-def _stub_github(monkeypatch: pytest.MonkeyPatch, body: str) -> list[str]:
+def _stub_github(monkeypatch, cf, body):
     """Stub fetch_issue_body and capture update_issue_body calls."""
     monkeypatch.setattr(
-        classify_file, "fetch_issue_body",
+        cf, "fetch_issue_body",
         lambda _o, _r, _i: body,
     )
     updates: list[str] = []
     monkeypatch.setattr(
-        classify_file, "update_issue_body",
+        cf, "update_issue_body",
         lambda _o, _r, _i, b: updates.append(b),
     )
     return updates
 
 
-def test_ensure_unchecked_all_unchecked_no_update(monkeypatch):
+def test_ensure_unchecked_all_unchecked_no_update(monkeypatch, cf):
     """Does not call update when all checkboxes are already unchecked."""
     body = "- [ ] Alpha\n- [ ] Beta\n"
-    updates = _stub_github(monkeypatch, body)
-    ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    updates = _stub_github(monkeypatch, cf, body)
+    cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
     assert len(updates) == 0
 
 
-def test_ensure_unchecked_unchecks_checked_box(monkeypatch):
+def test_ensure_unchecked_unchecks_checked_box(monkeypatch, cf):
     """Unchecks a checked checkbox."""
     body = "- [x] Alpha\n- [ ] Beta\n"
-    updates = _stub_github(monkeypatch, body)
-    ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    updates = _stub_github(monkeypatch, cf, body)
+    cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
     assert "- [ ] Alpha" in updates[0]
 
 
-def test_ensure_unchecked_adds_missing_box(monkeypatch):
+def test_ensure_unchecked_adds_missing_box(monkeypatch, cf):
     """Adds an unchecked checkbox for a missing test."""
     body = "- [ ] Alpha\n"
-    updates = _stub_github(monkeypatch, body)
-    ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    updates = _stub_github(monkeypatch, cf, body)
+    cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
     assert "- [ ] Beta" in updates[0]
 
 
-def test_ensure_unchecked_mixed_unchecks(monkeypatch):
+def test_ensure_unchecked_mixed_unchecks(monkeypatch, cf):
     """Mixed: unchecks the checked box."""
     body = "- [x] Alpha\n"
-    updates = _stub_github(monkeypatch, body)
-    ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    updates = _stub_github(monkeypatch, cf, body)
+    cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
     assert "- [ ] Alpha" in updates[0]
 
 
-def test_ensure_unchecked_mixed_adds_missing(monkeypatch):
+def test_ensure_unchecked_mixed_adds_missing(monkeypatch, cf):
     """Mixed: adds the missing box."""
     body = "- [x] Alpha\n"
-    updates = _stub_github(monkeypatch, body)
-    ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    updates = _stub_github(monkeypatch, cf, body)
+    cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
     assert "- [ ] Beta" in updates[0]
 
 
-def test_ensure_unchecked_calls_update(monkeypatch):
+def test_ensure_unchecked_calls_update(monkeypatch, cf):
     """Calls update_issue_body when changes are made."""
     body = "- [x] Alpha\n"
-    updates = _stub_github(monkeypatch, body)
-    ensure_unchecked(_make_args(), ["Alpha"])
+    updates = _stub_github(monkeypatch, cf, body)
+    cf.ensure_unchecked(_make_args(), ["Alpha"])
     assert len(updates) == 1
 
 
-def test_ensure_unchecked_preserves_other_checked(monkeypatch):
+def test_ensure_unchecked_preserves_other_checked(monkeypatch, cf):
     """Leaves checked boxes for tests not in test_names."""
     body = "- [x] Other\n- [ ] Alpha\n"
-    updates = _stub_github(monkeypatch, body)
-    ensure_unchecked(_make_args(), ["Alpha"])
+    updates = _stub_github(monkeypatch, cf, body)
+    cf.ensure_unchecked(_make_args(), ["Alpha"])
     assert len(updates) == 0
 
 
@@ -872,28 +861,27 @@ def test_ensure_unchecked_preserves_other_checked(monkeypatch):
 
 
 def test_run_calls_ensure_unchecked_with_issue(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Calls ensure_unchecked when --issue is provided."""
-    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    log = stub_ensure_unchecked(monkeypatch)
-    stub_subprocess_success(monkeypatch)
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path))
+    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    log = cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_subprocess_success(monkeypatch)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
     assert len(log) == 1
 
 
 def test_run_skips_ensure_unchecked_with_create_issue(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Does not call ensure_unchecked when --create-issue is used."""
-    make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    log = stub_ensure_unchecked(monkeypatch)
-    monkeypatch.setattr(
-        classify_file, "create_issue",
-        lambda _a, _n: 42,
-    )
-    stub_subprocess_success(monkeypatch)
-    stub_close_issue(monkeypatch)
-    _run(_make_run_args(tmp_path, issue=None, create_issue=True))
+    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    log = cf_helpers.stub_ensure_unchecked(monkeypatch)
+    monkeypatch.setattr(cf, "create_issue", lambda _a, _n: 42)
+    cf_helpers.stub_subprocess_success(monkeypatch)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(
+        tmp_path, issue=None, create_issue=True,
+    ))
     assert len(log) == 0
