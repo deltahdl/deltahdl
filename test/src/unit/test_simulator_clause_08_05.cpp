@@ -39,4 +39,37 @@ TEST(ClassSim, UndefinedPropertyReturnsZero) {
   EXPECT_EQ(obj->GetProperty("nonexistent", f.arena).ToUint64(), 0u);
 }
 
+// §8.5: Class parameters are accessible as properties.
+TEST(ClassSim, ParameterAccessAsProperty) {
+  SimFixture f;
+  auto* info = f.arena.Create<ClassTypeInfo>();
+  info->name = "vector";
+  info->properties.push_back({"data", 8, false});
+  // §8.5: Parameters registered as properties.
+  info->properties.push_back({"width", 32, false});
+  f.ctx.RegisterClassType("vector", info);
+
+  auto* obj = f.arena.Create<ClassObject>();
+  obj->type = info;
+  obj->properties["data"] = MakeLogic4VecVal(f.arena, 8, 0);
+  obj->properties["width"] = MakeLogic4VecVal(f.arena, 32, 7);
+  uint64_t handle = f.ctx.AllocateClassObject(obj);
+  (void)handle;
+
+  EXPECT_EQ(obj->GetProperty("width", f.arena).ToUint64(), 7u);
+}
+
+// §8.5: Property overwrite preserves latest value.
+TEST(ClassSim, PropertyOverwrite) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "C", {"x"});
+  auto [handle, obj] = MakeObj(f, type);
+
+  obj->SetProperty("x", MakeLogic4VecVal(f.arena, 32, 10));
+  EXPECT_EQ(obj->GetProperty("x", f.arena).ToUint64(), 10u);
+
+  obj->SetProperty("x", MakeLogic4VecVal(f.arena, 32, 20));
+  EXPECT_EQ(obj->GetProperty("x", f.arena).ToUint64(), 20u);
+}
+
 }  // namespace
