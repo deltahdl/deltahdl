@@ -162,7 +162,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _run_subclause_loop(
     args: argparse.Namespace,
-    lrm: Path,
     impl_items: dict[str, str],
 ) -> None:
     """Sync the issue checklist and implement subclauses one at a time."""
@@ -218,4 +217,4 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     print(f"Found {len(impl_items)} subclauses for {clause}.")
-    _run_subclause_loop(args, lrm, impl_items)
+    _run_subclause_loop(args, impl_items)
