@@ -143,4 +143,14 @@ TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
+TEST(ParserA25, PackedDimElaboratesWidth) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; logic [7:0] x; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].name, "x");
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
 }  // namespace
