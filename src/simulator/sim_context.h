@@ -151,6 +151,12 @@ class SimContext {
   void PopStaticScope(std::string_view func_name);
   Variable* FindLocalVariable(std::string_view name);
   Variable* CreateLocalVariable(std::string_view name, uint32_t width);
+  // §13.4.2: Find a static variable in a function's persistent frame.
+  Variable* FindStaticFuncVar(std::string_view func_name,
+                              std::string_view var_name);
+  // §13.4.2: Save a variable into a function's persistent frame.
+  void SaveStaticFuncVar(std::string_view func_name, std::string_view var_name,
+                         Variable* var);
   // §13.5.2: Alias an existing variable into the current scope (pass by ref).
   void AliasLocalVariable(std::string_view name, Variable* var);
 

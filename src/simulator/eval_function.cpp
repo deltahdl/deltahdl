@@ -463,32 +463,39 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
 }
 
 // Forward declarations for mutually recursive function body execution.
-static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+// func_name is passed through for §13.4.2 mixed-lifetime local variable support.
+static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
+                         std::string_view func_name, SimContext& ctx,
                          Arena& arena);
-static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
+                          std::string_view func_name, SimContext& ctx,
                           Arena& arena);
 
-static bool ExecFuncIf(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+static bool ExecFuncIf(const Stmt* stmt, Variable* ret_var,
+                       std::string_view func_name, SimContext& ctx,
                        Arena& arena) {
   auto cond = EvalExpr(stmt->condition, ctx, arena);
   bool taken = cond.ToUint64() != 0;
-  if (taken) return ExecFuncStmt(stmt->then_branch, ret_var, ctx, arena);
+  if (taken)
+    return ExecFuncStmt(stmt->then_branch, ret_var, func_name, ctx, arena);
   if (stmt->else_branch) {
-    return ExecFuncStmt(stmt->else_branch, ret_var, ctx, arena);
+    return ExecFuncStmt(stmt->else_branch, ret_var, func_name, ctx, arena);
   }
   return false;
 }
 
-static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
+                          std::string_view func_name, SimContext& ctx,
                           Arena& arena) {
   for (auto* c : stmt->stmts) {
-    if (ExecFuncStmt(c, ret_var, ctx, arena)) return true;
+    if (ExecFuncStmt(c, ret_var, func_name, ctx, arena)) return true;
   }
   return false;
 }
 
 // §13.8: For-loop execution inside function bodies.
-static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
+                        std::string_view func_name, SimContext& ctx,
                         Arena& arena) {
   if (stmt->for_init_type.kind != DataTypeKind::kImplicit && stmt->for_init &&
       stmt->for_init->lhs &&
@@ -499,19 +506,22 @@ static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
     if (stmt->for_init->rhs)
       v->value = EvalExpr(stmt->for_init->rhs, ctx, arena);
   } else if (stmt->for_init) {
-    ExecFuncStmt(stmt->for_init, ret_var, ctx, arena);
+    ExecFuncStmt(stmt->for_init, ret_var, func_name, ctx, arena);
   }
   while (stmt->for_cond &&
          EvalExpr(stmt->for_cond, ctx, arena).ToUint64() != 0) {
-    if (stmt->for_body && ExecFuncStmt(stmt->for_body, ret_var, ctx, arena))
+    if (stmt->for_body &&
+        ExecFuncStmt(stmt->for_body, ret_var, func_name, ctx, arena))
       return true;
-    if (stmt->for_step) ExecFuncStmt(stmt->for_step, ret_var, ctx, arena);
+    if (stmt->for_step)
+      ExecFuncStmt(stmt->for_step, ret_var, func_name, ctx, arena);
   }
   return false;
 }
 
 // Execute a single statement in a function body; returns true on 'return'.
-static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
+static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
+                         std::string_view func_name, SimContext& ctx,
                          Arena& arena) {
   if (!stmt) return false;
   switch (stmt->kind) {
@@ -525,6 +535,28 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
       EvalExpr(stmt->expr, ctx, arena);
       return false;
     case StmtKind::kVarDecl: {
+      // §13.4.2: Automatic var in static function — reinitialize each call.
+      if (stmt->var_is_automatic) {
+        uint32_t w = EvalTypeWidth(stmt->var_decl_type);
+        if (w == 0) w = 32;
+        auto* v = ctx.CreateLocalVariable(stmt->var_name, w);
+        if (stmt->var_init) v->value = EvalExpr(stmt->var_init, ctx, arena);
+        return false;
+      }
+      // §13.4.2: Static var in automatic function — persist across calls.
+      if (stmt->var_is_static) {
+        auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
+        if (existing) {
+          ctx.AliasLocalVariable(stmt->var_name, existing);
+          return false;
+        }
+        uint32_t w = EvalTypeWidth(stmt->var_decl_type);
+        if (w == 0) w = 32;
+        auto* v = ctx.CreateLocalVariable(stmt->var_name, w);
+        if (stmt->var_init) v->value = EvalExpr(stmt->var_init, ctx, arena);
+        ctx.SaveStaticFuncVar(func_name, stmt->var_name, v);
+        return false;
+      }
       // §13.3.1: Static variables persist across calls — skip re-init.
       if (ctx.FindLocalVariable(stmt->var_name)) return false;
       uint32_t w = EvalTypeWidth(stmt->var_decl_type);
@@ -534,11 +566,11 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
       return false;
     }
     case StmtKind::kIf:
-      return ExecFuncIf(stmt, ret_var, ctx, arena);
+      return ExecFuncIf(stmt, ret_var, func_name, ctx, arena);
     case StmtKind::kBlock:
-      return ExecFuncBlock(stmt, ret_var, ctx, arena);
+      return ExecFuncBlock(stmt, ret_var, func_name, ctx, arena);
     case StmtKind::kFor:
-      return ExecFuncFor(stmt, ret_var, ctx, arena);
+      return ExecFuncFor(stmt, ret_var, func_name, ctx, arena);
     default:
       return false;
   }
@@ -547,7 +579,7 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var, SimContext& ctx,
 static void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                              SimContext& ctx, Arena& arena) {
   for (auto* s : func->func_body_stmts) {
-    if (ExecFuncStmt(s, ret_var, ctx, arena)) return;
+    if (ExecFuncStmt(s, ret_var, func->name, ctx, arena)) return;
   }
 }
 

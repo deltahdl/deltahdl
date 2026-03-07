@@ -1,5 +1,6 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/eval.h"
 
@@ -71,6 +72,124 @@ TEST(Functions, StaticFunctionWithArgs) {
 
   auto* c3 = MakeCall(f.arena, "accum", {MakeInt(f.arena, 2)});
   EXPECT_EQ(EvalExpr(c3, f.ctx, f.arena).ToUint64(), 10u);
+}
+
+// §13.4.2: Static function variables persist between calls (end-to-end).
+TEST(Sim1342, StaticFunctionVarsPersist) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function static int counter();\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 3u);
+}
+
+// §13.4.2: Automatic function variables are fresh each call.
+TEST(Sim1342, AutomaticFunctionVarsFresh) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function automatic int counter();\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 1u);
+}
+
+// §13.4.2: Default function (no qualifier) is static.
+TEST(Sim1342, DefaultFunctionIsStatic) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function int counter();\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 2u);
+}
+
+// §13.4.2: Static var in automatic function persists.
+TEST(Sim1342, StaticVarInAutoFuncPersists) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function automatic int get_id();\n"
+      "    static int next_id = 0;\n"
+      "    next_id = next_id + 1;\n"
+      "    return next_id;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = get_id();\n"
+      "    result = get_id();\n"
+      "    result = get_id();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 3u);
+}
+
+// §13.4.2: Automatic var in static function is fresh each call.
+TEST(Sim1342, AutoVarInStaticFuncFresh) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function static int compute();\n"
+      "    automatic int tmp = 10;\n"
+      "    tmp = tmp + 1;\n"
+      "    return tmp;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = compute();\n"
+      "    result = compute();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  // tmp is automatic: re-initialized to 10 each call, then +1 = 11.
+  EXPECT_EQ(val, 11u);
+}
+
+// §13.4.2: Recursive automatic function (factorial from LRM example).
+TEST(Sim1342, RecursiveAutoFunction) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function automatic int factorial(input int n);\n"
+      "    if (n <= 1)\n"
+      "      factorial = 1;\n"
+      "    else\n"
+      "      factorial = factorial(n - 1) * n;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = factorial(5);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 120u);
 }
 
 }  // namespace
