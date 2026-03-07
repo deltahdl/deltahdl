@@ -135,4 +135,21 @@ TEST(ElabClause100302, VarContAndProcAssign_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §6.3.2.2: Drive strength on continuous assignment is elaborated.
+TEST(Elaborator, DriveStrengthOnContAssign) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign (strong0, weak1) w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->assigns.empty());
+  EXPECT_EQ(mod->assigns[0].drive_strength0, 4u);  // strong0
+  EXPECT_EQ(mod->assigns[0].drive_strength1, 2u);  // weak1
+}
+
 }  // namespace
