@@ -311,29 +311,26 @@ def test_resolve_destinations_merge(tmp_path, ct, ct_helpers):
     assert len(to_merge) == 1
 
 
-def test_resolve_destinations_duplicates(tmp_path, ct, ct_helpers):
-    """Drops duplicate tests."""
-    _resolve_destinations = getattr(ct, "_resolve_destinations")
-    _tb = ct_helpers.make_test_block
+def _setup_resolve_dup(ct, ct_helpers, tmp_path):
+    """Create a duplicate test scenario for _resolve_destinations tests."""
+    resolve = getattr(ct, "_resolve_destinations")
+    t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
     f = tmp_path / "test_parser_clause_06_01.cpp"
     f.write_text("TEST(S, T) {\n}\n")
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    groups = {("test_parser_", "6.1"): [t]}
-    to_create, to_merge, _ = _resolve_destinations(
-        groups, tmp_path,
-    )
+    return resolve, {("test_parser_", "6.1"): [t]}
+
+
+def test_resolve_destinations_duplicates(tmp_path, ct, ct_helpers):
+    """Drops duplicate tests."""
+    resolve, groups = _setup_resolve_dup(ct, ct_helpers, tmp_path)
+    to_create, to_merge, _ = resolve(groups, tmp_path)
     assert len(to_create) == 0 and len(to_merge) == 0
 
 
 def test_resolve_destinations_all_dupes(tmp_path, capsys, ct, ct_helpers):
     """Prints removal message with parentheses for each duplicate."""
-    _resolve_destinations = getattr(ct, "_resolve_destinations")
-    _tb = ct_helpers.make_test_block
-    f = tmp_path / "test_parser_clause_06_01.cpp"
-    f.write_text("TEST(S, T) {\n}\n")
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    groups = {("test_parser_", "6.1"): [t]}
-    _resolve_destinations(groups, tmp_path)
+    resolve, groups = _setup_resolve_dup(ct, ct_helpers, tmp_path)
+    resolve(groups, tmp_path)
     assert "- Removed T()" in capsys.readouterr().out
 
 
@@ -341,13 +338,8 @@ def test_resolve_destinations_dry_run_would_have_removed(
     tmp_path, capsys, ct, ct_helpers,
 ):
     """Dry-run prints 'Would have removed' with parentheses."""
-    _resolve_destinations = getattr(ct, "_resolve_destinations")
-    _tb = ct_helpers.make_test_block
-    f = tmp_path / "test_parser_clause_06_01.cpp"
-    f.write_text("TEST(S, T) {\n}\n")
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    groups = {("test_parser_", "6.1"): [t]}
-    _resolve_destinations(groups, tmp_path, dry_run=True)
+    resolve, groups = _setup_resolve_dup(ct, ct_helpers, tmp_path)
+    resolve(groups, tmp_path, dry_run=True)
     assert "- Would have removed T()" in capsys.readouterr().out
 
 
@@ -656,16 +648,20 @@ def test_run_live_mixed_keeps_cmake_entry(tmp_path, monkeypatch, ct,
     assert "test_non_lrm_aig" in cmake
 
 
-def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch, ct,
-                                                  ct_helpers):
-    """Live run rewrites source to remove tests that already exist elsewhere."""
-    # Source has two tests, both classified as non-lrm:aig
-    src_body = (
-        "#include <gtest/gtest.h>\n\n"
-        "TEST(S, Keep) {\n  auto r = Parse(src);\n}\n"
-        "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n"
-    )
-    # Pre-create a variant file that already contains Dup
+_DUP_BODY_TWO = (
+    "#include <gtest/gtest.h>\n\n"
+    "TEST(S, Keep) {\n  auto r = Parse(src);\n}\n"
+    "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n"
+)
+
+_DUP_BODY_ONE = (
+    "#include <gtest/gtest.h>\n\n"
+    "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n"
+)
+
+
+def _run_live_dedup(ct, ct_helpers, tmp_path, monkeypatch, src_body):
+    """Pre-create variant with Dup, stub externals, and run live pipeline."""
     variant = tmp_path / "test_non_lrm_aig_a.cpp"
     variant.write_text(
         "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n}\n",
@@ -673,10 +669,13 @@ def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch, ct,
     )
     monkeypatch.setattr(ct, "_call_claude", _self_named_classifier)
     ct_helpers.stub_side_effects(monkeypatch)
-    _run_live_non_lrm(
-        ct, tmp_path, monkeypatch,
-        src_body=src_body, test="Dup",
-    )
+    _run_live_non_lrm(ct, tmp_path, monkeypatch, src_body=src_body, test="Dup")
+
+
+def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch, ct,
+                                                  ct_helpers):
+    """Live run rewrites source to remove tests that already exist elsewhere."""
+    _run_live_dedup(ct, ct_helpers, tmp_path, monkeypatch, _DUP_BODY_TWO)
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Dup" not in src
 
@@ -684,43 +683,14 @@ def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch, ct,
 def test_run_live_dedup_only_test_rewrites_source(tmp_path, monkeypatch, ct,
                                                    ct_helpers):
     """Source with only the duplicate test is rewritten empty."""
-    src_body = (
-        "#include <gtest/gtest.h>\n\n"
-        "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n"
-    )
-    variant = tmp_path / "test_non_lrm_aig_a.cpp"
-    variant.write_text(
-        "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n}\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(ct, "_call_claude", _self_named_classifier)
-    ct_helpers.stub_side_effects(monkeypatch)
-    _run_live_non_lrm(
-        ct, tmp_path, monkeypatch,
-        src_body=src_body, test="Dup",
-    )
+    _run_live_dedup(ct, ct_helpers, tmp_path, monkeypatch, _DUP_BODY_ONE)
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
 def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch,
                                                       ct, ct_helpers):
     """Live run keeps non-duplicate tests when removing duplicates."""
-    src_body = (
-        "#include <gtest/gtest.h>\n\n"
-        "TEST(S, Keep) {\n  auto r = Parse(src);\n}\n"
-        "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n"
-    )
-    variant = tmp_path / "test_non_lrm_aig_a.cpp"
-    variant.write_text(
-        "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n}\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(ct, "_call_claude", _self_named_classifier)
-    ct_helpers.stub_side_effects(monkeypatch)
-    _run_live_non_lrm(
-        ct, tmp_path, monkeypatch,
-        src_body=src_body, test="Dup",
-    )
+    _run_live_dedup(ct, ct_helpers, tmp_path, monkeypatch, _DUP_BODY_TWO)
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Keep" in src
 
@@ -728,10 +698,8 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch,
 # ---- _run with --issue -----------------------------------------------------
 
 
-def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
-                                         ct_helpers):
-    """_run with --issue calls maybe_tick_issue_checkbox."""
-    _run = getattr(ct, "_run")
+def _setup_maybe_tick_test(ct, ct_helpers, tmp_path, monkeypatch):
+    """Stub classifier and capture maybe_tick_issue_checkbox calls."""
     _make_input_file(tmp_path)
     ct_helpers.stub_classifier(monkeypatch, _parser_response())
     called = []
@@ -739,6 +707,13 @@ def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
         ct, "maybe_tick_issue_checkbox",
         lambda args, tests: called.append(True),
     )
+    return getattr(ct, "_run"), called
+
+
+def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
+                                         ct_helpers):
+    """_run with --issue calls maybe_tick_issue_checkbox."""
+    _run, called = _setup_maybe_tick_test(ct, ct_helpers, tmp_path, monkeypatch)
     args = _run_args(
         tmp_path, dry_run=True,
         issue=42, organization="myorg", repo="myrepo",
@@ -750,16 +725,8 @@ def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
 def test_run_without_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
                                             ct_helpers):
     """_run without --issue still calls maybe_tick_issue_checkbox."""
-    _run = getattr(ct, "_run")
-    _make_input_file(tmp_path)
-    ct_helpers.stub_classifier(monkeypatch, _parser_response())
-    called = []
-    monkeypatch.setattr(
-        ct, "maybe_tick_issue_checkbox",
-        lambda args, tests: called.append(True),
-    )
-    args = _run_args(tmp_path, dry_run=True)
-    _run(args)
+    _run, called = _setup_maybe_tick_test(ct, ct_helpers, tmp_path, monkeypatch)
+    _run(_run_args(tmp_path, dry_run=True))
     assert len(called) == 1
 
 

@@ -526,18 +526,17 @@ def _make_large_test(ct, name, n_lines):
     )
 
 
-def _do_split_write(ct, ct_helpers, tmp_path):
-    """Helper: write two large tests with max_lines=50."""
-    _parsed = ct_helpers.make_parsed_file
+def _do_split_write(ct, ct_helpers, tmp_path, max_lines=50):
+    """Helper: write two large tests, optionally capped at max_lines."""
     _write_files = getattr(ct, "_write_files")
-    parsed = _parsed()
+    parsed = ct_helpers.make_parsed_file()
     t1 = _make_large_test(ct, "Big1", 40)
     t2 = _make_large_test(ct, "Big2", 40)
     to_create = [("test_parser_clause_06_01", "6.1", [t1, t2])]
-    return _write_files(
-        to_create, [], parsed,
-        {"test_dir": tmp_path, "lrm_titles": {}, "max_lines": 50},
-    )
+    opts = {"test_dir": tmp_path, "lrm_titles": {}}
+    if max_lines is not None:
+        opts["max_lines"] = max_lines
+    return _write_files(to_create, [], parsed, opts)
 
 
 def test_write_files_split_creates_a(ct, ct_helpers, tmp_path):
@@ -596,16 +595,7 @@ def test_write_files_no_split_returns_name(ct, ct_helpers, tmp_path):
 
 def test_write_files_no_split_when_no_max_lines(ct, ct_helpers, tmp_path):
     """max_lines=None never splits."""
-    _parsed = ct_helpers.make_parsed_file
-    _write_files = getattr(ct, "_write_files")
-    parsed = _parsed()
-    t1 = _make_large_test(ct, "Big1", 40)
-    t2 = _make_large_test(ct, "Big2", 40)
-    to_create = [("test_parser_clause_06_01", "6.1", [t1, t2])]
-    _write_files(
-        to_create, [], parsed,
-        {"test_dir": tmp_path, "lrm_titles": {}},
-    )
+    _do_split_write(ct, ct_helpers, tmp_path, max_lines=None)
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
 

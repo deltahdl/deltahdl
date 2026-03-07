@@ -525,14 +525,19 @@ def test_apply_classification_non_lrm_underscore(ct, ct_helpers):
     assert t.clause == "non-lrm:aig"
 
 
-def test_apply_classification_non_lrm_with_topic(ct, ct_helpers):
-    """Appends topic to non-lrm clause."""
-    _tb = ct_helpers.make_test_block
-    _apply_classification = getattr(ct, "_apply_classification")
-    t = _tb("T", body=["  auto r = Parse(src);"])
+def _apply_non_lrm_aig(ct, ct_helpers):
+    """Apply non-lrm classification with aig topic, return test block."""
+    apply_fn = getattr(ct, "_apply_classification")
+    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
     clause_resp = {"clause": "non-lrm", "rationale": "r"}
     topic_resp = {"non_lrm_topic": "aig", "rationale": "r"}
-    _apply_classification(t, clause_resp, topic_resp, lrm_path="/tmp/lrm.txt")
+    apply_fn(t, clause_resp, topic_resp, lrm_path="/tmp/lrm.txt")
+    return t
+
+
+def test_apply_classification_non_lrm_with_topic(ct, ct_helpers):
+    """Appends topic to non-lrm clause."""
+    t = _apply_non_lrm_aig(ct, ct_helpers)
     assert t.clause == "non-lrm:aig"
 
 
@@ -571,12 +576,7 @@ def test_apply_classification_detects_prefix(ct, ct_helpers):
 
 def test_apply_classification_non_lrm_prefix_override(ct, ct_helpers):
     """Non-LRM clause overrides prefix to test_non_lrm_."""
-    _tb = ct_helpers.make_test_block
-    _apply_classification = getattr(ct, "_apply_classification")
-    t = _tb("T", body=["  auto r = Parse(src);"])
-    clause_resp = {"clause": "non-lrm", "rationale": "r"}
-    topic_resp = {"non_lrm_topic": "aig", "rationale": "r"}
-    _apply_classification(t, clause_resp, topic_resp, lrm_path="/tmp/lrm.txt")
+    t = _apply_non_lrm_aig(ct, ct_helpers)
     assert t.prefix == "test_non_lrm_"
 
 
