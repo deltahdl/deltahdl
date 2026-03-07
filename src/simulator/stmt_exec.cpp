@@ -353,8 +353,50 @@ static bool CaseItemMatches(const Logic4Vec& sel, const Logic4Vec& pat,
 // --- Case with casex/casez/inside and qualifiers ---
 
 static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  auto qual = stmt->qualifier;
   auto sel = EvalExpr(stmt->condition, ctx, arena);
 
+  // §12.5.3: unique/unique0 must scan all items to detect overlap.
+  if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
+    const Stmt* first_match_body = nullptr;
+    int match_count = 0;
+    bool has_default = false;
+
+    for (const auto& item : stmt->case_items) {
+      if (item.is_default) {
+        has_default = true;
+        continue;
+      }
+      for (auto* pat : item.patterns) {
+        auto pat_val = EvalExpr(pat, ctx, arena);
+        if (CaseItemMatches(sel, pat_val, stmt->case_kind, stmt->case_inside)) {
+          match_count++;
+          if (!first_match_body) first_match_body = item.body;
+          break;  // One match per case_item is enough.
+        }
+      }
+    }
+
+    if (match_count > 1) {
+      ctx.AddPendingViolation("unique case: multiple items matched");
+    }
+
+    if (first_match_body) {
+      co_return co_await ExecStmt(first_match_body, ctx, arena);
+    }
+
+    // No match — fall through to default.
+    for (const auto& item : stmt->case_items) {
+      if (item.is_default) co_return co_await ExecStmt(item.body, ctx, arena);
+    }
+
+    if (!has_default && qual == CaseQualifier::kUnique) {
+      ctx.AddPendingViolation("unique case: no matching item found");
+    }
+    co_return StmtResult::kDone;
+  }
+
+  // Standard case or priority-case: linear search, first match wins.
   for (const auto& item : stmt->case_items) {
     if (item.is_default) continue;
     for (auto* pat : item.patterns) {
@@ -368,11 +410,8 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   for (const auto& item : stmt->case_items) {
     if (item.is_default) co_return co_await ExecStmt(item.body, ctx, arena);
   }
-  // priority case: no match and no default => warning.
-  bool is_priority = stmt->qualifier == CaseQualifier::kPriority;
-  bool is_unique = stmt->qualifier == CaseQualifier::kUnique;
-  if (is_priority || is_unique) {
-    ctx.GetDiag().Warning({}, "case: no matching item found");
+  if (qual == CaseQualifier::kPriority) {
+    ctx.AddPendingViolation("priority case: no matching item found");
   }
   co_return StmtResult::kDone;
 }
