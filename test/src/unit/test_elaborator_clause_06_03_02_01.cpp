@@ -1,18 +1,12 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "fixture_elaborator.h"
 #include "model_net_declaration.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(NetDecl, ChargeStrengthOnWireIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kWire;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
 
 TEST(NetDecl, ChargeStrengthOnWandIsError) {
   NetDeclInfo info;

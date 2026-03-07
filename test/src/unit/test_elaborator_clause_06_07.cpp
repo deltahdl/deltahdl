@@ -64,4 +64,11 @@ TEST(NetDecl, TriregWithChargeStrengthOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
+TEST(NetDecl, ChargeStrengthOnWireIsError) {
+  NetDeclInfo info;
+  info.type = NetType::kWire;
+  info.has_charge_strength = true;
+  EXPECT_FALSE(ValidateNetDecl(info));
+}
+
 }  // namespace
