@@ -13,13 +13,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 
 namespace {
 
-// --- §22.11: Unrecognized pragma_names have no effect ---
-TEST(Preprocessor, Pragma_UnrecognizedName_NoError) {
-  PreprocFixture f;
-  Preprocess("`pragma unknown_pragma_xyz\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 // --- §22.11: `pragma with pragma_expressions ---
 TEST(Preprocessor, Pragma_NameWithKeyword_NoError) {
   PreprocFixture f;

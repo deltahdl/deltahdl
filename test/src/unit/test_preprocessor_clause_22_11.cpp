@@ -27,4 +27,11 @@ TEST(Preprocessor, Pragma_SimpleName_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// --- §22.11: Unrecognized pragma_names have no effect ---
+TEST(Preprocessor, Pragma_UnrecognizedName_NoError) {
+  PreprocFixture f;
+  Preprocess("`pragma unknown_pragma_xyz\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
