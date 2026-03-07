@@ -229,3 +229,10 @@ TEST(Preprocessor, ResetAll_BetweenDesignElementsLegal) {
   // After resetall, default_nettype should be back to wire.
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
 }
+// --- §22.11.1: `pragma resetall resets all pragmas ---
+TEST(Preprocessor, Pragma_Resetall_NoError) {
+  PreprocFixture f;
+  Preprocess("`pragma resetall\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
