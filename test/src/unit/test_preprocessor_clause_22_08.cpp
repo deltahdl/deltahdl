@@ -189,3 +189,41 @@ TEST(Preprocessor, DefaultNettype_Trireg) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.DefaultNetType(), NetType::kTrireg);
 }
+
+// --- §22.8: missing argument ---
+
+TEST(Preprocessor, DefaultNettype_MissingArgument) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.8: resetall restores wire default ---
+
+TEST(Preprocessor, DefaultNettype_ResetallRestoresWire) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`default_nettype none\n"
+      "`resetall\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
+}
+
+// --- §22.8: supply0/supply1 are NOT valid default net types ---
+
+TEST(Preprocessor, DefaultNettype_Supply0Invalid) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype supply0\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, DefaultNettype_Supply1Invalid) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`default_nettype supply1\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
