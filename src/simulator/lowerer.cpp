@@ -381,6 +381,13 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
       info->methods[name] = member->method;
     }
   }
+  // §8.9: Initialize static properties on the class type.
+  for (const auto& p : info->properties) {
+    if (p.is_static) {
+      info->static_properties[std::string(p.name)] =
+          MakeLogic4VecVal(arena_, p.width, 0);
+    }
+  }
   // §8.5: Register class parameters as properties.
   for (const auto& [pname, pexpr] : cls->params) {
     info->properties.push_back({pname, 32, false});
