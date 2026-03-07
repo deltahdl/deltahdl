@@ -114,4 +114,22 @@ TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
   }
 }
 
+TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
+  auto r = Parse(
+      "class my_cls;\n"
+      "  int data;\n"
+      "  string name;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  EXPECT_EQ(cls->name, "my_cls");
+  ASSERT_GE(cls->members.size(), 2u);
+  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kProperty);
+  EXPECT_EQ(cls->members[0]->name, "data");
+  EXPECT_EQ(cls->members[1]->kind, ClassMemberKind::kProperty);
+  EXPECT_EQ(cls->members[1]->name, "name");
+}
+
 }  // namespace
