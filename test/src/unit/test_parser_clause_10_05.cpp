@@ -52,4 +52,54 @@ TEST(ParserCh90301, BlockVarDecl_WithInit) {
   EXPECT_NE(blk->stmts[0]->var_init, nullptr);
 }
 
+// §10.5: Variable init with expression referencing other variables.
+TEST(ParserSection10, Sec10_5_VarInitWithExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] consta = 8'hF0;\n"
+      "  logic [7:0] constb = 8'h0F;\n"
+      "  logic [7:0] v = consta & constb;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 3u);
+  auto* v = items[2];
+  EXPECT_EQ(v->name, "v");
+  ASSERT_NE(v->init_expr, nullptr);
+  EXPECT_EQ(v->init_expr->kind, ExprKind::kBinary);
+}
+
+// §10.5: Multiple variables with mixed initialization in one statement.
+TEST(ParserSection10, Sec10_5_MixedInitInOneStmt) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a = 1, b, c = 3;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 3u);
+  EXPECT_NE(items[0]->init_expr, nullptr);
+  EXPECT_EQ(items[1]->init_expr, nullptr);
+  EXPECT_NE(items[2]->init_expr, nullptr);
+}
+
+// §10.5: Block-local variable with expression initializer.
+TEST(ParserSection10, Sec10_5_BlockLocalWithExprInit) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x = 2 + 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* blk = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(blk, nullptr);
+  ASSERT_GE(blk->stmts.size(), 1u);
+  EXPECT_EQ(blk->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_NE(blk->stmts[0]->var_init, nullptr);
+}
+
 }  // namespace
