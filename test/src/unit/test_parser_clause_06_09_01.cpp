@@ -41,23 +41,6 @@ TEST(ParserSection6, Sec6_5_LogicPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
-  auto r = Parse(
-      "module t;\n"
-      "  reg [15:0] wide_reg;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 15u);
-  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
-  EXPECT_EQ(item->name, "wide_reg");
-}
-
 TEST(ParserSection6, SignedVector) {
   auto r = Parse(
       "module t;\n"
