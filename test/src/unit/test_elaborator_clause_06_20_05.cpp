@@ -19,4 +19,16 @@ TEST(Elaboration, SpecparamInParam_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §6.20.5: Specparam declared in module body is ok.
+TEST(Elaboration, SpecparamInModuleBody_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  specparam delay = 50;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

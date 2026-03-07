@@ -75,4 +75,21 @@ TEST(ParserSection6, LocalparamInHeaderPort) {
               "endmodule\n"));
 }
 
+// §6.20.4: localparam in package scope.
+TEST(ParserSection6, LocalparamInPackage) {
+  EXPECT_TRUE(
+      ParseOk("package p;\n"
+              "  localparam int SIZE = 256;\n"
+              "endpackage\n"));
+}
+
+// §6.20.4: localparam derived from parameter expression.
+TEST(ParserSection6, LocalparamDerivedFromParam) {
+  EXPECT_TRUE(
+      ParseOk("module m #(parameter int W = 8);\n"
+              "  localparam int W2 = W * 2;\n"
+              "  localparam int WMAX = (1 << W) - 1;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
