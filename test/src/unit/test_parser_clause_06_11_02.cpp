@@ -383,4 +383,16 @@ TEST(ParserSection6, IntegerTypeByteDecl) {
   EXPECT_EQ(item->name, "b");
 }
 
+TEST(ParserSection6, LogicVarDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [15:0] data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_EQ(item->name, "data");
+}
+
 }  // namespace

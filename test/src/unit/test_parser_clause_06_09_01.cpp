@@ -41,18 +41,6 @@ TEST(ParserSection6, Sec6_5_LogicPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(ParserSection6, LogicVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [15:0] data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_EQ(item->name, "data");
-}
-
 TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
   auto r = Parse(
       "module t;\n"
