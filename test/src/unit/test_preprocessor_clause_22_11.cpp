@@ -41,4 +41,10 @@ TEST(Preprocessor, Pragma_NameWithKeyword_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(Preprocessor, Pragma_NameWithKeywordValue_NoError) {
+  PreprocFixture f;
+  Preprocess("`pragma my_pragma key1 = val1\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
