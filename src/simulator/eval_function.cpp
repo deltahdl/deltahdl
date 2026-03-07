@@ -812,14 +812,26 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
   if (expr->kind == ExprKind::kIdentifier) {
     auto* func = ctx.FindFunction(expr->text);
     if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
-    ctx.PushScope();
+    // §13.3.1: Static tasks reuse their variable frame across calls.
+    bool is_static = func->is_static && !func->is_automatic;
+    if (is_static) {
+      ctx.PushStaticScope(func->name);
+    } else {
+      ctx.PushScope();
+    }
     ctx.PushQueueRefFrame();
     return func;
   }
   if (expr->kind != ExprKind::kCall) return nullptr;
   auto* func = ctx.FindFunction(expr->callee);
   if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
-  ctx.PushScope();
+  // §13.3.1: Static tasks reuse their variable frame across calls.
+  bool is_static = func->is_static && !func->is_automatic;
+  if (is_static) {
+    ctx.PushStaticScope(func->name);
+  } else {
+    ctx.PushScope();
+  }
   ctx.PushQueueRefFrame();
   BindFunctionArgs(func, expr, ctx, arena);
   return func;
@@ -829,7 +841,12 @@ void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
                       SimContext& ctx) {
   WritebackOutputArgs(func, expr, ctx);
   WritebackQueueRefs(ctx);
-  ctx.PopScope();
+  bool is_static = func->is_static && !func->is_automatic;
+  if (is_static) {
+    ctx.PopStaticScope(func->name);
+  } else {
+    ctx.PopScope();
+  }
 }
 
 // §6.21: Reject ref arguments in static subroutines.

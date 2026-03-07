@@ -273,4 +273,42 @@ TEST(ParserSection4, Sec4_9_4_AutoTaskExplicitAutoLocals) {
   EXPECT_NE(t->func_body_stmts[0]->var_init, nullptr);
 }
 
+// §13.3.1: Static local variable inside automatic task.
+TEST(ParserSection13, StaticVarInAutoTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic count();\n"
+      "    static int call_count = 0;\n"
+      "    call_count = call_count + 1;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* t = FirstFuncOrTask(r);
+  ASSERT_NE(t, nullptr);
+  EXPECT_TRUE(t->is_automatic);
+  ASSERT_GE(t->func_body_stmts.size(), 1u);
+  EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(t->func_body_stmts[0]->var_is_static);
+}
+
+// §13.3.1: Automatic local variable inside static task.
+TEST(ParserSection13, AutoVarInStaticTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task static proc();\n"
+      "    automatic int temp = 0;\n"
+      "    temp = temp + 1;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* t = FirstFuncOrTask(r);
+  ASSERT_NE(t, nullptr);
+  EXPECT_TRUE(t->is_static);
+  ASSERT_GE(t->func_body_stmts.size(), 1u);
+  EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(t->func_body_stmts[0]->var_is_automatic);
+}
+
 }  // namespace

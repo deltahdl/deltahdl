@@ -1,5 +1,3 @@
-#include "elaborator/elaborator.h"
-#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -17,6 +15,51 @@ TEST(ParserA27, ElabTaskAutomaticLifetime) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §13.3.1: Static task elaborates.
+TEST(Elab13031, StaticTaskElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task static counter();\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §13.3.1: Static var in automatic task elaborates.
+TEST(Elab13031, StaticVarInAutoTaskElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task automatic work();\n"
+      "    static int count = 0;\n"
+      "    count = count + 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §13.3.1: Automatic var in static task elaborates.
+TEST(Elab13031, AutoVarInStaticTaskElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task static work();\n"
+      "    automatic int temp = 0;\n"
+      "    temp = temp + 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
