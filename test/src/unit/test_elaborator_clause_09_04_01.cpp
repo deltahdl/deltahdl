@@ -1,12 +1,68 @@
+#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
-#include "simulator/net.h"
 #include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
 
+// §9.4.1: Delay control in initial block elaborates.
+TEST(ElabClause09_04_01, DelayControlInInitialElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    #10 x = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.4.1: Expression delay elaborates.
+TEST(ElabClause09_04_01, ExpressionDelayElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    #(5 + 3) x = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.4.1: Delay in always block elaborates (general purpose always).
+TEST(ElabClause09_04_01, DelayInAlwaysElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  always #5 x = ~x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.4.1: Delay in always_comb is an error.
+TEST(ElabClause09_04_01, DelayInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb #5 a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.4.1: Simulator verifies delay advances time.
 TEST(Lowerer, DelayBasic) {
   LowerFixture f;
   auto* design = ElaborateSrc(
