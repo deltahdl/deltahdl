@@ -968,3 +968,15 @@ def test_run_all_reviewed_closes_issue(
         tmp_path, monkeypatch, cf, cf_helpers,
     )
     assert len(close_log) == 1
+
+
+def test_run_all_reviewed_dry_run_skips_close(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
+    """Does not close issue when all reviewed and dry_run is set."""
+    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    monkeypatch.setattr(cf, "sync_issue_rows", lambda _a, _n: {"A"})
+    cf_helpers.stub_subprocess_success(monkeypatch)
+    close_log = cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path, dry_run=True))
+    assert len(close_log) == 0
