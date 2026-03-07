@@ -445,3 +445,109 @@ TEST(Preprocessor, Clause22_2_MultipleDirectivesScopeChaining) {
   EXPECT_TRUE(pp.InCelldefine());
   EXPECT_TRUE(pp.HasTimescale());
 }
+
+// §22.2: Directives with a defined end may be followed by language elements
+// on the same line — argument-taking directives.
+
+TEST(Preprocessor, Clause22_2_CodeAfterTimescaleOnSameLine) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>", "`timescale 1ns / 1ps int x = 1;\n");
+  auto result = pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(pp.HasTimescale());
+  EXPECT_NE(result.find("int x = 1"), std::string::npos);
+}
+
+TEST(Preprocessor, Clause22_2_CodeAfterDefaultNettypeOnSameLine) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>", "`default_nettype none int x = 1;\n");
+  auto result = pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+  EXPECT_NE(result.find("int x = 1"), std::string::npos);
+}
+
+TEST(Preprocessor, Clause22_2_CodeAfterUnconnectedDriveOnSameLine) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid =
+      f.mgr.AddFile("<test>", "`unconnected_drive pull0 int x = 1;\n");
+  auto result = pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.UnconnectedDrive(), NetType::kTri0);
+  EXPECT_NE(result.find("int x = 1"), std::string::npos);
+}
+
+TEST(Preprocessor, Clause22_2_CodeAfterUndefOnSameLine) {
+  PreprocFixture f;
+  auto result =
+      Preprocess("`define FOO 1\n`undef FOO int x = 42;\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int x = 42"), std::string::npos);
+}
+
+TEST(Preprocessor, Clause22_2_CodeAfterEndKeywordsOnSameLine) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`begin_keywords \"1800-2023\"\n"
+      "`end_keywords int x = 1;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int x = 1"), std::string::npos);
+}
+
+TEST(Preprocessor, Clause22_2_CodeAfterBeginKeywordsOnSameLine) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`begin_keywords \"1800-2023\" int x = 1;\n"
+      "`end_keywords\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int x = 1"), std::string::npos);
+}
+
+// §22.2: Macro expansion shall occur within a compiler directive.
+
+TEST(Preprocessor, Clause22_2_MacroExpansionWithinTimescale) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"MY_PREC", "1ps"}};
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto fid = f.mgr.AddFile("<test>", "`timescale 1ns / `MY_PREC\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(pp.HasTimescale());
+}
+
+TEST(Preprocessor, Clause22_2_MacroExpansionWithinDefaultNettype) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"MY_TYPE", "none"}};
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto fid = f.mgr.AddFile("<test>", "`default_nettype `MY_TYPE\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+}
+
+// §22.2: A compiler directive shall not appear in the middle of another.
+
+TEST(Preprocessor, Clause22_2_DirectiveInsideDirectiveArgIsError) {
+  PreprocFixture f;
+  Preprocess("`default_nettype `resetall\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §22.2: Macro in remainder after directive is expanded.
+
+TEST(Preprocessor, Clause22_2_MacroInRemainderAfterDirectiveExpanded) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"VAL", "42"}};
+  auto result =
+      Preprocess("`default_nettype none int x = `VAL;\n", f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("42"), std::string::npos);
+}

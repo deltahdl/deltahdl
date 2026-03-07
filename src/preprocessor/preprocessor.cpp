@@ -101,6 +101,8 @@ static bool HasUnterminatedString(std::string_view body) {
   return quotes % 2 != 0;
 }
 
+static bool IsIdentChar(char c);
+
 static bool EndsWithBackslash(std::string_view line) {
   return !line.empty() && line.back() == '\\';
 }
@@ -145,6 +147,54 @@ static std::string_view AfterDirective(std::string_view line,
   auto trimmed = Preprocessor::Trim(line);
   auto rest = trimmed.substr(1 + dir.size());
   return Preprocessor::Trim(rest);
+}
+
+// §22.2: Split a single-token directive argument from the remainder text.
+static std::pair<std::string_view, std::string_view> SplitFirstToken(
+    std::string_view s) {
+  size_t end = 0;
+  while (end < s.size() &&
+         !std::isspace(static_cast<unsigned char>(s[end])))
+    ++end;
+  if (end >= s.size()) return {s, {}};
+  return {s.substr(0, end), Preprocessor::Trim(s.substr(end))};
+}
+
+// §22.2: Split `timescale argument (unit / precision) from remainder.
+// Expects expanded text (macros already substituted).
+static std::pair<std::string_view, std::string_view> SplitTimescaleArg(
+    std::string_view s) {
+  auto slash = s.find('/');
+  if (slash == std::string_view::npos) return {s, {}};
+  auto after_slash = s.substr(slash + 1);
+  auto prec = Preprocessor::Trim(after_slash);
+  size_t end = 0;
+  // Skip digits (magnitude: 1, 10, 100).
+  while (end < prec.size() &&
+         std::isdigit(static_cast<unsigned char>(prec[end])))
+    ++end;
+  // Skip whitespace between magnitude and unit.
+  while (end < prec.size() &&
+         std::isspace(static_cast<unsigned char>(prec[end])))
+    ++end;
+  // Skip alpha chars (unit: s, ms, us, ns, ps, fs).
+  while (end < prec.size() &&
+         std::isalpha(static_cast<unsigned char>(prec[end])))
+    ++end;
+  auto ts_end =
+      static_cast<size_t>(prec.data() + end - s.data());
+  return {s.substr(0, ts_end), Preprocessor::Trim(s.substr(ts_end))};
+}
+
+// §22.2: Split `begin_keywords quoted argument from remainder.
+static std::pair<std::string_view, std::string_view> SplitQuotedArg(
+    std::string_view s) {
+  auto first = s.find('"');
+  if (first == std::string_view::npos) return {s, {}};
+  auto second = s.find('"', first + 1);
+  if (second == std::string_view::npos) return {s, {}};
+  auto end = second + 1;
+  return {s.substr(0, end), Preprocessor::Trim(s.substr(end))};
 }
 
 // §22.2: Replace comment content with spaces so backticks within comments
@@ -275,17 +325,33 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   return output;
 }
 
+// §22.2: Process arbitrary text — strip comments, expand macros, track design
+// elements, and append to output.
+void Preprocessor::OutputText(std::string_view text, uint32_t file_id,
+                              uint32_t line_num, std::string& output) {
+  if (Trim(text).empty()) return;
+  auto stripped = StripComments(text, in_block_comment_);
+  auto expanded = ExpandInlineMacros(stripped, file_id, line_num);
+  TrackDesignElement(Trim(expanded));
+  output.append(expanded);
+}
+
+// §22.2: Process pre-expanded text — strip comments and track design elements,
+// but skip macro expansion (already done by caller).
+void Preprocessor::OutputPreExpanded(std::string_view text,
+                                     std::string& output) {
+  if (Trim(text).empty()) return;
+  auto stripped = StripComments(text, in_block_comment_);
+  TrackDesignElement(Trim(std::string_view(stripped)));
+  output.append(stripped);
+}
+
 // §22.2: Output text that follows a directive with a defined end on the
 // same line.  Applies macro expansion and comment stripping.
 void Preprocessor::OutputRemainder(std::string_view line,
                                    std::string_view directive, uint32_t file_id,
                                    uint32_t line_num, std::string& output) {
-  auto rest = AfterDirective(line, directive);
-  if (rest.empty()) return;
-  auto stripped = StripComments(rest, in_block_comment_);
-  auto expanded = ExpandInlineMacros(stripped, file_id, line_num);
-  TrackDesignElement(Trim(expanded));
-  output.append(expanded);
+  OutputText(AfterDirective(line, directive), file_id, line_num, output);
 }
 
 bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
@@ -296,7 +362,13 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
       diag_.Error(loc, "`timescale illegal inside a design element");
       return true;
     }
-    HandleTimescale(AfterDirective(line, "timescale"), loc);
+    auto rest = AfterDirective(line, "timescale");
+    // §22.2: Macro expansion shall occur within a compiler directive.
+    auto expanded = ExpandInlineMacros(rest, file_id, line_num);
+    auto [ts_arg, remainder] = SplitTimescaleArg(expanded);
+    HandleTimescale(ts_arg, loc);
+    // §22.2: text after the directive's defined end is preserved.
+    OutputPreExpanded(remainder, output);
     return true;
   }
   if (StartsWithDirective(line, "resetall")) {
@@ -326,7 +398,12 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
       diag_.Error(loc, "`default_nettype illegal inside a design element");
       return true;
     }
-    HandleDefaultNettype(AfterDirective(line, "default_nettype"), loc);
+    auto rest = AfterDirective(line, "default_nettype");
+    // §22.2: Macro expansion shall occur within a compiler directive.
+    auto expanded = ExpandInlineMacros(rest, file_id, line_num);
+    auto [arg, remainder] = SplitFirstToken(expanded);
+    HandleDefaultNettype(arg, loc);
+    OutputPreExpanded(remainder, output);
     return true;
   }
   if (StartsWithDirective(line, "endcelldefine")) {
@@ -353,7 +430,12 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
       diag_.Error(loc, "`unconnected_drive illegal inside a design element");
       return true;
     }
-    HandleUnconnectedDrive(AfterDirective(line, "unconnected_drive"), loc);
+    auto rest = AfterDirective(line, "unconnected_drive");
+    // §22.2: Macro expansion shall occur within a compiler directive.
+    auto expanded = ExpandInlineMacros(rest, file_id, line_num);
+    auto [arg, remainder] = SplitFirstToken(expanded);
+    HandleUnconnectedDrive(arg, loc);
+    OutputPreExpanded(remainder, output);
     return true;
   }
   if (StartsWithDirective(line, "pragma")) {
@@ -441,7 +523,19 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     return true;
   }
   if (StartsWithDirective(line, "undef")) {
-    HandleUndef(AfterDirective(line, "undef"), loc);
+    auto rest = AfterDirective(line, "undef");
+    auto trimmed_rest = Trim(rest);
+    // Extract just the macro name identifier.
+    size_t name_end = 0;
+    while (name_end < trimmed_rest.size() &&
+           IsIdentChar(trimmed_rest[name_end]))
+      ++name_end;
+    HandleUndef(trimmed_rest.substr(0, name_end), loc);
+    // §22.2: text after the directive's defined end is preserved.
+    if (IsActive()) {
+      auto remainder = Trim(trimmed_rest.substr(name_end));
+      OutputText(remainder, file_id, line_num, output);
+    }
     return true;
   }
   if (ProcessConditionalDirective(line, file_id, line_num, output)) return true;
@@ -460,7 +554,11 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
       diag_.Error(loc, "`begin_keywords illegal inside a design element");
       return true;
     }
-    HandleBeginKeywords(AfterDirective(line, "begin_keywords"), loc, output);
+    auto rest = AfterDirective(line, "begin_keywords");
+    auto [bk_arg, remainder] = SplitQuotedArg(rest);
+    HandleBeginKeywords(bk_arg, loc, output);
+    // §22.2: text after the directive's defined end is preserved.
+    OutputText(remainder, file_id, line_num, output);
     return true;
   }
   if (StartsWithDirective(line, "end_keywords") && IsActive()) {
@@ -469,6 +567,8 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
       return true;
     }
     HandleEndKeywords(loc, output);
+    // §22.2: text after the directive's defined end is preserved.
+    OutputRemainder(line, "end_keywords", file_id, line_num, output);
     return true;
   }
   if (IsActive() && ProcessStateDirective(line, loc, file_id, line_num, output))

@@ -45,6 +45,9 @@ class Preprocessor {
   void OutputRemainder(std::string_view line, std::string_view directive,
                        uint32_t file_id, uint32_t line_num,
                        std::string& output);
+  void OutputText(std::string_view text, uint32_t file_id, uint32_t line_num,
+                  std::string& output);
+  void OutputPreExpanded(std::string_view text, std::string& output);
   bool IsActive() const;
   void HandleDefine(std::string_view rest, SourceLoc loc);
   void HandleUndef(std::string_view rest, SourceLoc loc);
