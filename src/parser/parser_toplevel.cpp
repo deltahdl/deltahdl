@@ -900,6 +900,12 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                     "constructor shall not be declared virtual");
       }
     }
+    // §8.10: Static methods cannot be virtual.
+    if (member->is_static && member->is_virtual &&
+        member->method->name != "new") {
+      diag_.Error(member->method->loc,
+                  "static method shall not be declared virtual");
+    }
     if (member->is_static) member->method->is_static = true;
     members.push_back(member);
     return true;
@@ -911,6 +917,11 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
     if (member->method->is_static) {
       diag_.Error(member->method->loc,
                   "class method shall not have static lifetime");
+    }
+    // §8.10: Static methods cannot be virtual.
+    if (member->is_static && member->is_virtual) {
+      diag_.Error(member->method->loc,
+                  "static method shall not be declared virtual");
     }
     if (member->is_static) member->method->is_static = true;
     members.push_back(member);

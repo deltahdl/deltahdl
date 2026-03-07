@@ -213,6 +213,9 @@ class Elaborator {
   /// §8.4: Class handle cannot appear in continuous assignment.
   void ValidateClassHandleContAssign(const ModuleItem* item);
 
+  /// §8.10: Static method bodies shall not reference 'this' or 'super'.
+  void ValidateStaticMethodBodies(const ModuleDecl* decl);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 

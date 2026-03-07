@@ -297,6 +297,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateConstAssignments(decl);
   ValidateArrayAssignments(decl);
   ValidateClassHandleOps(decl);
+  ValidateStaticMethodBodies(decl);
   // §3.14: Precision shall be at least as precise as the time unit.
   if (decl->has_timeunit && decl->has_timeprecision) {
     if (static_cast<int>(decl->time_prec) >
@@ -890,6 +891,72 @@ void Elaborator::ValidateClassHandleContAssign(const ModuleItem* item) {
   if (lhs_class || rhs_class) {
     diag_.Error(item->loc,
                 "class object handle cannot be used in continuous assignment");
+  }
+}
+
+// §8.10: Check if an expression references 'this' or 'super'.
+static bool ExprRefsThisOrSuper(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier &&
+      (e->text == "this" || e->text == "super"))
+    return true;
+  if (ExprRefsThisOrSuper(e->lhs)) return true;
+  if (ExprRefsThisOrSuper(e->rhs)) return true;
+  if (ExprRefsThisOrSuper(e->base)) return true;
+  if (ExprRefsThisOrSuper(e->index)) return true;
+  if (ExprRefsThisOrSuper(e->condition)) return true;
+  if (ExprRefsThisOrSuper(e->true_expr)) return true;
+  if (ExprRefsThisOrSuper(e->false_expr)) return true;
+  for (const auto* elem : e->elements) {
+    if (ExprRefsThisOrSuper(elem)) return true;
+  }
+  return false;
+}
+
+// §8.10: Walk statements looking for 'this'/'super' references.
+static bool StmtRefsThisOrSuper(const Stmt* s) {
+  if (!s) return false;
+  if (ExprRefsThisOrSuper(s->lhs)) return true;
+  if (ExprRefsThisOrSuper(s->rhs)) return true;
+  if (ExprRefsThisOrSuper(s->expr)) return true;
+  if (ExprRefsThisOrSuper(s->condition)) return true;
+  for (auto* sub : s->stmts) {
+    if (StmtRefsThisOrSuper(sub)) return true;
+  }
+  if (StmtRefsThisOrSuper(s->then_branch)) return true;
+  if (StmtRefsThisOrSuper(s->else_branch)) return true;
+  if (StmtRefsThisOrSuper(s->body)) return true;
+  if (StmtRefsThisOrSuper(s->for_body)) return true;
+  for (auto& ci : s->case_items) {
+    if (StmtRefsThisOrSuper(ci.body)) return true;
+  }
+  return false;
+}
+
+void Elaborator::ValidateStaticMethodBodies(const ModuleDecl* decl) {
+  auto check_class = [&](const ClassDecl* cls) {
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
+      if (!m->method) continue;
+      for (const auto* s : m->method->func_body_stmts) {
+        if (StmtRefsThisOrSuper(s)) {
+          diag_.Error(m->method->loc,
+                      "'this' and 'super' shall not be used in "
+                      "a static method");
+          break;
+        }
+      }
+    }
+  };
+  // Check CU-level classes.
+  for (const auto* cls : unit_->classes) {
+    check_class(cls);
+  }
+  // Check module-level class declarations.
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
+      check_class(item->class_decl);
+    }
   }
 }
 

@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -41,6 +40,109 @@ TEST(ParserSection13, Sec13_8_MultiArgParameterizedWidth) {
               "    return a + b;\n"
               "  endfunction\n"
               "endclass\n"));
+}
+
+// §8.10: Static function declaration parses correctly.
+TEST(ParserA810, StaticFunctionDeclaration) {
+  auto r = Parse(
+      "class id;\n"
+      "  static int current;\n"
+      "  static function int next_id();\n"
+      "    return current;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* cls = r.cu->classes[0];
+  ASSERT_GE(cls->members.size(), 2u);
+  auto* m = cls->members[1];
+  EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
+  EXPECT_TRUE(m->is_static);
+  EXPECT_EQ(m->method->name, "next_id");
+}
+
+// §8.10: Static task declaration parses correctly.
+TEST(ParserA810, StaticTaskDeclaration) {
+  auto r = Parse(
+      "class Logger;\n"
+      "  static task log_msg();\n"
+      "  endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* cls = r.cu->classes[0];
+  ASSERT_GE(cls->members.size(), 1u);
+  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kMethod);
+  EXPECT_TRUE(cls->members[0]->is_static);
+}
+
+// §8.10: Static methods cannot be virtual.
+TEST(ParserA810, StaticVirtualFunctionError) {
+  auto r = Parse(
+      "class C;\n"
+      "  static virtual function int foo();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §8.10: Static virtual task is also illegal.
+TEST(ParserA810, StaticVirtualTaskError) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual static task bar();\n"
+      "  endtask\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §8.10: Static method called via class scope resolution.
+TEST(ParserA810, StaticMethodClassScopeCall) {
+  ParseOk(
+      "class id;\n"
+      "  static function int next_id();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int x;\n"
+      "    x = id::next_id();\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+// §8.10: Static method called via instance dot notation.
+TEST(ParserA810, StaticMethodInstanceDotCall) {
+  ParseOk(
+      "class C;\n"
+      "  static function int helper();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "  initial begin\n"
+      "    automatic int x;\n"
+      "    x = c.helper();\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+// §8.10: Static method is distinct from static lifetime on task.
+TEST(ParserA810, StaticMethodVsStaticLifetime) {
+  auto r = Parse(
+      "class TwoTasks;\n"
+      "  static task t1();\n"
+      "  endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* cls = r.cu->classes[0];
+  ASSERT_GE(cls->members.size(), 1u);
+  // The 'static' is the class qualifier, not lifetime.
+  EXPECT_TRUE(cls->members[0]->is_static);
 }
 
 }  // namespace
