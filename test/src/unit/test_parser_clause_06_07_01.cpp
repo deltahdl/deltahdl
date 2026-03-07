@@ -911,4 +911,18 @@ TEST(ParserA222, DriveStrengthHighz0Strong1) {
   EXPECT_EQ(item->drive_strength1, 4u);   // strong1
 }
 
+// §6.3.2.2: Drive strength supply0, supply1.
+TEST(ParserA222, DriveStrengthSupply0Supply1) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (supply0, supply1) w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->drive_strength0, 5u);   // supply0
+  EXPECT_EQ(item->drive_strength1, 5u);   // supply1
+}
+
 }  // namespace
