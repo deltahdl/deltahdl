@@ -23,4 +23,47 @@ TEST(Elaboration, EnumArithNoCast_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §6.19.4: Enum value used in integer expression is auto-cast.
+TEST(Elaboration, EnumToIntAutocast_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  integer a;\n"
+      "  initial a = BLUE * 3;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.19.4: Enum assigned to integer variable is ok (auto-cast).
+TEST(Elaboration, EnumAssignToInt_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {A, B, C} my_e;\n"
+      "  int x;\n"
+      "  initial x = B;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.19.4: Integer comparison with enum is ok.
+TEST(Elaboration, EnumIntComparison_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {X, Y, Z} vals;\n"
+      "  initial begin\n"
+      "    if (1 == Y) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

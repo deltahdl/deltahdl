@@ -22,4 +22,20 @@ TEST(Elaboration, EnumStrictTypeCheck_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §6.19.3: Assigning enum member to enum variable is ok.
+TEST(Elaboration, EnumMemberAssign_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial begin\n"
+      "    e val;\n"
+      "    val = c;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

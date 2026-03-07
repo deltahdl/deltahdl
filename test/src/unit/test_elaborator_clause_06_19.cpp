@@ -41,4 +41,57 @@ TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §6.19: Duplicate enum values are an error.
+TEST(Elaboration, EnumDuplicateValue_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  enum {a=0, b=7, c, d=8} x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.19: Enum variable gets correct width (default int = 32).
+TEST(Elaboration, EnumDefaultWidthInt) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  enum {A, B, C} x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  for (const auto& v : mod->variables) {
+    if (v.name == "x") {
+      EXPECT_EQ(v.width, 32u);
+    }
+  }
+}
+
+// §6.19: Enum members are elaborated as constants.
+TEST(Elaboration, EnumMembersAsConstants) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  color_t c;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.19: Enum with explicit base type width.
+TEST(Elaboration, EnumExplicitBaseWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  enum logic [3:0] {A, B, C} x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
