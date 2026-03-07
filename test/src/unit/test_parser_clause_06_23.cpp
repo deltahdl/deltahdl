@@ -537,4 +537,37 @@ TEST(ParserSection6, TypeRef_DataType) {
                "endmodule\n"));
 }
 
+// §6.23: type(this) in a class refers to the enclosing class type.
+TEST(ParserSection6, TypeRefThis) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  static function type(this) get();\n"
+              "    return null;\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
+// §6.23: localparam type assigned from type operator on a data type.
+TEST(ParserSection6, LocalparamTypeFromTypeOp) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  localparam type T = type(bit [12:0]);\n"
+              "endmodule\n"));
+}
+
+// §6.23: type operator on expression — no hierarchical refs.
+TEST(ParserSection6, TypeRefSimpleExprNoHier) {
+  auto r = Parse(
+      "module t;\n"
+      "  int i;\n"
+      "  var type(i + 3) j;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* j_item = FindItemByName(r, "j");
+  ASSERT_NE(j_item, nullptr);
+  ASSERT_NE(j_item->data_type.type_ref_expr, nullptr);
+  EXPECT_EQ(j_item->data_type.type_ref_expr->kind, ExprKind::kBinary);
+}
+
 }  // namespace

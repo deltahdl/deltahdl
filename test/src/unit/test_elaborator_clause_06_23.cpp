@@ -703,4 +703,52 @@ TEST(SimCh6b, TypeOpByteFromWiderAssignment) {
   EXPECT_TRUE(var->is_signed);
 }
 
+// §6.23: localparam type = type(int); variable uses the resolved type.
+TEST(SimCh6b, TypeOpLocalparamType) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  localparam type T = type(int);\n"
+      "  T x;\n"
+      "  initial x = 55;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 32u);
+  EXPECT_EQ(var->value.ToUint64(), 55u);
+  EXPECT_TRUE(var->is_signed);
+}
+
+// §6.23: type operator on packed vector type.
+TEST(SimCh6b, TypeOpLogicVector) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] a;\n"
+      "  var type(a) b;\n"
+      "  initial begin\n"
+      "    a = 16'hBEEF;\n"
+      "    b = 16'hCAFE;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 16u);
+  EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
+}
+
 }  // namespace
