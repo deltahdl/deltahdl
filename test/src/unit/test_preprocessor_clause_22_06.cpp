@@ -601,3 +601,9 @@ TEST(ParserSection22, IfndefSelectsElseBranch) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "reached");
 }
+TEST(Preprocessor, Pragma_InsideIfdef_Inactive) {
+  PreprocFixture f;
+  auto out = Preprocess("`ifdef UNDEF_FLAG\n`pragma some_pragma\n`endif\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+

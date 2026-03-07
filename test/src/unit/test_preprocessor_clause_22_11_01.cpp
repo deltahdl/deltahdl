@@ -33,12 +33,6 @@ TEST(Preprocessor, Pragma_Protect_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Pragma_InsideIfdef_Inactive) {
-  PreprocFixture f;
-  auto out = Preprocess("`ifdef UNDEF_FLAG\n`pragma some_pragma\n`endif\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 // --- §22.11: Pragma does not affect `resetall behavior ---
 // `resetall does not reset pragma state per §22.3.
 TEST(Preprocessor, Pragma_ResetallDoesNotAffectPragma) {
