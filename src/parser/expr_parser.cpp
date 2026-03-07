@@ -387,7 +387,20 @@ Expr* Parser::ParsePrimaryExpr() {
       return MakeLiteral(ExprKind::kIdentifier, tok);
     case TokenKind::kKwThis:
     case TokenKind::kKwSuper: {  // §8.11/§8.15
-      Expr* result = ParseMemberAccessChain(Consume());
+      auto super_tok = Consume();
+      Expr* result = ParseMemberAccessChain(super_tok);
+      // §8.15: super.super is not allowed.
+      if (super_tok.kind == TokenKind::kKwSuper) {
+        for (auto* e = result; e && e->kind == ExprKind::kMemberAccess;
+             e = e->lhs) {
+          if (e->rhs && e->rhs->kind == ExprKind::kIdentifier &&
+              e->rhs->text == "super") {
+            diag_.Error(e->rhs->range.start,
+                        "'super.super' is not allowed");
+            break;
+          }
+        }
+      }
       if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
       if (Check(TokenKind::kLBracket)) result = ParseSelectExpr(result);
       return ParseWithClause(result);
