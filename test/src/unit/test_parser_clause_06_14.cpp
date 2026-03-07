@@ -1,9 +1,28 @@
+#include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast.h"
 
 using namespace delta;
 
 namespace {
+
+// §6.14: chandle width is at least pointer-sized (64-bit).
+TEST(TypeEval, ChandleWidth64) {
+  DataType dt;
+  dt.kind = DataTypeKind::kChandle;
+  EXPECT_EQ(EvalTypeWidth(dt), 64u);
+}
+
+// §6.14: chandle is not integral.
+TEST(TypeEval, ChandleNotIntegral) {
+  EXPECT_FALSE(IsIntegralType(DataTypeKind::kChandle));
+}
+
+// §6.14: chandle is not 4-state.
+TEST(TypeEval, ChandleNot4State) {
+  EXPECT_FALSE(Is4stateType(DataTypeKind::kChandle));
+}
 
 TEST(ParserA221, DataTypeChandle) {
   auto r = Parse("module m; chandle h; endmodule");
@@ -54,6 +73,49 @@ TEST(ParserSection6, ChandleVarDecl) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kChandle);
   EXPECT_EQ(item->name, "ch");
+}
+
+// §6.14: chandle as function return type.
+TEST(ParserSection6, ChandleFunctionReturn) {
+  auto r = Parse(
+      "module m;\n"
+      "  function chandle get_handle();\n"
+      "    return null;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kChandle);
+}
+
+// §6.14: chandle as function argument.
+TEST(ParserSection6, ChandleFunctionArg) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void use_handle(chandle h);\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
+// §6.14: chandle assignment to null.
+TEST(ParserSection6, ChandleAssignNull) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  chandle h;\n"
+              "  initial h = null;\n"
+              "endmodule\n"));
+}
+
+// §6.14: chandle equality with null.
+TEST(ParserSection6, ChandleEqualityWithNull) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  chandle h;\n"
+              "  int r;\n"
+              "  initial r = (h == null) ? 1 : 0;\n"
+              "endmodule\n"));
 }
 
 }  // namespace

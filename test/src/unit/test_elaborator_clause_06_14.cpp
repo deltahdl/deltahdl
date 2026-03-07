@@ -1,8 +1,4 @@
-#include "common/types.h"
-#include "elaborator/sensitivity.h"
-#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
-#include "lexer/token.h"
 
 using namespace delta;
 
@@ -44,6 +40,32 @@ TEST(Elaboration, ChandleVarDecl_OK) {
   auto* design = ElaborateSrc(
       "module top;\n"
       "  chandle ch;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.14: chandle-to-chandle assignment is ok.
+TEST(Elaboration, ChandleToChandleAssign_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  chandle a, b;\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.14: chandle assigned to null is ok.
+TEST(Elaboration, ChandleAssignNull_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  chandle h;\n"
+      "  initial h = null;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
