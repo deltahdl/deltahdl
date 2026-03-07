@@ -1,58 +1,85 @@
-#include "fixture_simulator.h"
-#include "simulator/lowerer.h"
-#include "simulator/net.h"
-#include "simulator/variable.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(Lowerer, WaitConditionTrue) {
-  LowerFixture f;
+// §9.4.3: Wait statement elaborates in initial block.
+TEST(ElabClause09_04_03, WaitStatementElaborates) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
+      "module m;\n"
+      "  logic ready;\n"
+      "  int x;\n"
       "  initial begin\n"
-      "    x = 1;\n"
-      "    wait (x) x = 42;\n"
+      "    wait (ready) x = 1;\n"
       "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
+  EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Lowerer, WaitConditionDeferred) {
-  LowerFixture f;
+// §9.4.3: Wait with null statement elaborates.
+TEST(ElabClause09_04_03, WaitNullStatementElaborates) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] flag, result;\n"
+      "module m;\n"
+      "  logic done;\n"
       "  initial begin\n"
-      "    flag = 0;\n"
-      "    #5 flag = 1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    wait (flag) result = 99;\n"
+      "    wait (done);\n"
       "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
 
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+// §9.4.3: Wait with block statement elaborates.
+TEST(ElabClause09_04_03, WaitWithBlockElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic enable;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    wait (enable) begin\n"
+      "      a = 1;\n"
+      "      b = 2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
 
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
+// §9.4.3: Wait with negated expression elaborates.
+TEST(ElabClause09_04_03, WaitNegatedExprElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic enable;\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    wait (!enable) a = 42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.4.3: Wait in always_comb is an error (timing control).
+TEST(ElabClause09_04_03, WaitInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic ready, a;\n"
+      "  always_comb wait (ready) a = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace
