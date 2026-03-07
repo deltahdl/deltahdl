@@ -172,4 +172,140 @@ TEST(StmtExec, CasezWithZInSelector) {
   EXPECT_EQ(result_var->value.ToUint64(), 55u);
 }
 
+// §12.5.1: casez treats z/? as don't-care — instruction decode pattern.
+TEST(SimA60701, CasezQuestionMarkDontCare) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] ir, x;\n"
+      "  initial begin\n"
+      "    ir = 8'b10110010;\n"
+      "    casez (ir)\n"
+      "      8'b1???????: x = 8'd1;\n"
+      "      8'b01??????: x = 8'd2;\n"
+      "      8'b00010???: x = 8'd3;\n"
+      "      default: x = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // MSB is 1, matches first item.
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §12.5.1: casez second item matches when first does not.
+TEST(SimA60701, CasezSecondItemMatch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] ir, x;\n"
+      "  initial begin\n"
+      "    ir = 8'b01110010;\n"
+      "    casez (ir)\n"
+      "      8'b1???????: x = 8'd1;\n"
+      "      8'b01??????: x = 8'd2;\n"
+      "      8'b00010???: x = 8'd3;\n"
+      "      default: x = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// §12.5.1: casex treats both x and z as don't-care in case_expression.
+TEST(SimA60701, CasexXInSelectorTreatedAsDontCare) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] r, x;\n"
+      "  initial begin\n"
+      "    r = 8'b01100110;\n"
+      "    casex (r ^ 8'b0x0x0x0x)\n"
+      "      8'b001100xx: x = 8'd1;\n"
+      "      8'b1100xx00: x = 8'd2;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // XOR with x bits produces x bits in result; casex ignores those positions.
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // The result matches one of the patterns with x positions ignored.
+}
+
+// §12.5.1: casez with z in selector — z positions treated as don't-care.
+TEST(SimA60701, CasezZInSelectorIsDontCare) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = 4'bz1z0;\n"
+      "    casez (sel)\n"
+      "      4'b0100: x = 8'd10;\n"
+      "      4'b1100: x = 8'd20;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // sel=z1z0: z positions in selector are don't-care, so bits 1,0 = 1,0.
+  // Pattern 0100: bit3=0(dc),bit2=1(match),bit1=0(dc),bit0=0(!=0) → no match.
+  // Pattern 1100: bit3=1(dc),bit2=1(match),bit1=0(dc),bit0=0(!=0) → no match.
+  // Falls to default.
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+// §12.5.1: casez don't-care in pattern — ? bits ignored regardless of selector.
+TEST(SimA60701, CasezDontCareInPatternOnly) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = 4'b1010;\n"
+      "    casez (sel)\n"
+      "      4'b1??0: x = 8'd10;\n"
+      "      4'b1010: x = 8'd20;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // First item: 1??0 matches 1010 (middle bits don't care).
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
 }  // namespace
