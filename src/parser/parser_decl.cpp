@@ -327,6 +327,8 @@ void Parser::ParseFuncName(ModuleItem* item) {
   // named type but :: follows, the "type" was actually a class scope prefix.
   if (item->return_type.kind == DataTypeKind::kNamed &&
       Check(TokenKind::kColonColon)) {
+    // §8.24: The "type" is actually the class scope prefix.
+    item->method_class = item->return_type.type_name;
     item->return_type = DataType{};
     Consume();  // ::
     item->name =
@@ -337,6 +339,7 @@ void Parser::ParseFuncName(ModuleItem* item) {
   }
   // §8.24 out-of-block methods: class_name::method_name
   while (Match(TokenKind::kColonColon)) {
+    item->method_class = item->name;
     item->name =
         Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
   }
@@ -401,6 +404,7 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   }
   // §8.24 out-of-block methods: class_name::method_name
   while (Match(TokenKind::kColonColon)) {
+    item->method_class = item->name;
     item->name = Expect(TokenKind::kIdentifier).text;
   }
 

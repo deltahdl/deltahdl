@@ -1258,4 +1258,53 @@ void Elaborator::ValidateAbstractClassRules() {
   }
 }
 
+// §8.24: Validate out-of-block method declarations.
+void Elaborator::ValidateOutOfBlockDeclarations() {
+  // Track which extern methods have been linked to avoid duplicates.
+  std::unordered_set<std::string> linked;
+  for (auto* item : unit_->cu_items) {
+    if (item->method_class.empty()) continue;
+    bool is_func = (item->kind == ModuleItemKind::kFunctionDecl);
+    bool is_task = (item->kind == ModuleItemKind::kTaskDecl);
+    if (!is_func && !is_task) continue;
+    // Find the class.
+    const auto* cls = FindClassDecl(item->method_class, unit_);
+    if (!cls) {
+      diag_.Error(item->loc,
+                  std::format("out-of-block declaration for unknown class '{}'",
+                              item->method_class));
+      continue;
+    }
+    // Find matching extern prototype in the class.
+    bool found_proto = false;
+    for (auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+      if (m->method->name != item->name) continue;
+      if (!m->method->is_extern) continue;
+      found_proto = true;
+      break;
+    }
+    if (!found_proto) {
+      diag_.Error(item->loc,
+                  std::format("no matching extern prototype for '{}::{}' in "
+                              "class '{}'",
+                              item->method_class, item->name,
+                              item->method_class));
+      continue;
+    }
+    // Check for duplicate out-of-block declarations.
+    auto key =
+        std::string(item->method_class) + "::" + std::string(item->name);
+    if (linked.count(key)) {
+      diag_.Error(
+          item->loc,
+          std::format(
+              "duplicate out-of-block declaration for '{}::{}'",
+              item->method_class, item->name));
+      continue;
+    }
+    linked.insert(key);
+  }
+}
+
 }  // namespace delta

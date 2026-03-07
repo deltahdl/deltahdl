@@ -237,6 +237,9 @@ class Elaborator {
   /// §8.21: Validate abstract class and pure virtual method rules.
   void ValidateAbstractClassRules();
 
+  /// §8.24: Validate out-of-block method declarations.
+  void ValidateOutOfBlockDeclarations();
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 

@@ -135,6 +135,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateVirtualMethodOverrides();
   // §8.21: Validate abstract class and pure virtual method rules.
   ValidateAbstractClassRules();
+  // §8.24: Validate out-of-block method declarations.
+  ValidateOutOfBlockDeclarations();
 
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {

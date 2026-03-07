@@ -547,6 +547,9 @@ struct ModuleItem {
   bool is_method_extends = false;  // :extends
   bool is_method_final = false;    // :final
 
+  // §8.24: Out-of-block method class scope (e.g., "C" in "C::foo").
+  std::string_view method_class;
+
   // Declarations
   DataType data_type;
   std::string_view name;

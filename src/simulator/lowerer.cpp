@@ -551,6 +551,14 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }
+  // §8.24: Link out-of-block method bodies to their class types.
+  for (auto* item : design->cu_function_decls) {
+    if (item->method_class.empty()) continue;
+    auto* cls = ctx_.FindClassType(item->method_class);
+    if (!cls) continue;
+    std::string name(item->name);
+    cls->methods[name] = item;
+  }
 }
 
 }  // namespace delta

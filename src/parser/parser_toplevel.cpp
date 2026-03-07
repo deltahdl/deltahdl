@@ -908,6 +908,8 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                   "static method shall not be declared virtual");
     }
     if (member->is_static) member->method->is_static = true;
+    // §8.24: Mark extern method prototypes.
+    if (proto && !member->is_pure_virtual) member->method->is_extern = true;
     members.push_back(member);
     return true;
   }
@@ -925,6 +927,8 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                   "static method shall not be declared virtual");
     }
     if (member->is_static) member->method->is_static = true;
+    // §8.24: Mark extern task prototypes.
+    if (proto && !member->is_pure_virtual) member->method->is_extern = true;
     members.push_back(member);
     return true;
   }
