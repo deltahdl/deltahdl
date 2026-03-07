@@ -114,6 +114,10 @@ class SimContext {
 
   Variable* FindVariable(std::string_view name);
   Variable* CreateVariable(std::string_view name, uint32_t width);
+  // §10.11: Register an alias so that `alias_name` resolves to the same
+  // Variable as `target_name`.
+  void AliasVariable(std::string_view alias_name,
+                     std::string_view target_name);
 
   Net* FindNet(std::string_view name);
   Net* CreateNet(std::string_view name, NetType type, uint32_t width,

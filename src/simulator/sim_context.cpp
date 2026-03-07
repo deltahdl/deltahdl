@@ -29,6 +29,12 @@ Variable* SimContext::CreateVariable(std::string_view name, uint32_t width) {
   return var;
 }
 
+void SimContext::AliasVariable(std::string_view alias_name,
+                               std::string_view target_name) {
+  auto* target = FindVariable(target_name);
+  if (target) variables_[alias_name] = target;
+}
+
 Net* SimContext::FindNet(std::string_view name) {
   auto it = nets_.find(name);
   return (it != nets_.end()) ? it->second : nullptr;

@@ -540,6 +540,20 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
     LowerClassDecl(cls);
   }
 
+  // §10.11: Lower net aliases — map aliased names to the same variable.
+  for (const auto& alias : mod->aliases) {
+    if (alias.nets.size() < 2) continue;
+    std::string_view primary;
+    for (auto* net : alias.nets) {
+      if (net->kind != ExprKind::kIdentifier) continue;
+      if (primary.empty()) {
+        primary = net->text;
+      } else {
+        ctx_.AliasVariable(net->text, primary);
+      }
+    }
+  }
+
   // §9.4.2: Always blocks first so they register sensitivity before
   // initial blocks trigger events.
   LowerProcesses(mod->processes);

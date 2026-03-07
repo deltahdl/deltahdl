@@ -1060,6 +1060,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateSpecparam(item, mod);
       break;
     case ModuleItemKind::kAlias: {
+      ValidateAlias(item);
       RtlirAlias alias;
       alias.nets = item->alias_nets;
       mod->aliases.push_back(alias);

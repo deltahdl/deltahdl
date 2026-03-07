@@ -185,6 +185,9 @@ class Elaborator {
   /// §10.2 Table 10-1: Continuous assignment LHS selects must be constant.
   void ValidateContAssignConstSelect(const ModuleDecl* decl);
 
+  /// §10.11: Validate alias statement operands.
+  void ValidateAlias(const ModuleItem* item);
+
   /// Check specparam not used in parameter expressions (§6.20.5).
   void ValidateSpecparamInParams(const ModuleDecl* decl);
 

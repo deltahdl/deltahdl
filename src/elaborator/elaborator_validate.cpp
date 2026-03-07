@@ -2045,4 +2045,35 @@ void Elaborator::ValidateAssignInExprRestrictions(const ModuleDecl* decl) {
   }
 }
 
+// §10.11: Validate alias statement operands.
+static std::string_view AliasNetIdent(const Expr* e) {
+  if (!e) return {};
+  if (e->kind == ExprKind::kIdentifier) return e->text;
+  return {};
+}
+
+void Elaborator::ValidateAlias(const ModuleItem* item) {
+  // Check for self-alias.
+  std::unordered_set<std::string_view> seen;
+  for (auto* net : item->alias_nets) {
+    auto name = AliasNetIdent(net);
+    if (name.empty()) continue;
+    if (!seen.insert(name).second) {
+      diag_.Error(item->loc,
+                  std::format("net '{}' aliased to itself", name));
+    }
+  }
+  // Check that alias operands are nets, not variables.
+  for (auto* net : item->alias_nets) {
+    auto name = AliasNetIdent(net);
+    if (name.empty()) continue;
+    if (!net_names_.count(name) && declared_names_.count(name)) {
+      diag_.Error(item->loc,
+                  std::format("'{}' is a variable, not a net; "
+                              "variables cannot appear in alias statements",
+                              name));
+    }
+  }
+}
+
 }  // namespace delta
