@@ -11,6 +11,7 @@
 
 #include "common/arena.h"
 #include "parser/ast.h"
+#include "simulator/class_object.h"
 #include "simulator/eval.h"
 #include "simulator/sim_context.h"
 
@@ -382,7 +383,7 @@ static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// §6.24.2: $cast(dest, source) — dynamic cast, returns 1 on success.
+// §6.24.2/§8.16: $cast(dest, source) — dynamic cast, returns 1 on success.
 static Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   if (expr->args.size() < 2 || !expr->args[0]) {
@@ -406,7 +407,29 @@ static Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx,
     }
     return MakeLogic4VecVal(arena, 32, 0);
   }
-  // Non-enum: simple assignment (always succeeds).
+  // §8.16: Class handle cast.
+  auto dest_class = ctx.GetVariableClassType(dest_name);
+  if (!dest_class.empty()) {
+    auto* dest_type = ctx.FindClassType(dest_class);
+    if (!dest_type) return MakeLogic4VecVal(arena, 32, 0);
+    // §8.16 case 3: null source always succeeds.
+    if (src_val == kNullClassHandle) {
+      auto* var = ctx.FindVariable(dest_name);
+      if (var) var->value = MakeLogic4VecVal(arena, var->value.width, 0);
+      return MakeLogic4VecVal(arena, 32, 1);
+    }
+    auto* src_obj = ctx.GetClassObject(src_val);
+    if (!src_obj || !src_obj->type) return MakeLogic4VecVal(arena, 32, 0);
+    // §8.16 cases 1 & 2: source object's type must be same as or derived from
+    // dest type (i.e., the actual object must be assignment compatible).
+    if (!src_obj->type->IsA(dest_type)) {
+      return MakeLogic4VecVal(arena, 32, 0);
+    }
+    auto* var = ctx.FindVariable(dest_name);
+    if (var) var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
+    return MakeLogic4VecVal(arena, 32, 1);
+  }
+  // Non-enum, non-class: simple assignment (always succeeds).
   auto* var = ctx.FindVariable(dest_name);
   if (var) var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
   return MakeLogic4VecVal(arena, 32, 1);

@@ -1,8 +1,6 @@
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
-#include "parser/ast.h"
 #include "simulator/class_object.h"
-#include "simulator/eval.h"
 
 using namespace delta;
 
@@ -44,6 +42,73 @@ TEST(ClassSim, IsAUnrelated) {
 
   EXPECT_FALSE(type_a->IsA(type_b));
   EXPECT_FALSE(type_b->IsA(type_a));
+}
+
+// §8.16: Subclass-to-superclass assignment is always legal (IsA check).
+TEST(ClassSim, CastSubclassToSuperclassAlwaysLegal) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Packet", {"i"});
+  auto* derived = MakeClassType(f, "LinkedPacket", {"j"});
+  derived->parent = base;
+
+  auto [handle, obj] = MakeObj(f, derived);
+  EXPECT_TRUE(obj->type->IsA(base));
+}
+
+// §8.16: Superclass object is NOT a subclass (direct assignment illegal).
+TEST(ClassSim, CastSuperclassToSubclassIllegal) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Base", {});
+  auto* derived = MakeClassType(f, "Derived", {});
+  derived->parent = base;
+
+  auto [handle, obj] = MakeObj(f, base);
+  EXPECT_FALSE(obj->type->IsA(derived));
+}
+
+// §8.16: $cast succeeds when actual object type is derived from dest type.
+TEST(ClassSim, CastSucceedsWhenObjectIsDerived) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Base", {"x"});
+  auto* derived = MakeClassType(f, "Derived", {"y"});
+  derived->parent = base;
+
+  auto [handle, obj] = MakeObj(f, derived);
+  EXPECT_TRUE(obj->type->IsA(derived));
+  EXPECT_TRUE(obj->type->IsA(base));
+}
+
+// §8.16: $cast fails when source object type is unrelated to dest type.
+TEST(ClassSim, CastFailsUnrelatedTypes) {
+  SimFixture f;
+  auto* type_a = MakeClassType(f, "TypeA", {});
+  auto* type_b = MakeClassType(f, "TypeB", {});
+
+  auto [handle, obj] = MakeObj(f, type_a);
+  EXPECT_FALSE(obj->type->IsA(type_b));
+}
+
+// §8.16: Null handle returns nullptr from GetClassObject.
+TEST(ClassSim, CastNullHandleIsZero) {
+  SimFixture f;
+  EXPECT_EQ(f.ctx.GetClassObject(kNullClassHandle), nullptr);
+}
+
+// §8.16: $cast through deep hierarchy.
+TEST(ClassSim, CastDeepHierarchySucceeds) {
+  SimFixture f;
+  auto* grand = MakeClassType(f, "Grand", {});
+  auto* mid = MakeClassType(f, "Mid", {});
+  mid->parent = grand;
+  auto* leaf = MakeClassType(f, "Leaf", {});
+  leaf->parent = mid;
+
+  auto [handle, obj] = MakeObj(f, leaf);
+  EXPECT_TRUE(obj->type->IsA(grand));
+  EXPECT_TRUE(obj->type->IsA(mid));
+
+  auto [h2, obj2] = MakeObj(f, grand);
+  EXPECT_FALSE(obj2->type->IsA(leaf));
 }
 
 }  // namespace
