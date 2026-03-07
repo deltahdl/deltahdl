@@ -202,9 +202,8 @@ def test_invoke_claude_failure_exits(mock_popen, mock_exit, isc):
 # ---- run_prompt -----------------------------------------------------------
 
 
-@patch("implement_subclause.invoke_claude")
-def test_run_prompt_calls_invoke(mock_invoke, isc, tmp_path):
-    """run_prompt builds prompt and invokes Claude."""
+def _run_prompt_and_capture(isc, tmp_path):
+    """Helper: invoke run_prompt with a mock build_fn and return (mock_invoke, build_fn)."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     build_fn = MagicMock(return_value="generated prompt")
@@ -212,35 +211,26 @@ def test_run_prompt_calls_invoke(mock_invoke, isc, tmp_path):
         lrm=lrm, subclause="4.1", issue=6,
         model="sonnet", continue_session=False,
     )
-    isc.run_prompt(build_fn, args)
+    with patch("implement_subclause.invoke_claude") as mock_invoke:
+        isc.run_prompt(build_fn, args)
+    return mock_invoke, build_fn
+
+
+def test_run_prompt_calls_invoke(isc, tmp_path):
+    """run_prompt builds prompt and invokes Claude."""
+    mock_invoke, _ = _run_prompt_and_capture(isc, tmp_path)
     assert mock_invoke.call_args[0][0] == "generated prompt"
 
 
-@patch("implement_subclause.invoke_claude")
-def test_run_prompt_does_not_load_titles(_mock_invoke, isc, tmp_path):
+def test_run_prompt_does_not_load_titles(isc, tmp_path):
     """run_prompt passes only positional args (subclause, lrm_path)."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    build_fn = MagicMock(return_value="generated prompt")
-    args = argparse.Namespace(
-        lrm=lrm, subclause="4.1", issue=6,
-        model="sonnet", continue_session=False,
-    )
-    isc.run_prompt(build_fn, args)
+    _, build_fn = _run_prompt_and_capture(isc, tmp_path)
     assert len(build_fn.call_args[0]) == 2  # subclause, lrm_path
 
 
-@patch("implement_subclause.invoke_claude")
-def test_run_prompt_passes_subclause(_mock_invoke, isc, tmp_path):
+def test_run_prompt_passes_subclause(isc, tmp_path):
     """run_prompt passes the subclause as the first positional arg."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    build_fn = MagicMock(return_value="generated prompt")
-    args = argparse.Namespace(
-        lrm=lrm, subclause="4.1", issue=6,
-        model="sonnet", continue_session=False,
-    )
-    isc.run_prompt(build_fn, args)
+    _, build_fn = _run_prompt_and_capture(isc, tmp_path)
     assert build_fn.call_args[0][0] == "4.1"
 
 

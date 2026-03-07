@@ -150,8 +150,12 @@ def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
         ])
 
 
-def test_parse_args_rejects_figures_flag(ic, tmp_path) -> None:
-    """--figures flag is no longer accepted."""
+@pytest.mark.parametrize("flag,value", [
+    ("--figures", "4_1=fig.gv"),
+    ("--tables", "4_1=tbl.md"),
+])
+def test_parse_args_rejects_removed_flag(ic, tmp_path, flag, value) -> None:
+    """Removed flags (--figures, --tables) are no longer accepted."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     with pytest.raises(SystemExit):
@@ -159,20 +163,7 @@ def test_parse_args_rejects_figures_flag(ic, tmp_path) -> None:
             "--lrm", str(lrm), "--clause", "4",
             "--sub-issue", "1", "--master-issue", "99",
             "--organization", "o", "--repo", "r",
-            "--figures", "4_1=fig.gv",
-        ])
-
-
-def test_parse_args_rejects_tables_flag(ic, tmp_path) -> None:
-    """--tables flag is no longer accepted."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    with pytest.raises(SystemExit):
-        ic.parse_args([
-            "--lrm", str(lrm), "--clause", "4",
-            "--sub-issue", "1", "--master-issue", "99",
-            "--organization", "o", "--repo", "r",
-            "--tables", "4_1=tbl.md",
+            flag, value,
         ])
 
 
@@ -485,8 +476,8 @@ def test_discover_subclauses_strips_code_fences(ic) -> None:
     assert result == {"4.1": "General"}
 
 
-def test_discover_subclauses_prompt_contains_clause(ic) -> None:
-    """discover_subclauses prompt references the clause number."""
+def _discover_subclauses_prompt(ic):
+    """Helper: run discover_subclauses and return the prompt string."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
         stdout='{"4.1": "General"}\n',
@@ -494,20 +485,18 @@ def test_discover_subclauses_prompt_contains_clause(ic) -> None:
     )
     with patch("implement_clause.subprocess.run", return_value=cp) as mock_run:
         ic.discover_subclauses(Path("/path/lrm.pdf"), "4")
-    prompt = mock_run.call_args[1]["input"]
+    return mock_run.call_args[1]["input"]
+
+
+def test_discover_subclauses_prompt_contains_clause(ic) -> None:
+    """discover_subclauses prompt references the clause number."""
+    prompt = _discover_subclauses_prompt(ic)
     assert "clause 4" in prompt.lower() or "§4" in prompt
 
 
 def test_discover_subclauses_prompt_contains_lrm_path(ic) -> None:
     """discover_subclauses prompt references the LRM PDF path."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout='{"4.1": "General"}\n',
-        stderr="",
-    )
-    with patch("implement_clause.subprocess.run", return_value=cp) as mock_run:
-        ic.discover_subclauses(Path("/path/lrm.pdf"), "4")
-    prompt = mock_run.call_args[1]["input"]
+    prompt = _discover_subclauses_prompt(ic)
     assert "/path/lrm.pdf" in prompt
 
 
