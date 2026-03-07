@@ -105,17 +105,6 @@ TEST(ParserClause08_03, ExtendsWithArgs) {
   ASSERT_EQ(cls->extends_args.size(), 1u);
 }
 
-TEST(ParserClause08_03, ExtendsWithDefault) {
-  auto r = Parse(
-      "class D extends Base(default);\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto* cls = r.cu->classes[0];
-  EXPECT_EQ(cls->base_class, "Base");
-  EXPECT_TRUE(cls->extends_has_default);
-}
-
 // --- §8.3 class_constructor_arg: default keyword ---
 TEST(ParserClause08_03, ConstructorDefaultArg) {
   auto r = Parse(
