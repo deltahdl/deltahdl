@@ -3,9 +3,8 @@
 import argparse
 import subprocess
 import sys
-from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -14,9 +13,21 @@ _STUB_ARGS = argparse.Namespace(
     organization="deltahdl", repo="deltahdl",
 )
 
-@contextmanager
+
+def _patch_main_no_subclauses(monkeypatch, ic):
+    """Patch dependencies for the no-subclauses main() path."""
+    monkeypatch.setattr(ic, "discover_subclauses", lambda *_a: {})
+    mock_inv = MagicMock()
+    monkeypatch.setattr(ic, "invoke_implement_subclause", mock_inv)
+    mock_close = MagicMock()
+    monkeypatch.setattr(ic, "close_issue", mock_close)
+    mock_mark = MagicMock()
+    monkeypatch.setattr(ic, "mark_master_complete", mock_mark)
+    return mock_inv, mock_close, mock_mark
+
+
 def _patch_main_with_subclauses(
-    *, subclauses=None,
+    monkeypatch, ic, *, subclauses=None,
     synced_body="body", next_sub="4.2",
 ):
     """Patch all dependencies for main() with subclauses.
@@ -32,20 +43,27 @@ def _patch_main_with_subclauses(
     else:
         next_kw = {"side_effect": [next_sub, None]}
 
-    with (
-        patch("implement_clause.discover_subclauses",
-              return_value=subclauses),
-        patch("implement_clause.fetch_issue_body", return_value=""),
-        patch("implement_clause.build_synced_body",
-              return_value=synced_body),
-        patch("implement_clause.update_issue_body"),
-        patch("implement_clause.next_unchecked", **next_kw),
-        patch("implement_clause.invoke_implement_subclause") as mock_inv,
-        patch("implement_clause.commit_and_push") as mock_cap,
-        patch("implement_clause.close_issue") as mock_close,
-        patch("implement_clause.mark_master_complete") as mock_mark,
-    ):
-        yield mock_inv, mock_cap, mock_close, mock_mark
+    monkeypatch.setattr(ic, "discover_subclauses", lambda *_a: subclauses)
+    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
+    monkeypatch.setattr(ic, "build_synced_body", lambda *_a: synced_body)
+    monkeypatch.setattr(ic, "update_issue_body", lambda *_a, **_kw: None)
+
+    mock_next = MagicMock(**next_kw)
+    monkeypatch.setattr(ic, "next_unchecked", mock_next)
+
+    mock_inv = MagicMock()
+    monkeypatch.setattr(ic, "invoke_implement_subclause", mock_inv)
+
+    mock_cap = MagicMock()
+    monkeypatch.setattr(ic, "commit_and_push", mock_cap)
+
+    mock_close = MagicMock()
+    monkeypatch.setattr(ic, "close_issue", mock_close)
+
+    mock_mark = MagicMock()
+    monkeypatch.setattr(ic, "mark_master_complete", mock_mark)
+
+    return mock_inv, mock_cap, mock_close, mock_mark
 
 
 def test_invoke_implement_subclause_calls_subprocess(
@@ -103,7 +121,7 @@ def test_parse_args_clause_and_annex_exclusive(ic, tmp_path) -> None:
         ic.parse_args([
             "--lrm", str(lrm), "--clause", "4", "--annex", "A",
             "--sub-issue", "1", "--master-issue", "99",
-        "--organization", "o", "--repo", "r",
+            "--organization", "o", "--repo", "r",
         ])
 
 
@@ -113,7 +131,7 @@ def test_parse_args_missing_lrm(ic) -> None:
         ic.parse_args([
             "--lrm", "/no/such/file", "--clause", "4",
             "--sub-issue", "1", "--master-issue", "99",
-        "--organization", "o", "--repo", "r",
+            "--organization", "o", "--repo", "r",
         ])
 
 
@@ -146,7 +164,7 @@ def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
         ic.parse_args([
             "--lrm", str(lrm),
             "--sub-issue", "1", "--master-issue", "99",
-        "--organization", "o", "--repo", "r",
+            "--organization", "o", "--repo", "r",
         ])
 
 
@@ -170,119 +188,117 @@ def test_parse_args_rejects_removed_flag(ic, tmp_path, flag, value) -> None:
 # --- main ---
 
 
-def test_main_no_subclauses(ic, clause_argv) -> None:
+def test_main_no_subclauses(ic, monkeypatch, clause_argv) -> None:
     """Clause without subclauses invokes implement_subclause directly."""
-    with (
-        patch("implement_clause.discover_subclauses", return_value={}),
-        patch("implement_clause.invoke_implement_subclause") as mock_inv,
-        patch("implement_clause.close_issue"),
-        patch("implement_clause.mark_master_complete"),
-    ):
-        ic.main(clause_argv)
+    mock_inv, _, __ = _patch_main_no_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
     assert mock_inv.call_args[0][1] == "4"
 
 
-def test_main_no_subclauses_prints_leaf(ic, clause_argv, capsys) -> None:
+def test_main_no_subclauses_prints_leaf(
+    ic, monkeypatch, clause_argv, capsys,
+) -> None:
     """Prints that clause has no subclauses."""
-    with (
-        patch("implement_clause.discover_subclauses", return_value={}),
-        patch("implement_clause.invoke_implement_subclause"),
-        patch("implement_clause.close_issue"),
-        patch("implement_clause.mark_master_complete"),
-    ):
-        ic.main(clause_argv)
+    _patch_main_no_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
     assert "No subclauses" in capsys.readouterr().out
 
 
-def test_no_subclauses_closes_sub_issue(ic, clause_argv) -> None:
+def test_no_subclauses_closes_sub_issue(
+    ic, monkeypatch, clause_argv,
+) -> None:
     """No-subclauses path closes the sub-issue."""
-    with (
-        patch("implement_clause.discover_subclauses", return_value={}),
-        patch("implement_clause.invoke_implement_subclause"),
-        patch("implement_clause.close_issue") as mock_close,
-        patch("implement_clause.mark_master_complete"),
-    ):
-        ic.main(clause_argv)
+    _, mock_close, __ = _patch_main_no_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
     assert mock_close.call_args == (
         ("o", "r", 1, "all subclauses are implemented"),
     )
 
 
-def test_no_subclauses_marks_master(ic, clause_argv) -> None:
+def test_no_subclauses_marks_master(ic, monkeypatch, clause_argv) -> None:
     """No-subclauses path marks master issue complete."""
-    with (
-        patch("implement_clause.discover_subclauses", return_value={}),
-        patch("implement_clause.invoke_implement_subclause"),
-        patch("implement_clause.close_issue"),
-        patch("implement_clause.mark_master_complete") as mock_mark,
-    ):
-        ic.main(clause_argv)
+    _, __, mock_mark = _patch_main_no_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
     assert mock_mark.call_args == (("o", "r", 99, 1),)
 
 
-def test_main_with_subclauses(ic, clause_argv) -> None:
+def test_main_with_subclauses(ic, monkeypatch, clause_argv) -> None:
     """Next unchecked subclause is passed to implement_subclause."""
-    with _patch_main_with_subclauses() as (mock_inv, _, __, ___):
-        ic.main(clause_argv)
+    mock_inv, _, __, ___ = _patch_main_with_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
     assert mock_inv.call_args[0][1] == "4.2"
 
 
-def test_main_prints_subclauses_found(ic, clause_argv, capsys) -> None:
+def test_main_prints_subclauses_found(
+    ic, monkeypatch, clause_argv, capsys,
+) -> None:
     """Prints how many subclauses were discovered."""
-    with _patch_main_with_subclauses() as (_, __, ___, ____):
-        ic.main(clause_argv)
+    _patch_main_with_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
     assert "Found 2 subclauses" in capsys.readouterr().out
 
 
-def test_main_prints_synced_body(ic, clause_argv, capsys) -> None:
+def test_main_prints_synced_body(
+    ic, monkeypatch, clause_argv, capsys,
+) -> None:
     """Prints the synced issue body."""
-    with _patch_main_with_subclauses(
+    _patch_main_with_subclauses(
+        monkeypatch, ic,
         synced_body="## Subclauses\n\n- [ ] 4.1 General\n",
         next_sub="4.1",
-    ) as (_, __, ___, ____):
-        ic.main(clause_argv)
+    )
+    ic.main(clause_argv)
     assert "## Subclauses" in capsys.readouterr().out
 
 
-def test_main_prints_next_subclause(ic, clause_argv, capsys) -> None:
+def test_main_prints_next_subclause(
+    ic, monkeypatch, clause_argv, capsys,
+) -> None:
     """Prints which subclause was picked as next."""
-    with _patch_main_with_subclauses() as (_, __, ___, ____):
-        ic.main(clause_argv)
+    _patch_main_with_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
     assert "Next unchecked: 4.2" in capsys.readouterr().out
 
 
-def test_main_all_done(ic, clause_argv, capsys) -> None:
+def test_main_all_done(ic, monkeypatch, clause_argv, capsys) -> None:
     """Prints all-done message when no unchecked subclauses remain."""
-    with _patch_main_with_subclauses(
+    _patch_main_with_subclauses(
+        monkeypatch, ic,
         subclauses={"4.1": "General"}, next_sub=None,
-    ) as (_, __, ___, ____):
-        ic.main(clause_argv)
+    )
+    ic.main(clause_argv)
     assert "All subclauses are done" in capsys.readouterr().out
 
 
-def test_main_closes_issue_when_all_done(ic, clause_argv) -> None:
+def test_main_closes_issue_when_all_done(
+    ic, monkeypatch, clause_argv,
+) -> None:
     """Sub-issue is closed when all subclauses are implemented."""
-    with _patch_main_with_subclauses(
+    _, __, mock_close, ___ = _patch_main_with_subclauses(
+        monkeypatch, ic,
         subclauses={"4.1": "General"}, next_sub=None,
-    ) as (_, __, mock_close, ___):
-        ic.main(clause_argv)
+    )
+    ic.main(clause_argv)
     assert mock_close.call_args == (
         ("o", "r", 1, "all subclauses are implemented"),
     )
 
 
-def test_main_marks_master_after_close(ic, clause_argv) -> None:
+def test_main_marks_master_after_close(
+    ic, monkeypatch, clause_argv,
+) -> None:
     """Master issue is marked complete after sub-issue is closed."""
-    with _patch_main_with_subclauses(
+    _, __, ___, mock_mark = _patch_main_with_subclauses(
+        monkeypatch, ic,
         subclauses={"4.1": "General"}, next_sub=None,
-    ) as (_, __, ___, mock_mark):
-        ic.main(clause_argv)
+    )
+    ic.main(clause_argv)
     assert mock_mark.call_args == (
         ("o", "r", 99, 1),
     )
 
 
-def test_main_annex(ic, tmp_path) -> None:
+def test_main_annex(ic, monkeypatch, tmp_path) -> None:
     """Annex flag passes the letter to discover_subclauses."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
@@ -291,28 +307,26 @@ def test_main_annex(ic, tmp_path) -> None:
         "--sub-issue", "1", "--master-issue", "99",
         "--organization", "o", "--repo", "r",
     ]
-    with (
-        patch("implement_clause.discover_subclauses",
-              return_value={}) as mock_ds,
-        patch("implement_clause.invoke_implement_subclause"),
-        patch("implement_clause.close_issue"),
-        patch("implement_clause.mark_master_complete"),
-    ):
-        ic.main(argv)
+    mock_ds = MagicMock(return_value={})
+    monkeypatch.setattr(ic, "discover_subclauses", mock_ds)
+    monkeypatch.setattr(ic, "invoke_implement_subclause", MagicMock())
+    monkeypatch.setattr(ic, "close_issue", MagicMock())
+    monkeypatch.setattr(ic, "mark_master_complete", MagicMock())
+    ic.main(argv)
     assert mock_ds.call_args[0][1] == "A"
 
 
 # --- invoke_implement_subclause ---
 
 
-def test_invoke_implement_subclause_failure(ic) -> None:
+def test_invoke_implement_subclause_failure(ic, monkeypatch) -> None:
     """SystemExit on non-zero return code."""
-    with patch("implement_clause.subprocess.run") as mock_run:
-        mock_run.return_value = subprocess.CompletedProcess(
-            args=[], returncode=1,
-        )
-        with pytest.raises(SystemExit):
-            ic.invoke_implement_subclause(_STUB_ARGS, "4.2")
+    mock_run = MagicMock(
+        return_value=subprocess.CompletedProcess(args=[], returncode=1),
+    )
+    monkeypatch.setattr(ic.subprocess, "run", mock_run)
+    with pytest.raises(SystemExit):
+        ic.invoke_implement_subclause(_STUB_ARGS, "4.2")
 
 
 def test_invoke_implement_subclause_passes_continue(
@@ -352,75 +366,87 @@ def test_invoke_implement_subclause_no_tables_flag(
 # --- main loop ---
 
 
-def test_main_loops_all_subclauses(ic, clause_argv) -> None:
+def test_main_loops_all_subclauses(ic, monkeypatch, clause_argv) -> None:
     """main invokes implement_subclause for each unchecked subclause."""
-    with _patch_main_with_subclauses(
-        next_sub=["4.1", "4.2", None],
-    ) as (mock_inv, _, __, ___):
-        ic.main(clause_argv)
+    mock_inv, _, __, ___ = _patch_main_with_subclauses(
+        monkeypatch, ic, next_sub=["4.1", "4.2", None],
+    )
+    ic.main(clause_argv)
     assert mock_inv.call_count == 2
 
 
-def test_main_first_subclause_no_continue(ic, clause_argv) -> None:
+def test_main_first_subclause_no_continue(
+    ic, monkeypatch, clause_argv,
+) -> None:
     """First invocation does not pass continue_session=True."""
-    with _patch_main_with_subclauses(
-        next_sub=["4.1", None],
-    ) as (mock_inv, _, __, ___):
-        ic.main(clause_argv)
+    mock_inv, _, __, ___ = _patch_main_with_subclauses(
+        monkeypatch, ic, next_sub=["4.1", None],
+    )
+    ic.main(clause_argv)
     assert mock_inv.call_args_list[0].kwargs.get("continue_session") is not True
 
 
-def test_main_second_subclause_uses_continue(ic, clause_argv) -> None:
+def test_main_second_subclause_uses_continue(
+    ic, monkeypatch, clause_argv,
+) -> None:
     """Second invocation passes continue_session=True."""
-    with _patch_main_with_subclauses(
-        next_sub=["4.1", "4.2", None],
-    ) as (mock_inv, _, __, ___):
-        ic.main(clause_argv)
+    mock_inv, _, __, ___ = _patch_main_with_subclauses(
+        monkeypatch, ic, next_sub=["4.1", "4.2", None],
+    )
+    ic.main(clause_argv)
     assert mock_inv.call_args_list[1].kwargs["continue_session"] is True
 
 
-def test_main_commits_after_each_subclause(ic, clause_argv) -> None:
+def test_main_commits_after_each_subclause(
+    ic, monkeypatch, clause_argv,
+) -> None:
     """commit_and_push is called after each subclause implementation."""
-    with _patch_main_with_subclauses(
-        next_sub=["4.1", "4.2", None],
-    ) as (_, mock_cap, __, ___):
-        ic.main(clause_argv)
+    _, mock_cap, __, ___ = _patch_main_with_subclauses(
+        monkeypatch, ic, next_sub=["4.1", "4.2", None],
+    )
+    ic.main(clause_argv)
     assert mock_cap.call_count == 2
 
 
-def test_main_commits_with_subclause_number(ic, clause_argv) -> None:
+def test_main_commits_with_subclause_number(
+    ic, monkeypatch, clause_argv,
+) -> None:
     """commit_and_push receives the subclause number."""
-    with _patch_main_with_subclauses(
-        next_sub=["4.1", None],
-    ) as (_, mock_cap, __, ___):
-        ic.main(clause_argv)
+    _, mock_cap, __, ___ = _patch_main_with_subclauses(
+        monkeypatch, ic, next_sub=["4.1", None],
+    )
+    ic.main(clause_argv)
     assert mock_cap.call_args[0][0] == "4.1"
 
 
 # --- commit_and_push ---
 
 
-def test_commit_and_push_stages_all(ic) -> None:
+def test_commit_and_push_stages_all(ic, monkeypatch) -> None:
     """commit_and_push runs git add -A."""
     calls = []
+
     def fake_run(cmd, **_kw):
         calls.append(cmd)
         return subprocess.CompletedProcess(args=cmd, returncode=0)
-    with patch("implement_clause.subprocess.run", side_effect=fake_run):
-        ic.commit_and_push("4.1")
+
+    monkeypatch.setattr(ic.subprocess, "run", fake_run)
+    ic.commit_and_push("4.1")
     assert ["git", "add", "-A"] in calls
 
 
-def test_commit_and_push_skips_when_nothing_staged(ic) -> None:
+def test_commit_and_push_skips_when_nothing_staged(ic, monkeypatch) -> None:
     """commit_and_push skips commit/push when nothing is staged."""
     calls = []
+
     def fake_run(cmd, **_kw):
         calls.append(cmd)
         if cmd == ["git", "diff", "--cached", "--quiet"]:
             return subprocess.CompletedProcess(args=cmd, returncode=0)
         return subprocess.CompletedProcess(args=cmd, returncode=0)
-    with patch("implement_clause.subprocess.run", side_effect=fake_run):
-        ic.commit_and_push("4.1")
+
+    monkeypatch.setattr(ic.subprocess, "run", fake_run)
+    ic.commit_and_push("4.1")
     assert not any(
         c[1] == "commit"
         for c in calls if isinstance(c, list) and len(c) > 1
@@ -441,7 +467,9 @@ def test_commit_and_push_runs_push(ic, commit_push_calls) -> None:
     assert "push" in git_cmds
 
 
-def test_commit_and_push_message_contains_subclause(ic, commit_push_calls) -> None:
+def test_commit_and_push_message_contains_subclause(
+    ic, commit_push_calls,
+) -> None:
     """Commit message contains the subclause number."""
     calls = commit_push_calls(ic)
     commit_call = [c for c in calls if c[0] == "git" and c[1] == "commit"][0]
@@ -452,111 +480,122 @@ def test_commit_and_push_message_contains_subclause(ic, commit_push_calls) -> No
 # --- discover_subclauses ---
 
 
-def test_discover_subclauses_parses_json(ic) -> None:
+def test_discover_subclauses_parses_json(ic, monkeypatch) -> None:
     """discover_subclauses parses Claude's JSON response."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
         stdout='{"4.1": "General", "4.2": "Exec", "4.3": false}\n',
         stderr="",
     )
-    with patch("implement_clause.subprocess.run", return_value=cp):
-        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {"4.1": "General", "4.2": "Exec"}
 
 
-def test_discover_subclauses_strips_code_fences(ic) -> None:
+def test_discover_subclauses_strips_code_fences(ic, monkeypatch) -> None:
     """discover_subclauses strips markdown code fences from response."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
         stdout='```json\n{"4.1": "General"}\n```\n',
         stderr="",
     )
-    with patch("implement_clause.subprocess.run", return_value=cp):
-        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {"4.1": "General"}
 
 
-def test_discover_subclauses_strips_preamble_before_fences(ic) -> None:
+def test_discover_subclauses_strips_preamble_before_fences(
+    ic, monkeypatch,
+) -> None:
     """discover_subclauses extracts JSON from fences preceded by prose."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
         stdout='Here is the JSON:\n\n```json\n{"4.1": "General"}\n```\n',
         stderr="",
     )
-    with patch("implement_clause.subprocess.run", return_value=cp):
-        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {"4.1": "General"}
 
 
-def _discover_subclauses_prompt(ic):
+def _discover_subclauses_prompt(ic, monkeypatch):
     """Helper: run discover_subclauses and return the prompt string."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
         stdout='{"4.1": "General"}\n',
         stderr="",
     )
-    with patch("implement_clause.subprocess.run", return_value=cp) as mock_run:
-        ic.discover_subclauses(Path("/path/lrm.pdf"), "4")
+    mock_run = MagicMock(return_value=cp)
+    monkeypatch.setattr(ic.subprocess, "run", mock_run)
+    ic.discover_subclauses(Path("/path/lrm.pdf"), "4")
     return mock_run.call_args[1]["input"]
 
 
-def test_discover_subclauses_prompt_contains_clause(ic) -> None:
+def test_discover_subclauses_prompt_contains_clause(
+    ic, monkeypatch,
+) -> None:
     """discover_subclauses prompt references the clause number."""
-    prompt = _discover_subclauses_prompt(ic)
+    prompt = _discover_subclauses_prompt(ic, monkeypatch)
     assert "clause 4" in prompt.lower() or "§4" in prompt
 
 
-def test_discover_subclauses_prompt_contains_lrm_path(ic) -> None:
+def test_discover_subclauses_prompt_contains_lrm_path(
+    ic, monkeypatch,
+) -> None:
     """discover_subclauses prompt references the LRM PDF path."""
-    prompt = _discover_subclauses_prompt(ic)
+    prompt = _discover_subclauses_prompt(ic, monkeypatch)
     assert "/path/lrm.pdf" in prompt
 
 
-def test_discover_subclauses_exits_on_claude_failure(ic) -> None:
+def test_discover_subclauses_exits_on_claude_failure(
+    ic, monkeypatch,
+) -> None:
     """discover_subclauses exits when Claude CLI fails."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=1, stdout="", stderr="error",
     )
-    with (
-        patch("implement_clause.subprocess.run", return_value=cp),
-        pytest.raises(SystemExit),
-    ):
+    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    with pytest.raises(SystemExit):
         ic.discover_subclauses(Path("/lrm.pdf"), "4")
 
 
-def test_discover_subclauses_empty_result(ic) -> None:
+def test_discover_subclauses_empty_result(ic, monkeypatch) -> None:
     """discover_subclauses returns empty dict when all false."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
         stdout='{"4.1": false, "4.2": false}\n',
         stderr="",
     )
-    with patch("implement_clause.subprocess.run", return_value=cp):
-        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {}
 
 
-def test_discover_subclauses_rationale_is_implementable(ic) -> None:
+def test_discover_subclauses_rationale_is_implementable(
+    ic, monkeypatch,
+) -> None:
     """Subclauses with string rationale are treated as implementable."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
         stdout='{"4.1": "Defines syntax rules that must be parsed"}\n',
         stderr="",
     )
-    with patch("implement_clause.subprocess.run", return_value=cp):
-        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert "4.1" in result
 
 
-def test_discover_subclauses_bool_true_is_implementable(ic) -> None:
+def test_discover_subclauses_bool_true_is_implementable(
+    ic, monkeypatch,
+) -> None:
     """Subclauses with value true are treated as implementable."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
         stdout='{"4.2": true}\n',
         stderr="",
     )
-    with patch("implement_clause.subprocess.run", return_value=cp):
-        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {"4.2": "4.2"}
 
 
@@ -575,12 +614,10 @@ _MASTER_BODY = """\
 
 def _mark_master_and_capture(ic, monkeypatch, sub_issue=6) -> str:
     """Call mark_master_complete and return the updated body."""
-    monkeypatch.setattr(
-        "implement_clause.fetch_issue_body", lambda *_a: _MASTER_BODY,
-    )
+    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: _MASTER_BODY)
     updated: list[str] = []
     monkeypatch.setattr(
-        "implement_clause.update_issue_body",
+        ic, "update_issue_body",
         lambda _o, _r, _i, body: updated.append(body),
     )
     ic.mark_master_complete("o", "r", 1, sub_issue)
@@ -604,12 +641,7 @@ def test_mark_master_complete_warns_when_not_found(
     ic, monkeypatch, capsys,
 ) -> None:
     """Prints warning when no matching row found."""
-    monkeypatch.setattr(
-        "implement_clause.fetch_issue_body", lambda *_a: _MASTER_BODY,
-    )
-    monkeypatch.setattr(
-        "implement_clause.update_issue_body",
-        lambda *_a: None,
-    )
+    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: _MASTER_BODY)
+    monkeypatch.setattr(ic, "update_issue_body", lambda *_a: None)
     ic.mark_master_complete("o", "r", 1, 999)
     assert "WARNING" in capsys.readouterr().err
