@@ -527,10 +527,16 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // §7.4/§7.5: Compute unpacked array element count.
   ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
-  // §7.6: Track array info for assignment compatibility.
+  // §7.6/§7.9.9: Track array info for assignment compatibility.
   if (!item->unpacked_dims.empty()) {
-    var_array_info_[item->name] = {item->data_type.kind, var.unpacked_size,
-                                   var.is_dynamic};
+    VarArrayInfo info{item->data_type.kind, var.unpacked_size, var.is_dynamic,
+                      var.is_assoc, {}};
+    if (var.is_assoc && !item->unpacked_dims.empty() &&
+        item->unpacked_dims[0] &&
+        item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
+      info.assoc_index_type = item->unpacked_dims[0]->text;
+    }
+    var_array_info_[item->name] = info;
   }
   // §5.12: Resolve attributes.
   var.attrs = ResolveAttributes(item->attrs, diag_);

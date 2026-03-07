@@ -219,6 +219,8 @@ class Elaborator {
     DataTypeKind elem_type = DataTypeKind::kImplicit;
     uint32_t unpacked_size = 0;  // 0 = scalar or dynamic
     bool is_dynamic = false;
+    bool is_assoc = false;
+    std::string_view assoc_index_type;  // §7.9.9: e.g. "int", "string", "*"
   };
 
   // Per-module validation state (cleared in ElaborateItems).

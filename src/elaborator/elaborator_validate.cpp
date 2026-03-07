@@ -739,6 +739,19 @@ void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
       continue;
     const auto& lhs = lhs_it->second;
     const auto& rhs = rhs_it->second;
+    // §7.9.9: Associative arrays can only be assigned to/from matching assoc.
+    if (lhs.is_assoc != rhs.is_assoc) {
+      diag_.Error(item->loc,
+                  "associative array cannot be assigned to or from a "
+                  "non-associative array");
+      continue;
+    }
+    if (lhs.is_assoc && rhs.is_assoc &&
+        lhs.assoc_index_type != rhs.assoc_index_type) {
+      diag_.Error(item->loc,
+                  "associative array index type mismatch in assignment");
+      continue;
+    }
     // Element types must be equivalent.
     if (lhs.elem_type != rhs.elem_type) {
       diag_.Error(item->loc,
