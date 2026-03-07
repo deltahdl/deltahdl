@@ -107,7 +107,10 @@ def test_update_test_status_already_set(ct_github):
 def test_update_test_status_not_found_exits(ct_github):
     """Exits when test name is not found in any row."""
     with pytest.raises(SystemExit):
-        ct_github.update_test_status("| Other | Unreviewed | |\n", "Missing", "Reviewed but kept in the same file")
+        ct_github.update_test_status(
+            "| Other | Unreviewed | |\n", "Missing",
+            "Reviewed but kept in the same file",
+        )
 
 
 # ---- remove_test_row ------------------------------------------------------
@@ -127,8 +130,11 @@ def test_remove_test_row_removes_reviewed(ct_github):
 
 def test_remove_test_row_preserves_others(ct_github):
     """Other rows are untouched after removal."""
-    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n| Gamma | Unreviewed | |\n"
-    assert "| Beta | Unreviewed | |\n| Gamma | Unreviewed | |" in ct_github.remove_test_row(body, "Alpha")
+    body = ("| Alpha | Unreviewed | |\n"
+            "| Beta | Unreviewed | |\n"
+            "| Gamma | Unreviewed | |\n")
+    result = ct_github.remove_test_row(body, "Alpha")
+    assert "| Beta | Unreviewed | |\n| Gamma | Unreviewed | |" in result
 
 
 def test_remove_test_row_not_found_raises(ct_github):
