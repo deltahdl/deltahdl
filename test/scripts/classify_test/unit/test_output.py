@@ -6,19 +6,19 @@
 
 def test_format_clause_non_lrm(ct_output):
     """Non-LRM clause formats as 'Non-LRM TAG'."""
-    _format_clause = ct_output._format_clause
+    _format_clause = getattr(ct_output, "_format_clause")
     assert _format_clause("non-lrm:aig") == "Non-LRM AIG"
 
 
 def test_format_clause_non_lrm_underscore(ct_output):
     """Non-LRM clause with underscore converts to space."""
-    _format_clause = ct_output._format_clause
+    _format_clause = getattr(ct_output, "_format_clause")
     assert _format_clause("non-lrm:aig_opt") == "Non-LRM AIG OPT"
 
 
 def test_format_clause_regular(ct_output):
     """Regular clause formats with section sign."""
-    _format_clause = ct_output._format_clause
+    _format_clause = getattr(ct_output, "_format_clause")
     assert _format_clause("6.1") == "\u00a76.1"
 
 

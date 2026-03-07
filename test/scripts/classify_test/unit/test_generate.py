@@ -754,7 +754,7 @@ def test_append_overflow_includes_preceding_comments(ct, tmp_path):
 # ---- _write_overflow_file edge cases ----------------------------------------
 
 
-def test_write_overflow_file_strips_empty_comment(ct, ct_helpers, tmp_path):
+def test_write_overflow_file_strips_empty_comment(ct, tmp_path):
     """Stripped LRM-quote comment is omitted from overflow file."""
     _write_overflow_file = getattr(ct, "_write_overflow_file")
     source = tmp_path / "source.cpp"

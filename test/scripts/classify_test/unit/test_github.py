@@ -248,25 +248,25 @@ def _issue_args(**overrides):
 
 def test_validate_issue_args_no_issue(ct_github):
     """No error when --issue is not provided."""
-    assert ct_github._validate_issue_args(_issue_args()) is None
+    assert getattr(ct_github, "_validate_issue_args")(_issue_args()) is None
 
 
 def test_validate_issue_args_all_present(ct_github):
     """No error when all three args are present."""
     args = _issue_args(issue=42, organization="org", repo="repo")
-    assert ct_github._validate_issue_args(args) is None
+    assert getattr(ct_github, "_validate_issue_args")(args) is None
 
 
 def test_validate_issue_args_missing_organization(ct_github):
     """Exits when --issue is set but --organization is missing."""
     with pytest.raises(SystemExit):
-        ct_github._validate_issue_args(_issue_args(issue=42, repo="repo"))
+        getattr(ct_github, "_validate_issue_args")(_issue_args(issue=42, repo="repo"))
 
 
 def test_validate_issue_args_missing_repo(ct_github):
     """Exits when --issue is set but --repo is missing."""
     with pytest.raises(SystemExit):
-        ct_github._validate_issue_args(_issue_args(issue=42, organization="org"))
+        getattr(ct_github, "_validate_issue_args")(_issue_args(issue=42, organization="org"))
 
 
 # ---- maybe_tick_issue_checkbox ---------------------------------------------

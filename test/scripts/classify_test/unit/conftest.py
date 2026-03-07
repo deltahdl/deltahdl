@@ -17,7 +17,7 @@ def ct(module_loader):
 
 
 @pytest.fixture()
-def ct_git(ct, module_loader):
+def ct_git(_ct, module_loader):
     """Load the classify_test._git module."""
     return module_loader(
         "classify_test._git",
@@ -26,7 +26,7 @@ def ct_git(ct, module_loader):
 
 
 @pytest.fixture()
-def ct_github(ct, module_loader):
+def ct_github(_ct, module_loader):
     """Load the classify_test._github module."""
     return module_loader(
         "classify_test._github",
@@ -35,7 +35,7 @@ def ct_github(ct, module_loader):
 
 
 @pytest.fixture()
-def ct_output(ct, module_loader):
+def ct_output(_ct, module_loader):
     """Load the classify_test._output module."""
     return module_loader(
         "classify_test._output",
@@ -44,7 +44,7 @@ def ct_output(ct, module_loader):
 
 
 @pytest.fixture()
-def ct_helpers(ct, module_loader):
+def ct_helpers(_ct, module_loader):
     """Load the classify_test.test_helpers module."""
     return module_loader(
         "classify_test.test_helpers",

@@ -112,16 +112,16 @@ def test_parse_args_max_lines_required(monkeypatch, ct):
 def test_preamble_name_struct(ct):
     """Extracts struct name."""
     _preamble_name = getattr(ct, "_preamble_name")
-    _PI = ct.PreambleItem
-    item = _PI(lines=["struct ParseResult {", "  int x;", "};"])
+    pi_cls = ct.PreambleItem
+    item = pi_cls(lines=["struct ParseResult {", "  int x;", "};"])
     assert _preamble_name(item) == "ParseResult"
 
 
 def test_preamble_name_function(ct):
     """Extracts function name."""
     _preamble_name = getattr(ct, "_preamble_name")
-    _PI = ct.PreambleItem
-    item = _PI(lines=["ParseResult Parse(const std::string& src) {",
+    pi_cls = ct.PreambleItem
+    item = pi_cls(lines=["ParseResult Parse(const std::string& src) {",
                        "  return {};", "}"])
     assert _preamble_name(item) == "Parse"
 
@@ -129,8 +129,8 @@ def test_preamble_name_function(ct):
 def test_preamble_name_static_function(ct):
     """Extracts name from static function."""
     _preamble_name = getattr(ct, "_preamble_name")
-    _PI = ct.PreambleItem
-    item = _PI(lines=["static bool ParseOk(const std::string& src) {",
+    pi_cls = ct.PreambleItem
+    item = pi_cls(lines=["static bool ParseOk(const std::string& src) {",
                        "  return true;", "}"])
     assert _preamble_name(item) == "ParseOk"
 
@@ -138,32 +138,32 @@ def test_preamble_name_static_function(ct):
 def test_preamble_name_class(ct):
     """Extracts class name."""
     _preamble_name = getattr(ct, "_preamble_name")
-    _PI = ct.PreambleItem
-    item = _PI(lines=["class Foo {", "};"])
+    pi_cls = ct.PreambleItem
+    item = pi_cls(lines=["class Foo {", "};"])
     assert _preamble_name(item) == "Foo"
 
 
 def test_preamble_name_enum(ct):
     """Extracts enum name."""
     _preamble_name = getattr(ct, "_preamble_name")
-    _PI = ct.PreambleItem
-    item = _PI(lines=["enum Color {", "  RED,", "};"])
+    pi_cls = ct.PreambleItem
+    item = pi_cls(lines=["enum Color {", "  RED,", "};"])
     assert _preamble_name(item) == "Color"
 
 
 def test_preamble_name_no_match(ct):
     """Returns None for comment-only item."""
     _preamble_name = getattr(ct, "_preamble_name")
-    _PI = ct.PreambleItem
-    item = _PI(lines=["// just a comment"])
+    pi_cls = ct.PreambleItem
+    item = pi_cls(lines=["// just a comment"])
     assert _preamble_name(item) is None
 
 
 def test_preamble_name_with_leading_comment(ct):
     """Skips comment lines to find the name."""
     _preamble_name = getattr(ct, "_preamble_name")
-    _PI = ct.PreambleItem
-    item = _PI(lines=["// --- Test helpers ---",
+    pi_cls = ct.PreambleItem
+    item = pi_cls(lines=["// --- Test helpers ---",
                        "struct Foo {", "};"])
     assert _preamble_name(item) == "Foo"
 
@@ -171,8 +171,8 @@ def test_preamble_name_with_leading_comment(ct):
 def test_preamble_name_pointer_return(ct):
     """Extracts name from function with pointer return type."""
     _preamble_name = getattr(ct, "_preamble_name")
-    _PI = ct.PreambleItem
-    item = _PI(lines=["RtlirDesign* Elaborate(const std::string& src) {",
+    pi_cls = ct.PreambleItem
+    item = pi_cls(lines=["RtlirDesign* Elaborate(const std::string& src) {",
                        "  return nullptr;", "}"])
     assert _preamble_name(item) == "Elaborate"
 
@@ -180,8 +180,8 @@ def test_preamble_name_pointer_return(ct):
 def test_preamble_name_static_pointer_return(ct):
     """Extracts name from static function with pointer return type."""
     _preamble_name = getattr(ct, "_preamble_name")
-    _PI = ct.PreambleItem
-    item = _PI(lines=[
+    pi_cls = ct.PreambleItem
+    item = pi_cls(lines=[
         "static ModuleItem* FindItemByKind("
         "const std::vector<ModuleItem*>& items,",
         "  ModuleItemKind kind) {",
@@ -192,8 +192,8 @@ def test_preamble_name_static_pointer_return(ct):
 def test_preamble_name_reference_return(ct):
     """Extracts name from function with reference return type."""
     _preamble_name = getattr(ct, "_preamble_name")
-    _PI = ct.PreambleItem
-    item = _PI(lines=["const std::string& GetName() {",
+    pi_cls = ct.PreambleItem
+    item = pi_cls(lines=["const std::string& GetName() {",
                        '  return name_;', "}"])
     assert _preamble_name(item) == "GetName"
 
@@ -210,9 +210,9 @@ def _test_block(ct, body):
 def test_filter_preamble_keeps_used(ct):
     """Keeps preamble items referenced by test body."""
     _filter_preamble = getattr(ct, "_filter_preamble")
-    _PI = ct.PreambleItem
-    parse_fn = _PI(lines=["Result Parse(const std::string& s) {", "}"])
-    elab_fn = _PI(lines=["void Elaborate() {", "}"])
+    pi_cls = ct.PreambleItem
+    parse_fn = pi_cls(lines=["Result Parse(const std::string& s) {", "}"])
+    elab_fn = pi_cls(lines=["void Elaborate() {", "}"])
     t = _test_block(ct, ["  auto r = Parse(src);"])
     assert parse_fn in _filter_preamble([parse_fn, elab_fn], [t])
 
@@ -220,9 +220,9 @@ def test_filter_preamble_keeps_used(ct):
 def test_filter_preamble_drops_unused(ct):
     """Drops preamble items not referenced by any test."""
     _filter_preamble = getattr(ct, "_filter_preamble")
-    _PI = ct.PreambleItem
-    parse_fn = _PI(lines=["Result Parse(const std::string& s) {", "}"])
-    elab_fn = _PI(lines=["void Elaborate() {", "}"])
+    pi_cls = ct.PreambleItem
+    parse_fn = pi_cls(lines=["Result Parse(const std::string& s) {", "}"])
+    elab_fn = pi_cls(lines=["void Elaborate() {", "}"])
     t = _test_block(ct, ["  auto r = Parse(src);"])
     assert elab_fn not in _filter_preamble([parse_fn, elab_fn], [t])
 
@@ -230,9 +230,9 @@ def test_filter_preamble_drops_unused(ct):
 def _do_transitive_filter(ct):
     """Filter preamble with transitive deps and return kept list."""
     _filter_preamble = getattr(ct, "_filter_preamble")
-    _PI = ct.PreambleItem
-    result_struct = _PI(lines=["struct ParseResult {", "  int x;", "};"])
-    parse_fn = _PI(lines=["ParseResult Parse(const std::string& s) {",
+    pi_cls = ct.PreambleItem
+    result_struct = pi_cls(lines=["struct ParseResult {", "  int x;", "};"])
+    parse_fn = pi_cls(lines=["ParseResult Parse(const std::string& s) {",
                            "  ParseResult r;", "  return r;", "}"])
     t = _test_block(ct, ["  auto r = Parse(src);"])
     return _filter_preamble([result_struct, parse_fn], [t]), result_struct, parse_fn
@@ -253,8 +253,8 @@ def test_filter_preamble_transitive_keeps_fn(ct):
 def test_filter_preamble_keeps_unnamed(ct):
     """Items with no extractable name are always kept."""
     _filter_preamble = getattr(ct, "_filter_preamble")
-    _PI = ct.PreambleItem
-    unnamed = _PI(lines=["using Foo = int;"])
+    pi_cls = ct.PreambleItem
+    unnamed = pi_cls(lines=["using Foo = int;"])
     t = _test_block(ct, ["  int x = 1;"])
     assert unnamed in _filter_preamble([unnamed], [t])
 
@@ -564,8 +564,10 @@ def _mixed_classifier(prompt, schema=None):
     return {"clause": "6.1", "rationale": "r"}
 
 
-def _run_live_non_lrm(ct, ct_helpers, tmp_path, monkeypatch, src_body,
-                      classifier, test="T"):
+def _run_live_non_lrm(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    ct, ct_helpers, tmp_path, monkeypatch, src_body,
+    classifier, test="T",
+):
     """Write source, stub externals, and run live pipeline."""
     _run = getattr(ct, "_run")
     src = tmp_path / "test_non_lrm_aig.cpp"
