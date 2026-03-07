@@ -58,4 +58,31 @@ TEST(SimCh6, BitStreamShortArrayToInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEu);
 }
 
+// §6.24.3: Bitstream cast — packed struct round-trip preserves bits.
+TEST(SimCh6, BitStreamStructRoundTrip) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
+      "  pair_t p;\n"
+      "  int flat;\n"
+      "  pair_t p2;\n"
+      "  initial begin\n"
+      "    p = 16'hCAFE;\n"
+      "    flat = int'(p);\n"
+      "    p2 = pair_t'(flat);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* p2 = f.ctx.FindVariable("p2");
+  ASSERT_NE(p2, nullptr);
+  EXPECT_EQ(p2->value.ToUint64(), 0xCAFEu);
+}
+
 }  // namespace

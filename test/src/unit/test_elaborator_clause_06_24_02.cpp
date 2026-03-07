@@ -59,4 +59,53 @@ TEST(SimCh6, CastEnumFailure) {
   EXPECT_EQ(c->value.ToUint64(), 0u);
 }
 
+// §6.24.2: $cast as task — valid value succeeds silently.
+TEST(SimCh6, CastEnumTaskValid) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  color_t c;\n"
+      "  initial begin\n"
+      "    $cast(c, 2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 2u);
+}
+
+// §6.24.2: $cast in if-condition — returns 0 on failure.
+TEST(SimCh6, CastEnumInCondition) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  color_t c;\n"
+      "  int flag;\n"
+      "  initial begin\n"
+      "    flag = 0;\n"
+      "    if ($cast(c, 1))\n"
+      "      flag = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* flag = f.ctx.FindVariable("flag");
+  ASSERT_NE(flag, nullptr);
+  EXPECT_EQ(flag->value.ToUint64(), 1u);
+}
+
 }  // namespace

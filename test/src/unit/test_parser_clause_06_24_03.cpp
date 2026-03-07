@@ -54,4 +54,30 @@ TEST(ParserSection6, BitStreamCastFromStruct) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+// §6.24.3: Bitstream cast — struct to struct with same total width.
+TEST(ParserSection6, BitstreamCastStructToStruct) {
+  EXPECT_TRUE(ParseOk(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
+      "  typedef struct packed { logic [3:0] w; logic [3:0] x;\n"
+      "                          logic [3:0] y; logic [3:0] z; } wxyz_t;\n"
+      "  initial begin\n"
+      "    ab_t src;\n"
+      "    wxyz_t dst;\n"
+      "    dst = wxyz_t'(src);\n"
+      "  end\n"
+      "endmodule\n"));
+}
+
+// §6.24.3: Bitstream types include strings.
+TEST(ParserSection6, BitstreamCastStringType) {
+  EXPECT_TRUE(ParseOk(
+      "module t;\n"
+      "  typedef bit [$bits(int)-1:0] tagbits;\n"
+      "  int x;\n"
+      "  tagbits t_val;\n"
+      "  initial t_val = tagbits'(x);\n"
+      "endmodule\n"));
+}
+
 }  // namespace

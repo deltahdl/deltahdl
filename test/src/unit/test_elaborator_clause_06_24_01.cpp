@@ -177,4 +177,64 @@ TEST(SimCh10, BlockingAssignTypeCast) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
+// §6.24.1: Cast real multiplication to int — truncates fractional part.
+TEST(SimCh6, CastRealMulToInt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int result;\n"
+      "  initial result = int'(2.0 * 3.0);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 6u);
+}
+
+// §6.24.1: shortint cast of concatenation.
+TEST(SimCh6, CastConcatToShortint) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  shortint result;\n"
+      "  initial result = shortint'({8'hFA, 8'hCE});\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFACEu);
+}
+
+// §6.24.1: byte cast truncates wider value.
+TEST(SimCh6, CastByteTruncate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = byte'(32'hABCD);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xCDu);
+}
+
 }  // namespace

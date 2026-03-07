@@ -346,4 +346,64 @@ TEST(ParserSection6, ShortrealCast) {
               "endmodule\n"));
 }
 
+// §6.24.1: Size cast — positive integral constant as casting type.
+TEST(ParserSection6, SizeCastLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  logic [16:0] result;\n"
+      "  initial result = 17'(x - 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.24.1: Size cast — parameter as casting type.
+TEST(ParserSection6, SizeCastParameter) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter P = 17;\n"
+              "  parameter Q = 16;\n"
+              "  logic [31:0] x;\n"
+              "  logic [31:0] r1, r2;\n"
+              "  initial begin\n"
+              "    r1 = P'(x - 2);\n"
+              "    r2 = (Q+1)'(x - 2);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+// §6.24.1: Cast real expression to int.
+TEST(ParserSection6, CastRealExprToInt) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int result;\n"
+              "  initial result = int'(2.0 * 3.0);\n"
+              "endmodule\n"));
+}
+
+// §6.24.1: Cast concat expression with shortint.
+TEST(ParserSection6, CastConcatShortint) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  shortint result;\n"
+              "  initial result = shortint'({8'hFA, 8'hCE});\n"
+              "endmodule\n"));
+}
+
+// §6.24.1: Unsigned cast expression.
+TEST(ParserSection6, UnsignedCast) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = unsigned'(-4);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
+  EXPECT_EQ(stmt->rhs->text, "unsigned");
+}
+
 }  // namespace
