@@ -43,4 +43,18 @@ TEST(ParserSection8, NullExpression) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+TEST(ParserSection6, ClassVarDecl_ClassParsed) {
+  auto r = Parse(
+      "class MyClass;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  MyClass obj;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_FALSE(r.cu->classes.empty());
+  EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
+  ASSERT_FALSE(r.cu->modules.empty());
+}
+
 }  // namespace

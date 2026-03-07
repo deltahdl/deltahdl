@@ -81,20 +81,6 @@ TEST(ParserSection8, EmptyClassDecl) {
   EXPECT_TRUE(r.cu->classes[0]->members.empty());
 }
 
-TEST(ParserSection6, ClassVarDecl_ClassParsed) {
-  auto r = Parse(
-      "class MyClass;\n"
-      "  int x;\n"
-      "endclass\n"
-      "module t;\n"
-      "  MyClass obj;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->classes.empty());
-  EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
-  ASSERT_FALSE(r.cu->modules.empty());
-}
-
 // --- §8.3 implements clause ---
 TEST(ParserClause08_03, ImplementsSingleInterface) {
   auto r = Parse(
