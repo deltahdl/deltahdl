@@ -115,4 +115,81 @@ TEST(ParserSection8, ClassWithTask) {
   EXPECT_EQ(m->method->kind, ModuleItemKind::kTaskDecl);
 }
 
+// §8.6: Method call via dot notation parses correctly.
+TEST(ParserA86, MethodCallDotNotation) {
+  auto r = Parse(
+      "class Packet;\n"
+      "  function int current_status();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int status;\n"
+      "    Packet p;\n"
+      "    p = new;\n"
+      "    status = p.current_status();\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §8.6: Automatic lifetime on class method is legal (default).
+TEST(ParserA86, MethodAutomaticLifetimeLegal) {
+  ParseOk(
+      "class C;\n"
+      "  function automatic void foo();\n"
+      "  endfunction\n"
+      "endclass\n");
+}
+
+// §8.6: No explicit lifetime on class method is legal (implicit automatic).
+TEST(ParserA86, MethodNoLifetimeLegal) {
+  ParseOk(
+      "class C;\n"
+      "  function void foo();\n"
+      "  endfunction\n"
+      "endclass\n");
+}
+
+// §8.6: Static lifetime on class function is illegal.
+TEST(ParserA86, FunctionStaticLifetimeError) {
+  auto r = Parse(
+      "class C;\n"
+      "  function static void foo();\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §8.6: Static lifetime on class task is illegal.
+TEST(ParserA86, TaskStaticLifetimeError) {
+  auto r = Parse(
+      "class C;\n"
+      "  task static do_stuff();\n"
+      "  endtask\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §8.6: Static class qualifier (static method) is NOT the same as static
+// lifetime and is legal.
+TEST(ParserA86, StaticClassQualifierLegal) {
+  ParseOk(
+      "class C;\n"
+      "  static function void foo();\n"
+      "  endfunction\n"
+      "endclass\n");
+}
+
+// §8.6: Method with both static qualifier and automatic lifetime is legal.
+TEST(ParserA86, StaticQualifierAutoLifetimeLegal) {
+  ParseOk(
+      "class C;\n"
+      "  static function automatic void foo();\n"
+      "  endfunction\n"
+      "endclass\n");
+}
+
 }  // namespace

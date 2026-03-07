@@ -884,6 +884,11 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
   if (Check(TokenKind::kKwFunction)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseFunctionDecl(proto);
+    // §8.6: Static lifetime on class methods is illegal.
+    if (member->method->is_static) {
+      diag_.Error(member->method->loc,
+                  "class method shall not have static lifetime");
+    }
     if (member->is_static) member->method->is_static = true;
     members.push_back(member);
     return true;
@@ -891,6 +896,11 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
   if (Check(TokenKind::kKwTask)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseTaskDecl(proto);
+    // §8.6: Static lifetime on class methods is illegal.
+    if (member->method->is_static) {
+      diag_.Error(member->method->loc,
+                  "class method shall not have static lifetime");
+    }
     if (member->is_static) member->method->is_static = true;
     members.push_back(member);
     return true;
