@@ -13,12 +13,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 
 namespace {
 
-TEST(Preprocessor, Pragma_NumberValue_NoError) {
-  PreprocFixture f;
-  Preprocess("`pragma my_pragma 42\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(Preprocessor, Pragma_StringValue_NoError) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma \"hello world\"\n", f);

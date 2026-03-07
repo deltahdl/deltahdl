@@ -53,4 +53,10 @@ TEST(Preprocessor, Pragma_MultipleExpressions_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(Preprocessor, Pragma_NumberValue_NoError) {
+  PreprocFixture f;
+  Preprocess("`pragma my_pragma 42\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
