@@ -517,6 +517,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     const_names_.insert(item->name);
   }
   var_types_[item->name] = item->data_type.kind;
+  if (item->data_type.kind == DataTypeKind::kNamed)
+    var_named_types_[item->name] = item->data_type.type_name;
   RtlirVariable var;
   var.name = ScopedName(item->name);
   var.width = EvalTypeWidth(item->data_type, typedefs_);
@@ -816,6 +818,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   class_var_names_.clear();
   class_var_types_.clear();
   interconnect_names_.clear();
+  var_named_types_.clear();
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }

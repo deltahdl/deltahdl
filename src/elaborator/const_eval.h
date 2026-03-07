@@ -21,6 +21,14 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr);
 /// Scoped overload: resolves identifiers via the given scope map.
 std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope);
 
+/// §11.2.1: Attempt to evaluate an expression as a constant real.
+/// Returns nullopt if the expression is not a compile-time constant.
+std::optional<double> ConstEvalReal(const Expr* expr);
+std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope);
+
+/// §11.2.1: Check whether an expression qualifies as a constant expression.
+bool IsConstantExpr(const Expr* expr, const ScopeMap& scope = {});
+
 /// §11.5.3: Compute the longest static prefix of a select expression.
 /// Returns a string representation (e.g., "m[1]" for m[1][i]).
 /// The scope map is used to determine which identifiers are constants.

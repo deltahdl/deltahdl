@@ -297,6 +297,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateConstAssignments(decl);
   ValidateArrayAssignments(decl);
   ValidateClassHandleOps(decl);
+  ValidateAggregateComparisons(decl);
   ValidateLocalProtectedAccess(decl);
   ValidateStaticMethodBodies(decl);
   ValidateThisUsage(decl);
@@ -1417,6 +1418,66 @@ void Elaborator::ValidateInterfaceClassRules() {
           }
         }
       }
+    }
+  }
+}
+
+// --- §11.2.2: Aggregate expression comparison validation ---
+
+void Elaborator::WalkExprForAggregateCompare(const Expr* expr) {
+  if (!expr) return;
+  // Check binary equality/inequality on named-type operands.
+  if (expr->kind == ExprKind::kBinary &&
+      (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq)) {
+    if (expr->lhs && expr->rhs &&
+        expr->lhs->kind == ExprKind::kIdentifier &&
+        expr->rhs->kind == ExprKind::kIdentifier) {
+      auto lit = var_named_types_.find(expr->lhs->text);
+      auto rit = var_named_types_.find(expr->rhs->text);
+      if (lit != var_named_types_.end() && rit != var_named_types_.end()) {
+        if (lit->second != rit->second) {
+          diag_.Error(expr->range.start,
+                      std::format("comparison of non-equivalent aggregate "
+                                  "types '{}' and '{}'",
+                                  lit->second, rit->second));
+        }
+      }
+    }
+  }
+  // Recurse into sub-expressions.
+  WalkExprForAggregateCompare(expr->lhs);
+  WalkExprForAggregateCompare(expr->rhs);
+  WalkExprForAggregateCompare(expr->condition);
+  WalkExprForAggregateCompare(expr->true_expr);
+  WalkExprForAggregateCompare(expr->false_expr);
+  for (auto* elem : expr->elements) WalkExprForAggregateCompare(elem);
+  for (auto* arg : expr->args) WalkExprForAggregateCompare(arg);
+}
+
+void Elaborator::WalkStmtsForAggregateCompare(const Stmt* s) {
+  if (!s) return;
+  WalkExprForAggregateCompare(s->rhs);
+  WalkExprForAggregateCompare(s->lhs);
+  WalkExprForAggregateCompare(s->expr);
+  WalkExprForAggregateCompare(s->condition);
+  WalkExprForAggregateCompare(s->assert_expr);
+  for (auto* sub : s->stmts) WalkStmtsForAggregateCompare(sub);
+  WalkStmtsForAggregateCompare(s->then_branch);
+  WalkStmtsForAggregateCompare(s->else_branch);
+  WalkStmtsForAggregateCompare(s->body);
+  WalkStmtsForAggregateCompare(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForAggregateCompare(ci.body);
+}
+
+void Elaborator::ValidateAggregateComparisons(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForAggregateCompare(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
+      WalkExprForAggregateCompare(item->assign_rhs);
     }
   }
 }

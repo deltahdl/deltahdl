@@ -243,6 +243,11 @@ class Elaborator {
   /// §8.26: Validate interface class rules.
   void ValidateInterfaceClassRules();
 
+  /// §11.2.2: Validate aggregate expression comparison type equivalence.
+  void ValidateAggregateComparisons(const ModuleDecl* decl);
+  void WalkExprForAggregateCompare(const Expr* expr);
+  void WalkStmtsForAggregateCompare(const Stmt* s);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
@@ -278,6 +283,8 @@ class Elaborator {
       class_var_types_;  // §8.18: var name → class type name
   std::unordered_set<std::string_view> nettype_names_;
   std::unordered_set<std::string_view> interconnect_names_;
+  std::unordered_map<std::string_view, std::string_view>
+      var_named_types_;  // §11.2.2: var name → named type for aggregate checks
 };
 
 }  // namespace delta

@@ -1,5 +1,8 @@
 #include "elaborator/const_eval.h"
 
+#include <cmath>
+#include <unordered_set>
+
 #include "lexer/token.h"
 #include "parser/ast.h"
 
@@ -251,6 +254,153 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope) {
 std::optional<int64_t> ConstEvalInt(const Expr* expr) {
   static const ScopeMap kEmptyScope;
   return ConstEvalInt(expr, kEmptyScope);
+}
+
+// --- §11.2.1: Constant real evaluation ---
+
+static std::optional<double> EvalRealBinary(TokenKind op, double lhs,
+                                            double rhs) {
+  switch (op) {
+    case TokenKind::kPlus:
+      return lhs + rhs;
+    case TokenKind::kMinus:
+      return lhs - rhs;
+    case TokenKind::kStar:
+      return lhs * rhs;
+    case TokenKind::kSlash:
+      if (rhs == 0.0) return std::nullopt;
+      return lhs / rhs;
+    case TokenKind::kPower:
+      return std::pow(lhs, rhs);
+    default:
+      return std::nullopt;
+  }
+}
+
+static std::optional<double> EvalRealUnary(TokenKind op, double operand) {
+  switch (op) {
+    case TokenKind::kMinus:
+      return -operand;
+    case TokenKind::kPlus:
+      return operand;
+    default:
+      return std::nullopt;
+  }
+}
+
+std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
+  if (!expr) return std::nullopt;
+
+  switch (expr->kind) {
+    case ExprKind::kRealLiteral:
+      return expr->real_val;
+    case ExprKind::kIntegerLiteral:
+      return static_cast<double>(expr->int_val);
+    case ExprKind::kIdentifier: {
+      auto it = scope.find(expr->text);
+      if (it != scope.end()) return static_cast<double>(it->second);
+      return std::nullopt;
+    }
+    case ExprKind::kUnary: {
+      auto operand = ConstEvalReal(expr->lhs, scope);
+      if (!operand) return std::nullopt;
+      return EvalRealUnary(expr->op, *operand);
+    }
+    case ExprKind::kBinary: {
+      auto lhs = ConstEvalReal(expr->lhs, scope);
+      auto rhs = ConstEvalReal(expr->rhs, scope);
+      if (!lhs || !rhs) return std::nullopt;
+      return EvalRealBinary(expr->op, *lhs, *rhs);
+    }
+    case ExprKind::kTernary: {
+      auto cond = ConstEvalInt(expr->condition, scope);
+      if (!cond) return std::nullopt;
+      return ConstEvalReal(*cond ? expr->true_expr : expr->false_expr, scope);
+    }
+    default:
+      return std::nullopt;
+  }
+}
+
+std::optional<double> ConstEvalReal(const Expr* expr) {
+  static const ScopeMap kEmptyScope;
+  return ConstEvalReal(expr, kEmptyScope);
+}
+
+// --- §11.2.1: Constant expression predicate ---
+
+// System functions that are constant when their arguments are constant.
+static bool IsConstantSysFunc(std::string_view name) {
+  static const std::unordered_set<std::string_view> kConstSysFuncs = {
+      "$clog2",          "$bits",         "$countones",
+      "$onehot",         "$onehot0",      "$isunbounded",
+      // §20.4: Timescale system functions
+      "$timescale",      "$timeprecision",
+      // §20.5: Conversion functions
+      "$itor",           "$rtoi",         "$bitstoreal",
+      "$realtobits",     "$bitstoshortreal", "$shortrealtobits",
+      "$signed",         "$unsigned",
+      // §20.8: Math functions
+      "$ln",             "$log10",        "$exp",
+      "$sqrt",           "$pow",          "$floor",
+      "$ceil",           "$sin",          "$cos",
+      "$tan",            "$asin",         "$acos",
+      "$atan",           "$atan2",        "$hypot",
+      "$sinh",           "$cosh",         "$tanh",
+      "$asinh",          "$acosh",        "$atanh",
+      // §20.9: Bit vector system functions
+      "$countbits",
+      // §21.3.3
+      "$sformatf",
+  };
+  return kConstSysFuncs.count(name) > 0;
+}
+
+bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
+  if (!expr) return false;
+
+  switch (expr->kind) {
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kRealLiteral:
+    case ExprKind::kStringLiteral:
+    case ExprKind::kUnbasedUnsizedLiteral:
+    case ExprKind::kTimeLiteral:
+      return true;
+    case ExprKind::kIdentifier:
+      return scope.count(expr->text) > 0;
+    case ExprKind::kUnary:
+      return IsConstantExpr(expr->lhs, scope);
+    case ExprKind::kBinary:
+      return IsConstantExpr(expr->lhs, scope) &&
+             IsConstantExpr(expr->rhs, scope);
+    case ExprKind::kTernary:
+      return IsConstantExpr(expr->condition, scope) &&
+             IsConstantExpr(expr->true_expr, scope) &&
+             IsConstantExpr(expr->false_expr, scope);
+    case ExprKind::kConcatenation:
+      for (auto* elem : expr->elements) {
+        if (!IsConstantExpr(elem, scope)) return false;
+      }
+      return true;
+    case ExprKind::kReplicate:
+      if (!IsConstantExpr(expr->repeat_count, scope)) return false;
+      for (auto* elem : expr->elements) {
+        if (!IsConstantExpr(elem, scope)) return false;
+      }
+      return true;
+    case ExprKind::kSystemCall:
+      if (!IsConstantSysFunc(expr->callee)) return false;
+      // §20.6: $bits is constant even with non-constant type arguments.
+      if (expr->callee == "$bits") return true;
+      for (auto* arg : expr->args) {
+        if (!IsConstantExpr(arg, scope)) return false;
+      }
+      return true;
+    case ExprKind::kCast:
+      return IsConstantExpr(expr->lhs, scope);
+    default:
+      return false;
+  }
 }
 
 // §11.5.3: Build the textual representation of a static prefix.
