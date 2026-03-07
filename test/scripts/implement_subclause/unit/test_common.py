@@ -1,6 +1,7 @@
 """Unit tests for implement_subclause."""
 
 import argparse
+import inspect
 from unittest.mock import MagicMock, patch
 
 
@@ -121,7 +122,6 @@ def test_format_prompt_forbids_building(isc):
 
 def test_format_prompt_no_supplementary_param(isc):
     """format_prompt does not accept a supplementary parameter."""
-    import inspect
     sig = inspect.signature(isc.format_prompt)
     assert "supplementary" not in sig.parameters
 
@@ -217,7 +217,7 @@ def test_run_prompt_calls_invoke(mock_invoke, isc, tmp_path):
 
 
 @patch("implement_subclause.invoke_claude")
-def test_run_prompt_does_not_load_titles(mock_invoke, isc, tmp_path):
+def test_run_prompt_does_not_load_titles(_mock_invoke, isc, tmp_path):
     """run_prompt passes only positional args (subclause, lrm_path)."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
@@ -231,7 +231,7 @@ def test_run_prompt_does_not_load_titles(mock_invoke, isc, tmp_path):
 
 
 @patch("implement_subclause.invoke_claude")
-def test_run_prompt_passes_subclause(mock_invoke, isc, tmp_path):
+def test_run_prompt_passes_subclause(_mock_invoke, isc, tmp_path):
     """run_prompt passes the subclause as the first positional arg."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
