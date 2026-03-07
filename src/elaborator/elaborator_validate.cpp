@@ -13,6 +13,13 @@
 
 namespace delta {
 
+// §10.9.2: Type key strings that are valid in assignment patterns.
+static bool IsTypeKeyword(std::string_view key) {
+  return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
+         key == "byte" || key == "shortint" || key == "longint" ||
+         key == "bit" || key == "real" || key == "shortreal" || key == "string";
+}
+
 // §5.11: Check if an assignment pattern is a replication or named form.
 static bool IsArrayPatternSpecial(const Expr* init) {
   if (init->repeat_count) return true;
@@ -32,10 +39,27 @@ static std::optional<int64_t> ComputeDimSize(const Expr* dim) {
   return ConstEvalInt(dim);
 }
 
+// §10.9.1: Check for duplicate index keys in a keyed array pattern.
+static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
+                                              DiagEngine& diag) {
+  if (init->pattern_keys.empty()) return;
+  std::unordered_set<std::string_view> seen;
+  for (auto key : init->pattern_keys) {
+    if (key == "default" || IsTypeKeyword(key)) continue;
+    if (!seen.insert(key).second) {
+      diag.Error(loc,
+                 std::format("duplicate index key '{}' in array pattern", key));
+    }
+  }
+}
+
 void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
   if (!item->init_expr || item->unpacked_dims.empty()) return;
   if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
-  if (IsArrayPatternSpecial(item->init_expr)) return;
+  if (IsArrayPatternSpecial(item->init_expr)) {
+    CheckArrayPatternDuplicateIndices(item->init_expr, item->loc, diag_);
+    return;
+  }
 
   const auto* dim = item->unpacked_dims[0];
   if (!dim) return;
@@ -51,21 +75,17 @@ void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
   }
 }
 
-// §10.9.2: Type key strings that are valid in assignment patterns.
-static bool IsTypeKeyword(std::string_view key) {
-  return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
-         key == "byte" || key == "shortint" || key == "longint" ||
-         key == "bit" || key == "real" || key == "shortreal" || key == "string";
-}
-
 static void CheckPatternKeys(const ModuleItem* item,
                              const std::vector<StructMember>& members,
                              DiagEngine& diag) {
   std::unordered_set<std::string_view> member_names;
   for (const auto& m : members) member_names.insert(m.name);
   std::unordered_set<std::string_view> seen;
+  bool has_default = false;
+  bool has_type_key = false;
   for (auto key : item->init_expr->pattern_keys) {
-    if (key == "default" || IsTypeKeyword(key)) continue;
+    if (key == "default") { has_default = true; continue; }
+    if (IsTypeKeyword(key)) { has_type_key = true; continue; }
     if (!member_names.count(key)) {
       diag.Error(item->loc,
                  std::format("'{}' is not a member of the struct", key));
@@ -73,6 +93,17 @@ static void CheckPatternKeys(const ModuleItem* item,
     if (!seen.insert(key).second) {
       diag.Error(item->loc,
                  std::format("duplicate member key '{}' in pattern", key));
+    }
+  }
+  // §10.9.2: Every member shall be covered by member, type, or default key.
+  if (!has_default && !has_type_key) {
+    for (const auto& m : members) {
+      if (!seen.count(m.name)) {
+        diag.Error(item->loc,
+                   std::format("member '{}' not covered by assignment pattern",
+                               m.name));
+        break;
+      }
     }
   }
 }

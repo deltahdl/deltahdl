@@ -166,6 +166,18 @@ TEST(Elaboration, StructPattern_DuplicateKey) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §10.9.2: Struct pattern that does not cover all members is an error.
+TEST(Elaboration, StructPattern_UncoveredMember) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct packed { logic [7:0] a; logic [7:0] b; } s = "
+      "'{a: 8'h01};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(ElabA60701, StructNamedPatternElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -181,4 +181,15 @@ TEST(ElabA60701, PatternDefaultKeyElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
+// §10.9.1: Specifying the same index more than once is an error.
+TEST(ElabCh511, ArrayInitPattern_DuplicateIndex) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  int arr[0:2] = '{0: 1, 1: 2, 0: 3};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
