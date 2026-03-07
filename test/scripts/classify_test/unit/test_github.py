@@ -244,8 +244,8 @@ def test_validate_issue_args_missing_repo(ct_github):
 # ---- maybe_update_issue_status ---------------------------------------------
 
 
-def test_maybe_update_kept(monkeypatch, ct_github, ct_helpers):
-    """Sets status to 'Reviewed but kept in the same file' when kept."""
+def _setup_maybe_update(monkeypatch, ct_github, ct_helpers, *, source_is_target):
+    """Run maybe_update_issue_status and return captured body updates."""
     _tb = ct_helpers.make_test_block
     updated = []
     monkeypatch.setattr(
@@ -259,26 +259,25 @@ def test_maybe_update_kept(monkeypatch, ct_github, ct_helpers):
     t = _tb("T", prefix="test_parser_", clause="6.1")
     t.rationale = "r"
     args = _issue_args(issue=42, organization="org", repo="repo")
-    ct_github.maybe_update_issue_status(args, [t], source_is_target=True)
+    ct_github.maybe_update_issue_status(
+        args, [t], source_is_target=source_is_target,
+    )
+    return updated
+
+
+def test_maybe_update_kept(monkeypatch, ct_github, ct_helpers):
+    """Sets status to 'Reviewed but kept in the same file' when kept."""
+    updated = _setup_maybe_update(
+        monkeypatch, ct_github, ct_helpers, source_is_target=True,
+    )
     assert "| T | Reviewed but kept in the same file | |" in updated[0]
 
 
 def test_maybe_update_moved(monkeypatch, ct_github, ct_helpers):
     """Sets status to 'Reviewed but moved to another file' when moved."""
-    _tb = ct_helpers.make_test_block
-    updated = []
-    monkeypatch.setattr(
-        ct_github, "fetch_issue_body",
-        lambda org, repo, issue: "| T | Unreviewed | |\n",
+    updated = _setup_maybe_update(
+        monkeypatch, ct_github, ct_helpers, source_is_target=False,
     )
-    monkeypatch.setattr(
-        ct_github, "update_issue_body",
-        lambda org, repo, issue, body: updated.append(body),
-    )
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
-    args = _issue_args(issue=42, organization="org", repo="repo")
-    ct_github.maybe_update_issue_status(args, [t], source_is_target=False)
     assert "| T | Reviewed but moved to another file | |" in updated[0]
 
 
