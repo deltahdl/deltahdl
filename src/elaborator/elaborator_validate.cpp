@@ -264,7 +264,8 @@ void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
 // §13.2/§13.4.1/§13.4.4: Check function body for illegal constructs.
 static void CheckFuncBodyStmt(
     const Stmt* s, bool is_void,
-    const std::unordered_set<std::string_view>& task_names, DiagEngine& diag) {
+    const std::unordered_set<std::string_view>& task_names,
+    std::string_view func_name, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kReturn && s->expr && is_void) {
     diag.Error(s->range.start, "void function returns a value");
@@ -286,13 +287,21 @@ static void CheckFuncBodyStmt(
       task_names.count(s->expr->callee) != 0) {
     diag.Error(s->range.start, "function cannot enable a task");
   }
-  for (auto* sub : s->stmts) CheckFuncBodyStmt(sub, is_void, task_names, diag);
-  CheckFuncBodyStmt(s->then_branch, is_void, task_names, diag);
-  CheckFuncBodyStmt(s->else_branch, is_void, task_names, diag);
-  CheckFuncBodyStmt(s->body, is_void, task_names, diag);
-  CheckFuncBodyStmt(s->for_body, is_void, task_names, diag);
+  // §13.4.1: Illegal to declare variable with same name as function inside body.
+  if (s->kind == StmtKind::kVarDecl && !func_name.empty() &&
+      s->var_name == func_name) {
+    diag.Error(s->range.start,
+               std::format("declaration of '{}' conflicts with function name",
+                           func_name));
+  }
+  for (auto* sub : s->stmts)
+    CheckFuncBodyStmt(sub, is_void, task_names, func_name, diag);
+  CheckFuncBodyStmt(s->then_branch, is_void, task_names, func_name, diag);
+  CheckFuncBodyStmt(s->else_branch, is_void, task_names, func_name, diag);
+  CheckFuncBodyStmt(s->body, is_void, task_names, func_name, diag);
+  CheckFuncBodyStmt(s->for_body, is_void, task_names, func_name, diag);
   for (auto& ci : s->case_items)
-    CheckFuncBodyStmt(ci.body, is_void, task_names, diag);
+    CheckFuncBodyStmt(ci.body, is_void, task_names, func_name, diag);
 }
 
 // §13.2: A task shall not return a value.
@@ -363,7 +372,7 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kFunctionDecl) return;
   bool is_void = (item->return_type.kind == DataTypeKind::kVoid);
   for (auto* s : item->func_body_stmts) {
-    CheckFuncBodyStmt(s, is_void, task_names_, diag_);
+    CheckFuncBodyStmt(s, is_void, task_names_, item->name, diag_);
   }
 }
 

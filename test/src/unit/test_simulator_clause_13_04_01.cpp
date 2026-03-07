@@ -174,6 +174,95 @@ TEST(SimA82, VoidCastFunctionCall) {
   LowerRunAndCheck(f, design, {{"x", 55u}});
 }
 
+// §13.4.1: Return value via assignment to function-name variable.
+TEST(Sim1341, FunctionNameAssignReturnsValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  function logic [15:0] myfunc1(input logic [7:0] a, input logic [7:0] b);\n"
+      "    myfunc1 = a * b - 16'd1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = myfunc1(8'd3, 8'd5);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 14u}});
+}
+
+// §13.4.1: return statement overrides value assigned to function name.
+TEST(Sim1341, ReturnOverridesFunctionNameAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  function int compute();\n"
+      "    compute = 100;\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = compute();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 42u}});
+}
+
+// §13.4.1: Function with no return or function-name assignment returns 0.
+TEST(Sim1341, EmptyFunctionReturnsZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  function int nop();\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = nop();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 0u}});
+}
+
+// §13.4.1: Function-name assignment used conditionally.
+TEST(Sim1341, FunctionNameAssignConditional) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  function int abs_val(input int v);\n"
+      "    if (v < 0)\n"
+      "      abs_val = -v;\n"
+      "    else\n"
+      "      abs_val = v;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = abs_val(32'd7);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 7u}});
+}
+
+// §13.4.1: Void function call used as statement (no return value).
+TEST(Sim1341, VoidFunctionCallAsStatement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  function void set_val();\n"
+      "    x = 32'd99;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = 32'd0;\n"
+      "    set_val();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 99u}});
+}
+
 TEST(Functions, VoidFunctionSideEffect) {
   FuncFixture f;
 
