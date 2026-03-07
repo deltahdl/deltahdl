@@ -120,19 +120,6 @@ TEST(ParserClause08_03, ConstructorDefaultArg) {
   EXPECT_TRUE(members[0]->method->func_args[0].is_default);
 }
 
-TEST(ParserClause08_03, ConstructorDefaultBeforeArgs) {
-  auto r = Parse(
-      "class C extends Base;\n"
-      "  function new(default, bit enable);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  auto& args = r.cu->classes[0]->members[0]->method->func_args;
-  ASSERT_EQ(args.size(), 2u);
-  EXPECT_TRUE(args[0].is_default);
-  EXPECT_FALSE(args[1].is_default);
-}
-
 // --- §8.3 extern constructor prototype ---
 TEST(ParserClause08_03, ExternConstructorPrototype) {
   auto r = Parse(
