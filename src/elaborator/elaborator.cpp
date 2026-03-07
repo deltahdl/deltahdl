@@ -137,6 +137,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateAbstractClassRules();
   // §8.24: Validate out-of-block method declarations.
   ValidateOutOfBlockDeclarations();
+  // §8.26: Validate interface class rules.
+  ValidateInterfaceClassRules();
 
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {

@@ -1307,4 +1307,118 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
   }
 }
 
+// §8.26: Validate interface class rules.
+void Elaborator::ValidateInterfaceClassRules() {
+  for (const auto* cls : unit_->classes) {
+    if (cls->is_interface) {
+      // §8.26.1: Interface class members must be pure virtual methods,
+      // type declarations, or parameter declarations.
+      for (const auto* m : cls->members) {
+        if (m->kind == ClassMemberKind::kMethod) {
+          if (!m->is_pure_virtual) {
+            diag_.Error(m->method ? m->method->loc : cls->range.start,
+                        std::format("interface class '{}' shall only contain "
+                                    "pure virtual methods",
+                                    cls->name));
+          }
+        } else if (m->kind == ClassMemberKind::kTypedef) {
+          // OK — type declarations allowed.
+        } else if (m->kind == ClassMemberKind::kProperty) {
+          // Only parameter/localparam declarations are allowed.
+          if (!m->is_const) {
+            diag_.Error(cls->range.start,
+                        std::format("interface class '{}' shall not contain "
+                                    "data members",
+                                    cls->name));
+          }
+        } else if (m->kind == ClassMemberKind::kConstraint) {
+          // §8.26.1/§8.26.9: Constraint blocks not allowed.
+          diag_.Error(cls->range.start,
+                      std::format("interface class '{}' shall not contain "
+                                  "constraint blocks",
+                                  cls->name));
+        }
+      }
+
+      // §8.26.2: Interface class cannot implement.
+      if (!cls->implements_types.empty()) {
+        diag_.Error(cls->range.start,
+                    std::format("interface class '{}' shall not use "
+                                "'implements'",
+                                cls->name));
+      }
+
+      // §8.26.2: Interface class may only extend interface classes.
+      if (!cls->base_class.empty()) {
+        const auto* base = FindClassDecl(cls->base_class, unit_);
+        if (base && !base->is_interface) {
+          diag_.Error(cls->range.start,
+                      std::format("interface class '{}' cannot extend "
+                                  "non-interface class '{}'",
+                                  cls->name, cls->base_class));
+        }
+      }
+    } else {
+      // §8.26.2: Regular/virtual class cannot extend an interface class.
+      if (!cls->base_class.empty()) {
+        const auto* base = FindClassDecl(cls->base_class, unit_);
+        if (base && base->is_interface) {
+          diag_.Error(cls->range.start,
+                      std::format("class '{}' cannot extend interface class "
+                                  "'{}'; use 'implements' instead",
+                                  cls->name, cls->base_class));
+        }
+      }
+
+      // §8.26: Non-abstract class implementing interfaces must provide
+      // all pure virtual method implementations.
+      if (!cls->is_virtual && !cls->implements_types.empty()) {
+        for (auto iface_name : cls->implements_types) {
+          const auto* iface = FindClassDecl(iface_name, unit_);
+          if (!iface) continue;
+          for (const auto* im : iface->members) {
+            if (im->kind != ClassMemberKind::kMethod || !im->is_pure_virtual)
+              continue;
+            if (!im->method) continue;
+            // Check that the implementing class has a matching virtual method.
+            bool found = false;
+            // Check own members.
+            for (const auto* cm : cls->members) {
+              if (cm->kind == ClassMemberKind::kMethod && cm->method &&
+                  cm->method->name == im->method->name && cm->is_virtual) {
+                found = true;
+                break;
+              }
+            }
+            // Check inherited methods from base class chain.
+            if (!found && !cls->base_class.empty()) {
+              const auto* walk = FindClassDecl(cls->base_class, unit_);
+              while (walk && !found) {
+                for (const auto* bm : walk->members) {
+                  if (bm->kind == ClassMemberKind::kMethod && bm->method &&
+                      bm->method->name == im->method->name && bm->is_virtual &&
+                      !bm->is_pure_virtual) {
+                    found = true;
+                    break;
+                  }
+                }
+                walk = walk->base_class.empty()
+                           ? nullptr
+                           : FindClassDecl(walk->base_class, unit_);
+              }
+            }
+            if (!found) {
+              diag_.Error(
+                  cls->range.start,
+                  std::format("class '{}' does not implement pure virtual "
+                              "method '{}' from interface '{}'",
+                              cls->name, im->method->name, iface_name));
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 }  // namespace delta

@@ -31,6 +31,7 @@ struct ClassTypeInfo {
   const ClassTypeInfo* parent = nullptr;
   const ClassDecl* decl = nullptr;
   bool is_abstract = false;
+  bool is_interface = false;  // §8.26: interface class
 
   // Property metadata (name -> default init value).
   struct PropertyInfo {

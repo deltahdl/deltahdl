@@ -240,6 +240,9 @@ class Elaborator {
   /// §8.24: Validate out-of-block method declarations.
   void ValidateOutOfBlockDeclarations();
 
+  /// §8.26: Validate interface class rules.
+  void ValidateInterfaceClassRules();
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 

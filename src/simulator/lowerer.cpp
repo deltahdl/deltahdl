@@ -368,6 +368,7 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   info->name = cls->name;
   info->decl = cls;
   info->is_abstract = cls->is_virtual;
+  info->is_interface = cls->is_interface;
   // §8.13: Wire parent linkage from base_class.
   if (!cls->base_class.empty())
     info->parent = ctx_.FindClassType(cls->base_class);
