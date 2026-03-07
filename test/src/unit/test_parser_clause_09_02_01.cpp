@@ -1,6 +1,5 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
-#include "simulator/udp_eval.h"
 
 using namespace delta;
 namespace {
@@ -69,6 +68,58 @@ TEST(ParserSection9, InitialBlock) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+// §9.2.1: initial_construct ::= initial statement_or_null
+// The body can be a begin-end block with variable initialization.
+TEST(ParserClause09_02_01, InitialBeginEndWithInit) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 0;\n"
+      "    for (int index = 0; index < 4; index++)\n"
+      "      memory[index] = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+}
+
+// §9.2.1: initial with waveform stimulus using delays.
+TEST(ParserClause09_02_01, InitialWaveformStimulus) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    inputs = 'b000000;\n"
+      "    #10 inputs = 'b011001;\n"
+      "    #10 inputs = 'b011011;\n"
+      "    #10 inputs = 'b011000;\n"
+      "    #10 inputs = 'b001000;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  EXPECT_EQ(item->body->stmts.size(), 5u);
+}
+
+// §9.2.1: initial_construct accepts statement_or_null (null statement = ;).
+TEST(ParserClause09_02_01, InitialNullStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(item, nullptr);
 }
 
 }  // namespace
