@@ -889,6 +889,17 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
       diag_.Error(member->method->loc,
                   "class method shall not have static lifetime");
     }
+    // §8.7: Constructor shall not be declared static or virtual.
+    if (member->method->name == "new") {
+      if (member->is_static) {
+        diag_.Error(member->method->loc,
+                    "constructor shall not be declared static");
+      }
+      if (member->is_virtual) {
+        diag_.Error(member->method->loc,
+                    "constructor shall not be declared virtual");
+      }
+    }
     if (member->is_static) member->method->is_static = true;
     members.push_back(member);
     return true;

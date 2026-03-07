@@ -148,4 +148,108 @@ TEST(ParserSection8, ClassWithInitializer) {
   EXPECT_NE(cls->members[0]->init_expr, nullptr);
 }
 
+// §8.7: Constructor with local qualifier is legal.
+TEST(ParserA87, ConstructorLocalQualifierLegal) {
+  ParseOk(
+      "class C;\n"
+      "  local function new();\n"
+      "  endfunction\n"
+      "endclass\n");
+}
+
+// §8.7: Constructor with protected qualifier is legal.
+TEST(ParserA87, ConstructorProtectedQualifierLegal) {
+  ParseOk(
+      "class C;\n"
+      "  protected function new(int x);\n"
+      "  endfunction\n"
+      "endclass\n");
+}
+
+// §8.7: Constructor shall not be static.
+TEST(ParserA87, ConstructorStaticError) {
+  auto r = Parse(
+      "class C;\n"
+      "  static function new();\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §8.7: Constructor shall not be virtual.
+TEST(ParserA87, ConstructorVirtualError) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function new();\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §8.7: Constructor with default argument values.
+TEST(ParserA87, ConstructorDefaultArgs) {
+  auto r = Parse(
+      "class Packet;\n"
+      "  int command;\n"
+      "  int address;\n"
+      "  function new(int cmd = 0, bit [12:0] adrs = 0);\n"
+      "    command = cmd;\n"
+      "    address = adrs;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* cls = r.cu->classes[0];
+  auto* m = FindMethodMember(cls);
+  ASSERT_NE(m, nullptr);
+  EXPECT_EQ(m->method->name, "new");
+  ASSERT_GE(m->method->func_args.size(), 2u);
+  EXPECT_NE(m->method->func_args[0].default_value, nullptr);
+  EXPECT_NE(m->method->func_args[1].default_value, nullptr);
+}
+
+// §8.7: Class without explicit constructor (implicit new).
+TEST(ParserA87, ImplicitConstructor) {
+  auto r = Parse(
+      "class C;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "  initial c = new;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §8.7: Constructor with super.new() call.
+TEST(ParserA87, ConstructorSuperNewCall) {
+  ParseOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function new();\n"
+      "    super.new();\n"
+      "  endfunction\n"
+      "endclass\n");
+}
+
+// §8.7: Constructor with super.new(args) call.
+TEST(ParserA87, ConstructorSuperNewWithArgs) {
+  ParseOk(
+      "class Base;\n"
+      "  int x;\n"
+      "  function new(int val);\n"
+      "    x = val;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function new;\n"
+      "    super.new(42);\n"
+      "  endfunction\n"
+      "endclass\n");
+}
+
 }  // namespace
