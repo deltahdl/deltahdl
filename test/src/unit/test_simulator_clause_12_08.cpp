@@ -297,6 +297,53 @@ TEST(SimA608, NestedLoopInnerBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
+// §12.8: return with expression from non-void function.
+TEST(SimA605, JumpReturnWithValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function int double_val(int v);\n"
+      "    return v * 2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = double_val(21);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// §12.8: return early from non-void function.
+TEST(SimA605, JumpReturnEarlyFromFunction) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function int clamp(int v);\n"
+      "    if (v > 10) return 10;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = clamp(50);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
 TEST(SimA608, NestedLoopInnerContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
