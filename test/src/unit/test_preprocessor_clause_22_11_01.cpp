@@ -13,15 +13,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 
 namespace {
 
-TEST(Preprocessor, Pragma_WithExpressions_NoOutput) {
-  PreprocFixture f;
-  auto out = Preprocess("`pragma my_pragma key = val, 42\n", f);
-  auto trimmed = out;
-  trimmed.erase(0, trimmed.find_first_not_of(" \t\n\r"));
-  trimmed.erase(trimmed.find_last_not_of(" \t\n\r") + 1);
-  EXPECT_TRUE(trimmed.empty());
-}
-
 // --- §22.11: Surrounding code is preserved ---
 TEST(Preprocessor, Pragma_SurroundingCodePreserved) {
   PreprocFixture f;

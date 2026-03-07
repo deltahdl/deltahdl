@@ -87,4 +87,13 @@ TEST(Preprocessor, Pragma_NoOutput) {
   EXPECT_TRUE(trimmed.empty());
 }
 
+TEST(Preprocessor, Pragma_WithExpressions_NoOutput) {
+  PreprocFixture f;
+  auto out = Preprocess("`pragma my_pragma key = val, 42\n", f);
+  auto trimmed = out;
+  trimmed.erase(0, trimmed.find_first_not_of(" \t\n\r"));
+  trimmed.erase(trimmed.find_last_not_of(" \t\n\r") + 1);
+  EXPECT_TRUE(trimmed.empty());
+}
+
 }  // namespace
