@@ -219,6 +219,9 @@ class Elaborator {
   /// §8.11: 'this' shall only be used within non-static class methods.
   void ValidateThisUsage(const ModuleDecl* decl);
 
+  /// §8.13: A class declared :final shall not be extended.
+  void ValidateFinalClassExtension();
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 

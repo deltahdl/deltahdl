@@ -987,4 +987,20 @@ void Elaborator::ValidateThisUsage(const ModuleDecl* decl) {
   }
 }
 
+// §8.13: A class declared :final shall not be extended.
+void Elaborator::ValidateFinalClassExtension() {
+  auto check = [&](const ClassDecl* cls) {
+    if (cls->base_class.empty()) return;
+    // Look up the base class in CU-level classes.
+    const auto* base = FindClassDecl(cls->base_class, unit_);
+    if (base && base->is_final) {
+      diag_.Error(cls->range.start,
+                  "cannot extend a class declared ':final'");
+    }
+  };
+  for (const auto* cls : unit_->classes) {
+    check(cls);
+  }
+}
+
 }  // namespace delta

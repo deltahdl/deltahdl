@@ -76,4 +76,55 @@ TEST(ClassSim, MethodResolutionWalksChain) {
   EXPECT_EQ(resolved, m);
 }
 
+// §8.13: IsA checks inheritance chain.
+TEST(ClassSim, IsAReflexive) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "A", {});
+  EXPECT_TRUE(type->IsA(type));
+}
+
+TEST(ClassSim, IsADerived) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Base", {});
+  auto* derived = MakeClassType(f, "Derived", {});
+  derived->parent = base;
+
+  EXPECT_TRUE(derived->IsA(base));
+  EXPECT_FALSE(base->IsA(derived));
+}
+
+TEST(ClassSim, IsAMultiLevel) {
+  SimFixture f;
+  auto* a = MakeClassType(f, "A", {});
+  auto* b = MakeClassType(f, "B", {});
+  b->parent = a;
+  auto* c = MakeClassType(f, "C", {});
+  c->parent = b;
+
+  EXPECT_TRUE(c->IsA(a));
+  EXPECT_TRUE(c->IsA(b));
+  EXPECT_FALSE(a->IsA(c));
+}
+
+// §8.13: Derived method overrides base method in resolution.
+TEST(ClassSim, DerivedMethodOverridesBase) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Base", {});
+  auto* base_method = f.arena.Create<ModuleItem>();
+  base_method->kind = ModuleItemKind::kFunctionDecl;
+  base_method->name = "get";
+  base->methods["get"] = base_method;
+
+  auto* derived = MakeClassType(f, "Derived", {});
+  derived->parent = base;
+  auto* derived_method = f.arena.Create<ModuleItem>();
+  derived_method->kind = ModuleItemKind::kFunctionDecl;
+  derived_method->name = "get";
+  derived->methods["get"] = derived_method;
+
+  auto [handle, obj] = MakeObj(f, derived);
+  auto* resolved = obj->ResolveMethod("get");
+  EXPECT_EQ(resolved, derived_method);
+}
+
 }  // namespace

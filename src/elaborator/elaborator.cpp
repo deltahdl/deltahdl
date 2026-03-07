@@ -125,6 +125,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateNameSpaces();
   // §3.12.1: Register CU-scope typedefs and classes before module elaboration.
   RegisterCuScopeItems();
+  // §8.13: Check that no class extends a :final class.
+  ValidateFinalClassExtension();
 
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {
