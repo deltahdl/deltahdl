@@ -49,4 +49,11 @@ ModuleItem* ClassObject::ResolveMethod(std::string_view name) const {
   return nullptr;
 }
 
+ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
+  auto* copy = arena.Create<ClassObject>();
+  copy->type = type;
+  copy->properties = properties;
+  return copy;
+}
+
 }  // namespace delta

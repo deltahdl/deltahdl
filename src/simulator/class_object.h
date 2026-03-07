@@ -72,6 +72,9 @@ struct ClassObject {
 
   // Resolve a non-virtual method (walk type chain).
   ModuleItem* ResolveMethod(std::string_view name) const;
+
+  // §8.12: Create a shallow copy — new object, same type, properties copied.
+  ClassObject* ShallowCopy(Arena& arena) const;
 };
 
 // Sentinel value: null class handle is encoded as handle_id == 0.
