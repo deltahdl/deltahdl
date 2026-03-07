@@ -126,10 +126,15 @@ def test_format_prompt_no_supplementary_param(isc):
     assert "supplementary" not in sig.parameters
 
 
-def test_format_prompt_mentions_general_overview(isc):
-    """Prompt instructs Claude to read General/Overview sections."""
+def test_format_prompt_mentions_general(isc):
+    """Prompt instructs Claude to read General sections."""
     result = isc.format_prompt("4.4.3", "~/LRM.txt", issue=6)
     assert "General" in result
+
+
+def test_format_prompt_mentions_overview(isc):
+    """Prompt instructs Claude to read Overview sections."""
+    result = isc.format_prompt("4.4.3", "~/LRM.txt", issue=6)
     assert "Overview" in result
 
 
@@ -213,7 +218,7 @@ def test_run_prompt_calls_invoke(mock_invoke, isc, tmp_path):
 
 @patch("implement_subclause.invoke_claude")
 def test_run_prompt_does_not_load_titles(mock_invoke, isc, tmp_path):
-    """run_prompt does not call load_lrm_titles."""
+    """run_prompt passes only positional args (subclause, lrm_path)."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     build_fn = MagicMock(return_value="generated prompt")
@@ -222,11 +227,21 @@ def test_run_prompt_does_not_load_titles(mock_invoke, isc, tmp_path):
         model="sonnet", continue_session=False,
     )
     isc.run_prompt(build_fn, args)
-    # build_fn should be called with (subclause, lrm_str, issue=N)
-    # NOT with a titles dict
-    call_args = build_fn.call_args
-    assert len(call_args[0]) == 2  # subclause, lrm_path
-    assert call_args[0][0] == "4.1"
+    assert len(build_fn.call_args[0]) == 2  # subclause, lrm_path
+
+
+@patch("implement_subclause.invoke_claude")
+def test_run_prompt_passes_subclause(mock_invoke, isc, tmp_path):
+    """run_prompt passes the subclause as the first positional arg."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    build_fn = MagicMock(return_value="generated prompt")
+    args = argparse.Namespace(
+        lrm=lrm, subclause="4.1", issue=6,
+        model="sonnet", continue_session=False,
+    )
+    isc.run_prompt(build_fn, args)
+    assert build_fn.call_args[0][0] == "4.1"
 
 
 @patch("implement_subclause.invoke_claude")
