@@ -552,6 +552,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     ValidatePackedUnion(item->data_type, item->loc);
   }
   ValidatePackedDimOnPredefinedType(item->data_type, item->loc);
+  ValidateAssocIndexType(item);
 }
 
 // §6.20.5: Elaborate a specparam as a simulation-accessible constant variable.

@@ -760,4 +760,17 @@ void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
   }
 }
 
+// §7.8.5: real/shortreal shall be an illegal associative array index type.
+void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
+  if (item->unpacked_dims.empty()) return;
+  auto* dim = item->unpacked_dims[0];
+  if (!dim || dim->kind != ExprKind::kIdentifier) return;
+  auto t = dim->text;
+  if (t == "real" || t == "shortreal" || t == "realtime") {
+    diag_.Error(item->loc,
+                "real or shortreal type shall not be used as an "
+                "associative array index type");
+  }
+}
+
 }  // namespace delta

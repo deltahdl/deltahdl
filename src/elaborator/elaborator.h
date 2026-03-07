@@ -154,6 +154,9 @@ class Elaborator {
   /// §7.6: Array assignment compatibility checks.
   void ValidateArrayAssignments(const ModuleDecl* decl);
 
+  /// §7.8.5: real/shortreal as associative array index type is illegal.
+  void ValidateAssocIndexType(const ModuleItem* item);
+
   /// Validate a single enum member literal (§6.19).
   bool ValidateEnumLiteral(const EnumMember& member, uint32_t base_width,
                            bool is_2state);
