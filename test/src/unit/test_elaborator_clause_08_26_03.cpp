@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -13,16 +15,6 @@ TEST(ElabA8263, TypesInheritedByExtendingInterfaceOk) {
       "endclass\n"
       "interface class IntfB extends IntfA;\n"
       "  pure virtual function void funcB();\n"
-      "endclass\n"
-      "module m;\n"
-      "endmodule\n"));
-}
-
-// §8.26.3: Interface class with parameter — OK.
-TEST(ElabA8263, InterfaceClassWithParamOk) {
-  EXPECT_TRUE(ElabOk(
-      "interface class IC;\n"
-      "  pure virtual function void foo();\n"
       "endclass\n"
       "module m;\n"
       "endmodule\n"));

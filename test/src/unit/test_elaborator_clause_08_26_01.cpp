@@ -58,4 +58,14 @@ TEST(ElabA8261, InterfaceClassMultiplePureVirtualsOk) {
       "endmodule\n"));
 }
 
+// §8.26.3: Interface class with parameter — OK.
+TEST(ElabA8263, InterfaceClassWithParamOk) {
+  EXPECT_TRUE(ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n"));
+}
+
 }  // namespace
