@@ -38,7 +38,7 @@ def _parse_args() -> argparse.Namespace:
         help="Comma-separated list of sub-issue numbers",
     )
     parser.add_argument(
-        "--issue", type=int, required=True,
+        "--issue", type=int, default=None,
         help="Master GitHub issue number to update",
     )
     add_output_args(parser)
@@ -138,7 +138,7 @@ def _run(args: argparse.Namespace) -> None:
         run_classify_file(
             args, file_path, i, total, sub_issue=sub_issue,
         )
-        if not Path(file_path).exists():
+        if args.issue is not None and not Path(file_path).exists():
             remove_file_checkbox(
                 args.organization, args.repo,
                 args.issue, Path(file_path).name,

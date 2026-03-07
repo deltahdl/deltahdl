@@ -84,12 +84,11 @@ def test_parse_args_issue(monkeypatch):
     assert _parse_args().issue == 61
 
 
-def test_parse_args_issue_required(monkeypatch):
-    """Rejects missing --issue."""
+def test_parse_args_issue_optional(monkeypatch):
+    """--issue defaults to None when omitted."""
     argv = [a for a in _BASE_ARGV if a not in ("--issue", "61")]
     monkeypatch.setattr(sys, "argv", argv)
-    with pytest.raises(SystemExit):
-        _parse_args()
+    assert _parse_args().issue is None
 
 
 def test_parse_args_lrm(monkeypatch):
@@ -423,6 +422,14 @@ def test_run_splits_comma_separated_files(monkeypatch):
     _run(_make_args(files="x.cpp,y.cpp"))
     files = [c[c.index("--file") + 1] for c in captured]
     assert files == ["x.cpp", "y.cpp"]
+
+
+def test_run_skips_checkbox_when_no_issue(monkeypatch):
+    """Does not remove checkbox when --issue is omitted."""
+    stub_subprocess_success(monkeypatch)
+    removed = stub_remove_file_checkbox(monkeypatch)
+    _run(_make_args(issue=None, files="a.cpp,b.cpp"))
+    assert not removed
 
 
 def test_run_prints_done(monkeypatch, capsys):
