@@ -462,6 +462,159 @@ void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
   }
 }
 
+// §13.5: Check if an expression is a valid LHS for output/inout args.
+static bool IsValidOutputArg(const Expr* e) {
+  if (!e) return false;
+  return e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kSelect ||
+         e->kind == ExprKind::kMemberAccess;
+}
+
+// §13.5: Validate a single call expression against its declaration.
+static void CheckCallArgs(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty()) return;
+  auto it = func_decls.find(expr->callee);
+  if (it == func_decls.end()) return;
+  const auto* func = it->second;
+  size_t param_count = func->func_args.size();
+  size_t positional_count = expr->args.size() - expr->arg_names.size();
+  // §13.5: Too many positional args.
+  if (positional_count > param_count) {
+    diag.Error(expr->range.start,
+               std::format("too many arguments to '{}': expected {}, got {}",
+                           func->name, param_count, positional_count));
+    return;
+  }
+  // §13.5.3: Check that required args (no default) are provided.
+  for (size_t i = 0; i < param_count; ++i) {
+    bool provided = false;
+    if (expr->arg_names.empty()) {
+      provided = (i < expr->args.size());
+    } else {
+      if (i < positional_count) {
+        provided = true;
+      } else {
+        for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+          if (expr->arg_names[j] == func->func_args[i].name) {
+            provided = true;
+            break;
+          }
+        }
+      }
+    }
+    if (!provided && !func->func_args[i].default_value) {
+      diag.Error(expr->range.start,
+                 std::format("missing argument '{}' in call to '{}'",
+                             func->func_args[i].name, func->name));
+    }
+  }
+  // §13.5.4: Check that named args reference valid parameter names.
+  for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+    bool found = false;
+    for (size_t i = 0; i < param_count; ++i) {
+      if (func->func_args[i].name == expr->arg_names[j]) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      diag.Error(expr->range.start,
+                 std::format("no parameter '{}' in '{}'", expr->arg_names[j],
+                             func->name));
+    }
+  }
+  // §13.5: Check output/inout args are valid LHS.
+  for (size_t i = 0; i < param_count; ++i) {
+    auto dir = func->func_args[i].direction;
+    if (dir != Direction::kOutput && dir != Direction::kInout) continue;
+    // Find corresponding call-site arg.
+    int ai = -1;
+    if (expr->arg_names.empty()) {
+      ai = (i < expr->args.size()) ? static_cast<int>(i) : -1;
+    } else {
+      if (i < positional_count) {
+        ai = static_cast<int>(i);
+      } else {
+        for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+          if (expr->arg_names[j] == func->func_args[i].name) {
+            ai = static_cast<int>(positional_count + j);
+            break;
+          }
+        }
+      }
+    }
+    if (ai < 0) continue;
+    auto* arg = expr->args[static_cast<size_t>(ai)];
+    if (arg && !IsValidOutputArg(arg)) {
+      diag.Error(arg->range.start,
+                 std::format("{} argument '{}' requires a variable",
+                             dir == Direction::kOutput ? "output" : "inout",
+                             func->func_args[i].name));
+    }
+  }
+}
+
+// §13.5: Walk expression tree for call validation.
+static void WalkExprForCallArgs(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  if (!expr) return;
+  CheckCallArgs(expr, func_decls, diag);
+  WalkExprForCallArgs(expr->lhs, func_decls, diag);
+  WalkExprForCallArgs(expr->rhs, func_decls, diag);
+  WalkExprForCallArgs(expr->condition, func_decls, diag);
+  WalkExprForCallArgs(expr->true_expr, func_decls, diag);
+  WalkExprForCallArgs(expr->false_expr, func_decls, diag);
+  for (auto* a : expr->args) WalkExprForCallArgs(a, func_decls, diag);
+  for (auto* e : expr->elements) WalkExprForCallArgs(e, func_decls, diag);
+}
+
+// §13.5: Walk statement tree for call validation.
+static void WalkStmtForCallArgs(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  if (!s) return;
+  WalkExprForCallArgs(s->expr, func_decls, diag);
+  WalkExprForCallArgs(s->lhs, func_decls, diag);
+  WalkExprForCallArgs(s->rhs, func_decls, diag);
+  WalkExprForCallArgs(s->condition, func_decls, diag);
+  for (auto* sub : s->stmts) WalkStmtForCallArgs(sub, func_decls, diag);
+  WalkStmtForCallArgs(s->then_branch, func_decls, diag);
+  WalkStmtForCallArgs(s->else_branch, func_decls, diag);
+  WalkStmtForCallArgs(s->body, func_decls, diag);
+  WalkStmtForCallArgs(s->for_init, func_decls, diag);
+  WalkStmtForCallArgs(s->for_body, func_decls, diag);
+  WalkExprForCallArgs(s->for_cond, func_decls, diag);
+  for (auto& ci : s->case_items) WalkStmtForCallArgs(ci.body, func_decls, diag);
+}
+
+void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
+  // Build combined map of tasks and functions.
+  std::unordered_map<std::string_view, const ModuleItem*> all_decls =
+      func_decls_;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
+  }
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kFinalBlock) {
+      WalkStmtForCallArgs(item->body, all_decls, diag_);
+    }
+    // Also check function/task bodies.
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      for (auto* s : item->func_body_stmts) {
+        WalkStmtForCallArgs(s, all_decls, diag_);
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item);
@@ -475,6 +628,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateAggregateComparisons(decl);
   ValidateRealOperatorRestrictions(decl);
   ValidateAssignInExprRestrictions(decl);
+  ValidateSubroutineCallArgs(decl);
   ValidateLocalProtectedAccess(decl);
   ValidateStaticMethodBodies(decl);
   ValidateThisUsage(decl);

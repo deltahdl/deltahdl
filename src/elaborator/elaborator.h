@@ -186,6 +186,8 @@ class Elaborator {
   void ValidateFunctionBody(const ModuleItem* item);
   /// §13.4.3: Validate constant function calls in parameter expressions.
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
+  /// §13.5: Validate subroutine call arguments.
+  void ValidateSubroutineCallArgs(const ModuleDecl* decl);
 
   /// Track enum type info for a variable declaration.
   void TrackEnumVariable(const ModuleItem* item);
