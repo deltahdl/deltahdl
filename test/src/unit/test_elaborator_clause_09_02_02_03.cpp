@@ -1,3 +1,4 @@
+#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -5,6 +6,138 @@
 using namespace delta;
 
 namespace {
+
+// §9.2.2.3: always_latch with timing control produces an error.
+TEST(ElabClause09_02_02_03, TimingControlInAlwaysLatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch #5 if (en) q = d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.3: always_latch with fork-join produces an error.
+TEST(ElabClause09_02_02_03, ForkJoinInAlwaysLatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, b, q;\n"
+      "  always_latch begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.3: always_latch with incomplete if (no else) does not warn.
+TEST(ElabClause09_02_02_03, IncompleteIfNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §9.2.2.3: always_latch with complete if/else warns (not latched).
+TEST(ElabClause09_02_02_03, CompleteIfElseWarnsNotLatched) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, b, q;\n"
+      "  always_latch\n"
+      "    if (en) q = a;\n"
+      "    else q = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+// §9.2.2.3: always_latch with case without default does not warn.
+TEST(ElabClause09_02_02_03, CaseWithoutDefaultNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic q;\n"
+      "  always_latch\n"
+      "    case (sel)\n"
+      "      2'b00: q = 0;\n"
+      "      2'b01: q = 1;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §9.2.2.3: always_latch with case + default warns (not latched).
+TEST(ElabClause09_02_02_03, CaseWithDefaultWarnsNotLatched) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic q;\n"
+      "  always_latch\n"
+      "    case (sel)\n"
+      "      2'b00: q = 0;\n"
+      "      2'b01: q = 1;\n"
+      "      default: q = 0;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+// §9.2.2.3: always_latch elaborates to kAlwaysLatch process kind.
+TEST(ElabClause09_02_02_03, AlwaysLatchElaboratesToCorrectKind) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch\n"
+      "    if (en) q = d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  bool found = false;
+  for (auto& p : design->top_modules[0]->processes) {
+    if (p.kind == RtlirProcessKind::kAlwaysLatch) found = true;
+  }
+  EXPECT_TRUE(found);
+}
+
+// §9.2.2.3: Multi-driver: same variable in two always_latch blocks.
+TEST(ElabClause09_02_02_03, MultiDriverTwoAlwaysLatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, b, q;\n"
+      "  always_latch if (en) q = a;\n"
+      "  always_latch if (en) q = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
 
 TEST(SimCh9c, ExecutesAtTimeZero) {
   SimFixture f;

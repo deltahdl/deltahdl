@@ -448,6 +448,12 @@ static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
                  "always_comb may infer latched behavior; "
                  "ensure all paths assign all outputs");
   }
+  // §9.2.2.3: Warn if always_latch does not infer latched behavior.
+  if (kind == RtlirProcessKind::kAlwaysLatch && !MayInferLatch(proc.body)) {
+    diag.Warning(item->loc,
+                 "always_latch does not infer latched behavior; "
+                 "ensure incomplete assignments create intended latches");
+  }
   // §5.12: Resolve attributes.
   proc.attrs = ResolveAttributes(item->attrs, diag);
   mod->processes.push_back(proc);
