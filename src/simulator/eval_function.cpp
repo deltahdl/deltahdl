@@ -644,6 +644,34 @@ static void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
   }
 }
 
+// §8.23: Dispatch a non-parameterized class scope call — Class::method(args).
+static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out) {
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
+  auto* access = expr->lhs;
+  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return false;
+  // Skip parameterized forms — handled by TryEvalParameterizedScopeCall.
+  if (!access->lhs->elements.empty()) return false;
+  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
+
+  auto* cls = ctx.FindClassType(access->lhs->text);
+  if (!cls) return false;
+  auto it = cls->methods.find(std::string(access->rhs->text));
+  if (it == cls->methods.end()) return false;
+  auto* method = it->second;
+  bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
+
+  ctx.PushScope();
+  BindFunctionArgs(method, expr, ctx, arena);
+  Variable dummy_ret;
+  Variable* ret_var = &dummy_ret;
+  if (!is_void) ret_var = ctx.CreateLocalVariable(method->name, 32);
+  ExecFunctionBody(method, ret_var, ctx, arena);
+  out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+  ctx.PopScope();
+  return true;
+}
+
 // §13.8: Dispatch a parameterized class scope call — C#(N)::method(args).
 static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
                                           Arena& arena, Logic4Vec& out) {
@@ -723,6 +751,7 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalClassScopeCall(expr, ctx, arena, out)) return true;
   if (TryEvalParameterizedScopeCall(expr, ctx, arena, out)) return true;
   auto* let_decl = ctx.FindLetDecl(expr->callee);
   if (let_decl) {

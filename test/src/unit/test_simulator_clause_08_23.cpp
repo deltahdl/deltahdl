@@ -1,13 +1,12 @@
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
-#include "parser/ast.h"
 #include "simulator/class_object.h"
-#include "simulator/eval.h"
 
 using namespace delta;
 
 namespace {
 
+// §8.23: Static property lookup via class scope resolution.
 TEST(ClassSim, ScopeResolutionStaticLookup) {
   SimFixture f;
   auto* type = MakeClassType(f, "MyClass", {});
@@ -18,6 +17,7 @@ TEST(ClassSim, ScopeResolutionStaticLookup) {
   EXPECT_EQ(it->second.ToUint64(), 256u);
 }
 
+// §8.23: Static method lookup via class scope resolution.
 TEST(ClassSim, ScopeResolutionMethodLookup) {
   SimFixture f;
   auto* type = MakeClassType(f, "Utils", {});
@@ -32,6 +32,54 @@ TEST(ClassSim, ScopeResolutionMethodLookup) {
   auto it = found->methods.find("compute");
   ASSERT_NE(it, found->methods.end());
   EXPECT_EQ(it->second->name, "compute");
+}
+
+// §8.23: Multiple static properties on one class type.
+TEST(ClassSim, ScopeResolutionMultipleStaticProps) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "Config", {});
+  type->static_properties["WIDTH"] = MakeLogic4VecVal(f.arena, 32, 8);
+  type->static_properties["DEPTH"] = MakeLogic4VecVal(f.arena, 32, 16);
+
+  EXPECT_EQ(type->static_properties["WIDTH"].ToUint64(), 8u);
+  EXPECT_EQ(type->static_properties["DEPTH"].ToUint64(), 16u);
+}
+
+// §8.23: Accessing non-existent static property returns no entry.
+TEST(ClassSim, ScopeResolutionMissingProperty) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "Empty", {});
+  auto it = type->static_properties.find("nonexistent");
+  EXPECT_EQ(it, type->static_properties.end());
+}
+
+// §8.23: Class scope resolution disambiguates — class member vs local var.
+TEST(ClassSim, ScopeResolutionDisambiguates) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "Base", {});
+  type->static_properties["bin"] = MakeLogic4VecVal(f.arena, 32, 42);
+
+  auto* local = f.ctx.CreateLocalVariable("bin", 32);
+  local->value = MakeLogic4VecVal(f.arena, 32, 123);
+
+  auto it = type->static_properties.find("bin");
+  ASSERT_NE(it, type->static_properties.end());
+  EXPECT_EQ(it->second.ToUint64(), 42u);
+  EXPECT_EQ(local->value.ToUint64(), 123u);
+}
+
+// §8.23: Derived class can access base class static property via ::
+TEST(ClassSim, ScopeResolutionBaseClassStatic) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Base", {});
+  base->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 7);
+
+  auto* derived = MakeClassType(f, "Derived", {});
+  derived->parent = base;
+
+  auto* found = f.ctx.FindClassType("Base");
+  ASSERT_NE(found, nullptr);
+  EXPECT_EQ(found->static_properties["count"].ToUint64(), 7u);
 }
 
 }  // namespace

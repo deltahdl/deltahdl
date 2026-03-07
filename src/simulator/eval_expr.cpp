@@ -214,6 +214,12 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec coll_result;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, coll_result))
     return coll_result;
+  // §8.23: Class scope resolution — ClassName::static_member.
+  auto* cls_type = ctx.FindClassType(base_name);
+  if (cls_type) {
+    auto it = cls_type->static_properties.find(std::string(field_name));
+    if (it != cls_type->static_properties.end()) return it->second;
+  }
   return MakeLogic4Vec(arena, 1);
 }
 
