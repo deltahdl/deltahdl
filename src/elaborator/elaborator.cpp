@@ -382,6 +382,7 @@ static bool StmtHasTimingControl(const Stmt* stmt) {
     case StmtKind::kDelay:
     case StmtKind::kEventControl:
     case StmtKind::kWait:
+    case StmtKind::kWaitFork:
       return true;
     case StmtKind::kBlock:
       for (const auto* s : stmt->stmts)
