@@ -654,4 +654,48 @@ TEST(ParserSection4, Sec4_9_3_StaticVarInAutoFunc) {
   EXPECT_NE(var_stmt->var_init, nullptr);
 }
 
+// §6.21: Variable in unnamed block visible to nested blocks.
+TEST(ParserSection6, VarInUnnamedBlockVisibleToNested) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    int x = 5;\n"
+      "    begin\n"
+      "      x = x + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.21: CU-scope function has static lifetime by default.
+TEST(ParserSection6, CuScopeFuncStaticDefault) {
+  auto r = Parse(
+      "function int global_fn(int x);\n"
+      "  return x + 1;\n"
+      "endfunction\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_FALSE(r.cu->cu_items[0]->is_automatic);
+}
+
+// §6.21: Task with automatic lifetime.
+TEST(ParserSection6, TaskAutomaticLifetime) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic my_task(input int x);\n"
+      "    $display(\"%0d\", x);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+}
+
 }  // namespace
