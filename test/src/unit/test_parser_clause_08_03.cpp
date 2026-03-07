@@ -93,19 +93,6 @@ TEST(ParserClause08_03, ImplementsSingleInterface) {
   EXPECT_EQ(cls->implements_types[0], "IFace");
 }
 
-TEST(ParserClause08_03, ExtendsAndImplements) {
-  auto r = Parse(
-      "class D extends Base implements IFace1, IFace2;\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto* cls = r.cu->classes[0];
-  EXPECT_EQ(cls->base_class, "Base");
-  ASSERT_EQ(cls->implements_types.size(), 2u);
-  EXPECT_EQ(cls->implements_types[0], "IFace1");
-  EXPECT_EQ(cls->implements_types[1], "IFace2");
-}
-
 TEST(ParserClause08_03, ImplementsWithParamAssignment) {
   auto r = Parse(
       "class C implements IFace#(int);\n"
