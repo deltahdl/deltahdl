@@ -39,4 +39,21 @@ TEST(TypeEval, NonIntegralTypes) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kEvent));
 }
 
+// §6.11.1: Built-in type widths per Table 6-8.
+TEST(TypeEval, IntegerTypeWidths) {
+  DataType dt;
+  dt.kind = DataTypeKind::kByte;
+  EXPECT_EQ(EvalTypeWidth(dt), 8u);
+  dt.kind = DataTypeKind::kShortint;
+  EXPECT_EQ(EvalTypeWidth(dt), 16u);
+  dt.kind = DataTypeKind::kInt;
+  EXPECT_EQ(EvalTypeWidth(dt), 32u);
+  dt.kind = DataTypeKind::kLongint;
+  EXPECT_EQ(EvalTypeWidth(dt), 64u);
+  dt.kind = DataTypeKind::kInteger;
+  EXPECT_EQ(EvalTypeWidth(dt), 32u);
+  dt.kind = DataTypeKind::kTime;
+  EXPECT_EQ(EvalTypeWidth(dt), 64u);
+}
+
 }  // namespace
