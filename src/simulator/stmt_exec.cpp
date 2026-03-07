@@ -765,6 +765,17 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
+// §10.4.1: Blocking assignment with intra-assignment delay.
+// Evaluates RHS before the delay, then assigns after the delay.
+static ExecTask ExecBlockingAssignTimed(const Stmt* stmt, SimContext& ctx,
+                                        Arena& arena) {
+  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  auto delay_val = EvalExpr(stmt->delay, ctx, arena);
+  co_await DelayAwaiter{ctx, delay_val.ToUint64()};
+  PerformBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
+  co_return StmtResult::kDone;
+}
+
 // --- Main dispatch ---
 
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -792,6 +803,8 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kDoWhile:
       return ExecDoWhile(stmt, ctx, arena);
     case StmtKind::kBlockingAssign:
+      if (stmt->delay)
+        return ExecBlockingAssignTimed(stmt, ctx, arena);
       return ExecTask::Immediate(ExecBlockingAssignImpl(stmt, ctx, arena));
     case StmtKind::kNonblockingAssign:
       return ExecTask::Immediate(ExecNonblockingAssignImpl(stmt, ctx, arena));

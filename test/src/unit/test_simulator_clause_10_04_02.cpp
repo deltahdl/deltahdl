@@ -25,6 +25,78 @@ TEST(SimA85, VarLvalueNonblocking) {
   EXPECT_EQ(var->value.ToUint64(), 0x99u);
 }
 
+// §10.4.2: NBA with intra-assignment delay schedules at current_time + delay.
+TEST(SimA85, NbaIntraAssignDelay) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    b = 8'd42;\n"
+      "    a <= #5 b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// §10.4.2: NBA with intra-assignment delay does not block procedural flow.
+TEST(SimA85, NbaIntraAssignDelayNonBlocking) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    b = 8'd10;\n"
+      "    a <= #5 b;\n"
+      "    c = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("a");
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(c, nullptr);
+  // a gets NBA-scheduled value; c gets immediate blocking value.
+  EXPECT_EQ(a->value.ToUint64(), 10u);
+  EXPECT_EQ(c->value.ToUint64(), 99u);
+}
+
+// §10.4.2: NBA intra-assignment delay captures RHS at evaluation time.
+TEST(SimA85, NbaIntraAssignDelayCapturesRHS) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    b = 8'd10;\n"
+      "    a <= #5 b;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #2 b = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("a");
+  ASSERT_NE(a, nullptr);
+  // a should get the value of b at time 0 (10), not time 2 (99).
+  EXPECT_EQ(a->value.ToUint64(), 10u);
+}
+
 TEST(StmtExec, NonblockingAssignBitSelect) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("nb", 8);
