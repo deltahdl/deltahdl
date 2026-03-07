@@ -20,4 +20,11 @@ TEST(Preprocessor, Pragma_MissingName_OnlyWhitespace_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// --- §22.11: `pragma with pragma_name (no expressions) ---
+TEST(Preprocessor, Pragma_SimpleName_NoError) {
+  PreprocFixture f;
+  Preprocess("`pragma my_pragma\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
