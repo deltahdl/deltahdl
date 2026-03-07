@@ -215,7 +215,7 @@ static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto cond = EvalExpr(stmt->condition, ctx, arena);
-  bool taken = cond.ToUint64() != 0;
+  bool taken = cond.IsTruthy();
 
   if (taken) {
     co_return co_await ExecStmt(stmt->then_branch, ctx, arena);

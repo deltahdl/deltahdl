@@ -231,6 +231,99 @@ TEST(SimA606, SequentialIfStatements) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
+// §12.4: if condition with z value is treated as false.
+TEST(SimA606, IfConditionZIsFalse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic cond;\n"
+      "  initial begin\n"
+      "    cond = 1'bz;\n"
+      "    x = 8'd10;\n"
+      "    if (cond) x = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);  // z is false, x unchanged
+}
+
+// §12.4: if condition with x value is treated as false.
+TEST(SimA606, IfConditionXIsFalse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic cond;\n"
+      "  initial begin\n"
+      "    cond = 1'bx;\n"
+      "    x = 8'd10;\n"
+      "    if (cond) x = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);  // x is false, x unchanged
+}
+
+// §12.4: if condition with z takes else branch.
+TEST(SimA606, IfConditionZTakesElse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic cond;\n"
+      "  initial begin\n"
+      "    cond = 1'bz;\n"
+      "    if (cond) x = 8'd42;\n"
+      "    else x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);  // z is false, takes else
+}
+
+// §12.4: multi-bit value with some known-1 bits is still true.
+TEST(SimA606, IfConditionPartiallyKnownNonzeroIsTrue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic [1:0] cond;\n"
+      "  initial begin\n"
+      "    cond = 2'b1z;\n"
+      "    if (cond) x = 8'd42;\n"
+      "    else x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // Bit 1 is known 1, so value is definitely nonzero → true
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
 bool EvaluateWaitCondition(uint64_t value) { return value != 0; }
 
 TEST(TimingControl, WaitConditionNonzeroIsTrue) {

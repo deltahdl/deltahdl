@@ -37,6 +37,7 @@ struct Logic4Vec {
   bool is_string = false;  // True when value holds a string (§6.16).
 
   bool IsKnown() const;
+  bool IsTruthy() const;
   uint64_t ToUint64() const;
   std::string ToString() const;
 };

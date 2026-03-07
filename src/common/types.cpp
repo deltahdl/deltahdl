@@ -48,6 +48,15 @@ bool Logic4Vec::IsKnown() const {
   return true;
 }
 
+bool Logic4Vec::IsTruthy() const {
+  for (uint32_t i = 0; i < nwords; ++i) {
+    if (words[i].aval & ~words[i].bval) {
+      return true;
+    }
+  }
+  return false;
+}
+
 uint64_t Logic4Vec::ToUint64() const {
   if (nwords == 0) {
     return 0;

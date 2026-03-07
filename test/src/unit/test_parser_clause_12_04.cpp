@@ -409,4 +409,38 @@ TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
+// §12.4 Syntax 12-2: cond_predicate with &&& operator.
+TEST(ParserA606, CondPredicateTripleAnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a &&& b) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
+  EXPECT_EQ(stmt->condition->op, TokenKind::kAmpAmpAmp);
+}
+
+// §12.4 Syntax 12-2: chained &&& in cond_predicate.
+TEST(ParserA606, CondPredicateChainedTripleAnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (a &&& b &&& c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->condition, nullptr);
+}
+
 }  // namespace
