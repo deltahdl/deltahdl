@@ -581,6 +581,87 @@ void Elaborator::ValidatePackedStructDefaults(const DataType& dtype,
   }
 }
 
+// §7.2.2: Members of unpacked structures containing a union shall not be
+// assigned individual default member values.
+void Elaborator::ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
+                                                         SourceLoc loc) {
+  if (dtype.kind != DataTypeKind::kStruct || dtype.is_packed) return;
+  bool has_union_member = false;
+  for (const auto& m : dtype.struct_members) {
+    if (m.type_kind == DataTypeKind::kUnion) has_union_member = true;
+  }
+  if (!has_union_member) return;
+  for (const auto& m : dtype.struct_members) {
+    if (m.init_expr) {
+      diag_.Error(loc,
+                  "members of unpacked structures containing a union shall "
+                  "not be assigned individual default member values");
+      return;
+    }
+  }
+}
+
+// §7.2, footnote 20: void struct_union_member only within tagged unions.
+void Elaborator::ValidateVoidMembers(const DataType& dtype, SourceLoc loc) {
+  bool allow_void = (dtype.kind == DataTypeKind::kUnion && dtype.is_tagged);
+  for (const auto& m : dtype.struct_members) {
+    if (m.type_kind == DataTypeKind::kVoid && !allow_void) {
+      diag_.Error(loc, "void member is only allowed in tagged unions");
+      return;
+    }
+  }
+}
+
+// §7.2, footnote 20: random_qualifier only within unpacked structures.
+void Elaborator::ValidateRandQualifiers(const DataType& dtype, SourceLoc loc) {
+  bool allow_rand =
+      (dtype.kind == DataTypeKind::kStruct && !dtype.is_packed);
+  for (const auto& m : dtype.struct_members) {
+    if ((m.is_rand || m.is_randc) && !allow_rand) {
+      diag_.Error(loc,
+                  "random qualifier is only allowed in unpacked structures");
+      return;
+    }
+  }
+}
+
+// §7.2.1: Only packed data types and integer data types shall be legal in
+// packed structures.
+static bool IsLegalPackedMemberType(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kBit:
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+    case DataTypeKind::kEnum:
+    case DataTypeKind::kStruct:
+    case DataTypeKind::kUnion:
+    case DataTypeKind::kNamed:
+    case DataTypeKind::kImplicit:
+      return true;
+    default:
+      return false;
+  }
+}
+
+void Elaborator::ValidatePackedStructMemberTypes(const DataType& dtype,
+                                                  SourceLoc loc) {
+  if (dtype.kind != DataTypeKind::kStruct || !dtype.is_packed) return;
+  for (const auto& m : dtype.struct_members) {
+    if (!IsLegalPackedMemberType(m.type_kind)) {
+      diag_.Error(loc,
+                  std::format("type of member '{}' is not allowed in a "
+                              "packed structure",
+                              m.name));
+    }
+  }
+}
+
 // §7.3.1: Validate packed union member constraints.
 void Elaborator::ValidatePackedUnion(const DataType& dtype, SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kUnion) return;

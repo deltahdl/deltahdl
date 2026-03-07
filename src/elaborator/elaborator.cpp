@@ -536,10 +536,13 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->data_type.kind == DataTypeKind::kEnum) {
     ValidateEnumDecl(item->data_type, item->loc);
   }
-  if (item->data_type.kind == DataTypeKind::kStruct) {
+  if (item->data_type.kind == DataTypeKind::kStruct ||
+      item->data_type.kind == DataTypeKind::kUnion) {
     ValidatePackedStructDefaults(item->data_type, item->loc);
-  }
-  if (item->data_type.kind == DataTypeKind::kUnion) {
+    ValidateUnpackedStructWithUnionDefaults(item->data_type, item->loc);
+    ValidateVoidMembers(item->data_type, item->loc);
+    ValidateRandQualifiers(item->data_type, item->loc);
+    ValidatePackedStructMemberTypes(item->data_type, item->loc);
     ValidatePackedUnion(item->data_type, item->loc);
   }
 }
@@ -729,10 +732,13 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   typedefs_[item->name] = item->typedef_type;
-  if (item->typedef_type.kind == DataTypeKind::kStruct) {
+  if (item->typedef_type.kind == DataTypeKind::kStruct ||
+      item->typedef_type.kind == DataTypeKind::kUnion) {
     ValidatePackedStructDefaults(item->typedef_type, item->loc);
-  }
-  if (item->typedef_type.kind == DataTypeKind::kUnion) {
+    ValidateUnpackedStructWithUnionDefaults(item->typedef_type, item->loc);
+    ValidateVoidMembers(item->typedef_type, item->loc);
+    ValidateRandQualifiers(item->typedef_type, item->loc);
+    ValidatePackedStructMemberTypes(item->typedef_type, item->loc);
     ValidatePackedUnion(item->typedef_type, item->loc);
   }
   if (item->typedef_type.kind != DataTypeKind::kEnum) return;

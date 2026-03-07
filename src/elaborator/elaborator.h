@@ -134,6 +134,19 @@ class Elaborator {
   /// Validate packed struct default member values (§7.2.2).
   void ValidatePackedStructDefaults(const DataType& dtype, SourceLoc loc);
 
+  /// §7.2.2: Unpacked struct containing union: no member defaults.
+  void ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
+                                               SourceLoc loc);
+
+  /// §7.2, footnote 20: void member only in tagged unions.
+  void ValidateVoidMembers(const DataType& dtype, SourceLoc loc);
+
+  /// §7.2, footnote 20: random qualifier only in unpacked structures.
+  void ValidateRandQualifiers(const DataType& dtype, SourceLoc loc);
+
+  /// §7.2.1: Only packed/integer types in packed structures.
+  void ValidatePackedStructMemberTypes(const DataType& dtype, SourceLoc loc);
+
   /// Validate packed union constraints (§7.3.1).
   void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);
 
