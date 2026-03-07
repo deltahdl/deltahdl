@@ -23,4 +23,9 @@ TEST(TypeEval, IntegerTypesAreIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kTime));
 }
 
+// §6.11.1: Enum is integral.
+TEST(TypeEval, EnumIsIntegral) {
+  EXPECT_TRUE(IsIntegralType(DataTypeKind::kEnum));
+}
+
 }  // namespace
