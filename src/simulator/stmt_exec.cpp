@@ -323,9 +323,39 @@ static bool CasezMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return CaseDontCareMatch(sel, pat, BitIsZ);
 }
 
-// Case-inside uses value matching (exact for known bits).
-static bool CaseInsideMatch(uint64_t sel_val, const Logic4Vec& pat) {
-  return sel_val == pat.ToUint64();
+// §12.5.4: Asymmetric wildcard value match — x/z in pattern are don't-cares,
+// x/z in selector produce no match.
+static bool CaseInsideValueMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
+  if (!sel.IsKnown()) return false;
+  uint32_t nw = (sel.nwords > pat.nwords) ? sel.nwords : pat.nwords;
+  for (uint32_t i = 0; i < nw; ++i) {
+    uint64_t sa = (i < sel.nwords) ? sel.words[i].aval : 0;
+    uint64_t pa = (i < pat.nwords) ? pat.words[i].aval : 0;
+    uint64_t pb = (i < pat.nwords) ? pat.words[i].bval : 0;
+    // pb marks x/z bits in pattern — those are don't-cares.
+    if ((sa ^ pa) & ~pb) return false;
+  }
+  return true;
+}
+
+// §12.5.4: Range match [lo:hi] for case-inside.
+static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
+                                 SimContext& ctx, Arena& arena) {
+  if (!sel.IsKnown()) return false;
+  uint64_t sv = sel.ToUint64();
+  uint64_t lo = EvalExpr(pat->index, ctx, arena).ToUint64();
+  uint64_t hi = EvalExpr(pat->index_end, ctx, arena).ToUint64();
+  if (lo > hi) { uint64_t t = lo; lo = hi; hi = t; }
+  return sv >= lo && sv <= hi;
+}
+
+// §12.5.4: Check if a case-inside pattern matches (value or range).
+static bool CaseInsidePatternMatch(const Logic4Vec& sel, const Expr* pat,
+                                   SimContext& ctx, Arena& arena) {
+  if (pat->kind == ExprKind::kSelect && pat->index && pat->index_end)
+    return CaseInsideRangeMatch(sel, pat, ctx, arena);
+  auto pat_val = EvalExpr(pat, ctx, arena);
+  return CaseInsideValueMatch(sel, pat_val);
 }
 
 // §12.5: 4-state exact comparison — each bit must match exactly (0, 1, x, z).
@@ -341,10 +371,9 @@ static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return true;
 }
 
-// Check if a case item matches based on case_kind and case_inside.
+// Check if a case item matches based on case_kind (non-inside).
 static bool CaseItemMatches(const Logic4Vec& sel, const Logic4Vec& pat,
-                            TokenKind case_kind, bool case_inside) {
-  if (case_inside) return CaseInsideMatch(sel.ToUint64(), pat);
+                            TokenKind case_kind) {
   if (case_kind == TokenKind::kKwCasex) return CasexMatch(sel, pat);
   if (case_kind == TokenKind::kKwCasez) return CasezMatch(sel, pat);
   return CaseExactMatch(sel, pat);
@@ -368,8 +397,11 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
         continue;
       }
       for (auto* pat : item.patterns) {
-        auto pat_val = EvalExpr(pat, ctx, arena);
-        if (CaseItemMatches(sel, pat_val, stmt->case_kind, stmt->case_inside)) {
+        bool matched = stmt->case_inside
+                           ? CaseInsidePatternMatch(sel, pat, ctx, arena)
+                           : CaseItemMatches(sel, EvalExpr(pat, ctx, arena),
+                                             stmt->case_kind);
+        if (matched) {
           match_count++;
           if (!first_match_body) first_match_body = item.body;
           break;  // One match per case_item is enough.
@@ -400,8 +432,11 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   for (const auto& item : stmt->case_items) {
     if (item.is_default) continue;
     for (auto* pat : item.patterns) {
-      auto pat_val = EvalExpr(pat, ctx, arena);
-      if (CaseItemMatches(sel, pat_val, stmt->case_kind, stmt->case_inside)) {
+      bool matched = stmt->case_inside
+                         ? CaseInsidePatternMatch(sel, pat, ctx, arena)
+                         : CaseItemMatches(sel, EvalExpr(pat, ctx, arena),
+                                           stmt->case_kind);
+      if (matched) {
         co_return co_await ExecStmt(item.body, ctx, arena);
       }
     }
