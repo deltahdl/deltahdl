@@ -158,4 +158,21 @@ TEST(Elaborator, DriveStrengthHighz1Highz0IsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §6.3.2.2: Drive strength supply0, supply1 is valid.
+TEST(Elaborator, DriveStrengthSupply0Supply1Valid) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign (supply0, supply1) w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->assigns.empty());
+  EXPECT_EQ(mod->assigns[0].drive_strength0, 5u);  // supply0
+  EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);  // supply1
+}
+
 }  // namespace
