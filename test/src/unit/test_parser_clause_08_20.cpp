@@ -206,4 +206,12 @@ TEST(ParserA820, TaskInitialSpecifier) {
   EXPECT_TRUE(m->is_method_initial);
 }
 
+TEST(ParserClause08_03, MethodExtendsSpecifier) {
+  auto r = Parse(
+      "class C;\n"
+      "  function :extends void bar(); endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+}
+
 }  // namespace

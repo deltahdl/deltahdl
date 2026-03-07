@@ -129,14 +129,6 @@ TEST(ParserClause08_03, MethodInitialSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause08_03, MethodExtendsSpecifier) {
-  auto r = Parse(
-      "class C;\n"
-      "  function :extends void bar(); endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-}
-
 TEST(ParserClause08_03, MethodFinalSpecifier) {
   auto r = Parse(
       "class C;\n"
