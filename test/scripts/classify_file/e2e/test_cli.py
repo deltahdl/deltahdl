@@ -320,13 +320,16 @@ def test_neither_issue_flag_rejects(tmp_path):
     assert result.returncode != 0
 
 
-# ---- ensure_unchecked e2e --------------------------------------------------
+# ---- sync_issue_rows e2e ---------------------------------------------------
 
 
-def test_issue_unchecks_before_processing(tmp_path):
-    """Unchecks checked boxes before processing when --issue is given."""
+def test_issue_skips_reviewed_tests(tmp_path):
+    """Skips already-reviewed tests when --issue is given."""
     fake = _install_fake_classify_test(tmp_path)
-    issue_body = "- [x] Alpha\n- [ ] Beta\n"
+    issue_body = (
+        "| Alpha | Reviewed but kept in the same file | |\n"
+        "| Beta | Unreviewed | |\n"
+    )
     env = _base_env(tmp_path, fake, issue_body=issue_body)
     _write_test_file(
         tmp_path, "TEST(S, Alpha) {\n}\nTEST(S, Beta) {\n}\n",
@@ -336,3 +339,4 @@ def test_issue_unchecks_before_processing(tmp_path):
         cwd=str(tmp_path), env=env,
     )
     assert result.returncode == 0
+    assert "Skipping 1 already-reviewed" in result.stdout

@@ -586,7 +586,7 @@ def test_run_all_succeed(tmp_path, monkeypatch, cf, cf_helpers):
     """Does not exit when all tests succeed."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     cf_helpers.make_test_file(tmp_path, body)
-    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_sync_issue_rows(monkeypatch)
     captured = cf_helpers.stub_subprocess_success(monkeypatch)
     cf_helpers.stub_close_issue(monkeypatch)
     getattr(cf, "_run")(_make_run_args(tmp_path))
@@ -597,7 +597,7 @@ def test_run_some_fail_exits(tmp_path, monkeypatch, cf, cf_helpers):
     """Exits when any test fails."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     cf_helpers.make_test_file(tmp_path, body)
-    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_sync_issue_rows(monkeypatch)
     cf_helpers.stub_subprocess_mixed(monkeypatch, {"B"})
     with pytest.raises(SystemExit):
         getattr(cf, "_run")(_make_run_args(tmp_path))
@@ -607,7 +607,7 @@ def test_run_stops_after_failure(tmp_path, monkeypatch, cf, cf_helpers):
     """Stops immediately when a test fails."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\nTEST(S, C) {\n}\n"
     cf_helpers.make_test_file(tmp_path, body)
-    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_sync_issue_rows(monkeypatch)
     captured = cf_helpers.stub_subprocess_mixed(monkeypatch, {"A"})
     try:
         getattr(cf, "_run")(_make_run_args(tmp_path))
@@ -620,7 +620,7 @@ def test_run_invokes_per_test(tmp_path, monkeypatch, cf, cf_helpers):
     """Invokes classify_test once per test name."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\nTEST(S, C) {\n}\n"
     cf_helpers.make_test_file(tmp_path, body)
-    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_sync_issue_rows(monkeypatch)
     captured = cf_helpers.stub_subprocess_success(monkeypatch)
     cf_helpers.stub_close_issue(monkeypatch)
     getattr(cf, "_run")(_make_run_args(tmp_path))
@@ -630,7 +630,7 @@ def test_run_invokes_per_test(tmp_path, monkeypatch, cf, cf_helpers):
 def test_run_closes_issue_on_success(tmp_path, monkeypatch, cf, cf_helpers):
     """Closes issue when all tests succeed."""
     cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_sync_issue_rows(monkeypatch)
     cf_helpers.stub_subprocess_success(monkeypatch)
     log = cf_helpers.stub_close_issue(monkeypatch)
     getattr(cf, "_run")(_make_run_args(tmp_path))
@@ -640,7 +640,7 @@ def test_run_closes_issue_on_success(tmp_path, monkeypatch, cf, cf_helpers):
 def test_run_skips_close_on_failure(tmp_path, monkeypatch, cf, cf_helpers):
     """Does not close issue when tests fail."""
     cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_sync_issue_rows(monkeypatch)
     cf_helpers.stub_subprocess_failure(monkeypatch)
     log = cf_helpers.stub_close_issue(monkeypatch)
     try:
@@ -653,7 +653,7 @@ def test_run_skips_close_on_failure(tmp_path, monkeypatch, cf, cf_helpers):
 def test_run_skips_close_on_dry_run(tmp_path, monkeypatch, cf, cf_helpers):
     """Does not close issue in dry-run mode."""
     cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_sync_issue_rows(monkeypatch)
     cf_helpers.stub_subprocess_success(monkeypatch)
     log = cf_helpers.stub_close_issue(monkeypatch)
     getattr(cf, "_run")(_make_run_args(tmp_path, dry_run=True))
@@ -665,7 +665,7 @@ def test_run_close_reason_all_classified(
 ):
     """Closes with 'all tests have been classified' on success."""
     cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_sync_issue_rows(monkeypatch)
     cf_helpers.stub_subprocess_success(monkeypatch)
     getattr(cf, "_run")(_make_run_args(tmp_path))
     assert "because all tests have been classified" \
@@ -707,7 +707,7 @@ def _stub_create_and_run(
         return 42
 
     monkeypatch.setattr(cf, "create_issue", fake_create)
-    cf_helpers.stub_ensure_unchecked(monkeypatch)
+    cf_helpers.stub_sync_issue_rows(monkeypatch)
     captured = cf_helpers.stub_subprocess_success(monkeypatch)
     cf_helpers.stub_close_issue(monkeypatch)
     getattr(cf, "_run")(_make_run_args(tmp_path, **run_overrides))
@@ -777,7 +777,7 @@ def test_main_enables_line_buffering(monkeypatch, cf):
     assert any(k.get("line_buffering") for k in configured)
 
 
-# ---- ensure_unchecked ------------------------------------------------------
+# ---- sync_issue_rows -------------------------------------------------------
 
 
 def _stub_github(monkeypatch, cf, body):
@@ -794,83 +794,89 @@ def _stub_github(monkeypatch, cf, body):
     return updates
 
 
-def test_ensure_unchecked_all_unreviewed_no_update(monkeypatch, cf):
+def test_sync_issue_rows_all_unreviewed_no_update(monkeypatch, cf):
     """Does not call update when all rows are already Unreviewed."""
     body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
     updates = _stub_github(monkeypatch, cf, body)
-    cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    result = cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
     assert len(updates) == 0
+    assert result == set()
 
 
-def test_ensure_unchecked_resets_reviewed_row(monkeypatch, cf):
-    """Resets a reviewed row back to Unreviewed."""
-    body = "| Alpha | Reviewed but moved to another file | |\n| Beta | Unreviewed | |\n"
-    updates = _stub_github(monkeypatch, cf, body)
-    cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
-    assert "| Alpha | Unreviewed | |" in updates[0]
-
-
-def test_ensure_unchecked_adds_missing_row(monkeypatch, cf):
+def test_sync_issue_rows_adds_missing_row(monkeypatch, cf):
     """Adds an Unreviewed row for a missing test."""
     body = "| Alpha | Unreviewed | |\n"
     updates = _stub_github(monkeypatch, cf, body)
-    cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
+    result = cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
     assert "| Beta | Unreviewed | |" in updates[0]
+    assert result == set()
 
 
-def test_ensure_unchecked_mixed_resets(monkeypatch, cf):
-    """Mixed: resets the reviewed row."""
-    body = "| Alpha | Reviewed but kept in the same file | |\n"
-    updates = _stub_github(monkeypatch, cf, body)
-    cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
-    assert "| Alpha | Unreviewed | |" in updates[0]
-
-
-def test_ensure_unchecked_mixed_adds_missing(monkeypatch, cf):
-    """Mixed: adds the missing row."""
-    body = "| Alpha | Reviewed but kept in the same file | |\n"
-    updates = _stub_github(monkeypatch, cf, body)
-    cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
-    assert "| Beta | Unreviewed | |" in updates[0]
-
-
-def test_ensure_unchecked_calls_update(monkeypatch, cf):
-    """Calls update_issue_body when changes are made."""
-    body = "| Alpha | Reviewed but moved to another file | |\n"
-    updates = _stub_github(monkeypatch, cf, body)
-    cf.ensure_unchecked(_make_args(), ["Alpha"])
-    assert len(updates) == 1
-
-
-def test_ensure_unchecked_preserves_other_reviewed(monkeypatch, cf):
+def test_sync_issue_rows_preserves_other_reviewed(monkeypatch, cf):
     """Leaves reviewed rows for tests not in test_names."""
-    body = "| Other | Reviewed but kept in the same file | |\n| Alpha | Unreviewed | |\n"
+    body = (
+        "| Other | Reviewed but kept in the same file | |\n"
+        "| Alpha | Unreviewed | |\n"
+    )
     updates = _stub_github(monkeypatch, cf, body)
-    cf.ensure_unchecked(_make_args(), ["Alpha"])
+    cf.sync_issue_rows(_make_args(), ["Alpha"])
     assert len(updates) == 0
 
 
-# ---- _run + ensure_unchecked -----------------------------------------------
+def test_sync_issue_rows_returns_reviewed(monkeypatch, cf):
+    """Returns reviewed test names."""
+    body = (
+        "| Alpha | Reviewed but kept in the same file | |\n"
+        "| Beta | Unreviewed | |\n"
+    )
+    _stub_github(monkeypatch, cf, body)
+    result = cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
+    assert result == {"Alpha"}
 
 
-def test_run_calls_ensure_unchecked_with_issue(
+def test_sync_issue_rows_returns_moved(monkeypatch, cf):
+    """Returns moved test names."""
+    body = (
+        "| Alpha | Reviewed but moved to another file | target.cpp |\n"
+        "| Beta | Unreviewed | |\n"
+    )
+    _stub_github(monkeypatch, cf, body)
+    result = cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
+    assert result == {"Alpha"}
+
+
+def test_sync_issue_rows_mixed_returns_and_adds(monkeypatch, cf):
+    """Returns reviewed and adds missing tests."""
+    body = "| Alpha | Reviewed but kept in the same file | |\n"
+    updates = _stub_github(monkeypatch, cf, body)
+    result = cf.sync_issue_rows(
+        _make_args(), ["Alpha", "Beta"],
+    )
+    assert result == {"Alpha"}
+    assert "| Beta | Unreviewed | |" in updates[0]
+
+
+# ---- _run + sync_issue_rows ------------------------------------------------
+
+
+def test_run_calls_sync_issue_rows_with_issue(
     tmp_path, monkeypatch, cf, cf_helpers,
 ):
-    """Calls ensure_unchecked when --issue is provided."""
+    """Calls sync_issue_rows when --issue is provided."""
     cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    log = cf_helpers.stub_ensure_unchecked(monkeypatch)
+    log = cf_helpers.stub_sync_issue_rows(monkeypatch)
     cf_helpers.stub_subprocess_success(monkeypatch)
     cf_helpers.stub_close_issue(monkeypatch)
     getattr(cf, "_run")(_make_run_args(tmp_path))
     assert len(log) == 1
 
 
-def test_run_skips_ensure_unchecked_with_create_issue(
+def test_run_skips_sync_issue_rows_with_create_issue(
     tmp_path, monkeypatch, cf, cf_helpers,
 ):
-    """Does not call ensure_unchecked when --create-issue is used."""
+    """Does not call sync_issue_rows when --create-issue is used."""
     cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    log = cf_helpers.stub_ensure_unchecked(monkeypatch)
+    log = cf_helpers.stub_sync_issue_rows(monkeypatch)
     monkeypatch.setattr(cf, "create_issue", lambda _a, _n: 42)
     cf_helpers.stub_subprocess_success(monkeypatch)
     cf_helpers.stub_close_issue(monkeypatch)
@@ -878,3 +884,37 @@ def test_run_skips_ensure_unchecked_with_create_issue(
         tmp_path, issue=None, create_issue=True,
     ))
     assert len(log) == 0
+
+
+def test_run_skips_reviewed_tests(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
+    """Skips tests already marked as reviewed."""
+    cf_helpers.make_test_file(
+        tmp_path, "TEST(S, A) {\n}\nTEST(S, B) {\n}\n",
+    )
+    monkeypatch.setattr(
+        cf, "sync_issue_rows",
+        lambda _a, _n: {"A"},
+    )
+    captured = cf_helpers.stub_subprocess_success(monkeypatch)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
+    assert len(captured) == 1
+    assert "B" in " ".join(captured[0])
+
+
+def test_run_closes_when_all_reviewed(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
+    """Closes issue when all tests are already reviewed."""
+    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
+    monkeypatch.setattr(
+        cf, "sync_issue_rows",
+        lambda _a, _n: {"A"},
+    )
+    captured = cf_helpers.stub_subprocess_success(monkeypatch)
+    log = cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
+    assert len(captured) == 0
+    assert len(log) == 1

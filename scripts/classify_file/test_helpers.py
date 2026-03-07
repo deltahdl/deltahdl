@@ -17,7 +17,7 @@ __all__ = [
     "make_test_file",
     "stub_close_issue",
     "stub_create_issue",
-    "stub_ensure_unchecked",
+    "stub_sync_issue_rows",
     "stub_subprocess_failure",
     "stub_subprocess_mixed",
     "stub_subprocess_success",
@@ -83,11 +83,11 @@ def stub_create_issue(
     return captured
 
 
-def stub_ensure_unchecked(monkeypatch: pytest.MonkeyPatch) -> list[bool]:
-    """Stub classify_file.ensure_unchecked; return call log."""
+def stub_sync_issue_rows(monkeypatch: pytest.MonkeyPatch) -> list[bool]:
+    """Stub classify_file.sync_issue_rows; return call log."""
     log: list[bool] = []
     monkeypatch.setattr(
-        classify_file, "ensure_unchecked",
-        lambda _a, _n: log.append(True),
+        classify_file, "sync_issue_rows",
+        lambda _a, _n: (log.append(True), set())[1],
     )
     return log

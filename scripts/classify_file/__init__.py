@@ -70,37 +70,34 @@ def create_issue(
     return issue_number
 
 
-def ensure_unchecked(
+def sync_issue_rows(
     args: argparse.Namespace,
     test_names: list[str],
-) -> None:
-    """Ensure every test has an 'Unreviewed' row in the issue table."""
-    print(f"Fetching issue #{args.issue} to verify statuses...")
+) -> set[str]:
+    """Sync issue table rows, adding missing tests. Return reviewed names."""
     body = fetch_issue_body(
         args.organization, args.repo, args.issue,
     )
+    reviewed: set[str] = set()
     changed = False
     for name in test_names:
         row_re = re.compile(
-            r"^\| " + re.escape(name) + r" \|[^|]*\|[^|]*\|$",
+            r"^\| " + re.escape(name) + r" \|([^|]*)\|[^|]*\|$",
             re.MULTILINE,
         )
         match = row_re.search(body)
         if match:
-            new_row = f"| {name} | Unreviewed | |"
-            if match.group(0) != new_row:
-                body = body[:match.start()] + new_row + body[match.end():]
-                changed = True
+            status = match.group(1).strip()
+            if status != "Unreviewed":
+                reviewed.add(name)
         else:
             body = body.rstrip("\n") + f"\n| {name} | Unreviewed | |\n"
             changed = True
     if changed:
-        print(f"Resetting statuses for issue #{args.issue}"
-              " because a previous run already reviewed"
-              " some tests...")
         update_issue_body(
             args.organization, args.repo, args.issue, body,
         )
+    return reviewed
 
 
 def _build_command(
@@ -186,10 +183,22 @@ def _run(args: argparse.Namespace) -> None:
         return
     if args.create_issue:
         args.issue = create_issue(args, test_names)
+        reviewed: set[str] = set()
     else:
-        ensure_unchecked(args, test_names)
-    total = len(test_names)
-    for i, name in enumerate(test_names, 1):
+        reviewed = sync_issue_rows(args, test_names)
+    pending = [n for n in test_names if n not in reviewed]
+    if reviewed:
+        print(f"Skipping {len(reviewed)} already-reviewed"
+              f" test(s): {', '.join(reviewed)}")
+    if not pending:
+        if not args.dry_run:
+            close_issue(
+                args.organization, args.repo, args.issue,
+                "all tests have been classified",
+            )
+        return
+    total = len(pending)
+    for i, name in enumerate(pending, 1):
         if not run_classify_test(args, name, i, total):
             sys.exit(1)
     if not args.dry_run:

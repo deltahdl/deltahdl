@@ -75,11 +75,11 @@ def _stub_create(monkeypatch: pytest.MonkeyPatch, cf, number: int = 42) -> list[
 
 
 def _stub_ensure(monkeypatch: pytest.MonkeyPatch, cf) -> list[bool]:
-    """Stub ensure_unchecked; return call log."""
+    """Stub sync_issue_rows; return call log."""
     called: list[bool] = []
     monkeypatch.setattr(
-        cf, "ensure_unchecked",
-        lambda _a, _n: called.append(True),
+        cf, "sync_issue_rows",
+        lambda _a, _n: (called.append(True), set())[1],
     )
     return called
 
@@ -178,18 +178,18 @@ def test_create_issue_then_process(tmp_path, monkeypatch, cf):
     assert len(log) == 2
 
 
-# ---- ensure_unchecked integration -----------------------------------------
+# ---- sync_issue_rows integration ------------------------------------------
 
 
-def _ensure_order_log(
+def _sync_order_log(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cf,
 ) -> list[str]:
-    """Run pipeline recording ensure vs subprocess call order."""
+    """Run pipeline recording sync vs subprocess call order."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     order: list[str] = []
     monkeypatch.setattr(
-        cf, "ensure_unchecked",
-        lambda _a, _n: order.append("ensure"),
+        cf, "sync_issue_rows",
+        lambda _a, _n: (order.append("sync"), set())[1],
     )
 
     def log_run(_cmd, **_kw):
@@ -204,17 +204,17 @@ def _ensure_order_log(
     return order
 
 
-def test_ensure_unchecked_runs_first(
+def test_sync_issue_rows_runs_first(
     tmp_path, monkeypatch, cf,
 ):
-    """Pipeline calls ensure_unchecked before subprocess calls."""
-    order = _ensure_order_log(tmp_path, monkeypatch, cf)
-    assert order[0] == "ensure"
+    """Pipeline calls sync_issue_rows before subprocess calls."""
+    order = _sync_order_log(tmp_path, monkeypatch, cf)
+    assert order[0] == "sync"
 
 
-def test_subprocess_runs_after_ensure(
+def test_subprocess_runs_after_sync(
     tmp_path, monkeypatch, cf,
 ):
-    """All calls after ensure_unchecked are subprocess calls."""
-    order = _ensure_order_log(tmp_path, monkeypatch, cf)
+    """All calls after sync_issue_rows are subprocess calls."""
+    order = _sync_order_log(tmp_path, monkeypatch, cf)
     assert all(e == "subprocess" for e in order[1:])
