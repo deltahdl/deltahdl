@@ -34,4 +34,85 @@ TEST(ParserSection8, ParameterizedClassScopeNew) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+// §8.8: Typed constructor call — ClassName::new.
+TEST(ParserA88, TypedConstructorNoArgs) {
+  auto r = Parse(
+      "class C; endclass\n"
+      "class D extends C; endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "  initial c = D::new;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §8.8: Typed constructor call with arguments — ClassName::new(args).
+TEST(ParserA88, TypedConstructorWithArgs) {
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int x); endfunction\n"
+      "endclass\n"
+      "class D extends C;\n"
+      "  function new(int x); super.new(x); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "  initial c = D::new(42);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §8.8: Shallow copy — new expression.
+TEST(ParserA88, ShallowCopy) {
+  auto r = Parse(
+      "class C;\n"
+      "  int data;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C a, b;\n"
+      "  initial begin\n"
+      "    a = new;\n"
+      "    b = new a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §8.8: Typed constructor with named args.
+TEST(ParserA88, TypedConstructorNamedArgs) {
+  auto r = Parse(
+      "class C;\n"
+      "  int x;\n"
+      "  function new(int val); x = val; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "  initial c = C::new(.val(10));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §8.8: Parameterized typed constructor.
+TEST(ParserA88, ParameterizedTypedConstructor) {
+  auto r = Parse(
+      "class E #(type T = int) extends C;\n"
+      "  T x;\n"
+      "  function new(T x_init);\n"
+      "    super.new();\n"
+      "    x = x_init;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class C; endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "  initial c = E#(.T(byte))::new(.x_init(5));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
