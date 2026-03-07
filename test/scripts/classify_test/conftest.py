@@ -17,9 +17,6 @@ def ct(module_loader):
 
 
 @pytest.fixture()
-def _ct(module_loader):
+def _ct(request):
     """Order-only dependency so submodule fixtures load after classify_test."""
-    return module_loader(
-        "classify_test",
-        SCRIPTS_DIR / "classify_test" / "__init__.py",
-    )
+    return request.getfixturevalue("ct")

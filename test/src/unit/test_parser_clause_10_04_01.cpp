@@ -527,4 +527,79 @@ TEST(ParserSection9b, BlockingAssignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
+// §10.4.1: Blocking assignment in task body.
+TEST(ParserSection10, Sec10_4_1_InTaskBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t();\n"
+      "    int x;\n"
+      "    x = 42;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* task = FindItemByKind(r, ModuleItemKind::kTaskDecl);
+  ASSERT_NE(task, nullptr);
+  ASSERT_NE(task->body, nullptr);
+  ASSERT_GE(task->body->stmts.size(), 1u);
+  auto* assign = task->body->stmts.back();
+  EXPECT_EQ(assign->kind, StmtKind::kBlockingAssign);
+}
+
+// §10.4.1: Blocking assignment in function body.
+TEST(ParserSection10, Sec10_4_1_InFunctionBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int compute(int a, int b);\n"
+      "    int tmp;\n"
+      "    tmp = a + b;\n"
+      "    return tmp;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* func = FirstFunctionDecl(r);
+  ASSERT_NE(func, nullptr);
+  ASSERT_NE(func->body, nullptr);
+  auto* assign = FindStmtByKind(func->body->stmts, StmtKind::kBlockingAssign);
+  ASSERT_NE(assign, nullptr);
+  EXPECT_EQ(assign->lhs->text, "tmp");
+}
+
+// §10.4.1: Blocking with intra-assignment event control.
+TEST(ParserSection10, Sec10_4_1_IntraAssignEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_FALSE(stmt->events.empty());
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+// §10.4.1: Blocking does not prevent execution in parallel block (§9.3.2).
+TEST(ParserSection10, Sec10_4_1_InForkJoinBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  join\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_GE(stmt->stmts.size(), 2u);
+  EXPECT_EQ(stmt->stmts[0]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->stmts[1]->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace

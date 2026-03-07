@@ -712,12 +712,45 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
-  if (!stmt->lhs) return StmtResult::kDone;
+  // §10.4.2: Intra-assignment delay offsets the NBA schedule time.
+  uint64_t delay = 0;
+  if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
+  ScheduleNonblockingAssign(stmt, rhs_val, delay, ctx, arena);
+  return StmtResult::kDone;
+}
 
+// §10.4.1: Assign a pre-evaluated value to a blocking assignment LHS.
+void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
+                           SimContext& ctx, Arena& arena) {
+  if (!lhs) return;
+  if (lhs->kind == ExprKind::kConcatenation) {
+    UnpackConcatLhs(lhs, rhs_val, ctx, arena);
+    return;
+  }
+  if (lhs->kind == ExprKind::kSelect) {
+    Logic4Vec mutable_val = rhs_val;
+    TrySelectBlockingAssign(lhs, mutable_val, ctx, arena);
+    return;
+  }
+  auto* var = ResolveLhsVariable(lhs, ctx);
+  if (var) {
+    auto resized = ResizeToWidth(rhs_val, var->value.width, arena);
+    var->value = resized;
+    var->NotifyWatchers();
+  } else if (lhs->kind == ExprKind::kMemberAccess) {
+    WriteStructField(lhs, rhs_val, ctx, arena);
+  }
+}
+
+// §10.4.2: Schedule an NBA event at current_time + delay_ticks.
+void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
+                               uint64_t delay_ticks, SimContext& ctx,
+                               Arena& arena) {
+  if (!stmt->lhs) return;
   bool is_select = (stmt->lhs->kind == ExprKind::kSelect);
   auto* elem = is_select ? TryResolveArrayElement(stmt->lhs, ctx) : nullptr;
   auto* var = elem ? elem : ResolveLhsVariable(stmt->lhs, ctx);
-  if (!var) return StmtResult::kDone;
+  if (!var) return;
 
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   if (is_select && !elem) {
@@ -738,8 +771,8 @@ StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
     };
   }
   auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
-  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), nba_region, event);
-  return StmtResult::kDone;
+  auto schedule_time = ctx.CurrentTime() + SimTime{delay_ticks};
+  ctx.GetScheduler().ScheduleEvent(schedule_time, nba_region, event);
 }
 
 StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {

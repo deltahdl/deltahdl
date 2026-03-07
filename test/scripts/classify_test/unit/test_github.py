@@ -277,11 +277,11 @@ def test_maybe_tick_does_fetch_and_update(monkeypatch, ct_github, ct_helpers):
     _tb = ct_helpers.make_test_block
     updated = []
     monkeypatch.setattr(
-        "classify_test._github.fetch_issue_body",
+        ct_github, "fetch_issue_body",
         lambda org, repo, issue: "- [ ] T\n",
     )
     monkeypatch.setattr(
-        "classify_test._github.update_issue_body",
+        ct_github, "update_issue_body",
         lambda org, repo, issue, body: updated.append(body),
     )
     t = _tb("T", prefix="test_parser_", clause="6.1")
@@ -296,11 +296,11 @@ def test_maybe_tick_passes_correct_org(monkeypatch, ct_github, ct_helpers):
     _tb = ct_helpers.make_test_block
     orgs = []
     monkeypatch.setattr(
-        "classify_test._github.fetch_issue_body",
+        ct_github, "fetch_issue_body",
         lambda org, repo, issue: (orgs.append(org), "- [ ] T\n")[1],
     )
     monkeypatch.setattr(
-        "classify_test._github.update_issue_body",
+        ct_github, "update_issue_body",
         lambda org, repo, issue, body: orgs.append(org),
     )
     t = _tb("T", prefix="test_parser_", clause="6.1")
@@ -315,11 +315,11 @@ def test_maybe_tick_passes_correct_issue(monkeypatch, ct_github, ct_helpers):
     _tb = ct_helpers.make_test_block
     issues = []
     monkeypatch.setattr(
-        "classify_test._github.fetch_issue_body",
+        ct_github, "fetch_issue_body",
         lambda org, repo, issue: (issues.append(issue), "- [ ] T\n")[1],
     )
     monkeypatch.setattr(
-        "classify_test._github.update_issue_body",
+        ct_github, "update_issue_body",
         lambda org, repo, issue, body: issues.append(issue),
     )
     t = _tb("T", prefix="test_parser_", clause="6.1")
