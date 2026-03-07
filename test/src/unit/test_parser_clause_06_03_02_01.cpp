@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithLogic) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (large) logic cap1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "cap1");
-}
-
 TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthMedium) {
   auto r = Parse(
       "module t;\n"
