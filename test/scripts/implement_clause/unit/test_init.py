@@ -536,6 +536,18 @@ def test_discover_subclauses_rationale_is_implementable(ic) -> None:
     assert "4.1" in result
 
 
+def test_discover_subclauses_bool_true_is_implementable(ic) -> None:
+    """Subclauses with value true are treated as implementable."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"4.2": true}\n',
+        stderr="",
+    )
+    with patch("implement_clause.subprocess.run", return_value=cp):
+        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    assert result == {"4.2": "4.2"}
+
+
 # --- mark_master_complete ---
 
 
