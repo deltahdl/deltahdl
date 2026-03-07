@@ -222,6 +222,9 @@ class Elaborator {
   /// §8.13: A class declared :final shall not be extended.
   void ValidateFinalClassExtension();
 
+  /// §8.17: Validate chaining constructor rules.
+  void ValidateChainingConstructors();
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 

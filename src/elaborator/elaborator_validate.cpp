@@ -1003,4 +1003,59 @@ void Elaborator::ValidateFinalClassExtension() {
   }
 }
 
+// §8.17: Detect if a statement is a super.new() call.
+static bool IsSuperNewCall(const Stmt* s) {
+  if (!s || s->kind != StmtKind::kExprStmt || !s->expr) return false;
+  const auto* call = s->expr;
+  if (call->kind != ExprKind::kCall) return false;
+  const auto* callee = call->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
+  bool lhs_is_super = callee->lhs &&
+                       callee->lhs->kind == ExprKind::kIdentifier &&
+                       callee->lhs->text == "super";
+  bool rhs_is_new = callee->rhs &&
+                     callee->rhs->kind == ExprKind::kIdentifier &&
+                     callee->rhs->text == "new";
+  return lhs_is_super && rhs_is_new;
+}
+
+// §8.17: Validate chaining constructor rules.
+void Elaborator::ValidateChainingConstructors() {
+  auto check = [&](const ClassDecl* cls) {
+    if (cls->base_class.empty()) return;
+    const ClassMember* ctor = nullptr;
+    for (const auto* m : cls->members) {
+      if (m->kind == ClassMemberKind::kMethod && m->method &&
+          m->method->name == "new") {
+        ctor = m;
+        break;
+      }
+    }
+    if (!ctor || !ctor->method) return;
+    bool has_super_new = false;
+    const auto& stmts = ctor->method->func_body_stmts;
+    for (size_t i = 0; i < stmts.size(); ++i) {
+      if (IsSuperNewCall(stmts[i])) {
+        has_super_new = true;
+        // §8.17: super.new() shall be the first executable statement.
+        if (i != 0) {
+          diag_.Error(stmts[i]->range.start,
+                      "super.new() shall be the first executable statement "
+                      "in the constructor");
+        }
+        break;
+      }
+    }
+    // §8.17: If extends has args, constructor shall not contain super.new().
+    if (has_super_new && !cls->extends_args.empty()) {
+      diag_.Error(ctor->method->loc,
+                  "constructor shall not contain super.new() when extends "
+                  "specifier has arguments");
+    }
+  };
+  for (const auto* cls : unit_->classes) {
+    check(cls);
+  }
+}
+
 }  // namespace delta

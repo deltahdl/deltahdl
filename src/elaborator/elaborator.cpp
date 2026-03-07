@@ -127,6 +127,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   RegisterCuScopeItems();
   // §8.13: Check that no class extends a :final class.
   ValidateFinalClassExtension();
+  // §8.17: Validate chaining constructor rules.
+  ValidateChainingConstructors();
 
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {
