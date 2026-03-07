@@ -27,13 +27,6 @@ TEST(Preprocessor, Pragma_Protect_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// --- §22.11: Edge case — pragma with only whitespace after name ---
-TEST(Preprocessor, Pragma_NameTrailingWhitespace_NoError) {
-  PreprocFixture f;
-  Preprocess("`pragma my_pragma   \n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 // --- §22.11: Edge case — pragma at end of file without newline ---
 TEST(Preprocessor, Pragma_NoTrailingNewline_NoError) {
   PreprocFixture f;

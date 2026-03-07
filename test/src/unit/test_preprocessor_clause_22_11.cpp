@@ -130,4 +130,11 @@ TEST(Preprocessor, Pragma_MacroExpansionInName) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// --- §22.11: Edge case — pragma with only whitespace after name ---
+TEST(Preprocessor, Pragma_NameTrailingWhitespace_NoError) {
+  PreprocFixture f;
+  Preprocess("`pragma my_pragma   \n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
