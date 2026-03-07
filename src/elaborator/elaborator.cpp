@@ -484,6 +484,17 @@ static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
                    "may not represent sequential logic");
     }
   }
+  // §9.2.3: final procedures shall not contain delays or timing controls.
+  if (kind == RtlirProcessKind::kFinal) {
+    if (StmtHasTimingControl(proc.body)) {
+      diag.Error(item->loc,
+                 "final procedure shall not contain timing controls");
+    }
+    if (StmtHasForkJoin(proc.body)) {
+      diag.Error(item->loc,
+                 "final procedure shall not contain fork-join statements");
+    }
+  }
   // §5.12: Resolve attributes.
   proc.attrs = ResolveAttributes(item->attrs, diag);
   mod->processes.push_back(proc);
