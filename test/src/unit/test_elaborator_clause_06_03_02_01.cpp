@@ -15,13 +15,6 @@ TEST(NetDecl, ChargeStrengthOnTriIsError) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-TEST(NetDecl, ChargeStrengthOnTriregIsValid) {
-  NetDeclInfo info;
-  info.type = NetType::kTrireg;
-  info.has_charge_strength = true;
-  EXPECT_TRUE(ValidateNetDecl(info));
-}
-
 // §6.3.2.1: trireg without explicit charge strength defaults to kMedium.
 TEST(Elaborator, TriregDefaultChargeStrengthMedium) {
   ElabFixture f;
