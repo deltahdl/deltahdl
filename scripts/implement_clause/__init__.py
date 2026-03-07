@@ -64,8 +64,9 @@ def discover_subclauses(
 
     raw = result.stdout.strip()
     print(f"Claude response:\n{raw}")
-    raw = re.sub(r"^```(?:json)?\s*\n?", "", raw)
-    raw = re.sub(r"\n?```\s*$", "", raw)
+    fenced = re.search(r"```(?:json)?\s*\n(.*?)\n```", raw, re.DOTALL)
+    if fenced:
+        raw = fenced.group(1)
     verdicts = json.loads(raw)
 
     implementable: dict[str, str] = {}

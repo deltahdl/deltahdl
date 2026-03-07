@@ -476,6 +476,18 @@ def test_discover_subclauses_strips_code_fences(ic) -> None:
     assert result == {"4.1": "General"}
 
 
+def test_discover_subclauses_strips_preamble_before_fences(ic) -> None:
+    """discover_subclauses extracts JSON from fences preceded by prose."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='Here is the JSON:\n\n```json\n{"4.1": "General"}\n```\n',
+        stderr="",
+    )
+    with patch("implement_clause.subprocess.run", return_value=cp):
+        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    assert result == {"4.1": "General"}
+
+
 def _discover_subclauses_prompt(ic):
     """Helper: run discover_subclauses and return the prompt string."""
     cp = subprocess.CompletedProcess(
