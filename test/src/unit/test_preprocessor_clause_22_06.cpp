@@ -337,6 +337,241 @@ TEST(Preprocessor, DefineInSkippedBranchNotDefined) {
   EXPECT_EQ(result.find("skip_visible"), std::string::npos);
 }
 
+// --- §22.6: Inline `ifdef (Example 4) ---
+
+TEST(Preprocessor, InlineIfdefTrue) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"FOO", "1"}};
+  auto result = Preprocess(
+      "initial if (`ifdef FOO 1 `else 0 `endif)\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("initial if ( 1 )"), std::string::npos);
+  EXPECT_EQ(result.find("`ifdef"), std::string::npos);
+}
+
+TEST(Preprocessor, InlineIfdefFalse) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "initial if (`ifdef FOO 1 `else 0 `endif)\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("initial if ( 0 )"), std::string::npos);
+}
+
+TEST(Preprocessor, InlineIfdefWithoutElse) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"FOO", "1"}};
+  auto result = Preprocess(
+      "int x = `ifdef FOO 42 `endif;\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("42"), std::string::npos);
+}
+
+TEST(Preprocessor, InlineIfndefTrue) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "int x = `ifndef FOO 42 `else 0 `endif;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("42"), std::string::npos);
+}
+
+TEST(Preprocessor, InlineIfdefExprForm) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", "1"}, {"B", "1"}};
+  auto result = Preprocess(
+      "int x = `ifdef (A && B) 1 `else 0 `endif;\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("1"), std::string::npos);
+}
+
+TEST(Preprocessor, InlineIfdefNested) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", "1"}};
+  auto result = Preprocess(
+      "int x = `ifdef A `ifdef B 2 `else 1 `endif `else 0 `endif;\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("1"), std::string::npos);
+}
+
+// --- §22.6: Deep nesting (Example 2) ---
+
+TEST(Preprocessor, DeeplyNestedIfdef) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"wow", ""}, {"nest_one", ""}, {"nest_two", ""}};
+  auto result = Preprocess(
+      "`ifdef wow\n"
+      "wow_defined\n"
+      "`ifdef nest_one\n"
+      "nest_one_defined\n"
+      "`ifdef nest_two\n"
+      "nest_two_defined\n"
+      "`else\n"
+      "nest_two_undef\n"
+      "`endif\n"
+      "`else\n"
+      "nest_one_undef\n"
+      "`endif\n"
+      "`else\n"
+      "wow_undef\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_NE(result.find("wow_defined"), std::string::npos);
+  EXPECT_NE(result.find("nest_one_defined"), std::string::npos);
+  EXPECT_NE(result.find("nest_two_defined"), std::string::npos);
+  EXPECT_EQ(result.find("nest_two_undef"), std::string::npos);
+  EXPECT_EQ(result.find("nest_one_undef"), std::string::npos);
+  EXPECT_EQ(result.find("wow_undef"), std::string::npos);
+}
+
+// --- §22.6: Chained `ifdef/`elsif/`ifndef (Example 3) ---
+
+TEST(Preprocessor, ChainedElsifWithNested) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"second_block", ""}};
+  auto result = Preprocess(
+      "`ifdef first_block\n"
+      "first_block_text\n"
+      "`elsif second_block\n"
+      "second_block_text\n"
+      "`else\n"
+      "else_text\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_EQ(result.find("first_block_text"), std::string::npos);
+  EXPECT_NE(result.find("second_block_text"), std::string::npos);
+  EXPECT_EQ(result.find("else_text"), std::string::npos);
+}
+
+TEST(Preprocessor, ChainedElsifWithNestedIfndef) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"first_block", ""}, {"second_nest", ""}};
+  auto result = Preprocess(
+      "`ifdef first_block\n"
+      "`ifndef second_nest\n"
+      "first_only\n"
+      "`else\n"
+      "first_and_second\n"
+      "`endif\n"
+      "`else\n"
+      "not_first\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_EQ(result.find("first_only"), std::string::npos);
+  EXPECT_NE(result.find("first_and_second"), std::string::npos);
+  EXPECT_EQ(result.find("not_first"), std::string::npos);
+}
+
+// --- §22.6: Error cases ---
+
+TEST(Preprocessor, EndifWithoutIfdef) {
+  PreprocFixture f;
+  Preprocess("`endif\n", f);
+  // Orphan `endif — should not crash (existing code handles gracefully).
+  // No error required by LRM, but should not crash.
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, ElseWithoutIfdef) {
+  PreprocFixture f;
+  Preprocess("`else\ntext\n`endif\n", f);
+  // Orphan `else — should not crash.
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, IfdefWithoutEndif) {
+  PreprocFixture f;
+  Preprocess("`ifdef SOMETHING\ntext\n", f);
+  // Unterminated `ifdef — should not crash.
+  // Text in active branch is processed; cond_stack is non-empty at EOF.
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// --- §22.6: Empty blocks ---
+
+TEST(Preprocessor, IfdefEmptyBlocks) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"A", "1"}};
+  auto result = Preprocess(
+      "`ifdef A\n"
+      "`else\n"
+      "else_text\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_EQ(result.find("else_text"), std::string::npos);
+}
+
+TEST(Preprocessor, IfdefAllEmptyBlocks) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifdef UNDEF\n"
+      "`elsif ALSO_UNDEF\n"
+      "`else\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// --- §22.6: `ifndef with simple identifier ---
+
+TEST(Preprocessor, IfndefSimpleUndefined) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifndef UNDEF\n"
+      "visible\n"
+      "`endif\n",
+      f);
+  EXPECT_NE(result.find("visible"), std::string::npos);
+}
+
+TEST(Preprocessor, IfndefSimpleDefined) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"DEFINED", "1"}};
+  auto result = Preprocess(
+      "`ifndef DEFINED\n"
+      "visible\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_EQ(result.find("visible"), std::string::npos);
+}
+
+// --- §22.6: Macro defined to 0 or empty is still "defined" ---
+
+TEST(Preprocessor, IfdefMacroDefinedToZero) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define ZERO 0\n"
+      "`ifdef ZERO\n"
+      "visible\n"
+      "`endif\n",
+      f);
+  EXPECT_NE(result.find("visible"), std::string::npos);
+}
+
+TEST(Preprocessor, IfdefMacroDefinedEmpty) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define EMPTY\n"
+      "`ifdef EMPTY\n"
+      "visible\n"
+      "`endif\n",
+      f);
+  EXPECT_NE(result.find("visible"), std::string::npos);
+}
+
 TEST(ParserSection22, IfdefSelectsCorrectModule) {
   auto r = ParseWithPreprocessor(
       "`define USE_A\n"

@@ -76,6 +76,7 @@ class Preprocessor {
                           uint32_t file_id, uint32_t line_num);
   bool TryExpandMacro(std::string_view trimmed, std::string& output,
                       uint32_t file_id, uint32_t line_num, int depth);
+  std::string ExpandInlineConditionals(std::string_view line);
   std::string ExpandInlineMacros(std::string_view line, uint32_t file_id,
                                  uint32_t line_num);
   size_t ExpandSingleInlineMacro(std::string_view line, size_t pos,

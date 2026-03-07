@@ -377,7 +377,8 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
             ProcessDirective(remainder, file_id, line_num, depth, output);
         if (!handled && IsActive()) {
           auto stripped = StripComments(remainder, in_block_comment_);
-          auto expanded = ExpandInlineMacros(stripped, file_id, line_num);
+          auto conditioned = ExpandInlineConditionals(stripped);
+          auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
           TrackDesignElement(Trim(expanded));
           output.append(expanded);
         }
@@ -401,7 +402,9 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);
     if (!handled && IsActive()) {
       auto stripped = StripComments(line, in_block_comment_);
-      auto expanded = ExpandInlineMacros(stripped, file_id, line_num);
+      // §22.6: Expand inline `ifdef/`ifndef...`endif before macro expansion.
+      auto conditioned = ExpandInlineConditionals(stripped);
+      auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
       TrackDesignElement(Trim(expanded));
       output.append(expanded);
     }
@@ -928,6 +931,121 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
   result += ExpandMacro(*def, args_text);
   expansion_stack_.pop_back();
   return i;
+}
+
+// §22.6: Find a `ifdef or `ifndef that is followed by a matching `endif
+// on the same line. Returns npos if none found.
+static bool MatchesDirective(std::string_view text, std::string_view dir) {
+  if (text.size() < 1 + dir.size()) return false;
+  if (text[0] != '`') return false;
+  if (text.substr(1, dir.size()) != dir) return false;
+  if (text.size() > 1 + dir.size() &&
+      IsIdentChar(text[1 + dir.size()]))
+    return false;
+  return true;
+}
+
+static size_t FindInlineConditional(std::string_view line) {
+  for (size_t i = 0; i < line.size(); ++i) {
+    if (line[i] != '`') continue;
+    auto rest = line.substr(i);
+    bool is_ifdef = MatchesDirective(rest, "ifdef");
+    bool is_ifndef = MatchesDirective(rest, "ifndef");
+    if (!is_ifdef && !is_ifndef) continue;
+
+    // Check if there's a matching `endif on the same line.
+    size_t dir_len = is_ifndef ? 7 : 6;
+    int depth = 1;
+    for (size_t j = i + dir_len; j < line.size(); ++j) {
+      if (line[j] != '`') continue;
+      auto jr = line.substr(j);
+      if (MatchesDirective(jr, "ifdef") || MatchesDirective(jr, "ifndef")) {
+        ++depth;
+      } else if (MatchesDirective(jr, "endif")) {
+        --depth;
+        if (depth == 0) return i;
+      }
+    }
+  }
+  return std::string_view::npos;
+}
+
+// §22.6: Process inline `ifdef/`ifndef...`else...`endif within a line.
+std::string Preprocessor::ExpandInlineConditionals(std::string_view line) {
+  std::string result(line);
+
+  while (true) {
+    size_t ifdef_pos = FindInlineConditional(result);
+    if (ifdef_pos == std::string::npos) break;
+
+    auto rest = std::string_view(result).substr(ifdef_pos);
+    bool is_ifndef = MatchesDirective(rest, "ifndef");
+    size_t dir_len = is_ifndef ? 7 : 6;
+
+    // Extract condition.
+    size_t cond_start = ifdef_pos + dir_len;
+    while (cond_start < result.size() &&
+           std::isspace(static_cast<unsigned char>(result[cond_start])))
+      ++cond_start;
+
+    size_t cond_end;
+    bool has_expr = (cond_start < result.size() && result[cond_start] == '(');
+    if (has_expr) {
+      int pdepth = 0;
+      cond_end = cond_start;
+      for (; cond_end < result.size(); ++cond_end) {
+        if (result[cond_end] == '(') ++pdepth;
+        if (result[cond_end] == ')') { --pdepth; if (pdepth == 0) { ++cond_end; break; } }
+      }
+    } else {
+      cond_end = cond_start;
+      while (cond_end < result.size() && IsIdentChar(result[cond_end]))
+        ++cond_end;
+    }
+
+    auto condition = std::string_view(result).substr(cond_start, cond_end - cond_start);
+    bool cond_result;
+    if (has_expr) {
+      cond_result = EvalIfdefExpr(condition);
+    } else {
+      cond_result = macros_.IsDefined(condition);
+    }
+    if (is_ifndef) cond_result = !cond_result;
+
+    // Find `else and `endif at depth 0 within this inline conditional.
+    size_t else_pos = std::string::npos;
+    size_t endif_pos = std::string::npos;
+    int depth = 1;
+    for (size_t j = cond_end; j < result.size(); ++j) {
+      if (result[j] != '`') continue;
+      auto jr = std::string_view(result).substr(j);
+      if (MatchesDirective(jr, "ifdef") || MatchesDirective(jr, "ifndef")) {
+        ++depth;
+      } else if (MatchesDirective(jr, "endif")) {
+        --depth;
+        if (depth == 0) { endif_pos = j; break; }
+      } else if (depth == 1 && MatchesDirective(jr, "else")) {
+        if (else_pos == std::string::npos) else_pos = j;
+      }
+    }
+
+    if (endif_pos == std::string::npos) break;
+
+    // Extract the appropriate block.
+    std::string replacement;
+    if (cond_result) {
+      size_t text_end = (else_pos != std::string::npos) ? else_pos : endif_pos;
+      replacement = result.substr(cond_end, text_end - cond_end);
+    } else if (else_pos != std::string::npos) {
+      replacement = result.substr(else_pos + 5, endif_pos - (else_pos + 5));
+    }
+
+    // Replace the `ifdef...`endif span.
+    size_t span_end = endif_pos + 6;
+    result = result.substr(0, ifdef_pos) + replacement + result.substr(span_end);
+  }
+
+  return result;
 }
 
 std::string Preprocessor::ExpandInlineMacros(std::string_view line,
