@@ -53,10 +53,10 @@ def make_parsed_file(
 
 
 def stub_side_effects(monkeypatch):
-    """Stub maybe_tick_issue_checkbox and commit_classification."""
+    """Stub maybe_update_issue_status and commit_classification."""
     monkeypatch.setattr(
-        classify_test, "maybe_tick_issue_checkbox",
-        lambda args, tests: None,
+        classify_test, "maybe_update_issue_status",
+        lambda args, tests, **kw: None,
     )
     monkeypatch.setattr(
         classify_test, "commit_classification",

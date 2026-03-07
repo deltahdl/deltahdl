@@ -31,16 +31,18 @@ def extract_test_names(filepath: Path) -> list[str]:
 
 
 def build_issue_body(filename: str, test_names: list[str]) -> str:
-    """Build the GitHub issue body with checkboxes for each test."""
-    total = len(test_names)
-    checkboxes = "\n".join(f"- [ ] {name}" for name in test_names)
+    """Build the GitHub issue body with a status table for each test."""
+    rows = "\n".join(
+        f"| {name} | Unreviewed | |" for name in test_names
+    )
     return (
         f"## Summary\n\n"
         f"Classify each test in `test/src/unit/{filename}` "
         f"into the correct per-LRM-clause file using `classify_test`.\n\n"
-        f"## Tests\n"
-        f"Progress: 0/{total}\n\n"
-        f"{checkboxes}\n"
+        f"## Tests\n\n"
+        f"| Test | Status | Remarks |\n"
+        f"|------|--------|---------|\n"
+        f"{rows}\n"
     )
 
 
@@ -76,31 +78,30 @@ def ensure_unchecked(
     args: argparse.Namespace,
     test_names: list[str],
 ) -> None:
-    """Ensure every test has an unchecked checkbox in the issue."""
-    print(f"Fetching issue #{args.issue} to verify checkboxes...")
+    """Ensure every test has an 'Unreviewed' row in the issue table."""
+    print(f"Fetching issue #{args.issue} to verify statuses...")
     body = fetch_issue_body(
         args.organization, args.repo, args.issue,
     )
     changed = False
     for name in test_names:
-        checked = re.compile(
-            r"^- \[x\] " + re.escape(name) + r"$",
+        row_re = re.compile(
+            r"^\| " + re.escape(name) + r" \|[^|]*\|[^|]*\|$",
             re.MULTILINE,
         )
-        unchecked = re.compile(
-            r"^- \[ \] " + re.escape(name) + r"$",
-            re.MULTILINE,
-        )
-        if checked.search(body):
-            body = checked.sub("- [ ] " + name, body)
-            changed = True
-        elif not unchecked.search(body):
-            body = body.rstrip("\n") + "\n- [ ] " + name + "\n"
+        match = row_re.search(body)
+        if match:
+            new_row = f"| {name} | Unreviewed | |"
+            if match.group(0) != new_row:
+                body = body[:match.start()] + new_row + body[match.end():]
+                changed = True
+        else:
+            body = body.rstrip("\n") + f"\n| {name} | Unreviewed | |\n"
             changed = True
     if changed:
-        print(f"Resetting checkboxes for issue #{args.issue}"
-              " because a previous run already checked"
-              " some boxes...")
+        print(f"Resetting statuses for issue #{args.issue}"
+              " because a previous run already reviewed"
+              " some tests...")
         update_issue_body(
             args.organization, args.repo, args.issue, body,
         )

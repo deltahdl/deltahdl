@@ -23,8 +23,7 @@ from lib.python.classify import add_github_args, add_output_args, add_run_mode_a
 from ._github import (
     _validate_issue_args,
     fetch_issue_body,
-    maybe_tick_issue_checkbox,
-    tick_checkbox,
+    maybe_update_issue_status,
     update_issue_body,
 )
 from ._git import commit_classification
@@ -909,12 +908,12 @@ def _run(args):
         Path(args.lrm).resolve(),
     )
     print_classification_table(target)
-    maybe_tick_issue_checkbox(args, target)
     groups = _group_tests(target)
     source_is_target = any(
         clause_to_filename(p, c) == filepath.stem
         for p, c in groups
     )
+    maybe_update_issue_status(args, target, source_is_target=source_is_target)
     to_create, to_merge, n_removed = _resolve_destinations(
         groups, Path(args.output_dir).resolve(),
         exclude_path=filepath, dry_run=args.dry_run,

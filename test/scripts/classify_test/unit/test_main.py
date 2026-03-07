@@ -698,22 +698,22 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch,
 # ---- _run with --issue -----------------------------------------------------
 
 
-def _setup_maybe_tick_test(ct, ct_helpers, tmp_path, monkeypatch):
-    """Stub classifier and capture maybe_tick_issue_checkbox calls."""
+def _setup_maybe_update_test(ct, ct_helpers, tmp_path, monkeypatch):
+    """Stub classifier and capture maybe_update_issue_status calls."""
     _make_input_file(tmp_path)
     ct_helpers.stub_classifier(monkeypatch, _parser_response())
     called = []
     monkeypatch.setattr(
-        ct, "maybe_tick_issue_checkbox",
-        lambda args, tests: called.append(True),
+        ct, "maybe_update_issue_status",
+        lambda args, tests, **kw: called.append(True),
     )
     return getattr(ct, "_run"), called
 
 
 def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
                                          ct_helpers):
-    """_run with --issue calls maybe_tick_issue_checkbox."""
-    _run, called = _setup_maybe_tick_test(ct, ct_helpers, tmp_path, monkeypatch)
+    """_run with --issue calls maybe_update_issue_status."""
+    _run, called = _setup_maybe_update_test(ct, ct_helpers, tmp_path, monkeypatch)
     args = _run_args(
         tmp_path, dry_run=True,
         issue=42, organization="myorg", repo="myrepo",
@@ -724,8 +724,8 @@ def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
 
 def test_run_without_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
                                             ct_helpers):
-    """_run without --issue still calls maybe_tick_issue_checkbox."""
-    _run, called = _setup_maybe_tick_test(ct, ct_helpers, tmp_path, monkeypatch)
+    """_run without --issue still calls maybe_update_issue_status."""
+    _run, called = _setup_maybe_update_test(ct, ct_helpers, tmp_path, monkeypatch)
     _run(_run_args(tmp_path, dry_run=True))
     assert len(called) == 1
 

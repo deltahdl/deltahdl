@@ -8,7 +8,7 @@ from pathlib import Path
 
 from classify_test._github import (
     fetch_issue_body,
-    remove_checkbox,
+    remove_test_row,
     update_issue_body,
 )
 from lib.python.classify import (
@@ -84,7 +84,7 @@ def remove_file_checkbox(
     print(f"Removing {filename} from issue #{issue}...")
     body = fetch_issue_body(org, repo, issue)
     try:
-        body = remove_checkbox(body, filename)
+        body = remove_test_row(body, filename)
     except ValueError:
         print(f"Filename not found in issue #{issue}."
               " Nothing to delete.")

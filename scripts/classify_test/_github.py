@@ -18,58 +18,48 @@ def _validate_issue_args(args):
         sys.exit(1)
 
 
-def _checkbox_patterns(test_name):
-    """Return (unchecked, checked) regexes for plain or linked checkbox."""
-    escaped = re.escape(test_name)
-    suffix = r"(?:\[" + escaped + r"\]\([^)]*\)|" + escaped + r")"
-    unchecked = re.compile(
-        r"^(- \[) \] " + suffix + r"$", re.MULTILINE,
+def update_test_status(body, test_name, status):
+    """Update the Status column for test_name in the issue table."""
+    row_re = re.compile(
+        r"^\| " + re.escape(test_name) + r" \|[^|]*\|[^|]*\|$",
+        re.MULTILINE,
     )
-    checked = re.compile(
-        r"^- \[x\] " + suffix + r"$", re.MULTILINE,
-    )
-    return unchecked, checked
-
-
-def tick_checkbox(body, test_name):
-    """Replace '- [ ] test_name' with '- [x] test_name' in body."""
-    unchecked, checked = _checkbox_patterns(test_name)
-    match = unchecked.search(body)
+    match = row_re.search(body)
     if not match:
-        if checked.search(body):
-            return body
-        print(f"ERROR: Checkbox for {test_name!r} not found"
-              " in issue body")
+        print(f"ERROR: Row for {test_name!r} not found in issue body")
         sys.exit(1)
-    line = match.group(0)
-    ticked = line[:len("- [")] + "x" + line[len("- [x"):]
-    return body[:match.start()] + ticked + body[match.end():]
+    new_row = f"| {test_name} | {status} | |"
+    return body[:match.start()] + new_row + body[match.end():]
 
 
-def remove_checkbox(body, test_name):
-    """Remove the checkbox line for test_name from body."""
-    escaped = re.escape(test_name)
-    suffix = r"(?:\[" + escaped + r"\]\([^)]*\)|" + escaped + r")"
-    pattern = re.compile(
-        r"^- \[[ x]\] " + suffix + r"\n?", re.MULTILINE,
+def remove_test_row(body, test_name):
+    """Remove the table row for test_name from body."""
+    row_re = re.compile(
+        r"^\| " + re.escape(test_name) + r" \|[^|]*\|[^|]*\|\n?",
+        re.MULTILINE,
     )
-    match = pattern.search(body)
+    match = row_re.search(body)
     if not match:
         raise ValueError(
-            f"Checkbox for {test_name!r} not found in issue body",
+            f"Row for {test_name!r} not found in issue body",
         )
     return body[:match.start()] + body[match.end():]
 
 
-def maybe_tick_issue_checkbox(args, tests):
-    """Tick checkboxes for classified tests in a GitHub issue."""
+def maybe_update_issue_status(args, tests, *, source_is_target):
+    """Update status for classified tests in a GitHub issue."""
+    status = (
+        "Reviewed but kept in the same file"
+        if source_is_target
+        else "Reviewed but moved to another file"
+    )
     print(f"Fetching issue #{args.issue}...")
     body = fetch_issue_body(
         args.organization, args.repo, args.issue,
     )
     for t in tests:
-        body = tick_checkbox(body, t.test_name)
-    print(f"Ticking checkbox for issue #{args.issue}...")
+        body = update_test_status(body, t.test_name, status)
+    print(f"Updating status to '{status}' for issue #{args.issue}...")
     update_issue_body(
         args.organization, args.repo, args.issue, body,
     )

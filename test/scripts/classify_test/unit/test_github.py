@@ -80,95 +80,61 @@ def test_parse_args_repo_required(monkeypatch, ct):
         _parse_args()
 
 
-# ---- tick_checkbox ---------------------------------------------------------
+# ---- update_test_status ----------------------------------------------------
 
 
-def test_tick_checkbox_ticks_unchecked(ct_github):
-    """Replaces '- [ ] Name' with '- [x] Name'."""
-    body = "- [ ] Alpha\n- [ ] Beta\n"
-    assert "- [x] Alpha" in ct_github.tick_checkbox(body, "Alpha")
+def test_update_test_status_sets_status(ct_github):
+    """Updates status from Unreviewed to reviewed."""
+    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
+    result = ct_github.update_test_status(body, "Alpha", "Reviewed but kept in the same file")
+    assert "| Alpha | Reviewed but kept in the same file | |" in result
 
 
-def test_tick_checkbox_leaves_others_unchecked(ct_github):
-    """Does not tick other checkboxes."""
-    body = "- [ ] Alpha\n- [ ] Beta\n"
-    result = ct_github.tick_checkbox(body, "Alpha")
-    assert "- [ ] Beta" in result
+def test_update_test_status_leaves_others(ct_github):
+    """Does not change other rows."""
+    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
+    result = ct_github.update_test_status(body, "Alpha", "Reviewed but kept in the same file")
+    assert "| Beta | Unreviewed | |" in result
 
 
-def test_tick_checkbox_already_checked(ct_github):
-    """No change when checkbox is already checked."""
-    body = "- [x] Alpha\n- [ ] Beta\n"
-    assert ct_github.tick_checkbox(body, "Alpha") == body
+def test_update_test_status_already_set(ct_github):
+    """Idempotent when same status is set again."""
+    body = "| Alpha | Reviewed but kept in the same file | |\n"
+    result = ct_github.update_test_status(body, "Alpha", "Reviewed but kept in the same file")
+    assert "| Alpha | Reviewed but kept in the same file | |" in result
 
 
-def test_tick_checkbox_link_ticks_unchecked(ct_github):
-    """Ticks a checkbox when the name is a markdown link."""
-    body = "- [ ] [Alpha](https://example.com/1)\n- [ ] Beta\n"
-    assert "- [x] [Alpha]" in ct_github.tick_checkbox(body, "Alpha")
-
-
-def test_tick_checkbox_link_leaves_others_unchecked(ct_github):
-    """Does not tick other checkboxes when ticking a link."""
-    body = "- [ ] [Alpha](https://example.com/1)\n- [ ] Beta\n"
-    assert "- [ ] Beta" in ct_github.tick_checkbox(body, "Alpha")
-
-
-def test_tick_checkbox_link_preserves_url(ct_github):
-    """Preserves the markdown link URL after ticking."""
-    body = "- [ ] [Alpha](https://example.com/1)\n"
-    assert "(https://example.com/1)" in ct_github.tick_checkbox(body, "Alpha")
-
-
-def test_tick_checkbox_link_already_checked(ct_github):
-    """No change when a linked checkbox is already checked."""
-    body = "- [x] [Alpha](https://example.com/1)\n"
-    assert ct_github.tick_checkbox(body, "Alpha") == body
-
-
-def test_tick_checkbox_not_found_exits(ct_github):
-    """Exits when test name is not found in any checkbox."""
+def test_update_test_status_not_found_exits(ct_github):
+    """Exits when test name is not found in any row."""
     with pytest.raises(SystemExit):
-        ct_github.tick_checkbox("- [ ] Other\n", "Missing")
+        ct_github.update_test_status("| Other | Unreviewed | |\n", "Missing", "Reviewed but kept in the same file")
 
 
-# ---- remove_checkbox -------------------------------------------------------
+# ---- remove_test_row ------------------------------------------------------
 
 
-def test_remove_checkbox_removes_unchecked(ct_github):
-    """Removes an unchecked checkbox line."""
-    body = "- [ ] Alpha\n- [ ] Beta\n"
-    assert ct_github.remove_checkbox(body, "Alpha") == "- [ ] Beta\n"
+def test_remove_test_row_removes_unreviewed(ct_github):
+    """Removes an Unreviewed row."""
+    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
+    assert ct_github.remove_test_row(body, "Alpha") == "| Beta | Unreviewed | |\n"
 
 
-def test_remove_checkbox_removes_checked(ct_github):
-    """Removes a checked checkbox line."""
-    body = "- [x] Alpha\n- [ ] Beta\n"
-    assert ct_github.remove_checkbox(body, "Alpha") == "- [ ] Beta\n"
+def test_remove_test_row_removes_reviewed(ct_github):
+    """Removes a reviewed row."""
+    body = "| Alpha | Reviewed but kept in the same file | |\n| Beta | Unreviewed | |\n"
+    assert ct_github.remove_test_row(body, "Alpha") == "| Beta | Unreviewed | |\n"
 
 
-def test_remove_checkbox_removes_linked_unchecked(ct_github):
-    """Removes a linked unchecked checkbox line."""
-    body = "- [ ] [Alpha](https://example.com/1)\n- [ ] Beta\n"
-    assert ct_github.remove_checkbox(body, "Alpha") == "- [ ] Beta\n"
+def test_remove_test_row_preserves_others(ct_github):
+    """Other rows are untouched after removal."""
+    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n| Gamma | Unreviewed | |\n"
+    assert "| Beta | Unreviewed | |\n| Gamma | Unreviewed | |" in ct_github.remove_test_row(body, "Alpha")
 
 
-def test_remove_checkbox_removes_linked_checked(ct_github):
-    """Removes a linked checked checkbox line."""
-    body = "- [x] [Alpha](https://example.com/1)\n- [ ] Beta\n"
-    assert ct_github.remove_checkbox(body, "Alpha") == "- [ ] Beta\n"
-
-
-def test_remove_checkbox_preserves_others(ct_github):
-    """Other checkboxes are untouched after removal."""
-    body = "- [ ] Alpha\n- [ ] Beta\n- [ ] Gamma\n"
-    assert "- [ ] Beta\n- [ ] Gamma\n" in ct_github.remove_checkbox(body, "Alpha")
-
-
-def test_remove_checkbox_not_found_raises(ct_github):
-    """Raises ValueError when test name is not found in any checkbox."""
+def test_remove_test_row_not_found_raises(ct_github):
+    """Raises ValueError when test name is not found in any row."""
     with pytest.raises(ValueError, match="not found"):
-        ct_github.remove_checkbox("- [ ] Other\n", "Missing")
+        ct_github.remove_test_row("| Other | Unreviewed | |\n", "Missing")
 
 
 # ---- fetch_issue_body ------------------------------------------------------
@@ -269,16 +235,16 @@ def test_validate_issue_args_missing_repo(ct_github):
         getattr(ct_github, "_validate_issue_args")(_issue_args(issue=42, organization="org"))
 
 
-# ---- maybe_tick_issue_checkbox ---------------------------------------------
+# ---- maybe_update_issue_status ---------------------------------------------
 
 
-def test_maybe_tick_does_fetch_and_update(monkeypatch, ct_github, ct_helpers):
-    """Fetches body, ticks checkbox, and updates."""
+def test_maybe_update_kept(monkeypatch, ct_github, ct_helpers):
+    """Sets status to 'Reviewed but kept in the same file' when kept."""
     _tb = ct_helpers.make_test_block
     updated = []
     monkeypatch.setattr(
         ct_github, "fetch_issue_body",
-        lambda org, repo, issue: "- [ ] T\n",
+        lambda org, repo, issue: "| T | Unreviewed | |\n",
     )
     monkeypatch.setattr(
         ct_github, "update_issue_body",
@@ -287,17 +253,36 @@ def test_maybe_tick_does_fetch_and_update(monkeypatch, ct_github, ct_helpers):
     t = _tb("T", prefix="test_parser_", clause="6.1")
     t.rationale = "r"
     args = _issue_args(issue=42, organization="org", repo="repo")
-    ct_github.maybe_tick_issue_checkbox(args, [t])
-    assert "- [x] T" in updated[0]
+    ct_github.maybe_update_issue_status(args, [t], source_is_target=True)
+    assert "| T | Reviewed but kept in the same file | |" in updated[0]
 
 
-def test_maybe_tick_passes_correct_org(monkeypatch, ct_github, ct_helpers):
+def test_maybe_update_moved(monkeypatch, ct_github, ct_helpers):
+    """Sets status to 'Reviewed but moved to another file' when moved."""
+    _tb = ct_helpers.make_test_block
+    updated = []
+    monkeypatch.setattr(
+        ct_github, "fetch_issue_body",
+        lambda org, repo, issue: "| T | Unreviewed | |\n",
+    )
+    monkeypatch.setattr(
+        ct_github, "update_issue_body",
+        lambda org, repo, issue, body: updated.append(body),
+    )
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    t.rationale = "r"
+    args = _issue_args(issue=42, organization="org", repo="repo")
+    ct_github.maybe_update_issue_status(args, [t], source_is_target=False)
+    assert "| T | Reviewed but moved to another file | |" in updated[0]
+
+
+def test_maybe_update_passes_correct_org(monkeypatch, ct_github, ct_helpers):
     """Passes organization to fetch and update."""
     _tb = ct_helpers.make_test_block
     orgs = []
     monkeypatch.setattr(
         ct_github, "fetch_issue_body",
-        lambda org, repo, issue: (orgs.append(org), "- [ ] T\n")[1],
+        lambda org, repo, issue: (orgs.append(org), "| T | Unreviewed | |\n")[1],
     )
     monkeypatch.setattr(
         ct_github, "update_issue_body",
@@ -306,17 +291,17 @@ def test_maybe_tick_passes_correct_org(monkeypatch, ct_github, ct_helpers):
     t = _tb("T", prefix="test_parser_", clause="6.1")
     t.rationale = "r"
     args = _issue_args(issue=42, organization="myorg", repo="repo")
-    ct_github.maybe_tick_issue_checkbox(args, [t])
+    ct_github.maybe_update_issue_status(args, [t], source_is_target=True)
     assert all(o == "myorg" for o in orgs)
 
 
-def test_maybe_tick_passes_correct_issue(monkeypatch, ct_github, ct_helpers):
+def test_maybe_update_passes_correct_issue(monkeypatch, ct_github, ct_helpers):
     """Passes issue number to fetch and update."""
     _tb = ct_helpers.make_test_block
     issues = []
     monkeypatch.setattr(
         ct_github, "fetch_issue_body",
-        lambda org, repo, issue: (issues.append(issue), "- [ ] T\n")[1],
+        lambda org, repo, issue: (issues.append(issue), "| T | Unreviewed | |\n")[1],
     )
     monkeypatch.setattr(
         ct_github, "update_issue_body",
@@ -325,5 +310,5 @@ def test_maybe_tick_passes_correct_issue(monkeypatch, ct_github, ct_helpers):
     t = _tb("T", prefix="test_parser_", clause="6.1")
     t.rationale = "r"
     args = _issue_args(issue=99, organization="org", repo="repo")
-    ct_github.maybe_tick_issue_checkbox(args, [t])
+    ct_github.maybe_update_issue_status(args, [t], source_is_target=True)
     assert all(i == 99 for i in issues)

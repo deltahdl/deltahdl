@@ -355,17 +355,17 @@ def test_build_issue_body_filename_in_path(cf):
     )
 
 
-def test_build_issue_body_progress_line(cf):
-    """Body shows Progress: 0/N for N tests."""
-    assert "Progress: 0/3" in cf.build_issue_body(
+def test_build_issue_body_table_header(cf):
+    """Body contains the table header row."""
+    assert "| Test | Status | Remarks |" in cf.build_issue_body(
         "f.cpp", ["A", "B", "C"],
     )
 
 
-def test_build_issue_body_checkboxes(cf):
-    """Body contains unchecked checkboxes for each test name."""
+def test_build_issue_body_rows(cf):
+    """Body contains table rows for each test name."""
     body = cf.build_issue_body("f.cpp", ["Alpha", "Beta"])
-    assert "- [ ] Alpha" in body
+    assert "| Alpha | Unreviewed | |" in body
 
 
 def test_build_issue_body_tests_header(cf):
@@ -375,7 +375,7 @@ def test_build_issue_body_tests_header(cf):
 
 def test_build_issue_body_single_test(cf):
     """Body works correctly with a single test."""
-    assert "Progress: 0/1" in cf.build_issue_body("f.cpp", ["Only"])
+    assert "| Only | Unreviewed | |" in cf.build_issue_body("f.cpp", ["Only"])
 
 
 # ---- create_issue ----------------------------------------------------------
@@ -804,57 +804,57 @@ def _stub_github(monkeypatch, cf, body):
     return updates
 
 
-def test_ensure_unchecked_all_unchecked_no_update(monkeypatch, cf):
-    """Does not call update when all checkboxes are already unchecked."""
-    body = "- [ ] Alpha\n- [ ] Beta\n"
+def test_ensure_unchecked_all_unreviewed_no_update(monkeypatch, cf):
+    """Does not call update when all rows are already Unreviewed."""
+    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
     updates = _stub_github(monkeypatch, cf, body)
     cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
     assert len(updates) == 0
 
 
-def test_ensure_unchecked_unchecks_checked_box(monkeypatch, cf):
-    """Unchecks a checked checkbox."""
-    body = "- [x] Alpha\n- [ ] Beta\n"
+def test_ensure_unchecked_resets_reviewed_row(monkeypatch, cf):
+    """Resets a reviewed row back to Unreviewed."""
+    body = "| Alpha | Reviewed but moved to another file | |\n| Beta | Unreviewed | |\n"
     updates = _stub_github(monkeypatch, cf, body)
     cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
-    assert "- [ ] Alpha" in updates[0]
+    assert "| Alpha | Unreviewed | |" in updates[0]
 
 
-def test_ensure_unchecked_adds_missing_box(monkeypatch, cf):
-    """Adds an unchecked checkbox for a missing test."""
-    body = "- [ ] Alpha\n"
+def test_ensure_unchecked_adds_missing_row(monkeypatch, cf):
+    """Adds an Unreviewed row for a missing test."""
+    body = "| Alpha | Unreviewed | |\n"
     updates = _stub_github(monkeypatch, cf, body)
     cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
-    assert "- [ ] Beta" in updates[0]
+    assert "| Beta | Unreviewed | |" in updates[0]
 
 
-def test_ensure_unchecked_mixed_unchecks(monkeypatch, cf):
-    """Mixed: unchecks the checked box."""
-    body = "- [x] Alpha\n"
+def test_ensure_unchecked_mixed_resets(monkeypatch, cf):
+    """Mixed: resets the reviewed row."""
+    body = "| Alpha | Reviewed but kept in the same file | |\n"
     updates = _stub_github(monkeypatch, cf, body)
     cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
-    assert "- [ ] Alpha" in updates[0]
+    assert "| Alpha | Unreviewed | |" in updates[0]
 
 
 def test_ensure_unchecked_mixed_adds_missing(monkeypatch, cf):
-    """Mixed: adds the missing box."""
-    body = "- [x] Alpha\n"
+    """Mixed: adds the missing row."""
+    body = "| Alpha | Reviewed but kept in the same file | |\n"
     updates = _stub_github(monkeypatch, cf, body)
     cf.ensure_unchecked(_make_args(), ["Alpha", "Beta"])
-    assert "- [ ] Beta" in updates[0]
+    assert "| Beta | Unreviewed | |" in updates[0]
 
 
 def test_ensure_unchecked_calls_update(monkeypatch, cf):
     """Calls update_issue_body when changes are made."""
-    body = "- [x] Alpha\n"
+    body = "| Alpha | Reviewed but moved to another file | |\n"
     updates = _stub_github(monkeypatch, cf, body)
     cf.ensure_unchecked(_make_args(), ["Alpha"])
     assert len(updates) == 1
 
 
-def test_ensure_unchecked_preserves_other_checked(monkeypatch, cf):
-    """Leaves checked boxes for tests not in test_names."""
-    body = "- [x] Other\n- [ ] Alpha\n"
+def test_ensure_unchecked_preserves_other_reviewed(monkeypatch, cf):
+    """Leaves reviewed rows for tests not in test_names."""
+    body = "| Other | Reviewed but kept in the same file | |\n| Alpha | Unreviewed | |\n"
     updates = _stub_github(monkeypatch, cf, body)
     cf.ensure_unchecked(_make_args(), ["Alpha"])
     assert len(updates) == 0

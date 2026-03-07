@@ -299,7 +299,7 @@ def test_remove_file_checkbox_calls_fetch(monkeypatch: pytest.MonkeyPatch) -> No
         classify_files, "fetch_issue_body", fake_fetch,
     )
     monkeypatch.setattr(
-        classify_files, "remove_checkbox",
+        classify_files, "remove_test_row",
         lambda body, _name: body,
     )
     monkeypatch.setattr(
@@ -322,7 +322,7 @@ def test_remove_file_checkbox_calls_remove(monkeypatch: pytest.MonkeyPatch) -> N
         return body
 
     monkeypatch.setattr(
-        classify_files, "remove_checkbox", fake_remove,
+        classify_files, "remove_test_row", fake_remove,
     )
     monkeypatch.setattr(
         classify_files, "update_issue_body",
@@ -340,7 +340,7 @@ def test_remove_file_checkbox_calls_update(monkeypatch: pytest.MonkeyPatch) -> N
         lambda _o, _r, _i: "- [ ] a.cpp\n- [ ] b.cpp\n",
     )
     monkeypatch.setattr(
-        classify_files, "remove_checkbox",
+        classify_files, "remove_test_row",
         lambda _body, _name: "- [ ] b.cpp\n",
     )
     monkeypatch.setattr(
@@ -358,7 +358,7 @@ def _stub_not_found(monkeypatch: pytest.MonkeyPatch) -> list[str]:
         lambda _o, _r, _i: "- [ ] other.cpp\n",
     )
     monkeypatch.setattr(
-        classify_files, "remove_checkbox",
+        classify_files, "remove_test_row",
         _raise_value_error,
     )
     updated: list[str] = []
