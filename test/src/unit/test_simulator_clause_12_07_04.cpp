@@ -46,4 +46,80 @@ TEST(SimA608, WhileZeroIter) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
+// §12.7.4: while with break.
+TEST(SimA608, WhileBreak) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    while (1) begin\n"
+      "      if (x == 8'd5) break;\n"
+      "      x = x + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+// §12.7.4: while with continue.
+TEST(SimA608, WhileContinue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, sum;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    sum = 8'd0;\n"
+      "    while (x < 8'd5) begin\n"
+      "      x = x + 8'd1;\n"
+      "      if (x == 8'd3) continue;\n"
+      "      sum = sum + x;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("sum");
+  ASSERT_NE(var, nullptr);
+  // sum = 1+2+4+5 = 12 (skip 3)
+  EXPECT_EQ(var->value.ToUint64(), 12u);
+}
+
+// §12.7.4: while with block body.
+TEST(SimA608, WhileBlock) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x, cnt;\n"
+      "  initial begin\n"
+      "    x = 8'd3;\n"
+      "    cnt = 8'd0;\n"
+      "    while (x > 0) begin\n"
+      "      x = x - 8'd1;\n"
+      "      cnt = cnt + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("cnt");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
 }  // namespace
