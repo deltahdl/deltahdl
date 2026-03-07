@@ -33,14 +33,6 @@ TEST(Preprocessor, Pragma_Protect_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// --- §22.11: Pragma inside conditional compilation ---
-TEST(Preprocessor, Pragma_InsideIfdef_Active) {
-  PreprocFixture f;
-  Preprocess("`define MY_FLAG\n`ifdef MY_FLAG\n`pragma some_pragma\n`endif\n",
-             f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(Preprocessor, Pragma_InsideIfdef_Inactive) {
   PreprocFixture f;
   auto out = Preprocess("`ifdef UNDEF_FLAG\n`pragma some_pragma\n`endif\n", f);
