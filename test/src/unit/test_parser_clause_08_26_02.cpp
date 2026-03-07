@@ -89,4 +89,14 @@ TEST(ParserClause08_03, ImplementsMultipleInterfaces) {
   EXPECT_EQ(cls->implements_types[2], "IFace3");
 }
 
+TEST(ParserClause08_03, ImplementsWithParamAssignment) {
+  auto r = Parse(
+      "class C implements IFace#(int);\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  ASSERT_EQ(r.cu->classes[0]->implements_types.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->implements_types[0], "IFace");
+}
+
 }  // namespace
