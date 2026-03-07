@@ -26,4 +26,62 @@ TEST(Elaboration, ParameterizedType_Basic) {
   EXPECT_EQ(mod->variables[0].width, 1);
 }
 
+// §6.25: Parameterized class with value parameter affecting width.
+TEST(Elaboration, ParameterizedType_ValueParam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "virtual class bus_def #(parameter WIDTH = 8);\n"
+      "  typedef logic [WIDTH-1:0] data_t;\n"
+      "endclass\n"
+      "module top;\n"
+      "  bus_def#(16)::data_t wide;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 1);
+  EXPECT_EQ(mod->variables[0].name, "wide");
+  EXPECT_EQ(mod->variables[0].width, 16);
+}
+
+// §6.25: Parameterized class — default type parameter used.
+TEST(Elaboration, ParameterizedType_DefaultType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C #(type T = int);\n"
+      "  typedef T my_type;\n"
+      "endclass\n"
+      "module top;\n"
+      "  C::my_type x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 1);
+  EXPECT_EQ(mod->variables[0].name, "x");
+  EXPECT_EQ(mod->variables[0].width, 32);
+}
+
+// §6.25: Multiple specializations of same class yield different widths.
+TEST(Elaboration, ParameterizedType_MultipleWidths) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "virtual class bus_def #(parameter WIDTH = 8);\n"
+      "  typedef logic [WIDTH-1:0] data_t;\n"
+      "endclass\n"
+      "module top;\n"
+      "  bus_def#(8)::data_t narrow;\n"
+      "  bus_def#(32)::data_t wide;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->variables.size(), 2);
+  EXPECT_EQ(mod->variables[0].width, 8);
+  EXPECT_EQ(mod->variables[1].width, 32);
+}
+
 }  // namespace
