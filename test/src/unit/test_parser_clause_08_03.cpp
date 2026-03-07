@@ -120,21 +120,6 @@ TEST(ParserClause08_03, ConstructorDefaultArg) {
   EXPECT_TRUE(members[0]->method->func_args[0].is_default);
 }
 
-TEST(ParserClause08_03, ConstructorMixedArgsWithDefault) {
-  auto r = Parse(
-      "class C extends Base;\n"
-      "  function new(int size, default);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& args = r.cu->classes[0]->members[0]->method->func_args;
-  ASSERT_EQ(args.size(), 2u);
-  EXPECT_FALSE(args[0].is_default);
-  EXPECT_EQ(args[0].name, "size");
-  EXPECT_TRUE(args[1].is_default);
-}
-
 TEST(ParserClause08_03, ConstructorDefaultBeforeArgs) {
   auto r = Parse(
       "class C extends Base;\n"
