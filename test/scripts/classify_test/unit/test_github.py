@@ -263,12 +263,9 @@ def test_validate_issue_args_missing_repo(ct_github):
 # ---- maybe_update_issue_status ---------------------------------------------
 
 
-_DEFAULT_FILENAMES = {"T": "test_parser_clause_06_01.cpp"}
-
-
 def _setup_maybe_update(
     monkeypatch, ct_github, ct_helpers, *,
-    source_is_target, target_filenames=_DEFAULT_FILENAMES,
+    source_is_target, target_filenames=None,
 ):
     """Run maybe_update_issue_status and return captured body updates."""
     _tb = ct_helpers.make_test_block
@@ -296,6 +293,7 @@ def test_maybe_update_kept(monkeypatch, ct_github, ct_helpers):
     """Sets status to 'Reviewed' and action to 'Kept in the same file'."""
     updated = _setup_maybe_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=True,
+        target_filenames={"T": "test_parser_clause_06_01.cpp"},
     )
     assert "| T | Reviewed | Kept in the same file |" in updated[0]
 
@@ -304,6 +302,7 @@ def test_maybe_update_moved(monkeypatch, ct_github, ct_helpers):
     """Sets status and action with target filename when moved."""
     updated = _setup_maybe_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=False,
+        target_filenames={"T": "test_parser_clause_06_01.cpp"},
     )
     assert (
         "| T | Reviewed"
