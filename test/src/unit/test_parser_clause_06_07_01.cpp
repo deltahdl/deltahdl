@@ -897,4 +897,18 @@ TEST(ParserA222, DriveStrengthWeak0Weak1) {
   EXPECT_EQ(item->drive_strength1, 2u);   // weak1
 }
 
+// §6.3.2.2: Drive strength highz0, strong1.
+TEST(ParserA222, DriveStrengthHighz0Strong1) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (highz0, strong1) w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->drive_strength0, 1u);   // highz0
+  EXPECT_EQ(item->drive_strength1, 4u);   // strong1
+}
+
 }  // namespace
