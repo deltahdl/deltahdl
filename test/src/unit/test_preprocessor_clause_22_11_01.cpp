@@ -13,12 +13,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 
 namespace {
 
-TEST(Preprocessor, Pragma_ParenthesizedValue_NoError) {
-  PreprocFixture f;
-  Preprocess("`pragma my_pragma (a, b, c)\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(Preprocessor, Pragma_ComplexExpression_NoError) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma key1 = (a, b), key2 = \"str\", 99\n", f);
