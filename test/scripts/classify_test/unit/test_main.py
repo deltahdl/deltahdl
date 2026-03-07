@@ -564,16 +564,14 @@ def _mixed_classifier(prompt, schema=None):
     return {"clause": "6.1", "rationale": "r"}
 
 
-def _run_live_non_lrm(ct, ct_helpers, tmp_path, monkeypatch, *,
-                      src_body, classifier, test="T"):
-    """Write source, stub externals, and run live pipeline."""
+def _run_live_non_lrm(ct, tmp_path, monkeypatch, *, src_body, test="T"):
+    """Write source and run live pipeline.
+
+    Callers must stub _call_claude and side effects before calling.
+    """
     _run = getattr(ct, "_run")
     src = tmp_path / "test_non_lrm_aig.cpp"
     src.write_text(src_body, encoding="utf-8")
-    monkeypatch.setattr(
-        ct, "_call_claude", classifier,
-    )
-    ct_helpers.stub_side_effects(monkeypatch)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
         f"# header\nadd_unit_test({src.stem})\n", encoding="utf-8",
@@ -591,11 +589,12 @@ def _self_named_classifier(_prompt, schema=None):
 
 def test_run_live_self_named(tmp_path, monkeypatch, ct, ct_helpers):
     """Source file already in correct location is left untouched."""
+    monkeypatch.setattr(ct, "_call_claude", _self_named_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch,
+        ct, tmp_path, monkeypatch,
         src_body="#include <gtest/gtest.h>\n\n"
         "TEST(S, T) {\n  auto r = Parse(src);\n}\n",
-        classifier=_self_named_classifier,
     )
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
@@ -609,9 +608,11 @@ _MIXED_BODY = (
 
 def test_run_live_mixed_keeps_source(tmp_path, monkeypatch, ct, ct_helpers):
     """Source is rewritten with only the staying tests."""
+    monkeypatch.setattr(ct, "_call_claude", _mixed_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch,
-        src_body=_MIXED_BODY, classifier=_mixed_classifier, test="Move",
+        ct, tmp_path, monkeypatch,
+        src_body=_MIXED_BODY, test="Move",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Stay" in src
@@ -620,9 +621,11 @@ def test_run_live_mixed_keeps_source(tmp_path, monkeypatch, ct, ct_helpers):
 def test_run_live_mixed_removes_moved_from_source(tmp_path, monkeypatch, ct,
                                                    ct_helpers):
     """Moved tests are removed from the source file."""
+    monkeypatch.setattr(ct, "_call_claude", _mixed_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch,
-        src_body=_MIXED_BODY, classifier=_mixed_classifier, test="Move",
+        ct, tmp_path, monkeypatch,
+        src_body=_MIXED_BODY, test="Move",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Move" not in src
@@ -631,9 +634,11 @@ def test_run_live_mixed_removes_moved_from_source(tmp_path, monkeypatch, ct,
 def test_run_live_mixed_creates_new_file(tmp_path, monkeypatch, ct,
                                          ct_helpers):
     """Moved tests are written to a new clause file."""
+    monkeypatch.setattr(ct, "_call_claude", _mixed_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch,
-        src_body=_MIXED_BODY, classifier=_mixed_classifier, test="Move",
+        ct, tmp_path, monkeypatch,
+        src_body=_MIXED_BODY, test="Move",
     )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
@@ -641,9 +646,11 @@ def test_run_live_mixed_creates_new_file(tmp_path, monkeypatch, ct,
 def test_run_live_mixed_keeps_cmake_entry(tmp_path, monkeypatch, ct,
                                           ct_helpers):
     """Source kept in CMakeLists.txt when source_is_target."""
+    monkeypatch.setattr(ct, "_call_claude", _mixed_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch,
-        src_body=_MIXED_BODY, classifier=_mixed_classifier, test="Move",
+        ct, tmp_path, monkeypatch,
+        src_body=_MIXED_BODY, test="Move",
     )
     cmake = (tmp_path / "CMakeLists.txt").read_text()
     assert "test_non_lrm_aig" in cmake
@@ -664,9 +671,11 @@ def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch, ct,
         "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n}\n",
         encoding="utf-8",
     )
+    monkeypatch.setattr(ct, "_call_claude", _self_named_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch,
-        src_body=src_body, classifier=_self_named_classifier, test="Dup",
+        ct, tmp_path, monkeypatch,
+        src_body=src_body, test="Dup",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Dup" not in src
@@ -684,9 +693,11 @@ def test_run_live_dedup_only_test_rewrites_source(tmp_path, monkeypatch, ct,
         "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n}\n",
         encoding="utf-8",
     )
+    monkeypatch.setattr(ct, "_call_claude", _self_named_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch,
-        src_body=src_body, classifier=_self_named_classifier, test="Dup",
+        ct, tmp_path, monkeypatch,
+        src_body=src_body, test="Dup",
     )
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
@@ -704,9 +715,11 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch,
         "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n}\n",
         encoding="utf-8",
     )
+    monkeypatch.setattr(ct, "_call_claude", _self_named_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch,
-        src_body=src_body, classifier=_self_named_classifier, test="Dup",
+        ct, tmp_path, monkeypatch,
+        src_body=src_body, test="Dup",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Keep" in src
