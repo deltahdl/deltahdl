@@ -57,6 +57,15 @@ void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   CollectStmtReads(stmt->for_step, out);
   CollectStmtReads(stmt->body, out);
   for (auto* s : stmt->fork_stmts) CollectStmtReads(s, out);
+  // §9.2.2.2.2: Case item patterns and bodies contribute to sensitivity.
+  for (const auto& ci : stmt->case_items) {
+    for (const auto* pat : ci.patterns) CollectExprReads(pat, out);
+    CollectStmtReads(ci.body, out);
+  }
+  // §9.2.2.2.2: Immediate assertion expressions contribute to sensitivity.
+  CollectExprReads(stmt->assert_expr, out);
+  CollectStmtReads(stmt->assert_pass_stmt, out);
+  CollectStmtReads(stmt->assert_fail_stmt, out);
 }
 
 std::vector<std::string> CollectReadSignals(const Stmt* body) {
