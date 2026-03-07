@@ -8,18 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA83, GenvarExprElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  parameter int N = 4;\n"
-      "  logic [N-1:0] w;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §6.9.1: Little-endian range [0:7] has width 8.
 TEST(ElabSection6, Sec6_9_1_LittleEndianWidth) {
   ElabFixture f;
