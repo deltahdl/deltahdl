@@ -376,6 +376,89 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   }
 }
 
+// §13.4.3: Check if a function body contains fork constructs.
+static bool BodyContainsFork(const Stmt* s) {
+  if (!s) return false;
+  if (s->kind == StmtKind::kFork) return true;
+  for (auto* sub : s->stmts)
+    if (BodyContainsFork(sub)) return true;
+  if (BodyContainsFork(s->then_branch)) return true;
+  if (BodyContainsFork(s->else_branch)) return true;
+  if (BodyContainsFork(s->body)) return true;
+  if (BodyContainsFork(s->for_body)) return true;
+  for (auto& ci : s->case_items)
+    if (BodyContainsFork(ci.body)) return true;
+  return false;
+}
+
+// §13.4.3: Validate that a function meets constant function constraints.
+static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
+                                     DiagEngine& diag) {
+  for (const auto& arg : func->func_args) {
+    if (arg.direction == Direction::kOutput ||
+        arg.direction == Direction::kInout ||
+        arg.direction == Direction::kRef) {
+      diag.Error(loc,
+                 std::format("constant function '{}' shall not have {}"
+                             " arguments",
+                             func->name,
+                             arg.direction == Direction::kOutput  ? "output"
+                             : arg.direction == Direction::kInout ? "inout"
+                                                                  : "ref"));
+      return false;
+    }
+  }
+  for (auto* s : func->func_body_stmts) {
+    if (BodyContainsFork(s)) {
+      diag.Error(loc,
+                 std::format("constant function '{}' shall not contain fork",
+                             func->name));
+      return false;
+    }
+  }
+  return true;
+}
+
+// §13.4.3: Find function calls in an expression and validate for constant use.
+static void ValidateConstantFuncCallsInExpr(
+    const Expr* expr, SourceLoc loc,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
+    auto it = func_decls.find(expr->callee);
+    if (it != func_decls.end()) {
+      ValidateConstantFunction(it->second, loc, diag);
+    }
+  }
+  ValidateConstantFuncCallsInExpr(expr->lhs, loc, func_decls, diag);
+  ValidateConstantFuncCallsInExpr(expr->rhs, loc, func_decls, diag);
+  ValidateConstantFuncCallsInExpr(expr->condition, loc, func_decls, diag);
+  ValidateConstantFuncCallsInExpr(expr->true_expr, loc, func_decls, diag);
+  ValidateConstantFuncCallsInExpr(expr->false_expr, loc, func_decls, diag);
+  for (auto* arg : expr->args)
+    ValidateConstantFuncCallsInExpr(arg, loc, func_decls, diag);
+  for (auto* elem : expr->elements)
+    ValidateConstantFuncCallsInExpr(elem, loc, func_decls, diag);
+}
+
+void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
+  // Check function calls in module header parameter defaults.
+  for (const auto& [name, default_expr] : decl->params) {
+    if (default_expr) {
+      ValidateConstantFuncCallsInExpr(default_expr, decl->range.start,
+                                      func_decls_,
+                                      diag_);
+    }
+  }
+  // Check function calls in localparam/parameter item initializers.
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) continue;
+    ValidateConstantFuncCallsInExpr(item->init_expr, item->loc, func_decls_,
+                                    diag_);
+  }
+}
+
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item);

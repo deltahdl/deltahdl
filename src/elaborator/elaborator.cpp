@@ -821,16 +821,22 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   interconnect_names_.clear();
   var_named_types_.clear();
   task_names_.clear();
+  func_decls_.clear();
   // §13.2: Collect task names so function body validation can detect task enables.
+  // §13.4.3: Collect function declarations for constant function validation.
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) {
       task_names_.insert(item->name);
+    }
+    if (item->kind == ModuleItemKind::kFunctionDecl) {
+      func_decls_[item->name] = item;
     }
   }
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }
   ValidateModuleConstraints(decl);
+  ValidateConstantFunctionCalls(decl);
 }
 
 // --- Module instantiation ---

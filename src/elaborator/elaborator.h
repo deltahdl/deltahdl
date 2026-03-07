@@ -184,6 +184,8 @@ class Elaborator {
 
   /// §13.2/§13.4.1/§13.4.4: Validate function/task body constraints.
   void ValidateFunctionBody(const ModuleItem* item);
+  /// §13.4.3: Validate constant function calls in parameter expressions.
+  void ValidateConstantFunctionCalls(const ModuleDecl* decl);
 
   /// Track enum type info for a variable declaration.
   void TrackEnumVariable(const ModuleItem* item);
@@ -293,6 +295,8 @@ class Elaborator {
   std::unordered_set<std::string_view> nettype_names_;
   std::unordered_set<std::string_view> interconnect_names_;
   std::unordered_set<std::string_view> task_names_;  // §13.2
+  // §13.4.3: Function declarations by name for constant function validation.
+  std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
   std::unordered_map<std::string_view, std::string_view>
       var_named_types_;  // §11.2.2: var name → named type for aggregate checks
 };
