@@ -2,12 +2,12 @@
 #include "helpers_class_object.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
-#include "simulator/eval.h"
 
 using namespace delta;
 
 namespace {
 
+// §8.22: Multi-level polymorphic vtable dispatch — leaf overrides base.
 TEST(ClassSim, PolymorphicVTableMultiLevel) {
   SimFixture f;
   auto* base = MakeClassType(f, "A", {});
@@ -29,6 +29,104 @@ TEST(ClassSim, PolymorphicVTableMultiLevel) {
 
   auto [handle, obj] = MakeObj(f, leaf);
   EXPECT_EQ(obj->ResolveVirtualMethod("f"), m_leaf);
+}
+
+// §8.22: Virtual dispatch returns method from actual object type, not declared
+// type — the essence of polymorphism.
+TEST(ClassSim, PolymorphicDispatchSubclassMethod) {
+  SimFixture f;
+  auto* base_type = MakeClassType(f, "BasePacket", {});
+  auto* ether_type = MakeClassType(f, "EtherPacket", {});
+  ether_type->parent = base_type;
+
+  auto* base_send = f.arena.Create<ModuleItem>();
+  base_send->kind = ModuleItemKind::kFunctionDecl;
+  base_send->name = "send";
+  auto* ether_send = f.arena.Create<ModuleItem>();
+  ether_send->kind = ModuleItemKind::kFunctionDecl;
+  ether_send->name = "send";
+
+  base_type->vtable.push_back({"send", base_send, base_type});
+  ether_type->vtable.push_back({"send", ether_send, ether_type});
+
+  // Object is EtherPacket — dispatch should resolve to ether_send.
+  auto [handle, obj] = MakeObj(f, ether_type);
+  EXPECT_EQ(obj->ResolveVirtualMethod("send"), ether_send);
+}
+
+// §8.22: Non-virtual method falls back to static resolution via methods map.
+TEST(ClassSim, NonVirtualFallbackToStaticResolution) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "Foo", {});
+
+  auto* method = f.arena.Create<ModuleItem>();
+  method->kind = ModuleItemKind::kFunctionDecl;
+  method->name = "bar";
+  type->methods["bar"] = method;
+
+  auto [handle, obj] = MakeObj(f, type);
+  // Not in vtable — ResolveVirtualMethod returns nullptr.
+  EXPECT_EQ(obj->ResolveVirtualMethod("bar"), nullptr);
+  // Static resolution succeeds.
+  EXPECT_EQ(obj->ResolveMethod("bar"), method);
+}
+
+// §8.22: Middle class in hierarchy doesn't override — dispatches to base.
+TEST(ClassSim, PolymorphicMiddleInheritsBase) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Base", {});
+  auto* mid = MakeClassType(f, "Mid", {});
+  mid->parent = base;
+
+  auto* base_fn = f.arena.Create<ModuleItem>();
+  base_fn->kind = ModuleItemKind::kFunctionDecl;
+  base_fn->name = "compute";
+
+  base->vtable.push_back({"compute", base_fn, base});
+  // Mid inherits the vtable entry unchanged.
+  mid->vtable.push_back({"compute", base_fn, base});
+
+  auto [handle, obj] = MakeObj(f, mid);
+  EXPECT_EQ(obj->ResolveVirtualMethod("compute"), base_fn);
+}
+
+// §8.22: Multiple virtual methods — each resolves independently.
+TEST(ClassSim, PolymorphicMultipleMethods) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Base", {});
+
+  auto* send_fn = f.arena.Create<ModuleItem>();
+  send_fn->kind = ModuleItemKind::kFunctionDecl;
+  send_fn->name = "send";
+  auto* recv_fn = f.arena.Create<ModuleItem>();
+  recv_fn->kind = ModuleItemKind::kFunctionDecl;
+  recv_fn->name = "receive";
+
+  base->vtable.push_back({"send", send_fn, base});
+  base->vtable.push_back({"receive", recv_fn, base});
+
+  auto* derived = MakeClassType(f, "Derived", {});
+  derived->parent = base;
+  auto* derived_send = f.arena.Create<ModuleItem>();
+  derived_send->kind = ModuleItemKind::kFunctionDecl;
+  derived_send->name = "send";
+
+  // Override only send, inherit receive.
+  derived->vtable.push_back({"send", derived_send, derived});
+  derived->vtable.push_back({"receive", recv_fn, base});
+
+  auto [handle, obj] = MakeObj(f, derived);
+  EXPECT_EQ(obj->ResolveVirtualMethod("send"), derived_send);
+  EXPECT_EQ(obj->ResolveVirtualMethod("receive"), recv_fn);
+}
+
+// §8.22: Unknown method name returns nullptr from both dispatch paths.
+TEST(ClassSim, PolymorphicUnknownMethodReturnsNull) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "Foo", {});
+  auto [handle, obj] = MakeObj(f, type);
+  EXPECT_EQ(obj->ResolveVirtualMethod("nonexistent"), nullptr);
+  EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
 }
 
 }  // namespace

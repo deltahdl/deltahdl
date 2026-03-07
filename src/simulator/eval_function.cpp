@@ -603,7 +603,9 @@ static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
   if (handle == kNullClassHandle) return false;
   auto* obj = ctx.GetClassObject(handle);
   if (!obj) return false;
-  auto* method = obj->ResolveMethod(parts.method_name);
+  // §8.22: Try virtual dispatch first (polymorphic), then static resolution.
+  auto* method = obj->ResolveVirtualMethod(parts.method_name);
+  if (!method) method = obj->ResolveMethod(parts.method_name);
   if (!method) return false;
   bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
   ctx.PushScope();

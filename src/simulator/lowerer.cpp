@@ -383,6 +383,28 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
       info->methods[name] = member->method;
     }
   }
+  // §8.22: Build vtable for polymorphic dispatch.
+  // Inherit parent vtable entries.
+  if (info->parent) {
+    info->vtable = info->parent->vtable;
+  }
+  // Override or add virtual method entries.
+  for (auto* member : cls->members) {
+    if (member->kind != ClassMemberKind::kMethod || !member->method) continue;
+    if (!member->is_virtual) continue;
+    int idx = info->FindVTableIndex(member->method->name);
+    if (idx >= 0) {
+      // Override existing entry.
+      info->vtable[static_cast<size_t>(idx)].method =
+          member->is_pure_virtual ? nullptr : member->method;
+      info->vtable[static_cast<size_t>(idx)].owner = info;
+    } else {
+      // New virtual method.
+      info->vtable.push_back(
+          {member->method->name,
+           member->is_pure_virtual ? nullptr : member->method, info});
+    }
+  }
   // §8.9: Initialize static properties on the class type.
   for (const auto& p : info->properties) {
     if (p.is_static) {
