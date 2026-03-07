@@ -311,4 +311,76 @@ TEST(ParserSection6, VoidTaskReturnType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
 }
 
+// §13.3: Default direction is input when no direction specified.
+TEST(ParserSection13, TaskDefaultDirectionInput) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t(int a, int b);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kInput);
+}
+
+// §13.3: Task with empty body is legal.
+TEST(ParserSection13, TaskEmptyBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  task empty_task;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->func_body_stmts.empty());
+}
+
+// §13.3: Direction stickiness — output sticks to subsequent args.
+TEST(ParserSection13, TaskDirectionStickyOutput) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t(output logic [7:0] a, b);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].direction, Direction::kOutput);
+  EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
+}
+
+// §13.3: Task with multiple statements.
+TEST(ParserSection13, TaskMultipleStatements) {
+  auto r = Parse(
+      "module m;\n"
+      "  task compute(input int a, output int b, output int c);\n"
+      "    b = a + 1;\n"
+      "    c = a * 2;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_GE(item->func_body_stmts.size(), 2u);
+}
+
+// §13.3: Task with return statement (early exit).
+TEST(ParserSection13, TaskReturnStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t(input int a);\n"
+      "    if (a == 0) return;\n"
+      "    $display(\"%d\", a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
