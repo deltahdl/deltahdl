@@ -1,12 +1,64 @@
-#include "common/types.h"
-#include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
-#include "lexer/token.h"
+#include "parser/ast.h"
 
 using namespace delta;
 
 namespace {
+
+// §6.12: Type widths — real=64, shortreal=32, realtime=64.
+TEST(TypeEval, RealTypeWidths) {
+  DataType dt;
+  dt.kind = DataTypeKind::kReal;
+  EXPECT_EQ(EvalTypeWidth(dt), 64u);
+  dt.kind = DataTypeKind::kShortreal;
+  EXPECT_EQ(EvalTypeWidth(dt), 32u);
+  dt.kind = DataTypeKind::kRealtime;
+  EXPECT_EQ(EvalTypeWidth(dt), 64u);
+}
+
+// §6.12: realtime treated synonymously with real.
+TEST(Elaboration, RealtimeSynonymousWithReal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  real r;\n"
+      "  realtime rt;\n"
+      "  initial begin r = 0.0; rt = 0.0; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  bool r_real = false;
+  bool rt_real = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "r") r_real = v.is_real;
+    if (v.name == "rt") rt_real = v.is_real;
+  }
+  EXPECT_TRUE(r_real);
+  EXPECT_TRUE(rt_real);
+}
+
+// §6.12: negedge on real type is illegal.
+TEST(Elaboration, RealNegedge_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  real a;\n"
+      "  always @(negedge a)\n"
+      "    $display(\"negedge\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §6.12: real types are not integral.
+TEST(TypeEval, RealTypesNotIntegral) {
+  EXPECT_FALSE(IsIntegralType(DataTypeKind::kReal));
+  EXPECT_FALSE(IsIntegralType(DataTypeKind::kShortreal));
+  EXPECT_FALSE(IsIntegralType(DataTypeKind::kRealtime));
+}
 
 TEST(Elaboration, RealBitSelect_Error) {
   ElabFixture f;
