@@ -213,18 +213,66 @@ static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 // --- If with unique/priority qualifiers ---
 
+// §12.4.2: Check for uniqueness violations in if-else-if chains.
+// Walks the chain, evaluates all conditions, detects overlap and no-match.
 static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  auto cond = EvalExpr(stmt->condition, ctx, arena);
-  bool taken = cond.IsTruthy();
+  auto qual = stmt->qualifier;
 
-  if (taken) {
+  if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
+    // Walk the if-else-if chain, evaluate ALL conditions to detect overlap.
+    const Stmt* first_match = nullptr;
+    int match_count = 0;
+    bool has_final_else = false;
+
+    for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
+         cur = cur->else_branch) {
+      auto cond = EvalExpr(cur->condition, ctx, arena);
+      if (cond.IsTruthy()) {
+        match_count++;
+        if (!first_match) first_match = cur;
+      }
+      // Check if the else_branch is a final else (not another if).
+      if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
+        has_final_else = true;
+      }
+    }
+
+    if (match_count > 1) {
+      ctx.GetDiag().Warning({}, "unique if: multiple conditions matched");
+    }
+
+    if (first_match) {
+      co_return co_await ExecStmt(first_match->then_branch, ctx, arena);
+    }
+
+    // No match: execute final else if present.
+    if (has_final_else) {
+      // Find the final else statement.
+      const Stmt* cur = stmt;
+      while (cur->else_branch && cur->else_branch->kind == StmtKind::kIf) {
+        cur = cur->else_branch;
+      }
+      if (cur->else_branch) {
+        co_return co_await ExecStmt(cur->else_branch, ctx, arena);
+      }
+    }
+
+    // No match, no else: unique → violation, unique0 → no violation.
+    if (!has_final_else && qual == CaseQualifier::kUnique) {
+      ctx.GetDiag().Warning({}, "unique if: no condition matched");
+    }
+    co_return StmtResult::kDone;
+  }
+
+  // Standard if or priority-if: evaluate conditions in order.
+  auto cond = EvalExpr(stmt->condition, ctx, arena);
+  if (cond.IsTruthy()) {
     co_return co_await ExecStmt(stmt->then_branch, ctx, arena);
   }
   if (stmt->else_branch) {
     co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
   }
-  // priority-if with no match and no else => warning.
-  if (stmt->qualifier == CaseQualifier::kPriority) {
+  if (qual == CaseQualifier::kPriority) {
     ctx.GetDiag().Warning({}, "priority if: no condition matched");
   }
   co_return StmtResult::kDone;
