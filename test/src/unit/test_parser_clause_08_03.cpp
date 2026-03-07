@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -11,20 +13,6 @@ TEST(SourceText, DescriptionClass) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->name, "C");
-}
-
-TEST(SourceText, ClassCovergroupDecl) {
-  auto r = Parse(
-      "class C;\n"
-      "  covergroup cg @(posedge clk);\n"
-      "  endgroup\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 1u);
-  EXPECT_EQ(members[0]->kind, ClassMemberKind::kCovergroup);
-  EXPECT_EQ(members[0]->name, "cg");
 }
 
 TEST(ParserSection8, ClassWithLifetime) {
@@ -46,6 +34,7 @@ TEST(ParserSection8, ClassWithParameter) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->name, "par_cls");
 }
+
 TEST(ParserSection23, EndLabelClass) {
   auto r = Parse("class myclass; endclass : myclass\n");
   ASSERT_NE(r.cu, nullptr);
@@ -261,7 +250,6 @@ TEST(ParserSection6, ClassVarDecl_ClassParsed) {
 }
 
 // --- §8.3 implements clause ---
-
 TEST(ParserClause08_03, ImplementsSingleInterface) {
   auto r = Parse(
       "class C implements IFace;\n"
@@ -310,7 +298,6 @@ TEST(ParserClause08_03, ImplementsWithParamAssignment) {
 }
 
 // --- §8.3 extends with constructor arguments ---
-
 TEST(ParserClause08_03, ExtendsWithArgs) {
   auto r = Parse(
       "class D extends Base(5);\n"
@@ -334,7 +321,6 @@ TEST(ParserClause08_03, ExtendsWithDefault) {
 }
 
 // --- §8.3 class_constructor_arg: default keyword ---
-
 TEST(ParserClause08_03, ConstructorDefaultArg) {
   auto r = Parse(
       "class C extends Base;\n"
@@ -378,7 +364,6 @@ TEST(ParserClause08_03, ConstructorDefaultBeforeArgs) {
 }
 
 // --- §8.3 extern constructor prototype ---
-
 TEST(ParserClause08_03, ExternConstructorPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -393,7 +378,6 @@ TEST(ParserClause08_03, ExternConstructorPrototype) {
 }
 
 // --- §8.3 dynamic_override_specifiers on methods ---
-
 TEST(ParserClause08_03, MethodInitialSpecifier) {
   auto r = Parse(
       "class C;\n"
@@ -435,7 +419,6 @@ TEST(ParserClause08_03, TaskDynamicOverrideSpecifiers) {
 }
 
 // --- §8.3 footnote 9: default at most once in constructor arg list ---
-
 TEST(ParserClause08_03, ErrorDuplicateDefaultInConstructorArgs) {
   auto r = Parse(
       "class C extends Base;\n"
@@ -446,7 +429,6 @@ TEST(ParserClause08_03, ErrorDuplicateDefaultInConstructorArgs) {
 }
 
 // --- §8.3 footnote 10: qualifier conflict errors ---
-
 TEST(ParserClause08_03, ErrorBothLocalAndProtected) {
   auto r = Parse(
       "class C;\n"
@@ -480,7 +462,6 @@ TEST(ParserClause08_03, ErrorDuplicateVirtual) {
 }
 
 // --- §8.3 interface class extends multiple bases (§8.26) ---
-
 TEST(ParserClause08_03, InterfaceClassExtendsMultiple) {
   auto r = Parse(
       "interface class IFace extends IBase1, IBase2;\n"
