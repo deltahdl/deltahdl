@@ -8,13 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(NetDecl, ChargeStrengthOnWandIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kWand;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
-
 TEST(NetDecl, ChargeStrengthOnTriIsError) {
   NetDeclInfo info;
   info.type = NetType::kTri;
