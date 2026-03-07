@@ -407,4 +407,68 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithOutputArg) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
+// §13.4: Default function argument direction is input.
+TEST(ParserSection13, FunctionDefaultDirectionInput) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = r.cu->modules[0]->items[0];
+  ASSERT_EQ(fn->func_args.size(), 2u);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kInput);
+  EXPECT_EQ(fn->func_args[1].direction, Direction::kInput);
+}
+
+// §13.4: Direction stickiness — output sticks to subsequent args.
+TEST(ParserSection13, FunctionDirectionStickyOutput) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(output int a, int b);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = r.cu->modules[0]->items[0];
+  ASSERT_EQ(fn->func_args.size(), 2u);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kOutput);
+  EXPECT_EQ(fn->func_args[1].direction, Direction::kOutput);
+}
+
+// §13.4: Multiple statements in function body executed sequentially.
+TEST(ParserSection13, FunctionMultipleStmtsSequential) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    int x;\n"
+      "    x = 1;\n"
+      "    x = x + 1;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FindFunc(r, "f");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_GE(fn->func_body_stmts.size(), 3u);
+}
+
+// §13.4: Function with ref argument.
+TEST(ParserSection13, FunctionRefArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(ref int a);\n"
+      "    a = a + 1;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FindFunc(r, "f");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 1u);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
+}
+
 }  // namespace
