@@ -229,9 +229,19 @@ ModuleItem* Parser::ParseAlias() {
   return item;
 }
 
+static ModuleItemKind AlwaysKindToItemKind(AlwaysKind kind) {
+  switch (kind) {
+    case AlwaysKind::kAlways: return ModuleItemKind::kAlwaysBlock;
+    case AlwaysKind::kAlwaysComb: return ModuleItemKind::kAlwaysCombBlock;
+    case AlwaysKind::kAlwaysFF: return ModuleItemKind::kAlwaysFFBlock;
+    case AlwaysKind::kAlwaysLatch: return ModuleItemKind::kAlwaysLatchBlock;
+  }
+  return ModuleItemKind::kAlwaysBlock;
+}
+
 ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
   auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kAlwaysBlock;
+  item->kind = AlwaysKindToItemKind(kind);
   item->always_kind = kind;
   item->loc = CurrentLoc();
   Consume();  // always / always_comb / always_ff / always_latch

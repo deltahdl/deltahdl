@@ -257,8 +257,7 @@ template <typename T>
 inline ModuleItem* FirstAlwaysCombItem(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock &&
-        item->always_kind == AlwaysKind::kAlwaysComb)
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock)
       return item;
   }
   return nullptr;
@@ -577,8 +576,7 @@ inline ModuleItem* NthAlwaysComb(T& r, size_t n) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   size_t count = 0;
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock &&
-        item->always_kind == AlwaysKind::kAlwaysComb) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock) {
       if (count == n) return item;
       ++count;
     }

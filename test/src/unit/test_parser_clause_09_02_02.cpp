@@ -4,6 +4,7 @@
 using namespace delta;
 namespace {
 
+// §9.2.2: Four forms of always procedures with distinct ModuleItemKind.
 TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
   auto r = Parse(
       "module m;\n"
@@ -14,13 +15,58 @@ TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto blocks =
-      FindItems(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
-  ASSERT_EQ(blocks.size(), 4u);
-  EXPECT_EQ(blocks[0]->always_kind, AlwaysKind::kAlways);
-  EXPECT_EQ(blocks[1]->always_kind, AlwaysKind::kAlwaysComb);
-  EXPECT_EQ(blocks[2]->always_kind, AlwaysKind::kAlwaysLatch);
-  EXPECT_EQ(blocks[3]->always_kind, AlwaysKind::kAlwaysFF);
+  auto& items = r.cu->modules[0]->items;
+  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysCombBlock));
+  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysLatchBlock));
+  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysFFBlock));
+}
+
+// §9.2.2: Each always variant preserves AlwaysKind.
+TEST(ParserClause09_02_02, AlwaysKindPreserved) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) a = 1;\n"
+      "  always_comb b = 2;\n"
+      "  always_latch if (en) c = 3;\n"
+      "  always_ff @(posedge clk) d <= 4;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  auto* a = FindItemByKind(items, ModuleItemKind::kAlwaysBlock);
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->always_kind, AlwaysKind::kAlways);
+  auto* ac = FindItemByKind(items, ModuleItemKind::kAlwaysCombBlock);
+  ASSERT_NE(ac, nullptr);
+  EXPECT_EQ(ac->always_kind, AlwaysKind::kAlwaysComb);
+  auto* al = FindItemByKind(items, ModuleItemKind::kAlwaysLatchBlock);
+  ASSERT_NE(al, nullptr);
+  EXPECT_EQ(al->always_kind, AlwaysKind::kAlwaysLatch);
+  auto* af = FindItemByKind(items, ModuleItemKind::kAlwaysFFBlock);
+  ASSERT_NE(af, nullptr);
+  EXPECT_EQ(af->always_kind, AlwaysKind::kAlwaysFF);
+}
+
+// §9.2.2: All always forms have a non-null body statement.
+TEST(ParserClause09_02_02, AlwaysFormsHaveBodies) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(posedge clk) a = 1;\n"
+      "  always_comb b = 2;\n"
+      "  always_latch if (en) c = 3;\n"
+      "  always_ff @(posedge clk) d <= 4;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      EXPECT_NE(item->body, nullptr);
+    }
+  }
 }
 
 }  // namespace
