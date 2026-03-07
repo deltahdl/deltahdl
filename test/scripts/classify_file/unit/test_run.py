@@ -908,7 +908,7 @@ def test_run_skips_sync_issue_rows_with_create_issue(
     assert len(log) == 0
 
 
-def _run_with_reviewed(tmp_path, monkeypatch, cf, cf_helpers,
+def _run_with_reviewed(tmp_path, monkeypatch, cf, cf_helpers, *,
                        body, reviewed):
     """Run _run() with sync_issue_rows returning *reviewed*."""
     cf_helpers.make_test_file(tmp_path, body)
@@ -927,7 +927,7 @@ def test_run_skips_reviewed_tests_count(
     """Only invokes classify_test for unreviewed tests."""
     captured, _ = _run_with_reviewed(
         tmp_path, monkeypatch, cf, cf_helpers,
-        "TEST(S, A) {\n}\nTEST(S, B) {\n}\n", {"A"},
+        body="TEST(S, A) {\n}\nTEST(S, B) {\n}\n", reviewed={"A"},
     )
     assert len(captured) == 1
 
@@ -938,7 +938,7 @@ def test_run_skips_reviewed_tests_name(
     """Invokes classify_test for the unreviewed test only."""
     captured, _ = _run_with_reviewed(
         tmp_path, monkeypatch, cf, cf_helpers,
-        "TEST(S, A) {\n}\nTEST(S, B) {\n}\n", {"A"},
+        body="TEST(S, A) {\n}\nTEST(S, B) {\n}\n", reviewed={"A"},
     )
     assert "B" in " ".join(captured[0])
 
@@ -949,7 +949,7 @@ def test_run_all_reviewed_skips_classify(
     """Does not invoke classify_test when all tests are reviewed."""
     captured, _ = _run_with_reviewed(
         tmp_path, monkeypatch, cf, cf_helpers,
-        "TEST(S, A) {\n}\n", {"A"},
+        body="TEST(S, A) {\n}\n", reviewed={"A"},
     )
     assert len(captured) == 0
 
@@ -960,6 +960,6 @@ def test_run_all_reviewed_closes_issue(
     """Closes issue when all tests are already reviewed."""
     _, log = _run_with_reviewed(
         tmp_path, monkeypatch, cf, cf_helpers,
-        "TEST(S, A) {\n}\n", {"A"},
+        body="TEST(S, A) {\n}\n", reviewed={"A"},
     )
     assert len(log) == 1
