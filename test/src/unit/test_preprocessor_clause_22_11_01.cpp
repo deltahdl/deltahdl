@@ -13,12 +13,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 
 namespace {
 
-TEST(Preprocessor, Pragma_MissingName_OnlyWhitespace_Error) {
-  PreprocFixture f;
-  Preprocess("`pragma   \n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 // --- §22.11: `pragma with pragma_name (no expressions) ---
 TEST(Preprocessor, Pragma_SimpleName_NoError) {
   PreprocFixture f;

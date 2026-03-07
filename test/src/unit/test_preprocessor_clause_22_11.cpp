@@ -14,4 +14,10 @@ TEST(Preprocessor, Pragma_MissingName_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+TEST(Preprocessor, Pragma_MissingName_OnlyWhitespace_Error) {
+  PreprocFixture f;
+  Preprocess("`pragma   \n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
