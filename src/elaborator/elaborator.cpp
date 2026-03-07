@@ -721,6 +721,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       mod->function_decls.push_back(item);
       break;
     case ModuleItemKind::kTaskDecl:
+      ValidateFunctionBody(item);
       mod->function_decls.push_back(item);
       break;
     case ModuleItemKind::kGateInst:
@@ -819,6 +820,13 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   class_var_types_.clear();
   interconnect_names_.clear();
   var_named_types_.clear();
+  task_names_.clear();
+  // §13.2: Collect task names so function body validation can detect task enables.
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kTaskDecl) {
+      task_names_.insert(item->name);
+    }
+  }
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }

@@ -182,8 +182,7 @@ class Elaborator {
   /// Check specparam not used in parameter expressions (§6.20.5).
   void ValidateSpecparamInParams(const ModuleDecl* decl);
 
-  /// §13.4.1: Validate void function doesn't return a value.
-  /// §13.4.4: Validate only fork/join_none in function body.
+  /// §13.2/§13.4.1/§13.4.4: Validate function/task body constraints.
   void ValidateFunctionBody(const ModuleItem* item);
 
   /// Track enum type info for a variable declaration.
@@ -293,6 +292,7 @@ class Elaborator {
       class_var_types_;  // §8.18: var name → class type name
   std::unordered_set<std::string_view> nettype_names_;
   std::unordered_set<std::string_view> interconnect_names_;
+  std::unordered_set<std::string_view> task_names_;  // §13.2
   std::unordered_map<std::string_view, std::string_view>
       var_named_types_;  // §11.2.2: var name → named type for aggregate checks
 };
