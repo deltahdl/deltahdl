@@ -77,4 +77,14 @@ TEST(Preprocessor, Pragma_ComplexExpression_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// --- §22.11: Directive produces no output ---
+TEST(Preprocessor, Pragma_NoOutput) {
+  PreprocFixture f;
+  auto out = Preprocess("`pragma some_pragma\n", f);
+  auto trimmed = out;
+  trimmed.erase(0, trimmed.find_first_not_of(" \t\n\r"));
+  trimmed.erase(trimmed.find_last_not_of(" \t\n\r") + 1);
+  EXPECT_TRUE(trimmed.empty());
+}
+
 }  // namespace
