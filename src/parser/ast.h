@@ -719,6 +719,7 @@ struct ClassMember {
   bool is_rand = false;
   bool is_randc = false;
   bool is_const = false;
+  bool is_pure_virtual = false;  // §8.21: pure virtual method (no body)
 
   // Property fields
   DataType data_type;

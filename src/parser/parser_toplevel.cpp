@@ -848,6 +848,7 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
       Consume();
     } else if (Match(TokenKind::kKwPure)) {
       m->is_virtual = true;
+      m->is_pure_virtual = true;
       proto = true;
     } else if (Check(TokenKind::kKwRand)) {
       // §8.3 fn 10: only one of rand or randc

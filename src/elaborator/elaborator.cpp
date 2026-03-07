@@ -133,6 +133,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateConstClassProperties();
   // §8.20: Validate virtual method override rules.
   ValidateVirtualMethodOverrides();
+  // §8.21: Validate abstract class and pure virtual method rules.
+  ValidateAbstractClassRules();
 
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {

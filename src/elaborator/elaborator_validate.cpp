@@ -1210,4 +1210,52 @@ void Elaborator::ValidateVirtualMethodOverrides() {
   }
 }
 
+// §8.21: Collect all pure virtual method names from a class and its ancestors.
+static void CollectPureVirtualMethods(
+    const ClassDecl* cls, const CompilationUnit* unit,
+    std::vector<std::string_view>& pure_names) {
+  if (!cls) return;
+  // Walk up to base first.
+  if (!cls->base_class.empty()) {
+    const auto* base = FindClassDecl(cls->base_class, unit);
+    CollectPureVirtualMethods(base, unit, pure_names);
+  }
+  // Remove any pure virtuals that this class overrides with a concrete method.
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+    if (m->is_pure_virtual) {
+      pure_names.push_back(m->method->name);
+    } else if (m->is_virtual) {
+      // Concrete virtual override — remove from unimplemented list.
+      std::erase(pure_names, m->method->name);
+    }
+  }
+}
+
+// §8.21: Validate abstract class and pure virtual method rules.
+void Elaborator::ValidateAbstractClassRules() {
+  for (const auto* cls : unit_->classes) {
+    // §8.21: :final on a pure virtual method is illegal.
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+      if (m->is_pure_virtual && m->method->is_method_final) {
+        diag_.Error(m->method->loc,
+                    "':final' shall not be specified on a pure virtual method");
+      }
+    }
+    // §8.21: Non-abstract class extending abstract must implement all pure
+    // virtual methods.
+    if (!cls->is_virtual && !cls->base_class.empty()) {
+      std::vector<std::string_view> unimpl;
+      CollectPureVirtualMethods(cls, unit_, unimpl);
+      for (auto name : unimpl) {
+        diag_.Error(cls->range.start,
+                    std::format("non-abstract class '{}' does not implement "
+                                "pure virtual method '{}'",
+                                cls->name, name));
+      }
+    }
+  }
+}
+
 }  // namespace delta
