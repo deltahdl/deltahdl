@@ -1,15 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(ParserA213, NetDeclTriregChargeStrength) {
-  auto r = Parse("module m; trireg (medium) net1; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
 
 TEST(ParserA222, ChargeStrengthMedium) {
   auto r = Parse(

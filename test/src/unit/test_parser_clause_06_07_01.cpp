@@ -787,4 +787,10 @@ TEST(ParserSection6, Sec6_7_1_Delay3RiseFallDecay) {
   EXPECT_NE(item->net_delay_decay, nullptr);
 }
 
+TEST(ParserA213, NetDeclTriregChargeStrength) {
+  auto r = Parse("module m; trireg (medium) net1; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
