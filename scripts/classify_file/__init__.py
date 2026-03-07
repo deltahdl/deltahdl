@@ -30,7 +30,7 @@ def extract_test_names(filepath: Path) -> list[str]:
     return _TEST_RE.findall(text)
 
 
-def build_issue_body(filename: str, test_names: list[str]) -> str:
+def build_issue_body(test_names: list[str]) -> str:
     """Build the GitHub issue body with a status table for each test."""
     rows = "\n".join(
         f"| {name} | Unreviewed | |" for name in test_names
@@ -49,7 +49,7 @@ def create_issue(
     """Create a GitHub issue and return its number."""
     filename = Path(args.file).name
     title = f"Classify tests in {filename}"
-    body = build_issue_body(filename, test_names)
+    body = build_issue_body(test_names)
     print(f"Creating issue for {filename}...")
     payload = json.dumps({"title": title, "body": body})
     result = subprocess.run(
@@ -156,16 +156,20 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _maybe_close(args, reason):
+    """Close the issue if one is attached and not creating a new one."""
+    if not args.create_issue and args.issue is not None:
+        close_issue(
+            args.organization, args.repo, args.issue, reason,
+        )
+
+
 def _run(args: argparse.Namespace) -> None:
     """Execute the batch classification."""
     filepath = Path(args.file)
     if not filepath.is_file():
         print(f"Skipping: {filepath} not found")
-        if not args.create_issue and args.issue is not None:
-            close_issue(
-                args.organization, args.repo, args.issue,
-                "the source file no longer exists",
-            )
+        _maybe_close(args, "the source file no longer exists")
         return
     test_names = extract_test_names(filepath)
     if not test_names:
@@ -175,11 +179,7 @@ def _run(args: argparse.Namespace) -> None:
         print(f"Deleted {filepath.name}")
         if not args.dry_run and not args.no_commit:
             commit_and_push([], [filepath], f"Delete empty {filepath.name}\n")
-        if not args.create_issue and args.issue is not None:
-            close_issue(
-                args.organization, args.repo, args.issue,
-                "the file has no tests",
-            )
+        _maybe_close(args, "the file has no tests")
         return
     if args.create_issue:
         args.issue = create_issue(args, test_names)

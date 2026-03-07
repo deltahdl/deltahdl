@@ -346,24 +346,24 @@ def test_run_classify_test_does_not_capture_output(monkeypatch, cf):
 def test_build_issue_body_table_header(cf):
     """Body contains the table header row."""
     assert "| Test | Status | Remarks |" in cf.build_issue_body(
-        "f.cpp", ["A", "B", "C"],
+        ["A", "B", "C"],
     )
 
 
 def test_build_issue_body_rows(cf):
     """Body contains table rows for each test name."""
-    body = cf.build_issue_body("f.cpp", ["Alpha", "Beta"])
+    body = cf.build_issue_body(["Alpha", "Beta"])
     assert "| Alpha | Unreviewed | |" in body
 
 
 def test_build_issue_body_single_test(cf):
     """Body works correctly with a single test."""
-    assert "| Only | Unreviewed | |" in cf.build_issue_body("f.cpp", ["Only"])
+    assert "| Only | Unreviewed | |" in cf.build_issue_body(["Only"])
 
 
 def test_build_issue_body_no_headings(cf):
     """Body does not contain Summary or Tests headings."""
-    body = cf.build_issue_body("f.cpp", ["A"])
+    body = cf.build_issue_body(["A"])
     assert "## Summary" not in body
     assert "## Tests" not in body
 
