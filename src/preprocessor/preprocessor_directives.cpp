@@ -39,6 +39,14 @@ static bool ParseTimescaleComponent(std::string_view text, int& magnitude,
   return ParseTimeUnitStr(unit_str, unit);
 }
 
+// Effective order: unit exponent + log10(magnitude). More negative = more precise.
+static int EffectiveOrder(TimeUnit unit, int magnitude) {
+  int order = static_cast<int>(unit);
+  if (magnitude == 10) order += 1;
+  else if (magnitude == 100) order += 2;
+  return order;
+}
+
 void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   // Format: `timescale unit_mag unit / prec_mag precision
   auto slash = rest.find('/');
@@ -60,7 +68,8 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   }
 
   // §22.7: precision shall be at least as precise as the unit.
-  if (static_cast<int>(ts.precision) > static_cast<int>(ts.unit)) {
+  if (EffectiveOrder(ts.precision, ts.prec_magnitude) >
+      EffectiveOrder(ts.unit, ts.magnitude)) {
     diag_.Error(loc, "`timescale precision is less precise than the time unit");
     return;
   }

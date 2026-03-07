@@ -229,4 +229,79 @@ TEST(Preprocessor, Timescale_InvalidPrecisionUnit) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// --- §22.7: precision-magnitude must not exceed unit-magnitude ---
+
+TEST(Preprocessor, Timescale_PrecisionSameUnitLargerMagnitudeError) {
+  // 10ns is less precise than 1ns — should error.
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 1ns / 10ns\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Timescale_PrecisionSameUnitSmallerMagnitudeOk) {
+  // 1ns unit, 1ns precision — same, should pass.
+  // 10ns unit, 1ns precision — precision is finer, should pass.
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 10ns / 1ns\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Timescale_100nsUnit10nsPrecisionOk) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 100ns / 10ns\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Timescale_10nsUnit100nsError) {
+  // 100ns is less precise than 10ns.
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`timescale 10ns / 100ns\n", f, pp);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.7: global precision tracking with magnitude ---
+
+TEST(Preprocessor, Timescale_GlobalPrecisionWithMagnitude) {
+  // 10ps is less precise than 1ps — global should remain 1ps.
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1ns / 1ps\n"
+      "`timescale 1ns / 10ps\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
+}
+
+// --- §22.7: resetall then timescale re-establishment ---
+
+TEST(Preprocessor, Timescale_ResetallThenTimescale) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1ns / 1ps\n"
+      "`resetall\n"
+      "`timescale 1us / 1ns\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(pp.HasTimescale());
+  EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kUs);
+  EXPECT_EQ(pp.CurrentTimescale().precision, TimeUnit::kNs);
+}
+
+TEST(Preprocessor, Timescale_ResetallClearsTimescale) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1ns / 1ps\n"
+      "`resetall\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_FALSE(pp.HasTimescale());
+}
+
 }  // namespace
