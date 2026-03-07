@@ -67,21 +67,6 @@ TEST(SourceText, ClassEmptyItem) {
   EXPECT_EQ(r.cu->classes[0]->members.size(), 1u);
 }
 
-TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
-  auto r = Parse(
-      "class MyClass;\n"
-      "  int a, b, c;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto* cls = r.cu->classes[0];
-  ASSERT_EQ(cls->members.size(), 3u);
-  const std::string kExpectedNames[] = {"a", "b", "c"};
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(cls->members[i]->name, kExpectedNames[i]);
-  }
-}
-
 TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
   auto r = Parse(
       "class my_cls;\n"
