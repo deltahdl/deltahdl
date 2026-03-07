@@ -309,6 +309,38 @@ static RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
   return RtlirProcessKind::kAlwaysComb;
 }
 
+// §9.2.2.1: Check if a statement contains any timing control.
+static bool StmtHasTimingControl(const Stmt* stmt) {
+  if (!stmt) return false;
+  switch (stmt->kind) {
+    case StmtKind::kTimingControl:
+    case StmtKind::kDelay:
+    case StmtKind::kEventControl:
+    case StmtKind::kWait:
+      return true;
+    case StmtKind::kBlock:
+      for (const auto* s : stmt->stmts)
+        if (StmtHasTimingControl(s)) return true;
+      return false;
+    case StmtKind::kIf:
+      return StmtHasTimingControl(stmt->then_branch) ||
+             StmtHasTimingControl(stmt->else_branch);
+    case StmtKind::kFor:
+      return StmtHasTimingControl(stmt->for_body);
+    case StmtKind::kWhile:
+    case StmtKind::kDoWhile:
+    case StmtKind::kForever:
+    case StmtKind::kRepeat:
+      return StmtHasTimingControl(stmt->body);
+    case StmtKind::kFork:
+      for (const auto* s : stmt->fork_stmts)
+        if (StmtHasTimingControl(s)) return true;
+      return false;
+    default:
+      return false;
+  }
+}
+
 static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
                        RtlirModule* mod, Arena& arena, DiagEngine& diag) {
   RtlirProcess proc;
@@ -319,6 +351,13 @@ static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
                       kind == RtlirProcessKind::kAlwaysLatch);
   if (needs_infer && proc.sensitivity.empty()) {
     proc.sensitivity = InferSensitivity(proc.body, arena);
+  }
+  // §9.2.2.1: Warn if a general-purpose always has no timing control.
+  if (kind == RtlirProcessKind::kAlways && item->sensitivity.empty() &&
+      !StmtHasTimingControl(proc.body)) {
+    diag.Warning(item->loc,
+                 "always block has no timing control; may cause "
+                 "a zero-delay loop");
   }
   // §5.12: Resolve attributes.
   proc.attrs = ResolveAttributes(item->attrs, diag);
