@@ -69,4 +69,43 @@ TEST(ParserSection8, ThisKeywordPropertyAccess) {
               "endclass\n"));
 }
 
+// §8.11: this.member used for disambiguation in constructor.
+TEST(ParserA811, ThisDisambiguationInConstructor) {
+  auto r = Parse(
+      "class Demo;\n"
+      "  integer x;\n"
+      "  function new(integer x);\n"
+      "    this.x = x;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* cls = r.cu->classes[0];
+  ASSERT_GE(cls->members.size(), 2u);
+  auto* ctor = cls->members[1];
+  EXPECT_EQ(ctor->kind, ClassMemberKind::kMethod);
+  EXPECT_EQ(ctor->method->name, "new");
+}
+
+// §8.11: this with chained member access.
+TEST(ParserA811, ThisChainedMemberAccess) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  int a;\n"
+              "  function int get_a();\n"
+              "    return this.a;\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
+// §8.11: this used in method call chain.
+TEST(ParserA811, ThisMethodCallChain) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  function C get_self();\n"
+              "    return this;\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
 }  // namespace

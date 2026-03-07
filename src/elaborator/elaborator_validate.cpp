@@ -298,6 +298,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateArrayAssignments(decl);
   ValidateClassHandleOps(decl);
   ValidateStaticMethodBodies(decl);
+  ValidateThisUsage(decl);
   // §3.14: Precision shall be at least as precise as the time unit.
   if (decl->has_timeunit && decl->has_timeprecision) {
     if (static_cast<int>(decl->time_prec) >
@@ -956,6 +957,32 @@ void Elaborator::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
       check_class(item->class_decl);
+    }
+  }
+}
+
+// §8.11: 'this' shall only be used within non-static class methods.
+// Check module-level procedural blocks for illegal 'this' usage.
+void Elaborator::ValidateThisUsage(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body && StmtRefsThisOrSuper(item->body)) {
+      diag_.Error(item->loc,
+                  "'this' shall only be used within non-static class methods");
+    }
+    // Also check function/task bodies declared at module scope.
+    if ((item->kind == ModuleItemKind::kFunctionDecl ||
+         item->kind == ModuleItemKind::kTaskDecl) &&
+        !item->func_body_stmts.empty()) {
+      for (const auto* s : item->func_body_stmts) {
+        if (StmtRefsThisOrSuper(s)) {
+          diag_.Error(item->loc,
+                      "'this' shall only be used within non-static "
+                      "class methods");
+          break;
+        }
+      }
     }
   }
 }
