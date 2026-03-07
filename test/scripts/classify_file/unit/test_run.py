@@ -559,10 +559,8 @@ def test_run_no_tests_with_issue_commits_deletion(
     assert len(log) == 1
 
 
-def test_run_no_tests_with_issue_dry_run_skips_commit(
-    tmp_path, monkeypatch, cf, cf_helpers,
-):
-    """Empty file + --issue + --dry-run → commit_and_push not called."""
+def _run_empty_file_skip_commit(tmp_path, monkeypatch, cf, cf_helpers, **kw):
+    """Shared setup: empty file with commit_and_push stubbed out."""
     cf_helpers.make_test_file(tmp_path, "")
     log = []
     monkeypatch.setattr(
@@ -570,7 +568,17 @@ def test_run_no_tests_with_issue_dry_run_skips_commit(
         lambda changed, deleted, msg: log.append(1),
     )
     cf_helpers.stub_close_issue(monkeypatch)
-    getattr(cf, "_run")(_make_run_args(tmp_path, dry_run=True))
+    getattr(cf, "_run")(_make_run_args(tmp_path, **kw))
+    return log
+
+
+def test_run_no_tests_with_issue_dry_run_skips_commit(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
+    """Empty file + --issue + --dry-run → commit_and_push not called."""
+    log = _run_empty_file_skip_commit(
+        tmp_path, monkeypatch, cf, cf_helpers, dry_run=True,
+    )
     assert len(log) == 0
 
 
@@ -578,14 +586,9 @@ def test_run_no_tests_with_issue_no_commit_skips_commit(
     tmp_path, monkeypatch, cf, cf_helpers,
 ):
     """Empty file + --issue + --no-commit → commit_and_push not called."""
-    cf_helpers.make_test_file(tmp_path, "")
-    log = []
-    monkeypatch.setattr(
-        cf, "commit_and_push",
-        lambda changed, deleted, msg: log.append(1),
+    log = _run_empty_file_skip_commit(
+        tmp_path, monkeypatch, cf, cf_helpers, no_commit=True,
     )
-    cf_helpers.stub_close_issue(monkeypatch)
-    getattr(cf, "_run")(_make_run_args(tmp_path, no_commit=True))
     assert len(log) == 0
 
 
