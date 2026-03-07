@@ -93,6 +93,12 @@ struct WeakReference {
 
   // §8.30.4: clear() — sets referent to null.
   void Clear() { referent_handle = kNullClassHandle; }
+
+  // §8.30.5: get_id() — returns unique ID for the referent (0 if null).
+  static int64_t GetId(uint64_t obj_handle) {
+    return (obj_handle == kNullClassHandle) ? 0
+                                            : static_cast<int64_t>(obj_handle);
+  }
 };
 
 }  // namespace delta
