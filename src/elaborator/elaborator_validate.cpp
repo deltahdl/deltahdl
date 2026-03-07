@@ -298,6 +298,8 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateArrayAssignments(decl);
   ValidateClassHandleOps(decl);
   ValidateAggregateComparisons(decl);
+  ValidateRealOperatorRestrictions(decl);
+  ValidateAssignInExprRestrictions(decl);
   ValidateLocalProtectedAccess(decl);
   ValidateStaticMethodBodies(decl);
   ValidateThisUsage(decl);
@@ -1478,6 +1480,162 @@ void Elaborator::ValidateAggregateComparisons(const ModuleDecl* decl) {
     }
     if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
       WalkExprForAggregateCompare(item->assign_rhs);
+    }
+  }
+}
+
+// --- §11.3.1: Operators not permitted on real operands ---
+
+static bool IsRealVar(const Expr* e, const TypeMap& types) {
+  auto name = ExprIdent(e);
+  if (name.empty()) return false;
+  auto it = types.find(name);
+  return it != types.end() && IsRealType(it->second);
+}
+
+// Operators illegal on real/shortreal operands per Table 11-1.
+static bool IsIllegalOnReal(TokenKind op) {
+  switch (op) {
+    // Case equality
+    case TokenKind::kEqEqEq:
+    case TokenKind::kBangEqEq:
+    // Wildcard equality
+    case TokenKind::kEqEqQuestion:
+    case TokenKind::kBangEqQuestion:
+    // Bitwise binary
+    case TokenKind::kAmp:
+    case TokenKind::kPipe:
+    case TokenKind::kCaret:
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
+    // Shift
+    case TokenKind::kLtLt:
+    case TokenKind::kGtGt:
+    case TokenKind::kLtLtLt:
+    case TokenKind::kGtGtGt:
+    // Modulus
+    case TokenKind::kPercent:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Unary operators illegal on real operands.
+static bool IsUnaryIllegalOnReal(TokenKind op) {
+  switch (op) {
+    case TokenKind::kTilde:
+    case TokenKind::kAmp:
+    case TokenKind::kTildeAmp:
+    case TokenKind::kPipe:
+    case TokenKind::kTildePipe:
+    case TokenKind::kCaret:
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
+      return true;
+    default:
+      return false;
+  }
+}
+
+void Elaborator::WalkExprForRealOps(const Expr* expr) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kBinary) {
+    bool lhs_real = expr->lhs && IsRealVar(expr->lhs, var_types_);
+    bool rhs_real = expr->rhs && IsRealVar(expr->rhs, var_types_);
+    if ((lhs_real || rhs_real) && IsIllegalOnReal(expr->op)) {
+      diag_.Error(expr->range.start,
+                  "operator is not allowed on real operands");
+    }
+  }
+  if (expr->kind == ExprKind::kUnary) {
+    bool operand_real = expr->lhs && IsRealVar(expr->lhs, var_types_);
+    if (operand_real && IsUnaryIllegalOnReal(expr->op)) {
+      diag_.Error(expr->range.start,
+                  "operator is not allowed on real operands");
+    }
+  }
+  WalkExprForRealOps(expr->lhs);
+  WalkExprForRealOps(expr->rhs);
+  WalkExprForRealOps(expr->condition);
+  WalkExprForRealOps(expr->true_expr);
+  WalkExprForRealOps(expr->false_expr);
+  for (auto* elem : expr->elements) WalkExprForRealOps(elem);
+  for (auto* arg : expr->args) WalkExprForRealOps(arg);
+}
+
+void Elaborator::WalkStmtsForRealOps(const Stmt* s) {
+  if (!s) return;
+  WalkExprForRealOps(s->rhs);
+  WalkExprForRealOps(s->lhs);
+  WalkExprForRealOps(s->expr);
+  WalkExprForRealOps(s->condition);
+  WalkExprForRealOps(s->assert_expr);
+  for (auto* sub : s->stmts) WalkStmtsForRealOps(sub);
+  WalkStmtsForRealOps(s->then_branch);
+  WalkStmtsForRealOps(s->else_branch);
+  WalkStmtsForRealOps(s->body);
+  WalkStmtsForRealOps(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForRealOps(ci.body);
+}
+
+void Elaborator::ValidateRealOperatorRestrictions(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForRealOps(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
+      WalkExprForRealOps(item->assign_rhs);
+    }
+  }
+}
+
+// --- §11.3.6: Assignment-in-expression restrictions ---
+
+void Elaborator::WalkExprForAssignInExpr(const Expr* expr,
+                                          bool in_event_or_cont) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kBinary && expr->op == TokenKind::kEq) {
+    if (in_event_or_cont) {
+      diag_.Error(expr->range.start,
+                  "assignment operator within expression is illegal in "
+                  "this context");
+    }
+  }
+  WalkExprForAssignInExpr(expr->lhs, in_event_or_cont);
+  WalkExprForAssignInExpr(expr->rhs, in_event_or_cont);
+  WalkExprForAssignInExpr(expr->condition, in_event_or_cont);
+  WalkExprForAssignInExpr(expr->true_expr, in_event_or_cont);
+  WalkExprForAssignInExpr(expr->false_expr, in_event_or_cont);
+  for (auto* elem : expr->elements)
+    WalkExprForAssignInExpr(elem, in_event_or_cont);
+  for (auto* arg : expr->args)
+    WalkExprForAssignInExpr(arg, in_event_or_cont);
+}
+
+void Elaborator::WalkStmtsForAssignInExpr(const Stmt* s) {
+  if (!s) return;
+  for (auto* sub : s->stmts) WalkStmtsForAssignInExpr(sub);
+  WalkStmtsForAssignInExpr(s->then_branch);
+  WalkStmtsForAssignInExpr(s->else_branch);
+  WalkStmtsForAssignInExpr(s->body);
+  WalkStmtsForAssignInExpr(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForAssignInExpr(ci.body);
+}
+
+void Elaborator::ValidateAssignInExprRestrictions(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    // §11.3.6: Assignment operators in event expressions are illegal.
+    if (item->kind == ModuleItemKind::kAlwaysBlock) {
+      for (const auto& ev : item->sensitivity) {
+        WalkExprForAssignInExpr(ev.signal, true);
+      }
+    }
+    // §11.3.6: Assignment operators in continuous assignment RHS are illegal.
+    if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
+      WalkExprForAssignInExpr(item->assign_rhs, true);
     }
   }
 }

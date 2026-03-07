@@ -248,6 +248,16 @@ class Elaborator {
   void WalkExprForAggregateCompare(const Expr* expr);
   void WalkStmtsForAggregateCompare(const Stmt* s);
 
+  /// §11.3.1: Validate operators not permitted on real operands.
+  void ValidateRealOperatorRestrictions(const ModuleDecl* decl);
+  void WalkExprForRealOps(const Expr* expr);
+  void WalkStmtsForRealOps(const Stmt* s);
+
+  /// §11.3.6: Validate assignment-in-expression restrictions.
+  void ValidateAssignInExprRestrictions(const ModuleDecl* decl);
+  void WalkExprForAssignInExpr(const Expr* expr, bool in_event_or_cont);
+  void WalkStmtsForAssignInExpr(const Stmt* s);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
