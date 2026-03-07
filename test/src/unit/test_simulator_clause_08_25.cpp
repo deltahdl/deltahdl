@@ -45,4 +45,51 @@ TEST(ClassSim, ParameterizedClassInstantiation) {
   EXPECT_EQ(obj->GetProperty("second", f.arena).ToUint64(), 20u);
 }
 
+// §8.25.1: ClassTypeInfo with decl stores param metadata for scope resolution.
+TEST(ClassSim, ParameterizedClassDeclParams) {
+  SimFixture f;
+
+  auto* decl = f.arena.Create<ClassDecl>();
+  decl->name = "C";
+  decl->params.push_back({"p", nullptr});
+
+  auto* type = f.arena.Create<ClassTypeInfo>();
+  type->name = "C";
+  type->decl = decl;
+  f.ctx.RegisterClassType("C", type);
+
+  auto* found = f.ctx.FindClassType("C");
+  ASSERT_NE(found, nullptr);
+  ASSERT_NE(found->decl, nullptr);
+  ASSERT_EQ(found->decl->params.size(), 1u);
+  EXPECT_EQ(found->decl->params[0].first, "p");
+}
+
+// §8.25.1: Static method registered on parameterized class type.
+TEST(ClassSim, ParameterizedClassStaticMethod) {
+  SimFixture f;
+
+  auto* decl = f.arena.Create<ClassDecl>();
+  decl->name = "Codec";
+  decl->params.push_back({"W", nullptr});
+
+  auto* type = f.arena.Create<ClassTypeInfo>();
+  type->name = "Codec";
+  type->decl = decl;
+
+  auto* method = f.arena.Create<ModuleItem>();
+  method->kind = ModuleItemKind::kFunctionDecl;
+  method->name = "encode";
+  method->is_static = true;
+  type->methods["encode"] = method;
+
+  f.ctx.RegisterClassType("Codec", type);
+
+  auto* found = f.ctx.FindClassType("Codec");
+  ASSERT_NE(found, nullptr);
+  auto it = found->methods.find("encode");
+  ASSERT_NE(it, found->methods.end());
+  EXPECT_TRUE(it->second->is_static);
+}
+
 }  // namespace
