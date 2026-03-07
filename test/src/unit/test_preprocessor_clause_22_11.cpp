@@ -34,4 +34,11 @@ TEST(Preprocessor, Pragma_UnrecognizedName_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// --- §22.11: `pragma with pragma_expressions ---
+TEST(Preprocessor, Pragma_NameWithKeyword_NoError) {
+  PreprocFixture f;
+  Preprocess("`pragma my_pragma keyword1\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

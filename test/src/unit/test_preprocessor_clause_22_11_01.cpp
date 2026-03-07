@@ -13,13 +13,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 
 namespace {
 
-// --- §22.11: `pragma with pragma_expressions ---
-TEST(Preprocessor, Pragma_NameWithKeyword_NoError) {
-  PreprocFixture f;
-  Preprocess("`pragma my_pragma keyword1\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(Preprocessor, Pragma_NameWithKeywordValue_NoError) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma key1 = val1\n", f);
