@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
@@ -45,6 +44,48 @@ TEST(SourceText, ClassConstProperty) {
   EXPECT_NE(members[0]->init_expr, nullptr);
   EXPECT_TRUE(members[1]->is_const);
   EXPECT_TRUE(members[1]->is_static);
+}
+
+// §8.19: Global constant (const with initializer) parses.
+TEST(ParserA819, GlobalConstantWithInitializer) {
+  auto r = Parse(
+      "class Jumbo_Packet;\n"
+      "  const int max_size = 9 * 1024;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* m = r.cu->classes[0]->members[0];
+  EXPECT_TRUE(m->is_const);
+  EXPECT_NE(m->init_expr, nullptr);
+}
+
+// §8.19: Instance constant (const without initializer) parses.
+TEST(ParserA819, InstanceConstantNoInitializer) {
+  auto r = Parse(
+      "class Big_Packet;\n"
+      "  const int size;\n"
+      "  function new();\n"
+      "    size = 4096;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* m = r.cu->classes[0]->members[0];
+  EXPECT_TRUE(m->is_const);
+  EXPECT_EQ(m->init_expr, nullptr);
+}
+
+// §8.19: static const (global constant) parses.
+TEST(ParserA819, StaticConstGlobalConstant) {
+  auto r = Parse(
+      "class Config;\n"
+      "  static const int VERSION = 3;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* m = r.cu->classes[0]->members[0];
+  EXPECT_TRUE(m->is_static);
+  EXPECT_TRUE(m->is_const);
+  EXPECT_NE(m->init_expr, nullptr);
 }
 
 }  // namespace

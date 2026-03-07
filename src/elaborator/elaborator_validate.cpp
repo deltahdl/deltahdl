@@ -1142,4 +1142,18 @@ void Elaborator::ValidateLocalProtectedAccess(const ModuleDecl* decl) {
   }
 }
 
+// §8.19: Validate constant class property rules.
+void Elaborator::ValidateConstClassProperties() {
+  for (const auto* cls : unit_->classes) {
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kProperty || !m->is_const) continue;
+      // §8.19: Instance constant (no initializer) cannot be static.
+      if (!m->init_expr && m->is_static) {
+        diag_.Error(m->loc,
+                    "instance constant cannot be declared static");
+      }
+    }
+  }
+}
+
 }  // namespace delta

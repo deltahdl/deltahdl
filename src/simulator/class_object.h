@@ -39,6 +39,7 @@ struct ClassTypeInfo {
     bool is_static = false;
     bool is_local = false;
     bool is_protected = false;
+    bool is_const = false;
   };
   std::vector<PropertyInfo> properties;
 

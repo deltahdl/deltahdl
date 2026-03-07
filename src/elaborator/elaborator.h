@@ -228,6 +228,9 @@ class Elaborator {
   /// §8.18: Validate local/protected access from module-level code.
   void ValidateLocalProtectedAccess(const ModuleDecl* decl);
 
+  /// §8.19: Validate constant class property rules.
+  void ValidateConstClassProperties();
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 

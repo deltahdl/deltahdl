@@ -129,6 +129,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateFinalClassExtension();
   // §8.17: Validate chaining constructor rules.
   ValidateChainingConstructors();
+  // §8.19: Validate constant class property rules.
+  ValidateConstClassProperties();
 
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {
