@@ -297,6 +297,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateConstAssignments(decl);
   ValidateArrayAssignments(decl);
   ValidateClassHandleOps(decl);
+  ValidateLocalProtectedAccess(decl);
   ValidateStaticMethodBodies(decl);
   ValidateThisUsage(decl);
   // §3.14: Precision shall be at least as precise as the time unit.
@@ -1055,6 +1056,89 @@ void Elaborator::ValidateChainingConstructors() {
   };
   for (const auto* cls : unit_->classes) {
     check(cls);
+  }
+}
+
+// §8.18: Find a class member by name, walking up the hierarchy.
+static const ClassMember* FindMemberInClass(const ClassDecl* cls,
+                                            std::string_view name,
+                                            const CompilationUnit* unit) {
+  for (const auto* c = cls; c; /* advance below */) {
+    for (const auto* m : c->members) {
+      if (m->name == name) return m;
+    }
+    if (c->base_class.empty()) break;
+    c = FindClassDecl(c->base_class, unit);
+  }
+  return nullptr;
+}
+
+// §8.18: Check expressions for local/protected member access from outside class.
+static void CheckVisibilityExpr(
+    const Expr* e,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kMemberAccess && e->lhs && e->rhs) {
+    // Check obj.member pattern where obj is a class variable.
+    if (e->lhs->kind == ExprKind::kIdentifier) {
+      auto it = var_types.find(e->lhs->text);
+      if (it != var_types.end() && e->rhs->kind == ExprKind::kIdentifier) {
+        const auto* cls = FindClassDecl(it->second, unit);
+        if (cls) {
+          const auto* m = FindMemberInClass(cls, e->rhs->text, unit);
+          if (m && m->is_local) {
+            diag.Error(e->rhs->range.start,
+                       "cannot access local member from outside its class");
+          } else if (m && m->is_protected) {
+            diag.Error(e->rhs->range.start,
+                       "cannot access protected member from outside "
+                       "its class hierarchy");
+          }
+        }
+      }
+    }
+  }
+  CheckVisibilityExpr(e->lhs, var_types, unit, diag);
+  CheckVisibilityExpr(e->rhs, var_types, unit, diag);
+  CheckVisibilityExpr(e->base, var_types, unit, diag);
+  CheckVisibilityExpr(e->index, var_types, unit, diag);
+  CheckVisibilityExpr(e->condition, var_types, unit, diag);
+  CheckVisibilityExpr(e->true_expr, var_types, unit, diag);
+  CheckVisibilityExpr(e->false_expr, var_types, unit, diag);
+  for (const auto* arg : e->args)
+    CheckVisibilityExpr(arg, var_types, unit, diag);
+}
+
+// §8.18: Walk statements checking for local/protected access violations.
+static void WalkStmtsForVisibility(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (!s) return;
+  CheckVisibilityExpr(s->lhs, var_types, unit, diag);
+  CheckVisibilityExpr(s->rhs, var_types, unit, diag);
+  CheckVisibilityExpr(s->expr, var_types, unit, diag);
+  CheckVisibilityExpr(s->condition, var_types, unit, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForVisibility(sub, var_types, unit, diag);
+  WalkStmtsForVisibility(s->then_branch, var_types, unit, diag);
+  WalkStmtsForVisibility(s->else_branch, var_types, unit, diag);
+  WalkStmtsForVisibility(s->body, var_types, unit, diag);
+  WalkStmtsForVisibility(s->for_body, var_types, unit, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForVisibility(ci.body, var_types, unit, diag);
+}
+
+// §8.18: Validate local/protected access from module-level code.
+void Elaborator::ValidateLocalProtectedAccess(const ModuleDecl* decl) {
+  if (class_var_types_.empty()) return;
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForVisibility(item->body, class_var_types_, unit_, diag_);
+    }
   }
 }
 

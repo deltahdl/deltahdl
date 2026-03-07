@@ -375,7 +375,8 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
     if (member->kind == ClassMemberKind::kProperty) {
       uint32_t w = EvalTypeWidth(member->data_type, {});
       if (w == 0) w = 32;
-      info->properties.push_back({member->name, w, member->is_static});
+      info->properties.push_back({member->name, w, member->is_static,
+                                    member->is_local, member->is_protected});
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;

@@ -37,6 +37,8 @@ struct ClassTypeInfo {
     std::string_view name;
     uint32_t width = 32;
     bool is_static = false;
+    bool is_local = false;
+    bool is_protected = false;
   };
   std::vector<PropertyInfo> properties;
 

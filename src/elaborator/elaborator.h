@@ -225,6 +225,9 @@ class Elaborator {
   /// §8.17: Validate chaining constructor rules.
   void ValidateChainingConstructors();
 
+  /// §8.18: Validate local/protected access from module-level code.
+  void ValidateLocalProtectedAccess(const ModuleDecl* decl);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
@@ -256,6 +259,8 @@ class Elaborator {
   std::unordered_set<std::string_view> const_names_;
   std::unordered_set<std::string_view> class_names_;
   std::unordered_set<std::string_view> class_var_names_;  // §8.4
+  std::unordered_map<std::string_view, std::string_view>
+      class_var_types_;  // §8.18: var name → class type name
   std::unordered_set<std::string_view> nettype_names_;
   std::unordered_set<std::string_view> interconnect_names_;
 };

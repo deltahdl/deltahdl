@@ -552,6 +552,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
     class_var_names_.insert(item->name);
+    class_var_types_[item->name] = item->data_type.type_name;
   }
   if (item->data_type.kind == DataTypeKind::kEnum) {
     ValidateEnumDecl(item->data_type, item->loc);
@@ -803,6 +804,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   enum_member_names_.clear();
   const_names_.clear();
   class_var_names_.clear();
+  class_var_types_.clear();
   interconnect_names_.clear();
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
