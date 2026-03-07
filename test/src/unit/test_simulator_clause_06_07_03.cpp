@@ -64,4 +64,43 @@ TEST(NetDecl, UserDefinedNettypeDefaultIsDataTypeDefault) {
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
+// §6.7.3: Resolution function receives driver array.
+TEST(NetDecl, UserDefinedResolutionReceivesDrivers) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+
+  size_t driver_count = 0;
+  UserNettype nt;
+  nt.resolution = [&](Arena& a,
+                      const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
+    driver_count = drivers.size();
+    return MakeLogic4Vec(a, 1);
+  };
+
+  ActivateResolutionAtTimeZero(net, nt, arena);
+  EXPECT_EQ(driver_count, 2u);
+}
+
+// §6.7.3: Unresolved nettype (no resolution function) uses data type default.
+TEST(NetDecl, UnresolvedNettypeNoResolutionFunction) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  UserNettype nt;
+  // No resolution function set.
+  ActivateResolutionAtTimeZero(net, nt, arena);
+  // Value unchanged — still default x from MakeLogic4Vec.
+  EXPECT_EQ(ValOf(*var), kValX);
+}
+
 }  // namespace

@@ -725,7 +725,14 @@ static void ApplyNetInfo(DataType& inner, const DataType& net) {
 // §6.7.1: Try to parse explicit data_type after net keyword.
 // Returns true if an explicit type was parsed and merged into dtype.
 // Returns false for implicit_data_type (caller continues with signing + dims).
-bool Parser::TryParseNetDataType(DataType& dtype) {
+bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
+  // §6.7.1: A net type keyword shall not be followed directly by 'reg'.
+  if (!has_intervening && CurrentToken().kind == TokenKind::kKwReg) {
+    diag_.Error(CurrentLoc(),
+                "net type keyword shall not be followed directly by 'reg'");
+    Consume();
+    return false;
+  }
   // Named type (user-defined): wire addressT w1;
   if (CurrentToken().Is(TokenKind::kIdentifier) &&
       known_types_.count(CurrentToken().text) != 0) {
@@ -805,7 +812,10 @@ DataType Parser::ParseDataType() {
   }
 
   // §6.7.1: data_type_or_implicit — check for explicit type after net keyword.
-  if (dtype.is_net && TryParseNetDataType(dtype)) return dtype;
+  bool has_intervening = dtype.drive_strength0 != 0 ||
+                         dtype.charge_strength != 0 || dtype.is_vectored ||
+                         dtype.is_scalared;
+  if (dtype.is_net && TryParseNetDataType(dtype, has_intervening)) return dtype;
 
   // §6.11.3: Explicit signed/unsigned overrides the default.
   if (Match(TokenKind::kKwSigned)) {

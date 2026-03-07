@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "fixture_elaborator.h"
 #include "model_net_declaration.h"
 
 using namespace delta;
@@ -79,6 +80,39 @@ TEST(NetDecl, InvalidNetDataTypeDynamicArray) {
 
 TEST(NetDecl, InvalidNetDataTypeString) {
   EXPECT_FALSE(ValidateNetDataType(NetDataTypeKind::kString));
+}
+
+// §6.7.2: User-defined nettype produces a net in elaboration.
+TEST(NetDecl, UserDefinedNettypeCreatesNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic [7:0] mynet;\n"
+      "  mynet x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  // The user-defined nettype decl should produce a net, not a variable.
+  bool found_net = false;
+  for (auto& net : mod->nets) {
+    if (net.name == "t.x") found_net = true;
+  }
+  EXPECT_TRUE(found_net);
+}
+
+// §6.7.2: Array of user-defined nettype.
+TEST(NetDecl, UserDefinedNettypeArrayCreatesNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic mynet;\n"
+      "  mynet x [0:3];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

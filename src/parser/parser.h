@@ -322,7 +322,7 @@ class Parser {
 
   // Types
   DataType ParseDataType();
-  bool TryParseNetDataType(DataType& dtype);
+  bool TryParseNetDataType(DataType& dtype, bool has_intervening);
   void ParsePackedDims(DataType& dtype);
   DataType ParseVirtualInterfaceType();
 

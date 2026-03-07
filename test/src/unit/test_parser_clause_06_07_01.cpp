@@ -705,4 +705,86 @@ TEST(ParserSection6, Sec6_7_1_Supply1WithRange) {
               "endmodule\n"));
 }
 
+// §6.7.1: Net type keyword shall not be followed directly by 'reg'.
+TEST(ParserSection6, Sec6_7_1_TriRegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  tri reg r;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, Sec6_7_1_WireRegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  wire reg p;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, Sec6_7_1_WandRegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  wand reg w;\n"
+              "endmodule\n"));
+}
+
+// 'reg' is OK when there are lexical elements between net keyword and 'reg'.
+TEST(ParserSection6, Sec6_7_1_WireVectoredRegOk) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wire vectored reg [7:0] r;\n"
+              "endmodule\n"));
+}
+
+TEST(ParserSection6, Sec6_7_1_WireDriveStrengthRegOk) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wire (strong0, pull1) reg r = 1'b0;\n"
+              "endmodule\n"));
+}
+
+// Identifier 'reg_name' is not the keyword 'reg' — should parse fine.
+TEST(ParserSection6, Sec6_7_1_IdentifierStartingWithRegOk) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire reg_name;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->name, "reg_name");
+}
+
+// §6.7.1: Trireg with charge strength — default to medium.
+TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthLarge) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) logic #(0,0,0) cap1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
+  EXPECT_NE(item->data_type.charge_strength, 0u);
+  EXPECT_EQ(item->name, "cap1");
+}
+
+// §6.7.1: Net with 3-value delay (rise, fall, decay).
+TEST(ParserSection6, Sec6_7_1_Delay3RiseFallDecay) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire #(1, 2, 3) w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_NE(item->net_delay, nullptr);
+  EXPECT_NE(item->net_delay_fall, nullptr);
+  EXPECT_NE(item->net_delay_decay, nullptr);
+}
+
 }  // namespace
