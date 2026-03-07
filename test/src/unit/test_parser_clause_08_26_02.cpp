@@ -76,4 +76,17 @@ TEST(ParserSection8, ExtendsAndImplements) {
   EXPECT_EQ(r.cu->classes[2]->base_class, "Base");
 }
 
+TEST(ParserClause08_03, ImplementsMultipleInterfaces) {
+  auto r = Parse(
+      "class C implements IFace1, IFace2, IFace3;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->implements_types.size(), 3u);
+  EXPECT_EQ(cls->implements_types[0], "IFace1");
+  EXPECT_EQ(cls->implements_types[1], "IFace2");
+  EXPECT_EQ(cls->implements_types[2], "IFace3");
+}
+
 }  // namespace
