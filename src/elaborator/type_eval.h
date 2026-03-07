@@ -25,7 +25,7 @@ uint32_t EvalStructMemberWidth(const StructMember& m);
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs);
 
 /// Return true if the type kind uses 4-state values (0, 1, x, z).
-/// logic, reg, integer are 4-state.  bit, int, byte, etc. are 2-state.
+/// logic, reg, integer, time are 4-state.  bit, int, byte, etc. are 2-state.
 bool Is4stateType(DataTypeKind kind);
 
 /// §6.8: Return true if the type kind is implicitly signed.
@@ -45,6 +45,9 @@ bool IsSingularType(const DataType& dtype);
 /// §6.4: Return true if the data type is aggregate (unpacked struct, unpacked
 /// union, or unpacked array).
 bool IsAggregateType(const DataType& dtype);
+
+/// §6.11.1: Return true if the type kind represents an integral type.
+bool IsIntegralType(DataTypeKind kind);
 
 /// Return true if two types match (IEEE §6.22.1).
 bool TypesMatch(const DataType& a, const DataType& b);

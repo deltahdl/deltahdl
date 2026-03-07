@@ -138,6 +138,7 @@ bool Is4stateType(DataTypeKind kind) {
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
     case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
     case DataTypeKind::kImplicit:
       return true;
     default:
@@ -188,8 +189,8 @@ bool IsSingularType(const DataType& dtype) { return !IsAggregateType(dtype); }
 
 // --- Type compatibility (IEEE §6.22) ---
 
-// §6.11: Return true if the type kind is an integral type.
-static bool IsIntegralKind(DataTypeKind kind) {
+// §6.11.1: Return true if the type kind is an integral type.
+bool IsIntegralType(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
     case DataTypeKind::kLogic:
@@ -228,10 +229,10 @@ bool TypesEquivalent(const DataType& a, const DataType& b) {
 bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
   if (TypesEquivalent(a, b)) return true;
   // §6.22.3: All integral types are assignment compatible with each other.
-  if (IsIntegralKind(a.kind) && IsIntegralKind(b.kind)) return true;
+  if (IsIntegralType(a.kind) && IsIntegralType(b.kind)) return true;
   // §6.22.3: enum → integral is assignment compatible.
-  if (a.kind == DataTypeKind::kEnum && IsIntegralKind(b.kind)) return true;
-  if (b.kind == DataTypeKind::kEnum && IsIntegralKind(a.kind)) return true;
+  if (a.kind == DataTypeKind::kEnum && IsIntegralType(b.kind)) return true;
+  if (b.kind == DataTypeKind::kEnum && IsIntegralType(a.kind)) return true;
   // Real types are assignment compatible with integral types.
   bool a_real =
       (a.kind == DataTypeKind::kReal || a.kind == DataTypeKind::kShortreal ||
@@ -239,8 +240,8 @@ bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
   bool b_real =
       (b.kind == DataTypeKind::kReal || b.kind == DataTypeKind::kShortreal ||
        b.kind == DataTypeKind::kRealtime);
-  if ((a_real && IsIntegralKind(b.kind)) ||
-      (b_real && IsIntegralKind(a.kind))) {
+  if ((a_real && IsIntegralType(b.kind)) ||
+      (b_real && IsIntegralType(a.kind))) {
     return true;
   }
   return a_real && b_real;
@@ -249,8 +250,8 @@ bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
 bool IsCastCompatible(const DataType& a, const DataType& b) {
   if (IsAssignmentCompatible(a, b)) return true;
   // §6.22.4: integral → enum requires explicit cast but is cast compatible.
-  if (IsIntegralKind(a.kind) && b.kind == DataTypeKind::kEnum) return true;
-  if (IsIntegralKind(b.kind) && a.kind == DataTypeKind::kEnum) return true;
+  if (IsIntegralType(a.kind) && b.kind == DataTypeKind::kEnum) return true;
+  if (IsIntegralType(b.kind) && a.kind == DataTypeKind::kEnum) return true;
   return false;
 }
 
