@@ -91,4 +91,61 @@ TEST(ClassSim, EmptyVTable) {
   EXPECT_EQ(type->FindVTableIndex("anything"), -1);
 }
 
+// §8.20: Virtual method dispatch through three-level hierarchy.
+TEST(ClassSim, VirtualMethodThreeLevelHierarchy) {
+  SimFixture f;
+  auto* grand = MakeClassType(f, "Grand", {});
+  auto* mid = MakeClassType(f, "Mid", {});
+  mid->parent = grand;
+  auto* leaf = MakeClassType(f, "Leaf", {});
+  leaf->parent = mid;
+
+  auto* grand_method = f.arena.Create<ModuleItem>();
+  grand_method->kind = ModuleItemKind::kFunctionDecl;
+  grand_method->name = "action";
+
+  auto* leaf_method = f.arena.Create<ModuleItem>();
+  leaf_method->kind = ModuleItemKind::kFunctionDecl;
+  leaf_method->name = "action";
+
+  grand->vtable.push_back({"action", grand_method, grand});
+  mid->vtable.push_back({"action", grand_method, grand});
+  leaf->vtable.push_back({"action", leaf_method, leaf});
+
+  auto [handle, obj] = MakeObj(f, leaf);
+  EXPECT_EQ(obj->ResolveVirtualMethod("action"), leaf_method);
+}
+
+// §8.20: Non-virtual method dispatch does NOT use vtable.
+TEST(ClassSim, NonVirtualMethodUsesResolveMethod) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Base", {});
+  auto* derived = MakeClassType(f, "Derived", {});
+  derived->parent = base;
+
+  auto* base_method = f.arena.Create<ModuleItem>();
+  base_method->kind = ModuleItemKind::kFunctionDecl;
+  base_method->name = "printA";
+  base->methods["printA"] = base_method;
+
+  auto* derived_method = f.arena.Create<ModuleItem>();
+  derived_method->kind = ModuleItemKind::kFunctionDecl;
+  derived_method->name = "printA";
+  derived->methods["printA"] = derived_method;
+
+  auto [handle, obj] = MakeObj(f, derived);
+  // ResolveMethod returns the derived's non-virtual method.
+  EXPECT_EQ(obj->ResolveMethod("printA"), derived_method);
+}
+
+// §8.20: :final stored on ModuleItem.
+TEST(ClassSim, MethodFinalFlag) {
+  SimFixture f;
+  auto* method = f.arena.Create<ModuleItem>();
+  method->kind = ModuleItemKind::kFunctionDecl;
+  method->name = "locked";
+  method->is_method_final = true;
+  EXPECT_TRUE(method->is_method_final);
+}
+
 }  // namespace

@@ -542,6 +542,11 @@ struct ModuleItem {
   // checker_or_generate_item_declaration (A.1.8)
   bool is_rand = false;  // [rand] data_declaration in checker body
 
+  // §8.20: dynamic_override_specifiers for methods
+  bool is_method_initial = false;  // :initial
+  bool is_method_extends = false;  // :extends
+  bool is_method_final = false;    // :final
+
   // Declarations
   DataType data_type;
   std::string_view name;

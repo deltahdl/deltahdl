@@ -1156,4 +1156,58 @@ void Elaborator::ValidateConstClassProperties() {
   }
 }
 
+// §8.20: Find a virtual method in a base class by name.
+static const ClassMember* FindBaseVirtualMethod(
+    const ClassDecl* cls, std::string_view method_name,
+    const CompilationUnit* unit) {
+  if (cls->base_class.empty()) return nullptr;
+  for (const auto* c = FindClassDecl(cls->base_class, unit); c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kMethod && m->method &&
+          m->method->name == method_name && m->is_virtual) {
+        return m;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// §8.20: Validate virtual method override rules.
+void Elaborator::ValidateVirtualMethodOverrides() {
+  for (const auto* cls : unit_->classes) {
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+      auto* method = m->method;
+      // §8.20: :initial and :extends are mutually exclusive.
+      if (method->is_method_initial && method->is_method_extends) {
+        diag_.Error(method->loc,
+                    "':initial' and ':extends' are mutually exclusive");
+        continue;
+      }
+      const auto* base_virtual =
+          FindBaseVirtualMethod(cls, method->name, unit_);
+      // §8.20: :initial — shall not override a virtual base class method.
+      if (method->is_method_initial && base_virtual) {
+        diag_.Error(method->loc,
+                    "method with ':initial' shall not override a virtual "
+                    "base class method");
+      }
+      // §8.20: :extends — shall override a virtual base class method.
+      if (method->is_method_extends && !base_virtual) {
+        diag_.Error(method->loc,
+                    "method with ':extends' does not override a virtual "
+                    "base class method");
+      }
+      // §8.20: Cannot override a method declared :final.
+      if (base_virtual && base_virtual->method &&
+          base_virtual->method->is_method_final) {
+        diag_.Error(method->loc,
+                    "cannot override a method declared ':final'");
+      }
+    }
+  }
+}
+
 }  // namespace delta

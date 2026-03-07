@@ -303,12 +303,21 @@ DataType Parser::ParseFunctionReturnType() {
 }
 
 // A.2.6: dynamic_override_specifiers
-void Parser::ParseDynamicOverrideSpecifiers() {
+void Parser::ParseDynamicOverrideSpecifiers(ModuleItem* item) {
   if (Match(TokenKind::kColon)) {
-    Match(TokenKind::kKwInitial) || Match(TokenKind::kKwExtends) ||
-        Match(TokenKind::kKwFinal);
+    if (Match(TokenKind::kKwInitial)) {
+      if (item) item->is_method_initial = true;
+    } else if (Match(TokenKind::kKwExtends)) {
+      if (item) item->is_method_extends = true;
+    } else if (Match(TokenKind::kKwFinal)) {
+      if (item) item->is_method_final = true;
+    }
   }
-  if (Match(TokenKind::kColon)) Match(TokenKind::kKwFinal);
+  if (Match(TokenKind::kColon)) {
+    if (Match(TokenKind::kKwFinal)) {
+      if (item) item->is_method_final = true;
+    }
+  }
 }
 
 // Parse function/task name with optional class_scope and 'new' for ctors.
@@ -355,7 +364,7 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwFunction);
 
-  ParseDynamicOverrideSpecifiers();
+  ParseDynamicOverrideSpecifiers(item);
 
   item->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!item->is_automatic) item->is_static = Match(TokenKind::kKwStatic);
@@ -377,7 +386,7 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwTask);
 
-  ParseDynamicOverrideSpecifiers();
+  ParseDynamicOverrideSpecifiers(item);
 
   if (Match(TokenKind::kKwAutomatic)) {
     item->is_automatic = true;

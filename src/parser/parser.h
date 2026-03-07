@@ -179,7 +179,7 @@ class Parser {
   DataType ParseStructOrUnionBody(TokenKind kw);
   void ParseStructMembers(DataType& dtype);
   DataType ParseFunctionReturnType();
-  void ParseDynamicOverrideSpecifiers();
+  void ParseDynamicOverrideSpecifiers(ModuleItem* item);
   void ParseFuncName(ModuleItem* item);
   void ParseFuncBody(ModuleItem* item);
   ModuleItem* ParseFunctionDecl(bool prototype_only = false);

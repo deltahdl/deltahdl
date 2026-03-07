@@ -231,6 +231,9 @@ class Elaborator {
   /// §8.19: Validate constant class property rules.
   void ValidateConstClassProperties();
 
+  /// §8.20: Validate virtual method override rules.
+  void ValidateVirtualMethodOverrides();
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 

@@ -131,6 +131,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateChainingConstructors();
   // §8.19: Validate constant class property rules.
   ValidateConstClassProperties();
+  // §8.20: Validate virtual method override rules.
+  ValidateVirtualMethodOverrides();
 
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {

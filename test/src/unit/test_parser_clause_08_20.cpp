@@ -116,4 +116,94 @@ TEST(ParserSection8, ClassWithVirtualMethod) {
   EXPECT_TRUE(found);
 }
 
+// §8.20: :initial specifier is stored on method.
+TEST(ParserA820, InitialSpecifierStored) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :initial int foo(); return 0; endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* m = r.cu->classes[0]->members[0]->method;
+  ASSERT_NE(m, nullptr);
+  EXPECT_TRUE(m->is_method_initial);
+  EXPECT_FALSE(m->is_method_extends);
+  EXPECT_FALSE(m->is_method_final);
+}
+
+// §8.20: :extends specifier is stored on method.
+TEST(ParserA820, ExtendsSpecifierStored) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :extends int foo(); return 0; endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* m = r.cu->classes[0]->members[0]->method;
+  ASSERT_NE(m, nullptr);
+  EXPECT_FALSE(m->is_method_initial);
+  EXPECT_TRUE(m->is_method_extends);
+}
+
+// §8.20: :final specifier is stored on method.
+TEST(ParserA820, FinalSpecifierStored) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :final int foo(); return 0; endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* m = r.cu->classes[0]->members[0]->method;
+  ASSERT_NE(m, nullptr);
+  EXPECT_TRUE(m->is_method_final);
+}
+
+// §8.20: :initial :final combined specifiers.
+TEST(ParserA820, InitialFinalCombined) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :initial :final int foo();\n"
+      "    return 0;\n  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* m = r.cu->classes[0]->members[0]->method;
+  ASSERT_NE(m, nullptr);
+  EXPECT_TRUE(m->is_method_initial);
+  EXPECT_TRUE(m->is_method_final);
+}
+
+// §8.20: :extends :final combined specifiers.
+TEST(ParserA820, ExtendsFinalCombined) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual function :extends :final int foo();\n"
+      "    return 0;\n  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* m = r.cu->classes[0]->members[0]->method;
+  ASSERT_NE(m, nullptr);
+  EXPECT_TRUE(m->is_method_extends);
+  EXPECT_TRUE(m->is_method_final);
+}
+
+// §8.20: Derived override without virtual keyword parses.
+TEST(ParserA820, DerivedOverrideWithoutVirtual) {
+  EXPECT_TRUE(ParseOk(
+      "class Base;\n"
+      "  virtual function void display(); endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function void display(); endfunction\n"
+      "endclass\n"));
+}
+
+// §8.20: task with :initial specifier stores it.
+TEST(ParserA820, TaskInitialSpecifier) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual task :initial my_task(); endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* m = r.cu->classes[0]->members[0]->method;
+  ASSERT_NE(m, nullptr);
+  EXPECT_TRUE(m->is_method_initial);
+}
+
 }  // namespace
