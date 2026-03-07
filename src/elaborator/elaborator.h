@@ -10,23 +10,18 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast.h"
 
 namespace delta {
 
 // Forward declarations
 class Arena;
 class DiagEngine;
-struct CompilationUnit;
-struct ModuleDecl;
 struct RtlirDesign;
 struct RtlirModule;
-struct ModuleItem;
-struct Expr;
 struct RtlirVariable;
 struct RtlirModuleInst;
 struct RtlirParamDecl;
-struct EnumMember;
-struct Stmt;
 
 /// Elaborator transforms a parsed AST (CompilationUnit) into the
 /// elaborated RTLIR representation.  Phase 1 supports single-module
@@ -156,6 +151,9 @@ class Elaborator {
   /// §7.4.1: Predefined-width types shall not have packed dims.
   void ValidatePackedDimOnPredefinedType(const DataType& dtype, SourceLoc loc);
 
+  /// §7.6: Array assignment compatibility checks.
+  void ValidateArrayAssignments(const ModuleDecl* decl);
+
   /// Validate a single enum member literal (§6.19).
   bool ValidateEnumLiteral(const EnumMember& member, uint32_t base_width,
                            bool is_2state);
@@ -213,11 +211,19 @@ class Elaborator {
   TypedefMap typedefs_;
   std::unordered_set<std::string_view> cu_scope_names_;  // §3.12.1
 
+  /// §7.6: Per-variable array metadata for assignment compatibility checks.
+  struct VarArrayInfo {
+    DataTypeKind elem_type = DataTypeKind::kImplicit;
+    uint32_t unpacked_size = 0;  // 0 = scalar or dynamic
+    bool is_dynamic = false;
+  };
+
   // Per-module validation state (cleared in ElaborateItems).
   std::unordered_set<std::string_view> declared_names_;
   std::unordered_map<std::string_view, SourceLoc> cont_assign_targets_;
   std::unordered_set<std::string_view> proc_assign_targets_;
   std::unordered_map<std::string_view, DataTypeKind> var_types_;
+  std::unordered_map<std::string_view, VarArrayInfo> var_array_info_;
   std::unordered_set<std::string_view> specparam_names_;
   std::unordered_set<std::string_view> enum_var_names_;
   std::unordered_set<std::string_view> enum_member_names_;

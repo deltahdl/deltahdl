@@ -294,6 +294,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateSpecparamInParams(decl);
   ValidateEnumAssignments(decl);
   ValidateConstAssignments(decl);
+  ValidateArrayAssignments(decl);
   // §3.14: Precision shall be at least as precise as the time unit.
   if (decl->has_timeunit && decl->has_timeprecision) {
     if (static_cast<int>(decl->time_prec) >
@@ -723,6 +724,40 @@ void Elaborator::ValidatePackedDimOnPredefinedType(const DataType& dtype,
   diag_.Error(loc,
               "integer type with predefined width shall not have packed "
               "array dimensions");
+}
+
+// §7.6: Validate array assignment compatibility in continuous assignments.
+void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kContAssign) continue;
+    if (!item->assign_lhs || !item->assign_rhs) continue;
+    if (item->assign_lhs->kind != ExprKind::kIdentifier) continue;
+    if (item->assign_rhs->kind != ExprKind::kIdentifier) continue;
+    auto lhs_it = var_array_info_.find(item->assign_lhs->text);
+    auto rhs_it = var_array_info_.find(item->assign_rhs->text);
+    if (lhs_it == var_array_info_.end() || rhs_it == var_array_info_.end())
+      continue;
+    const auto& lhs = lhs_it->second;
+    const auto& rhs = rhs_it->second;
+    // Element types must be equivalent.
+    if (lhs.elem_type != rhs.elem_type) {
+      diag_.Error(item->loc,
+                  std::format("array element type mismatch in assignment "
+                              "('{}' vs '{}')",
+                              item->assign_lhs->text, item->assign_rhs->text));
+      continue;
+    }
+    // Fixed-size target: source must have the same number of elements.
+    if (lhs.unpacked_size > 0 && !lhs.is_dynamic && rhs.unpacked_size > 0 &&
+        !rhs.is_dynamic && lhs.unpacked_size != rhs.unpacked_size) {
+      diag_.Error(
+          item->loc,
+          std::format("array size mismatch: '{}' has {} elements but "
+                      "'{}' has {}",
+                      item->assign_lhs->text, lhs.unpacked_size,
+                      item->assign_rhs->text, rhs.unpacked_size));
+    }
+  }
 }
 
 }  // namespace delta

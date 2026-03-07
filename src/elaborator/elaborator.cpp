@@ -527,6 +527,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // §7.4/§7.5: Compute unpacked array element count.
   ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
+  // §7.6: Track array info for assignment compatibility.
+  if (!item->unpacked_dims.empty()) {
+    var_array_info_[item->name] = {item->data_type.kind, var.unpacked_size,
+                                   var.is_dynamic};
+  }
   // §5.12: Resolve attributes.
   var.attrs = ResolveAttributes(item->attrs, diag_);
   mod->variables.push_back(var);
@@ -776,6 +781,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   cont_assign_targets_.clear();
   proc_assign_targets_.clear();
   var_types_.clear();
+  var_array_info_.clear();
   specparam_names_.clear();
   enum_var_names_.clear();
   enum_member_names_.clear();

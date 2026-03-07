@@ -14,4 +14,67 @@ TEST(ParserA25, UnsizedDimWithInitInferSize) {
   EXPECT_EQ(mod->variables[0].unpacked_size, 3u);
 }
 
+// §7.6: Compatible array types in continuous assignment — OK.
+TEST(Elaboration, ArrayAssignCompatibleTypes) {
+  EXPECT_TRUE(ElabOk(
+      "module t;\n"
+      "  int a[4], b[4];\n"
+      "  assign a = b;\n"
+      "endmodule\n"));
+}
+
+// §7.6: Fixed-size array size mismatch — error.
+TEST(Elaboration, ArrayAssignSizeMismatch) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[4], b[8];\n"
+      "  assign a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.6: Array element type mismatch — error.
+TEST(Elaboration, ArrayAssignTypeMismatch) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a[4];\n"
+      "  logic [31:0] b[4];\n"
+      "  assign a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.6: Same element type, same size — no error.
+TEST(Elaboration, ArrayAssignSameTypeSameSize) {
+  EXPECT_TRUE(ElabOk(
+      "module t;\n"
+      "  logic [7:0] a[10], b[10];\n"
+      "  assign a = b;\n"
+      "endmodule\n"));
+}
+
+// §7.6: Packed array treated as vector — vector to packed array is OK.
+TEST(Elaboration, PackedArrayVectorAssign) {
+  EXPECT_TRUE(ElabOk(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  assign a = b;\n"
+      "endmodule\n"));
+}
+
+// §7.6: Wire-to-variable assignment compatibility.
+TEST(Elaboration, WireToVarArrayAssign) {
+  EXPECT_TRUE(ElabOk(
+      "module t;\n"
+      "  logic [7:0] v[4];\n"
+      "  wire [7:0] w[4];\n"
+      "  assign w = v;\n"
+      "endmodule\n"));
+}
+
 }  // namespace
