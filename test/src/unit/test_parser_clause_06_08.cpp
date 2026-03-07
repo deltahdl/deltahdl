@@ -359,4 +359,97 @@ TEST(ParserSection6, ShortrealWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
+// §6.8: var byte my_byte — equivalent to "byte my_byte".
+TEST(ParserSection6, Sec6_8_VarByteDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  var byte my_byte;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
+  EXPECT_EQ(item->name, "my_byte");
+}
+
+// §6.8: var [15:0] vw — equivalent to "var logic [15:0] vw".
+TEST(ParserSection6, Sec6_8_VarImplicitLogicWithRange) {
+  auto r = Parse(
+      "module t;\n"
+      "  var [15:0] vw;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "vw");
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 15u);
+}
+
+// §6.8: shortint s1, s2[0:9] — mixed scalar and array.
+TEST(ParserSection6, Sec6_8_MixedScalarAndArrayDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  shortint s1, s2 [0:9];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[0]->name, "s1");
+  EXPECT_TRUE(items[0]->unpacked_dims.empty());
+  EXPECT_EQ(items[1]->name, "s2");
+  EXPECT_FALSE(items[1]->unpacked_dims.empty());
+}
+
+// §6.8: const variable declaration.
+TEST(ParserSection6, Sec6_8_ConstVarDecl) {
+  auto r = Parse(
+      "module t;\n"
+      "  const int MAX = 100;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_TRUE(item->data_type.is_const);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->name, "MAX");
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+// §6.8: Variable with initializer — int i = 0.
+TEST(ParserSection6, Sec6_8_IntInitZero) {
+  auto r = Parse(
+      "module t;\n"
+      "  int i = 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->name, "i");
+  ASSERT_NE(item->init_expr, nullptr);
+  EXPECT_EQ(item->init_expr->int_val, 0u);
+}
+
+// §6.8: input var logic port declaration.
+TEST(ParserSection6, Sec6_8_InputVarLogicPort) {
+  auto r = Parse(
+      "module t(input var logic data_in);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& ports = r.cu->modules[0]->ports;
+  ASSERT_GE(ports.size(), 1u);
+  EXPECT_EQ(ports[0].name, "data_in");
+  EXPECT_EQ(ports[0].direction, Direction::kInput);
+}
+
 }  // namespace
