@@ -1,8 +1,27 @@
+#include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast.h"
 
 using namespace delta;
 namespace {
+
+// §6.16: string type has dynamic width (0 at compile time).
+TEST(TypeEval, StringTypeWidthZero) {
+  DataType dt;
+  dt.kind = DataTypeKind::kString;
+  EXPECT_EQ(EvalTypeWidth(dt), 0u);
+}
+
+// §6.16: string is not integral.
+TEST(TypeEval, StringNotIntegral) {
+  EXPECT_FALSE(IsIntegralType(DataTypeKind::kString));
+}
+
+// §6.16: string is not 4-state.
+TEST(TypeEval, StringNot4State) {
+  EXPECT_FALSE(Is4stateType(DataTypeKind::kString));
+}
 
 TEST(ParserA212, VarDataTypeString) {
   auto r = Parse("module m(input string name); endmodule");
