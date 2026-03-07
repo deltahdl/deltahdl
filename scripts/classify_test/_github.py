@@ -63,7 +63,8 @@ def maybe_update_issue_status(
     for t in tests:
         remark = ""
         if not source_is_target and target_filenames:
-            remark = target_filenames.get(t.test_name, "")
+            fname = target_filenames.get(t.test_name, "")
+            remark = f"Moved to {fname}" if fname else ""
         body = update_test_status(
             body, t.test_name, status, remark=remark,
         )

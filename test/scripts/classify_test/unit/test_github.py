@@ -124,9 +124,12 @@ def test_update_test_status_with_remark(ct_github):
     body = "| Alpha | Unreviewed | |\n"
     result = ct_github.update_test_status(
         body, "Alpha", "Reviewed but moved to another file",
-        remark="target.cpp",
+        remark="Moved to target.cpp",
     )
-    assert "| Alpha | Reviewed but moved to another file | target.cpp |" in result
+    assert (
+        "| Alpha | Reviewed but moved to another file"
+        " | Moved to target.cpp |"
+    ) in result
 
 
 # ---- remove_test_row ------------------------------------------------------
@@ -298,7 +301,7 @@ def test_maybe_update_moved(monkeypatch, ct_github, ct_helpers):
     )
     assert (
         "| T | Reviewed but moved to another file"
-        " | test_parser_clause_06_01.cpp |"
+        " | Moved to test_parser_clause_06_01.cpp |"
     ) in updated[0]
 
 
