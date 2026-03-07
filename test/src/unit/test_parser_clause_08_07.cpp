@@ -252,4 +252,14 @@ TEST(ParserA87, ConstructorSuperNewWithArgs) {
       "endclass\n");
 }
 
+TEST(ParserSection8, ConstructorEndLabel) {
+  auto r = Parse(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction : new\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+}
+
 }  // namespace

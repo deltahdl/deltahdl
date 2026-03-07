@@ -40,16 +40,6 @@ TEST(Parser, EmptyClass) {
   EXPECT_FALSE(r.cu->classes[0]->is_virtual);
 }
 
-TEST(ParserSection8, ConstructorEndLabel) {
-  auto r = Parse(
-      "class Base;\n"
-      "  function new();\n"
-      "  endfunction : new\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
 TEST(SourceText, ClassParameters) {
   auto r = Parse(
       "class C;\n"
