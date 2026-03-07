@@ -175,4 +175,21 @@ TEST(Elaborator, DriveStrengthSupply0Supply1Valid) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);  // supply1
 }
 
+// §6.3.2.2: Drive strength with highz0 on one side is valid.
+TEST(Elaborator, DriveStrengthHighz0Strong1Valid) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign (highz0, strong1) w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->assigns.empty());
+  EXPECT_EQ(mod->assigns[0].drive_strength0, 1u);  // highz0
+  EXPECT_EQ(mod->assigns[0].drive_strength1, 4u);  // strong1
+}
+
 }  // namespace
