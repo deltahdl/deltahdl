@@ -236,3 +236,13 @@ TEST(Preprocessor, Pragma_Resetall_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// --- §22.11: Pragma does not affect `resetall behavior ---
+// `resetall does not reset pragma state per §22.3.
+TEST(Preprocessor, Pragma_ResetallDoesNotAffectPragma) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`pragma some_pragma key=val\n", f, pp);
+  PreprocessWithPP("`resetall\n", f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+

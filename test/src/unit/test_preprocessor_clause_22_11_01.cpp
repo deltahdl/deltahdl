@@ -5,12 +5,6 @@
 
 using namespace delta;
 
-static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
-                                    Preprocessor& pp) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  return pp.Preprocess(fid);
-}
-
 namespace {
 
 // --- §22.11.1: `pragma reset resets named pragmas ---
@@ -30,16 +24,6 @@ TEST(Preprocessor, Pragma_Reset_MultipleNames_NoError) {
 TEST(Preprocessor, Pragma_Protect_NoError) {
   PreprocFixture f;
   Preprocess("`pragma protect begin\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-// --- §22.11: Pragma does not affect `resetall behavior ---
-// `resetall does not reset pragma state per §22.3.
-TEST(Preprocessor, Pragma_ResetallDoesNotAffectPragma) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("`pragma some_pragma key=val\n", f, pp);
-  PreprocessWithPP("`resetall\n", f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
