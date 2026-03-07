@@ -163,9 +163,14 @@ def test_format_prompt_forbids_parent_file(isc):
 
 
 def test_format_prompt_search_for_misplaced_tests(isc):
-    """Prompt instructs Claude to search for existing tests in wrong files."""
+    """Prompt instructs Claude to search test/src/unit/ for misplaced tests."""
     result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
     assert "Search test/src/unit/" in result
+
+
+def test_format_prompt_search_mentions_subclause(isc):
+    """Misplaced-test search instruction references the target subclause."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
     assert "§10.10.2" in result
 
 
