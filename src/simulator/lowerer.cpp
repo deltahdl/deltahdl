@@ -1,5 +1,6 @@
 #include "simulator/lowerer.h"
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -81,11 +82,78 @@ static Strength ParserStrToStrength(uint8_t s) {
   }
 }
 
+// §10.3.3: Check if all bits are high-Z (aval=0, bval=1 for each word).
+static bool IsAllHighZ(const Logic4Vec& v) {
+  for (uint32_t i = 0; i < v.nwords; ++i) {
+    if (v.words[i].aval != 0 || v.words[i].bval == 0) return false;
+  }
+  return v.nwords > 0;
+}
+
+// §10.3.3: Select the appropriate delay for a continuous assignment based on
+// the transition from old_val to new_val.
+static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
+                                      const Logic4Vec& new_val,
+                                      uint64_t d_rise, uint64_t d_fall,
+                                      uint64_t d_decay, bool has_fall,
+                                      bool has_decay) {
+  if (!has_fall) return d_rise;  // Single delay for all transitions.
+  uint64_t new_bits = new_val.ToUint64();
+  bool new_has_x = HasUnknownBits(new_val);
+  bool new_is_z = IsAllHighZ(new_val);
+  uint64_t old_bits = old_val.ToUint64();
+  bool old_has_x = HasUnknownBits(old_val);
+  if (new_is_z && has_decay) return d_decay;
+  if (new_has_x) {
+    // Transition to x: use minimum of all available delays.
+    uint64_t m = std::min(d_rise, d_fall);
+    if (has_decay) m = std::min(m, d_decay);
+    return m;
+  }
+  if (old_has_x || IsAllHighZ(old_val)) {
+    // From unknown/z to known: use minimum of rise and fall.
+    return std::min(d_rise, d_fall);
+  }
+  if (new_bits > old_bits) return d_rise;
+  if (new_bits < old_bits) return d_fall;
+  return d_rise;  // No change — use rise as default.
+}
+
 static SimCoroutine MakeContAssignCoroutine(const Expr* lhs, const Expr* rhs,
-                                            DriverStrength ds, SimContext& ctx,
-                                            Arena& arena) {
+                                            DriverStrength ds,
+                                            const Expr* delay_expr,
+                                            const Expr* delay_fall_expr,
+                                            const Expr* delay_decay_expr,
+                                            SimContext& ctx, Arena& arena) {
   auto val = EvalExpr(rhs, ctx, arena);
   if (!lhs || lhs->kind != ExprKind::kIdentifier) co_return;
+
+  // §10.3.3: Apply continuous assignment delay if specified.
+  if (delay_expr) {
+    uint64_t d_rise = EvalExpr(delay_expr, ctx, arena).ToUint64();
+    uint64_t d_fall = delay_fall_expr
+                          ? EvalExpr(delay_fall_expr, ctx, arena).ToUint64()
+                          : 0;
+    uint64_t d_decay = delay_decay_expr
+                           ? EvalExpr(delay_decay_expr, ctx, arena).ToUint64()
+                           : 0;
+    bool has_fall = delay_fall_expr != nullptr;
+    bool has_decay = delay_decay_expr != nullptr;
+
+    // Get old value for transition detection.
+    Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);  // Default x-ish.
+    auto* var = ctx.FindVariable(lhs->text);
+    auto* net = ctx.FindNet(lhs->text);
+    if (var) old_val = var->value;
+    else if (net && net->resolved) old_val = net->resolved->value;
+
+    uint64_t ticks = SelectContAssignDelay(old_val, val, d_rise, d_fall,
+                                           d_decay, has_fall, has_decay);
+    if (ticks > 0) {
+      co_await DelayAwaiter{ctx, ticks};
+    }
+  }
+
   // §10.3.4: If target is a net, add as a strength-aware driver.
   auto* net = ctx.FindNet(lhs->text);
   if (net) {
@@ -541,7 +609,9 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca) {
   p->home_region = Region::kActive;
   DriverStrength ds{ParserStrToStrength(ca.drive_strength0),
                     ParserStrToStrength(ca.drive_strength1)};
-  p->coro = MakeContAssignCoroutine(ca.lhs, ca.rhs, ds, ctx_, arena_).Release();
+  p->coro = MakeContAssignCoroutine(ca.lhs, ca.rhs, ds, ca.delay,
+                                    ca.delay_fall, ca.delay_decay,
+                                    ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_.GetScheduler());
 }

@@ -921,6 +921,15 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                   "indexing or select");
     }
   }
+  // §10.3.3: Nettype nets shall only have a single delay.
+  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier &&
+      nettype_net_names_.count(item->assign_lhs->text) != 0) {
+    if (item->assign_delay_fall || item->assign_delay_decay) {
+      diag_.Error(item->loc,
+                  "continuous assignment to a nettype net shall have at most "
+                  "a single delay");
+    }
+  }
   RtlirContAssign ca;
   ca.lhs = item->assign_lhs;
   ca.rhs = item->assign_rhs;
