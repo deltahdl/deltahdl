@@ -690,6 +690,27 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // §5.12: Resolve attributes.
   net.attrs = ResolveAttributes(item->attrs, diag_);
   mod->nets.push_back(net);
+
+  // §10.3.1: Net declaration assignment creates an implicit continuous assign.
+  if (item->init_expr) {
+    if (item->data_type.is_interconnect) {
+      diag_.Error(item->loc,
+                  "interconnect net shall not have a net declaration assignment");
+      return;
+    }
+    auto* lhs = arena_.Create<Expr>();
+    lhs->kind = ExprKind::kIdentifier;
+    lhs->text = item->name;
+    lhs->range = item->init_expr->range;
+    cont_assign_targets_.emplace(item->name, item->loc);
+    RtlirContAssign ca;
+    ca.lhs = lhs;
+    ca.rhs = item->init_expr;
+    ca.width = net.width;
+    ca.drive_strength0 = item->data_type.drive_strength0;
+    ca.drive_strength1 = item->data_type.drive_strength1;
+    mod->assigns.push_back(ca);
+  }
 }
 
 // §6.23: Resolve type(expr) to concrete type kind from declared variables.
