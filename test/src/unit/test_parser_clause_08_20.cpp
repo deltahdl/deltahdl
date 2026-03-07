@@ -214,4 +214,12 @@ TEST(ParserClause08_03, MethodExtendsSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
+TEST(ParserClause08_03, MethodFinalSpecifier) {
+  auto r = Parse(
+      "class C;\n"
+      "  function :final void baz(); endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+}
+
 }  // namespace
