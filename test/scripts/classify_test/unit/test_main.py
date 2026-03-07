@@ -564,10 +564,8 @@ def _mixed_classifier(prompt, schema=None):
     return {"clause": "6.1", "rationale": "r"}
 
 
-def _run_live_non_lrm(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    ct, ct_helpers, tmp_path, monkeypatch, src_body,
-    classifier, test="T",
-):
+def _run_live_non_lrm(ct, ct_helpers, tmp_path, monkeypatch, *,
+                      src_body, classifier, test="T"):
     """Write source, stub externals, and run live pipeline."""
     _run = getattr(ct, "_run")
     src = tmp_path / "test_non_lrm_aig.cpp"
@@ -595,9 +593,9 @@ def test_run_live_self_named(tmp_path, monkeypatch, ct, ct_helpers):
     """Source file already in correct location is left untouched."""
     _run_live_non_lrm(
         ct, ct_helpers, tmp_path, monkeypatch,
-        "#include <gtest/gtest.h>\n\n"
+        src_body="#include <gtest/gtest.h>\n\n"
         "TEST(S, T) {\n  auto r = Parse(src);\n}\n",
-        _self_named_classifier,
+        classifier=_self_named_classifier,
     )
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
@@ -612,8 +610,8 @@ _MIXED_BODY = (
 def test_run_live_mixed_keeps_source(tmp_path, monkeypatch, ct, ct_helpers):
     """Source is rewritten with only the staying tests."""
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch, _MIXED_BODY,
-        _mixed_classifier, test="Move",
+        ct, ct_helpers, tmp_path, monkeypatch,
+        src_body=_MIXED_BODY, classifier=_mixed_classifier, test="Move",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Stay" in src
@@ -623,8 +621,8 @@ def test_run_live_mixed_removes_moved_from_source(tmp_path, monkeypatch, ct,
                                                    ct_helpers):
     """Moved tests are removed from the source file."""
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch, _MIXED_BODY,
-        _mixed_classifier, test="Move",
+        ct, ct_helpers, tmp_path, monkeypatch,
+        src_body=_MIXED_BODY, classifier=_mixed_classifier, test="Move",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Move" not in src
@@ -634,8 +632,8 @@ def test_run_live_mixed_creates_new_file(tmp_path, monkeypatch, ct,
                                          ct_helpers):
     """Moved tests are written to a new clause file."""
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch, _MIXED_BODY,
-        _mixed_classifier, test="Move",
+        ct, ct_helpers, tmp_path, monkeypatch,
+        src_body=_MIXED_BODY, classifier=_mixed_classifier, test="Move",
     )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
@@ -644,8 +642,8 @@ def test_run_live_mixed_keeps_cmake_entry(tmp_path, monkeypatch, ct,
                                           ct_helpers):
     """Source kept in CMakeLists.txt when source_is_target."""
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch, _MIXED_BODY,
-        _mixed_classifier, test="Move",
+        ct, ct_helpers, tmp_path, monkeypatch,
+        src_body=_MIXED_BODY, classifier=_mixed_classifier, test="Move",
     )
     cmake = (tmp_path / "CMakeLists.txt").read_text()
     assert "test_non_lrm_aig" in cmake
@@ -667,8 +665,8 @@ def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch, ct,
         encoding="utf-8",
     )
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch, src_body,
-        _self_named_classifier, test="Dup",
+        ct, ct_helpers, tmp_path, monkeypatch,
+        src_body=src_body, classifier=_self_named_classifier, test="Dup",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Dup" not in src
@@ -687,8 +685,8 @@ def test_run_live_dedup_only_test_rewrites_source(tmp_path, monkeypatch, ct,
         encoding="utf-8",
     )
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch, src_body,
-        _self_named_classifier, test="Dup",
+        ct, ct_helpers, tmp_path, monkeypatch,
+        src_body=src_body, classifier=_self_named_classifier, test="Dup",
     )
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
@@ -707,8 +705,8 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch,
         encoding="utf-8",
     )
     _run_live_non_lrm(
-        ct, ct_helpers, tmp_path, monkeypatch, src_body,
-        _self_named_classifier, test="Dup",
+        ct, ct_helpers, tmp_path, monkeypatch,
+        src_body=src_body, classifier=_self_named_classifier, test="Dup",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Keep" in src
