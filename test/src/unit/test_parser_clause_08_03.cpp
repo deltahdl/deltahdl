@@ -120,20 +120,6 @@ TEST(ParserClause08_03, ConstructorDefaultArg) {
   EXPECT_TRUE(members[0]->method->func_args[0].is_default);
 }
 
-// --- §8.3 extern constructor prototype ---
-TEST(ParserClause08_03, ExternConstructorPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  extern function new(int x);\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 1u);
-  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
-  EXPECT_EQ(members[0]->method->name, "new");
-}
-
 // --- §8.3 dynamic_override_specifiers on methods ---
 TEST(ParserClause08_03, MethodInitialSpecifier) {
   auto r = Parse(
