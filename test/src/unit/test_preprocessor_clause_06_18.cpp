@@ -60,4 +60,30 @@ TEST(ParserSection6, TypedefUsedInVarDecl) {
   EXPECT_EQ(var->data_type.type_name, "counter_t");
 }
 
+// §6.18: Interface-based typedef syntax.
+TEST(ParserSection6, InterfaceBasedTypedef) {
+  auto r = ParseWithPreprocessor(
+      "interface intf_i;\n"
+      "  typedef int data_t;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.18: Typedef chain through preprocessor.
+TEST(ParserSection6, TypedefChainPreprocessor) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  typedef logic [15:0] halfword_t;\n"
+      "  typedef halfword_t addr_t;\n"
+      "  addr_t pc;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
+  auto* var = r.cu->modules[0]->items[2];
+  EXPECT_EQ(var->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(var->data_type.type_name, "addr_t");
+}
+
 }  // namespace

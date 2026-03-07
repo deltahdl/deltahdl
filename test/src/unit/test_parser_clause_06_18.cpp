@@ -186,4 +186,77 @@ TEST(ParserCh5, UnpackedDim_Typedef) {
   EXPECT_TRUE(ParseOk5("module m; typedef int triple[1:3]; endmodule"));
 }
 
+// §6.18: Bare forward typedef (typedef type_identifier;).
+TEST(ParserSection6, BareForwardTypedef) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef my_type;\n"
+      "  typedef int my_type;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.18: Forward typedef followed by actual definition in same scope.
+TEST(ParserSection6, ForwardTypedefThenDefinition) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum color_e;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_e;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.18: Multiple forward typedefs for same identifier.
+TEST(ParserSection6, MultipleForwardTypedefs) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef class myclass;\n"
+      "  typedef class myclass;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.18: Forward typedef after actual definition.
+TEST(ParserSection6, ForwardTypedefAfterDefinition) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum {X, Y} my_enum;\n"
+      "  typedef enum my_enum;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.18: Typedef used for casting complex data types.
+TEST(ParserSection6, TypedefForCastingUse) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  int x;\n"
+      "  initial x = byte_t'(255);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.18: Typedef of enum type.
+TEST(ParserSection6, TypedefEnum) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum {A, B, C} my_enum;\n"
+      "  my_enum val;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* td = r.cu->modules[0]->items[0];
+  EXPECT_EQ(td->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(td->typedef_type.kind, DataTypeKind::kEnum);
+  auto* var = r.cu->modules[0]->items[1];
+  EXPECT_EQ(var->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(var->data_type.type_name, "my_enum");
+}
+
 }  // namespace
