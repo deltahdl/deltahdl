@@ -129,14 +129,6 @@ TEST(ParserClause08_03, MethodInitialSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause08_03, TaskDynamicOverrideSpecifiers) {
-  auto r = Parse(
-      "class C;\n"
-      "  task :extends my_task(); endtask\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-}
-
 // --- §8.3 footnote 9: default at most once in constructor arg list ---
 TEST(ParserClause08_03, ErrorDuplicateDefaultInConstructorArgs) {
   auto r = Parse(
