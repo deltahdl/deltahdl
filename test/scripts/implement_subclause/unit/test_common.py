@@ -162,6 +162,13 @@ def test_format_prompt_forbids_parent_file(isc):
     assert "parent clause file" in result
 
 
+def test_format_prompt_search_for_misplaced_tests(isc):
+    """Prompt instructs Claude to search for existing tests in wrong files."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    assert "Search test/src/unit/" in result
+    assert "§10.10.2" in result
+
+
 def test_format_prompt_forbids_git_commits(isc):
     """Prompt forbids making git commits."""
     result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)

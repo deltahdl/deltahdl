@@ -91,6 +91,13 @@ def format_prompt(
     )
 
     lines.append(
+        "Search test/src/unit/ for any existing tests"
+        f" that cover §{subclause} requirements."
+        " If found in files other than the ones listed below,"
+        " move them to the correct file.",
+    )
+
+    lines.append(
         "Use strict test-driven development:"
         f" for each requirement in §{subclause},"
         " write a failing unit test, then implement."
