@@ -129,14 +129,6 @@ TEST(ParserClause08_03, MethodInitialSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause08_03, MethodInitialFinalSpecifiers) {
-  auto r = Parse(
-      "class C;\n"
-      "  function :initial :final void qux(); endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-}
-
 TEST(ParserClause08_03, TaskDynamicOverrideSpecifiers) {
   auto r = Parse(
       "class C;\n"

@@ -222,4 +222,12 @@ TEST(ParserClause08_03, MethodFinalSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
+TEST(ParserClause08_03, MethodInitialFinalSpecifiers) {
+  auto r = Parse(
+      "class C;\n"
+      "  function :initial :final void qux(); endfunction\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+}
+
 }  // namespace
