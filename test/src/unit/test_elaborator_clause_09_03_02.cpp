@@ -1,0 +1,170 @@
+#include "fixture_elaborator.h"
+
+using namespace delta;
+
+namespace {
+
+// §9.3.2: fork/join elaborates within an initial process.
+TEST(ElabClause09_03_02, ForkJoinInInitialElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.3.2: fork/join_any elaborates without errors.
+TEST(ElabClause09_03_02, ForkJoinAnyElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.3.2: fork/join_none elaborates without errors.
+TEST(ElabClause09_03_02, ForkJoinNoneElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.3.2: Empty fork/join elaborates without errors.
+TEST(ElabClause09_03_02, EmptyForkJoinElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.3.2: begin-end inside fork creates a single sequential process.
+TEST(ElabClause09_03_02, BeginEndInsideForkElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        a = 1;\n"
+      "        b = 0;\n"
+      "      end\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.3.2: fork/join in always_comb is an error.
+TEST(ElabClause09_03_02, ForkInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.3.2: fork/join in always_ff is an error.
+TEST(ElabClause09_03_02, ForkInAlwaysFFErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    fork\n"
+      "      a <= 1;\n"
+      "      b <= 0;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.3.2: fork/join in final is an error.
+TEST(ElabClause09_03_02, ForkInFinalErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  final begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.3.2: Nested fork/join in initial elaborates.
+TEST(ElabClause09_03_02, NestedForkElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, c;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        fork\n"
+      "          a = 1;\n"
+      "          b = 0;\n"
+      "        join\n"
+      "      end\n"
+      "      c = 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+}  // namespace
