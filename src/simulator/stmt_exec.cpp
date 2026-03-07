@@ -371,9 +371,30 @@ static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return true;
 }
 
-// §12.6: Pattern match — x/z in pattern are wildcards (same as inside).
-static bool CaseMatchesMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
+// §12.6: Pattern match — x/z in pattern are wildcards.
+// casez matches additionally treats z in selector as wildcard;
+// casex matches treats x/z in both as wildcards.
+static bool CaseMatchesMatch(const Logic4Vec& sel, const Logic4Vec& pat,
+                             TokenKind case_kind) {
+  if (case_kind == TokenKind::kKwCasex) return CasexMatch(sel, pat);
+  if (case_kind == TokenKind::kKwCasez) return CasezMatch(sel, pat);
   return CaseInsideValueMatch(sel, pat);
+}
+
+// §12.6.1: Check a case-matches pattern, handling &&& guard expressions.
+static bool CaseMatchesPatternMatch(const Logic4Vec& sel, const Expr* pat_expr,
+                                    SimContext& ctx, Arena& arena,
+                                    TokenKind case_kind) {
+  // §12.6.1: pattern &&& guard — pattern must match AND guard must be true.
+  if (pat_expr->kind == ExprKind::kBinary &&
+      pat_expr->op == TokenKind::kAmpAmpAmp) {
+    auto pat_val = EvalExpr(pat_expr->lhs, ctx, arena);
+    if (!CaseMatchesMatch(sel, pat_val, case_kind)) return false;
+    auto guard = EvalExpr(pat_expr->rhs, ctx, arena);
+    return guard.IsTruthy();
+  }
+  auto pv = EvalExpr(pat_expr, ctx, arena);
+  return CaseMatchesMatch(sel, pv, case_kind);
 }
 
 // Check if a case item matches based on case_kind (non-inside, non-matches).
@@ -405,11 +426,10 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
         bool matched;
         if (stmt->case_inside)
           matched = CaseInsidePatternMatch(sel, pat, ctx, arena);
-        else {
-          auto pv = EvalExpr(pat, ctx, arena);
-          matched = stmt->case_matches ? CaseMatchesMatch(sel, pv)
-                                       : CaseItemMatches(sel, pv, stmt->case_kind);
-        }
+        else if (stmt->case_matches)
+          matched = CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
+        else
+          matched = CaseItemMatches(sel, EvalExpr(pat, ctx, arena), stmt->case_kind);
         if (matched) {
           match_count++;
           if (!first_match_body) first_match_body = item.body;
@@ -444,11 +464,10 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       bool matched;
       if (stmt->case_inside)
         matched = CaseInsidePatternMatch(sel, pat, ctx, arena);
-      else {
-        auto pv = EvalExpr(pat, ctx, arena);
-        matched = stmt->case_matches ? CaseMatchesMatch(sel, pv)
-                                     : CaseItemMatches(sel, pv, stmt->case_kind);
-      }
+      else if (stmt->case_matches)
+        matched = CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
+      else
+        matched = CaseItemMatches(sel, EvalExpr(pat, ctx, arena), stmt->case_kind);
       if (matched) {
         co_return co_await ExecStmt(item.body, ctx, arena);
       }

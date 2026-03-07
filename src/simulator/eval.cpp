@@ -900,6 +900,13 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     if (TryArrayEqualityOp(expr, ctx, arena, arr_result)) return arr_result;
   }
   if (expr->op == TokenKind::kAmpAmp) return EvalLogicalAnd(expr, ctx, arena);
+  // §12.6: &&& is sequential conjunction — short-circuit on false.
+  if (expr->op == TokenKind::kAmpAmpAmp) {
+    auto lv = EvalExpr(expr->lhs, ctx, arena);
+    if (!lv.IsTruthy()) return MakeLogic4VecVal(arena, 1, 0);
+    auto rv = EvalExpr(expr->rhs, ctx, arena);
+    return MakeLogic4VecVal(arena, 1, rv.IsTruthy() ? 1 : 0);
+  }
   if (expr->op == TokenKind::kPipePipe) return EvalLogicalOr(expr, ctx, arena);
   if (expr->op == TokenKind::kArrow) return EvalLogicalImpl(expr, ctx, arena);
   if (expr->op == TokenKind::kLtDashGt)
