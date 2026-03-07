@@ -760,6 +760,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
       nettype_names_.count(item->data_type.type_name)) {
     item->data_type.is_net = true;
     item->kind = ModuleItemKind::kNetDecl;
+    nettype_net_names_.insert(item->name);
     ElaborateNetDecl(item, mod);
     return;
   }
@@ -790,6 +791,10 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.is_signed =
       item->data_type.is_signed || IsImplicitlySigned(item->data_type.kind);
   var.init_expr = item->init_expr;
+  // §10.3.2: Track variables with initializers.
+  if (item->init_expr) {
+    var_init_names_.insert(item->name);
+  }
   // Pass struct/union type info for field-level access.
   SetStructTypeInfo(item, var);
   // §8: Mark class-typed variables.
@@ -889,9 +894,31 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
     auto name = item->assign_lhs->text;
     MaybeCreateImplicitNet(name, item->loc, mod);
+    // §10.3.2: Variables can only have one continuous assignment.
     if (!cont_assign_targets_.emplace(name, item->loc).second) {
+      if (net_names_.count(name) == 0) {
+        diag_.Error(
+            item->loc,
+            std::format("multiple continuous assignments to '{}'", name));
+      }
+    }
+    // §10.3.2: Variable driven by continuous assignment shall not have
+    // an initializer in the declaration.
+    if (var_init_names_.count(name) != 0) {
       diag_.Error(item->loc,
-                  std::format("multiple continuous assignments to '{}'", name));
+                  std::format("variable '{}' has both an initializer and a "
+                              "continuous assignment",
+                              name));
+    }
+  }
+  // §10.3.2: Nettype LHS shall not contain indexing or select.
+  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kSelect) {
+    auto* base = item->assign_lhs->base;
+    if (base && base->kind == ExprKind::kIdentifier &&
+        nettype_net_names_.count(base->text) != 0) {
+      diag_.Error(item->loc,
+                  "continuous assignment to a nettype net shall not contain "
+                  "indexing or select");
     }
   }
   RtlirContAssign ca;
@@ -1079,6 +1106,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   const_names_.clear();
   class_var_names_.clear();
   class_var_types_.clear();
+  var_init_names_.clear();
+  nettype_net_names_.clear();
   interconnect_names_.clear();
   var_named_types_.clear();
   task_names_.clear();

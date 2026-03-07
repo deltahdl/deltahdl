@@ -304,6 +304,8 @@ class Elaborator {
   std::unordered_set<std::string_view> class_var_names_;  // §8.4
   std::unordered_map<std::string_view, std::string_view>
       class_var_types_;  // §8.18: var name → class type name
+  std::unordered_set<std::string_view> var_init_names_;  // §10.3.2
+  std::unordered_set<std::string_view> nettype_net_names_;  // §10.3.2
   std::unordered_set<std::string_view> nettype_names_;
   std::unordered_set<std::string_view> interconnect_names_;
   std::unordered_set<std::string_view> task_names_;  // §13.2

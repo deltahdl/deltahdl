@@ -1,8 +1,4 @@
-#include "common/types.h"
-#include "elaborator/sensitivity.h"
-#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
-#include "lexer/token.h"
 
 using namespace delta;
 
@@ -42,6 +38,101 @@ TEST(ElabClause1003, MultipleContAssigns) {
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 2u);
+}
+
+// §10.3.2: Variable with initializer + continuous assignment = error.
+
+TEST(ElabClause100302, VarWithInitAndContAssign_Error) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic v = 1'b0;\n"
+      "  assign v = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ElabClause100302, VarNoInitAndContAssign_Ok) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  logic v;\n"
+      "  assign v = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §10.3.2: Nets can be driven by multiple continuous assignments.
+
+TEST(ElabClause100302, NetMultipleContAssign_Ok) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign w = 1'b0;\n"
+      "  assign w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §10.3.2: Variables can only be driven by one continuous assignment.
+
+TEST(ElabClause100302, VarMultiContAssign_Error) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic v;\n"
+      "  assign v = 1'b0;\n"
+      "  assign v = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §10.3.2: Nettype LHS shall not contain indexing or select.
+
+TEST(ElabClause100302, NettypeLhsWithSelect_Error) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  nettype logic mytype;\n"
+      "  mytype n;\n"
+      "  assign n[0] = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ElabClause100302, NettypeLhsNoSelect_Ok) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  nettype logic mytype;\n"
+      "  mytype n;\n"
+      "  assign n = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §10.3.2: Variable with procedural assignment cannot also have continuous.
+
+TEST(ElabClause100302, VarContAndProcAssign_Error) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic v;\n"
+      "  assign v = 1'b0;\n"
+      "  initial v = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace
