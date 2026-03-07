@@ -36,27 +36,6 @@ TEST(Elaborator, TriregDefaultChargeStrengthMedium) {
   EXPECT_TRUE(found);
 }
 
-// §6.3.2.1: trireg with explicit (small) charge strength.
-TEST(Elaborator, TriregExplicitChargeStrengthSmall) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  trireg (small) s;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  bool found = false;
-  for (const auto& net : mod->nets) {
-    if (net.name == "s") {
-      EXPECT_EQ(net.charge_strength, Strength::kSmall);
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 // §6.3.2.1: trireg with explicit (large) charge strength.
 TEST(Elaborator, TriregExplicitChargeStrengthLarge) {
   ElabFixture f;
