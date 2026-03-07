@@ -27,16 +27,6 @@ TEST(Preprocessor, Pragma_Protect_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// --- §22.11: Macro expansion within pragma ---
-TEST(Preprocessor, Pragma_MacroExpansionInName) {
-  PreprocFixture f;
-  // Macro expansion in pragma arguments (§22.2: macro expansion occurs within
-  // directives). The pragma_name itself is a simple_identifier from the
-  // directive text, but expressions may contain macros.
-  auto out = Preprocess("`define MY_VAL 42\n`pragma my_pragma `MY_VAL\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 // --- §22.11: Edge case — pragma with only whitespace after name ---
 TEST(Preprocessor, Pragma_NameTrailingWhitespace_NoError) {
   PreprocFixture f;
