@@ -129,4 +129,21 @@ TEST(ElabClause100304, NetDeclStrengthVector_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §6.3.2.2: Continuous assignment without drive strength has defaults (0, 0).
+TEST(Elaborator, ContAssignNoDriveStrengthDefault) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign w = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->assigns.empty());
+  EXPECT_EQ(mod->assigns[0].drive_strength0, 0u);
+  EXPECT_EQ(mod->assigns[0].drive_strength1, 0u);
+}
+
 }  // namespace
