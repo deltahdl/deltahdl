@@ -78,7 +78,7 @@ def _stub_ensure(monkeypatch: pytest.MonkeyPatch, cf) -> list[bool]:
     """Stub sync_issue_rows; return call log."""
     called: list[bool] = []
 
-    def fake(_a, _n):  # type: ignore[no-untyped-def]
+    def fake(_a: object, _n: object) -> set[str]:
         called.append(True)
         return set()
 
@@ -189,7 +189,7 @@ def _sync_order_log(
     """Run pipeline recording sync vs subprocess call order."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     order: list[str] = []
-    def fake_sync(_a, _n):  # type: ignore[no-untyped-def]
+    def fake_sync(_a: object, _n: object) -> set[str]:
         order.append("sync")
         return set()
 

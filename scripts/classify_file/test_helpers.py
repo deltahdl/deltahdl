@@ -87,7 +87,7 @@ def stub_sync_issue_rows(monkeypatch: pytest.MonkeyPatch) -> list[bool]:
     """Stub classify_file.sync_issue_rows; return call log."""
     log: list[bool] = []
 
-    def fake(_a, _n):  # type: ignore[no-untyped-def]
+    def fake(_a: object, _n: object) -> set[str]:
         log.append(True)
         return set()
 
