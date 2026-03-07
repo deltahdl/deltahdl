@@ -1,18 +1,12 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "fixture_elaborator.h"
 #include "model_net_declaration.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(NetDecl, VectoredWithPackedDimensionOk) {
-  NetDeclInfo info;
-  info.is_vectored = true;
-  info.packed_dim_count = 1;
-  EXPECT_TRUE(ValidateNetDecl(info));
-}
 
 TEST(NetDecl, ScalaredWithPackedDimensionOk) {
   NetDeclInfo info;

@@ -185,4 +185,11 @@ TEST(Elaborator, TriregExplicitChargeStrengthMedium) {
   EXPECT_TRUE(found);
 }
 
+TEST(NetDecl, VectoredWithPackedDimensionOk) {
+  NetDeclInfo info;
+  info.is_vectored = true;
+  info.packed_dim_count = 1;
+  EXPECT_TRUE(ValidateNetDecl(info));
+}
+
 }  // namespace
