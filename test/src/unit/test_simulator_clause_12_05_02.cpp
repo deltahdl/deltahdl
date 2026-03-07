@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <string_view>
 
 #include "builders_ast.h"
@@ -6,12 +5,8 @@
 #include "fixture_simulator.h"
 #include "helpers_stmt_exec.h"
 #include "parser/ast.h"
-#include "simulator/awaiters.h"
-#include "simulator/exec_task.h"
 #include "simulator/lowerer.h"
-#include "simulator/process.h"
 #include "simulator/stmt_exec.h"
-#include "simulator/stmt_result.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -118,6 +113,63 @@ TEST(SimA607, SequentialCaseStatements) {
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 11u);
   EXPECT_EQ(y->value.ToUint64(), 22u);
+}
+
+// §12.5.2: Priority encoder pattern — constant case_expression with bit-select
+// case_item_expressions.
+TEST(SimA607, ConstCaseExprPriorityEncoder) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [2:0] encode;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    encode = 3'b010;\n"
+      "    case (1)\n"
+      "      encode[2]: x = 8'd2;\n"
+      "      encode[1]: x = 8'd1;\n"
+      "      encode[0]: x = 8'd0;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // encode[2]=0 (no match), encode[1]=1 (match) → x = 1.
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §12.5.2: Constant case_expression, no matching item → default.
+TEST(SimA607, ConstCaseExprFallsToDefault) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [2:0] encode;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    encode = 3'b000;\n"
+      "    case (1)\n"
+      "      encode[2]: x = 8'd2;\n"
+      "      encode[1]: x = 8'd1;\n"
+      "      encode[0]: x = 8'd0;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  // All bits are 0, none match 1 → default.
+  EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 }  // namespace
