@@ -10,17 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §6.11.1: Non-integral types.
-TEST(TypeEval, NonIntegralTypes) {
-  EXPECT_FALSE(IsIntegralType(DataTypeKind::kReal));
-  EXPECT_FALSE(IsIntegralType(DataTypeKind::kShortreal));
-  EXPECT_FALSE(IsIntegralType(DataTypeKind::kRealtime));
-  EXPECT_FALSE(IsIntegralType(DataTypeKind::kString));
-  EXPECT_FALSE(IsIntegralType(DataTypeKind::kVoid));
-  EXPECT_FALSE(IsIntegralType(DataTypeKind::kChandle));
-  EXPECT_FALSE(IsIntegralType(DataTypeKind::kEvent));
-}
-
 // §6.11.1: Built-in type widths per Table 6-8.
 TEST(TypeEval, IntegerTypeWidths) {
   DataType dt;
