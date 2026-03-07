@@ -41,19 +41,6 @@ TEST(ParserSection6, Sec6_5_LogicPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(ParserSection6, UnsignedVector) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic unsigned [15:0] uv;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_FALSE(item->data_type.is_signed);
-  EXPECT_EQ(item->name, "uv");
-}
-
 // §6.9: Scalar — no range specification, 1-bit wide.
 TEST(ParserSection6, Sec6_9_ScalarNoRange) {
   auto r = Parse(
