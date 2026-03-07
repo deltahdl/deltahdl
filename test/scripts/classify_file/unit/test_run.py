@@ -361,11 +361,14 @@ def test_build_issue_body_single_test(cf):
     assert "| Only | Unreviewed | |" in cf.build_issue_body(["Only"])
 
 
-def test_build_issue_body_no_headings(cf):
-    """Body does not contain Summary or Tests headings."""
-    body = cf.build_issue_body(["A"])
-    assert "## Summary" not in body
-    assert "## Tests" not in body
+def test_build_issue_body_no_summary_heading(cf):
+    """Body does not contain Summary heading."""
+    assert "## Summary" not in cf.build_issue_body(["A"])
+
+
+def test_build_issue_body_no_tests_heading(cf):
+    """Body does not contain Tests heading."""
+    assert "## Tests" not in cf.build_issue_body(["A"])
 
 
 # ---- create_issue ----------------------------------------------------------
@@ -798,18 +801,30 @@ def test_sync_issue_rows_all_unreviewed_no_update(monkeypatch, cf):
     """Does not call update when all rows are already Unreviewed."""
     body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
     updates = _stub_github(monkeypatch, cf, body)
-    result = cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
+    cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
     assert len(updates) == 0
-    assert result == set()
+
+
+def test_sync_issue_rows_all_unreviewed_returns_empty(monkeypatch, cf):
+    """Returns empty set when all rows are Unreviewed."""
+    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
+    _stub_github(monkeypatch, cf, body)
+    assert cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"]) == set()
 
 
 def test_sync_issue_rows_adds_missing_row(monkeypatch, cf):
     """Adds an Unreviewed row for a missing test."""
     body = "| Alpha | Unreviewed | |\n"
     updates = _stub_github(monkeypatch, cf, body)
-    result = cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
+    cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
     assert "| Beta | Unreviewed | |" in updates[0]
-    assert result == set()
+
+
+def test_sync_issue_rows_missing_returns_empty(monkeypatch, cf):
+    """Returns empty set when only missing tests are added."""
+    body = "| Alpha | Unreviewed | |\n"
+    _stub_github(monkeypatch, cf, body)
+    assert cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"]) == set()
 
 
 def test_sync_issue_rows_preserves_other_reviewed(monkeypatch, cf):
@@ -845,14 +860,21 @@ def test_sync_issue_rows_returns_moved(monkeypatch, cf):
     assert result == {"Alpha"}
 
 
-def test_sync_issue_rows_mixed_returns_and_adds(monkeypatch, cf):
-    """Returns reviewed and adds missing tests."""
+def test_sync_issue_rows_mixed_returns_reviewed(monkeypatch, cf):
+    """Returns reviewed names when mixed with missing tests."""
     body = "| Alpha | Reviewed but kept in the same file | |\n"
-    updates = _stub_github(monkeypatch, cf, body)
+    _stub_github(monkeypatch, cf, body)
     result = cf.sync_issue_rows(
         _make_args(), ["Alpha", "Beta"],
     )
     assert result == {"Alpha"}
+
+
+def test_sync_issue_rows_mixed_adds_missing(monkeypatch, cf):
+    """Adds missing test row when mixed with reviewed tests."""
+    body = "| Alpha | Reviewed but kept in the same file | |\n"
+    updates = _stub_github(monkeypatch, cf, body)
+    cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
     assert "| Beta | Unreviewed | |" in updates[0]
 
 
@@ -886,35 +908,58 @@ def test_run_skips_sync_issue_rows_with_create_issue(
     assert len(log) == 0
 
 
-def test_run_skips_reviewed_tests(
-    tmp_path, monkeypatch, cf, cf_helpers,
-):
-    """Skips tests already marked as reviewed."""
-    cf_helpers.make_test_file(
-        tmp_path, "TEST(S, A) {\n}\nTEST(S, B) {\n}\n",
-    )
+def _run_with_reviewed(tmp_path, monkeypatch, cf, cf_helpers,
+                       body, reviewed):
+    """Run _run() with sync_issue_rows returning *reviewed*."""
+    cf_helpers.make_test_file(tmp_path, body)
     monkeypatch.setattr(
-        cf, "sync_issue_rows",
-        lambda _a, _n: {"A"},
-    )
-    captured = cf_helpers.stub_subprocess_success(monkeypatch)
-    cf_helpers.stub_close_issue(monkeypatch)
-    getattr(cf, "_run")(_make_run_args(tmp_path))
-    assert len(captured) == 1
-    assert "B" in " ".join(captured[0])
-
-
-def test_run_closes_when_all_reviewed(
-    tmp_path, monkeypatch, cf, cf_helpers,
-):
-    """Closes issue when all tests are already reviewed."""
-    cf_helpers.make_test_file(tmp_path, "TEST(S, A) {\n}\n")
-    monkeypatch.setattr(
-        cf, "sync_issue_rows",
-        lambda _a, _n: {"A"},
+        cf, "sync_issue_rows", lambda _a, _n: reviewed,
     )
     captured = cf_helpers.stub_subprocess_success(monkeypatch)
     log = cf_helpers.stub_close_issue(monkeypatch)
     getattr(cf, "_run")(_make_run_args(tmp_path))
+    return captured, log
+
+
+def test_run_skips_reviewed_tests_count(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
+    """Only invokes classify_test for unreviewed tests."""
+    captured, _ = _run_with_reviewed(
+        tmp_path, monkeypatch, cf, cf_helpers,
+        "TEST(S, A) {\n}\nTEST(S, B) {\n}\n", {"A"},
+    )
+    assert len(captured) == 1
+
+
+def test_run_skips_reviewed_tests_name(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
+    """Invokes classify_test for the unreviewed test only."""
+    captured, _ = _run_with_reviewed(
+        tmp_path, monkeypatch, cf, cf_helpers,
+        "TEST(S, A) {\n}\nTEST(S, B) {\n}\n", {"A"},
+    )
+    assert "B" in " ".join(captured[0])
+
+
+def test_run_all_reviewed_skips_classify(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
+    """Does not invoke classify_test when all tests are reviewed."""
+    captured, _ = _run_with_reviewed(
+        tmp_path, monkeypatch, cf, cf_helpers,
+        "TEST(S, A) {\n}\n", {"A"},
+    )
     assert len(captured) == 0
+
+
+def test_run_all_reviewed_closes_issue(
+    tmp_path, monkeypatch, cf, cf_helpers,
+):
+    """Closes issue when all tests are already reviewed."""
+    _, log = _run_with_reviewed(
+        tmp_path, monkeypatch, cf, cf_helpers,
+        "TEST(S, A) {\n}\n", {"A"},
+    )
     assert len(log) == 1

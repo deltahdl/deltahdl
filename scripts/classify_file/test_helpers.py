@@ -86,8 +86,10 @@ def stub_create_issue(
 def stub_sync_issue_rows(monkeypatch: pytest.MonkeyPatch) -> list[bool]:
     """Stub classify_file.sync_issue_rows; return call log."""
     log: list[bool] = []
-    monkeypatch.setattr(
-        classify_file, "sync_issue_rows",
-        lambda _a, _n: (log.append(True), set())[1],
-    )
+
+    def fake(_a, _n):  # type: ignore[no-untyped-def]
+        log.append(True)
+        return set()
+
+    monkeypatch.setattr(classify_file, "sync_issue_rows", fake)
     return log

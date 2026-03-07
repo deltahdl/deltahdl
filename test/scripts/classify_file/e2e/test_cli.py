@@ -323,8 +323,8 @@ def test_neither_issue_flag_rejects(tmp_path):
 # ---- sync_issue_rows e2e ---------------------------------------------------
 
 
-def test_issue_skips_reviewed_tests(tmp_path):
-    """Skips already-reviewed tests when --issue is given."""
+def _run_with_reviewed(tmp_path):
+    """Run classify_file with one reviewed and one unreviewed test."""
     fake = _install_fake_classify_test(tmp_path)
     issue_body = (
         "| Alpha | Reviewed but kept in the same file | |\n"
@@ -334,9 +334,17 @@ def test_issue_skips_reviewed_tests(tmp_path):
     _write_test_file(
         tmp_path, "TEST(S, Alpha) {\n}\nTEST(S, Beta) {\n}\n",
     )
-    result = _invoke(
+    return _invoke(
         *_all_flags(tmp_path),
         cwd=str(tmp_path), env=env,
     )
-    assert result.returncode == 0
-    assert "Skipping 1 already-reviewed" in result.stdout
+
+
+def test_issue_skips_reviewed_exits_zero(tmp_path):
+    """Exits 0 when some tests are already reviewed."""
+    assert _run_with_reviewed(tmp_path).returncode == 0
+
+
+def test_issue_skips_reviewed_prints_message(tmp_path):
+    """Prints skip message for reviewed tests."""
+    assert "Skipping 1 already-reviewed" in _run_with_reviewed(tmp_path).stdout
