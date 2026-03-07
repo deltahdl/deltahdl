@@ -78,7 +78,7 @@ class Parser {
   ModportPort ParseModportSimplePort(Direction dir);
   bool IsAtClassDecl();
   ClassDecl* ParseClassDecl();
-  void ParseClassExtendsClause(ClassDecl* decl);
+  void ParseClassExtendsClause(ClassDecl* decl, bool is_implements);
   void ParseClassMembers(std::vector<ClassMember*>& members);
   bool TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                                   ClassMember* member, bool proto);

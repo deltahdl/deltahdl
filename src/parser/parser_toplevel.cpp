@@ -731,7 +731,7 @@ ModuleDecl* Parser::ParseProgramDecl() {
 
 // --- Class declaration ---
 
-void Parser::ParseClassExtendsClause(ClassDecl* decl) {
+void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
   // §8.26: interface classes may extend multiple base classes
   // (comma-separated).
   do {
@@ -739,14 +739,28 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl) {
     while (Match(TokenKind::kColonColon)) {
       name = Expect(TokenKind::kIdentifier).text;
     }
-    if (decl->base_class.empty()) decl->base_class = name;
+    if (is_implements) {
+      decl->implements_types.push_back(name);
+    } else if (decl->base_class.empty()) {
+      decl->base_class = name;
+    }
     // Skip parameter value assignment: #(type_or_expr, ...)
     if (Check(TokenKind::kHash)) {
       Consume();
       ParseTypeParamList();
     }
-    // Skip constructor arguments: (expr, ...)
-    if (Check(TokenKind::kLParen)) {
+    // §8.3: extends class_type [ ( [ list_of_arguments | default ] ) ]
+    if (!is_implements && Check(TokenKind::kLParen)) {
+      Consume();
+      if (Match(TokenKind::kKwDefault)) {
+        decl->extends_has_default = true;
+      } else if (!Check(TokenKind::kRParen)) {
+        do {
+          decl->extends_args.push_back(ParseExpr());
+        } while (Match(TokenKind::kComma));
+      }
+      Expect(TokenKind::kRParen);
+    } else if (is_implements && Check(TokenKind::kLParen)) {
       std::vector<Expr*> discard;
       ParseParenList(discard);
     }
@@ -780,9 +794,9 @@ ClassDecl* Parser::ParseClassDecl() {
     Expect(TokenKind::kRParen);
   }
 
-  if (Match(TokenKind::kKwExtends)) ParseClassExtendsClause(decl);
+  if (Match(TokenKind::kKwExtends)) ParseClassExtendsClause(decl, false);
   // §8.26: 'implements' with optional #(...) parameter assignments
-  if (Match(TokenKind::kKwImplements)) ParseClassExtendsClause(decl);
+  if (Match(TokenKind::kKwImplements)) ParseClassExtendsClause(decl, true);
   Expect(TokenKind::kSemicolon);
 
   while (!Check(TokenKind::kKwEndclass) && !AtEnd()) {
@@ -803,21 +817,55 @@ ClassDecl* Parser::ParseClassDecl() {
 bool Parser::ParseClassQualifiers(ClassMember* m) {
   bool proto = false;
   while (true) {
-    if (Match(TokenKind::kKwLocal)) {
+    if (Check(TokenKind::kKwLocal)) {
+      // §8.3 fn 10: only one of protected or local
+      if (m->is_protected)
+        diag_.Error(CurrentLoc(),
+                    "cannot combine 'local' and 'protected' qualifiers");
+      if (m->is_local)
+        diag_.Error(CurrentLoc(), "duplicate 'local' qualifier");
       m->is_local = true;
-    } else if (Match(TokenKind::kKwProtected)) {
+      Consume();
+    } else if (Check(TokenKind::kKwProtected)) {
+      if (m->is_local)
+        diag_.Error(CurrentLoc(),
+                    "cannot combine 'local' and 'protected' qualifiers");
+      if (m->is_protected)
+        diag_.Error(CurrentLoc(), "duplicate 'protected' qualifier");
       m->is_protected = true;
-    } else if (Match(TokenKind::kKwStatic)) {
+      Consume();
+    } else if (Check(TokenKind::kKwStatic)) {
+      // §8.3 fn 10: static can appear only once
+      if (m->is_static)
+        diag_.Error(CurrentLoc(), "duplicate 'static' qualifier");
       m->is_static = true;
-    } else if (Match(TokenKind::kKwVirtual)) {
+      Consume();
+    } else if (Check(TokenKind::kKwVirtual)) {
+      // §8.3 fn 10: virtual can appear only once
+      if (m->is_virtual)
+        diag_.Error(CurrentLoc(), "duplicate 'virtual' qualifier");
       m->is_virtual = true;
+      Consume();
     } else if (Match(TokenKind::kKwPure)) {
       m->is_virtual = true;
       proto = true;
-    } else if (Match(TokenKind::kKwRand)) {
+    } else if (Check(TokenKind::kKwRand)) {
+      // §8.3 fn 10: only one of rand or randc
+      if (m->is_randc)
+        diag_.Error(CurrentLoc(),
+                    "cannot combine 'rand' and 'randc' qualifiers");
+      if (m->is_rand)
+        diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier");
       m->is_rand = true;
-    } else if (Match(TokenKind::kKwRandc)) {
+      Consume();
+    } else if (Check(TokenKind::kKwRandc)) {
+      if (m->is_rand)
+        diag_.Error(CurrentLoc(),
+                    "cannot combine 'rand' and 'randc' qualifiers");
+      if (m->is_randc)
+        diag_.Error(CurrentLoc(), "duplicate 'randc' qualifier");
       m->is_randc = true;
+      Consume();
     } else if (Match(TokenKind::kKwConst)) {
       m->is_const = true;
     } else if (Match(TokenKind::kKwExtern)) {

@@ -225,8 +225,22 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
     return args;
   }
   Direction sticky_dir = Direction::kNone;
+  bool seen_default = false;
   do {
     FunctionArg arg;
+    // §8.3: class_constructor_arg ::= tf_port_item | default
+    if (Check(TokenKind::kKwDefault)) {
+      if (seen_default) {
+        diag_.Error(CurrentLoc(),
+                    "'default' keyword shall appear at most once "
+                    "in a class constructor argument list");
+      }
+      seen_default = true;
+      arg.is_default = true;
+      Consume();
+      args.push_back(arg);
+      continue;
+    }
     // A.2.7 tf_port_direction: [const] ref [static]
     if (Match(TokenKind::kKwConst)) {
       arg.is_const = true;

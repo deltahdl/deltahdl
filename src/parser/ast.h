@@ -498,7 +498,8 @@ struct ImportItem {
 
 struct FunctionArg {
   Direction direction = Direction::kNone;
-  bool is_const = false;  // const ref (§13.5.2)
+  bool is_const = false;    // const ref (§13.5.2)
+  bool is_default = false;  // §8.3: class_constructor_arg ::= default
   DataType data_type;
   std::string_view name;
   Expr* default_value = nullptr;     // §13.5.3
@@ -735,6 +736,9 @@ struct ClassDecl {
   bool is_final = false;      // class :final (§8.20)
   bool is_interface = false;  // interface class (A.1.9)
   std::string_view base_class;
+  std::vector<Expr*> extends_args;            // §8.3: extends constructor args
+  bool extends_has_default = false;           // §8.3: extends Base(default)
+  std::vector<std::string_view> implements_types;  // §8.3/§8.26: implements
   std::vector<ClassMember*> members;
   std::vector<std::pair<std::string_view, Expr*>> params;
 };
