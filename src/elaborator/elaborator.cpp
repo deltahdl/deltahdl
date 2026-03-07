@@ -454,29 +454,62 @@ static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
                  "always_latch does not infer latched behavior; "
                  "ensure incomplete assignments create intended latches");
   }
+  // §9.2.2.4: always_ff shall contain one and only one event control.
+  if (kind == RtlirProcessKind::kAlwaysFF) {
+    if (item->sensitivity.empty()) {
+      diag.Error(item->loc,
+                 "always_ff requires an event control");
+    }
+    if (StmtHasTimingControl(proc.body)) {
+      diag.Error(item->loc,
+                 "always_ff shall not contain blocking timing controls");
+    }
+    if (StmtHasForkJoin(proc.body)) {
+      diag.Error(item->loc,
+                 "always_ff shall not contain fork-join statements");
+    }
+  }
+  // §9.2.2.4: Warn if always_ff does not represent sequential logic.
+  if (kind == RtlirProcessKind::kAlwaysFF) {
+    bool has_edge = false;
+    for (const auto& ev : item->sensitivity) {
+      if (ev.edge == Edge::kPosedge || ev.edge == Edge::kNegedge) {
+        has_edge = true;
+        break;
+      }
+    }
+    if (!item->sensitivity.empty() && !has_edge) {
+      diag.Warning(item->loc,
+                   "always_ff has no edge-sensitive event; "
+                   "may not represent sequential logic");
+    }
+  }
   // §5.12: Resolve attributes.
   proc.attrs = ResolveAttributes(item->attrs, diag);
   mod->processes.push_back(proc);
 }
 
-// §9.2.2.2: Check that always_comb LHS variables are not driven elsewhere.
+// §9.2.2.2, §9.2.2.4: Check that always_comb/always_latch/always_ff LHS
+// variables are not driven by other processes or continuous assignments.
 void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
                                              RtlirModule* /*mod*/) {
-  // Collect per-process LHS variable sets for always_comb/always_latch items.
   struct ProcInfo {
     SourceLoc loc;
     std::unordered_set<std::string> lhs;
+    ModuleItemKind kind;
   };
-  std::vector<ProcInfo> comb_procs;
+  std::vector<ProcInfo> procs;
   std::unordered_set<std::string> cont_assign_lhs;
 
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
-        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock) {
       ProcInfo info;
       info.loc = item->loc;
+      info.kind = item->kind;
       CollectLhsNames(item->body, info.lhs);
-      comb_procs.push_back(std::move(info));
+      procs.push_back(std::move(info));
     }
     if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
       const Expr* e = item->assign_lhs;
@@ -486,22 +519,30 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
     }
   }
 
-  // Check each always_comb/always_latch process for multi-driver conflicts.
-  for (size_t i = 0; i < comb_procs.size(); ++i) {
-    for (const auto& var : comb_procs[i].lhs) {
+  auto KindLabel = [](ModuleItemKind k) -> const char* {
+    switch (k) {
+      case ModuleItemKind::kAlwaysFFBlock: return "always_ff";
+      case ModuleItemKind::kAlwaysLatchBlock: return "always_latch";
+      default: return "always_comb";
+    }
+  };
+
+  for (size_t i = 0; i < procs.size(); ++i) {
+    for (const auto& var : procs[i].lhs) {
       // Check against continuous assignments.
       if (cont_assign_lhs.count(var)) {
-        diag_.Error(comb_procs[i].loc,
-                    std::format("variable '{}' driven by always_comb and "
+        diag_.Error(procs[i].loc,
+                    std::format("variable '{}' driven by {} and "
                                 "continuous assignment",
-                                var));
+                                var, KindLabel(procs[i].kind)));
       }
-      // Check against other always_comb/always_latch processes.
-      for (size_t j = i + 1; j < comb_procs.size(); ++j) {
-        if (comb_procs[j].lhs.count(var)) {
-          diag_.Error(comb_procs[j].loc,
+      // Check against other processes.
+      for (size_t j = i + 1; j < procs.size(); ++j) {
+        if (procs[j].lhs.count(var)) {
+          diag_.Error(procs[j].loc,
                       std::format("variable '{}' driven by multiple "
-                                  "always_comb/always_latch processes",
+                                  "always_comb/always_latch/always_ff "
+                                  "processes",
                                   var));
         }
       }
