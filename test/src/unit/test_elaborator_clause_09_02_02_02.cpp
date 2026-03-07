@@ -1,3 +1,4 @@
+#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -6,6 +7,202 @@
 using namespace delta;
 
 namespace {
+
+// §9.2.2.2: always_comb with delay control produces an error.
+TEST(ElabClause09_02_02_02, TimingControlInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a;\n"
+      "  always_comb #5 a = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.2: always_comb with event control produces an error.
+TEST(ElabClause09_02_02_02, EventControlInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  always_comb @(posedge clk) a = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.2: always_comb with wait statement produces an error.
+TEST(ElabClause09_02_02_02, WaitInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb begin\n"
+      "    wait (a) b = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.2: always_comb with fork-join produces an error.
+TEST(ElabClause09_02_02_02, ForkJoinInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.2: always_comb with incomplete if warns about latched behavior.
+TEST(ElabClause09_02_02_02, IncompleteIfWarnsLatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic sel, a, y;\n"
+      "  always_comb\n"
+      "    if (sel) y = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+// §9.2.2.2: always_comb with complete if/else does not warn.
+TEST(ElabClause09_02_02_02, CompleteIfElseNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic sel, a, b, y;\n"
+      "  always_comb\n"
+      "    if (sel) y = a;\n"
+      "    else y = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §9.2.2.2: always_comb with case without default warns about latched behavior.
+TEST(ElabClause09_02_02_02, CaseWithoutDefaultWarnsLatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic y;\n"
+      "  always_comb\n"
+      "    case (sel)\n"
+      "      2'b00: y = 0;\n"
+      "      2'b01: y = 1;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+// §9.2.2.2: always_comb with case + default does not warn.
+TEST(ElabClause09_02_02_02, CaseWithDefaultNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  logic y;\n"
+      "  always_comb\n"
+      "    case (sel)\n"
+      "      2'b00: y = 0;\n"
+      "      2'b01: y = 1;\n"
+      "      default: y = 0;\n"
+      "    endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §9.2.2.2: Multi-driver: same variable in two always_comb blocks.
+TEST(ElabClause09_02_02_02, MultiDriverTwoAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, y;\n"
+      "  always_comb y = a;\n"
+      "  always_comb y = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.2: Multi-driver: always_comb + continuous assignment on same variable.
+TEST(ElabClause09_02_02_02, MultiDriverCombAndContAssignErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, y;\n"
+      "  assign y = a;\n"
+      "  always_comb y = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.2: Different variables in separate always_comb blocks is fine.
+TEST(ElabClause09_02_02_02, DifferentVarsInSeparateCombOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, x, y;\n"
+      "  always_comb x = a;\n"
+      "  always_comb y = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §9.2.2.2: always_comb elaborates to kAlwaysComb process kind.
+TEST(ElabClause09_02_02_02, AlwaysCombElaboratesToCorrectKind) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb a = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  bool found = false;
+  for (auto& p : design->top_modules[0]->processes) {
+    if (p.kind == RtlirProcessKind::kAlwaysComb) found = true;
+  }
+  EXPECT_TRUE(found);
+}
+
+// §9.2.2.2: always_comb without timing control is fine (no zero-delay warning).
+TEST(ElabClause09_02_02_02, AlwaysCombNoTimingControlNoZeroDelayWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb a = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
 
 TEST(SimCh9, MultipleAlwaysCombBlocks) {
   SimFixture f;

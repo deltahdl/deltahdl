@@ -182,6 +182,9 @@ class Elaborator {
   /// Check specparam not used in parameter expressions (§6.20.5).
   void ValidateSpecparamInParams(const ModuleDecl* decl);
 
+  /// §9.2.2.2: Check multi-driver violations on always_comb LHS variables.
+  void CheckAlwaysCombMultiDriver(const ModuleDecl* decl, RtlirModule* mod);
+
   /// §13.2/§13.4.1/§13.4.4: Validate function/task body constraints.
   void ValidateFunctionBody(const ModuleItem* item);
   /// §13.4.3: Validate constant function calls in parameter expressions.

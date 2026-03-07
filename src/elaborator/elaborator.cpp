@@ -309,6 +309,71 @@ static RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
   return RtlirProcessKind::kAlwaysComb;
 }
 
+// §9.2.2.2: Check if a statement contains a fork-join construct.
+static bool StmtHasForkJoin(const Stmt* stmt) {
+  if (!stmt) return false;
+  if (stmt->kind == StmtKind::kFork) return true;
+  for (const auto* s : stmt->stmts)
+    if (StmtHasForkJoin(s)) return true;
+  if (StmtHasForkJoin(stmt->then_branch)) return true;
+  if (StmtHasForkJoin(stmt->else_branch)) return true;
+  if (StmtHasForkJoin(stmt->body)) return true;
+  if (StmtHasForkJoin(stmt->for_body)) return true;
+  for (const auto& ci : stmt->case_items)
+    if (StmtHasForkJoin(ci.body)) return true;
+  return false;
+}
+
+// §9.2.2.2: Detect incomplete if/case that may infer latched behavior.
+static bool MayInferLatch(const Stmt* stmt) {
+  if (!stmt) return false;
+  switch (stmt->kind) {
+    case StmtKind::kIf:
+      if (!stmt->else_branch) return true;
+      return MayInferLatch(stmt->then_branch) ||
+             MayInferLatch(stmt->else_branch);
+    case StmtKind::kCase: {
+      bool has_default = false;
+      for (const auto& ci : stmt->case_items)
+        if (ci.is_default) { has_default = true; break; }
+      if (!has_default) return true;
+      for (const auto& ci : stmt->case_items)
+        if (MayInferLatch(ci.body)) return true;
+      return false;
+    }
+    case StmtKind::kBlock:
+      for (const auto* s : stmt->stmts)
+        if (MayInferLatch(s)) return true;
+      return false;
+    default:
+      return false;
+  }
+}
+
+// §9.2.2.2: Collect LHS variable names assigned in a statement.
+static void CollectLhsNames(const Stmt* stmt,
+                             std::unordered_set<std::string>& out) {
+  if (!stmt) return;
+  if (stmt->kind == StmtKind::kBlockingAssign ||
+      stmt->kind == StmtKind::kNonblockingAssign) {
+    if (stmt->lhs) {
+      const Expr* e = stmt->lhs;
+      while (e->kind == ExprKind::kSelect && e->base) e = e->base;
+      if (e->kind == ExprKind::kIdentifier && !e->text.empty())
+        out.insert(std::string(e->text));
+    }
+  }
+  for (const auto* s : stmt->stmts) CollectLhsNames(s, out);
+  CollectLhsNames(stmt->then_branch, out);
+  CollectLhsNames(stmt->else_branch, out);
+  CollectLhsNames(stmt->body, out);
+  CollectLhsNames(stmt->for_body, out);
+  CollectLhsNames(stmt->for_init, out);
+  CollectLhsNames(stmt->for_step, out);
+  for (const auto& ci : stmt->case_items) CollectLhsNames(ci.body, out);
+  for (const auto* s : stmt->fork_stmts) CollectLhsNames(s, out);
+}
+
 // §9.2.2.1: Check if a statement contains any timing control.
 static bool StmtHasTimingControl(const Stmt* stmt) {
   if (!stmt) return false;
@@ -359,9 +424,83 @@ static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
                  "always block has no timing control; may cause "
                  "a zero-delay loop");
   }
+  // §9.2.2.2: always_comb and always_latch shall not contain timing controls.
+  if ((kind == RtlirProcessKind::kAlwaysComb ||
+       kind == RtlirProcessKind::kAlwaysLatch) &&
+      StmtHasTimingControl(proc.body)) {
+    const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
+                                                              : "always_latch";
+    diag.Error(item->loc,
+               std::format("{} shall not contain timing controls", kw));
+  }
+  // §9.2.2.2: always_comb and always_latch shall not contain fork-join.
+  if ((kind == RtlirProcessKind::kAlwaysComb ||
+       kind == RtlirProcessKind::kAlwaysLatch) &&
+      StmtHasForkJoin(proc.body)) {
+    const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
+                                                              : "always_latch";
+    diag.Error(item->loc,
+               std::format("{} shall not contain fork-join statements", kw));
+  }
+  // §9.2.2.2: Warn if always_comb may infer latched behavior.
+  if (kind == RtlirProcessKind::kAlwaysComb && MayInferLatch(proc.body)) {
+    diag.Warning(item->loc,
+                 "always_comb may infer latched behavior; "
+                 "ensure all paths assign all outputs");
+  }
   // §5.12: Resolve attributes.
   proc.attrs = ResolveAttributes(item->attrs, diag);
   mod->processes.push_back(proc);
+}
+
+// §9.2.2.2: Check that always_comb LHS variables are not driven elsewhere.
+void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
+                                             RtlirModule* /*mod*/) {
+  // Collect per-process LHS variable sets for always_comb/always_latch items.
+  struct ProcInfo {
+    SourceLoc loc;
+    std::unordered_set<std::string> lhs;
+  };
+  std::vector<ProcInfo> comb_procs;
+  std::unordered_set<std::string> cont_assign_lhs;
+
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      ProcInfo info;
+      info.loc = item->loc;
+      CollectLhsNames(item->body, info.lhs);
+      comb_procs.push_back(std::move(info));
+    }
+    if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
+      const Expr* e = item->assign_lhs;
+      while (e->kind == ExprKind::kSelect && e->base) e = e->base;
+      if (e->kind == ExprKind::kIdentifier && !e->text.empty())
+        cont_assign_lhs.insert(std::string(e->text));
+    }
+  }
+
+  // Check each always_comb/always_latch process for multi-driver conflicts.
+  for (size_t i = 0; i < comb_procs.size(); ++i) {
+    for (const auto& var : comb_procs[i].lhs) {
+      // Check against continuous assignments.
+      if (cont_assign_lhs.count(var)) {
+        diag_.Error(comb_procs[i].loc,
+                    std::format("variable '{}' driven by always_comb and "
+                                "continuous assignment",
+                                var));
+      }
+      // Check against other always_comb/always_latch processes.
+      for (size_t j = i + 1; j < comb_procs.size(); ++j) {
+        if (comb_procs[j].lhs.count(var)) {
+          diag_.Error(comb_procs[j].loc,
+                      std::format("variable '{}' driven by multiple "
+                                  "always_comb/always_latch processes",
+                                  var));
+        }
+      }
+    }
+  }
 }
 
 // §7.5: Check for dynamic array [] with init to infer size from elements.
@@ -874,6 +1013,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }
+  // §9.2.2.2: Check for multi-driver violations on always_comb LHS variables.
+  CheckAlwaysCombMultiDriver(decl, mod);
   ValidateModuleConstraints(decl);
   ValidateConstantFunctionCalls(decl);
 }

@@ -1,5 +1,4 @@
 #include "fixture_simulator.h"
-#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -144,6 +143,76 @@ TEST(SimCh4, AlwaysCombWithBeginEnd) {
 
   EXPECT_EQ(f.ctx.FindVariable("r1")->value.ToUint64(), 6u);
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 7u);
+}
+
+// §9.2.2.2: always_comb triggers after initial at time zero.
+TEST(SimClause09_02_02_02, AlwaysCombTriggersAfterInitial) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial a = 8'd99;\n"
+      "  always_comb b = a;\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.ToUint64(), 99u);
+}
+
+// §9.2.2.2: always_comb retriggers when input changes.
+TEST(SimClause09_02_02_02, AlwaysCombRetriggersOnChange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  always_comb b = a + 1;\n"
+      "  initial begin\n"
+      "    a = 8'd0;\n"
+      "    #1 a = 8'd10;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.ToUint64(), 11u);
+}
+
+// §9.2.2.2: always_comb with if/else mux pattern.
+TEST(SimClause09_02_02_02, AlwaysCombMuxPattern) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic sel;\n"
+      "  logic [7:0] a, b, y;\n"
+      "  always_comb\n"
+      "    if (sel) y = a;\n"
+      "    else y = b;\n"
+      "  initial begin\n"
+      "    sel = 0;\n"
+      "    a = 8'd11;\n"
+      "    b = 8'd22;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 22u);
 }
 
 }  // namespace
