@@ -397,3 +397,81 @@ TEST(Preprocessor, Include_SubdirectoryRelativePath) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("wire count;"), std::string::npos);
 }
+
+// --- §22.4: Include depth boundary ---
+
+TEST(Preprocessor, Include_DepthBoundary_15LevelsSucceeds) {
+  IncludeTestDir tmp;
+  // Create a chain of 15 files, each including the next.
+  for (int i = 14; i >= 0; --i) {
+    std::string name = "level_" + std::to_string(i) + ".svh";
+    std::string content;
+    if (i < 14) {
+      content = "`include \"level_" + std::to_string(i + 1) + ".svh\"\n";
+    }
+    content += "wire w" + std::to_string(i) + ";\n";
+    tmp.WriteFile(name, content);
+  }
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`include \"level_0.svh\"\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  // Verify deepest file was included (depth 15: top -> level_0 ... level_14).
+  EXPECT_NE(result.find("wire w14;"), std::string::npos);
+}
+
+// --- §22.4: Include of empty file ---
+
+TEST(Preprocessor, Include_EmptyFile) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("empty.svh", "");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`include \"empty.svh\"\nmodule m; endmodule\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("module m;"), std::string::npos);
+}
+
+// --- §22.4: Directive state persists across included files ---
+
+TEST(Preprocessor, Include_DirectiveStatePersistsAcrossIncludes) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("set_timescale.svh", "`timescale 1ns / 1ps\n");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`include \"set_timescale.svh\"\n"
+                           "module m; endmodule\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(pp.HasTimescale());
+}
+
+// --- §22.4: Included file with `resetall ---
+
+TEST(Preprocessor, Include_ResetallInIncludedFile) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("reset.svh", "`resetall\n");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`default_nettype none\n"
+                           "`include \"reset.svh\"\n"
+                           "module m; endmodule\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  // `resetall in included file should reset state.
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
+}
