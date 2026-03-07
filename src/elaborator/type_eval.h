@@ -38,6 +38,14 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs);
 // Forward declarations
 struct Expr;
 
+/// §6.4: Return true if the data type is singular (not an unpacked struct,
+/// unpacked union, or unpacked array).  Packed structs/unions are singular.
+bool IsSingularType(const DataType& dtype);
+
+/// §6.4: Return true if the data type is aggregate (unpacked struct, unpacked
+/// union, or unpacked array).
+bool IsAggregateType(const DataType& dtype);
+
 /// Return true if two types match (IEEE §6.22.1).
 bool TypesMatch(const DataType& a, const DataType& b);
 

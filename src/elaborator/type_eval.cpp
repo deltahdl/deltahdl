@@ -176,6 +176,16 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
                   : Is4stateType(dtype.kind);
 }
 
+// --- §6.4: Singular and aggregate types ---
+
+bool IsAggregateType(const DataType& dtype) {
+  if (dtype.kind == DataTypeKind::kStruct || dtype.kind == DataTypeKind::kUnion)
+    return !dtype.is_packed;
+  return false;
+}
+
+bool IsSingularType(const DataType& dtype) { return !IsAggregateType(dtype); }
+
 // --- Type compatibility (IEEE §6.22) ---
 
 // §6.11: Return true if the type kind is an integral type.
