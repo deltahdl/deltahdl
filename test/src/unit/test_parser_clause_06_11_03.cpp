@@ -434,4 +434,16 @@ TEST(ParserSection6, RegDefaultUnsigned) {
   EXPECT_FALSE(item->data_type.is_signed) << "reg is unsigned by default";
 }
 
+TEST(ParserSection6, SignedVector) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic signed [7:0] sv;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
+  EXPECT_TRUE(item->data_type.is_signed);
+}
+
 }  // namespace

@@ -41,18 +41,6 @@ TEST(ParserSection6, Sec6_5_LogicPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(ParserSection6, SignedVector) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic signed [7:0] sv;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kLogic);
-  EXPECT_TRUE(item->data_type.is_signed);
-}
-
 TEST(ParserSection6, UnsignedVector) {
   auto r = Parse(
       "module t;\n"
