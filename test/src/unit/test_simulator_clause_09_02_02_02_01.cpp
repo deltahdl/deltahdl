@@ -1,5 +1,4 @@
 #include "fixture_simulator.h"
-#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -26,6 +25,78 @@ TEST(SimCh4, AlwaysCombReactsToDelayedChange) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 14u);
+}
+
+// §9.2.2.2.1: Sensitivity on all read inputs triggers re-evaluation.
+TEST(SimClause09_02_02_02_01, SensitivityTriggersOnAllInputs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, y;\n"
+      "  always_comb y = a + b;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    b = 8'd2;\n"
+      "    #1 b = 8'd10;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 11u);
+}
+
+// §9.2.2.2.1: Written-only variables don't trigger re-evaluation.
+TEST(SimClause09_02_02_02_01, WrittenOnlyVarNoRetrigger) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, y;\n"
+      "  always_comb y = a + 1;\n"
+      "  initial begin\n"
+      "    a = 8'd5;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 6u);
+}
+
+// §9.2.2.2.1: Ternary condition and branches all contribute to sensitivity.
+TEST(SimClause09_02_02_02_01, TernaryAllInputsSensitive) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic sel;\n"
+      "  logic [7:0] a, b, y;\n"
+      "  always_comb y = sel ? a : b;\n"
+      "  initial begin\n"
+      "    sel = 0;\n"
+      "    a = 8'd10;\n"
+      "    b = 8'd20;\n"
+      "    #1 sel = 1;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 10u);
 }
 
 }  // namespace

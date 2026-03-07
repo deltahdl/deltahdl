@@ -65,11 +65,61 @@ std::vector<std::string> CollectReadSignals(const Stmt* body) {
   return {set.begin(), set.end()};
 }
 
+// §9.2.2.2.1(b): Collect LHS variable names written in the statement tree.
+static void CollectWrittenNames(const Stmt* stmt,
+                                std::unordered_set<std::string>& out) {
+  if (!stmt) return;
+  if (stmt->kind == StmtKind::kBlockingAssign ||
+      stmt->kind == StmtKind::kNonblockingAssign) {
+    if (stmt->lhs) {
+      const Expr* e = stmt->lhs;
+      while (e->kind == ExprKind::kSelect && e->base) e = e->base;
+      if (e->kind == ExprKind::kIdentifier && !e->text.empty())
+        out.insert(std::string(e->text));
+    }
+  }
+  for (const auto* s : stmt->stmts) CollectWrittenNames(s, out);
+  CollectWrittenNames(stmt->then_branch, out);
+  CollectWrittenNames(stmt->else_branch, out);
+  CollectWrittenNames(stmt->body, out);
+  CollectWrittenNames(stmt->for_body, out);
+  CollectWrittenNames(stmt->for_init, out);
+  CollectWrittenNames(stmt->for_step, out);
+  for (const auto& ci : stmt->case_items) CollectWrittenNames(ci.body, out);
+  for (const auto* s : stmt->fork_stmts) CollectWrittenNames(s, out);
+}
+
+// §9.2.2.2.1(a): Collect names of variables declared within the block.
+static void CollectBlockLocalNames(const Stmt* stmt,
+                                   std::unordered_set<std::string>& out) {
+  if (!stmt) return;
+  if (stmt->kind == StmtKind::kVarDecl && !stmt->var_name.empty()) {
+    out.insert(std::string(stmt->var_name));
+  }
+  for (const auto* s : stmt->stmts) CollectBlockLocalNames(s, out);
+  CollectBlockLocalNames(stmt->then_branch, out);
+  CollectBlockLocalNames(stmt->else_branch, out);
+  CollectBlockLocalNames(stmt->body, out);
+  CollectBlockLocalNames(stmt->for_body, out);
+  for (const auto& ci : stmt->case_items) CollectBlockLocalNames(ci.body, out);
+}
+
 std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena) {
   auto signals = CollectReadSignals(body);
+
+  // §9.2.2.2.1(a): Exclude variables declared within the block.
+  std::unordered_set<std::string> locals;
+  CollectBlockLocalNames(body, locals);
+
+  // §9.2.2.2.1(b): Exclude variables also written within the block.
+  std::unordered_set<std::string> written;
+  CollectWrittenNames(body, written);
+
   std::vector<EventExpr> events;
   events.reserve(signals.size());
   for (const auto& name : signals) {
+    if (locals.count(name)) continue;
+    if (written.count(name)) continue;
     auto* expr = arena.Create<Expr>();
     expr->kind = ExprKind::kIdentifier;
     expr->text = std::string_view(arena.AllocString(name.data(), name.size()),

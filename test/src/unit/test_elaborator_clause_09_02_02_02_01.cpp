@@ -6,7 +6,6 @@
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
-#include "lexer/token.h"
 
 using namespace delta;
 
@@ -337,6 +336,165 @@ TEST(SimCh9b, AlwaysCombSensitivityRegistered) {
 
   const auto& procs = f.ctx.GetSensitiveProcesses("a");
   EXPECT_FALSE(procs.empty());
+}
+
+// §9.2.2.2.1: Variables also written in the block are excluded from sensitivity.
+TEST(ElabClause09_02_02_02_01, WrittenVarsExcludedFromSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b, temp;\n"
+      "  always_comb begin\n"
+      "    temp = a;\n"
+      "    b = temp;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  EXPECT_EQ(proc.kind, RtlirProcessKind::kAlwaysComb);
+  bool found_a = false, found_temp = false;
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.signal && ev.signal->text == "a") found_a = true;
+    if (ev.signal && ev.signal->text == "temp") found_temp = true;
+  }
+  EXPECT_TRUE(found_a);
+  EXPECT_FALSE(found_temp);
+}
+
+// §9.2.2.2.1: Block-local variables excluded from sensitivity.
+TEST(ElabClause09_02_02_02_01, BlockLocalVarsExcludedFromSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  always_comb begin\n"
+      "    logic local_var;\n"
+      "    local_var = a;\n"
+      "    b = local_var;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  bool found_a = false, found_local = false;
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.signal && ev.signal->text == "a") found_a = true;
+    if (ev.signal && ev.signal->text == "local_var") found_local = true;
+  }
+  EXPECT_TRUE(found_a);
+  EXPECT_FALSE(found_local);
+}
+
+// §9.2.2.2.1: Multiple read signals all appear in sensitivity.
+TEST(ElabClause09_02_02_02_01, MultipleReadsInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b, c, y;\n"
+      "  always_comb y = a & b | c;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  bool found_a = false, found_b = false, found_c = false;
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.signal && ev.signal->text == "a") found_a = true;
+    if (ev.signal && ev.signal->text == "b") found_b = true;
+    if (ev.signal && ev.signal->text == "c") found_c = true;
+  }
+  EXPECT_TRUE(found_a);
+  EXPECT_TRUE(found_b);
+  EXPECT_TRUE(found_c);
+}
+
+// §9.2.2.2.1: LHS output variable not in sensitivity when only written.
+TEST(ElabClause09_02_02_02_01, OutputOnlyVarNotInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, y;\n"
+      "  always_comb y = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  bool found_y = false;
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.signal && ev.signal->text == "y") found_y = true;
+  }
+  EXPECT_FALSE(found_y);
+}
+
+// §9.2.2.2.1: Sensitivity uses longest static prefix for array access.
+TEST(ElabClause09_02_02_02_01, ArrayAccessLongestStaticPrefix) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] mem [0:3];\n"
+      "  logic [1:0] addr;\n"
+      "  logic [7:0] data;\n"
+      "  always_comb data = mem[addr];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  bool found_mem = false, found_addr = false;
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.signal && ev.signal->text == "mem") found_mem = true;
+    if (ev.signal && ev.signal->text == "addr") found_addr = true;
+  }
+  EXPECT_TRUE(found_mem);
+  EXPECT_TRUE(found_addr);
+}
+
+// §9.2.2.2.1: If condition and both branches contribute to sensitivity.
+TEST(ElabClause09_02_02_02_01, IfConditionInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic sel, a, b, y;\n"
+      "  always_comb\n"
+      "    if (sel) y = a;\n"
+      "    else y = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  bool found_sel = false, found_a = false, found_b = false;
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.signal && ev.signal->text == "sel") found_sel = true;
+    if (ev.signal && ev.signal->text == "a") found_a = true;
+    if (ev.signal && ev.signal->text == "b") found_b = true;
+  }
+  EXPECT_TRUE(found_sel);
+  EXPECT_TRUE(found_a);
+  EXPECT_TRUE(found_b);
+}
+
+// §9.2.2.2.1: Sensitivity edges are all kNone (level-sensitive).
+TEST(ElabClause09_02_02_02_01, SensitivityEdgesAreNone) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  always_comb b = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  for (const auto& ev : proc.sensitivity) {
+    EXPECT_EQ(ev.edge, Edge::kNone);
+  }
 }
 
 }  // namespace
