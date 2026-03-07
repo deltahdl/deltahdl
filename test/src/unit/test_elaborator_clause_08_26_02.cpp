@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -112,18 +114,6 @@ TEST(ElabA8262, ClassMissingImplementationError) {
       "  pure virtual function void foo();\n"
       "endclass\n"
       "class C implements IC;\n"
-      "endclass\n"
-      "module m;\n"
-      "endmodule\n"));
-}
-
-// §8.26.2: Virtual class partial implementation — OK (§8.26.7).
-TEST(ElabA8262, VirtualClassPartialImplOk) {
-  EXPECT_TRUE(ElabOk(
-      "interface class IC;\n"
-      "  pure virtual function void foo();\n"
-      "endclass\n"
-      "virtual class C implements IC;\n"
       "endclass\n"
       "module m;\n"
       "endmodule\n"));
