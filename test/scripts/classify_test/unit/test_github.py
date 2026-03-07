@@ -263,7 +263,13 @@ def test_validate_issue_args_missing_repo(ct_github):
 # ---- maybe_update_issue_status ---------------------------------------------
 
 
-def _setup_maybe_update(monkeypatch, ct_github, ct_helpers, *, source_is_target):
+_DEFAULT_FILENAMES = {"T": "test_parser_clause_06_01.cpp"}
+
+
+def _setup_maybe_update(
+    monkeypatch, ct_github, ct_helpers, *,
+    source_is_target, target_filenames=_DEFAULT_FILENAMES,
+):
     """Run maybe_update_issue_status and return captured body updates."""
     _tb = ct_helpers.make_test_block
     updated = []
@@ -281,7 +287,7 @@ def _setup_maybe_update(monkeypatch, ct_github, ct_helpers, *, source_is_target)
     ct_github.maybe_update_issue_status(
         args, [t],
         source_is_target=source_is_target,
-        target_filenames={"T": "test_parser_clause_06_01.cpp"},
+        target_filenames=target_filenames,
     )
     return updated
 
@@ -307,21 +313,9 @@ def test_maybe_update_moved(monkeypatch, ct_github, ct_helpers):
 
 def test_maybe_update_moved_no_filenames(monkeypatch, ct_github, ct_helpers):
     """Sets empty action when moved but target_filenames is None."""
-    _tb = ct_helpers.make_test_block
-    updated = []
-    monkeypatch.setattr(
-        ct_github, "fetch_issue_body",
-        lambda org, repo, issue: "| T | Unreviewed | |\n",
-    )
-    monkeypatch.setattr(
-        ct_github, "update_issue_body",
-        lambda org, repo, issue, body: updated.append(body),
-    )
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
-    args = _issue_args(issue=42, organization="org", repo="repo")
-    ct_github.maybe_update_issue_status(
-        args, [t], source_is_target=False,
+    updated = _setup_maybe_update(
+        monkeypatch, ct_github, ct_helpers,
+        source_is_target=False, target_filenames=None,
     )
     assert "| T | Reviewed | |" in updated[0]
 
