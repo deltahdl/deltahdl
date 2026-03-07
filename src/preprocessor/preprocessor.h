@@ -137,6 +137,7 @@ class Preprocessor {
   bool has_line_override_ = false;
   std::string line_file_override_;
   std::vector<KeywordVersion> keyword_version_stack_;
+  std::vector<std::string> expansion_stack_;  // §22.5.1: recursive macro guard.
   uint32_t design_element_depth_ = 0;  // §22.3: for resetall validation.
   bool in_block_comment_ = false;      // §22.2: track /* */ across lines.
   // Annex E state.

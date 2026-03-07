@@ -93,12 +93,41 @@ static bool IsCompilerDirective(std::string_view name) {
 }
 
 // §22.5.1: Check for unterminated string literals in macro bodies.
+// Handles triple-quoted strings (""") and `" (backtick-quote) delimiters.
 static bool HasUnterminatedString(std::string_view body) {
-  size_t quotes = 0;
+  bool in_string = false;
+  bool in_triple = false;
   for (size_t i = 0; i < body.size(); ++i) {
-    if (body[i] == '"' && (i == 0 || body[i - 1] != '\\')) ++quotes;
+    // Skip `" (backtick-quote) — it's a macro string delimiter, not a
+    // real string.
+    if (body[i] == '`' && i + 1 < body.size() && body[i + 1] == '"') {
+      i += 1;
+      continue;
+    }
+    // Skip `\`" (backtick-escaped-quote).
+    if (body[i] == '`' && i + 3 < body.size() && body[i + 1] == '\\' &&
+        body[i + 2] == '`' && body[i + 3] == '"') {
+      i += 3;
+      continue;
+    }
+    if (body[i] == '"' && (i == 0 || body[i - 1] != '\\')) {
+      if (in_triple) {
+        if (i + 2 < body.size() && body[i + 1] == '"' && body[i + 2] == '"') {
+          in_triple = false;
+          i += 2;
+        }
+      } else if (in_string) {
+        in_string = false;
+      } else if (i + 2 < body.size() && body[i + 1] == '"' &&
+                 body[i + 2] == '"') {
+        in_triple = true;
+        i += 2;
+      } else {
+        in_string = true;
+      }
+    }
   }
-  return quotes % 2 != 0;
+  return in_string || in_triple;
 }
 
 static bool IsIdentChar(char c);
@@ -107,25 +136,78 @@ static bool EndsWithBackslash(std::string_view line) {
   return !line.empty() && line.back() == '\\';
 }
 
-// Joins backslash-continued lines into a single string.
-// Updates eol/line_num so the main loop skips the continuation lines.
-static std::string JoinContinuation(std::string_view src, size_t pos,
-                                    size_t& eol, uint32_t& line_num) {
-  std::string_view first = src.substr(pos, eol - pos);
-  std::string joined(first.substr(0, first.size() - 1));  // Strip trailing '\'
+// Count unmatched triple-quote sequences in text (ignoring inside comments).
+static bool HasOpenTripleQuote(std::string_view text) {
+  int count = 0;
+  for (size_t i = 0; i + 2 < text.size(); ++i) {
+    if (text[i] == '"' && text[i + 1] == '"' && text[i + 2] == '"') {
+      ++count;
+      i += 2;
+    }
+  }
+  return count % 2 != 0;
+}
 
-  while (eol < src.size()) {
+// Check for an unclosed block comment in text.
+static bool HasOpenBlockComment(std::string_view text) {
+  bool in_string = false;
+  bool in_block = false;
+  for (size_t i = 0; i < text.size(); ++i) {
+    if (text[i] == '"' && (i == 0 || text[i - 1] != '\\') &&
+        (i == 0 || text[i - 1] != '`')) {
+      if (!in_block) in_string = !in_string;
+      continue;
+    }
+    if (in_string) continue;
+    if (!in_block && i + 1 < text.size() && text[i] == '/' &&
+        text[i + 1] == '*') {
+      in_block = true;
+      ++i;
+    } else if (in_block && i + 1 < text.size() && text[i] == '*' &&
+               text[i + 1] == '/') {
+      in_block = false;
+      ++i;
+    }
+  }
+  return in_block;
+}
+
+// §22.5.1: Join a `define body that spans multiple lines via backslash,
+// triple-quoted strings, or block comments.
+static std::string JoinDefineBody(std::string_view src, size_t pos,
+                                  size_t& eol, uint32_t& line_num) {
+  std::string_view first_line = src.substr(pos, eol - pos);
+  std::string joined;
+
+  // Start with the first line, stripping trailing backslash if present.
+  if (EndsWithBackslash(first_line)) {
+    joined.assign(first_line.substr(0, first_line.size() - 1));
+  } else {
+    joined.assign(first_line);
+  }
+
+  // Keep joining while the current text has: trailing backslash (already
+  // stripped), open triple-quote, or open block comment.
+  auto needs_continuation = [](std::string_view line_text,
+                               const std::string& accumulated) {
+    if (EndsWithBackslash(line_text)) return true;
+    if (HasOpenTripleQuote(accumulated)) return true;
+    if (HasOpenBlockComment(accumulated)) return true;
+    return false;
+  };
+
+  while (eol < src.size() && needs_continuation(first_line, joined)) {
     size_t next_start = eol + 1;
     size_t next_eol = src.find('\n', next_start);
     if (next_eol == std::string_view::npos) next_eol = src.size();
     std::string_view next_line = src.substr(next_start, next_eol - next_start);
     ++line_num;
     eol = next_eol;
+    first_line = next_line;  // For next backslash check.
     if (EndsWithBackslash(next_line)) {
       joined.append(next_line.substr(0, next_line.size() - 1));
     } else {
       joined.append(next_line);
-      break;
     }
   }
   return joined;
@@ -305,11 +387,15 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
       continue;
     }
 
-    // Join backslash-continued lines for `define directives.
+    // §22.5.1: Join multi-line `define (backslash, triple-quote, block comment).
     std::string joined;
-    if (StartsWithDirective(line, "define") && EndsWithBackslash(line)) {
-      joined = JoinContinuation(src, pos, eol, line_num);
-      line = joined;
+    if (StartsWithDirective(line, "define")) {
+      auto body_start = AfterDirective(line, "define");
+      if (EndsWithBackslash(line) || HasOpenTripleQuote(body_start) ||
+          HasOpenBlockComment(body_start)) {
+        joined = JoinDefineBody(src, pos, eol, line_num);
+        line = joined;
+      }
     }
 
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);
@@ -525,11 +611,19 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
   if (StartsWithDirective(line, "undef")) {
     auto rest = AfterDirective(line, "undef");
     auto trimmed_rest = Trim(rest);
-    // Extract just the macro name identifier.
+    // Extract just the macro name identifier (or escaped identifier).
     size_t name_end = 0;
-    while (name_end < trimmed_rest.size() &&
-           IsIdentChar(trimmed_rest[name_end]))
-      ++name_end;
+    if (!trimmed_rest.empty() && trimmed_rest[0] == '\\') {
+      // §22.5.1: Escaped identifier — ends at first whitespace.
+      name_end = 1;
+      while (name_end < trimmed_rest.size() &&
+             !std::isspace(static_cast<unsigned char>(trimmed_rest[name_end])))
+        ++name_end;
+    } else {
+      while (name_end < trimmed_rest.size() &&
+             IsIdentChar(trimmed_rest[name_end]))
+        ++name_end;
+    }
     HandleUndef(trimmed_rest.substr(0, name_end), loc);
     // §22.2: text after the directive's defined end is preserved.
     if (IsActive()) {
@@ -623,7 +717,7 @@ bool Preprocessor::ValidateMacroArgCount(const MacroDef& def,
   }
   for (size_t i = args.size(); i < def.params.size(); ++i) {
     bool has_default =
-        i < def.param_defaults.size() && !def.param_defaults[i].empty();
+        i < def.param_defaults.size() && def.param_defaults[i] != "\x01";
     if (!has_default) {
       diag_.Error(loc,
                   "too few arguments for macro '" + std::string(name) + "'");
@@ -661,16 +755,44 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
                                   uint32_t file_id, uint32_t line_num,
                                   int depth) {
   auto macro_name = trimmed.substr(1);
-  auto space_pos = macro_name.find_first_of(" \t(");
-  auto name = (space_pos != std::string_view::npos)
-                  ? macro_name.substr(0, space_pos)
-                  : macro_name;
+  std::string_view name;
+  if (!macro_name.empty() && macro_name[0] == '\\') {
+    // §22.5.1: Escaped identifier — name ends at first whitespace.
+    auto ws = macro_name.find_first_of(" \t");
+    name = (ws != std::string_view::npos) ? macro_name.substr(0, ws)
+                                          : macro_name;
+  } else {
+    auto space_pos = macro_name.find_first_of(" \t(");
+    name = (space_pos != std::string_view::npos)
+               ? macro_name.substr(0, space_pos)
+               : macro_name;
+  }
 
   // Predefined macros (IEEE 1800-2023 §22.13).
   if (TryPredefinedMacro(name, output, file_id, line_num)) return true;
 
   const auto* def = macros_.Lookup(name);
   if (def == nullptr) return false;
+
+  // §22.5.1: Parentheses always required for function-like macros.
+  if (def->is_function_like) {
+    auto after_name = Trim(macro_name.substr(name.size()));
+    if (after_name.empty() || after_name[0] != '(') {
+      diag_.Error({file_id, line_num, 1},
+                  "parentheses required for function-like macro '" +
+                      std::string(name) + "'");
+      return true;
+    }
+  }
+
+  // §22.5.1: Detect recursive macro expansion.
+  for (const auto& expanding : expansion_stack_) {
+    if (expanding == name) {
+      diag_.Error({file_id, line_num, 1},
+                  "recursive expansion of macro '" + std::string(name) + "'");
+      return true;
+    }
+  }
 
   std::string expanded;
   std::string_view rest;
@@ -690,6 +812,9 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
     expanded = ExpandMacro(*def, {});
     rest = macro_name.substr(name.size());
   }
+  // §22.5.1: Push macro onto expansion stack for recursion detection.
+  expansion_stack_.emplace_back(name);
+
   // Append remaining text and expand further inline macros.
   if (!rest.empty()) {
     expanded += ExpandInlineMacros(rest, file_id, line_num);
@@ -701,6 +826,8 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   } else {
     output.append(expanded);
   }
+
+  expansion_stack_.pop_back();
   return true;
 }
 
@@ -731,7 +858,15 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
                                              std::string& result) {
   size_t i = pos + 1;  // skip backtick
   size_t name_start = i;
-  while (i < line.size() && IsIdentChar(line[i])) ++i;
+  if (i < line.size() && line[i] == '\\') {
+    // §22.5.1: Escaped identifier macro name.
+    ++i;
+    while (i < line.size() &&
+           !std::isspace(static_cast<unsigned char>(line[i])))
+      ++i;
+  } else {
+    while (i < line.size() && IsIdentChar(line[i])) ++i;
+  }
   if (i == name_start) {
     result += '`';
     return pos + 1;
@@ -763,6 +898,16 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
     return i;
   }
 
+  // §22.5.1: Detect recursive macro expansion.
+  for (const auto& expanding : expansion_stack_) {
+    if (expanding == name) {
+      diag_.Error({file_id, line_num, 1},
+                  "recursive expansion of macro '" + std::string(name) + "'");
+      result.append(line.substr(pos, i - pos));
+      return i;
+    }
+  }
+
   std::string_view args_text;
   if (def->is_function_like) {
     auto rest = line.substr(i);
@@ -776,9 +921,12 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
       result.append(line.substr(pos, i - pos));
       return i;
     }
-    i += balanced.size();
+    // Advance past everything up to and including the closing paren.
+    i += static_cast<size_t>(balanced.data() + balanced.size() - rest.data());
   }
+  expansion_stack_.emplace_back(name);
   result += ExpandMacro(*def, args_text);
+  expansion_stack_.pop_back();
   return i;
 }
 
@@ -890,7 +1038,17 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
 
   // Find where the macro name ends.
   size_t name_end = 0;
-  while (name_end < rest.size() && IsIdentChar(rest[name_end])) ++name_end;
+  bool escaped = false;
+  if (!rest.empty() && rest[0] == '\\') {
+    // §22.5.1: Escaped identifier macro name.
+    escaped = true;
+    name_end = 1;
+    while (name_end < rest.size() &&
+           !std::isspace(static_cast<unsigned char>(rest[name_end])))
+      ++name_end;
+  } else {
+    while (name_end < rest.size() && IsIdentChar(rest[name_end])) ++name_end;
+  }
 
   MacroDef def;
   def.def_loc = loc;
@@ -899,12 +1057,17 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   def.name = std::string(rest.substr(0, name_end));
 
   // §22.5.1: All compiler directives are predefined; redefining is illegal.
-  if (IsCompilerDirective(def.name)) {
+  if (!escaped && IsCompilerDirective(def.name)) {
     diag_.Error(loc, "redefining compiler directive '" + def.name + "'");
     return;
   }
 
   auto after_name = rest.substr(name_end);
+  // §22.5.1: Escaped identifier requires single whitespace before (.
+  if (escaped && !after_name.empty() &&
+      std::isspace(static_cast<unsigned char>(after_name[0]))) {
+    after_name.remove_prefix(1);
+  }
 
   // Function-like: `( immediately after name, NO space (IEEE §22.5.1).
   if (!after_name.empty() && after_name[0] == '(') {

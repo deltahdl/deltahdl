@@ -476,3 +476,257 @@ TEST(Preprocessor, Clause22_5_1_ResetallDoesNotAffectMacros) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("99"), std::string::npos);
 }
+
+// --- §22.5.1: Recursive macro detection ---
+
+TEST(Preprocessor, Clause22_5_1_DirectRecursiveMacroError) {
+  PreprocFixture f;
+  Preprocess(
+      "`define REC `REC\n"
+      "`REC\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Clause22_5_1_IndirectRecursiveMacroError) {
+  PreprocFixture f;
+  Preprocess(
+      "`define A `B\n"
+      "`define B `A\n"
+      "`A\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Clause22_5_1_MacroArgContainingSelfIsLegal) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define TOP(a,b) a + b\n"
+      "`TOP( `TOP(b,1), `TOP(42,a) )\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("b + 1 + 42 + a"), std::string::npos);
+}
+
+// --- §22.5.1: Balanced delimiters in actual arguments ---
+
+TEST(Preprocessor, Clause22_5_1_SquareBracketsInActualArgument) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define APPLY(x) x\n"
+      "`APPLY(a[1,2])\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("a[1,2]"), std::string::npos);
+}
+
+TEST(Preprocessor, Clause22_5_1_BracesInActualArgument) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define APPLY(x) x\n"
+      "`APPLY({a,b})\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("{a,b}"), std::string::npos);
+}
+
+TEST(Preprocessor, Clause22_5_1_QuotedStringInActualArgument) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define APPLY(x) x\n"
+      "`APPLY(\"a,b\")\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"a,b\""), std::string::npos);
+}
+
+// --- §22.5.1: Parentheses required for function-like macro ---
+
+TEST(Preprocessor, Clause22_5_1_FunctionLikeMacroWithoutParensError) {
+  PreprocFixture f;
+  Preprocess(
+      "`define FUNC(a=5) a\n"
+      "`FUNC\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.5.1: Escaped identifier as macro name ---
+
+TEST(Preprocessor, Clause22_5_1_EscapedIdentifierMacroName) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define \\M@CRO (a=5, b=0) a + b\n"
+      "`\\M@CRO (1, 2)\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("1 + 2"), std::string::npos);
+}
+
+TEST(Preprocessor, Clause22_5_1_EscapedIdentifierAllDefaults) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define \\M@CRO (a=5, b=0) a + b\n"
+      "`\\M@CRO ( )\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("5 + 0"), std::string::npos);
+}
+
+// --- §22.5.1: Triple-quoted string in macro body ---
+
+TEST(Preprocessor, Clause22_5_1_TripleQuotedStringInMacroBody) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define TEST \"\"\"\n"
+      "many\n"
+      "lines\"\"\"\n"
+      "string s = `TEST;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("many"), std::string::npos);
+  EXPECT_NE(result.find("lines"), std::string::npos);
+}
+
+// --- §22.5.1: Block comment in multi-line macro (no backslash needed) ---
+
+TEST(Preprocessor, Clause22_5_1_BlockCommentInMultiLineMacro) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define FOO nand /* block comment\n"
+      "continues here */ \\\n"
+      "#5\n"
+      "`FOO g1(q, a, b);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("nand"), std::string::npos);
+  EXPECT_NE(result.find("#5"), std::string::npos);
+  EXPECT_EQ(result.find("block comment"), std::string::npos);
+}
+
+// --- §22.5.1: Macro argument default contains macro usage ---
+
+TEST(Preprocessor, Clause22_5_1_DefaultContainsMacroUsage) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define VAL 42\n"
+      "`define M(a=`VAL) a\n"
+      "`M()\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("42"), std::string::npos);
+}
+
+// --- §22.5.1: Line comment followed by backslash-newline ---
+
+TEST(Preprocessor, Clause22_5_1_LineCommentBeforeBackslashContinuation) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define FOO nand // comment \\\n"
+      "#5\n"
+      "`FOO g1(q, a, b);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("nand"), std::string::npos);
+  EXPECT_NE(result.find("#5"), std::string::npos);
+}
+
+// --- §22.5.1: D(x,y) with single arg is error ---
+
+TEST(Preprocessor, Clause22_5_1_TwoArgMacroWithSingleArgError) {
+  PreprocFixture f;
+  Preprocess(
+      "`define D(x,y) initial $display(x, y);\n"
+      "`D(\"msg1\")\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.5.1: D() is illegal for two-arg macro (one empty arg) ---
+
+TEST(Preprocessor, Clause22_5_1_TwoArgMacroWithEmptyParensError) {
+  PreprocFixture f;
+  Preprocess(
+      "`define D(x,y) initial $display(x, y);\n"
+      "`D()\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.5.1: Macro argument with empty default (= followed by comma) ---
+
+TEST(Preprocessor, Clause22_5_1_ExplicitEmptyDefault) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a=,b=1) [a][b]\n"
+      "`M()\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // a gets empty default, b gets default 1.
+  EXPECT_NE(result.find("[][1]"), std::string::npos);
+}
+
+// --- §22.5.1: Macro text not split across string literal ---
+
+TEST(Preprocessor, Clause22_5_1_MacroBodySplitAcrossStringLiteral) {
+  PreprocFixture f;
+  Preprocess(
+      "`define first_half \"start of string\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// --- §22.5.1: Macro usage argument expansion does not introduce formals ---
+
+TEST(Preprocessor, Clause22_5_1_ArgExpansionDoesNotIntroduceFormals) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define TOP(a,b) a + b\n"
+      "`TOP( `TOP(b,1), `TOP(42,a) )\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // Inner `TOP(b,1) → "b + 1", inner `TOP(42,a) → "42 + a".
+  // Outer substitution: a="b + 1", b="42 + a" → "b + 1 + 42 + a".
+  // NOT "42 + a + 1 + 42 + a" (b should not be re-substituted).
+  EXPECT_NE(result.find("b + 1 + 42 + a"), std::string::npos);
+}
+
+// --- §22.5.1: No substitution inside `LO string literal ---
+
+TEST(Preprocessor, Clause22_5_1_NoSubstitutionInsideStringLiteral2) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define HI Hello\n"
+      "`define LO \"`HI, world\"\n"
+      "$display(`LO);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // `HI inside the string literal in `LO should NOT be expanded.
+  EXPECT_NE(result.find("`HI, world"), std::string::npos);
+}
+
+// --- §22.5.1: H(x) with formal arg in string literal ---
+
+TEST(Preprocessor, Clause22_5_1_FormalArgInStringLiteralNotSubstituted) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define H(x) \"Hello, x\"\n"
+      "$display(`H(world));\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // x inside string literal should NOT be substituted.
+  EXPECT_NE(result.find("\"Hello, x\""), std::string::npos);
+}
+
+// --- §22.5.1: `include with macro-generated filename ---
+
+TEST(Preprocessor, Clause22_5_1_IncludeWithMacroFilename) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define HOME(fn) `\"/tmp/fn`\"\n"
+      // We can't actually include a file, but verify the macro expands.
+      "string s = `HOME(test.sv);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\"/tmp/test.sv\""), std::string::npos);
+}

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -14,7 +13,7 @@ struct MacroDef {
   std::string name;
   std::string body;
   std::vector<std::string> params;
-  std::vector<std::string> param_defaults;  // Per-param default; empty = none.
+  std::vector<std::string> param_defaults;  // Per-param default; "\x01" = none.
   SourceLoc def_loc;
   bool is_function_like = false;
 };

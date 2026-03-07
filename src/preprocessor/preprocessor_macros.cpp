@@ -108,7 +108,7 @@ std::string Preprocessor::ExpandMacro(const MacroDef& macro,
   for (size_t i = 0; i < macro.params.size(); ++i) {
     std::string_view arg = (i < args.size()) ? args[i] : std::string_view{};
     if (arg.empty() && i < macro.param_defaults.size() &&
-        !macro.param_defaults[i].empty()) {
+        macro.param_defaults[i] != "\x01") {
       resolved.emplace_back(macro.param_defaults[i]);
     } else {
       resolved.emplace_back(arg);
@@ -134,7 +134,8 @@ std::vector<std::string> Preprocessor::ParseMacroParams(
       defaults.emplace_back(Trim(token.substr(eq + 1)));
     } else {
       params.emplace_back(token);
-      defaults.emplace_back();  // No default.
+      // Sentinel: \x01 means "no default specified" vs "" = explicit empty.
+      defaults.emplace_back("\x01");
     }
     pos = comma + 1;
   }
@@ -144,24 +145,44 @@ std::vector<std::string> Preprocessor::ParseMacroParams(
 std::string_view Preprocessor::ExtractBalancedArgs(std::string_view text) {
   auto open = text.find('(');
   if (open == std::string_view::npos) return {};
-  int depth = 0;
+  int paren_depth = 0;
+  bool in_string = false;
   for (size_t i = open; i < text.size(); ++i) {
-    if (text[i] == '(') ++depth;
-    if (text[i] == ')') --depth;
-    if (depth == 0) return text.substr(open, i - open + 1);
+    if (text[i] == '"' && (i == 0 || text[i - 1] != '\\')) {
+      in_string = !in_string;
+      continue;
+    }
+    if (in_string) continue;
+    if (text[i] == '(') ++paren_depth;
+    else if (text[i] == ')') --paren_depth;
+    if (paren_depth == 0) return text.substr(open, i - open + 1);
   }
   return {};
 }
 
+// §22.5.1: Split macro arguments respecting balanced (), [], {}, and "".
 std::vector<std::string_view> Preprocessor::SplitMacroArgs(
     std::string_view args_text) {
   std::vector<std::string_view> args;
-  int depth = 0;
+  int paren_depth = 0;
+  int bracket_depth = 0;
+  int brace_depth = 0;
+  bool in_string = false;
   size_t start = 0;
   for (size_t i = 0; i < args_text.size(); ++i) {
-    if (args_text[i] == '(') ++depth;
-    if (args_text[i] == ')') --depth;
-    if (args_text[i] == ',' && depth == 0) {
+    if (args_text[i] == '"' && (i == 0 || args_text[i - 1] != '\\')) {
+      in_string = !in_string;
+      continue;
+    }
+    if (in_string) continue;
+    if (args_text[i] == '(') ++paren_depth;
+    else if (args_text[i] == ')') --paren_depth;
+    else if (args_text[i] == '[') ++bracket_depth;
+    else if (args_text[i] == ']') --bracket_depth;
+    else if (args_text[i] == '{') ++brace_depth;
+    else if (args_text[i] == '}') --brace_depth;
+    if (args_text[i] == ',' && paren_depth == 0 && bracket_depth == 0 &&
+        brace_depth == 0) {
       args.push_back(Trim(args_text.substr(start, i - start)));
       start = i + 1;
     }
