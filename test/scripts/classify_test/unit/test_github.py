@@ -305,6 +305,27 @@ def test_maybe_update_moved(monkeypatch, ct_github, ct_helpers):
     ) in updated[0]
 
 
+def test_maybe_update_moved_no_filenames(monkeypatch, ct_github, ct_helpers):
+    """Sets empty action when moved but target_filenames is None."""
+    _tb = ct_helpers.make_test_block
+    updated = []
+    monkeypatch.setattr(
+        ct_github, "fetch_issue_body",
+        lambda org, repo, issue: "| T | Unreviewed | |\n",
+    )
+    monkeypatch.setattr(
+        ct_github, "update_issue_body",
+        lambda org, repo, issue, body: updated.append(body),
+    )
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    t.rationale = "r"
+    args = _issue_args(issue=42, organization="org", repo="repo")
+    ct_github.maybe_update_issue_status(
+        args, [t], source_is_target=False,
+    )
+    assert "| T | Reviewed | |" in updated[0]
+
+
 def test_maybe_update_passes_correct_org(monkeypatch, ct_github, ct_helpers):
     """Passes organization to fetch and update."""
     _tb = ct_helpers.make_test_block
