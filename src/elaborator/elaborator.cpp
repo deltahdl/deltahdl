@@ -691,6 +691,16 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   net.attrs = ResolveAttributes(item->attrs, diag_);
   mod->nets.push_back(net);
 
+  // §10.3.4: Drive strength on net decl applies only to scalar nets,
+  // except supply0/supply1.
+  if ((item->data_type.drive_strength0 != 0 ||
+       item->data_type.drive_strength1 != 0) &&
+      net.width > 1 && net.net_type != NetType::kSupply0 &&
+      net.net_type != NetType::kSupply1) {
+    diag_.Error(item->loc,
+                "drive strength on continuous assignment applies only to "
+                "scalar nets");
+  }
   // §10.3.1: Net declaration assignment creates an implicit continuous assign.
   if (item->init_expr) {
     if (item->data_type.is_interconnect) {
@@ -928,6 +938,26 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
       diag_.Error(item->loc,
                   "continuous assignment to a nettype net shall have at most "
                   "a single delay");
+    }
+  }
+  // §10.3.4: Drive strength applies only to scalar nets, except supply0/supply1.
+  if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
+      item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
+    uint32_t lhs_width = LookupLhsWidth(item->assign_lhs, mod);
+    if (lhs_width > 1) {
+      bool is_supply = false;
+      for (const auto& n : mod->nets) {
+        if (n.name == item->assign_lhs->text) {
+          is_supply = (n.net_type == NetType::kSupply0 ||
+                       n.net_type == NetType::kSupply1);
+          break;
+        }
+      }
+      if (!is_supply) {
+        diag_.Error(item->loc,
+                    "drive strength on continuous assignment applies only to "
+                    "scalar nets");
+      }
     }
   }
   RtlirContAssign ca;
