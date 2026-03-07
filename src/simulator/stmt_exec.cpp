@@ -371,7 +371,12 @@ static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return true;
 }
 
-// Check if a case item matches based on case_kind (non-inside).
+// §12.6: Pattern match — x/z in pattern are wildcards (same as inside).
+static bool CaseMatchesMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
+  return CaseInsideValueMatch(sel, pat);
+}
+
+// Check if a case item matches based on case_kind (non-inside, non-matches).
 static bool CaseItemMatches(const Logic4Vec& sel, const Logic4Vec& pat,
                             TokenKind case_kind) {
   if (case_kind == TokenKind::kKwCasex) return CasexMatch(sel, pat);
@@ -397,10 +402,14 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
         continue;
       }
       for (auto* pat : item.patterns) {
-        bool matched = stmt->case_inside
-                           ? CaseInsidePatternMatch(sel, pat, ctx, arena)
-                           : CaseItemMatches(sel, EvalExpr(pat, ctx, arena),
-                                             stmt->case_kind);
+        bool matched;
+        if (stmt->case_inside)
+          matched = CaseInsidePatternMatch(sel, pat, ctx, arena);
+        else {
+          auto pv = EvalExpr(pat, ctx, arena);
+          matched = stmt->case_matches ? CaseMatchesMatch(sel, pv)
+                                       : CaseItemMatches(sel, pv, stmt->case_kind);
+        }
         if (matched) {
           match_count++;
           if (!first_match_body) first_match_body = item.body;
@@ -432,10 +441,14 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   for (const auto& item : stmt->case_items) {
     if (item.is_default) continue;
     for (auto* pat : item.patterns) {
-      bool matched = stmt->case_inside
-                         ? CaseInsidePatternMatch(sel, pat, ctx, arena)
-                         : CaseItemMatches(sel, EvalExpr(pat, ctx, arena),
-                                           stmt->case_kind);
+      bool matched;
+      if (stmt->case_inside)
+        matched = CaseInsidePatternMatch(sel, pat, ctx, arena);
+      else {
+        auto pv = EvalExpr(pat, ctx, arena);
+        matched = stmt->case_matches ? CaseMatchesMatch(sel, pv)
+                                     : CaseItemMatches(sel, pv, stmt->case_kind);
+      }
       if (matched) {
         co_return co_await ExecStmt(item.body, ctx, arena);
       }

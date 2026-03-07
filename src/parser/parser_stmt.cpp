@@ -371,7 +371,9 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
     stmt->case_inside = true;
   }
   // §12.6: case-matches variant.
-  Match(TokenKind::kKwMatches);
+  if (Match(TokenKind::kKwMatches)) {
+    stmt->case_matches = true;
+  }
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     stmt->case_items.push_back(ParseCaseItem(stmt->case_inside));
   }

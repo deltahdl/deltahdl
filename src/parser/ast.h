@@ -341,7 +341,8 @@ struct Stmt {
   // Case
   std::vector<CaseItem> case_items;
   TokenKind case_kind = TokenKind::kKwCase;  // case/casex/casez
-  bool case_inside = false;  // case ... inside (LRM section 12.5.4)
+  bool case_inside = false;   // case ... inside (§12.5.4)
+  bool case_matches = false;  // case ... matches (§12.6.1)
 
   // Timing
   std::vector<EventExpr> events;
