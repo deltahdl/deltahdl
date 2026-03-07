@@ -5,17 +5,6 @@ from types import SimpleNamespace
 
 import pytest
 
-import classify_test
-from classify_test.test_helpers import make_parsed_file as _parsed
-from classify_test.test_helpers import make_test_block as _tb
-from classify_test.test_helpers import stub_classifier, stub_side_effects
-
-_parse_args = getattr(classify_test, "_parse_args")
-_group_tests = getattr(classify_test, "_group_tests")
-_resolve_destinations = getattr(classify_test, "_resolve_destinations")
-_write_files = getattr(classify_test, "_write_files")
-_run = getattr(classify_test, "_run")
-
 
 def _make_input_file(tmp_path):
     """Create a minimal test input file and return its path."""
@@ -55,21 +44,24 @@ _BASE_ARGV = ["prog", "--file", "f.cpp", "--output-dir", "/out",
               "--max-lines", "1000"]
 
 
-def test_parse_args_basic(monkeypatch):
+def test_parse_args_basic(monkeypatch, ct):
     """Parses --file, --output-dir, --lrm, and --test."""
+    _parse_args = getattr(ct, "_parse_args")
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     args = _parse_args()
     assert args.file == "f.cpp" and not args.dry_run
 
 
-def test_parse_args_dry_run(monkeypatch):
+def test_parse_args_dry_run(monkeypatch, ct):
     """Parses --dry-run flag."""
+    _parse_args = getattr(ct, "_parse_args")
     monkeypatch.setattr(sys, "argv", [*_BASE_ARGV, "--dry-run"])
     assert _parse_args().dry_run is True
 
 
-def test_parse_args_lrm(monkeypatch):
+def test_parse_args_lrm(monkeypatch, ct):
     """Parses --lrm flag."""
+    _parse_args = getattr(ct, "_parse_args")
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
@@ -80,8 +72,9 @@ def test_parse_args_lrm(monkeypatch):
     assert _parse_args().lrm == "/my/LRM.txt"
 
 
-def test_parse_args_test_flag(monkeypatch):
+def test_parse_args_test_flag(monkeypatch, ct):
     """Parses --test flag."""
+    _parse_args = getattr(ct, "_parse_args")
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
@@ -92,16 +85,18 @@ def test_parse_args_test_flag(monkeypatch):
     assert _parse_args().test == "Foo"
 
 
-def test_parse_args_max_lines(monkeypatch):
+def test_parse_args_max_lines(monkeypatch, ct):
     """Parses --max-lines flag."""
+    _parse_args = getattr(ct, "_parse_args")
     monkeypatch.setattr(
         sys, "argv", [*_BASE_ARGV, "--max-lines", "500"],
     )
     assert _parse_args().max_lines == 500
 
 
-def test_parse_args_max_lines_required(monkeypatch):
+def test_parse_args_max_lines_required(monkeypatch, ct):
     """--max-lines is required."""
+    _parse_args = getattr(ct, "_parse_args")
     argv = [v for i, v in enumerate(_BASE_ARGV)
             if _BASE_ARGV[max(0, i - 1)] != "--max-lines"
             and v != "--max-lines"]
@@ -113,65 +108,79 @@ def test_parse_args_max_lines_required(monkeypatch):
 
 # ---- _preamble_name / _filter_preamble ------------------------------------
 
-_preamble_name = getattr(classify_test, "_preamble_name")
-_filter_preamble = getattr(classify_test, "_filter_preamble")
-_PI = classify_test.PreambleItem
 
-
-def test_preamble_name_struct():
+def test_preamble_name_struct(ct):
     """Extracts struct name."""
+    _preamble_name = getattr(ct, "_preamble_name")
+    _PI = ct.PreambleItem
     item = _PI(lines=["struct ParseResult {", "  int x;", "};"])
     assert _preamble_name(item) == "ParseResult"
 
 
-def test_preamble_name_function():
+def test_preamble_name_function(ct):
     """Extracts function name."""
+    _preamble_name = getattr(ct, "_preamble_name")
+    _PI = ct.PreambleItem
     item = _PI(lines=["ParseResult Parse(const std::string& src) {",
                        "  return {};", "}"])
     assert _preamble_name(item) == "Parse"
 
 
-def test_preamble_name_static_function():
+def test_preamble_name_static_function(ct):
     """Extracts name from static function."""
+    _preamble_name = getattr(ct, "_preamble_name")
+    _PI = ct.PreambleItem
     item = _PI(lines=["static bool ParseOk(const std::string& src) {",
                        "  return true;", "}"])
     assert _preamble_name(item) == "ParseOk"
 
 
-def test_preamble_name_class():
+def test_preamble_name_class(ct):
     """Extracts class name."""
+    _preamble_name = getattr(ct, "_preamble_name")
+    _PI = ct.PreambleItem
     item = _PI(lines=["class Foo {", "};"])
     assert _preamble_name(item) == "Foo"
 
 
-def test_preamble_name_enum():
+def test_preamble_name_enum(ct):
     """Extracts enum name."""
+    _preamble_name = getattr(ct, "_preamble_name")
+    _PI = ct.PreambleItem
     item = _PI(lines=["enum Color {", "  RED,", "};"])
     assert _preamble_name(item) == "Color"
 
 
-def test_preamble_name_no_match():
+def test_preamble_name_no_match(ct):
     """Returns None for comment-only item."""
+    _preamble_name = getattr(ct, "_preamble_name")
+    _PI = ct.PreambleItem
     item = _PI(lines=["// just a comment"])
     assert _preamble_name(item) is None
 
 
-def test_preamble_name_with_leading_comment():
+def test_preamble_name_with_leading_comment(ct):
     """Skips comment lines to find the name."""
+    _preamble_name = getattr(ct, "_preamble_name")
+    _PI = ct.PreambleItem
     item = _PI(lines=["// --- Test helpers ---",
                        "struct Foo {", "};"])
     assert _preamble_name(item) == "Foo"
 
 
-def test_preamble_name_pointer_return():
+def test_preamble_name_pointer_return(ct):
     """Extracts name from function with pointer return type."""
+    _preamble_name = getattr(ct, "_preamble_name")
+    _PI = ct.PreambleItem
     item = _PI(lines=["RtlirDesign* Elaborate(const std::string& src) {",
                        "  return nullptr;", "}"])
     assert _preamble_name(item) == "Elaborate"
 
 
-def test_preamble_name_static_pointer_return():
+def test_preamble_name_static_pointer_return(ct):
     """Extracts name from static function with pointer return type."""
+    _preamble_name = getattr(ct, "_preamble_name")
+    _PI = ct.PreambleItem
     item = _PI(lines=[
         "static ModuleItem* FindItemByKind("
         "const std::vector<ModuleItem*>& items,",
@@ -180,79 +189,93 @@ def test_preamble_name_static_pointer_return():
     assert _preamble_name(item) == "FindItemByKind"
 
 
-def test_preamble_name_reference_return():
+def test_preamble_name_reference_return(ct):
     """Extracts name from function with reference return type."""
+    _preamble_name = getattr(ct, "_preamble_name")
+    _PI = ct.PreambleItem
     item = _PI(lines=["const std::string& GetName() {",
                        '  return name_;', "}"])
     assert _preamble_name(item) == "GetName"
 
 
-def _test_block(body):
+def _test_block(ct, body):
     """Create a TestBlock with specific body lines for preamble tests."""
-    return classify_test.TestBlock(
+    return ct.TestBlock(
         suite_name="S", test_name="T",
         lines=["TEST(S, T) {"] + body + ["}"],
         preceding_comments=[],
     )
 
 
-def test_filter_preamble_keeps_used():
+def test_filter_preamble_keeps_used(ct):
     """Keeps preamble items referenced by test body."""
+    _filter_preamble = getattr(ct, "_filter_preamble")
+    _PI = ct.PreambleItem
     parse_fn = _PI(lines=["Result Parse(const std::string& s) {", "}"])
     elab_fn = _PI(lines=["void Elaborate() {", "}"])
-    t = _test_block(["  auto r = Parse(src);"])
+    t = _test_block(ct, ["  auto r = Parse(src);"])
     assert parse_fn in _filter_preamble([parse_fn, elab_fn], [t])
 
 
-def test_filter_preamble_drops_unused():
+def test_filter_preamble_drops_unused(ct):
     """Drops preamble items not referenced by any test."""
+    _filter_preamble = getattr(ct, "_filter_preamble")
+    _PI = ct.PreambleItem
     parse_fn = _PI(lines=["Result Parse(const std::string& s) {", "}"])
     elab_fn = _PI(lines=["void Elaborate() {", "}"])
-    t = _test_block(["  auto r = Parse(src);"])
+    t = _test_block(ct, ["  auto r = Parse(src);"])
     assert elab_fn not in _filter_preamble([parse_fn, elab_fn], [t])
 
 
-def _do_transitive_filter():
+def _do_transitive_filter(ct):
     """Filter preamble with transitive deps and return kept list."""
+    _filter_preamble = getattr(ct, "_filter_preamble")
+    _PI = ct.PreambleItem
     result_struct = _PI(lines=["struct ParseResult {", "  int x;", "};"])
     parse_fn = _PI(lines=["ParseResult Parse(const std::string& s) {",
                            "  ParseResult r;", "  return r;", "}"])
-    t = _test_block(["  auto r = Parse(src);"])
+    t = _test_block(ct, ["  auto r = Parse(src);"])
     return _filter_preamble([result_struct, parse_fn], [t]), result_struct, parse_fn
 
 
-def test_filter_preamble_transitive_keeps_struct():
+def test_filter_preamble_transitive_keeps_struct(ct):
     """Transitive dep: keeps ParseResult struct used by Parse."""
-    kept, result_struct, _ = _do_transitive_filter()
+    kept, result_struct, _ = _do_transitive_filter(ct)
     assert result_struct in kept
 
 
-def test_filter_preamble_transitive_keeps_fn():
+def test_filter_preamble_transitive_keeps_fn(ct):
     """Transitive dep: keeps Parse function used by test."""
-    kept, _, parse_fn = _do_transitive_filter()
+    kept, _, parse_fn = _do_transitive_filter(ct)
     assert parse_fn in kept
 
 
-def test_filter_preamble_keeps_unnamed():
+def test_filter_preamble_keeps_unnamed(ct):
     """Items with no extractable name are always kept."""
+    _filter_preamble = getattr(ct, "_filter_preamble")
+    _PI = ct.PreambleItem
     unnamed = _PI(lines=["using Foo = int;"])
-    t = _test_block(["  int x = 1;"])
+    t = _test_block(ct, ["  int x = 1;"])
     assert unnamed in _filter_preamble([unnamed], [t])
 
 
 # ---- _group_tests ----------------------------------------------------------
 
 
-def test_group_tests_normal():
+def test_group_tests_normal(ct, ct_helpers):
     """Groups tests by (prefix, clause)."""
+    _group_tests = getattr(ct, "_group_tests")
+    _tb = ct_helpers.make_test_block
     t1 = _tb("A", prefix="test_parser_", clause="6.1")
     t2 = _tb("B", prefix="test_parser_", clause="6.1")
     groups = _group_tests([t1, t2])
     assert len(groups[("test_parser_", "6.1")]) == 2
 
 
-def test_group_tests_defaults():
+def test_group_tests_defaults(ct, ct_helpers):
     """Uses defaults when prefix/clause are None."""
+    _group_tests = getattr(ct, "_group_tests")
+    _tb = ct_helpers.make_test_block
     t = _tb("A")
     groups = _group_tests([t])
     assert ("test_non_lrm", "non-lrm") in groups
@@ -261,8 +284,10 @@ def test_group_tests_defaults():
 # ---- _resolve_destinations -------------------------------------------------
 
 
-def test_resolve_destinations_create(tmp_path):
+def test_resolve_destinations_create(tmp_path, ct, ct_helpers):
     """Creates new files when no merge target exists."""
+    _resolve_destinations = getattr(ct, "_resolve_destinations")
+    _tb = ct_helpers.make_test_block
     t = _tb("T", prefix="test_parser_", clause="6.1")
     groups = {("test_parser_", "6.1"): [t]}
     to_create, to_merge, _ = _resolve_destinations(
@@ -271,8 +296,10 @@ def test_resolve_destinations_create(tmp_path):
     assert len(to_create) == 1 and len(to_merge) == 0
 
 
-def test_resolve_destinations_merge(tmp_path):
+def test_resolve_destinations_merge(tmp_path, ct, ct_helpers):
     """Merges into existing file."""
+    _resolve_destinations = getattr(ct, "_resolve_destinations")
+    _tb = ct_helpers.make_test_block
     (tmp_path / "test_parser_clause_06_01.cpp").write_text(
         "TEST(S, Old) {}\n",
     )
@@ -284,8 +311,10 @@ def test_resolve_destinations_merge(tmp_path):
     assert len(to_merge) == 1
 
 
-def test_resolve_destinations_duplicates(tmp_path):
+def test_resolve_destinations_duplicates(tmp_path, ct, ct_helpers):
     """Drops duplicate tests."""
+    _resolve_destinations = getattr(ct, "_resolve_destinations")
+    _tb = ct_helpers.make_test_block
     f = tmp_path / "test_parser_clause_06_01.cpp"
     f.write_text("TEST(S, T) {\n}\n")
     t = _tb("T", prefix="test_parser_", clause="6.1")
@@ -296,8 +325,10 @@ def test_resolve_destinations_duplicates(tmp_path):
     assert len(to_create) == 0 and len(to_merge) == 0
 
 
-def test_resolve_destinations_all_dupes(tmp_path, capsys):
+def test_resolve_destinations_all_dupes(tmp_path, capsys, ct, ct_helpers):
     """Prints removal message with parentheses for each duplicate."""
+    _resolve_destinations = getattr(ct, "_resolve_destinations")
+    _tb = ct_helpers.make_test_block
     f = tmp_path / "test_parser_clause_06_01.cpp"
     f.write_text("TEST(S, T) {\n}\n")
     t = _tb("T", prefix="test_parser_", clause="6.1")
@@ -307,9 +338,11 @@ def test_resolve_destinations_all_dupes(tmp_path, capsys):
 
 
 def test_resolve_destinations_dry_run_would_have_removed(
-    tmp_path, capsys,
+    tmp_path, capsys, ct, ct_helpers,
 ):
     """Dry-run prints 'Would have removed' with parentheses."""
+    _resolve_destinations = getattr(ct, "_resolve_destinations")
+    _tb = ct_helpers.make_test_block
     f = tmp_path / "test_parser_clause_06_01.cpp"
     f.write_text("TEST(S, T) {\n}\n")
     t = _tb("T", prefix="test_parser_", clause="6.1")
@@ -318,8 +351,10 @@ def test_resolve_destinations_dry_run_would_have_removed(
     assert "- Would have removed T()" in capsys.readouterr().out
 
 
-def test_resolve_destinations_excludes_source(tmp_path):
+def test_resolve_destinations_excludes_source(tmp_path, ct, ct_helpers):
     """Source file matching target is skipped (already correct)."""
+    _resolve_destinations = getattr(ct, "_resolve_destinations")
+    _tb = ct_helpers.make_test_block
     src = tmp_path / "test_non_lrm_aig.cpp"
     src.write_text("TEST(S, Self) {\n}\n")
     t = _tb("Self", prefix="test_non_lrm_", clause="non-lrm:aig")
@@ -330,8 +365,10 @@ def test_resolve_destinations_excludes_source(tmp_path):
     assert len(to_create) == 0 and len(to_merge) == 0
 
 
-def test_resolve_destinations_source_is_target(tmp_path):
+def test_resolve_destinations_source_is_target(tmp_path, ct, ct_helpers):
     """Tests already in the correct file are skipped, not recreated."""
+    _resolve_destinations = getattr(ct, "_resolve_destinations")
+    _tb = ct_helpers.make_test_block
     src = tmp_path / "test_non_lrm_vpi.cpp"
     src.write_text("TEST(S, Keep) {\n}\n")
     t = _tb("Keep", prefix="test_non_lrm_", clause="non-lrm:vpi")
@@ -345,8 +382,11 @@ def test_resolve_destinations_source_is_target(tmp_path):
 # ---- _write_files ----------------------------------------------------------
 
 
-def test_write_files_create(tmp_path):
+def test_write_files_create(tmp_path, ct, ct_helpers):
     """Creates new files on disk."""
+    _write_files = getattr(ct, "_write_files")
+    _tb = ct_helpers.make_test_block
+    _parsed = ct_helpers.make_parsed_file
     t = _tb("T", comments=[])
     parsed = _parsed()
     to_create = [("test_parser_clause_06_01", "6.1", [t])]
@@ -357,8 +397,11 @@ def test_write_files_create(tmp_path):
     assert "test_parser_clause_06_01" in names
 
 
-def test_write_files_merge(tmp_path):
+def test_write_files_merge(tmp_path, ct, ct_helpers):
     """Merges tests into existing files."""
+    _write_files = getattr(ct, "_write_files")
+    _tb = ct_helpers.make_test_block
+    _parsed = ct_helpers.make_parsed_file
     f = tmp_path / "existing.cpp"
     f.write_text(
         "namespace {\nTEST(S, Old) {\n}\n}  // namespace\n",
@@ -376,15 +419,17 @@ def test_write_files_merge(tmp_path):
 # ---- _run ------------------------------------------------------------------
 
 
-def test_run_file_not_found(tmp_path):
+def test_run_file_not_found(tmp_path, ct):
     """Exits when input file does not exist."""
+    _run = getattr(ct, "_run")
     args = _run_args(tmp_path, file=str(tmp_path / "missing.cpp"))
     with pytest.raises(SystemExit):
         _run(args)
 
 
-def test_run_no_test_blocks(tmp_path):
+def test_run_no_test_blocks(tmp_path, ct):
     """Exits when file has no TEST blocks."""
+    _run = getattr(ct, "_run")
     f = tmp_path / "empty.cpp"
     f.write_text(
         "#include <gtest/gtest.h>\n\nint x = 0;\n",
@@ -395,8 +440,9 @@ def test_run_no_test_blocks(tmp_path):
         _run(args)
 
 
-def test_run_test_not_found(tmp_path):
+def test_run_test_not_found(tmp_path, ct):
     """Exits when --test names a test not in the file."""
+    _run = getattr(ct, "_run")
     _make_input_file(tmp_path)
     args = _run_args(tmp_path, test="NoSuchTest")
     with pytest.raises(SystemExit):
@@ -404,16 +450,18 @@ def test_run_test_not_found(tmp_path):
 
 
 
-def test_run_dry_run_shows_target(tmp_path, monkeypatch, capsys):
+def test_run_dry_run_shows_target(tmp_path, monkeypatch, capsys, ct,
+                                  ct_helpers):
     """Dry-run output shows the target filename."""
+    _run = getattr(ct, "_run")
     _make_input_file(tmp_path)
-    stub_classifier(monkeypatch, _parser_response())
+    ct_helpers.stub_classifier(monkeypatch, _parser_response())
     args = _run_args(tmp_path, dry_run=True)
     _run(args)
     assert "test_parser_clause_06_01.cpp" in capsys.readouterr().out
 
 
-def _setup_live_run(tmp_path, monkeypatch):
+def _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch):
     """Create input file, cmake, and stub classifier for a live run."""
     _make_input_file(tmp_path)
     cmake = tmp_path / "CMakeLists.txt"
@@ -421,76 +469,88 @@ def _setup_live_run(tmp_path, monkeypatch):
         "# header\nadd_unit_test(test_input)\n",
         encoding="utf-8",
     )
-    stub_classifier(monkeypatch, _parser_response())
-    monkeypatch.setattr(classify_test, "CMAKE_PATH", cmake)
+    ct_helpers.stub_classifier(monkeypatch, _parser_response())
+    monkeypatch.setattr(ct, "CMAKE_PATH", cmake)
     return _run_args(tmp_path)
 
 
-def test_run_live_updates_cmake(tmp_path, monkeypatch):
+def test_run_live_updates_cmake(tmp_path, monkeypatch, ct, ct_helpers):
     """Live run updates CMakeLists.txt with new entry."""
-    args = _setup_live_run(tmp_path, monkeypatch)
+    _run = getattr(ct, "_run")
+    args = _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch)
     _run(args)
     assert "test_parser_clause_06_01" in \
         (tmp_path / "CMakeLists.txt").read_text()
 
 
-def test_run_live_prints_cmake_update(tmp_path, monkeypatch, capsys):
+def test_run_live_prints_cmake_update(tmp_path, monkeypatch, capsys, ct,
+                                      ct_helpers):
     """Live run prints CMakeLists.txt update message."""
-    args = _setup_live_run(tmp_path, monkeypatch)
+    _run = getattr(ct, "_run")
+    args = _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch)
     _run(args)
     assert "Updated `CMakeLists.txt`" in capsys.readouterr().out
 
 
-def test_run_live_prints_cmake_updating(tmp_path, monkeypatch, capsys):
+def test_run_live_prints_cmake_updating(tmp_path, monkeypatch, capsys, ct,
+                                        ct_helpers):
     """Live run prints 'Updating' with rationale before the update."""
-    args = _setup_live_run(tmp_path, monkeypatch)
+    _run = getattr(ct, "_run")
+    args = _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch)
     _run(args)
     out = capsys.readouterr().out
     assert "Updating `CMakeLists.txt` because" in out
 
 
-def test_run_live_delete_prints_message(tmp_path, monkeypatch, capsys):
+def test_run_live_delete_prints_message(tmp_path, monkeypatch, capsys, ct,
+                                        ct_helpers):
     """Live run prints delete message when source file is removed."""
-    args = _setup_live_run(tmp_path, monkeypatch)
+    _run = getattr(ct, "_run")
+    args = _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch)
     _run(args)
     out = capsys.readouterr().out
     assert "Deleting test_input.cpp because all its tests" \
            " were moved elsewhere" in out
 
 
-def test_run_live_merge_writes_test(tmp_path, monkeypatch):
+def test_run_live_merge_writes_test(tmp_path, monkeypatch, ct, ct_helpers):
     """Live run merging into existing file writes the test."""
+    _run = getattr(ct, "_run")
     (tmp_path / "test_parser_clause_06_01.cpp").write_text(
         "// \u00a76.1\n\n#include <gtest/gtest.h>\n\n"
         "namespace {\n\nTEST(S, Old) {\n}\n\n}  // namespace\n",
         encoding="utf-8",
     )
-    args = _setup_live_run(tmp_path, monkeypatch)
+    args = _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch)
     _run(args)
     assert "TEST(S, T)" in \
         (tmp_path / "test_parser_clause_06_01.cpp").read_text()
 
 
-def _setup_live_merge(tmp_path, monkeypatch):
+def _setup_live_merge(ct, ct_helpers, tmp_path, monkeypatch):
     """Create existing clause file and set up a live merge run."""
     (tmp_path / "test_parser_clause_06_01.cpp").write_text(
         "// \u00a76.1\n\n#include <gtest/gtest.h>\n\n"
         "namespace {\n\nTEST(S, Old) {\n}\n\n}  // namespace\n",
         encoding="utf-8",
     )
-    return _setup_live_run(tmp_path, monkeypatch)
+    return _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch)
 
 
-def test_run_live_merge_prints_test_name(tmp_path, monkeypatch, capsys):
+def test_run_live_merge_prints_test_name(tmp_path, monkeypatch, capsys, ct,
+                                         ct_helpers):
     """Live merge message includes the test name."""
-    args = _setup_live_merge(tmp_path, monkeypatch)
+    _run = getattr(ct, "_run")
+    args = _setup_live_merge(ct, ct_helpers, tmp_path, monkeypatch)
     _run(args)
     assert "Merging test T into" in capsys.readouterr().out
 
 
-def test_run_live_merge_prints_rationale(tmp_path, monkeypatch, capsys):
+def test_run_live_merge_prints_rationale(tmp_path, monkeypatch, capsys, ct,
+                                         ct_helpers):
     """Live merge message includes a rationale."""
-    args = _setup_live_merge(tmp_path, monkeypatch)
+    _run = getattr(ct, "_run")
+    args = _setup_live_merge(ct, ct_helpers, tmp_path, monkeypatch)
     _run(args)
     assert "because" in capsys.readouterr().out
 
@@ -504,20 +564,21 @@ def _mixed_classifier(prompt, schema=None):
     return {"clause": "6.1", "rationale": "r"}
 
 
-def _run_live_non_lrm(tmp_path, monkeypatch, src_body, classifier,
-                      test="T"):
+def _run_live_non_lrm(ct, ct_helpers, tmp_path, monkeypatch, src_body,
+                      classifier, test="T"):
     """Write source, stub externals, and run live pipeline."""
+    _run = getattr(ct, "_run")
     src = tmp_path / "test_non_lrm_aig.cpp"
     src.write_text(src_body, encoding="utf-8")
     monkeypatch.setattr(
-        classify_test, "_call_claude", classifier,
+        ct, "_call_claude", classifier,
     )
-    stub_side_effects(monkeypatch)
+    ct_helpers.stub_side_effects(monkeypatch)
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
         f"# header\nadd_unit_test({src.stem})\n", encoding="utf-8",
     )
-    monkeypatch.setattr(classify_test, "CMAKE_PATH", cmake)
+    monkeypatch.setattr(ct, "CMAKE_PATH", cmake)
     _run(_run_args(tmp_path, file=str(src), test=test))
 
 
@@ -528,10 +589,10 @@ def _self_named_classifier(_prompt, schema=None):
     return {"clause": "non-lrm", "rationale": "r"}
 
 
-def test_run_live_self_named(tmp_path, monkeypatch):
+def test_run_live_self_named(tmp_path, monkeypatch, ct, ct_helpers):
     """Source file already in correct location is left untouched."""
     _run_live_non_lrm(
-        tmp_path, monkeypatch,
+        ct, ct_helpers, tmp_path, monkeypatch,
         "#include <gtest/gtest.h>\n\n"
         "TEST(S, T) {\n  auto r = Parse(src);\n}\n",
         _self_named_classifier,
@@ -546,46 +607,50 @@ _MIXED_BODY = (
 )
 
 
-def test_run_live_mixed_keeps_source(tmp_path, monkeypatch):
+def test_run_live_mixed_keeps_source(tmp_path, monkeypatch, ct, ct_helpers):
     """Source is rewritten with only the staying tests."""
     _run_live_non_lrm(
-        tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
-        test="Move",
+        ct, ct_helpers, tmp_path, monkeypatch, _MIXED_BODY,
+        _mixed_classifier, test="Move",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Stay" in src
 
 
-def test_run_live_mixed_removes_moved_from_source(tmp_path, monkeypatch):
+def test_run_live_mixed_removes_moved_from_source(tmp_path, monkeypatch, ct,
+                                                   ct_helpers):
     """Moved tests are removed from the source file."""
     _run_live_non_lrm(
-        tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
-        test="Move",
+        ct, ct_helpers, tmp_path, monkeypatch, _MIXED_BODY,
+        _mixed_classifier, test="Move",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Move" not in src
 
 
-def test_run_live_mixed_creates_new_file(tmp_path, monkeypatch):
+def test_run_live_mixed_creates_new_file(tmp_path, monkeypatch, ct,
+                                         ct_helpers):
     """Moved tests are written to a new clause file."""
     _run_live_non_lrm(
-        tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
-        test="Move",
+        ct, ct_helpers, tmp_path, monkeypatch, _MIXED_BODY,
+        _mixed_classifier, test="Move",
     )
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
 
-def test_run_live_mixed_keeps_cmake_entry(tmp_path, monkeypatch):
+def test_run_live_mixed_keeps_cmake_entry(tmp_path, monkeypatch, ct,
+                                          ct_helpers):
     """Source kept in CMakeLists.txt when source_is_target."""
     _run_live_non_lrm(
-        tmp_path, monkeypatch, _MIXED_BODY, _mixed_classifier,
-        test="Move",
+        ct, ct_helpers, tmp_path, monkeypatch, _MIXED_BODY,
+        _mixed_classifier, test="Move",
     )
     cmake = (tmp_path / "CMakeLists.txt").read_text()
     assert "test_non_lrm_aig" in cmake
 
 
-def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch):
+def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch, ct,
+                                                  ct_helpers):
     """Live run rewrites source to remove tests that already exist elsewhere."""
     # Source has two tests, both classified as non-lrm:aig
     src_body = (
@@ -600,14 +665,15 @@ def test_run_live_removes_duplicates_from_source(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     _run_live_non_lrm(
-        tmp_path, monkeypatch, src_body, _self_named_classifier,
-        test="Dup",
+        ct, ct_helpers, tmp_path, monkeypatch, src_body,
+        _self_named_classifier, test="Dup",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Dup" not in src
 
 
-def test_run_live_dedup_only_test_rewrites_source(tmp_path, monkeypatch):
+def test_run_live_dedup_only_test_rewrites_source(tmp_path, monkeypatch, ct,
+                                                   ct_helpers):
     """Source with only the duplicate test is rewritten empty."""
     src_body = (
         "#include <gtest/gtest.h>\n\n"
@@ -619,13 +685,14 @@ def test_run_live_dedup_only_test_rewrites_source(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     _run_live_non_lrm(
-        tmp_path, monkeypatch, src_body, _self_named_classifier,
-        test="Dup",
+        ct, ct_helpers, tmp_path, monkeypatch, src_body,
+        _self_named_classifier, test="Dup",
     )
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
-def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch):
+def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch,
+                                                      ct, ct_helpers):
     """Live run keeps non-duplicate tests when removing duplicates."""
     src_body = (
         "#include <gtest/gtest.h>\n\n"
@@ -638,8 +705,8 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     _run_live_non_lrm(
-        tmp_path, monkeypatch, src_body, _self_named_classifier,
-        test="Dup",
+        ct, ct_helpers, tmp_path, monkeypatch, src_body,
+        _self_named_classifier, test="Dup",
     )
     src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
     assert "Keep" in src
@@ -648,13 +715,15 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch):
 # ---- _run with --issue -----------------------------------------------------
 
 
-def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch):
+def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
+                                         ct_helpers):
     """_run with --issue calls maybe_tick_issue_checkbox."""
+    _run = getattr(ct, "_run")
     _make_input_file(tmp_path)
-    stub_classifier(monkeypatch, _parser_response())
+    ct_helpers.stub_classifier(monkeypatch, _parser_response())
     called = []
     monkeypatch.setattr(
-        classify_test, "maybe_tick_issue_checkbox",
+        ct, "maybe_tick_issue_checkbox",
         lambda args, tests: called.append(True),
     )
     args = _run_args(
@@ -665,13 +734,15 @@ def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch):
     assert len(called) == 1
 
 
-def test_run_without_issue_calls_maybe_tick(tmp_path, monkeypatch):
+def test_run_without_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
+                                            ct_helpers):
     """_run without --issue still calls maybe_tick_issue_checkbox."""
+    _run = getattr(ct, "_run")
     _make_input_file(tmp_path)
-    stub_classifier(monkeypatch, _parser_response())
+    ct_helpers.stub_classifier(monkeypatch, _parser_response())
     called = []
     monkeypatch.setattr(
-        classify_test, "maybe_tick_issue_checkbox",
+        ct, "maybe_tick_issue_checkbox",
         lambda args, tests: called.append(True),
     )
     args = _run_args(tmp_path, dry_run=True)
@@ -679,13 +750,14 @@ def test_run_without_issue_calls_maybe_tick(tmp_path, monkeypatch):
     assert len(called) == 1
 
 
-def test_run_no_commit_skips_commit(tmp_path, monkeypatch):
+def test_run_no_commit_skips_commit(tmp_path, monkeypatch, ct, ct_helpers):
     """_run with no_commit=True does not call commit_classification."""
-    args = _setup_live_run(tmp_path, monkeypatch)
+    _run = getattr(ct, "_run")
+    args = _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch)
     args.no_commit = True
     called = []
     monkeypatch.setattr(
-        classify_test, "commit_classification",
+        ct, "commit_classification",
         lambda _ctx: called.append(True),
     )
     _run(args)
@@ -695,23 +767,23 @@ def test_run_no_commit_skips_commit(tmp_path, monkeypatch):
 # ---- main ------------------------------------------------------------------
 
 
-def test_main(monkeypatch):
+def test_main(monkeypatch, ct):
     """main calls _run with parsed args."""
     ran = [False]
 
     def mock_run(_args):
         ran[0] = True
 
-    monkeypatch.setattr(classify_test, "_run", mock_run)
-    monkeypatch.setattr(classify_test, "_parse_args", lambda: SimpleNamespace(
+    monkeypatch.setattr(ct, "_run", mock_run)
+    monkeypatch.setattr(ct, "_parse_args", lambda: SimpleNamespace(
         file="x", output_dir="/tmp", dry_run=True, lrm="/lrm.txt",
         issue=None, organization=None, repo=None,
     ))
-    classify_test.main()
+    ct.main()
     assert ran[0] is True
 
 
-def test_main_enables_line_buffering(monkeypatch):
+def test_main_enables_line_buffering(monkeypatch, ct):
     """main reconfigures stdout to line-buffered mode."""
     configured = []
 
@@ -719,10 +791,10 @@ def test_main_enables_line_buffering(monkeypatch):
         configured.append(kwargs)
 
     monkeypatch.setattr(sys.stdout, "reconfigure", mock_reconfigure)
-    monkeypatch.setattr(classify_test, "_run", lambda _: None)
-    monkeypatch.setattr(classify_test, "_parse_args", lambda: SimpleNamespace(
+    monkeypatch.setattr(ct, "_run", lambda _: None)
+    monkeypatch.setattr(ct, "_parse_args", lambda: SimpleNamespace(
         file="x", output_dir="/tmp", dry_run=True, lrm="/lrm.txt",
         issue=None, organization=None, repo=None,
     ))
-    classify_test.main()
+    ct.main()
     assert any(k.get("line_buffering") for k in configured)
