@@ -54,4 +54,26 @@ TEST(Elaboration, WidthInference_Concatenation) {
   EXPECT_EQ(InferExprWidth(&concat, typedefs), 64);
 }
 
+TEST(SimCh9, AlwaysCombResultWidth32) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  int result;\n"
+      "  initial a = 100;\n"
+      "  always_comb begin\n"
+      "    result = a * 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 32u);
+  EXPECT_EQ(var->value.ToUint64(), 200u);
+}
+
 }  // namespace
