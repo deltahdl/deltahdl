@@ -333,9 +333,15 @@ Stmt* Parser::ParseBlockStmt() {
     }
   }
   Expect(TokenKind::kKwEnd);
-  // Optional end label.
+  // §9.3.4: Optional end label must match block name.
   if (Match(TokenKind::kColon)) {
-    ExpectIdentifier();
+    auto end_id = ExpectIdentifier();
+    if (!stmt->label.empty() && end_id.text != stmt->label) {
+      diag_.Error(end_id.loc,
+                  "end label '" + std::string(end_id.text) +
+                      "' does not match block name '" +
+                      std::string(stmt->label) + "'");
+    }
   }
   stmt->range.end = CurrentLoc();
   return stmt;
@@ -487,9 +493,15 @@ Stmt* Parser::ParseForkStmt() {
   }
   stmt->join_kind = CurrentToken().kind;
   Consume();  // join / join_any / join_none
-  // Optional end label.
+  // §9.3.4: Optional end label must match fork name.
   if (Match(TokenKind::kColon)) {
-    ExpectIdentifier();
+    auto end_id = ExpectIdentifier();
+    if (!stmt->label.empty() && end_id.text != stmt->label) {
+      diag_.Error(end_id.loc,
+                  "end label '" + std::string(end_id.text) +
+                      "' does not match block name '" +
+                      std::string(stmt->label) + "'");
+    }
   }
   return stmt;
 }
