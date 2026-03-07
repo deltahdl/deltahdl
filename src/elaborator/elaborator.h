@@ -144,8 +144,11 @@ class Elaborator {
   /// §7.2, footnote 20: random qualifier only in unpacked structures.
   void ValidateRandQualifiers(const DataType& dtype, SourceLoc loc);
 
-  /// §7.2.1: Only packed/integer types in packed structures.
+  /// §7.2.1/§7.3.1: Only packed/integer types in packed structures/unions.
   void ValidatePackedStructMemberTypes(const DataType& dtype, SourceLoc loc);
+
+  /// §7.3: Chandle types only in tagged unions.
+  void ValidateChandleInUnion(const DataType& dtype, SourceLoc loc);
 
   /// Validate packed union constraints (§7.3.1).
   void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);

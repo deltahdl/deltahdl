@@ -543,6 +543,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     ValidateVoidMembers(item->data_type, item->loc);
     ValidateRandQualifiers(item->data_type, item->loc);
     ValidatePackedStructMemberTypes(item->data_type, item->loc);
+    ValidateChandleInUnion(item->data_type, item->loc);
     ValidatePackedUnion(item->data_type, item->loc);
   }
 }
@@ -739,6 +740,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     ValidateVoidMembers(item->typedef_type, item->loc);
     ValidateRandQualifiers(item->typedef_type, item->loc);
     ValidatePackedStructMemberTypes(item->typedef_type, item->loc);
+    ValidateChandleInUnion(item->typedef_type, item->loc);
     ValidatePackedUnion(item->typedef_type, item->loc);
   }
   if (item->typedef_type.kind != DataTypeKind::kEnum) return;

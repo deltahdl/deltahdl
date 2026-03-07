@@ -651,13 +651,29 @@ static bool IsLegalPackedMemberType(DataTypeKind kind) {
 
 void Elaborator::ValidatePackedStructMemberTypes(const DataType& dtype,
                                                   SourceLoc loc) {
-  if (dtype.kind != DataTypeKind::kStruct || !dtype.is_packed) return;
+  if (!dtype.is_packed && !dtype.is_soft) return;
+  if (dtype.kind != DataTypeKind::kStruct && dtype.kind != DataTypeKind::kUnion)
+    return;
+  const char* container =
+      (dtype.kind == DataTypeKind::kStruct) ? "packed structure" : "packed union";
   for (const auto& m : dtype.struct_members) {
     if (!IsLegalPackedMemberType(m.type_kind)) {
       diag_.Error(loc,
-                  std::format("type of member '{}' is not allowed in a "
-                              "packed structure",
-                              m.name));
+                  std::format("type of member '{}' is not allowed in a {}",
+                              m.name, container));
+    }
+  }
+}
+
+// §7.3: Dynamic types and chandle types can only be used in tagged unions.
+void Elaborator::ValidateChandleInUnion(const DataType& dtype, SourceLoc loc) {
+  if (dtype.kind != DataTypeKind::kUnion) return;
+  if (dtype.is_tagged) return;
+  for (const auto& m : dtype.struct_members) {
+    if (m.type_kind == DataTypeKind::kChandle) {
+      diag_.Error(loc,
+                  "chandle type can only be used in tagged unions");
+      return;
     }
   }
 }
