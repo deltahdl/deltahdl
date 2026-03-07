@@ -343,18 +343,6 @@ def test_run_classify_test_does_not_capture_output(monkeypatch, cf):
 # ---- build_issue_body ------------------------------------------------------
 
 
-def test_build_issue_body_summary_section(cf):
-    """Body contains the summary heading."""
-    assert "## Summary" in cf.build_issue_body("f.cpp", ["A"])
-
-
-def test_build_issue_body_filename_in_path(cf):
-    """Body embeds filename in the test/src/unit path."""
-    assert "test/src/unit/foo.cpp" in cf.build_issue_body(
-        "foo.cpp", ["A"],
-    )
-
-
 def test_build_issue_body_table_header(cf):
     """Body contains the table header row."""
     assert "| Test | Status | Remarks |" in cf.build_issue_body(
@@ -368,14 +356,16 @@ def test_build_issue_body_rows(cf):
     assert "| Alpha | Unreviewed | |" in body
 
 
-def test_build_issue_body_tests_header(cf):
-    """Body contains the Tests heading."""
-    assert "## Tests" in cf.build_issue_body("f.cpp", ["A"])
-
-
 def test_build_issue_body_single_test(cf):
     """Body works correctly with a single test."""
     assert "| Only | Unreviewed | |" in cf.build_issue_body("f.cpp", ["Only"])
+
+
+def test_build_issue_body_no_headings(cf):
+    """Body does not contain Summary or Tests headings."""
+    body = cf.build_issue_body("f.cpp", ["A"])
+    assert "## Summary" not in body
+    assert "## Tests" not in body
 
 
 # ---- create_issue ----------------------------------------------------------

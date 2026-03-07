@@ -36,10 +36,6 @@ def build_issue_body(filename: str, test_names: list[str]) -> str:
         f"| {name} | Unreviewed | |" for name in test_names
     )
     return (
-        f"## Summary\n\n"
-        f"Classify each test in `test/src/unit/{filename}` "
-        f"into the correct per-LRM-clause file using `classify_test`.\n\n"
-        f"## Tests\n\n"
         f"| Test | Status | Remarks |\n"
         f"|------|--------|---------|\n"
         f"{rows}\n"
