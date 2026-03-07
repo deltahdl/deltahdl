@@ -939,4 +939,18 @@ TEST(ParserA222, DriveStrengthHighz1Pull0) {
   EXPECT_EQ(item->drive_strength1, 1u);   // highz1
 }
 
+// §6.3.2.2: Net declaration without drive strength has default (0, 0).
+TEST(ParserA222, NetDeclNoDriveStrengthDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->drive_strength0, 0u);
+  EXPECT_EQ(item->drive_strength1, 0u);
+}
+
 }  // namespace
