@@ -137,4 +137,16 @@ TEST(ElabClause100301, NetDeclAssignConflictsWithProcAssign) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §6.3.2.2: Drive strength on net declaration with assignment is valid.
+TEST(Elaborator, DriveStrengthOnNetDeclWithAssignIsValid) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  wire (strong0, pull1) w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
