@@ -100,13 +100,14 @@ static std::string_view ExprIdent(const Expr* e) {
   return {};
 }
 
-static void CollectProcTargets(const Stmt* s,
-                               std::unordered_set<std::string_view>& out) {
+static void CollectProcTargets(
+    const Stmt* s,
+    std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
     auto name = ExprIdent(s->lhs);
-    if (!name.empty()) out.insert(name);
+    if (!name.empty()) out.emplace(name, s->range.start);
   }
   for (auto* sub : s->stmts) CollectProcTargets(sub, out);
   CollectProcTargets(s->then_branch, out);
@@ -239,10 +240,52 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
 
 void Elaborator::ValidateMixedAssignments() {
   for (const auto& [name, loc] : cont_assign_targets_) {
-    if (proc_assign_targets_.count(name) != 0) {
+    if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {
       diag_.Error(loc, std::format("variable '{}' has both continuous and "
                                    "procedural assignments",
                                    name));
+    }
+  }
+}
+
+void Elaborator::ValidateProceduralNetAssign() {
+  for (const auto& [name, loc] : proc_assign_targets_) {
+    if (net_names_.count(name) != 0) {
+      diag_.Error(loc, std::format("net '{}' cannot be the target of a "
+                                   "procedural assignment",
+                                   name));
+    }
+  }
+}
+
+static bool IsConstantSelect(const Expr* e) {
+  if (!e) return true;
+  if (e->kind == ExprKind::kIdentifier) return true;
+  if (e->kind == ExprKind::kSelect) {
+    if (e->is_part_select_plus || e->is_part_select_minus) return false;
+    if (e->index && e->index_end) return true;  // [const:const] part-select
+    if (e->index && !e->index_end) {
+      return ConstEvalInt(e->index).has_value();
+    }
+    return true;
+  }
+  if (e->kind == ExprKind::kConcatenation) {
+    for (const auto* elem : e->elements) {
+      if (!IsConstantSelect(elem)) return false;
+    }
+    return true;
+  }
+  return true;
+}
+
+void Elaborator::ValidateContAssignConstSelect(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kContAssign) continue;
+    if (!item->assign_lhs) continue;
+    if (!IsConstantSelect(item->assign_lhs)) {
+      diag_.Error(item->loc,
+                  "continuous assignment left-hand side requires a "
+                  "constant select expression");
     }
   }
 }
@@ -620,6 +663,8 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
     ValidateItemConstraints(item);
   }
   ValidateMixedAssignments();
+  ValidateProceduralNetAssign();
+  ValidateContAssignConstSelect(decl);
   ValidateSpecparamInParams(decl);
   ValidateEnumAssignments(decl);
   ValidateConstAssignments(decl);

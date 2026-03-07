@@ -655,6 +655,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   if (!declared_names_.insert(item->name).second) {
     diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
   }
+  net_names_.insert(item->name);
   var_types_[item->name] = item->data_type.kind;
   RtlirNet net;
   net.name = ScopedName(item->name);
@@ -859,6 +860,7 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   net.width = 1;  // §6.10: Implicit nets are scalar.
   mod->nets.push_back(net);
   declared_names_.insert(name);
+  net_names_.insert(name);
   return true;
 }
 
@@ -1045,6 +1047,7 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* /*mod*/) {
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   declared_names_.clear();
+  net_names_.clear();
   cont_assign_targets_.clear();
   proc_assign_targets_.clear();
   var_types_.clear();

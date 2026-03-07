@@ -179,6 +179,12 @@ class Elaborator {
   /// Check for mixed continuous/procedural assignments (§6.5).
   void ValidateMixedAssignments();
 
+  /// §10.2 Table 10-1: Procedural assignment to a net is illegal.
+  void ValidateProceduralNetAssign();
+
+  /// §10.2 Table 10-1: Continuous assignment LHS selects must be constant.
+  void ValidateContAssignConstSelect(const ModuleDecl* decl);
+
   /// Check specparam not used in parameter expressions (§6.20.5).
   void ValidateSpecparamInParams(const ModuleDecl* decl);
 
@@ -285,8 +291,9 @@ class Elaborator {
 
   // Per-module validation state (cleared in ElaborateItems).
   std::unordered_set<std::string_view> declared_names_;
+  std::unordered_set<std::string_view> net_names_;  // §10.2 Table 10-1
   std::unordered_map<std::string_view, SourceLoc> cont_assign_targets_;
-  std::unordered_set<std::string_view> proc_assign_targets_;
+  std::unordered_map<std::string_view, SourceLoc> proc_assign_targets_;
   std::unordered_map<std::string_view, DataTypeKind> var_types_;
   std::unordered_map<std::string_view, VarArrayInfo> var_array_info_;
   std::unordered_set<std::string_view> specparam_names_;
