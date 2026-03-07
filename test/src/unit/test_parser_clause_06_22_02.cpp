@@ -63,4 +63,25 @@ TEST(ParserSection6, TypesEquivalentSameKind) {
   EXPECT_TRUE(TypesEquivalent(a, b));
 }
 
+// §6.22.2: Equivalent types — matching types are always equivalent.
+TEST(ParserSection6, EquivalentMatchingImpliesEquivalent) {
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  b.is_signed = true;
+  EXPECT_TRUE(TypesMatch(a, b));
+  EXPECT_TRUE(TypesEquivalent(a, b));
+}
+
+// §6.22.2: Non-integral types are not equivalent to integral types.
+TEST(ParserSection6, NotEquivalentStringToInt) {
+  DataType a;
+  a.kind = DataTypeKind::kString;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_FALSE(TypesEquivalent(a, b));
+}
+
 }  // namespace

@@ -61,4 +61,31 @@ TEST(ParserSection6, NotAssignmentCompatibleStringInt) {
   EXPECT_FALSE(IsAssignmentCompatible(a, b));
 }
 
+// §6.22.3: Real types are assignment compatible with integral types.
+TEST(ParserSection6, AssignCompatibleRealToLogic) {
+  DataType a;
+  a.kind = DataTypeKind::kReal;
+  DataType b;
+  b.kind = DataTypeKind::kLogic;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
+// §6.22.3: Realtime and shortreal are assignment compatible.
+TEST(ParserSection6, AssignCompatibleRealtimeToShortreal) {
+  DataType a;
+  a.kind = DataTypeKind::kRealtime;
+  DataType b;
+  b.kind = DataTypeKind::kShortreal;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
+// §6.22.3: Chandle is not assignment compatible with integral.
+TEST(ParserSection6, NotAssignCompatibleChandleToInt) {
+  DataType a;
+  a.kind = DataTypeKind::kChandle;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_FALSE(IsAssignmentCompatible(a, b));
+}
+
 }  // namespace
