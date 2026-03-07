@@ -294,6 +294,9 @@ static void CheckFuncBodyStmt(
                std::format("declaration of '{}' conflicts with function name",
                            func_name));
   }
+  // §13.4.4: fork/join_none body follows task rules, not function rules.
+  if (s->kind == StmtKind::kFork && s->join_kind == TokenKind::kKwJoinNone)
+    return;
   for (auto* sub : s->stmts)
     CheckFuncBodyStmt(sub, is_void, task_names, func_name, diag);
   CheckFuncBodyStmt(s->then_branch, is_void, task_names, func_name, diag);
