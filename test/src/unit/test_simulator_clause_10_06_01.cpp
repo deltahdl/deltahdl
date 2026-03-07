@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <string_view>
 
 #include "builders_ast.h"
@@ -6,9 +5,7 @@
 #include "fixture_simulator.h"
 #include "helpers_stmt_exec.h"
 #include "parser/ast.h"
-#include "simulator/awaiters.h"
-#include "simulator/exec_task.h"
-#include "simulator/process.h"
+#include "simulator/lowerer.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_result.h"
 #include "simulator/variable.h"
@@ -79,6 +76,117 @@ TEST(StmtExec, AssignDeassignBlockingAssign) {
   auto* blocking_stmt = MakeBlockAssign(f.arena, "adb", 44);
   RunStmt(blocking_stmt, f.ctx, f.arena);
   EXPECT_EQ(var->value.ToUint64(), 44u);
+}
+
+// §10.6.1: End-to-end assign overrides procedural assignments.
+TEST(SimCh10d, AssignOverridesProceduralAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    assign q = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 42u);
+  EXPECT_TRUE(q->is_forced);
+}
+
+// §10.6.1: Deassign then procedural assign works normally.
+TEST(SimCh10d, DeassignThenProceduralAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    assign q = 8'd10;\n"
+      "    deassign q;\n"
+      "    q = 8'd77;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_FALSE(q->is_forced);
+  EXPECT_EQ(q->value.ToUint64(), 77u);
+}
+
+// §10.6.1: Deassign retains value until next procedural assignment.
+TEST(SimCh10d, DeassignRetainsValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    assign q = 8'd50;\n"
+      "    deassign q;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_FALSE(q->is_forced);
+  // Value holds at 50 after deassign — no procedural assign changes it.
+  EXPECT_EQ(q->value.ToUint64(), 50u);
+}
+
+// §10.6.1: Second assign to same variable replaces first.
+TEST(SimCh10d, ReAssignReplacesFirst) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    assign q = 8'd10;\n"
+      "    assign q = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 20u);
+  EXPECT_TRUE(q->is_forced);
+}
+
+// §10.6.1: Assign with expression RHS.
+TEST(SimCh10d, AssignExpressionRhs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'd15;\n"
+      "    b = 8'd27;\n"
+      "    assign c = a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 42u);
 }
 
 }  // namespace

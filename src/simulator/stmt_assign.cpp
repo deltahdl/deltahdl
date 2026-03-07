@@ -668,6 +668,8 @@ static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
                               SimContext& ctx, Arena& arena) {
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (var) {
+    // §10.6.2: While forced, procedural assigns do not change the value.
+    if (var->is_forced) return;
     rhs_val = ResizeToWidth(rhs_val, var->value.width, arena);
     var->value = rhs_val;
     var->NotifyWatchers();
@@ -734,6 +736,8 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   }
   auto* var = ResolveLhsVariable(lhs, ctx);
   if (var) {
+    // §10.6.2: While forced, procedural assigns do not change the value.
+    if (var->is_forced) return;
     auto resized = ResizeToWidth(rhs_val, var->value.width, arena);
     var->value = resized;
     var->NotifyWatchers();
@@ -764,9 +768,12 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
     var->has_pending_nba = true;
     event->callback = [var]() {
       if (var->has_pending_nba) {
-        var->value = var->pending_nba;
+        // §10.6.2: While forced, NBA does not change the value.
+        if (!var->is_forced) {
+          var->value = var->pending_nba;
+          var->NotifyWatchers();
+        }
         var->has_pending_nba = false;
-        var->NotifyWatchers();
       }
     };
   }
