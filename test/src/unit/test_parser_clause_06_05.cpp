@@ -74,4 +74,26 @@ TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
   EXPECT_EQ(item->name, "v");
 }
 
+TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire [31:0] net_data;\n"
+      "  logic [31:0] var_data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 2u);
+
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(items[0]->data_type.is_net);
+  ASSERT_NE(items[0]->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(items[0]->data_type.packed_dim_left->int_val, 31u);
+
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_FALSE(items[1]->data_type.is_net);
+  ASSERT_NE(items[1]->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(items[1]->data_type.packed_dim_left->int_val, 31u);
+}
+
 }  // namespace
