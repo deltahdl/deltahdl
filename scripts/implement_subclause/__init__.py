@@ -10,6 +10,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from classify_test import clause_to_filename
+from classify_test._patterns import STAGE_TO_PREFIX
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -95,6 +98,22 @@ def format_prompt(
         " Include error conditions and edge cases.",
     )
 
+    lines.append(
+        f"Only implement §{subclause}."
+        " Do not implement any other subclauses.",
+    )
+
+    examples = [
+        clause_to_filename(prefix, subclause) + ".cpp"
+        for _stage, prefix in sorted(STAGE_TO_PREFIX.items())
+    ]
+    lines.append(
+        "Place tests in the subclause-specific test file."
+        f" The correct filenames by stage are: {', '.join(examples)}."
+        " Do NOT put tests in a parent clause file.",
+    )
+
+    lines.append("Do not make git commits or push.")
     lines.append("Do not copy LRM prose into source comments.")
     lines.append("Do not build or run tests.")
 

@@ -138,6 +138,36 @@ def test_format_prompt_mentions_overview(isc):
     assert "Overview" in result
 
 
+def test_format_prompt_scope_constraint(isc):
+    """Prompt constrains Claude to only implement the requested subclause."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    assert "Only implement §10.10.2" in result
+
+
+def test_format_prompt_elaborator_test_filename(isc):
+    """Prompt includes elaborator subclause-specific test filename."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    assert "test_elaborator_clause_10_10_02.cpp" in result
+
+
+def test_format_prompt_simulator_test_filename(isc):
+    """Prompt includes simulator subclause-specific test filename."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    assert "test_simulator_clause_10_10_02.cpp" in result
+
+
+def test_format_prompt_forbids_parent_file(isc):
+    """Prompt forbids putting tests in parent clause file."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    assert "parent clause file" in result
+
+
+def test_format_prompt_forbids_git_commits(isc):
+    """Prompt forbids making git commits."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    assert "Do not make git commits" in result
+
+
 # ---- invoke_claude --------------------------------------------------------
 
 
