@@ -30,4 +30,33 @@ TEST(ElabA82, NamedArgsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §13.5.4: Named arg with unknown parameter name is an error.
+TEST(Elab1354, UnknownNamedArgError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int add(int a, int b); return a + b; endfunction\n"
+      "  int x;\n"
+      "  initial x = add(.c(1), .a(2));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §13.5.4: Mixed positional then named is OK.
+TEST(Elab1354, MixedPositionalNamedOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int add3(int a, int b, int c);\n"
+      "    return a + b + c;\n"
+      "  endfunction\n"
+      "  int x;\n"
+      "  initial x = add3(1, .c(3), .b(2));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
