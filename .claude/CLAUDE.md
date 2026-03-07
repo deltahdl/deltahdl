@@ -19,11 +19,11 @@ When asked to implement a clause or subclause:
 
 When given a clause number, a clause issue, and a master issue:
 
-1. Read the clause from the PDF. Discover all subclauses. Determine which are implementable as software.
-2. Sync a checklist on the clause issue (`## Subclauses` heading with `- [ ] N.N Title` lines, nested by depth). Preserve already-checked items.
+1. Read the clause from the PDF. Discover **all** subclauses at every depth (e.g., 6.6, 6.6.1, 6.6.4.1). Determine which are implementable as software.
+2. Sync a checklist on the clause issue with `- [ ] N.N Title` lines, nested by depth. Preserve already-checked items. Every leaf subclause gets its own checklist item.
 3. For each unchecked subclause in order:
-   a. Implement it (steps above).
-   b. Commit and push: `git add -A && git commit` with message `Implement §X` and trailer `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>`. Skip if no changes.
+   a. Implement it (steps above). Each leaf subclause must be individually implemented and checked off — do not batch.
+   b. Commit and push: `git add -A && git commit` with message `Implement §X.Y.Z` and trailer `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>`. Skip if no changes.
    c. Check off the subclause in the clause issue.
 4. When all done: close the clause issue, then mark the master issue table row (the one containing `#{clause-issue}`) with `:white_check_mark:` in the Status column.
 
