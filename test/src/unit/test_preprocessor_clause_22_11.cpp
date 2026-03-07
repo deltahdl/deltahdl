@@ -113,4 +113,11 @@ TEST(Preprocessor, Pragma_InsideIfdef_Active) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// --- §22.11: Pragma can appear inside design elements ---
+TEST(Preprocessor, Pragma_InsideModule_NoError) {
+  PreprocFixture f;
+  Preprocess("module m;\n`pragma some_pragma\nendmodule\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

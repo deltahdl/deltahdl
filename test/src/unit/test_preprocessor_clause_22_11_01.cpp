@@ -27,13 +27,6 @@ TEST(Preprocessor, Pragma_Protect_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// --- §22.11: Pragma can appear inside design elements ---
-TEST(Preprocessor, Pragma_InsideModule_NoError) {
-  PreprocFixture f;
-  Preprocess("module m;\n`pragma some_pragma\nendmodule\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 // --- §22.11: Macro expansion within pragma ---
 TEST(Preprocessor, Pragma_MacroExpansionInName) {
   PreprocFixture f;
