@@ -296,23 +296,67 @@ static void CheckFuncBodyStmt(
 }
 
 // §13.2: A task shall not return a value.
-static void CheckTaskBodyStmt(const Stmt* s, DiagEngine& diag) {
+// §13.3.2: Automatic task variables shall not appear in nonblocking assignments.
+static void CheckTaskBodyStmt(
+    const Stmt* s, bool is_auto,
+    const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kReturn && s->expr) {
     diag.Error(s->range.start, "task returns a value");
   }
-  for (auto* sub : s->stmts) CheckTaskBodyStmt(sub, diag);
-  CheckTaskBodyStmt(s->then_branch, diag);
-  CheckTaskBodyStmt(s->else_branch, diag);
-  CheckTaskBodyStmt(s->body, diag);
-  CheckTaskBodyStmt(s->for_body, diag);
-  for (auto& ci : s->case_items) CheckTaskBodyStmt(ci.body, diag);
+  // §13.3.2: Automatic task variables shall not use nonblocking assignments.
+  if (is_auto && s->kind == StmtKind::kNonblockingAssign && s->lhs &&
+      s->lhs->kind == ExprKind::kIdentifier &&
+      auto_vars.count(s->lhs->text) != 0) {
+    diag.Error(s->range.start,
+               "automatic task variable in nonblocking assignment");
+  }
+  // Collect locally declared variables as we descend.
+  for (auto* sub : s->stmts)
+    CheckTaskBodyStmt(sub, is_auto, auto_vars, diag);
+  CheckTaskBodyStmt(s->then_branch, is_auto, auto_vars, diag);
+  CheckTaskBodyStmt(s->else_branch, is_auto, auto_vars, diag);
+  CheckTaskBodyStmt(s->body, is_auto, auto_vars, diag);
+  CheckTaskBodyStmt(s->for_body, is_auto, auto_vars, diag);
+  for (auto& ci : s->case_items)
+    CheckTaskBodyStmt(ci.body, is_auto, auto_vars, diag);
+}
+
+// §13.3.2: Collect names of variables that are automatic within a task body.
+static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
+                                std::unordered_set<std::string_view>& out) {
+  if (!s) return;
+  if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
+    // In an automatic task, all locals are automatic unless explicitly static.
+    // In a static task, only explicitly automatic locals are automatic.
+    if (task_is_auto && !s->var_is_static) {
+      out.insert(s->var_name);
+    }
+  }
+  for (auto* sub : s->stmts) CollectAutoVarNames(sub, task_is_auto, out);
+  CollectAutoVarNames(s->then_branch, task_is_auto, out);
+  CollectAutoVarNames(s->else_branch, task_is_auto, out);
+  CollectAutoVarNames(s->body, task_is_auto, out);
+  CollectAutoVarNames(s->for_body, task_is_auto, out);
+  for (auto& ci : s->case_items)
+    CollectAutoVarNames(ci.body, task_is_auto, out);
 }
 
 void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   if (item->kind == ModuleItemKind::kTaskDecl) {
+    bool is_auto = item->is_automatic;
+    // §13.3.2: Collect automatic variable names in the task.
+    std::unordered_set<std::string_view> auto_vars;
+    if (is_auto) {
+      for (const auto& arg : item->func_args) {
+        auto_vars.insert(arg.name);
+      }
+    }
     for (auto* s : item->func_body_stmts) {
-      CheckTaskBodyStmt(s, diag_);
+      CollectAutoVarNames(s, is_auto, auto_vars);
+    }
+    for (auto* s : item->func_body_stmts) {
+      CheckTaskBodyStmt(s, is_auto, auto_vars, diag_);
     }
     return;
   }
