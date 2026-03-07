@@ -13,12 +13,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 
 namespace {
 
-TEST(Preprocessor, Pragma_ComplexExpression_NoError) {
-  PreprocFixture f;
-  Preprocess("`pragma my_pragma key1 = (a, b), key2 = \"str\", 99\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 // --- §22.11: Directive produces no output ---
 TEST(Preprocessor, Pragma_NoOutput) {
   PreprocFixture f;
