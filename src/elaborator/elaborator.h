@@ -153,6 +153,9 @@ class Elaborator {
   /// Validate packed union constraints (§7.3.1).
   void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);
 
+  /// §7.4.1: Predefined-width types shall not have packed dims.
+  void ValidatePackedDimOnPredefinedType(const DataType& dtype, SourceLoc loc);
+
   /// Validate a single enum member literal (§6.19).
   bool ValidateEnumLiteral(const EnumMember& member, uint32_t base_width,
                            bool is_2state);

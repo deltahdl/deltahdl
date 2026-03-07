@@ -1,3 +1,4 @@
+#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -5,6 +6,99 @@
 using namespace delta;
 
 namespace {
+
+// §7.4.1: Integer types with predefined widths shall not have packed array
+// dimensions.
+TEST(Elaboration, PackedDimOnByte_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  byte [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, PackedDimOnShortint_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  shortint [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, PackedDimOnInt_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, PackedDimOnLongint_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  longint [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, PackedDimOnInteger_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  integer [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, PackedDimOnTime_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  time [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// Packed dims on single-bit types are fine.
+TEST(Elaboration, PackedDimOnLogic_Allowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, PackedDimOnBit_Allowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  bit [7:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, PackedDimOnReg_Allowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  reg [7:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
 
 TEST(SimCh9, AlwaysCombResultWidth8) {
   SimFixture f;

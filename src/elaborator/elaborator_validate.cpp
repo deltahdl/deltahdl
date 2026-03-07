@@ -700,4 +700,29 @@ void Elaborator::ValidatePackedUnion(const DataType& dtype, SourceLoc loc) {
   }
 }
 
+// §7.4.1: Integer types with predefined widths shall not have packed array
+// dimensions.
+static bool HasPredefinedWidth(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+      return true;
+    default:
+      return false;
+  }
+}
+
+void Elaborator::ValidatePackedDimOnPredefinedType(const DataType& dtype,
+                                                    SourceLoc loc) {
+  if (!HasPredefinedWidth(dtype.kind)) return;
+  if (!dtype.packed_dim_left) return;
+  diag_.Error(loc,
+              "integer type with predefined width shall not have packed "
+              "array dimensions");
+}
+
 }  // namespace delta
