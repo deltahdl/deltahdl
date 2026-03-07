@@ -913,7 +913,15 @@ def _run(args):
         clause_to_filename(p, c) == filepath.stem
         for p, c in groups
     )
-    maybe_update_issue_status(args, target, source_is_target=source_is_target)
+    target_filenames = {
+        t.test_name: clause_to_filename(t.prefix, t.clause) + ".cpp"
+        for t in target
+    }
+    maybe_update_issue_status(
+        args, target,
+        source_is_target=source_is_target,
+        target_filenames=target_filenames,
+    )
     to_create, to_merge, n_removed = _resolve_destinations(
         groups, Path(args.output_dir).resolve(),
         exclude_path=filepath, dry_run=args.dry_run,

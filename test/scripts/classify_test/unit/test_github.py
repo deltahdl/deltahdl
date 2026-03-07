@@ -86,21 +86,27 @@ def test_parse_args_repo_required(monkeypatch, ct):
 def test_update_test_status_sets_status(ct_github):
     """Updates status from Unreviewed to reviewed."""
     body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
-    result = ct_github.update_test_status(body, "Alpha", "Reviewed but kept in the same file")
+    result = ct_github.update_test_status(
+        body, "Alpha", "Reviewed but kept in the same file",
+    )
     assert "| Alpha | Reviewed but kept in the same file | |" in result
 
 
 def test_update_test_status_leaves_others(ct_github):
     """Does not change other rows."""
     body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
-    result = ct_github.update_test_status(body, "Alpha", "Reviewed but kept in the same file")
+    result = ct_github.update_test_status(
+        body, "Alpha", "Reviewed but kept in the same file",
+    )
     assert "| Beta | Unreviewed | |" in result
 
 
 def test_update_test_status_already_set(ct_github):
     """Idempotent when same status is set again."""
     body = "| Alpha | Reviewed but kept in the same file | |\n"
-    result = ct_github.update_test_status(body, "Alpha", "Reviewed but kept in the same file")
+    result = ct_github.update_test_status(
+        body, "Alpha", "Reviewed but kept in the same file",
+    )
     assert "| Alpha | Reviewed but kept in the same file | |" in result
 
 
@@ -111,6 +117,16 @@ def test_update_test_status_not_found_exits(ct_github):
             "| Other | Unreviewed | |\n", "Missing",
             "Reviewed but kept in the same file",
         )
+
+
+def test_update_test_status_with_remark(ct_github):
+    """Sets remark in the Remarks column."""
+    body = "| Alpha | Unreviewed | |\n"
+    result = ct_github.update_test_status(
+        body, "Alpha", "Reviewed but moved to another file",
+        remark="target.cpp",
+    )
+    assert "| Alpha | Reviewed but moved to another file | target.cpp |" in result
 
 
 # ---- remove_test_row ------------------------------------------------------
@@ -260,7 +276,9 @@ def _setup_maybe_update(monkeypatch, ct_github, ct_helpers, *, source_is_target)
     t.rationale = "r"
     args = _issue_args(issue=42, organization="org", repo="repo")
     ct_github.maybe_update_issue_status(
-        args, [t], source_is_target=source_is_target,
+        args, [t],
+        source_is_target=source_is_target,
+        target_filenames={"T": "test_parser_clause_06_01.cpp"},
     )
     return updated
 
@@ -274,11 +292,14 @@ def test_maybe_update_kept(monkeypatch, ct_github, ct_helpers):
 
 
 def test_maybe_update_moved(monkeypatch, ct_github, ct_helpers):
-    """Sets status to 'Reviewed but moved to another file' when moved."""
+    """Sets status and remark with target filename when moved."""
     updated = _setup_maybe_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=False,
     )
-    assert "| T | Reviewed but moved to another file | |" in updated[0]
+    assert (
+        "| T | Reviewed but moved to another file"
+        " | test_parser_clause_06_01.cpp |"
+    ) in updated[0]
 
 
 def test_maybe_update_passes_correct_org(monkeypatch, ct_github, ct_helpers):
