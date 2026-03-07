@@ -133,30 +133,34 @@ def test_parse_args_continue_default_false(isc, tmp_path):
 
 
 @patch("implement_subclause.run_prompt")
-@patch("implement_subclause.check_supplementary_args")
-@patch("implement_subclause.lrm_labels_for_subclause", return_value=([], []))
-def test_main_dispatches_depth_1(_mock_labels, _mock_check, mock_run, isc, tmp_path):
+def test_main_dispatches_depth_1(mock_run, isc, tmp_path):
     """main() passes args namespace to run_prompt."""
-    lrm = tmp_path / "lrm.txt"
+    lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     isc.main(["--lrm", str(lrm), "--subclause", "4", "--issue", "6", "--model", "opus"])
     assert mock_run.call_args[0][1].model == "opus"
 
 
-@patch("implement_subclause.run_prompt")
-@patch("implement_subclause.check_supplementary_args")
-@patch("implement_subclause.lrm_labels_for_subclause", return_value=([], []))
-def test_main_with_figures(_mock_labels, _mock_check, mock_run, isc, tmp_path):
-    """main() builds supplementary string when --figures is provided."""
-    lrm = tmp_path / "lrm.txt"
+def test_parse_args_rejects_figures_flag(isc, tmp_path):
+    """--figures flag is no longer accepted."""
+    lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
-    gv = tmp_path / "fig.gv"
-    gv.write_text("digraph {}")
-    isc.main([
-        "--lrm", str(lrm), "--subclause", "4", "--issue", "6",
-        "--figures", f"4_1={gv}",
-    ])
-    assert "Figure 4-1" in mock_run.call_args[0][0].keywords["supplementary"]
+    with pytest.raises(SystemExit):
+        isc.parse_args([
+            "--lrm", str(lrm), "--subclause", "4", "--issue", "6",
+            "--figures", "4_1=fig.gv",
+        ])
+
+
+def test_parse_args_rejects_tables_flag(isc, tmp_path):
+    """--tables flag is no longer accepted."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    with pytest.raises(SystemExit):
+        isc.parse_args([
+            "--lrm", str(lrm), "--subclause", "4", "--issue", "6",
+            "--tables", "4_1=tbl.md",
+        ])
 
 
 # ---- __main__ guard --------------------------------------------------------

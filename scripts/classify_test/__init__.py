@@ -20,8 +20,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from lib.python.classify import add_github_args, add_output_args, add_run_mode_args
-from lib.python.lrm import load_lrm_titles
-
 from ._github import (
     _validate_issue_args,
     fetch_issue_body,
@@ -933,15 +931,14 @@ def _run(args):
         return
     if not to_create and not to_merge and source_is_target and n_removed == 0:
         return
-    titles = load_lrm_titles(Path(args.lrm).resolve())
     new_names = _write_files(to_create, to_merge, parsed, {
         "test_dir": Path(args.output_dir).resolve(),
-        "lrm_titles": titles,
+        "lrm_titles": {},
         "max_lines": getattr(args, "max_lines", None),
     })
     _update_source(filepath, parsed, {
         "test": args.test, "groups": groups,
-        "titles": titles, "stem": filepath.stem,
+        "titles": {}, "stem": filepath.stem,
         "source_is_target": source_is_target,
     })
     print("Updating `CMakeLists.txt` because the test moved to a new file...")

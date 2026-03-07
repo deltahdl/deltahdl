@@ -4,24 +4,11 @@ Builds an optimized prompt and invokes Claude CLI.
 """
 
 import argparse
-import functools
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
-
-from lib.python.lrm import (
-    extract_clause_text,
-    load_lrm_titles,
-    lrm_labels_for_subclause,
-)
-from lib.python.supplementary import (
-    add_supplementary_args,
-    build_supplementary_lines,
-    check_supplementary_args,
-    parse_supplementary_csv_args,
-)
 
 
 # ---------------------------------------------------------------------------
@@ -67,88 +54,38 @@ def build_hierarchy(clause: str) -> dict:
     return result
 
 
-def find_context_subclauses(
-    clause: str, titles: dict[str, str],
-) -> list[str]:
-    """Find subclauses titled 'General' or 'Overview' at each ancestry level.
-
-    Scans sibling subclauses at each level between the top-level clause
-    and the target, returning those titled exactly 'General' or 'Overview'.
-    Excludes the target itself.
-    """
-    parts = clause.split(".")
-    context: list[str] = []
-
-    for level in range(1, len(parts)):
-        prefix = ".".join(parts[:level]) + "."
-        target_depth = level + 1
-        for key, title in sorted(titles.items()):
-            if (
-                key.startswith(prefix)
-                and key.count(".") == prefix.count(".")
-                and len(key.split(".")) == target_depth
-                and title in ("General", "Overview")
-                and key != clause
-            ):
-                context.append(key)
-
-    return context
-
-
 # ---------------------------------------------------------------------------
 # Prompt formatting
 # ---------------------------------------------------------------------------
 
-def _build_context_list(
-    clause: str, titles: dict[str, str],
-) -> list[str]:
-    """Build the list of related LRM subclauses to read for context.
-
-    Collects General/Overview siblings at each ancestry level and
-    intermediate ancestors — all deduplicated.
-    """
-    h = build_hierarchy(clause)
-    context: list[str] = []
-
-    # Context subclauses (General/Overview siblings), deduped vs ancestors
-    ancestor_set = set(h["ancestors"])
-    for ctx in find_context_subclauses(clause, titles):
-        if ctx not in ancestor_set:
-            context.append(ctx)
-
-    # Intermediate ancestors
-    context.extend(h["ancestors"])
-
-    return context
-
-
 def format_prompt(
     subclause: str,
     lrm: str,
-    context: list[str],
     *,
     issue: int,
-    supplementary: str = "",
 ) -> str:
     """Assemble the implementation prompt from structured inputs."""
+    h = build_hierarchy(subclause)
     lines = [f"Implement §{subclause} from the LRM at {lrm}.\n"]
 
-    if context:
-        refs = ", ".join(f"§{s}" for s in context)
+    if h["ancestors"]:
+        ancestors_str = ", ".join(f"§{a}" for a in h["ancestors"])
         lines.append(
-            f"Read §{subclause} and related subclauses"
-            f" ({refs}) for context.",
+            f"Read §{subclause} and its ancestor subclauses"
+            f" ({ancestors_str}) for context."
+            " Also read any General or Overview subclauses"
+            " at each level.",
         )
     else:
-        lines.append(f"Read §{subclause} for context.")
+        lines.append(
+            f"Read §{subclause} for context."
+            " Also read any General or Overview sibling subclauses.",
+        )
 
     lines.append(
         "Search the codebase for existing related code"
         " before writing anything new.",
     )
-
-    if supplementary:
-        lines.append(supplementary.rstrip("\n"))
 
     lines.append(
         "Use strict test-driven development:"
@@ -171,18 +108,12 @@ def format_prompt(
 
 def build_prompt(
     clause: str,
-    titles: dict[str, str],
     lrm: str,
     *,
     issue: int,
-    supplementary: str = "",
 ) -> str:
     """Build the implementation prompt for any clause depth."""
-    context = _build_context_list(clause, titles)
-    return format_prompt(
-        clause, lrm, context,
-        issue=issue, supplementary=supplementary,
-    )
+    return format_prompt(clause, lrm, issue=issue)
 
 
 # ---------------------------------------------------------------------------
@@ -230,10 +161,8 @@ def invoke_claude(
 
 
 def run_prompt(build_fn, args: argparse.Namespace) -> None:
-    """Load titles, build a prompt via *build_fn*, and invoke Claude."""
-    titles = load_lrm_titles(args.lrm)
-    print(f"Loaded {len(titles)} LRM clause titles from {args.lrm}")
-    prompt = build_fn(args.subclause, titles, str(args.lrm), issue=args.issue)
+    """Build a prompt via *build_fn* and invoke Claude."""
+    prompt = build_fn(args.subclause, str(args.lrm), issue=args.issue)
     print(f"Built prompt ({len(prompt)} characters)")
     invoke_claude(
         prompt, model=args.model,
@@ -254,7 +183,7 @@ def parse_args(argv=None):
         "--lrm",
         type=Path,
         required=True,
-        help="Path to the LRM text file.",
+        help="Path to the LRM PDF.",
     )
     parser.add_argument(
         "--subclause",
@@ -274,7 +203,6 @@ def parse_args(argv=None):
         default="opus",
         help="Claude model to use (default: opus).",
     )
-    add_supplementary_args(parser)
     parser.add_argument(
         "--continue",
         action="store_true",
@@ -294,8 +222,6 @@ def parse_args(argv=None):
             "(V is a number or uppercase letter; remaining parts are numbers)."
         )
 
-    parse_supplementary_csv_args(args)
-
     return args
 
 
@@ -313,22 +239,4 @@ def main(argv=None):
         f" issue #{args.issue}, model {args.model}",
     )
 
-    lrm_labels = lrm_labels_for_subclause(args.lrm, args.subclause)
-    check_supplementary_args(
-        args.subclause, lrm_labels,
-        figures=args.figures,
-        tables=args.tables,
-        ignore_figures=args.ignore_figures,
-    )
-
-    supplementary = build_supplementary_lines(
-        figures=args.figures, tables=args.tables,
-    )
-    if supplementary:
-        n_supp = supplementary.count("\n") + 1
-        print(f"Found {n_supp} supplementary files")
-
-    bound_handler = functools.partial(
-        build_prompt, supplementary=supplementary,
-    )
-    run_prompt(bound_handler, args)
+    run_prompt(build_prompt, args)

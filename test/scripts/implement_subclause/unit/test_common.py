@@ -115,65 +115,22 @@ class TestBuildHierarchyAnnex:
 
 def test_format_prompt_forbids_building(isc):
     """Prompt tells Claude not to build or run tests."""
-    result = isc.format_prompt("4.1", "~/LRM.txt", ["4"], issue=6)
+    result = isc.format_prompt("4.1", "~/LRM.txt", issue=6)
     assert "Do not build or run tests" in result
 
 
-def test_format_prompt_includes_supplementary(isc):
-    """Supplementary text appears in the formatted prompt."""
-    result = isc.format_prompt(
-        "4.1", "~/LRM.txt", ["4"],
-        issue=6,
-        supplementary="Consult Table 4-1 at /t (Markdown)"
-        " when implementing.",
-    )
-    assert "Table 4-1" in result
+def test_format_prompt_no_supplementary_param(isc):
+    """format_prompt does not accept a supplementary parameter."""
+    import inspect
+    sig = inspect.signature(isc.format_prompt)
+    assert "supplementary" not in sig.parameters
 
 
-# ---- find_context_subclauses ----------------------------------------------
-
-
-def test_find_context_general(isc):
-    """Finds sibling titled 'General'."""
-    titles = {"4.1": "General", "4.2": "Foo"}
-    assert isc.find_context_subclauses("4.3", titles) == ["4.1"]
-
-
-def test_find_context_overview(isc):
-    """Finds siblings titled 'General' and 'Overview'."""
-    titles = {"4.1": "General", "4.2": "Overview", "4.3": "Foo"}
-    assert isc.find_context_subclauses("4.3", titles) == ["4.1", "4.2"]
-
-
-def test_find_context_none(isc):
-    """Returns empty list when no General/Overview siblings exist."""
-    titles = {"4.1": "Foo", "4.2": "Bar"}
-    assert not isc.find_context_subclauses("4.1", titles)
-
-
-def test_find_context_excludes_self(isc):
-    """Does not include the target subclause itself."""
-    titles = {"4.1": "General"}
-    assert not isc.find_context_subclauses("4.1", titles)
-
-
-def test_find_context_intermediate(isc):
-    """Finds General at an intermediate ancestry level."""
-    titles = {
-        "4.1": "General",
-        "4.4": "Foo",
-        "4.4.1": "General",
-        "4.4.3": "Bar",
-    }
-    assert isc.find_context_subclauses("4.4.3", titles) == [
-        "4.1", "4.4.1",
-    ]
-
-
-def test_find_context_depth_1(isc):
-    """Depth-1 clause has no siblings to scan."""
-    titles = {"4.1": "General", "4.2": "Overview"}
-    assert not isc.find_context_subclauses("4", titles)
+def test_format_prompt_mentions_general_overview(isc):
+    """Prompt instructs Claude to read General/Overview sections."""
+    result = isc.format_prompt("4.4.3", "~/LRM.txt", issue=6)
+    assert "General" in result
+    assert "Overview" in result
 
 
 # ---- invoke_claude --------------------------------------------------------
@@ -242,9 +199,9 @@ def test_invoke_claude_failure_exits(mock_popen, mock_exit, isc):
 
 @patch("implement_subclause.invoke_claude")
 def test_run_prompt_calls_invoke(mock_invoke, isc, tmp_path):
-    """run_prompt loads titles, builds prompt, and invokes Claude."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("4. Scheduling semantics\n4.1 General\n")
+    """run_prompt builds prompt and invokes Claude."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
     build_fn = MagicMock(return_value="generated prompt")
     args = argparse.Namespace(
         lrm=lrm, subclause="4.1", issue=6,
@@ -255,10 +212,28 @@ def test_run_prompt_calls_invoke(mock_invoke, isc, tmp_path):
 
 
 @patch("implement_subclause.invoke_claude")
+def test_run_prompt_does_not_load_titles(mock_invoke, isc, tmp_path):
+    """run_prompt does not call load_lrm_titles."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    build_fn = MagicMock(return_value="generated prompt")
+    args = argparse.Namespace(
+        lrm=lrm, subclause="4.1", issue=6,
+        model="sonnet", continue_session=False,
+    )
+    isc.run_prompt(build_fn, args)
+    # build_fn should be called with (subclause, lrm_str, issue=N)
+    # NOT with a titles dict
+    call_args = build_fn.call_args
+    assert len(call_args[0]) == 2  # subclause, lrm_path
+    assert call_args[0][0] == "4.1"
+
+
+@patch("implement_subclause.invoke_claude")
 def test_run_prompt_passes_continue_session(mock_invoke, isc, tmp_path):
     """run_prompt passes continue_session to invoke_claude."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("4. Scheduling semantics\n4.1 General\n")
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
     build_fn = MagicMock(return_value="generated prompt")
     args = argparse.Namespace(
         lrm=lrm, subclause="4.1", issue=6,

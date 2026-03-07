@@ -10,14 +10,13 @@ from unittest.mock import patch
 import pytest
 
 _STUB_ARGS = argparse.Namespace(
-    lrm="/path/lrm.txt", sub_issue=123, master_issue=99,
+    lrm="/path/lrm.pdf", sub_issue=123, master_issue=99,
     organization="deltahdl", repo="deltahdl",
-    figures={}, tables={}, ignore_figures=[],
 )
 
 @contextmanager
 def _patch_main_with_subclauses(
-    *, subclauses=None, implementable=None,
+    *, subclauses=None,
     synced_body="body", next_sub="4.2",
 ):
     """Patch all dependencies for main() with subclauses.
@@ -27,8 +26,6 @@ def _patch_main_with_subclauses(
     """
     if subclauses is None:
         subclauses = {"4.1": "General", "4.2": "Exec"}
-    if implementable is None:
-        implementable = list(subclauses.keys())
 
     if isinstance(next_sub, list):
         next_kw = {"side_effect": next_sub}
@@ -36,12 +33,8 @@ def _patch_main_with_subclauses(
         next_kw = {"side_effect": [next_sub, None]}
 
     with (
-        patch("implement_clause.parse_all_subclauses",
+        patch("implement_clause.discover_subclauses",
               return_value=subclauses),
-        patch("implement_clause.extract_clause_text",
-              return_value="text"),
-        patch("implement_clause.filter_implementable",
-              return_value=implementable),
         patch("implement_clause.fetch_issue_body", return_value=""),
         patch("implement_clause.build_synced_body",
               return_value=synced_body),
@@ -62,7 +55,7 @@ def test_invoke_implement_subclause_calls_subprocess(
     ic.invoke_implement_subclause(_STUB_ARGS, "4.2")
     assert invoke_subprocess_ok.call_args[0][0] == [
         sys.executable, "-m", "implement_subclause",
-        "--lrm", "/path/lrm.txt",
+        "--lrm", "/path/lrm.pdf",
         "--subclause", "4.2",
         "--issue", "123",
     ]
@@ -80,7 +73,7 @@ def test_invoke_implement_subclause_prints_subclause(ic, capsys) -> None:
 
 def test_parse_args_clause(ic, tmp_path) -> None:
     """--clause flag sets args.clause to the number."""
-    lrm = tmp_path / "lrm.txt"
+    lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
@@ -92,7 +85,7 @@ def test_parse_args_clause(ic, tmp_path) -> None:
 
 def test_parse_args_annex(ic, tmp_path) -> None:
     """--annex flag sets args.annex to the letter."""
-    lrm = tmp_path / "lrm.txt"
+    lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     args = ic.parse_args([
         "--lrm", str(lrm), "--annex", "A",
@@ -104,7 +97,7 @@ def test_parse_args_annex(ic, tmp_path) -> None:
 
 def test_parse_args_clause_and_annex_exclusive(ic, tmp_path) -> None:
     """--clause and --annex are mutually exclusive."""
-    lrm = tmp_path / "lrm.txt"
+    lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     with pytest.raises(SystemExit):
         ic.parse_args([
@@ -126,7 +119,7 @@ def test_parse_args_missing_lrm(ic) -> None:
 
 def _parse_issue_args(ic, tmp_path):
     """Parse args with --sub-issue 42 --master-issue 1."""
-    lrm = tmp_path / "lrm.txt"
+    lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     return ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
@@ -147,7 +140,7 @@ def test_parse_args_master_issue_is_int(ic, tmp_path) -> None:
 
 def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
     """SystemExit when neither --clause nor --annex is provided."""
-    lrm = tmp_path / "lrm.txt"
+    lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     with pytest.raises(SystemExit):
         ic.parse_args([
@@ -157,59 +150,30 @@ def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
         ])
 
 
-# --- main ---
+def test_parse_args_rejects_figures_flag(ic, tmp_path) -> None:
+    """--figures flag is no longer accepted."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    with pytest.raises(SystemExit):
+        ic.parse_args([
+            "--lrm", str(lrm), "--clause", "4",
+            "--sub-issue", "1", "--master-issue", "99",
+            "--organization", "o", "--repo", "r",
+            "--figures", "4_1=fig.gv",
+        ])
 
 
-# --- parse_all_subclauses ---
-
-
-_SAMPLE_LRM = """\
-6. Data types
-
-6.1 General
-General text.
-
-6.7 Net declarations
-Net text.
-
-6.7.1 Net data types
-Data types text.
-
-6.7.2 Drive strength
-Drive text.
-
-7. Aggregate data types
-"""
-
-
-def test_parse_all_subclauses_returns_all_descendants(ic, tmp_path) -> None:
-    """All descendants at every depth are returned."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_SAMPLE_LRM)
-    result = ic.parse_all_subclauses(lrm, "6")
-    assert result == {
-        "6.1": "General",
-        "6.7": "Net declarations",
-        "6.7.1": "Net data types",
-        "6.7.2": "Drive strength",
-    }
-
-
-def test_parse_all_subclauses_leaf_returns_empty(ic, tmp_path) -> None:
-    """Leaf clause with no children returns empty dict."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_SAMPLE_LRM)
-    assert ic.parse_all_subclauses(lrm, "6.1") == {}
-
-
-def test_parse_all_subclauses_mid_level(ic, tmp_path) -> None:
-    """Mid-level clause returns its children."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_SAMPLE_LRM)
-    assert ic.parse_all_subclauses(lrm, "6.7") == {
-        "6.7.1": "Net data types",
-        "6.7.2": "Drive strength",
-    }
+def test_parse_args_rejects_tables_flag(ic, tmp_path) -> None:
+    """--tables flag is no longer accepted."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    with pytest.raises(SystemExit):
+        ic.parse_args([
+            "--lrm", str(lrm), "--clause", "4",
+            "--sub-issue", "1", "--master-issue", "99",
+            "--organization", "o", "--repo", "r",
+            "--tables", "4_1=tbl.md",
+        ])
 
 
 # --- main ---
@@ -218,7 +182,7 @@ def test_parse_all_subclauses_mid_level(ic, tmp_path) -> None:
 def test_main_no_subclauses(ic, clause_argv) -> None:
     """Clause without subclauses invokes implement_subclause directly."""
     with (
-        patch("implement_clause.parse_all_subclauses", return_value={}),
+        patch("implement_clause.discover_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause") as mock_inv,
         patch("implement_clause.close_issue"),
         patch("implement_clause.mark_master_complete"),
@@ -227,32 +191,10 @@ def test_main_no_subclauses(ic, clause_argv) -> None:
     assert mock_inv.call_args[0][1] == "4"
 
 
-def test_main_no_subclauses_forwards_tables(ic, tmp_path) -> None:
-    """No-subclauses path forwards --tables to invoke_implement_subclause."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    tbl = tmp_path / "tbl.md"
-    tbl.write_text("")
-    argv = [
-        "--lrm", str(lrm), "--clause", "4",
-        "--sub-issue", "1", "--master-issue", "99",
-        "--organization", "o", "--repo", "r",
-        "--tables", f"4_1={tbl}",
-    ]
-    with (
-        patch("implement_clause.parse_all_subclauses", return_value={}),
-        patch("implement_clause.invoke_implement_subclause") as mock_inv,
-        patch("implement_clause.close_issue"),
-        patch("implement_clause.mark_master_complete"),
-    ):
-        ic.main(argv)
-    assert mock_inv.call_args.kwargs["tables"] == {"4-1": tbl}
-
-
 def test_main_no_subclauses_prints_leaf(ic, clause_argv, capsys) -> None:
     """Prints that clause has no subclauses."""
     with (
-        patch("implement_clause.parse_all_subclauses", return_value={}),
+        patch("implement_clause.discover_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause"),
         patch("implement_clause.close_issue"),
         patch("implement_clause.mark_master_complete"),
@@ -264,7 +206,7 @@ def test_main_no_subclauses_prints_leaf(ic, clause_argv, capsys) -> None:
 def test_no_subclauses_closes_sub_issue(ic, clause_argv) -> None:
     """No-subclauses path closes the sub-issue."""
     with (
-        patch("implement_clause.parse_all_subclauses", return_value={}),
+        patch("implement_clause.discover_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause"),
         patch("implement_clause.close_issue") as mock_close,
         patch("implement_clause.mark_master_complete"),
@@ -278,7 +220,7 @@ def test_no_subclauses_closes_sub_issue(ic, clause_argv) -> None:
 def test_no_subclauses_marks_master(ic, clause_argv) -> None:
     """No-subclauses path marks master issue complete."""
     with (
-        patch("implement_clause.parse_all_subclauses", return_value={}),
+        patch("implement_clause.discover_subclauses", return_value={}),
         patch("implement_clause.invoke_implement_subclause"),
         patch("implement_clause.close_issue"),
         patch("implement_clause.mark_master_complete") as mock_mark,
@@ -350,8 +292,8 @@ def test_main_marks_master_after_close(ic, clause_argv) -> None:
 
 
 def test_main_annex(ic, tmp_path) -> None:
-    """Annex flag passes the letter to parse_subclauses."""
-    lrm = tmp_path / "lrm.txt"
+    """Annex flag passes the letter to discover_subclauses."""
+    lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     argv = [
         "--lrm", str(lrm), "--annex", "A",
@@ -359,14 +301,14 @@ def test_main_annex(ic, tmp_path) -> None:
         "--organization", "o", "--repo", "r",
     ]
     with (
-        patch("implement_clause.parse_all_subclauses",
-              return_value={}) as mock_ps,
+        patch("implement_clause.discover_subclauses",
+              return_value={}) as mock_ds,
         patch("implement_clause.invoke_implement_subclause"),
         patch("implement_clause.close_issue"),
         patch("implement_clause.mark_master_complete"),
     ):
         ic.main(argv)
-    assert mock_ps.call_args[0][1] == "A"
+    assert mock_ds.call_args[0][1] == "A"
 
 
 # --- invoke_implement_subclause ---
@@ -398,6 +340,22 @@ def test_invoke_implement_subclause_no_continue_by_default(
     """--continue not in subprocess command by default."""
     ic.invoke_implement_subclause(_STUB_ARGS, "4.2")
     assert "--continue" not in invoke_subprocess_ok.call_args[0][0]
+
+
+def test_invoke_implement_subclause_no_figures_flag(
+    ic, invoke_subprocess_ok,
+) -> None:
+    """invoke_implement_subclause does not pass --figures."""
+    ic.invoke_implement_subclause(_STUB_ARGS, "4.2")
+    assert "--figures" not in invoke_subprocess_ok.call_args[0][0]
+
+
+def test_invoke_implement_subclause_no_tables_flag(
+    ic, invoke_subprocess_ok,
+) -> None:
+    """invoke_implement_subclause does not pass --tables."""
+    ic.invoke_implement_subclause(_STUB_ARGS, "4.2")
+    assert "--tables" not in invoke_subprocess_ok.call_args[0][0]
 
 
 # --- main loop ---
@@ -500,263 +458,93 @@ def test_commit_and_push_message_contains_subclause(ic, commit_push_calls) -> No
     assert "4.1" in commit_call[msg_idx]
 
 
-# --- lrm_labels_for_clause (whole-clause) ---
+# --- discover_subclauses ---
 
 
-_LRM_CLAUSE_WITH_TABLE = """\
-List of figures
-Figure 4-1\u2014Event scheduling regions
-
-List of tables
-Table 4-1\u2014PLI callbacks
-"""
-
-
-def testlrm_labels_for_clause_finds_figures(ic, tmp_path) -> None:
-    """Finds figure labels for a clause."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
-    figs, _ = ic.lrm_labels_for_clause(lrm, "4")
-    assert figs == ["4-1"]
-
-
-def testlrm_labels_for_clause_finds_tables(ic, tmp_path) -> None:
-    """Finds table labels for a clause."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_CLAUSE_WITH_TABLE)
-    _, tbls = ic.lrm_labels_for_clause(lrm, "4")
-    assert tbls == ["4-1"]
-
-
-def testlrm_labels_for_clause_empty_figures(ic, tmp_path) -> None:
-    """Returns empty figure list when no labels exist."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("No figures or tables here.\n")
-    figs, _ = ic.lrm_labels_for_clause(lrm, "99")
-    assert figs == []
-
-
-def testlrm_labels_for_clause_empty_tables(ic, tmp_path) -> None:
-    """Returns empty table list when no labels exist."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("No figures or tables here.\n")
-    _, tbls = ic.lrm_labels_for_clause(lrm, "99")
-    assert tbls == []
-
-
-_LRM_ANNEX_WITH_TABLE = """\
-List of tables
-Table B.1\u2014Keywords
-"""
-
-
-def testlrm_labels_for_clause_finds_annex_tables(ic, tmp_path) -> None:
-    """Finds dot-separated table labels for an annex clause."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_ANNEX_WITH_TABLE)
-    _, tbls = ic.lrm_labels_for_clause(lrm, "B")
-    assert tbls == ["B.1"]
-
-
-def testlrm_labels_for_clause_ignores_other_clause_figures(ic, tmp_path) -> None:
-    """Does not pick up figure labels from other clauses."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(
-        "Figure 5-1\u2014Something\n"
-        "Table 5-1\u2014Other\n"
+def test_discover_subclauses_parses_json(ic) -> None:
+    """discover_subclauses parses Claude's JSON response."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"4.1": "General", "4.2": "Exec", "4.3": false}\n',
+        stderr="",
     )
-    figs, _ = ic.lrm_labels_for_clause(lrm, "4")
-    assert figs == []
+    with patch("implement_clause.subprocess.run", return_value=cp):
+        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    assert result == {"4.1": "General", "4.2": "Exec"}
 
 
-def testlrm_labels_for_clause_ignores_other_clause_tables(ic, tmp_path) -> None:
-    """Does not pick up table labels from other clauses."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(
-        "Figure 5-1\u2014Something\n"
-        "Table 5-1\u2014Other\n"
+def test_discover_subclauses_strips_code_fences(ic) -> None:
+    """discover_subclauses strips markdown code fences from response."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='```json\n{"4.1": "General"}\n```\n',
+        stderr="",
     )
-    _, tbls = ic.lrm_labels_for_clause(lrm, "4")
-    assert tbls == []
+    with patch("implement_clause.subprocess.run", return_value=cp):
+        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    assert result == {"4.1": "General"}
 
 
-# --- parse_args supplementary flags ---
+def test_discover_subclauses_prompt_contains_clause(ic) -> None:
+    """discover_subclauses prompt references the clause number."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"4.1": "General"}\n',
+        stderr="",
+    )
+    with patch("implement_clause.subprocess.run", return_value=cp) as mock_run:
+        ic.discover_subclauses(Path("/path/lrm.pdf"), "4")
+    prompt = mock_run.call_args[1]["input"]
+    assert "clause 4" in prompt.lower() or "§4" in prompt
 
 
-def test_parse_args_figures(ic, tmp_path) -> None:
-    """--figures flag is parsed as dict of shorthand to Path."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    gv = tmp_path / "fig.gv"
-    gv.write_text("digraph {}")
-    args = ic.parse_args([
-        "--lrm", str(lrm), "--clause", "4",
-        "--sub-issue", "1", "--master-issue", "99",
-        "--organization", "o", "--repo", "r",
-        "--figures", f"4_1={gv}",
-    ])
-    assert args.figures == {"4-1": gv}
+def test_discover_subclauses_prompt_contains_lrm_path(ic) -> None:
+    """discover_subclauses prompt references the LRM PDF path."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"4.1": "General"}\n',
+        stderr="",
+    )
+    with patch("implement_clause.subprocess.run", return_value=cp) as mock_run:
+        ic.discover_subclauses(Path("/path/lrm.pdf"), "4")
+    prompt = mock_run.call_args[1]["input"]
+    assert "/path/lrm.pdf" in prompt
 
 
-def test_parse_args_tables(ic, tmp_path) -> None:
-    """--tables flag is parsed as dict of shorthand to Path."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    md = tmp_path / "tbl.md"
-    md.write_text("| col |\n")
-    args = ic.parse_args([
-        "--lrm", str(lrm), "--clause", "4",
-        "--sub-issue", "1", "--master-issue", "99",
-        "--organization", "o", "--repo", "r",
-        "--tables", f"4_1={md}",
-    ])
-    assert args.tables == {"4-1": md}
-
-
-def test_parse_args_ignore_figures(ic, tmp_path) -> None:
-    """--ignore-figures flag is parsed as list of strings."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    args = ic.parse_args([
-        "--lrm", str(lrm), "--clause", "4",
-        "--sub-issue", "1", "--master-issue", "99",
-        "--organization", "o", "--repo", "r",
-        "--ignore-figures", "4-1,4-2",
-    ])
-    assert args.ignore_figures == ["4-1", "4-2"]
-
-
-# --- early validation of supplementary args ---
-
-
-_LRM_WITH_TABLE = """\
-4. Scheduling semantics
-Table 4-1\u2014PLI callbacks
-
-4.1 General
-General text.
-
-5. Data types
-"""
-
-
-_LRM_WITH_FIGURE = """\
-4. Scheduling semantics
-Figure 4-1—Overview diagram
-
-4.1 General
-General text.
-
-5. Data types
-"""
-
-
-@pytest.mark.parametrize(
-    "lrm_content",
-    [_LRM_WITH_TABLE, _LRM_WITH_FIGURE],
-    ids=["tables_missing", "figures_missing"],
-)
-def test_main_exits_when_supplementary_missing(
-    ic, tmp_path, lrm_content,
-) -> None:
-    """main() exits early when LRM has supplementary but flag not provided."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(lrm_content)
+def test_discover_subclauses_exits_on_claude_failure(ic) -> None:
+    """discover_subclauses exits when Claude CLI fails."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="", stderr="error",
+    )
     with (
-        patch("implement_clause.parse_all_subclauses") as mock_ps,
+        patch("implement_clause.subprocess.run", return_value=cp),
         pytest.raises(SystemExit),
     ):
-        ic.main([
-            "--lrm", str(lrm), "--clause", "4",
-            "--sub-issue", "1", "--master-issue", "99",
-        "--organization", "o", "--repo", "r",
-        ])
-    mock_ps.assert_not_called()
+        ic.discover_subclauses(Path("/lrm.pdf"), "4")
 
 
-def test_main_no_exit_when_figures_ignored(ic, tmp_path) -> None:
-    """main() does not exit when missing figures are in --ignore-figures."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text(_LRM_WITH_FIGURE)
-    with (
-        patch("implement_clause.parse_all_subclauses", return_value={}) as mock_ps,
-        patch("implement_clause.invoke_implement_subclause"),
-        patch("implement_clause.close_issue"),
-        patch("implement_clause.mark_master_complete"),
-    ):
-        ic.main([
-            "--lrm", str(lrm), "--clause", "4",
-            "--sub-issue", "1", "--master-issue", "99",
-            "--organization", "o", "--repo", "r",
-            "--ignore-figures", "4-1",
-        ])
-    assert mock_ps.called
-
-
-# --- invoke_implement_subclause forwarding ---
-
-
-def test_invoke_forwards_tables_to_subclause(
-    ic, invoke_subprocess_ok,
-) -> None:
-    """invoke_implement_subclause forwards --tables in key=path format."""
-    args = argparse.Namespace(
-        lrm="/path/lrm.txt", sub_issue=123, master_issue=99,
-        organization="o", repo="r",
-        figures={}, tables={"4-1": Path("/t/tbl.md")},
-        ignore_figures=[],
+def test_discover_subclauses_empty_result(ic) -> None:
+    """discover_subclauses returns empty dict when all false."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"4.1": false, "4.2": false}\n',
+        stderr="",
     )
-    ic.invoke_implement_subclause(
-        args, "4.1", tables={"4-1": Path("/t/tbl.md")},
+    with patch("implement_clause.subprocess.run", return_value=cp):
+        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    assert result == {}
+
+
+def test_discover_subclauses_rationale_is_implementable(ic) -> None:
+    """Subclauses with string rationale are treated as implementable."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"4.1": "Defines syntax rules that must be parsed"}\n',
+        stderr="",
     )
-    cmd = invoke_subprocess_ok.call_args[0][0]
-    idx = cmd.index("--tables")
-    assert cmd[idx + 1] == "4_1=/t/tbl.md"
-
-
-def test_invoke_forwards_figures_to_subclause(
-    ic, invoke_subprocess_ok,
-) -> None:
-    """invoke_implement_subclause forwards --figures in key=path format."""
-    args = argparse.Namespace(
-        lrm="/path/lrm.txt", sub_issue=123, master_issue=99,
-        organization="o", repo="r",
-        figures={"4-1": Path("/f/fig.gv")}, tables={},
-        ignore_figures=[],
-    )
-    ic.invoke_implement_subclause(
-        args, "4.1", figures={"4-1": Path("/f/fig.gv")},
-    )
-    cmd = invoke_subprocess_ok.call_args[0][0]
-    idx = cmd.index("--figures")
-    assert cmd[idx + 1] == "4_1=/f/fig.gv"
-
-
-def test_invoke_forwards_annex_tables_to_subclause(
-    ic, invoke_subprocess_ok,
-) -> None:
-    """invoke_implement_subclause forwards annex --tables with dot-to-underscore."""
-    args = argparse.Namespace(
-        lrm="/path/lrm.txt", sub_issue=123, master_issue=99,
-        organization="o", repo="r",
-        figures={}, tables={"B.1": Path("/t/tbl.md")},
-        ignore_figures=[],
-    )
-    ic.invoke_implement_subclause(
-        args, "B", tables={"B.1": Path("/t/tbl.md")},
-    )
-    cmd = invoke_subprocess_ok.call_args[0][0]
-    idx = cmd.index("--tables")
-    assert cmd[idx + 1] == "B_1=/t/tbl.md"
-
-
-def test_invoke_no_tables_flag_when_empty(
-    ic, invoke_subprocess_ok,
-) -> None:
-    """invoke_implement_subclause omits --tables when no tables to forward."""
-    ic.invoke_implement_subclause(_STUB_ARGS, "4.1")
-    cmd = invoke_subprocess_ok.call_args[0][0]
-    assert "--tables" not in cmd
+    with patch("implement_clause.subprocess.run", return_value=cp):
+        result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    assert "4.1" in result
 
 
 # --- mark_master_complete ---

@@ -1,7 +1,7 @@
 """LRM clause implementation orchestrator.
 
-Discovers subclauses, filters for implementability via Claude,
-syncs a GitHub issue checklist, and invokes implement_subclause.
+Discovers subclauses via Claude, syncs a GitHub issue checklist,
+and invokes implement_subclause.
 """
 
 import argparse
@@ -19,81 +19,29 @@ from lib.python.github import (
     next_unchecked,
     update_issue_body,
 )
-from lib.python.lrm import (
-    FIGURE_LABEL_RE,
-    TABLE_LABEL_RE,
-    extract_clause_text,
-    load_lrm_titles,
-    lrm_labels_for_subclause,
-)
-from lib.python.supplementary import (
-    add_supplementary_args,
-    check_supplementary_args,
-    parse_supplementary_csv_args,
-)
 
 
-def parse_all_subclauses(lrm_path: Path, clause: str) -> dict[str, str]:
-    """Return all descendant subclauses of *clause*."""
-    all_titles = load_lrm_titles(lrm_path)
-    prefix = clause + "."
-    return {k: v for k, v in all_titles.items() if k.startswith(prefix)}
+def discover_subclauses(
+    lrm_path: Path, clause: str, *, model: str = "sonnet",
+) -> dict[str, str]:
+    """Discover implementable subclauses by asking Claude.
 
-
-def lrm_labels_for_clause(
-    lrm_path: Path, clause: str,
-) -> tuple[list[str], list[str]]:
-    """Find all figure/table labels for a top-level clause in the LRM."""
-    top = clause.split(".")[0]
-    prefix_fig = f"Figure {top}"
-    prefix_tbl = f"Table {top}"
-    figures: list[str] = []
-    tables: list[str] = []
-
-    text = lrm_path.read_text(errors="replace")
-    for line in text.splitlines():
-        m = FIGURE_LABEL_RE.match(line)
-        if m and line.startswith(prefix_fig):
-            figures.append(m.group(1))
-            continue
-        m = TABLE_LABEL_RE.match(line)
-        if m and line.startswith(prefix_tbl):
-            tables.append(m.group(1))
-
-    return figures, tables
-
-
-def filter_implementable(
-    clause_text: str,
-    subclauses: dict[str, str],
-    *,
-    model: str = "sonnet",
-) -> list[str]:
-    """Return subclause numbers that are implementable as software."""
-    print(
-        f"Filtering {len(subclauses)} subclauses"
-        f" for implementability via Claude ({model})...",
-    )
-    numbered = "\n".join(
-        f"- {k}: {v}" for k, v in subclauses.items()
-    )
+    Returns a dict of ``{subclause_number: title}`` for subclauses
+    that Claude determines are implementable as software.
+    """
+    print(f"Discovering subclauses for clause {clause} via Claude ({model})...")
     prompt = (
-        "You are evaluating subclauses of the IEEE SystemVerilog "
-        "Language Reference Manual. Determine which of the following "
-        "subclauses describe functionality that can be implemented as "
+        f"Read clause {clause} in the LRM at {lrm_path}. "
+        "List all direct and indirect subclauses. For each, determine "
+        "whether it describes functionality that can be implemented as "
         "software (e.g., parsing, simulation, synthesis, elaboration, "
         "scheduling).\n\n"
-        f"Clause text:\n{clause_text}\n\n"
-        f"Subclauses:\n{numbered}\n\n"
         "Return ONLY a JSON object where each key is a subclause "
         "number and each value is one of:\n"
-        "- true if the subclause is implementable\n"
-        "- false if it is not implementable\n"
-        "- For subclauses titled 'General' or 'Overview', you MUST "
-        "provide a string rationale explaining why it is implementable, "
-        "or false to exclude it.\n\n"
-        'Example: {"4.1": "Defines syntax rules that must be parsed", '
-        '"4.2": true, "4.3": false}'
+        "- A string containing the subclause title if the subclause "
+        "is implementable\n"
+        "- false if it is not implementable\n\n"
+        'Example: {"4.1": "General", "4.2": "Overview", "4.3": false}'
     )
 
     env = os.environ.copy()
@@ -120,15 +68,14 @@ def filter_implementable(
     raw = re.sub(r"\n?```\s*$", "", raw)
     verdicts = json.loads(raw)
 
-    implementable: list[str] = []
+    implementable: dict[str, str] = {}
     for key, value in verdicts.items():
         if isinstance(value, str):
-            print(f"Rationale for {key}: {value}")
-            implementable.append(key)
-        elif value:
-            implementable.append(key)
+            implementable[key] = value
+        elif value is True:
+            implementable[key] = key
 
-    print(f"Implementable: {implementable}")
+    print(f"Implementable: {list(implementable.keys())}")
     return implementable
 
 
@@ -169,21 +116,11 @@ def mark_master_complete(
     print(f"Marked #{sub_issue} complete on master issue #{master_issue}.")
 
 
-def _format_key_path_csv(mapping: dict[str, Path]) -> str:
-    """Format a dict as 'key=path,key=path' for CLI forwarding."""
-    return ",".join(
-        f"{k.replace('-', '_').replace('.', '_')}={v}"
-        for k, v in mapping.items()
-    )
-
-
 def invoke_implement_subclause(
     args: argparse.Namespace,
     subclause: str,
     *,
     continue_session: bool = False,
-    figures: dict[str, Path] | None = None,
-    tables: dict[str, Path] | None = None,
 ) -> None:
     """Shell out to ``python -m implement_subclause``."""
     print(f"Invoking implement_subclause for {subclause}...")
@@ -195,10 +132,6 @@ def invoke_implement_subclause(
     ]
     if continue_session:
         cmd.append("--continue")
-    if figures:
-        cmd.extend(["--figures", _format_key_path_csv(figures)])
-    if tables:
-        cmd.extend(["--tables", _format_key_path_csv(tables)])
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
         sys.exit(result.returncode)
@@ -209,7 +142,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Orchestrate LRM clause implementation.",
     )
-    parser.add_argument("--lrm", required=True, help="Path to LRM text")
+    parser.add_argument("--lrm", required=True, help="Path to LRM PDF")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--clause", help="Numeric clause (e.g. 4)")
     group.add_argument("--annex", help="Annex letter (e.g. A)")
@@ -217,15 +150,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--master-issue", type=int, required=True)
     parser.add_argument("--organization", required=True)
     parser.add_argument("--repo", required=True)
-    add_supplementary_args(parser)
 
     args = parser.parse_args(argv)
 
     lrm = Path(args.lrm)
     if not lrm.exists():
         parser.error(f"LRM file not found: {args.lrm}")
-
-    parse_supplementary_csv_args(args)
 
     return args
 
@@ -259,12 +189,8 @@ def _run_subclause_loop(
             return
 
         print(f"Next unchecked: {subclause}")
-        sub_figs, sub_tbls = lrm_labels_for_subclause(lrm, subclause)
-        sub_figures = {k: v for k, v in args.figures.items() if k in sub_figs}
-        sub_tables = {k: v for k, v in args.tables.items() if k in sub_tbls}
         invoke_implement_subclause(
             args, subclause, continue_session=not first,
-            figures=sub_figures, tables=sub_tables,
         )
         commit_and_push(subclause)
         first = False
@@ -276,22 +202,11 @@ def main(argv: list[str] | None = None) -> None:
     clause = args.clause or args.annex
     lrm = Path(args.lrm)
 
-    lrm_labels = lrm_labels_for_clause(lrm, clause)
-    check_supplementary_args(
-        clause, lrm_labels,
-        figures=args.figures,
-        tables=args.tables,
-        ignore_figures=args.ignore_figures,
-    )
+    impl_items = discover_subclauses(lrm, clause)
 
-    subclauses = parse_all_subclauses(lrm, clause)
-
-    if not subclauses:
+    if not impl_items:
         print(f"No subclauses for {clause}; invoking directly.")
-        invoke_implement_subclause(
-            args, clause,
-            figures=args.figures, tables=args.tables,
-        )
+        invoke_implement_subclause(args, clause)
         close_issue(
             args.organization, args.repo, args.sub_issue,
             "all subclauses are implemented",
@@ -302,10 +217,5 @@ def main(argv: list[str] | None = None) -> None:
         )
         return
 
-    print(f"Found {len(subclauses)} subclauses for {clause}.")
-
-    clause_text = extract_clause_text(lrm, clause)
-    implementable = filter_implementable(clause_text, subclauses)
-    impl_items = {k: subclauses[k] for k in implementable}
-
+    print(f"Found {len(impl_items)} subclauses for {clause}.")
     _run_subclause_loop(args, lrm, impl_items)

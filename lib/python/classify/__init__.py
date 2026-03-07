@@ -11,7 +11,7 @@ def add_output_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--lrm", required=True,
-        help="Path to IEEE 1800-2023 LRM text file",
+        help="Path to IEEE 1800-2023 LRM PDF",
     )
     parser.add_argument(
         "--max-lines", type=int, required=True,

@@ -22,7 +22,7 @@ def ic(module_loader):
 @pytest.fixture()
 def clause_argv(tmp_path: Path) -> list[str]:
     """Return argv for a --clause 4 invocation with a dummy LRM file."""
-    lrm = tmp_path / "lrm.txt"
+    lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     return [
         "--lrm", str(lrm), "--clause", "4",
@@ -63,15 +63,3 @@ def commit_push_calls():
         return calls
 
     return _run
-
-
-@pytest.fixture()
-def patch_filter_ok():
-    """Patch subprocess to return ["4.2", "4.3"] for filter calls."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout='{"4.1": false, "4.2": true, "4.3": true}\n',
-        stderr="",
-    )
-    with patch("implement_clause.subprocess.run", return_value=cp):
-        yield
