@@ -70,8 +70,13 @@ Stmt* Parser::ParseStmt() {
 
   Stmt* stmt = ParseStmtBody();
   if (stmt != nullptr) {
+    // §9.3.5: Label before begin/fork is equivalent to block name.
     if (!prefix_label.empty() && stmt->label.empty()) {
       stmt->label = prefix_label;
+    } else if (!prefix_label.empty() && !stmt->label.empty()) {
+      // §9.3.5: Illegal to have both a label and a block name.
+      diag_.Error(stmt->range.start,
+                  "cannot have both a statement label and a block name");
     }
     if (!attrs.empty()) stmt->attrs = std::move(attrs);
     if (qual != CaseQualifier::kNone) stmt->qualifier = qual;
