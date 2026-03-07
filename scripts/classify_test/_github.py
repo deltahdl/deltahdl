@@ -51,20 +51,19 @@ def maybe_update_issue_status(
     args, tests, *, source_is_target, target_filenames=None,
 ):
     """Update status for classified tests in a GitHub issue."""
-    status = (
-        "Reviewed but kept in the same file"
-        if source_is_target
-        else "Reviewed but moved to another file"
-    )
+    status = "Reviewed"
     print(f"Fetching issue #{args.issue}...")
     body = fetch_issue_body(
         args.organization, args.repo, args.issue,
     )
     for t in tests:
-        remark = ""
-        if not source_is_target and target_filenames:
+        if source_is_target:
+            remark = "Kept in the same file"
+        elif target_filenames:
             fname = target_filenames.get(t.test_name, "")
             remark = f"Moved to {fname}" if fname else ""
+        else:
+            remark = ""
         body = update_test_status(
             body, t.test_name, status, remark=remark,
         )

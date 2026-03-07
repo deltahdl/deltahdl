@@ -345,7 +345,7 @@ def test_run_classify_test_does_not_capture_output(monkeypatch, cf):
 
 def test_build_issue_body_table_header(cf):
     """Body contains the table header row."""
-    assert "| Test | Status | Remarks |" in cf.build_issue_body(
+    assert "| Test | Status | Action |" in cf.build_issue_body(
         ["A", "B", "C"],
     )
 
@@ -830,7 +830,7 @@ def test_sync_issue_rows_missing_returns_empty(monkeypatch, cf):
 def test_sync_issue_rows_preserves_other_reviewed(monkeypatch, cf):
     """Leaves reviewed rows for tests not in test_names."""
     body = (
-        "| Other | Reviewed but kept in the same file | |\n"
+        "| Other | Reviewed | Kept in the same file |\n"
         "| Alpha | Unreviewed | |\n"
     )
     updates = _stub_github(monkeypatch, cf, body)
@@ -841,7 +841,7 @@ def test_sync_issue_rows_preserves_other_reviewed(monkeypatch, cf):
 def test_sync_issue_rows_returns_reviewed(monkeypatch, cf):
     """Returns reviewed test names."""
     body = (
-        "| Alpha | Reviewed but kept in the same file | |\n"
+        "| Alpha | Reviewed | Kept in the same file |\n"
         "| Beta | Unreviewed | |\n"
     )
     _stub_github(monkeypatch, cf, body)
@@ -852,7 +852,7 @@ def test_sync_issue_rows_returns_reviewed(monkeypatch, cf):
 def test_sync_issue_rows_returns_moved(monkeypatch, cf):
     """Returns moved test names."""
     body = (
-        "| Alpha | Reviewed but moved to another file | target.cpp |\n"
+        "| Alpha | Reviewed | Moved to target.cpp |\n"
         "| Beta | Unreviewed | |\n"
     )
     _stub_github(monkeypatch, cf, body)
@@ -862,7 +862,7 @@ def test_sync_issue_rows_returns_moved(monkeypatch, cf):
 
 def test_sync_issue_rows_mixed_returns_reviewed(monkeypatch, cf):
     """Returns reviewed names when mixed with missing tests."""
-    body = "| Alpha | Reviewed but kept in the same file | |\n"
+    body = "| Alpha | Reviewed | Kept in the same file |\n"
     _stub_github(monkeypatch, cf, body)
     result = cf.sync_issue_rows(
         _make_args(), ["Alpha", "Beta"],
@@ -872,7 +872,7 @@ def test_sync_issue_rows_mixed_returns_reviewed(monkeypatch, cf):
 
 def test_sync_issue_rows_mixed_adds_missing(monkeypatch, cf):
     """Adds missing test row when mixed with reviewed tests."""
-    body = "| Alpha | Reviewed but kept in the same file | |\n"
+    body = "| Alpha | Reviewed | Kept in the same file |\n"
     updates = _stub_github(monkeypatch, cf, body)
     cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
     assert "| Beta | Unreviewed | |" in updates[0]

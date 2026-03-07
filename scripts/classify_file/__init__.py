@@ -36,8 +36,8 @@ def build_issue_body(test_names: list[str]) -> str:
         f"| {name} | Unreviewed | |" for name in test_names
     )
     return (
-        f"| Test | Status | Remarks |\n"
-        f"|------|--------|---------|\n"
+        f"| Test | Status | Action |\n"
+        f"|------|--------|--------|\n"
         f"{rows}\n"
     )
 

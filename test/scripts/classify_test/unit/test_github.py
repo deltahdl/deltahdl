@@ -87,27 +87,27 @@ def test_update_test_status_sets_status(ct_github):
     """Updates status from Unreviewed to reviewed."""
     body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
     result = ct_github.update_test_status(
-        body, "Alpha", "Reviewed but kept in the same file",
+        body, "Alpha", "Reviewed",
     )
-    assert "| Alpha | Reviewed but kept in the same file | |" in result
+    assert "| Alpha | Reviewed | |" in result
 
 
 def test_update_test_status_leaves_others(ct_github):
     """Does not change other rows."""
     body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
     result = ct_github.update_test_status(
-        body, "Alpha", "Reviewed but kept in the same file",
+        body, "Alpha", "Reviewed",
     )
     assert "| Beta | Unreviewed | |" in result
 
 
 def test_update_test_status_already_set(ct_github):
     """Idempotent when same status is set again."""
-    body = "| Alpha | Reviewed but kept in the same file | |\n"
+    body = "| Alpha | Reviewed | Kept in the same file |\n"
     result = ct_github.update_test_status(
-        body, "Alpha", "Reviewed but kept in the same file",
+        body, "Alpha", "Reviewed",
     )
-    assert "| Alpha | Reviewed but kept in the same file | |" in result
+    assert "| Alpha | Reviewed | |" in result
 
 
 def test_update_test_status_not_found_exits(ct_github):
@@ -115,19 +115,19 @@ def test_update_test_status_not_found_exits(ct_github):
     with pytest.raises(SystemExit):
         ct_github.update_test_status(
             "| Other | Unreviewed | |\n", "Missing",
-            "Reviewed but kept in the same file",
+            "Reviewed",
         )
 
 
 def test_update_test_status_with_remark(ct_github):
-    """Sets remark in the Remarks column."""
+    """Sets remark in the Action column."""
     body = "| Alpha | Unreviewed | |\n"
     result = ct_github.update_test_status(
-        body, "Alpha", "Reviewed but moved to another file",
+        body, "Alpha", "Reviewed",
         remark="Moved to target.cpp",
     )
     assert (
-        "| Alpha | Reviewed but moved to another file"
+        "| Alpha | Reviewed"
         " | Moved to target.cpp |"
     ) in result
 
@@ -143,7 +143,7 @@ def test_remove_test_row_removes_unreviewed(ct_github):
 
 def test_remove_test_row_removes_reviewed(ct_github):
     """Removes a reviewed row."""
-    body = "| Alpha | Reviewed but kept in the same file | |\n| Beta | Unreviewed | |\n"
+    body = "| Alpha | Reviewed | Kept in the same file |\n| Beta | Unreviewed | |\n"
     assert ct_github.remove_test_row(body, "Alpha") == "| Beta | Unreviewed | |\n"
 
 
@@ -287,20 +287,20 @@ def _setup_maybe_update(monkeypatch, ct_github, ct_helpers, *, source_is_target)
 
 
 def test_maybe_update_kept(monkeypatch, ct_github, ct_helpers):
-    """Sets status to 'Reviewed but kept in the same file' when kept."""
+    """Sets status to 'Reviewed' and action to 'Kept in the same file'."""
     updated = _setup_maybe_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=True,
     )
-    assert "| T | Reviewed but kept in the same file | |" in updated[0]
+    assert "| T | Reviewed | Kept in the same file |" in updated[0]
 
 
 def test_maybe_update_moved(monkeypatch, ct_github, ct_helpers):
-    """Sets status and remark with target filename when moved."""
+    """Sets status and action with target filename when moved."""
     updated = _setup_maybe_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=False,
     )
     assert (
-        "| T | Reviewed but moved to another file"
+        "| T | Reviewed"
         " | Moved to test_parser_clause_06_01.cpp |"
     ) in updated[0]
 

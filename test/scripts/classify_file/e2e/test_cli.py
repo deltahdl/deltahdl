@@ -327,7 +327,7 @@ def _run_with_reviewed(tmp_path):
     """Run classify_file with one reviewed and one unreviewed test."""
     fake = _install_fake_classify_test(tmp_path)
     issue_body = (
-        "| Alpha | Reviewed but kept in the same file | |\n"
+        "| Alpha | Reviewed | Kept in the same file |\n"
         "| Beta | Unreviewed | |\n"
     )
     env = _base_env(tmp_path, fake, issue_body=issue_body)
