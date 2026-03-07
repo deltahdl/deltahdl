@@ -96,4 +96,13 @@ TEST(Preprocessor, Pragma_WithExpressions_NoOutput) {
   EXPECT_TRUE(trimmed.empty());
 }
 
+// --- §22.11: Surrounding code is preserved ---
+TEST(Preprocessor, Pragma_SurroundingCodePreserved) {
+  PreprocFixture f;
+  auto out = Preprocess("wire a;\n`pragma some_pragma\nwire b;\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("wire a;"), std::string::npos);
+  EXPECT_NE(out.find("wire b;"), std::string::npos);
+}
+
 }  // namespace

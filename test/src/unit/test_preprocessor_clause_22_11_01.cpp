@@ -13,15 +13,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 
 namespace {
 
-// --- §22.11: Surrounding code is preserved ---
-TEST(Preprocessor, Pragma_SurroundingCodePreserved) {
-  PreprocFixture f;
-  auto out = Preprocess("wire a;\n`pragma some_pragma\nwire b;\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(out.find("wire a;"), std::string::npos);
-  EXPECT_NE(out.find("wire b;"), std::string::npos);
-}
-
 // --- §22.11.1: `pragma reset resets named pragmas ---
 TEST(Preprocessor, Pragma_Reset_NoError) {
   PreprocFixture f;
