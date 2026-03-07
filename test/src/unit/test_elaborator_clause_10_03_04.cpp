@@ -146,4 +146,16 @@ TEST(Elaborator, ContAssignNoDriveStrengthDefault) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 0u);
 }
 
+// §6.3.2.2: Drive strength (highz1, highz0) — reversed order, also illegal.
+TEST(Elaborator, DriveStrengthHighz1Highz0IsError) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign (highz1, highz0) w = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

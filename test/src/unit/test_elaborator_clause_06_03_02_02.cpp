@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §6.3.2.2: Drive strength (highz1, highz0) — reversed order, also illegal.
-TEST(Elaborator, DriveStrengthHighz1Highz0IsError) {
-  ElabFixture f;
-  Elaborate(
-      "module t;\n"
-      "  wire w;\n"
-      "  assign (highz1, highz0) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 // §6.3.2.2: Drive strength supply0, supply1 is valid.
 TEST(Elaborator, DriveStrengthSupply0Supply1Valid) {
   ElabFixture f;
