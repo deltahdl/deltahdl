@@ -278,7 +278,47 @@ static void DistributePatternToArray(std::string_view arr_name,
   }
 }
 
-// §7.4/§7.6: Try array-level blocking assignment (pattern or copy).
+static void CollectFixedArrayElements(std::string_view name, const ArrayInfo& ai,
+                                      SimContext& ctx,
+                                      std::vector<Logic4Vec>& out);
+
+// §10.10: Distribute unpacked array concatenation elements to array variables.
+// Flattens array items (each contributing multiple elements) and scalar items.
+static void DistributeConcatToArray(std::string_view arr_name,
+                                    const ArrayInfo& info, const Expr* rhs,
+                                    SimContext& ctx, Arena& arena) {
+  std::vector<Logic4Vec> elems;
+  for (auto* item : rhs->elements) {
+    if (item->kind == ExprKind::kIdentifier) {
+      auto* ai = ctx.FindArrayInfo(item->text);
+      if (ai) {
+        CollectFixedArrayElements(item->text, *ai, ctx, elems);
+        continue;
+      }
+      auto* q = ctx.FindQueue(item->text);
+      if (q) {
+        elems.insert(elems.end(), q->elements.begin(), q->elements.end());
+        continue;
+      }
+    }
+    elems.push_back(EvalExpr(item, ctx, arena));
+  }
+  for (uint32_t i = 0; i < info.size; ++i) {
+    uint32_t idx =
+        info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);
+    auto name = std::string(arr_name) + "[" + std::to_string(idx) + "]";
+    auto* elem = ctx.FindVariable(name);
+    if (!elem) continue;
+    if (i < elems.size()) {
+      elem->value = ResizeToWidth(elems[i], info.elem_width, arena);
+    } else {
+      elem->value = MakeLogic4VecVal(arena, info.elem_width, 0);
+    }
+    elem->NotifyWatchers();
+  }
+}
+
+// §7.4/§7.6: Try array-level blocking assignment (pattern, concat, or copy).
 static bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
@@ -286,6 +326,14 @@ static bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx,
     auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
     if (ainfo) {
       DistributePatternToArray(stmt->lhs->text, *ainfo, stmt->rhs, ctx, arena);
+      return true;
+    }
+  }
+  // §10.10: Unpacked array concatenation assigned to fixed-size array.
+  if (stmt->rhs && stmt->rhs->kind == ExprKind::kConcatenation) {
+    auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
+    if (ainfo) {
+      DistributeConcatToArray(stmt->lhs->text, *ainfo, stmt->rhs, ctx, arena);
       return true;
     }
   }
