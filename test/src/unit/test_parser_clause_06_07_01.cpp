@@ -869,4 +869,18 @@ TEST(ParserSection6, TriregChargeStrengthSignedVector) {
   EXPECT_EQ(item->name, "cap2");
 }
 
+// §6.3.2.2: Drive strength with supply0.
+TEST(ParserA222, DriveStrengthSupply0Weak1) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (supply0, weak1) w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->drive_strength0, 5u);   // supply0
+  EXPECT_EQ(item->drive_strength1, 2u);   // weak1
+}
+
 }  // namespace
