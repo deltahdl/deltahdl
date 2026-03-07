@@ -220,6 +220,7 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
   ValidateChandleContAssign(item);
   ValidateChandleSensitivity(item);
   ValidateInterconnectContAssign(item);
+  ValidateClassHandleContAssign(item);
   // §6.3.2.2: Drive strength on a net declaration requires an initializer.
   if (item->kind == ModuleItemKind::kNetDecl &&
       (item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
@@ -295,6 +296,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateEnumAssignments(decl);
   ValidateConstAssignments(decl);
   ValidateArrayAssignments(decl);
+  ValidateClassHandleOps(decl);
   // §3.14: Precision shall be at least as precise as the time unit.
   if (decl->has_timeunit && decl->has_timeprecision) {
     if (static_cast<int>(decl->time_prec) >
@@ -783,6 +785,111 @@ void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
     diag_.Error(item->loc,
                 "real or shortreal type shall not be used as an "
                 "associative array index type");
+  }
+}
+
+// --- §8.4: Class handle operator restriction validation ---
+
+static bool IsClassVar(const Expr* e,
+                       const std::unordered_set<std::string_view>& class_vars) {
+  auto name = ExprIdent(e);
+  if (name.empty()) return false;
+  return class_vars.count(name) != 0;
+}
+
+// §8.4 Table 8-1: Only ==, !=, ===, !== are legal binary ops on class handles.
+static bool IsAllowedClassBinaryOp(TokenKind op) {
+  return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
+         op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq;
+}
+
+static void CheckClassHandleExpr(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& class_vars,
+    DiagEngine& diag) {
+  if (!e) return;
+  // Binary: only equality operators are allowed.
+  if (e->kind == ExprKind::kBinary) {
+    bool lhs_class = e->lhs && IsClassVar(e->lhs, class_vars);
+    bool rhs_class = e->rhs && IsClassVar(e->rhs, class_vars);
+    if ((lhs_class || rhs_class) && !IsAllowedClassBinaryOp(e->op)) {
+      diag.Error(e->range.start,
+                 "operator is not allowed on class object handles");
+    }
+  }
+  // Unary: no unary operators are allowed on class handles.
+  if (e->kind == ExprKind::kUnary && IsClassVar(e->lhs, class_vars)) {
+    diag.Error(e->range.start,
+               "operator is not allowed on class object handles");
+  }
+  // Postfix (++, --): not allowed.
+  if (e->kind == ExprKind::kPostfixUnary && IsClassVar(e->lhs, class_vars)) {
+    diag.Error(e->range.start,
+               "operator is not allowed on class object handles");
+  }
+  // Bit-select on class handle is illegal.
+  if (e->kind == ExprKind::kSelect && e->base &&
+      IsClassVar(e->base, class_vars)) {
+    diag.Error(e->range.start,
+               "bit-select on class object handle is illegal");
+  }
+  // Recurse into sub-expressions.
+  CheckClassHandleExpr(e->lhs, class_vars, diag);
+  CheckClassHandleExpr(e->rhs, class_vars, diag);
+  CheckClassHandleExpr(e->base, class_vars, diag);
+  CheckClassHandleExpr(e->index, class_vars, diag);
+  CheckClassHandleExpr(e->condition, class_vars, diag);
+  CheckClassHandleExpr(e->true_expr, class_vars, diag);
+  CheckClassHandleExpr(e->false_expr, class_vars, diag);
+  for (const auto* elem : e->elements) {
+    CheckClassHandleExpr(elem, class_vars, diag);
+  }
+}
+
+void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
+  if (!s) return;
+  // Check compound assignment to class handle.
+  if ((s->kind == StmtKind::kBlockingAssign ||
+       s->kind == StmtKind::kNonblockingAssign) &&
+      s->lhs && IsClassVar(s->lhs, class_var_names_)) {
+    if (s->rhs && s->rhs->kind == ExprKind::kBinary &&
+        IsCompoundAssignOp(s->rhs->op)) {
+      diag_.Error(s->range.start,
+                  "operator is not allowed on class object handles");
+    }
+  }
+  // Check expressions in assignments, conditions, and expression statements.
+  CheckClassHandleExpr(s->rhs, class_var_names_, diag_);
+  CheckClassHandleExpr(s->expr, class_var_names_, diag_);
+  CheckClassHandleExpr(s->condition, class_var_names_, diag_);
+  for (auto* sub : s->stmts) WalkStmtsForClassHandleOps(sub);
+  WalkStmtsForClassHandleOps(s->then_branch);
+  WalkStmtsForClassHandleOps(s->else_branch);
+  WalkStmtsForClassHandleOps(s->body);
+  WalkStmtsForClassHandleOps(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForClassHandleOps(ci.body);
+}
+
+void Elaborator::ValidateClassHandleOps(const ModuleDecl* decl) {
+  if (class_var_names_.empty()) return;
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForClassHandleOps(item->body);
+    }
+  }
+}
+
+void Elaborator::ValidateClassHandleContAssign(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kContAssign) return;
+  auto lhs_class = item->assign_lhs &&
+                   IsClassVar(item->assign_lhs, class_var_names_);
+  auto rhs_class = item->assign_rhs &&
+                   IsClassVar(item->assign_rhs, class_var_names_);
+  if (lhs_class || rhs_class) {
+    diag_.Error(item->loc,
+                "class object handle cannot be used in continuous assignment");
   }
 }
 

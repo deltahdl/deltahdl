@@ -544,6 +544,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ValidateArrayInitPattern(item);
   ValidateStructInitPattern(item);
   TrackEnumVariable(item);
+  // §8.4: Track class-typed variables for operator restriction checks.
+  if (item->data_type.kind == DataTypeKind::kNamed &&
+      class_names_.count(item->data_type.type_name)) {
+    class_var_names_.insert(item->name);
+  }
   if (item->data_type.kind == DataTypeKind::kEnum) {
     ValidateEnumDecl(item->data_type, item->loc);
   }
@@ -793,6 +798,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   enum_var_names_.clear();
   enum_member_names_.clear();
   const_names_.clear();
+  class_var_names_.clear();
   interconnect_names_.clear();
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);

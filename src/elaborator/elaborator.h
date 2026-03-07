@@ -204,6 +204,15 @@ class Elaborator {
   /// Check a single assignment statement for enum type violations.
   void CheckEnumAssignStmt(const Stmt* s);
 
+  /// §8.4: Validate class handle operator restrictions.
+  void ValidateClassHandleOps(const ModuleDecl* decl);
+
+  /// Walk statement tree checking class handle operation constraints.
+  void WalkStmtsForClassHandleOps(const Stmt* s);
+
+  /// §8.4: Class handle cannot appear in continuous assignment.
+  void ValidateClassHandleContAssign(const ModuleItem* item);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
@@ -234,6 +243,7 @@ class Elaborator {
   std::unordered_set<std::string_view> enum_member_names_;
   std::unordered_set<std::string_view> const_names_;
   std::unordered_set<std::string_view> class_names_;
+  std::unordered_set<std::string_view> class_var_names_;  // §8.4
   std::unordered_set<std::string_view> nettype_names_;
   std::unordered_set<std::string_view> interconnect_names_;
 };
