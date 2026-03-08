@@ -443,4 +443,26 @@ TEST(ParserA606, CondPredicateChainedTripleAnd) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
+TEST(ParserSection10, Sec10_4_1_InIfElseBranches) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg a, sel;\n"
+      "  initial begin\n"
+      "    if (sel)\n"
+      "      a = 1;\n"
+      "    else\n"
+      "      a = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace
