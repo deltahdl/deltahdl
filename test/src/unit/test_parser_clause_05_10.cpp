@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_10_TypePrefixedPattern) {
-
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct {int a; shortreal b;} ab;\n"
-              "  ab d;\n"
-              "  initial d = ab'{int:1, shortreal:1.0};\n"
-              "endmodule\n"));
-}
-
 TEST(ParserClause05, Cl5_10_ReplicationPattern) {
 
   auto r = Parse(

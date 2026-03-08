@@ -406,3 +406,13 @@ TEST(StructureAssignmentPatternDefault, Cl5_10_DefaultValue) {
   EXPECT_EQ(stmt->rhs->pattern_keys[0], "default");
 }
 
+TEST(TypePrefixedPattern, Cl5_10_TypePrefixedPattern) {
+
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {int a; shortreal b;} ab;\n"
+              "  ab d;\n"
+              "  initial d = ab'{int:1, shortreal:1.0};\n"
+              "endmodule\n"));
+}
+
