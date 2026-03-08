@@ -712,6 +712,102 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
+// §11.4.14.3: Determine streaming slice size from optional type/expression.
+static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
+                                         Arena& arena) {
+  if (!size_expr) return 1;
+  if (size_expr->kind == ExprKind::kIdentifier) {
+    // Check for digit string first.
+    if (!size_expr->text.empty() && size_expr->text[0] >= '0' &&
+        size_expr->text[0] <= '9') {
+      uint32_t n = 0;
+      for (char c : size_expr->text) {
+        if (c >= '0' && c <= '9') n = n * 10 + (c - '0');
+      }
+      return n > 0 ? n : 1;
+    }
+    // Type-based slice size.
+    auto t = size_expr->text;
+    if (t == "byte") return 8;
+    if (t == "shortint") return 16;
+    if (t == "int" || t == "integer") return 32;
+    if (t == "longint") return 64;
+    if (t == "real" || t == "realtime") return 64;
+    if (t == "shortreal") return 32;
+    if (t == "bit" || t == "logic" || t == "reg") return 1;
+    return 32;
+  }
+  auto val = EvalExpr(size_expr, ctx, arena).ToUint64();
+  return (val == 0) ? 1 : static_cast<uint32_t>(val);
+}
+
+// §11.4.14.3: Streaming concatenation as LHS — unpack RHS into elements.
+static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
+                                     SimContext& ctx, Arena& arena) {
+  // Compute total target width from LHS elements.
+  uint32_t total_width = 0;
+  struct ElemInfo {
+    const Expr* expr;
+    uint32_t width;
+  };
+  std::vector<ElemInfo> elems;
+  for (auto* elem : lhs->elements) {
+    auto* var = ResolveLhsVariable(elem, ctx);
+    if (!var) continue;
+    elems.push_back({elem, var->value.width});
+    total_width += var->value.width;
+  }
+  if (total_width == 0 || elems.empty()) return;
+
+  // Start with the RHS value, resized to target width.
+  // §11.4.14.3: If source has more bits, consume from MSB end.
+  auto stream = ResizeToWidth(rhs_val, total_width, arena);
+
+  // For left-shift streaming (<<), reverse slice order before distributing.
+  if (lhs->op == TokenKind::kLtLt) {
+    uint32_t ss = StreamSliceSizeForUnpack(lhs->lhs, ctx, arena);
+    uint32_t nslices = (total_width + ss - 1) / ss;
+    auto reordered = MakeLogic4Vec(arena, total_width);
+    for (uint32_t i = 0; i < nslices; ++i) {
+      uint32_t src_start = i * ss;
+      uint32_t dst_start = (nslices - 1 - i) * ss;
+      // Extract bits from source.
+      uint32_t bits_to_copy = ss;
+      if (src_start + bits_to_copy > total_width)
+        bits_to_copy = total_width - src_start;
+      for (uint32_t b = 0; b < bits_to_copy; ++b) {
+        uint32_t sbit = src_start + b;
+        uint32_t dbit = dst_start + b;
+        if (dbit >= total_width) break;
+        uint32_t sw = sbit / 64, sb = sbit % 64;
+        uint32_t dw = dbit / 64, db = dbit % 64;
+        if (sw < stream.nwords && (stream.words[sw].aval >> sb) & 1)
+          reordered.words[dw].aval |= uint64_t{1} << db;
+      }
+    }
+    stream = reordered;
+  }
+
+  // Distribute bits MSB-first (left-to-right) into elements.
+  uint32_t bit_offset = total_width;
+  for (auto& ei : elems) {
+    bit_offset -= ei.width;
+    auto* var = ResolveLhsVariable(ei.expr, ctx);
+    if (!var) continue;
+    // Extract ei.width bits starting at bit_offset from the stream.
+    uint64_t val = 0;
+    for (uint32_t b = 0; b < ei.width && b < 64; ++b) {
+      uint32_t sbit = bit_offset + b;
+      if (sbit >= total_width) break;
+      uint32_t w = sbit / 64, bi = sbit % 64;
+      if (w < stream.nwords && (stream.words[w].aval >> bi) & 1)
+        val |= uint64_t{1} << b;
+    }
+    var->value = MakeLogic4VecVal(arena, ei.width, val);
+    var->NotifyWatchers();
+  }
+}
+
 static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
                               SimContext& ctx, Arena& arena) {
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
@@ -748,6 +844,12 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
     return StmtResult::kDone;
   }
 
+  // §11.4.14.3: Streaming concatenation as assignment target (unpack).
+  if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
+    UnpackStreamingConcatLhs(stmt->lhs, rhs_val, ctx, arena);
+    return StmtResult::kDone;
+  }
+
   if (stmt->lhs->kind == ExprKind::kSelect) {
     TrySelectBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
     return StmtResult::kDone;
@@ -775,6 +877,11 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   if (!lhs) return;
   if (lhs->kind == ExprKind::kConcatenation) {
     UnpackConcatLhs(lhs, rhs_val, ctx, arena);
+    return;
+  }
+  // §11.4.14.3: Streaming concatenation as assignment target (unpack).
+  if (lhs->kind == ExprKind::kStreamingConcat) {
+    UnpackStreamingConcatLhs(lhs, rhs_val, ctx, arena);
     return;
   }
   if (lhs->kind == ExprKind::kSelect) {

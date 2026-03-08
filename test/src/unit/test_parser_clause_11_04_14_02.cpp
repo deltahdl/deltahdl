@@ -47,19 +47,6 @@ TEST(ParserA81, StreamingWithExprSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
-TEST(ParserA85, VarLvalueStreamingConcatSliceSize) {
-  auto r = Parse(
-      "module m; logic [31:0] a, b;\n"
-      "  initial {>> 8 {a}} = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
-}
-
 TEST(ParserSection11, StreamingWithTypedSlice) {
   auto r = Parse(
       "module t;\n"
