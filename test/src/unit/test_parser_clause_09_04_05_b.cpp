@@ -174,4 +174,18 @@ TEST(ParserSection9, RepeatEventControl) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
+TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin a = #10 b; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace

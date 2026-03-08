@@ -1,7 +1,16 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
+
+static Expr* FirstAssignLhs(ParseResult& r) {
+  auto* stmt = FirstInitialStmt(r);
+  if (!stmt) return nullptr;
+  return stmt->lhs;
+}
+
 namespace {
 
 TEST(ParserA602, BlockingAssignment_Simple) {
@@ -16,20 +25,6 @@ TEST(ParserA602, BlockingAssignment_Simple) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->lhs, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
-}
-
-TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin a = #10 b; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_NE(stmt->delay, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
 }
 
 TEST(ParserA602, BlockingAssignment_ConcatLhs) {
@@ -252,11 +247,6 @@ TEST(ParserSection10, Sec10_4_1_InIfElseBranches) {
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->else_branch, nullptr);
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
-}
-static Expr* FirstAssignLhs(ParseResult& r) {
-  auto* stmt = FirstInitialStmt(r);
-  if (!stmt) return nullptr;
-  return stmt->lhs;
 }
 
 TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsBlocking) {
