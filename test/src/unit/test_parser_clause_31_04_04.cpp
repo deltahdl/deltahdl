@@ -96,4 +96,18 @@ TEST(WidthBasic, WidthBasic) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
+TEST(WidthWithNotifier, WidthWithNotifier) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(posedge clk, 20, 1, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
+  EXPECT_EQ(tc->notifier, "ntfr");
+}
+
 }  // namespace
