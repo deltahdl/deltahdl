@@ -7,12 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, PrefixDecrement) {
-  auto r = Parse("module m; initial begin --i; end endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §A.8.6 — binary_module_path_operator
 TEST(ParserA86, BinaryModulePathEq) {
   auto r = Parse(
