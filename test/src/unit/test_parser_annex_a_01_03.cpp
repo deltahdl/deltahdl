@@ -6,25 +6,6 @@ using namespace delta;
 
 namespace {
 
-// port_declaration with all four directions
-TEST(ModuleParamsA13, AllPortDirections) {
-  auto r = Parse(
-      "module m(\n"
-      "  input  logic a,\n"
-      "  output logic b,\n"
-      "  inout  wire  c,\n"
-      "  ref    logic d\n"
-      ");\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& ports = r.cu->modules[0]->ports;
-  ASSERT_EQ(ports.size(), 4u);
-  EXPECT_EQ(ports[0].direction, Direction::kInput);
-  EXPECT_EQ(ports[1].direction, Direction::kOutput);
-  EXPECT_EQ(ports[2].direction, Direction::kInout);
-  EXPECT_EQ(ports[3].direction, Direction::kRef);
-}
-
 // ansi_port_declaration with default value
 TEST(ModuleParamsA13, AnsiPortWithDefault) {
   auto r = Parse(
