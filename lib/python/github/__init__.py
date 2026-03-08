@@ -107,3 +107,22 @@ def next_unchecked(body: str) -> str | None:
     """Return the first unchecked subclause number, or ``None``."""
     m = re.search(r"^\s*- \[ \] (\S+) ", body, re.MULTILINE)
     return m.group(1) if m else None
+
+
+def mark_master_complete(
+    organization: str, repo: str, master_issue: int,
+    sub_issue: int,
+) -> None:
+    """Mark a sub-issue's row as complete on the master issue table."""
+    body = fetch_issue_body(organization, repo, master_issue)
+    pattern = re.compile(
+        r"^(\|[^|]+\|[^|]+\| #" + str(sub_issue) + r" \|)\s*[^|]*\|",
+        re.MULTILINE,
+    )
+    new_body, count = pattern.subn(r"\1 :white_check_mark: |", body)
+    if count == 0:
+        print(f"WARNING: No table row found for #{sub_issue}"
+              f" on issue #{master_issue}.", file=sys.stderr)
+        return
+    update_issue_body(organization, repo, master_issue, new_body)
+    print(f"Marked #{sub_issue} complete on master issue #{master_issue}.")
