@@ -165,7 +165,8 @@ TEST(SimCh4427, ReInactiveRegionHoldsMultipleEvents) {
   sched.Run();
   EXPECT_EQ(count, 5);
 }
-TEST(ReInactiveGeneratesReactive, ReactiveSetReIteratesWhenReInactiveGeneratesReactive) {
+TEST(ReInactiveGeneratesReactive,
+     ReactiveSetReIteratesWhenReInactiveGeneratesReactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -186,4 +187,3 @@ TEST(ReInactiveGeneratesReactive, ReactiveSetReIteratesWhenReInactiveGeneratesRe
   EXPECT_EQ(order[0], "re_inactive");
   EXPECT_EQ(order[1], "reactive_from_re_inactive");
 }
-

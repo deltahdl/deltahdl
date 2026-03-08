@@ -32,7 +32,7 @@ inline Expr* MkAssocCall(Arena& arena, std::string_view var,
 
 // Build aa.method() call expression (no arguments).
 inline Expr* MkAssocCallNoArg(Arena& arena, std::string_view var,
-                               std::string_view method) {
+                              std::string_view method) {
   auto* expr = arena.Create<Expr>();
   expr->kind = ExprKind::kCall;
   auto* access = arena.Create<Expr>();
@@ -51,7 +51,7 @@ inline Expr* MkAssocCallNoArg(Arena& arena, std::string_view var,
 
 // Build aa.method(int_literal) call expression.
 inline Expr* MkAssocCallInt(Arena& arena, std::string_view var,
-                             std::string_view method, int64_t int_arg) {
+                            std::string_view method, int64_t int_arg) {
   auto* expr = MkAssocCallNoArg(arena, var, method);
   auto* arg = arena.Create<Expr>();
   arg->kind = ExprKind::kIntegerLiteral;

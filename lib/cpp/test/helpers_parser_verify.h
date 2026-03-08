@@ -257,8 +257,7 @@ template <typename T>
 inline ModuleItem* FirstAlwaysCombItem(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysCombBlock)
-      return item;
+    if (item->kind == ModuleItemKind::kAlwaysCombBlock) return item;
   }
   return nullptr;
 }

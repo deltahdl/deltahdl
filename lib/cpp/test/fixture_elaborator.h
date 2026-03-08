@@ -31,8 +31,8 @@ inline RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
 }
 
 inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
-                                               ElabFixture& f,
-                                               std::string_view top = "") {
+                                              ElabFixture& f,
+                                              std::string_view top = "") {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor preproc(f.mgr, f.diag, {});
   auto pp = preproc.Preprocess(fid);
