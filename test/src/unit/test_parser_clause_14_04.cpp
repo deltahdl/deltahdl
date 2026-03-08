@@ -487,3 +487,14 @@ TEST(DefaultSkew, DefaultSkew_NoEdgeEvent) {
               "endmodule\n"));
 }
 
+TEST(DefaultSkew_NumericLiterals, DefaultSkew_NumericLiterals) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    default input #3 output #7;\n"
+              "    input x;\n"
+              "    output y;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
