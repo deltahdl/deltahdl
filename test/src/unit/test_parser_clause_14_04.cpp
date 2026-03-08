@@ -453,3 +453,14 @@ TEST(DefaultSkew_OutputOnly, DefaultSkew_OutputOnly) {
               "endmodule\n"));
 }
 
+TEST(DefaultSkew_1StepInputNegedgeOutput, DefaultSkew_1StepInputNegedgeOutput) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking ck1 @(posedge clk);\n"
+              "    default input #1step output negedge;\n"
+              "    input a;\n"
+              "    output b;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
