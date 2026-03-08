@@ -178,4 +178,11 @@ TEST(ConstExpr, ReplicationOfConstantsIsConstant) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
+// §11.2.1: Constant system function call — $clog2 with constant arg.
+TEST(ConstExpr, Clog2ConstantSysFuncIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$clog2(8)", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
 }  // namespace
