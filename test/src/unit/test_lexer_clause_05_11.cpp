@@ -60,4 +60,16 @@ TEST(LexerClause05, Cl5_11_TypePrefixedTokens) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
 }
 
+TEST(LexerClause05, Cl5_10_ReplicationTokens) {
+  // '{3{1}} — replication form
+  auto tokens = Lex("'{3{1}}");
+  ASSERT_GE(tokens.size(), 6u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kLBrace);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kRBrace);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kRBrace);
+}
+
 }  // namespace
