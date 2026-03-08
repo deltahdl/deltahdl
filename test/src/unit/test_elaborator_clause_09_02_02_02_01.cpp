@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include <unordered_set>
+
 #include "builders_sensitivity.h"
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
