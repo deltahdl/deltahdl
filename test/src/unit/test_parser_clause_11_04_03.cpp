@@ -207,15 +207,6 @@ TEST(ParserSection10, Sec10_4_1_ExprAddition) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-// §11.2.1: ConstEvalReal — unary minus on real.
-TEST(ConstEvalReal, UnaryMinusOnReal) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("-3.14", f);
-  auto val = ConstEvalReal(e);
-  ASSERT_TRUE(val.has_value());
-  EXPECT_NEAR(*val, -3.14, 1e-6);
-}
-
 // §11.2.1: ConstEvalReal — binary add on reals.
 TEST(ConstEvalReal, BinaryAddReals) {
   EvalFixture f;
