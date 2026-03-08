@@ -906,23 +906,42 @@ def test_apply_classification_updates_suite_name_attr(ct, ct_helpers):
     assert _apply_with_suite_name(ct, ct_helpers).suite_name == "BinaryOps"
 
 
-def test_apply_classification_no_suite_name_preserves_original(ct, ct_helpers):
-    """Preserves original suite name when response lacks suite_name."""
+def _apply_without_suite_name(ct, ct_helpers):
+    """Apply a clause response without suite_name and return the test block."""
     _tb = ct_helpers.make_test_block
     _apply = getattr(ct, "_apply_classification")
     t = _tb("MyTest", body=["  auto r = Parse(src);"])
     resp = {"clause": "6.1", "rationale": "r"}
     _apply(t, resp, lrm_path="/tmp/lrm.txt")
-    assert t.suite_name == "S"
-    assert not hasattr(t, "new_suite_name")
+    return t
 
 
-def test_apply_classification_invalid_suite_name_preserves_original(ct, ct_helpers):
-    """Preserves original suite name when suite_name is invalid."""
+def test_apply_classification_no_suite_name_preserves_original(ct, ct_helpers):
+    """Preserves original suite name when response lacks suite_name."""
+    assert _apply_without_suite_name(ct, ct_helpers).suite_name == "S"
+
+
+def test_apply_classification_no_suite_name_skips_new_attr(ct, ct_helpers):
+    """Does not set new_suite_name when response lacks suite_name."""
+    assert not hasattr(_apply_without_suite_name(ct, ct_helpers), "new_suite_name")
+
+
+def _apply_with_invalid_suite_name(ct, ct_helpers):
+    """Apply a clause response with invalid suite_name and return the block."""
     _tb = ct_helpers.make_test_block
     _apply = getattr(ct, "_apply_classification")
     t = _tb("MyTest", body=["  auto r = Parse(src);"])
     resp = {"clause": "6.1", "rationale": "r", "suite_name": "3Bad"}
     _apply(t, resp, lrm_path="/tmp/lrm.txt")
-    assert t.suite_name == "S"
+    return t
+
+
+def test_apply_classification_invalid_suite_name_preserves_original(ct, ct_helpers):
+    """Preserves original suite name when suite_name is invalid."""
+    assert _apply_with_invalid_suite_name(ct, ct_helpers).suite_name == "S"
+
+
+def test_apply_classification_invalid_suite_name_skips_new_attr(ct, ct_helpers):
+    """Does not set new_suite_name when suite_name is invalid."""
+    t = _apply_with_invalid_suite_name(ct, ct_helpers)
     assert not hasattr(t, "new_suite_name")
