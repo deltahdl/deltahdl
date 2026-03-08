@@ -185,4 +185,12 @@ TEST(ConstExpr, Clog2ConstantSysFuncIsConstant) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
+// §11.2.1: Constant system function call — $clog2 with non-constant arg
+// is not constant.
+TEST(ConstExpr, Clog2NonConstantArgNotConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$clog2(x)", f);
+  EXPECT_FALSE(IsConstantExpr(e));
+}
+
 }  // namespace
