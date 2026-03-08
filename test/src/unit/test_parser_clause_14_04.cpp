@@ -416,3 +416,18 @@ TEST(ClockingItemDefaultSkewInputOutput, ClockingItemDefaultSkewInputOutput) {
   ASSERT_GE(item->clocking_signals.size(), 1u);
 }
 
+TEST(ClockingDefaultSkewTimeUnits, DefaultSkew_InputOutputTimeUnits) {
+  auto r = Parse(
+      "module t;\n"
+      "  clocking bus @(posedge clock1);\n"
+      "    default input #10ns output #2ns;\n"
+      "    input data, ready;\n"
+      "    output ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
+
+  ASSERT_GE(item->clocking_signals.size(), 3u);
+}
+

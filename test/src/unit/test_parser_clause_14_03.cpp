@@ -396,21 +396,6 @@ TEST(ParserSection19, ClockingBlockScope_MultipleBlocks) {
   EXPECT_EQ(cb2->name, "cd2");
 }
 
-TEST(ParserSection19, DefaultSkew_InputOutputTimeUnits) {
-  auto r = Parse(
-      "module t;\n"
-      "  clocking bus @(posedge clock1);\n"
-      "    default input #10ns output #2ns;\n"
-      "    input data, ready;\n"
-      "    output ack;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-
-  ASSERT_GE(item->clocking_signals.size(), 3u);
-}
-
 TEST(ParserSection19, DefaultSkew_InputOnly) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
