@@ -165,3 +165,25 @@ TEST(SimCh4427, ReInactiveRegionHoldsMultipleEvents) {
   sched.Run();
   EXPECT_EQ(count, 5);
 }
+TEST(ReInactiveGeneratesReactive, ReactiveSetReIteratesWhenReInactiveGeneratesReactive) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* re_inactive = sched.GetEventPool().Acquire();
+  re_inactive->callback = [&]() {
+    order.push_back("re_inactive");
+    auto* new_reactive = sched.GetEventPool().Acquire();
+    new_reactive->callback = [&]() {
+      order.push_back("reactive_from_re_inactive");
+    };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kReactive, new_reactive);
+  };
+  sched.ScheduleEvent({0}, Region::kReInactive, re_inactive);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 2u);
+  EXPECT_EQ(order[0], "re_inactive");
+  EXPECT_EQ(order[1], "reactive_from_re_inactive");
+}
+
