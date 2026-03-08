@@ -50,7 +50,8 @@ TEST(ConstraintsA110, ImplicationConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// constraint_expression ::= if (expression) constraint_set [else constraint_set]
+// constraint_expression ::= if (expression) constraint_set [else
+// constraint_set]
 TEST(ConstraintsA110, IfElseConstraint) {
   auto r = Parse(
       "class C;\n"

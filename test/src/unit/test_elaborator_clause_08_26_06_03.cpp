@@ -6,47 +6,47 @@ namespace {
 
 // §8.26.6.3: Diamond inheritance — single copy of base interface's symbols.
 TEST(ElabA82663, DiamondInheritanceOk) {
-  EXPECT_TRUE(ElabOk(
-      "interface class IntfBase;\n"
-      "  pure virtual function bit funcBase();\n"
-      "endclass\n"
-      "interface class IntfExt1 extends IntfBase;\n"
-      "  pure virtual function bit funcExt1();\n"
-      "endclass\n"
-      "interface class IntfExt2 extends IntfBase;\n"
-      "  pure virtual function bit funcExt2();\n"
-      "endclass\n"
-      "interface class IntfExt3 extends IntfExt1, IntfExt2;\n"
-      "endclass\n"
-      "module m;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("interface class IntfBase;\n"
+             "  pure virtual function bit funcBase();\n"
+             "endclass\n"
+             "interface class IntfExt1 extends IntfBase;\n"
+             "  pure virtual function bit funcExt1();\n"
+             "endclass\n"
+             "interface class IntfExt2 extends IntfBase;\n"
+             "  pure virtual function bit funcExt2();\n"
+             "endclass\n"
+             "interface class IntfExt3 extends IntfExt1, IntfExt2;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
 }
 
 // §8.26.6.3: Class implements diamond — OK with all methods implemented.
 TEST(ElabA82663, ClassImplementsDiamondOk) {
-  EXPECT_TRUE(ElabOk(
-      "interface class IntfBase;\n"
-      "  pure virtual function bit funcBase();\n"
-      "endclass\n"
-      "interface class IntfExt1 extends IntfBase;\n"
-      "  pure virtual function bit funcExt1();\n"
-      "endclass\n"
-      "interface class IntfExt2 extends IntfBase;\n"
-      "  pure virtual function bit funcExt2();\n"
-      "endclass\n"
-      "class C implements IntfExt1, IntfExt2;\n"
-      "  virtual function bit funcBase();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "  virtual function bit funcExt1();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "  virtual function bit funcExt2();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module m;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("interface class IntfBase;\n"
+             "  pure virtual function bit funcBase();\n"
+             "endclass\n"
+             "interface class IntfExt1 extends IntfBase;\n"
+             "  pure virtual function bit funcExt1();\n"
+             "endclass\n"
+             "interface class IntfExt2 extends IntfBase;\n"
+             "  pure virtual function bit funcExt2();\n"
+             "endclass\n"
+             "class C implements IntfExt1, IntfExt2;\n"
+             "  virtual function bit funcBase();\n"
+             "    return 0;\n"
+             "  endfunction\n"
+             "  virtual function bit funcExt1();\n"
+             "    return 0;\n"
+             "  endfunction\n"
+             "  virtual function bit funcExt2();\n"
+             "    return 0;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
 }
 
 }  // namespace

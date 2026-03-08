@@ -343,9 +343,8 @@ TEST(Preprocessor, InlineIfdefTrue) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"FOO", "1"}};
-  auto result = Preprocess(
-      "initial if (`ifdef FOO 1 `else 0 `endif)\n",
-      f, std::move(cfg));
+  auto result = Preprocess("initial if (`ifdef FOO 1 `else 0 `endif)\n", f,
+                           std::move(cfg));
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("initial if ( 1 )"), std::string::npos);
   EXPECT_EQ(result.find("`ifdef"), std::string::npos);
@@ -353,9 +352,7 @@ TEST(Preprocessor, InlineIfdefTrue) {
 
 TEST(Preprocessor, InlineIfdefFalse) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "initial if (`ifdef FOO 1 `else 0 `endif)\n",
-      f);
+  auto result = Preprocess("initial if (`ifdef FOO 1 `else 0 `endif)\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("initial if ( 0 )"), std::string::npos);
 }
@@ -364,18 +361,15 @@ TEST(Preprocessor, InlineIfdefWithoutElse) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"FOO", "1"}};
-  auto result = Preprocess(
-      "int x = `ifdef FOO 42 `endif;\n",
-      f, std::move(cfg));
+  auto result =
+      Preprocess("int x = `ifdef FOO 42 `endif;\n", f, std::move(cfg));
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("42"), std::string::npos);
 }
 
 TEST(Preprocessor, InlineIfndefTrue) {
   PreprocFixture f;
-  auto result = Preprocess(
-      "int x = `ifndef FOO 42 `else 0 `endif;\n",
-      f);
+  auto result = Preprocess("int x = `ifndef FOO 42 `else 0 `endif;\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("42"), std::string::npos);
 }
@@ -384,9 +378,8 @@ TEST(Preprocessor, InlineIfdefExprForm) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"A", "1"}, {"B", "1"}};
-  auto result = Preprocess(
-      "int x = `ifdef (A && B) 1 `else 0 `endif;\n",
-      f, std::move(cfg));
+  auto result = Preprocess("int x = `ifdef (A && B) 1 `else 0 `endif;\n", f,
+                           std::move(cfg));
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("1"), std::string::npos);
 }
@@ -395,9 +388,9 @@ TEST(Preprocessor, InlineIfdefNested) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"A", "1"}};
-  auto result = Preprocess(
-      "int x = `ifdef A `ifdef B 2 `else 1 `endif `else 0 `endif;\n",
-      f, std::move(cfg));
+  auto result =
+      Preprocess("int x = `ifdef A `ifdef B 2 `else 1 `endif `else 0 `endif;\n",
+                 f, std::move(cfg));
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("1"), std::string::npos);
 }
@@ -606,4 +599,3 @@ TEST(Preprocessor, Pragma_InsideIfdef_Inactive) {
   auto out = Preprocess("`ifdef UNDEF_FLAG\n`pragma some_pragma\n`endif\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-

@@ -79,9 +79,10 @@ TEST(ShortCircuit, TernaryEvaluatesTrueBranchOnly) {
   MakeVar(f, "c", 8, 1);
   MakeVar(f, "t", 8, 10);
   MakeVar(f, "e", 8, 20);
-  auto result = EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "c"),
-                                     MakeId(f.arena, "t"), MakeId(f.arena, "e")),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "c"), MakeId(f.arena, "t"),
+                           MakeId(f.arena, "e")),
+               f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 10u);
 }
 
@@ -91,9 +92,10 @@ TEST(ShortCircuit, TernaryEvaluatesFalseBranchOnly) {
   MakeVar(f, "c", 8, 0);
   MakeVar(f, "t", 8, 10);
   MakeVar(f, "e", 8, 20);
-  auto result = EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "c"),
-                                     MakeId(f.arena, "t"), MakeId(f.arena, "e")),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "c"), MakeId(f.arena, "t"),
+                           MakeId(f.arena, "e")),
+               f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 20u);
 }
 

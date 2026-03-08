@@ -345,7 +345,11 @@ static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
   uint64_t sv = sel.ToUint64();
   uint64_t lo = EvalExpr(pat->index, ctx, arena).ToUint64();
   uint64_t hi = EvalExpr(pat->index_end, ctx, arena).ToUint64();
-  if (lo > hi) { uint64_t t = lo; lo = hi; hi = t; }
+  if (lo > hi) {
+    uint64_t t = lo;
+    lo = hi;
+    hi = t;
+  }
   return sv >= lo && sv <= hi;
 }
 
@@ -427,9 +431,11 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
         if (stmt->case_inside)
           matched = CaseInsidePatternMatch(sel, pat, ctx, arena);
         else if (stmt->case_matches)
-          matched = CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
+          matched =
+              CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
         else
-          matched = CaseItemMatches(sel, EvalExpr(pat, ctx, arena), stmt->case_kind);
+          matched =
+              CaseItemMatches(sel, EvalExpr(pat, ctx, arena), stmt->case_kind);
         if (matched) {
           match_count++;
           if (!first_match_body) first_match_body = item.body;
@@ -465,9 +471,11 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       if (stmt->case_inside)
         matched = CaseInsidePatternMatch(sel, pat, ctx, arena);
       else if (stmt->case_matches)
-        matched = CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
+        matched =
+            CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
       else
-        matched = CaseItemMatches(sel, EvalExpr(pat, ctx, arena), stmt->case_kind);
+        matched =
+            CaseItemMatches(sel, EvalExpr(pat, ctx, arena), stmt->case_kind);
       if (matched) {
         co_return co_await ExecStmt(item.body, ctx, arena);
       }
@@ -803,8 +811,7 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kDoWhile:
       return ExecDoWhile(stmt, ctx, arena);
     case StmtKind::kBlockingAssign:
-      if (stmt->delay)
-        return ExecBlockingAssignTimed(stmt, ctx, arena);
+      if (stmt->delay) return ExecBlockingAssignTimed(stmt, ctx, arena);
       return ExecTask::Immediate(ExecBlockingAssignImpl(stmt, ctx, arena));
     case StmtKind::kNonblockingAssign:
       return ExecTask::Immediate(ExecNonblockingAssignImpl(stmt, ctx, arena));

@@ -39,11 +39,14 @@ static bool ParseTimescaleComponent(std::string_view text, int& magnitude,
   return ParseTimeUnitStr(unit_str, unit);
 }
 
-// Effective order: unit exponent + log10(magnitude). More negative = more precise.
+// Effective order: unit exponent + log10(magnitude). More negative = more
+// precise.
 static int EffectiveOrder(TimeUnit unit, int magnitude) {
   int order = static_cast<int>(unit);
-  if (magnitude == 10) order += 1;
-  else if (magnitude == 100) order += 2;
+  if (magnitude == 10)
+    order += 1;
+  else if (magnitude == 100)
+    order += 2;
   return order;
 }
 

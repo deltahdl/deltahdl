@@ -45,7 +45,8 @@ TEST(Elaboration, PackedStructUnsigned_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2.1: Only packed data types and integer data types allowed in packed structs.
+// §7.2.1: Only packed data types and integer data types allowed in packed
+// structs.
 TEST(Elaboration, PackedStructRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(

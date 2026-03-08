@@ -153,8 +153,10 @@ std::string_view Preprocessor::ExtractBalancedArgs(std::string_view text) {
       continue;
     }
     if (in_string) continue;
-    if (text[i] == '(') ++paren_depth;
-    else if (text[i] == ')') --paren_depth;
+    if (text[i] == '(')
+      ++paren_depth;
+    else if (text[i] == ')')
+      --paren_depth;
     if (paren_depth == 0) return text.substr(open, i - open + 1);
   }
   return {};
@@ -175,12 +177,18 @@ std::vector<std::string_view> Preprocessor::SplitMacroArgs(
       continue;
     }
     if (in_string) continue;
-    if (args_text[i] == '(') ++paren_depth;
-    else if (args_text[i] == ')') --paren_depth;
-    else if (args_text[i] == '[') ++bracket_depth;
-    else if (args_text[i] == ']') --bracket_depth;
-    else if (args_text[i] == '{') ++brace_depth;
-    else if (args_text[i] == '}') --brace_depth;
+    if (args_text[i] == '(')
+      ++paren_depth;
+    else if (args_text[i] == ')')
+      --paren_depth;
+    else if (args_text[i] == '[')
+      ++bracket_depth;
+    else if (args_text[i] == ']')
+      --bracket_depth;
+    else if (args_text[i] == '{')
+      ++brace_depth;
+    else if (args_text[i] == '}')
+      --brace_depth;
     if (args_text[i] == ',' && paren_depth == 0 && bracket_depth == 0 &&
         brace_depth == 0) {
       args.push_back(Trim(args_text.substr(start, i - start)));

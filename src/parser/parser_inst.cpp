@@ -231,10 +231,14 @@ ModuleItem* Parser::ParseAlias() {
 
 static ModuleItemKind AlwaysKindToItemKind(AlwaysKind kind) {
   switch (kind) {
-    case AlwaysKind::kAlways: return ModuleItemKind::kAlwaysBlock;
-    case AlwaysKind::kAlwaysComb: return ModuleItemKind::kAlwaysCombBlock;
-    case AlwaysKind::kAlwaysFF: return ModuleItemKind::kAlwaysFFBlock;
-    case AlwaysKind::kAlwaysLatch: return ModuleItemKind::kAlwaysLatchBlock;
+    case AlwaysKind::kAlways:
+      return ModuleItemKind::kAlwaysBlock;
+    case AlwaysKind::kAlwaysComb:
+      return ModuleItemKind::kAlwaysCombBlock;
+    case AlwaysKind::kAlwaysFF:
+      return ModuleItemKind::kAlwaysFFBlock;
+    case AlwaysKind::kAlwaysLatch:
+      return ModuleItemKind::kAlwaysLatchBlock;
   }
   return ModuleItemKind::kAlwaysBlock;
 }

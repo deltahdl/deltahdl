@@ -124,7 +124,8 @@ TEST(ElabA10, StructPackedWithDimOk) {
              "endmodule\n"));
 }
 
-// §A.10 clarification 18: type_reference in net decl preceded by net type keyword
+// §A.10 clarification 18: type_reference in net decl preceded by net type
+// keyword
 
 TEST(ElabA10, TypeRefWithWireOk) {
   EXPECT_TRUE(

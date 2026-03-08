@@ -822,8 +822,7 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
       if (m->is_protected)
         diag_.Error(CurrentLoc(),
                     "cannot combine 'local' and 'protected' qualifiers");
-      if (m->is_local)
-        diag_.Error(CurrentLoc(), "duplicate 'local' qualifier");
+      if (m->is_local) diag_.Error(CurrentLoc(), "duplicate 'local' qualifier");
       m->is_local = true;
       Consume();
     } else if (Check(TokenKind::kKwProtected)) {
@@ -855,16 +854,14 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
       if (m->is_randc)
         diag_.Error(CurrentLoc(),
                     "cannot combine 'rand' and 'randc' qualifiers");
-      if (m->is_rand)
-        diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier");
+      if (m->is_rand) diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier");
       m->is_rand = true;
       Consume();
     } else if (Check(TokenKind::kKwRandc)) {
       if (m->is_rand)
         diag_.Error(CurrentLoc(),
                     "cannot combine 'rand' and 'randc' qualifiers");
-      if (m->is_randc)
-        diag_.Error(CurrentLoc(), "duplicate 'randc' qualifier");
+      if (m->is_randc) diag_.Error(CurrentLoc(), "duplicate 'randc' qualifier");
       m->is_randc = true;
       Consume();
     } else if (Match(TokenKind::kKwConst)) {

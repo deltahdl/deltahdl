@@ -212,11 +212,11 @@ TEST(ParserClause03, Cl3_3_ModuleWithFinalBlock) {
 }
 
 TEST(ParserClause03, Cl3_3_ModuleWithAlwaysBlock) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic clk, q, d;\n"
-      "  always @(posedge clk) q <= d;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic clk, q, d;\n"
+              "  always @(posedge clk) q <= d;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_3_ModuleWithAlwaysComb) {
@@ -231,41 +231,41 @@ TEST(ParserClause03, Cl3_3_ModuleWithAlwaysComb) {
 }
 
 TEST(ParserClause03, Cl3_3_ModuleWithAlwaysFF) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic clk, d, q;\n"
-      "  always_ff @(posedge clk) q <= d;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic clk, d, q;\n"
+              "  always_ff @(posedge clk) q <= d;\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_3_ModuleWithAlwaysLatch) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  logic en, d, q;\n"
-      "  always_latch if (en) q <= d;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic en, d, q;\n"
+              "  always_latch if (en) q <= d;\n"
+              "endmodule\n"));
 }
 
 // --- Generate blocks ---
 
 TEST(ParserClause03, Cl3_3_ModuleWithGenerateFor) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  genvar i;\n"
-      "  for (i = 0; i < 4; i = i + 1) begin : gen\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  genvar i;\n"
+              "  for (i = 0; i < 4; i = i + 1) begin : gen\n"
+              "    wire w;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_3_ModuleWithGenerateIf) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  parameter int P = 1;\n"
-      "  if (P) begin : gen\n"
-      "    wire w;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter int P = 1;\n"
+              "  if (P) begin : gen\n"
+              "    wire w;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 // --- Specify blocks ---
@@ -310,7 +310,8 @@ TEST(ParserClause03, Cl3_3_Mux2to1Example) {
 
 TEST(ParserClause03, Cl3_3_ModuleWithMixedContents) {
   EXPECT_TRUE(ParseOk(
-      "module m #(parameter int W = 8) (input logic clk, output logic [W-1:0] q);\n"
+      "module m #(parameter int W = 8) (input logic clk, output logic [W-1:0] "
+      "q);\n"
       "  typedef logic [W-1:0] data_t;\n"
       "  wire [W-1:0] net;\n"
       "  logic [W-1:0] var;\n"

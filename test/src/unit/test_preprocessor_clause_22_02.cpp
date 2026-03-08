@@ -472,8 +472,7 @@ TEST(Preprocessor, Clause22_2_CodeAfterDefaultNettypeOnSameLine) {
 TEST(Preprocessor, Clause22_2_CodeAfterUnconnectedDriveOnSameLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  auto fid =
-      f.mgr.AddFile("<test>", "`unconnected_drive pull0 int x = 1;\n");
+  auto fid = f.mgr.AddFile("<test>", "`unconnected_drive pull0 int x = 1;\n");
   auto result = pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.UnconnectedDrive(), NetType::kTri0);
@@ -482,8 +481,7 @@ TEST(Preprocessor, Clause22_2_CodeAfterUnconnectedDriveOnSameLine) {
 
 TEST(Preprocessor, Clause22_2_CodeAfterUndefOnSameLine) {
   PreprocFixture f;
-  auto result =
-      Preprocess("`define FOO 1\n`undef FOO int x = 42;\n", f);
+  auto result = Preprocess("`define FOO 1\n`undef FOO int x = 42;\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 42"), std::string::npos);
 }

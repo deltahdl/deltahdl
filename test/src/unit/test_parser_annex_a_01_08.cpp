@@ -41,8 +41,8 @@ TEST(CheckerItemsA18, CheckerInitial) {
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->checkers[0]->items,
-                            ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
 
 // checker_or_generate_item ::= always_construct
@@ -63,8 +63,8 @@ TEST(CheckerItemsA18, CheckerFinal) {
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->checkers[0]->items,
-                            ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kFinalBlock));
 }
 
 // checker_or_generate_item ::= assertion_item
@@ -108,8 +108,8 @@ TEST(CheckerItemsA18, CheckerFuncDecl) {
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->checkers[0]->items,
-                            ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
 // checker_or_generate_item_declaration ::= checker_declaration (nested)
@@ -187,8 +187,8 @@ TEST(CheckerItemsA18, CheckerGenFor) {
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->checkers[0]->items,
-                            ModuleItemKind::kGenerateFor));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kGenerateFor));
 }
 
 // checker_generate_item ::= generate_region

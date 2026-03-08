@@ -73,7 +73,8 @@ TEST(Sim13031, StaticTaskWithInputArgs) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
-      "  task static add_to(input logic [31:0] addend, output logic [31:0] v);\n"
+      "  task static add_to(input logic [31:0] addend, output logic [31:0] "
+      "v);\n"
       "    int acc;\n"
       "    acc = acc + addend;\n"
       "    v = acc;\n"

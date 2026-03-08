@@ -335,7 +335,10 @@ static bool MayInferLatch(const Stmt* stmt) {
     case StmtKind::kCase: {
       bool has_default = false;
       for (const auto& ci : stmt->case_items)
-        if (ci.is_default) { has_default = true; break; }
+        if (ci.is_default) {
+          has_default = true;
+          break;
+        }
       if (!has_default) return true;
       for (const auto& ci : stmt->case_items)
         if (MayInferLatch(ci.body)) return true;
@@ -352,7 +355,7 @@ static bool MayInferLatch(const Stmt* stmt) {
 
 // §9.2.2.2: Collect LHS variable names assigned in a statement.
 static void CollectLhsNames(const Stmt* stmt,
-                             std::unordered_set<std::string>& out) {
+                            std::unordered_set<std::string>& out) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlockingAssign ||
       stmt->kind == StmtKind::kNonblockingAssign) {
@@ -430,7 +433,7 @@ static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
        kind == RtlirProcessKind::kAlwaysLatch) &&
       StmtHasTimingControl(proc.body)) {
     const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
-                                                              : "always_latch";
+                                                             : "always_latch";
     diag.Error(item->loc,
                std::format("{} shall not contain timing controls", kw));
   }
@@ -439,7 +442,7 @@ static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
        kind == RtlirProcessKind::kAlwaysLatch) &&
       StmtHasForkJoin(proc.body)) {
     const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
-                                                              : "always_latch";
+                                                             : "always_latch";
     diag.Error(item->loc,
                std::format("{} shall not contain fork-join statements", kw));
   }
@@ -458,16 +461,14 @@ static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
   // §9.2.2.4: always_ff shall contain one and only one event control.
   if (kind == RtlirProcessKind::kAlwaysFF) {
     if (item->sensitivity.empty()) {
-      diag.Error(item->loc,
-                 "always_ff requires an event control");
+      diag.Error(item->loc, "always_ff requires an event control");
     }
     if (StmtHasTimingControl(proc.body)) {
       diag.Error(item->loc,
                  "always_ff shall not contain blocking timing controls");
     }
     if (StmtHasForkJoin(proc.body)) {
-      diag.Error(item->loc,
-                 "always_ff shall not contain fork-join statements");
+      diag.Error(item->loc, "always_ff shall not contain fork-join statements");
     }
   }
   // §9.2.2.4: Warn if always_ff does not represent sequential logic.
@@ -504,7 +505,7 @@ static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
 // §9.2.2.2, §9.2.2.4: Check that always_comb/always_latch/always_ff LHS
 // variables are not driven by other processes or continuous assignments.
 void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
-                                             RtlirModule* /*mod*/) {
+                                            RtlirModule* /*mod*/) {
   struct ProcInfo {
     SourceLoc loc;
     std::unordered_set<std::string> lhs;
@@ -533,9 +534,12 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
 
   auto KindLabel = [](ModuleItemKind k) -> const char* {
     switch (k) {
-      case ModuleItemKind::kAlwaysFFBlock: return "always_ff";
-      case ModuleItemKind::kAlwaysLatchBlock: return "always_latch";
-      default: return "always_comb";
+      case ModuleItemKind::kAlwaysFFBlock:
+        return "always_ff";
+      case ModuleItemKind::kAlwaysLatchBlock:
+        return "always_latch";
+      default:
+        return "always_comb";
     }
   };
 
@@ -543,10 +547,9 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
     for (const auto& var : procs[i].lhs) {
       // Check against continuous assignments.
       if (cont_assign_lhs.count(var)) {
-        diag_.Error(procs[i].loc,
-                    std::format("variable '{}' driven by {} and "
-                                "continuous assignment",
-                                var, KindLabel(procs[i].kind)));
+        diag_.Error(procs[i].loc, std::format("variable '{}' driven by {} and "
+                                              "continuous assignment",
+                                              var, KindLabel(procs[i].kind)));
       }
       // Check against other processes.
       for (size_t j = i + 1; j < procs.size(); ++j) {
@@ -710,8 +713,9 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // §10.3.1: Net declaration assignment creates an implicit continuous assign.
   if (item->init_expr) {
     if (item->data_type.is_interconnect) {
-      diag_.Error(item->loc,
-                  "interconnect net shall not have a net declaration assignment");
+      diag_.Error(
+          item->loc,
+          "interconnect net shall not have a net declaration assignment");
       return;
     }
     auto* lhs = arena_.Create<Expr>();
@@ -825,8 +829,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
   // §7.6/§7.9.9: Track array info for assignment compatibility.
   if (!item->unpacked_dims.empty()) {
-    VarArrayInfo info{item->data_type.kind, var.unpacked_size, var.is_dynamic,
-                      var.is_assoc, {}};
+    VarArrayInfo info{item->data_type.kind,
+                      var.unpacked_size,
+                      var.is_dynamic,
+                      var.is_assoc,
+                      {}};
     if (var.is_assoc && !item->unpacked_dims.empty() &&
         item->unpacked_dims[0] &&
         item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
@@ -946,7 +953,8 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                   "a single delay");
     }
   }
-  // §10.3.4: Drive strength applies only to scalar nets, except supply0/supply1.
+  // §10.3.4: Drive strength applies only to scalar nets, except
+  // supply0/supply1.
   if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
       item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
     uint32_t lhs_width = LookupLhsWidth(item->assign_lhs, mod);
@@ -1158,8 +1166,9 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   var_named_types_.clear();
   task_names_.clear();
   func_decls_.clear();
-  // §13.2: Collect task names so function body validation can detect task enables.
-  // §13.4.3: Collect function declarations for constant function validation.
+  // §13.2: Collect task names so function body validation can detect task
+  // enables. §13.4.3: Collect function declarations for constant function
+  // validation.
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) {
       task_names_.insert(item->name);

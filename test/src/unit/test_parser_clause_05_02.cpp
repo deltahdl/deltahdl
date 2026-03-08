@@ -27,8 +27,7 @@ TEST(ParserClause05, Cl5_2_FreeFormatMaximallyCompact) {
 }
 
 TEST(ParserClause05, Cl5_2_FreeFormatExcessiveWhitespace) {
-  EXPECT_TRUE(
-      ParseOk("  module   t  ;   logic   a  ;   endmodule  "));
+  EXPECT_TRUE(ParseOk("  module   t  ;   logic   a  ;   endmodule  "));
 }
 
 TEST(ParserClause05, Cl5_2_WhitespaceVariationsProduceSameAST) {

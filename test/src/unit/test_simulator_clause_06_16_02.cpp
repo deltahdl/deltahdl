@@ -29,8 +29,8 @@ TEST(StringMethods, PutcOutOfBounds) {
 TEST(StringMethods, PutcZeroByte) {
   StringFixture f;
   auto* var = f.CreateStringVar("s", "abc");
-  auto* call = f.MakeMethodCall("s", "putc",
-                                {f.MakeIntLiteral(0), f.MakeIntLiteral(0)});
+  auto* call =
+      f.MakeMethodCall("s", "putc", {f.MakeIntLiteral(0), f.MakeIntLiteral(0)});
   EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(VecToString(var->value), "abc");
 }

@@ -75,35 +75,35 @@ TEST(ParserA817, ExtendsArgsStored) {
 
 // §8.17: Constructor chaining — three-level hierarchy parses OK.
 TEST(ParserA817, ThreeLevelChaining) {
-  EXPECT_TRUE(ParseOk(
-      "class A;\n"
-      "  function new();\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class B extends A;\n"
-      "  function new();\n"
-      "    super.new();\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class C extends B;\n"
-      "  function new();\n"
-      "    super.new();\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class A;\n"
+              "  function new();\n"
+              "  endfunction\n"
+              "endclass\n"
+              "class B extends A;\n"
+              "  function new();\n"
+              "    super.new();\n"
+              "  endfunction\n"
+              "endclass\n"
+              "class C extends B;\n"
+              "  function new();\n"
+              "    super.new();\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §8.17: super.new with arguments parses.
 TEST(ParserA817, SuperNewWithMultipleArgs) {
-  EXPECT_TRUE(ParseOk(
-      "class Base;\n"
-      "  function new(string name, int id);\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Child extends Base;\n"
-      "  function new();\n"
-      "    super.new(\"foo\", 42);\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class Base;\n"
+              "  function new(string name, int id);\n"
+              "  endfunction\n"
+              "endclass\n"
+              "class Child extends Base;\n"
+              "  function new();\n"
+              "    super.new(\"foo\", 42);\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §8.17: extends with 'default' keyword parses.
@@ -124,14 +124,14 @@ TEST(ParserA817, ExtendsWithDefault) {
 
 // §8.17: No constructor in subclass (implicit super.new) parses OK.
 TEST(ParserA817, ImplicitSuperNewNoConstructor) {
-  EXPECT_TRUE(ParseOk(
-      "class Base;\n"
-      "  function new();\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Child extends Base;\n"
-      "  int x;\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class Base;\n"
+              "  function new();\n"
+              "  endfunction\n"
+              "endclass\n"
+              "class Child extends Base;\n"
+              "  int x;\n"
+              "endclass\n"));
 }
 
 TEST(ParserClause08_03, ConstructorMixedArgsWithDefault) {

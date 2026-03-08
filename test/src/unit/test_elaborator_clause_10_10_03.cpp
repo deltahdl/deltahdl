@@ -91,7 +91,8 @@ TEST(ElabCh10j, ArrayIdentifierSelfDetermined) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10.3: Multiple nested concats in unpacked array concat each produce error.
+// §10.10.3: Multiple nested concats in unpacked array concat each produce
+// error.
 TEST(ElabCh10j, MultipleNestedConcatsError) {
   ElabFixture f;
   auto* design = ElaborateSrc(

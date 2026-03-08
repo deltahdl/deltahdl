@@ -109,7 +109,8 @@ TEST(LexerA92, UnterminatedBlockCommentError) {
   EXPECT_TRUE(errors);
 }
 
-// §A.9.2 — // has no special meaning in block comment, /* */ has none in line comment
+// §A.9.2 — // has no special meaning in block comment, /* */ has none in line
+// comment
 
 TEST(LexerA92, LineCommentTokenInsideBlockComment) {
   auto tokens = Lex("a /* // still block */ b");

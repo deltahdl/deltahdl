@@ -15,8 +15,8 @@ TEST(ModuleItemsA14, ElabFatalTask) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kElabSystemTask));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kElabSystemTask));
 }
 
 TEST(ModuleItemsA14, ElabErrorTask) {
@@ -57,8 +57,8 @@ TEST(ModuleItemsA14, ContinuousAssign) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kContAssign));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign));
 }
 
 // net_alias
@@ -70,8 +70,7 @@ TEST(ModuleItemsA14, NetAlias) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kAlias));
+  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAlias));
 }
 
 // initial_construct
@@ -82,8 +81,8 @@ TEST(ModuleItemsA14, InitialConstruct) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
 }
 
 // final_construct
@@ -94,8 +93,8 @@ TEST(ModuleItemsA14, FinalConstruct) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock));
 }
 
 // always_construct — all four variants
@@ -116,8 +115,8 @@ TEST(ModuleItemsA14, AlwaysComb) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items,
-                              AlwaysKind::kAlwaysComb));
+  EXPECT_TRUE(
+      HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
 }
 
 TEST(ModuleItemsA14, AlwaysFF) {
@@ -127,8 +126,7 @@ TEST(ModuleItemsA14, AlwaysFF) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items,
-                              AlwaysKind::kAlwaysFF));
+  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysFF));
 }
 
 TEST(ModuleItemsA14, AlwaysLatch) {
@@ -138,8 +136,8 @@ TEST(ModuleItemsA14, AlwaysLatch) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items,
-                              AlwaysKind::kAlwaysLatch));
+  EXPECT_TRUE(
+      HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysLatch));
 }
 
 // loop_generate_construct
@@ -153,8 +151,8 @@ TEST(ModuleItemsA14, LoopGenerateConstruct) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kGenerateFor));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor));
 }
 
 // conditional_generate_construct
@@ -167,8 +165,8 @@ TEST(ModuleItemsA14, ConditionalGenerateIf) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kGenerateIf));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateIf));
 }
 
 TEST(ModuleItemsA14, ConditionalGenerateCase) {
@@ -181,8 +179,8 @@ TEST(ModuleItemsA14, ConditionalGenerateCase) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kGenerateCase));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateCase));
 }
 
 // module_or_generate_item ::= parameter_override
@@ -193,8 +191,8 @@ TEST(ModuleItemsA14, ParameterOverride) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kDefparam));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kDefparam));
 }
 
 // module_or_generate_item ::= gate_instantiation
@@ -205,8 +203,8 @@ TEST(ModuleItemsA14, GateInstantiation) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kGateInst));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGateInst));
 }
 
 // module_or_generate_item ::= module_instantiation
@@ -217,8 +215,8 @@ TEST(ModuleItemsA14, ModuleInstantiation) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kModuleInst));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
 }
 
 // module_or_generate_item_declaration ::= clocking_declaration
@@ -230,8 +228,8 @@ TEST(ModuleItemsA14, ClockingDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kClockingBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kClockingBlock));
 }
 
 // default clocking clocking_identifier ;
@@ -280,8 +278,8 @@ TEST(ModuleItemsA14, SpecifyBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kSpecifyBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecifyBlock));
 }
 
 // non_port_module_item ::= specparam_declaration
@@ -292,8 +290,8 @@ TEST(ModuleItemsA14, SpecparamDeclaration) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kSpecparam));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecparam));
 }
 
 // non_port_module_item ::= nested program/module/interface declarations
@@ -377,8 +375,8 @@ TEST(ModuleItemsA14, AssertionItem) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kAssertProperty));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty));
 }
 
 // interface_instantiation / program_instantiation (via module_common_item)
@@ -389,8 +387,8 @@ TEST(ModuleItemsA14, InterfaceInstantiation) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kModuleInst));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
 }
 
 // module_or_generate_item with { attribute_instance }

@@ -24,9 +24,9 @@ TEST(ArrayMap, MapDoubleElements) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 10, 15});
   // with (item + item) — doubles each element.
-  auto* with_expr = MakeBinary(f.arena, TokenKind::kPlus,
-                                MakeId(f.arena, "item"),
-                                MakeId(f.arena, "item"));
+  auto* with_expr =
+      MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "item"),
+                 MakeId(f.arena, "item"));
   auto* call = MakeMethodCall(f.arena, "arr", "map", {});
   call->with_expr = with_expr;
   std::vector<Logic4Vec> out;

@@ -395,8 +395,7 @@ Expr* Parser::ParsePrimaryExpr() {
              e = e->lhs) {
           if (e->rhs && e->rhs->kind == ExprKind::kIdentifier &&
               e->rhs->text == "super") {
-            diag_.Error(e->rhs->range.start,
-                        "'super.super' is not allowed");
+            diag_.Error(e->rhs->range.start, "'super.super' is not allowed");
             break;
           }
         }

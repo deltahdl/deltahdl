@@ -338,7 +338,8 @@ TEST(SimCh9b, AlwaysCombSensitivityRegistered) {
   EXPECT_FALSE(procs.empty());
 }
 
-// §9.2.2.2.1: Variables also written in the block are excluded from sensitivity.
+// §9.2.2.2.1: Variables also written in the block are excluded from
+// sensitivity.
 TEST(ElabClause09_02_02_02_01, WrittenVarsExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(

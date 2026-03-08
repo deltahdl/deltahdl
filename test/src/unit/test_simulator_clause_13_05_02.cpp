@@ -80,8 +80,7 @@ TEST(Sim1352, RefImmediateVisibility) {
   // r = 42; return r;
   func->func_body_stmts.push_back(
       MakeAssign(f.arena, "r", MakeInt(f.arena, 42)));
-  func->func_body_stmts.push_back(
-      MakeReturn(f.arena, MakeId(f.arena, "r")));
+  func->func_body_stmts.push_back(MakeReturn(f.arena, MakeId(f.arena, "r")));
   f.ctx.RegisterFunction("write_and_read", func);
 
   auto* call = MakeCall(f.arena, "write_and_read", {MakeId(f.arena, "x")});

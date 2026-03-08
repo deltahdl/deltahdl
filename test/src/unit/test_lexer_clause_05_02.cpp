@@ -170,8 +170,7 @@ TEST(LexerClause05, Cl5_2_KeywordCategory) {
 TEST(LexerClause05, Cl5_2_AllSevenCategoriesInOneStream) {
   // Whitespace (implicit), comment (stripped), operator, number,
   // string literal, identifier, keyword
-  auto tokens =
-      Lex("module /* comment */ m; logic x = 42 + \"s\"; endmodule");
+  auto tokens = Lex("module /* comment */ m; logic x = 42 + \"s\"; endmodule");
   bool has_operator = false;
   bool has_number = false;
   bool has_string = false;

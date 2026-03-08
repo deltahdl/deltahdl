@@ -53,7 +53,8 @@ TEST(Elaboration, AssocArrayClassIndex_IsClassIndex) {
   EXPECT_TRUE(found);
 }
 
-// §7.8.3: Class-indexed assoc array has 64-bit index width (handles are 64-bit).
+// §7.8.3: Class-indexed assoc array has 64-bit index width (handles are
+// 64-bit).
 TEST(Elaboration, AssocArrayClassIndex_IndexWidth64) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -103,15 +104,15 @@ TEST(Elaboration, AssocArrayClassIndex_NotStringIndex) {
 
 // §7.8.3: Assignment between arrays with same class index type is OK.
 TEST(Elaboration, AssocArrayClassIndex_SameTypeAssignOk) {
-  EXPECT_TRUE(ElabOk(
-      "module top;\n"
-      "  class K;\n"
-      "    int id;\n"
-      "  endclass\n"
-      "  int aa[K];\n"
-      "  int bb[K];\n"
-      "  assign aa = bb;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  class K;\n"
+             "    int id;\n"
+             "  endclass\n"
+             "  int aa[K];\n"
+             "  int bb[K];\n"
+             "  assign aa = bb;\n"
+             "endmodule\n"));
 }
 
 // §7.8.3: Assignment between arrays with different class index types is error.

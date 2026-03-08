@@ -47,7 +47,7 @@ TEST(ArrayAssign, PatternDistribute) {
   auto* pattern = f.arena.Create<Expr>();
   pattern->kind = ExprKind::kAssignmentPattern;
   pattern->elements = {MakeInt(f.arena, 10), MakeInt(f.arena, 20),
-                        MakeInt(f.arena, 30)};
+                       MakeInt(f.arena, 30)};
 
   auto* stmt = MakeAssign(f.arena, "arr", pattern);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);

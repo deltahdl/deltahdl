@@ -18,7 +18,8 @@ TEST(ParserSection1110_1, StringLiteralCopyToVector) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-// §11.10.1: Concatenate — string literals concatenated via concatenation operator.
+// §11.10.1: Concatenate — string literals concatenated via concatenation
+// operator.
 TEST(ParserSection1110_1, StringLiteralConcatInVector) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

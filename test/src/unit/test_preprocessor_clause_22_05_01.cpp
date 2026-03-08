@@ -670,9 +670,7 @@ TEST(Preprocessor, Clause22_5_1_ExplicitEmptyDefault) {
 
 TEST(Preprocessor, Clause22_5_1_MacroBodySplitAcrossStringLiteral) {
   PreprocFixture f;
-  Preprocess(
-      "`define first_half \"start of string\n",
-      f);
+  Preprocess("`define first_half \"start of string\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 

@@ -26,10 +26,10 @@ TEST(ParserClause03, Cl3_9_PackageWithTypedef) {
 }
 
 TEST(ParserClause03, Cl3_9_PackageWithFunction) {
-  EXPECT_TRUE(ParseOk(
-      "package pkg;\n"
-      "  function int add(int a, int b); return a + b; endfunction\n"
-      "endpackage\n"));
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  function int add(int a, int b); return a + b; endfunction\n"
+              "endpackage\n"));
 }
 
 // §3.9: Package declarations can be imported into other building blocks.
@@ -49,27 +49,27 @@ TEST(ParserClause03, Cl3_9_ImportIntoModule) {
 }
 
 TEST(ParserClause03, Cl3_9_ImportIntoInterface) {
-  EXPECT_TRUE(ParseOk(
-      "package pkg; typedef int myint; endpackage\n"
-      "interface ifc;\n"
-      "  import pkg::*;\n"
-      "endinterface\n"));
+  EXPECT_TRUE(
+      ParseOk("package pkg; typedef int myint; endpackage\n"
+              "interface ifc;\n"
+              "  import pkg::*;\n"
+              "endinterface\n"));
 }
 
 TEST(ParserClause03, Cl3_9_ImportIntoProgram) {
-  EXPECT_TRUE(ParseOk(
-      "package pkg; typedef int myint; endpackage\n"
-      "program p;\n"
-      "  import pkg::*;\n"
-      "endprogram\n"));
+  EXPECT_TRUE(
+      ParseOk("package pkg; typedef int myint; endpackage\n"
+              "program p;\n"
+              "  import pkg::*;\n"
+              "endprogram\n"));
 }
 
 TEST(ParserClause03, Cl3_9_ImportIntoPackage) {
-  EXPECT_TRUE(ParseOk(
-      "package a; typedef int myint; endpackage\n"
-      "package b;\n"
-      "  import a::*;\n"
-      "endpackage\n"));
+  EXPECT_TRUE(
+      ParseOk("package a; typedef int myint; endpackage\n"
+              "package b;\n"
+              "  import a::*;\n"
+              "endpackage\n"));
 }
 
 TEST(ParserClause03, Cl3_9_NamedImport) {
@@ -108,9 +108,9 @@ TEST(ParserClause03, Cl3_9_ComplexPkgExample) {
 // §3.9: Module/interface/program/checker declarations are local.
 
 TEST(ParserClause03, Cl3_9_LocalScopesDoNotConflict) {
-  EXPECT_TRUE(ParseOk(
-      "module a; logic x; endmodule\n"
-      "module b; logic x; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module a; logic x; endmodule\n"
+              "module b; logic x; endmodule\n"));
 }
 
 }  // namespace

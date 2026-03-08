@@ -151,8 +151,7 @@ TEST(ParserA91, AttrOnCaseStatement) {
 }
 
 TEST(ParserA91, AttrValueStringLiteral) {
-  EXPECT_TRUE(
-      ParseOk("(* tool = \"synplify\" *) module m; endmodule\n"));
+  EXPECT_TRUE(ParseOk("(* tool = \"synplify\" *) module m; endmodule\n"));
 }
 
 }  // namespace

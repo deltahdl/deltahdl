@@ -220,10 +220,10 @@ TEST(Preprocessor, ResetAll_BetweenDesignElementsLegal) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
-                            "`default_nettype none\n"
-                            "module m1; endmodule\n"
-                            "`resetall\n"
-                            "module m2; endmodule\n");
+                           "`default_nettype none\n"
+                           "module m1; endmodule\n"
+                           "`resetall\n"
+                           "module m2; endmodule\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   // After resetall, default_nettype should be back to wire.
@@ -245,4 +245,3 @@ TEST(Preprocessor, Pragma_ResetallDoesNotAffectPragma) {
   PreprocessWithPP("`resetall\n", f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-

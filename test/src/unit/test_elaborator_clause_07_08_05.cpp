@@ -50,10 +50,10 @@ TEST(Elaboration, AssocArrayTypedefIndex_Allowed) {
 
 // §7.8.4: int as assoc index type is OK (sanity check).
 TEST(Elaboration, AssocArrayIntIndex_Allowed) {
-  EXPECT_TRUE(ElabOk(
-      "module top;\n"
-      "  int aa[int];\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  int aa[int];\n"
+             "endmodule\n"));
 }
 
 }  // namespace

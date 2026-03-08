@@ -7,7 +7,8 @@ using namespace delta;
 
 namespace {
 
-// §10.10.1: Unpacked array concat vs assignment pattern produce the same result.
+// §10.10.1: Unpacked array concat vs assignment pattern produce the same
+// result.
 TEST(SimCh10j, ConcatAndPatternEquivalent) {
   SimFixture f;
   auto* design = ElaborateSrc(

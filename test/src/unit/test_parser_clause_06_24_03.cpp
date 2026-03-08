@@ -71,13 +71,13 @@ TEST(ParserSection6, BitstreamCastStructToStruct) {
 
 // §6.24.3: Bitstream types include strings.
 TEST(ParserSection6, BitstreamCastStringType) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  typedef bit [$bits(int)-1:0] tagbits;\n"
-      "  int x;\n"
-      "  tagbits t_val;\n"
-      "  initial t_val = tagbits'(x);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef bit [$bits(int)-1:0] tagbits;\n"
+              "  int x;\n"
+              "  tagbits t_val;\n"
+              "  initial t_val = tagbits'(x);\n"
+              "endmodule\n"));
 }
 
 }  // namespace

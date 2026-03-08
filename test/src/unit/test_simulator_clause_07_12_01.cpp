@@ -20,7 +20,7 @@ static void MakeDynArray(SimFixture& f, std::string_view name,
 
 // Build arr.method with (predicate) expression.
 static Expr* MakeLocatorExpr(Arena& arena, std::string_view var,
-                              std::string_view method, Expr* with_expr) {
+                             std::string_view method, Expr* with_expr) {
   auto* call = MakeMethodCall(arena, var, method, {});
   call->with_expr = with_expr;
   return call;
@@ -59,7 +59,7 @@ TEST(ArrayLocator, FindWithPredicate) {
   MakeDynArray(f, "arr", {5, 15, 25, 35});
   // with (item > 10)
   auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "item"),
-                           MakeInt(f.arena, 10));
+                          MakeInt(f.arena, 10));
   auto* expr = MakeLocatorExpr(f.arena, "arr", "find", pred);
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(expr, f.ctx, f.arena, out);
@@ -75,7 +75,7 @@ TEST(ArrayLocator, FindFirstReturnsSingleMatch) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25});
   auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "item"),
-                           MakeInt(f.arena, 10));
+                          MakeInt(f.arena, 10));
   auto* expr = MakeLocatorExpr(f.arena, "arr", "find_first", pred);
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(expr, f.ctx, f.arena, out);
@@ -89,7 +89,7 @@ TEST(ArrayLocator, FindLastReturnsLastMatch) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25});
   auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "item"),
-                           MakeInt(f.arena, 10));
+                          MakeInt(f.arena, 10));
   auto* expr = MakeLocatorExpr(f.arena, "arr", "find_last", pred);
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(expr, f.ctx, f.arena, out);
@@ -103,7 +103,7 @@ TEST(ArrayLocator, FindIndexReturnsMatchingIndices) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25, 35});
   auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "item"),
-                           MakeInt(f.arena, 10));
+                          MakeInt(f.arena, 10));
   auto* expr = MakeLocatorExpr(f.arena, "arr", "find_index", pred);
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(expr, f.ctx, f.arena, out);
@@ -119,7 +119,7 @@ TEST(ArrayLocator, FindLastIndexReturnsLastMatchIndex) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25, 35});
   auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "item"),
-                           MakeInt(f.arena, 10));
+                          MakeInt(f.arena, 10));
   auto* expr = MakeLocatorExpr(f.arena, "arr", "find_last_index", pred);
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(expr, f.ctx, f.arena, out);
@@ -133,7 +133,7 @@ TEST(ArrayLocator, FindNoMatchReturnsEmpty) {
   SimFixture f;
   MakeDynArray(f, "arr", {1, 2, 3});
   auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "item"),
-                           MakeInt(f.arena, 100));
+                          MakeInt(f.arena, 100));
   auto* expr = MakeLocatorExpr(f.arena, "arr", "find", pred);
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(expr, f.ctx, f.arena, out);

@@ -60,8 +60,7 @@ TEST(ElabSection6, Sec6_9_1_VectorDefaultUnsigned) {
 // §6.9.1: Explicitly signed vector.
 TEST(ElabSection6, Sec6_9_1_ExplicitlySigned) {
   ElabFixture f;
-  auto* design =
-      Elaborate("module m; logic signed [7:0] sv; endmodule\n", f);
+  auto* design = Elaborate("module m; logic signed [7:0] sv; endmodule\n", f);
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->variables.size(), 1u);

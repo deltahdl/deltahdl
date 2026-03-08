@@ -100,9 +100,9 @@ TEST(ExprType, ComparisonAlwaysUnsigned) {
 TEST(ExprType, ReductionAlwaysUnsigned) {
   SimFixture f;
   MakeSignedVarAdv(f, "r", 8, 0xFF);
-  auto result = EvalExpr(MakeUnary(f.arena, TokenKind::kPipe,
-                                   MakeId(f.arena, "r")),
-                         f.ctx, f.arena);
+  auto result =
+      EvalExpr(MakeUnary(f.arena, TokenKind::kPipe, MakeId(f.arena, "r")),
+               f.ctx, f.arena);
   EXPECT_EQ(result.width, 1u);
   EXPECT_FALSE(result.is_signed);
 }

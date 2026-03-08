@@ -136,7 +136,8 @@ TEST(ParserA26, DpiImportFunction) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
   ASSERT_NE(item, nullptr);
   EXPECT_FALSE(item->dpi_is_task);
 }
@@ -148,7 +149,8 @@ TEST(ParserA26, DpiImportTask) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->dpi_is_task);
 }
@@ -160,7 +162,8 @@ TEST(ParserA26, DpiImportPure) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->dpi_is_pure);
   EXPECT_FALSE(item->dpi_is_context);
@@ -173,7 +176,8 @@ TEST(ParserA26, DpiImportContext) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->dpi_is_context);
 }
@@ -185,7 +189,8 @@ TEST(ParserA26, DpiImportWithCIdentifier) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->dpi_c_name, "c_name");
 }
@@ -198,7 +203,8 @@ TEST(ParserA26, DpiExportFunction) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiExport);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiExport);
   ASSERT_NE(item, nullptr);
   EXPECT_FALSE(item->dpi_is_task);
 }
@@ -211,7 +217,8 @@ TEST(ParserA26, DpiExportTask) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiExport);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiExport);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->dpi_is_task);
 }
@@ -224,7 +231,8 @@ TEST(ParserA26, DpiExportWithCIdentifier) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiExport);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiExport);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->dpi_c_name, "c_alias");
 }

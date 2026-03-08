@@ -93,10 +93,9 @@ static bool IsAllHighZ(const Logic4Vec& v) {
 // §10.3.3: Select the appropriate delay for a continuous assignment based on
 // the transition from old_val to new_val.
 static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
-                                      const Logic4Vec& new_val,
-                                      uint64_t d_rise, uint64_t d_fall,
-                                      uint64_t d_decay, bool has_fall,
-                                      bool has_decay) {
+                                      const Logic4Vec& new_val, uint64_t d_rise,
+                                      uint64_t d_fall, uint64_t d_decay,
+                                      bool has_fall, bool has_decay) {
   if (!has_fall) return d_rise;  // Single delay for all transitions.
   uint64_t new_bits = new_val.ToUint64();
   bool new_has_x = HasUnknownBits(new_val);
@@ -131,9 +130,8 @@ static SimCoroutine MakeContAssignCoroutine(const Expr* lhs, const Expr* rhs,
   // §10.3.3: Apply continuous assignment delay if specified.
   if (delay_expr) {
     uint64_t d_rise = EvalExpr(delay_expr, ctx, arena).ToUint64();
-    uint64_t d_fall = delay_fall_expr
-                          ? EvalExpr(delay_fall_expr, ctx, arena).ToUint64()
-                          : 0;
+    uint64_t d_fall =
+        delay_fall_expr ? EvalExpr(delay_fall_expr, ctx, arena).ToUint64() : 0;
     uint64_t d_decay = delay_decay_expr
                            ? EvalExpr(delay_decay_expr, ctx, arena).ToUint64()
                            : 0;
@@ -144,8 +142,10 @@ static SimCoroutine MakeContAssignCoroutine(const Expr* lhs, const Expr* rhs,
     Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);  // Default x-ish.
     auto* var = ctx.FindVariable(lhs->text);
     auto* net = ctx.FindNet(lhs->text);
-    if (var) old_val = var->value;
-    else if (net && net->resolved) old_val = net->resolved->value;
+    if (var)
+      old_val = var->value;
+    else if (net && net->resolved)
+      old_val = net->resolved->value;
 
     uint64_t ticks = SelectContAssignDelay(old_val, val, d_rise, d_fall,
                                            d_decay, has_fall, has_decay);
@@ -449,8 +449,8 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
       uint32_t w = EvalTypeWidth(member->data_type, {});
       if (w == 0) w = 32;
       info->properties.push_back({member->name, w, member->is_static,
-                                    member->is_local, member->is_protected,
-                                    member->is_const});
+                                  member->is_local, member->is_protected,
+                                  member->is_const});
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;
@@ -623,9 +623,9 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca) {
   p->home_region = Region::kActive;
   DriverStrength ds{ParserStrToStrength(ca.drive_strength0),
                     ParserStrToStrength(ca.drive_strength1)};
-  p->coro = MakeContAssignCoroutine(ca.lhs, ca.rhs, ds, ca.delay,
-                                    ca.delay_fall, ca.delay_decay,
-                                    ctx_, arena_).Release();
+  p->coro = MakeContAssignCoroutine(ca.lhs, ca.rhs, ds, ca.delay, ca.delay_fall,
+                                    ca.delay_decay, ctx_, arena_)
+                .Release();
 
   ScheduleProcess(p, ctx_.GetScheduler());
 }

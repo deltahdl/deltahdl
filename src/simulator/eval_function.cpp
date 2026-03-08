@@ -463,7 +463,8 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
 }
 
 // Forward declarations for mutually recursive function body execution.
-// func_name is passed through for §13.4.2 mixed-lifetime local variable support.
+// func_name is passed through for §13.4.2 mixed-lifetime local variable
+// support.
 static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
                          std::string_view func_name, SimContext& ctx,
                          Arena& arena);

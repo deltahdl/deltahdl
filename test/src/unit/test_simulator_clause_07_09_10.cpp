@@ -13,8 +13,8 @@ TEST(AssocMethods, AssocArgCopyByValue) {
   src->str_data["key2"] = MakeLogic4VecVal(f.arena, 32, 200);
 
   // Simulate the copy that TryBindAssocArg would do.
-  auto* dst = f.ctx.CreateAssocArray("formal", src->elem_width,
-                                      src->is_string_key);
+  auto* dst =
+      f.ctx.CreateAssocArray("formal", src->elem_width, src->is_string_key);
   dst->str_data = src->str_data;
   dst->has_default = src->has_default;
   dst->default_value = src->default_value;
@@ -37,8 +37,8 @@ TEST(AssocMethods, AssocArgCopiesDefault) {
   src->default_value = MakeLogic4VecVal(f.arena, 32, 42);
   src->int_data[1] = MakeLogic4VecVal(f.arena, 32, 10);
 
-  auto* dst = f.ctx.CreateAssocArray("formal", src->elem_width,
-                                      src->is_string_key);
+  auto* dst =
+      f.ctx.CreateAssocArray("formal", src->elem_width, src->is_string_key);
   dst->int_data = src->int_data;
   dst->has_default = src->has_default;
   dst->default_value = src->default_value;

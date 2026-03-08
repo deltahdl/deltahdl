@@ -16,8 +16,8 @@ TEST(ParserA222, DriveStrengthStr1Highz0) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->drive_strength0, 1u);   // highz0
-  EXPECT_EQ(item->drive_strength1, 4u);   // strong1
+  EXPECT_EQ(item->drive_strength0, 1u);  // highz0
+  EXPECT_EQ(item->drive_strength1, 4u);  // strong1
 }
 
 // §6.3.2.2: Drive strength (strength0, strength1) — normal order.
@@ -30,8 +30,8 @@ TEST(ParserA222, DriveStrengthStr0Str1) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 4u);   // strong0
-  EXPECT_EQ(item->drive_strength1, 3u);   // pull1
+  EXPECT_EQ(item->drive_strength0, 4u);  // strong0
+  EXPECT_EQ(item->drive_strength1, 3u);  // pull1
 }
 
 // §6.3.2.2: Drive strength with supply1.
@@ -44,8 +44,8 @@ TEST(ParserA222, DriveStrengthPull0Supply1) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 3u);   // pull0
-  EXPECT_EQ(item->drive_strength1, 5u);   // supply1
+  EXPECT_EQ(item->drive_strength0, 3u);  // pull0
+  EXPECT_EQ(item->drive_strength1, 5u);  // supply1
 }
 
 // §6.3.2.2: Drive strength (highz0, highz1) parses but is semantically illegal.
@@ -72,8 +72,8 @@ TEST(ParserA222, DriveStrengthOnTri) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 3u);   // pull0
-  EXPECT_EQ(item->drive_strength1, 3u);   // pull1
+  EXPECT_EQ(item->drive_strength0, 3u);  // pull0
+  EXPECT_EQ(item->drive_strength1, 3u);  // pull1
 }
 
 }  // namespace

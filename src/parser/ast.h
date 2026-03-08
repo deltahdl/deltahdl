@@ -341,8 +341,8 @@ struct Stmt {
   // Case
   std::vector<CaseItem> case_items;
   TokenKind case_kind = TokenKind::kKwCase;  // case/casex/casez
-  bool case_inside = false;   // case ... inside (§12.5.4)
-  bool case_matches = false;  // case ... matches (§12.6.1)
+  bool case_inside = false;                  // case ... inside (§12.5.4)
+  bool case_matches = false;                 // case ... matches (§12.6.1)
 
   // Timing
   std::vector<EventExpr> events;
@@ -746,8 +746,8 @@ struct ClassDecl {
   bool is_final = false;      // class :final (§8.20)
   bool is_interface = false;  // interface class (A.1.9)
   std::string_view base_class;
-  std::vector<Expr*> extends_args;            // §8.3: extends constructor args
-  bool extends_has_default = false;           // §8.3: extends Base(default)
+  std::vector<Expr*> extends_args;   // §8.3: extends constructor args
+  bool extends_has_default = false;  // §8.3: extends Base(default)
   std::vector<std::string_view> implements_types;  // §8.3/§8.26: implements
   std::vector<ClassMember*> members;
   std::vector<std::pair<std::string_view, Expr*>> params;

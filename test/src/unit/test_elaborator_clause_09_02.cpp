@@ -4,7 +4,8 @@ using namespace delta;
 
 namespace {
 
-// §9.2: All six structured procedure types elaborate to correct RtlirProcessKind.
+// §9.2: All six structured procedure types elaborate to correct
+// RtlirProcessKind.
 TEST(ElabClause09_02, AllSixProcedureTypesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -27,12 +28,24 @@ TEST(ElabClause09_02, AllSixProcedureTypesElaborate) {
   bool has_latch = false, has_ff = false, has_final = false;
   for (auto& p : procs) {
     switch (p.kind) {
-      case RtlirProcessKind::kInitial: has_initial = true; break;
-      case RtlirProcessKind::kAlways: has_always = true; break;
-      case RtlirProcessKind::kAlwaysComb: has_comb = true; break;
-      case RtlirProcessKind::kAlwaysLatch: has_latch = true; break;
-      case RtlirProcessKind::kAlwaysFF: has_ff = true; break;
-      case RtlirProcessKind::kFinal: has_final = true; break;
+      case RtlirProcessKind::kInitial:
+        has_initial = true;
+        break;
+      case RtlirProcessKind::kAlways:
+        has_always = true;
+        break;
+      case RtlirProcessKind::kAlwaysComb:
+        has_comb = true;
+        break;
+      case RtlirProcessKind::kAlwaysLatch:
+        has_latch = true;
+        break;
+      case RtlirProcessKind::kAlwaysFF:
+        has_ff = true;
+        break;
+      case RtlirProcessKind::kFinal:
+        has_final = true;
+        break;
     }
   }
   EXPECT_TRUE(has_initial);
@@ -43,7 +56,8 @@ TEST(ElabClause09_02, AllSixProcedureTypesElaborate) {
   EXPECT_TRUE(has_final);
 }
 
-// §9.2: No limit to the number of processes — multiple initial/always elaborate.
+// §9.2: No limit to the number of processes — multiple initial/always
+// elaborate.
 TEST(ElabClause09_02, MultipleProcessesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(

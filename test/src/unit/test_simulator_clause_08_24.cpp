@@ -44,8 +44,7 @@ TEST(ClassSim, OutOfBlockBodyReplacesPrototype) {
   body->kind = ModuleItemKind::kFunctionDecl;
   body->name = "send";
   body->method_class = "Packet";
-  body->func_body_stmts.push_back(
-      MakeReturn(f.arena, MkInt(f.arena, 100)));
+  body->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 100)));
 
   type->methods["send"] = body;
 

@@ -185,13 +185,13 @@ TEST(ParserA820, ExtendsFinalCombined) {
 
 // §8.20: Derived override without virtual keyword parses.
 TEST(ParserA820, DerivedOverrideWithoutVirtual) {
-  EXPECT_TRUE(ParseOk(
-      "class Base;\n"
-      "  virtual function void display(); endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  function void display(); endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class Base;\n"
+              "  virtual function void display(); endfunction\n"
+              "endclass\n"
+              "class Derived extends Base;\n"
+              "  function void display(); endfunction\n"
+              "endclass\n"));
 }
 
 // §8.20: task with :initial specifier stores it.

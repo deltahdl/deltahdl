@@ -30,12 +30,12 @@ TEST(ParserClause03, Cl3_10_ConfigWithDesignCell) {
 }
 
 TEST(ParserClause03, Cl3_10_ConfigWithDefaultRule) {
-  EXPECT_TRUE(ParseOk(
-      "module m; endmodule\n"
-      "config cfg;\n"
-      "  design m;\n"
-      "  default liblist work;\n"
-      "endconfig\n"));
+  EXPECT_TRUE(
+      ParseOk("module m; endmodule\n"
+              "config cfg;\n"
+              "  design m;\n"
+              "  default liblist work;\n"
+              "endconfig\n"));
 }
 
 // §3.10: Configurations utilize libraries.

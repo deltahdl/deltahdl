@@ -52,8 +52,8 @@ TEST(AssocTraversal, NextStringKey) {
   // Encode "apple" as a 5-byte Logic4Vec.
   auto v = MakeLogic4Vec(f.arena, 40);
   v.words[0].aval = (uint64_t('a') << 32) | (uint64_t('p') << 24) |
-                     (uint64_t('p') << 16) | (uint64_t('l') << 8) |
-                     uint64_t('e');
+                    (uint64_t('p') << 16) | (uint64_t('l') << 8) |
+                    uint64_t('e');
   ref->value = v;
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "next", "s");

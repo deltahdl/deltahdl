@@ -20,74 +20,74 @@ TEST(ElabA84, PrimaryNullElaborates) {
 
 // §8.4: Class handle assignment of null is legal.
 TEST(ElabA84, ClassHandleAssignNull) {
-  EXPECT_TRUE(ElabOk(
-      "class C; endclass\n"
-      "module m;\n"
-      "  C c;\n"
-      "  initial c = null;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "  initial c = null;\n"
+             "endmodule\n"));
 }
 
 // §8.4: Class handle assignment from another handle is legal.
 TEST(ElabA84, ClassHandleAssignHandle) {
-  EXPECT_TRUE(ElabOk(
-      "class C; endclass\n"
-      "module m;\n"
-      "  C a, b;\n"
-      "  initial a = b;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module m;\n"
+             "  C a, b;\n"
+             "  initial a = b;\n"
+             "endmodule\n"));
 }
 
 // §8.4: Equality comparison (==) on class handles is legal.
 TEST(ElabA84, ClassHandleEqualityAllowed) {
-  EXPECT_TRUE(ElabOk(
-      "class C; endclass\n"
-      "module m;\n"
-      "  C a, b;\n"
-      "  initial begin\n"
-      "    automatic int r;\n"
-      "    r = (a == b);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module m;\n"
+             "  C a, b;\n"
+             "  initial begin\n"
+             "    automatic int r;\n"
+             "    r = (a == b);\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 // §8.4: Case equality (===) on class handles is legal.
 TEST(ElabA84, ClassHandleCaseEqualityAllowed) {
-  EXPECT_TRUE(ElabOk(
-      "class C; endclass\n"
-      "module m;\n"
-      "  C a, b;\n"
-      "  initial begin\n"
-      "    automatic int r;\n"
-      "    r = (a === b);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module m;\n"
+             "  C a, b;\n"
+             "  initial begin\n"
+             "    automatic int r;\n"
+             "    r = (a === b);\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 // §8.4: Inequality (!=) on class handles is legal.
 TEST(ElabA84, ClassHandleInequalityAllowed) {
-  EXPECT_TRUE(ElabOk(
-      "class C; endclass\n"
-      "module m;\n"
-      "  C a;\n"
-      "  initial begin\n"
-      "    automatic int r;\n"
-      "    r = (a != null);\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module m;\n"
+             "  C a;\n"
+             "  initial begin\n"
+             "    automatic int r;\n"
+             "    r = (a != null);\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 // §8.4: Conditional operator on class handle is legal.
 TEST(ElabA84, ClassHandleConditionalAllowed) {
-  EXPECT_TRUE(ElabOk(
-      "class C; endclass\n"
-      "module m;\n"
-      "  C a, b, c;\n"
-      "  initial begin\n"
-      "    automatic int sel;\n"
-      "    a = sel ? b : c;\n"
-      "  end\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module m;\n"
+             "  C a, b, c;\n"
+             "  initial begin\n"
+             "    automatic int sel;\n"
+             "    a = sel ? b : c;\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 // §8.4: Arithmetic on class handle is illegal.

@@ -5,7 +5,8 @@ using namespace delta;
 
 namespace {
 
-// §13.7/§23.8.1: Forward reference — call function declared after initial block.
+// §13.7/§23.8.1: Forward reference — call function declared after initial
+// block.
 TEST(Sim1370, ForwardFunctionCallSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(

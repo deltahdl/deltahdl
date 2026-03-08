@@ -48,52 +48,52 @@ TEST(ParserA818, ProtectedPropertyParses) {
 
 // §8.18: Combining local and protected is an error.
 TEST(ParserA818, LocalAndProtectedError) {
-  EXPECT_FALSE(ParseOk(
-      "class Packet;\n"
-      "  local protected int x;\n"
-      "endclass\n"));
+  EXPECT_FALSE(
+      ParseOk("class Packet;\n"
+              "  local protected int x;\n"
+              "endclass\n"));
 }
 
 // §8.18: Duplicate local qualifier is an error.
 TEST(ParserA818, DuplicateLocalError) {
-  EXPECT_FALSE(ParseOk(
-      "class Packet;\n"
-      "  local local int x;\n"
-      "endclass\n"));
+  EXPECT_FALSE(
+      ParseOk("class Packet;\n"
+              "  local local int x;\n"
+              "endclass\n"));
 }
 
 // §8.18: Duplicate protected qualifier is an error.
 TEST(ParserA818, DuplicateProtectedError) {
-  EXPECT_FALSE(ParseOk(
-      "class Packet;\n"
-      "  protected protected int x;\n"
-      "endclass\n"));
+  EXPECT_FALSE(
+      ParseOk("class Packet;\n"
+              "  protected protected int x;\n"
+              "endclass\n"));
 }
 
 // §8.18: Local member accessed within same class method (legal).
 TEST(ParserA818, LocalAccessSameClassParses) {
-  EXPECT_TRUE(ParseOk(
-      "class Packet;\n"
-      "  local integer i;\n"
-      "  function integer compare(Packet other);\n"
-      "    compare = (this.i == other.i);\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class Packet;\n"
+              "  local integer i;\n"
+              "  function integer compare(Packet other);\n"
+              "    compare = (this.i == other.i);\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §8.18: Protected method in derived class parses.
 TEST(ParserA818, ProtectedMethodInDerived) {
-  EXPECT_TRUE(ParseOk(
-      "class Base;\n"
-      "  protected function int secret();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  function int get_secret();\n"
-      "    return secret();\n"
-      "  endfunction\n"
-      "endclass\n"));
+  EXPECT_TRUE(
+      ParseOk("class Base;\n"
+              "  protected function int secret();\n"
+              "    return 42;\n"
+              "  endfunction\n"
+              "endclass\n"
+              "class Derived extends Base;\n"
+              "  function int get_secret();\n"
+              "    return secret();\n"
+              "  endfunction\n"
+              "endclass\n"));
 }
 
 // §8.18: Unqualified members are public (default).

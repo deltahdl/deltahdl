@@ -77,7 +77,8 @@ TEST(ElabClause09_02_02_04, ElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-// §9.2.2.4: always_ff sensitivity list is preserved (posedge clk or negedge rst).
+// §9.2.2.4: always_ff sensitivity list is preserved (posedge clk or negedge
+// rst).
 TEST(ElabClause09_02_02_04, SensitivityListPreserved) {
   ElabFixture f;
   auto* design = ElaborateSrc(

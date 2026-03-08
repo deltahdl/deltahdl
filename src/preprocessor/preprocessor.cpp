@@ -174,8 +174,8 @@ static bool HasOpenBlockComment(std::string_view text) {
 
 // §22.5.1: Join a `define body that spans multiple lines via backslash,
 // triple-quoted strings, or block comments.
-static std::string JoinDefineBody(std::string_view src, size_t pos,
-                                  size_t& eol, uint32_t& line_num) {
+static std::string JoinDefineBody(std::string_view src, size_t pos, size_t& eol,
+                                  uint32_t& line_num) {
   std::string_view first_line = src.substr(pos, eol - pos);
   std::string joined;
 
@@ -235,8 +235,7 @@ static std::string_view AfterDirective(std::string_view line,
 static std::pair<std::string_view, std::string_view> SplitFirstToken(
     std::string_view s) {
   size_t end = 0;
-  while (end < s.size() &&
-         !std::isspace(static_cast<unsigned char>(s[end])))
+  while (end < s.size() && !std::isspace(static_cast<unsigned char>(s[end])))
     ++end;
   if (end >= s.size()) return {s, {}};
   return {s.substr(0, end), Preprocessor::Trim(s.substr(end))};
@@ -263,8 +262,7 @@ static std::pair<std::string_view, std::string_view> SplitTimescaleArg(
   while (end < prec.size() &&
          std::isalpha(static_cast<unsigned char>(prec[end])))
     ++end;
-  auto ts_end =
-      static_cast<size_t>(prec.data() + end - s.data());
+  auto ts_end = static_cast<size_t>(prec.data() + end - s.data());
   return {s.substr(0, ts_end), Preprocessor::Trim(s.substr(ts_end))};
 }
 
@@ -388,7 +386,8 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
       continue;
     }
 
-    // §22.5.1: Join multi-line `define (backslash, triple-quote, block comment).
+    // §22.5.1: Join multi-line `define (backslash, triple-quote, block
+    // comment).
     std::string joined;
     if (StartsWithDirective(line, "define")) {
       auto body_start = AfterDirective(line, "define");
@@ -762,8 +761,8 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   if (!macro_name.empty() && macro_name[0] == '\\') {
     // §22.5.1: Escaped identifier — name ends at first whitespace.
     auto ws = macro_name.find_first_of(" \t");
-    name = (ws != std::string_view::npos) ? macro_name.substr(0, ws)
-                                          : macro_name;
+    name =
+        (ws != std::string_view::npos) ? macro_name.substr(0, ws) : macro_name;
   } else {
     auto space_pos = macro_name.find_first_of(" \t(");
     name = (space_pos != std::string_view::npos)
@@ -939,8 +938,7 @@ static bool MatchesDirective(std::string_view text, std::string_view dir) {
   if (text.size() < 1 + dir.size()) return false;
   if (text[0] != '`') return false;
   if (text.substr(1, dir.size()) != dir) return false;
-  if (text.size() > 1 + dir.size() &&
-      IsIdentChar(text[1 + dir.size()]))
+  if (text.size() > 1 + dir.size() && IsIdentChar(text[1 + dir.size()]))
     return false;
   return true;
 }
@@ -995,7 +993,13 @@ std::string Preprocessor::ExpandInlineConditionals(std::string_view line) {
       cond_end = cond_start;
       for (; cond_end < result.size(); ++cond_end) {
         if (result[cond_end] == '(') ++pdepth;
-        if (result[cond_end] == ')') { --pdepth; if (pdepth == 0) { ++cond_end; break; } }
+        if (result[cond_end] == ')') {
+          --pdepth;
+          if (pdepth == 0) {
+            ++cond_end;
+            break;
+          }
+        }
       }
     } else {
       cond_end = cond_start;
@@ -1003,7 +1007,8 @@ std::string Preprocessor::ExpandInlineConditionals(std::string_view line) {
         ++cond_end;
     }
 
-    auto condition = std::string_view(result).substr(cond_start, cond_end - cond_start);
+    auto condition =
+        std::string_view(result).substr(cond_start, cond_end - cond_start);
     bool cond_result;
     if (has_expr) {
       cond_result = EvalIfdefExpr(condition);
@@ -1023,7 +1028,10 @@ std::string Preprocessor::ExpandInlineConditionals(std::string_view line) {
         ++depth;
       } else if (MatchesDirective(jr, "endif")) {
         --depth;
-        if (depth == 0) { endif_pos = j; break; }
+        if (depth == 0) {
+          endif_pos = j;
+          break;
+        }
       } else if (depth == 1 && MatchesDirective(jr, "else")) {
         if (else_pos == std::string::npos) else_pos = j;
       }
@@ -1042,7 +1050,8 @@ std::string Preprocessor::ExpandInlineConditionals(std::string_view line) {
 
     // Replace the `ifdef...`endif span.
     size_t span_end = endif_pos + 6;
-    result = result.substr(0, ifdef_pos) + replacement + result.substr(span_end);
+    result =
+        result.substr(0, ifdef_pos) + replacement + result.substr(span_end);
   }
 
   return result;

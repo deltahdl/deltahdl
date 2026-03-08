@@ -25,72 +25,72 @@ TEST(ParserClause03, Cl3_7_BuiltInNInputGates) {
 }
 
 TEST(ParserClause03, Cl3_7_BuiltInNOutputGates) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  wire a, y1, y2;\n"
-      "  buf  g1(y1, a);\n"
-      "  not  g2(y2, a);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, y1, y2;\n"
+              "  buf  g1(y1, a);\n"
+              "  not  g2(y2, a);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_7_BuiltInEnableGates) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  wire a, en, y;\n"
-      "  bufif0 g1(y, a, en);\n"
-      "  bufif1 g2(y, a, en);\n"
-      "  notif0 g3(y, a, en);\n"
-      "  notif1 g4(y, a, en);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, en, y;\n"
+              "  bufif0 g1(y, a, en);\n"
+              "  bufif1 g2(y, a, en);\n"
+              "  notif0 g3(y, a, en);\n"
+              "  notif1 g4(y, a, en);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_7_BuiltInPassGates) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  tran  g1(a, b);\n"
-      "  rtran g2(a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, b;\n"
+              "  tran  g1(a, b);\n"
+              "  rtran g2(a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_7_BuiltInPassEnableGates) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  wire a, b, en;\n"
-      "  tranif0  g1(a, b, en);\n"
-      "  tranif1  g2(a, b, en);\n"
-      "  rtranif0 g3(a, b, en);\n"
-      "  rtranif1 g4(a, b, en);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, b, en;\n"
+              "  tranif0  g1(a, b, en);\n"
+              "  tranif1  g2(a, b, en);\n"
+              "  rtranif0 g3(a, b, en);\n"
+              "  rtranif1 g4(a, b, en);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_7_BuiltInMosSwitches) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  wire out, in, gate;\n"
-      "  nmos  g1(out, in, gate);\n"
-      "  pmos  g2(out, in, gate);\n"
-      "  rnmos g3(out, in, gate);\n"
-      "  rpmos g4(out, in, gate);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire out, in, gate;\n"
+              "  nmos  g1(out, in, gate);\n"
+              "  pmos  g2(out, in, gate);\n"
+              "  rnmos g3(out, in, gate);\n"
+              "  rpmos g4(out, in, gate);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_7_BuiltInCmosSwitches) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  wire out, in, nctrl, pctrl;\n"
-      "  cmos  g1(out, in, nctrl, pctrl);\n"
-      "  rcmos g2(out, in, nctrl, pctrl);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire out, in, nctrl, pctrl;\n"
+              "  cmos  g1(out, in, nctrl, pctrl);\n"
+              "  rcmos g2(out, in, nctrl, pctrl);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_7_BuiltInPullGates) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  pullup   g1(a);\n"
-      "  pulldown g2(b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, b;\n"
+              "  pullup   g1(a);\n"
+              "  pulldown g2(b);\n"
+              "endmodule\n"));
 }
 
 // §3.7: UDPs are enclosed between primitive...endprimitive.
@@ -117,8 +117,7 @@ TEST(ParserClause03, Cl3_7_UdpInstantiationInModule) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
+  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
 }
 
 TEST(ParserClause03, Cl3_7_BuiltInAndUdpCoexist) {
@@ -135,8 +134,7 @@ TEST(ParserClause03, Cl3_7_BuiltInAndUdpCoexist) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGateInst));
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
+  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
 }
 
 }  // namespace

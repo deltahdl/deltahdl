@@ -24,8 +24,8 @@ TEST(ArrayIterator, ItemIndexInFindIndex) {
   SimFixture f;
   MakeDynArray(f, "arr", {100, 200, 300});
   // with (item.index > 0) — selects indices 1 and 2.
-  auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "item.index"),
-                           MakeInt(f.arena, 0));
+  auto* pred = MakeBinary(f.arena, TokenKind::kGt,
+                          MakeId(f.arena, "item.index"), MakeInt(f.arena, 0));
   auto* call = MakeMethodCall(f.arena, "arr", "find_index", {});
   call->with_expr = pred;
   std::vector<Logic4Vec> out;
@@ -41,8 +41,8 @@ TEST(ArrayIterator, ItemIndexInFind) {
   SimFixture f;
   MakeDynArray(f, "arr", {10, 20, 30, 40});
   // with (item.index < 2) — selects elements at indices 0 and 1.
-  auto* pred = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "item.index"),
-                           MakeInt(f.arena, 2));
+  auto* pred = MakeBinary(f.arena, TokenKind::kLt,
+                          MakeId(f.arena, "item.index"), MakeInt(f.arena, 2));
   auto* call = MakeMethodCall(f.arena, "arr", "find", {});
   call->with_expr = pred;
   std::vector<Logic4Vec> out;

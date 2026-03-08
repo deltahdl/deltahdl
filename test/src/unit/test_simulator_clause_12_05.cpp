@@ -339,7 +339,8 @@ TEST(SimA607, CaseXDoesNotMatchZero) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.5: case_expression evaluated once, linear search terminates at first match.
+// §12.5: case_expression evaluated once, linear search terminates at first
+// match.
 TEST(SimA607, CaseLinearSearchFirstMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(

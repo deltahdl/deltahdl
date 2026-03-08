@@ -26,7 +26,8 @@ struct Net {
 
   // §6.6.4: Trireg charge strength and decay.
   Strength charge_strength = Strength::kMedium;
-  Strength base_charge_strength = Strength::kMedium;  // §6.6.4.1: Declared strength.
+  Strength base_charge_strength =
+      Strength::kMedium;  // §6.6.4.1: Declared strength.
   uint64_t decay_ticks = 0;
   uint64_t decay_generation = 0;
 

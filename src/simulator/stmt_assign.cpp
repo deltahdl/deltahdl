@@ -278,8 +278,8 @@ static void DistributePatternToArray(std::string_view arr_name,
   }
 }
 
-static void CollectFixedArrayElements(std::string_view name, const ArrayInfo& ai,
-                                      SimContext& ctx,
+static void CollectFixedArrayElements(std::string_view name,
+                                      const ArrayInfo& ai, SimContext& ctx,
                                       std::vector<Logic4Vec>& out);
 
 // §10.10: Distribute unpacked array concatenation elements to array variables.

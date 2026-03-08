@@ -228,8 +228,7 @@ TEST(ParserClause05, Cl5_7_1_SignedDecimalUpper) {
 }
 
 TEST(ParserClause05, Cl5_7_1_SignedBinaryLower) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'sb1111; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'sb1111; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
@@ -237,8 +236,7 @@ TEST(ParserClause05, Cl5_7_1_SignedBinaryLower) {
 }
 
 TEST(ParserClause05, Cl5_7_1_SignedBinaryUpper) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'SB1111; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'SB1111; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
@@ -309,8 +307,7 @@ TEST(ParserClause05, Cl5_7_1_OctalDigitAll) {
 }
 
 TEST(ParserClause05, Cl5_7_1_BinaryDigitZeroOne) {
-  auto r =
-      Parse("module m; logic [3:0] x; initial x = 4'b0101; endmodule\n");
+  auto r = Parse("module m; logic [3:0] x; initial x = 4'b0101; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);

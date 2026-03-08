@@ -86,8 +86,7 @@ TEST(SimClause05, Cl5_9_1_UnknownEscapeDropsBackslash) {
 
 TEST(SimClause05, Cl5_9_1_MultipleEscapes) {
   auto v = RunAndGet(
-      "module t;\n  bit [23:0] s;\n  initial s = \"A\\nB\";\nendmodule\n",
-      "s");
+      "module t;\n  bit [23:0] s;\n  initial s = \"A\\nB\";\nendmodule\n", "s");
   EXPECT_EQ(v, 0x410A42u);
 }
 

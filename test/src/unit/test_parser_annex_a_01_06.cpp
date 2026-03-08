@@ -37,8 +37,8 @@ TEST(InterfaceItemsA16, InterfaceContinuousAssign) {
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->interfaces[0]->items,
-                            ModuleItemKind::kContAssign));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
 }
 
 // interface_or_generate_item ::= extern_tf_declaration
@@ -49,8 +49,8 @@ TEST(InterfaceItemsA16, ExternMethodPrototype) {
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* func = FindItemByKind(r.cu->interfaces[0]->items,
-                              ModuleItemKind::kFunctionDecl);
+  auto* func =
+      FindItemByKind(r.cu->interfaces[0]->items, ModuleItemKind::kFunctionDecl);
   ASSERT_NE(func, nullptr);
   EXPECT_TRUE(func->is_extern);
 }
@@ -62,8 +62,8 @@ TEST(InterfaceItemsA16, ExternForkjoinTask) {
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* task = FindItemByKind(r.cu->interfaces[0]->items,
-                              ModuleItemKind::kTaskDecl);
+  auto* task =
+      FindItemByKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl);
   ASSERT_NE(task, nullptr);
   EXPECT_TRUE(task->is_extern);
   EXPECT_TRUE(task->is_forkjoin);
@@ -157,8 +157,8 @@ TEST(InterfaceItemsA16, InterfaceInitial) {
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->interfaces[0]->items,
-                            ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kInitialBlock));
 }
 
 // assertion_item in interface (via module_common_item)

@@ -879,8 +879,8 @@ TEST(ParserA222, DriveStrengthSupply0Weak1) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 5u);   // supply0
-  EXPECT_EQ(item->drive_strength1, 2u);   // weak1
+  EXPECT_EQ(item->drive_strength0, 5u);  // supply0
+  EXPECT_EQ(item->drive_strength1, 2u);  // weak1
 }
 
 // §6.3.2.2: Drive strength weak0, weak1.
@@ -893,8 +893,8 @@ TEST(ParserA222, DriveStrengthWeak0Weak1) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 2u);   // weak0
-  EXPECT_EQ(item->drive_strength1, 2u);   // weak1
+  EXPECT_EQ(item->drive_strength0, 2u);  // weak0
+  EXPECT_EQ(item->drive_strength1, 2u);  // weak1
 }
 
 // §6.3.2.2: Drive strength highz0, strong1.
@@ -907,8 +907,8 @@ TEST(ParserA222, DriveStrengthHighz0Strong1) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 1u);   // highz0
-  EXPECT_EQ(item->drive_strength1, 4u);   // strong1
+  EXPECT_EQ(item->drive_strength0, 1u);  // highz0
+  EXPECT_EQ(item->drive_strength1, 4u);  // strong1
 }
 
 // §6.3.2.2: Drive strength supply0, supply1.
@@ -921,8 +921,8 @@ TEST(ParserA222, DriveStrengthSupply0Supply1) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 5u);   // supply0
-  EXPECT_EQ(item->drive_strength1, 5u);   // supply1
+  EXPECT_EQ(item->drive_strength0, 5u);  // supply0
+  EXPECT_EQ(item->drive_strength1, 5u);  // supply1
 }
 
 // §6.3.2.2: Drive strength highz1, pull0 — reversed order.
@@ -935,8 +935,8 @@ TEST(ParserA222, DriveStrengthHighz1Pull0) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 3u);   // pull0
-  EXPECT_EQ(item->drive_strength1, 1u);   // highz1
+  EXPECT_EQ(item->drive_strength0, 3u);  // pull0
+  EXPECT_EQ(item->drive_strength1, 1u);  // highz1
 }
 
 // §6.3.2.2: Net declaration without drive strength has default (0, 0).

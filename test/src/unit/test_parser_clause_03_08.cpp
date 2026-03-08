@@ -31,11 +31,11 @@ TEST(ParserClause03, Cl3_8_TaskWithAllArgDirections) {
 }
 
 TEST(ParserClause03, Cl3_8_TaskCalledAsStatement) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  task greet; endtask\n"
-      "  initial greet();\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task greet; endtask\n"
+              "  initial greet();\n"
+              "endmodule\n"));
 }
 
 // --- Functions ---
@@ -53,41 +53,41 @@ TEST(ParserClause03, Cl3_8_FunctionWithReturnValue) {
 }
 
 TEST(ParserClause03, Cl3_8_VoidFunction) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function void log(int val);\n"
-      "    $display(\"%0d\", val);\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void log(int val);\n"
+              "    $display(\"%0d\", val);\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_8_NonVoidFunctionUsedAsOperand) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function int twice(int v); return v * 2; endfunction\n"
-      "  logic [31:0] result;\n"
-      "  initial result = twice(5);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function int twice(int v); return v * 2; endfunction\n"
+              "  logic [31:0] result;\n"
+              "  initial result = twice(5);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_8_VoidFunctionCalledAsStatement) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function void log(int v); $display(\"%0d\", v); endfunction\n"
-      "  initial log(42);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void log(int v); $display(\"%0d\", v); endfunction\n"
+              "  initial log(42);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_8_FunctionWithAllArgDirections) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  function int compute(input int a, output int b,\n"
-      "                       inout int c, ref int d);\n"
-      "    b = a;\n"
-      "    c = c + 1;\n"
-      "    return a + d;\n"
-      "  endfunction\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function int compute(input int a, output int b,\n"
+              "                       inout int c, ref int d);\n"
+              "    b = a;\n"
+              "    c = c + 1;\n"
+              "    return a + d;\n"
+              "  endfunction\n"
+              "endmodule\n"));
 }
 
 // --- Both subroutine forms in same module ---
@@ -100,8 +100,8 @@ TEST(ParserClause03, Cl3_8_TaskAndFunctionCoexist) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                             ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFunctionDecl));
   EXPECT_TRUE(
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kTaskDecl));
 }

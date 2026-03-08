@@ -4,7 +4,8 @@ using namespace delta;
 
 namespace {
 
-// §10.3.1: Net declaration assignment creates an implicit continuous assignment.
+// §10.3.1: Net declaration assignment creates an implicit continuous
+// assignment.
 
 TEST(ElabClause100301, NetDeclAssign_CreatesContAssign) {
   ElabFixture f;

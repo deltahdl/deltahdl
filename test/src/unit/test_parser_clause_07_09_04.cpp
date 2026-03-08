@@ -40,23 +40,23 @@ TEST(ParserSection7, AssocArrayFirstMethodStringKey) {
 
 // §7.9.4: first() in if-condition context.
 TEST(ParserSection7, AssocArrayFirstInIfCondition) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  int aa[string];\n"
-      "  string s;\n"
-      "  initial if (aa.first(s)) $display(s);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  int aa[string];\n"
+              "  string s;\n"
+              "  initial if (aa.first(s)) $display(s);\n"
+              "endmodule\n"));
 }
 
 // §7.9.4: first() return value used in assignment.
 TEST(ParserSection7, AssocArrayFirstReturnAssigned) {
-  EXPECT_TRUE(ParseOk(
-      "module t;\n"
-      "  int aa[int];\n"
-      "  int k;\n"
-      "  int status;\n"
-      "  initial status = aa.first(k);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  int aa[int];\n"
+              "  int k;\n"
+              "  int status;\n"
+              "  initial status = aa.first(k);\n"
+              "endmodule\n"));
 }
 
 }  // namespace

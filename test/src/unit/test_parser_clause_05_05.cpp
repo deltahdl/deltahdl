@@ -152,7 +152,8 @@ TEST(ParserClause05, Cl5_5_ShiftOperators) {
               "endmodule\n"));
 }
 
-// --- §5.5: conditional operator has two characters separating three operands ---
+// --- §5.5: conditional operator has two characters separating three operands
+// ---
 
 TEST(ParserClause05, Cl5_5_ConditionalOperatorThreeOperands) {
   auto r = Parse(

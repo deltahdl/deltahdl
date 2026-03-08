@@ -23,8 +23,7 @@ TEST(ParserClause05, Cl5_6_1_EscapedIdentKeyword) {
 }
 
 TEST(ParserClause05, Cl5_6_1_EscapedIdentSpecialChars) {
-  EXPECT_TRUE(
-      ParseOk("module m; wire \\***error-condition*** ; endmodule"));
+  EXPECT_TRUE(ParseOk("module m; wire \\***error-condition*** ; endmodule"));
 }
 
 TEST(ParserClause05, Cl5_6_1_EscapedIdentForwardSlash) {

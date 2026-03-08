@@ -47,8 +47,7 @@ TEST(BoundedQueue, AllowsPushAfterDelete) {
   q->AssignFreshIds();
 
   // Delete one, then push should work.
-  auto* del =
-      MakeMethodCall(f.arena, "q", "delete", {MakeInt(f.arena, 0)});
+  auto* del = MakeMethodCall(f.arena, "q", "delete", {MakeInt(f.arena, 0)});
   TryExecQueueMethodStmt(del, f.ctx, f.arena);
   EXPECT_EQ(q->elements.size(), 2u);
 
@@ -65,7 +64,7 @@ TEST(BoundedQueue, UnboundedHasNoLimit) {
   auto* q = f.ctx.CreateQueue("q", 32);  // max_size = -1 (unbounded)
   for (int i = 0; i < 100; ++i) {
     auto* call = MakeMethodCall(f.arena, "q", "push_back",
-                                 {MakeInt(f.arena, static_cast<uint64_t>(i))});
+                                {MakeInt(f.arena, static_cast<uint64_t>(i))});
     TryExecQueueMethodStmt(call, f.ctx, f.arena);
   }
   EXPECT_EQ(q->elements.size(), 100u);

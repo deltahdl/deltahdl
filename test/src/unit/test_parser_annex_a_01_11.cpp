@@ -46,8 +46,8 @@ TEST(PackageItemsA111, FunctionDeclaration) {
       "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->packages[0]->items,
-                            ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
 // package_or_generate_item_declaration ::= checker_declaration
@@ -69,8 +69,8 @@ TEST(PackageItemsA111, DpiImport) {
       "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->packages[0]->items,
-                            ModuleItemKind::kDpiImport));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kDpiImport));
 }
 
 // package_or_generate_item_declaration ::= class_declaration
@@ -208,7 +208,8 @@ TEST(PackageItemsA111, PackageImport) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package with package_or_generate_item_declaration ::= class_constructor_declaration
+// package with package_or_generate_item_declaration ::=
+// class_constructor_declaration
 TEST(PackageItemsA111, ClassConstructorInPackage) {
   auto r = Parse(
       "package p;\n"

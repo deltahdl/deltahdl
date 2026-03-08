@@ -25,8 +25,8 @@ TEST(ParserClause03, Cl3_6_CheckerWithAssertion) {
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->checkers[0]->items,
-                             ModuleItemKind::kAssertProperty));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kAssertProperty));
 }
 
 TEST(ParserClause03, Cl3_6_CheckerWithModelingCode) {
@@ -53,13 +53,13 @@ TEST(ParserClause03, Cl3_6_CheckerWithPorts) {
 }
 
 TEST(ParserClause03, Cl3_6_CheckerWithMixedContent) {
-  EXPECT_TRUE(ParseOk(
-      "checker chk(input logic clk, input logic a, input logic b);\n"
-      "  logic internal;\n"
-      "  always_comb internal = a & b;\n"
-      "  assert property (@(posedge clk) a |-> b);\n"
-      "  cover property (@(posedge clk) a && b);\n"
-      "endchecker\n"));
+  EXPECT_TRUE(
+      ParseOk("checker chk(input logic clk, input logic a, input logic b);\n"
+              "  logic internal;\n"
+              "  always_comb internal = a & b;\n"
+              "  assert property (@(posedge clk) a |-> b);\n"
+              "  cover property (@(posedge clk) a && b);\n"
+              "endchecker\n"));
 }
 
 }  // namespace

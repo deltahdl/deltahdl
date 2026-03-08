@@ -53,8 +53,8 @@ TEST(LexerA10, NoSpaceInExponentNumber) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
 }
 
-// §A.10 clarification 49: time_literal number shall not be followed by white_space
-// (before the time unit)
+// §A.10 clarification 49: time_literal number shall not be followed by
+// white_space (before the time unit)
 
 TEST(LexerA10, TimeLiteralNoSpace) {
   auto tokens = Lex("10ns");
@@ -110,8 +110,8 @@ TEST(LexerA10, UnbasedUnsizedZNoSpace) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-// §A.10 clarification 54: simple_identifier shall start with alpha or underscore,
-// have at least one char, and no spaces
+// §A.10 clarification 54: simple_identifier shall start with alpha or
+// underscore, have at least one char, and no spaces
 
 TEST(LexerA10, SimpleIdentStartsWithAlpha) {
   auto tokens = Lex("abc");

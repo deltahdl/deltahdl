@@ -24,11 +24,20 @@ TEST(ElabClause09_02_02, FourAlwaysVariantsElaborate) {
   bool has_latch = false, has_ff = false;
   for (auto& p : design->top_modules[0]->processes) {
     switch (p.kind) {
-      case RtlirProcessKind::kAlways: has_always = true; break;
-      case RtlirProcessKind::kAlwaysComb: has_comb = true; break;
-      case RtlirProcessKind::kAlwaysLatch: has_latch = true; break;
-      case RtlirProcessKind::kAlwaysFF: has_ff = true; break;
-      default: break;
+      case RtlirProcessKind::kAlways:
+        has_always = true;
+        break;
+      case RtlirProcessKind::kAlwaysComb:
+        has_comb = true;
+        break;
+      case RtlirProcessKind::kAlwaysLatch:
+        has_latch = true;
+        break;
+      case RtlirProcessKind::kAlwaysFF:
+        has_ff = true;
+        break;
+      default:
+        break;
     }
   }
   EXPECT_TRUE(has_always);

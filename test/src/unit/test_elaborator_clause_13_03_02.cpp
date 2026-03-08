@@ -18,7 +18,8 @@ TEST(Elab13032, AutoTaskLocalInNonblockingAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.3.2: Module-level variable in nonblocking assignment inside auto task is ok.
+// §13.3.2: Module-level variable in nonblocking assignment inside auto task is
+// ok.
 TEST(Elab13032, AutoTaskModuleVarNonblockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -48,7 +49,8 @@ TEST(Elab13032, StaticTaskLocalInNonblockingOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.2: Default task (static) local variable in nonblocking assignment is ok.
+// §13.3.2: Default task (static) local variable in nonblocking assignment is
+// ok.
 TEST(Elab13032, DefaultTaskLocalInNonblockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(

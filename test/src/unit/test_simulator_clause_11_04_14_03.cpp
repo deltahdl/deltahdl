@@ -24,8 +24,7 @@ static Expr* MakeStreamConcat(Arena& arena, TokenKind dir,
 }
 
 // Helper: build a Stmt with streaming concat on LHS.
-static Stmt* MakeStreamUnpackAssign(Arena& arena, Expr* lhs_stream,
-                                    Expr* rhs) {
+static Stmt* MakeStreamUnpackAssign(Arena& arena, Expr* lhs_stream, Expr* rhs) {
   auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;
   s->lhs = lhs_stream;
@@ -62,9 +61,8 @@ TEST(EvalAdv, StreamingUnpackRightShiftMultiByte) {
   MakeVar(f, "a", 8, 0);
   MakeVar(f, "b", 8, 0);
 
-  auto* lhs = MakeStreamConcat(
-      f.arena, TokenKind::kGtGt,
-      {MakeId(f.arena, "a"), MakeId(f.arena, "b")});
+  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
+                               {MakeId(f.arena, "a"), MakeId(f.arena, "b")});
   auto* rhs = MakeInt(f.arena, 0xABCD);
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
@@ -86,9 +84,9 @@ TEST(EvalAdv, StreamingUnpackLeftShiftByte) {
 
   auto* ss = MakeInt(f.arena, 8);
   ss->text = "8";
-  auto* lhs = MakeStreamConcat(
-      f.arena, TokenKind::kLtLt,
-      {MakeId(f.arena, "a"), MakeId(f.arena, "b")}, ss);
+  auto* lhs =
+      MakeStreamConcat(f.arena, TokenKind::kLtLt,
+                       {MakeId(f.arena, "a"), MakeId(f.arena, "b")}, ss);
   auto* rhs = MakeInt(f.arena, 0xABCD);
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
@@ -108,9 +106,8 @@ TEST(EvalAdv, StreamingUnpackSourceWiderTruncatesLSBs) {
   MakeVar(f, "a2", 8, 0);
   MakeVar(f, "b2", 8, 0);
 
-  auto* lhs = MakeStreamConcat(
-      f.arena, TokenKind::kGtGt,
-      {MakeId(f.arena, "a2"), MakeId(f.arena, "b2")});
+  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
+                               {MakeId(f.arena, "a2"), MakeId(f.arena, "b2")});
   // RHS is wider: 32-bit int with value 0x0000ABCD.
   // Target is 16 bits, consume from MSB of the RHS.
   // With a 32-bit RHS and 16-bit target, top 16 bits = 0x0000.
@@ -132,8 +129,8 @@ TEST(EvalAdv, StreamingUnpackRightShiftSingleElement) {
 
   MakeVar(f, "x", 16, 0);
 
-  auto* lhs = MakeStreamConcat(
-      f.arena, TokenKind::kGtGt, {MakeId(f.arena, "x")});
+  auto* lhs =
+      MakeStreamConcat(f.arena, TokenKind::kGtGt, {MakeId(f.arena, "x")});
   auto* rhs = MakeInt(f.arena, 0xBEEF);
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
@@ -151,8 +148,8 @@ TEST(EvalAdv, StreamingUnpackLeftShiftBitReverse) {
   // pick a non-palindrome: 0b11001010 = 0xCA → reversed = 0b01010011 = 0x53
   MakeVar(f, "v", 8, 0);
 
-  auto* lhs = MakeStreamConcat(
-      f.arena, TokenKind::kLtLt, {MakeId(f.arena, "v")});
+  auto* lhs =
+      MakeStreamConcat(f.arena, TokenKind::kLtLt, {MakeId(f.arena, "v")});
   auto* rhs = MakeInt(f.arena, 0xCA);
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
@@ -169,8 +166,8 @@ TEST(EvalAdv, StreamingUnpackLeftShiftNibbleReverse) {
 
   auto* ss = MakeInt(f.arena, 4);
   ss->text = "4";
-  auto* lhs = MakeStreamConcat(
-      f.arena, TokenKind::kLtLt, {MakeId(f.arena, "v2")}, ss);
+  auto* lhs =
+      MakeStreamConcat(f.arena, TokenKind::kLtLt, {MakeId(f.arena, "v2")}, ss);
   auto* rhs = MakeInt(f.arena, 0xAB);
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
@@ -191,9 +188,9 @@ TEST(EvalAdv, StreamingUnpackLeftShift16BitSlice) {
 
   auto* ss = MakeInt(f.arena, 16);
   ss->text = "16";
-  auto* lhs = MakeStreamConcat(
-      f.arena, TokenKind::kLtLt,
-      {MakeId(f.arena, "a3"), MakeId(f.arena, "b3")}, ss);
+  auto* lhs =
+      MakeStreamConcat(f.arena, TokenKind::kLtLt,
+                       {MakeId(f.arena, "a3"), MakeId(f.arena, "b3")}, ss);
   auto* rhs = MakeInt(f.arena, 0xDEADBEEFu);
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
@@ -210,9 +207,8 @@ TEST(EvalAdv, StreamingUnpackRoundTripRightShift) {
   MakeVar(f, "q", 8, 0xBB);
 
   // Pack: result = {>> {p, q}} = 0xAABB
-  auto* pack = MakeStreamConcat(
-      f.arena, TokenKind::kGtGt,
-      {MakeId(f.arena, "p"), MakeId(f.arena, "q")});
+  auto* pack = MakeStreamConcat(f.arena, TokenKind::kGtGt,
+                                {MakeId(f.arena, "p"), MakeId(f.arena, "q")});
   auto pack_val = EvalExpr(pack, f.ctx, f.arena);
   ASSERT_EQ(pack_val.ToUint64(), 0xAABBu);
 
@@ -220,9 +216,8 @@ TEST(EvalAdv, StreamingUnpackRoundTripRightShift) {
   MakeVar(f, "r", 8, 0);
   MakeVar(f, "s", 8, 0);
 
-  auto* unpack = MakeStreamConcat(
-      f.arena, TokenKind::kGtGt,
-      {MakeId(f.arena, "r"), MakeId(f.arena, "s")});
+  auto* unpack = MakeStreamConcat(f.arena, TokenKind::kGtGt,
+                                  {MakeId(f.arena, "r"), MakeId(f.arena, "s")});
   auto* rhs_expr = MakeInt(f.arena, pack_val.ToUint64());
   auto* stmt = MakeStreamUnpackAssign(f.arena, unpack, rhs_expr);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
@@ -241,9 +236,9 @@ TEST(EvalAdv, StreamingUnpackRoundTripLeftShift) {
   // Pack: result = {<< byte {p2, q2}} reverses bytes → 0xBBAA
   auto* ss1 = MakeInt(f.arena, 8);
   ss1->text = "8";
-  auto* pack = MakeStreamConcat(
-      f.arena, TokenKind::kLtLt,
-      {MakeId(f.arena, "p2"), MakeId(f.arena, "q2")}, ss1);
+  auto* pack =
+      MakeStreamConcat(f.arena, TokenKind::kLtLt,
+                       {MakeId(f.arena, "p2"), MakeId(f.arena, "q2")}, ss1);
   auto pack_val = EvalExpr(pack, f.ctx, f.arena);
   ASSERT_EQ(pack_val.ToUint64(), 0xBBAAu);
 
@@ -253,9 +248,9 @@ TEST(EvalAdv, StreamingUnpackRoundTripLeftShift) {
 
   auto* ss2 = MakeInt(f.arena, 8);
   ss2->text = "8";
-  auto* unpack = MakeStreamConcat(
-      f.arena, TokenKind::kLtLt,
-      {MakeId(f.arena, "r2"), MakeId(f.arena, "s2")}, ss2);
+  auto* unpack =
+      MakeStreamConcat(f.arena, TokenKind::kLtLt,
+                       {MakeId(f.arena, "r2"), MakeId(f.arena, "s2")}, ss2);
   auto* rhs_expr = MakeInt(f.arena, pack_val.ToUint64());
   auto* stmt = MakeStreamUnpackAssign(f.arena, unpack, rhs_expr);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);

@@ -19,8 +19,8 @@ TEST(ProgramItemsA17, ProgramWithInitial) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(HasItemOfKind(r.cu->programs[0]->items,
-                            ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
 // non_port_program_item ::= continuous_assign
@@ -32,8 +32,8 @@ TEST(ProgramItemsA17, ProgramContinuousAssign) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->programs[0]->items,
-                            ModuleItemKind::kContAssign));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kContAssign));
 }
 
 // non_port_program_item ::= final_construct
@@ -44,8 +44,8 @@ TEST(ProgramItemsA17, ProgramFinal) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->programs[0]->items,
-                            ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
 // non_port_program_item ::= module_or_generate_item_declaration
@@ -58,8 +58,8 @@ TEST(ProgramItemsA17, ProgramFunctionDecl) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->programs[0]->items,
-                            ModuleItemKind::kFunctionDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
 TEST(ProgramItemsA17, ProgramTaskDecl) {
@@ -71,8 +71,8 @@ TEST(ProgramItemsA17, ProgramTaskDecl) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->programs[0]->items,
-                            ModuleItemKind::kTaskDecl));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kTaskDecl));
 }
 
 // non_port_program_item ::= timeunits_declaration
@@ -97,8 +97,8 @@ TEST(ProgramItemsA17, ProgramGenFor) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->programs[0]->items,
-                            ModuleItemKind::kGenerateFor));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateFor));
 }
 
 // program_generate_item ::= conditional_generate_construct
@@ -111,8 +111,8 @@ TEST(ProgramItemsA17, ProgramGenIf) {
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->programs[0]->items,
-                            ModuleItemKind::kGenerateIf));
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateIf));
 }
 
 // program_generate_item ::= elaboration_severity_system_task

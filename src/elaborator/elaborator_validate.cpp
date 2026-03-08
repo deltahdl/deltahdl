@@ -84,8 +84,14 @@ static void CheckPatternKeys(const ModuleItem* item,
   bool has_default = false;
   bool has_type_key = false;
   for (auto key : item->init_expr->pattern_keys) {
-    if (key == "default") { has_default = true; continue; }
-    if (IsTypeKeyword(key)) { has_type_key = true; continue; }
+    if (key == "default") {
+      has_default = true;
+      continue;
+    }
+    if (IsTypeKeyword(key)) {
+      has_type_key = true;
+      continue;
+    }
     if (!member_names.count(key)) {
       diag.Error(item->loc,
                  std::format("'{}' is not a member of the struct", key));
@@ -132,8 +138,7 @@ static std::string_view ExprIdent(const Expr* e) {
 }
 
 static void CollectProcTargets(
-    const Stmt* s,
-    std::unordered_map<std::string_view, SourceLoc>& out) {
+    const Stmt* s, std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
@@ -361,7 +366,8 @@ static void CheckFuncBodyStmt(
       task_names.count(s->expr->callee) != 0) {
     diag.Error(s->range.start, "function cannot enable a task");
   }
-  // §13.4.1: Illegal to declare variable with same name as function inside body.
+  // §13.4.1: Illegal to declare variable with same name as function inside
+  // body.
   if (s->kind == StmtKind::kVarDecl && !func_name.empty() &&
       s->var_name == func_name) {
     diag.Error(s->range.start,
@@ -382,7 +388,8 @@ static void CheckFuncBodyStmt(
 }
 
 // §13.2: A task shall not return a value.
-// §13.3.2: Automatic task variables shall not appear in nonblocking assignments.
+// §13.3.2: Automatic task variables shall not appear in nonblocking
+// assignments.
 static void CheckTaskBodyStmt(
     const Stmt* s, bool is_auto,
     const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
@@ -398,8 +405,7 @@ static void CheckTaskBodyStmt(
                "automatic task variable in nonblocking assignment");
   }
   // Collect locally declared variables as we descend.
-  for (auto* sub : s->stmts)
-    CheckTaskBodyStmt(sub, is_auto, auto_vars, diag);
+  for (auto* sub : s->stmts) CheckTaskBodyStmt(sub, is_auto, auto_vars, diag);
   CheckTaskBodyStmt(s->then_branch, is_auto, auto_vars, diag);
   CheckTaskBodyStmt(s->else_branch, is_auto, auto_vars, diag);
   CheckTaskBodyStmt(s->body, is_auto, auto_vars, diag);
@@ -524,8 +530,7 @@ void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
   for (const auto& [name, default_expr] : decl->params) {
     if (default_expr) {
       ValidateConstantFuncCallsInExpr(default_expr, decl->range.start,
-                                      func_decls_,
-                                      diag_);
+                                      func_decls_, diag_);
     }
   }
   // Check function calls in localparam/parameter item initializers.
@@ -711,8 +716,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateThisUsage(decl);
   // §3.14: Precision shall be at least as precise as the time unit.
   if (decl->has_timeunit && decl->has_timeprecision) {
-    if (static_cast<int>(decl->time_prec) >
-        static_cast<int>(decl->time_unit)) {
+    if (static_cast<int>(decl->time_prec) > static_cast<int>(decl->time_unit)) {
       diag_.Error(decl->range.start,
                   "time precision is less precise than the time unit");
     }
@@ -1029,8 +1033,7 @@ void Elaborator::ValidateVoidMembers(const DataType& dtype, SourceLoc loc) {
 
 // §7.2, footnote 20: random_qualifier only within unpacked structures.
 void Elaborator::ValidateRandQualifiers(const DataType& dtype, SourceLoc loc) {
-  bool allow_rand =
-      (dtype.kind == DataTypeKind::kStruct && !dtype.is_packed);
+  bool allow_rand = (dtype.kind == DataTypeKind::kStruct && !dtype.is_packed);
   for (const auto& m : dtype.struct_members) {
     if ((m.is_rand || m.is_randc) && !allow_rand) {
       diag_.Error(loc,
@@ -1065,17 +1068,17 @@ static bool IsLegalPackedMemberType(DataTypeKind kind) {
 }
 
 void Elaborator::ValidatePackedStructMemberTypes(const DataType& dtype,
-                                                  SourceLoc loc) {
+                                                 SourceLoc loc) {
   if (!dtype.is_packed && !dtype.is_soft) return;
   if (dtype.kind != DataTypeKind::kStruct && dtype.kind != DataTypeKind::kUnion)
     return;
-  const char* container =
-      (dtype.kind == DataTypeKind::kStruct) ? "packed structure" : "packed union";
+  const char* container = (dtype.kind == DataTypeKind::kStruct)
+                              ? "packed structure"
+                              : "packed union";
   for (const auto& m : dtype.struct_members) {
     if (!IsLegalPackedMemberType(m.type_kind)) {
-      diag_.Error(loc,
-                  std::format("type of member '{}' is not allowed in a {}",
-                              m.name, container));
+      diag_.Error(loc, std::format("type of member '{}' is not allowed in a {}",
+                                   m.name, container));
     }
   }
 }
@@ -1086,8 +1089,7 @@ void Elaborator::ValidateChandleInUnion(const DataType& dtype, SourceLoc loc) {
   if (dtype.is_tagged) return;
   for (const auto& m : dtype.struct_members) {
     if (m.type_kind == DataTypeKind::kChandle) {
-      diag_.Error(loc,
-                  "chandle type can only be used in tagged unions");
+      diag_.Error(loc, "chandle type can only be used in tagged unions");
       return;
     }
   }
@@ -1132,7 +1134,7 @@ static bool HasPredefinedWidth(DataTypeKind kind) {
 }
 
 void Elaborator::ValidatePackedDimOnPredefinedType(const DataType& dtype,
-                                                    SourceLoc loc) {
+                                                   SourceLoc loc) {
   if (!HasPredefinedWidth(dtype.kind)) return;
   if (!dtype.packed_dim_left) return;
   diag_.Error(loc,
@@ -1177,12 +1179,11 @@ void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
     // Fixed-size target: source must have the same number of elements.
     if (lhs.unpacked_size > 0 && !lhs.is_dynamic && rhs.unpacked_size > 0 &&
         !rhs.is_dynamic && lhs.unpacked_size != rhs.unpacked_size) {
-      diag_.Error(
-          item->loc,
-          std::format("array size mismatch: '{}' has {} elements but "
-                      "'{}' has {}",
-                      item->assign_lhs->text, lhs.unpacked_size,
-                      item->assign_rhs->text, rhs.unpacked_size));
+      diag_.Error(item->loc,
+                  std::format("array size mismatch: '{}' has {} elements but "
+                              "'{}' has {}",
+                              item->assign_lhs->text, lhs.unpacked_size,
+                              item->assign_rhs->text, rhs.unpacked_size));
     }
   }
 }
@@ -1216,8 +1217,7 @@ static bool IsAllowedClassBinaryOp(TokenKind op) {
 }
 
 static void CheckClassHandleExpr(
-    const Expr* e,
-    const std::unordered_set<std::string_view>& class_vars,
+    const Expr* e, const std::unordered_set<std::string_view>& class_vars,
     DiagEngine& diag) {
   if (!e) return;
   // Binary: only equality operators are allowed.
@@ -1242,8 +1242,7 @@ static void CheckClassHandleExpr(
   // Bit-select on class handle is illegal.
   if (e->kind == ExprKind::kSelect && e->base &&
       IsClassVar(e->base, class_vars)) {
-    diag.Error(e->range.start,
-               "bit-select on class object handle is illegal");
+    diag.Error(e->range.start, "bit-select on class object handle is illegal");
   }
   // Recurse into sub-expressions.
   CheckClassHandleExpr(e->lhs, class_vars, diag);
@@ -1295,10 +1294,10 @@ void Elaborator::ValidateClassHandleOps(const ModuleDecl* decl) {
 
 void Elaborator::ValidateClassHandleContAssign(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kContAssign) return;
-  auto lhs_class = item->assign_lhs &&
-                   IsClassVar(item->assign_lhs, class_var_names_);
-  auto rhs_class = item->assign_rhs &&
-                   IsClassVar(item->assign_rhs, class_var_names_);
+  auto lhs_class =
+      item->assign_lhs && IsClassVar(item->assign_lhs, class_var_names_);
+  auto rhs_class =
+      item->assign_rhs && IsClassVar(item->assign_rhs, class_var_names_);
   if (lhs_class || rhs_class) {
     diag_.Error(item->loc,
                 "class object handle cannot be used in continuous assignment");
@@ -1404,8 +1403,7 @@ void Elaborator::ValidateFinalClassExtension() {
     // Look up the base class in CU-level classes.
     const auto* base = FindClassDecl(cls->base_class, unit_);
     if (base && base->is_final) {
-      diag_.Error(cls->range.start,
-                  "cannot extend a class declared ':final'");
+      diag_.Error(cls->range.start, "cannot extend a class declared ':final'");
     }
   };
   for (const auto* cls : unit_->classes) {
@@ -1421,11 +1419,10 @@ static bool IsSuperNewCall(const Stmt* s) {
   const auto* callee = call->lhs;
   if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
   bool lhs_is_super = callee->lhs &&
-                       callee->lhs->kind == ExprKind::kIdentifier &&
-                       callee->lhs->text == "super";
-  bool rhs_is_new = callee->rhs &&
-                     callee->rhs->kind == ExprKind::kIdentifier &&
-                     callee->rhs->text == "new";
+                      callee->lhs->kind == ExprKind::kIdentifier &&
+                      callee->lhs->text == "super";
+  bool rhs_is_new = callee->rhs && callee->rhs->kind == ExprKind::kIdentifier &&
+                    callee->rhs->text == "new";
   return lhs_is_super && rhs_is_new;
 }
 
@@ -1482,7 +1479,8 @@ static const ClassMember* FindMemberInClass(const ClassDecl* cls,
   return nullptr;
 }
 
-// §8.18: Check expressions for local/protected member access from outside class.
+// §8.18: Check expressions for local/protected member access from outside
+// class.
 static void CheckVisibilityExpr(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -1529,8 +1527,7 @@ static void WalkStmtsForVisibility(
   CheckVisibilityExpr(s->rhs, var_types, unit, diag);
   CheckVisibilityExpr(s->expr, var_types, unit, diag);
   CheckVisibilityExpr(s->condition, var_types, unit, diag);
-  for (auto* sub : s->stmts)
-    WalkStmtsForVisibility(sub, var_types, unit, diag);
+  for (auto* sub : s->stmts) WalkStmtsForVisibility(sub, var_types, unit, diag);
   WalkStmtsForVisibility(s->then_branch, var_types, unit, diag);
   WalkStmtsForVisibility(s->else_branch, var_types, unit, diag);
   WalkStmtsForVisibility(s->body, var_types, unit, diag);
@@ -1558,17 +1555,16 @@ void Elaborator::ValidateConstClassProperties() {
       if (m->kind != ClassMemberKind::kProperty || !m->is_const) continue;
       // §8.19: Instance constant (no initializer) cannot be static.
       if (!m->init_expr && m->is_static) {
-        diag_.Error(m->loc,
-                    "instance constant cannot be declared static");
+        diag_.Error(m->loc, "instance constant cannot be declared static");
       }
     }
   }
 }
 
 // §8.20: Find a virtual method in a base class by name.
-static const ClassMember* FindBaseVirtualMethod(
-    const ClassDecl* cls, std::string_view method_name,
-    const CompilationUnit* unit) {
+static const ClassMember* FindBaseVirtualMethod(const ClassDecl* cls,
+                                                std::string_view method_name,
+                                                const CompilationUnit* unit) {
   if (cls->base_class.empty()) return nullptr;
   for (const auto* c = FindClassDecl(cls->base_class, unit); c;
        c = c->base_class.empty() ? nullptr
@@ -1612,8 +1608,7 @@ void Elaborator::ValidateVirtualMethodOverrides() {
       // §8.20: Cannot override a method declared :final.
       if (base_virtual && base_virtual->method &&
           base_virtual->method->is_method_final) {
-        diag_.Error(method->loc,
-                    "cannot override a method declared ':final'");
+        diag_.Error(method->loc, "cannot override a method declared ':final'");
       }
     }
   }
@@ -1694,22 +1689,19 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
       break;
     }
     if (!found_proto) {
-      diag_.Error(item->loc,
-                  std::format("no matching extern prototype for '{}::{}' in "
-                              "class '{}'",
-                              item->method_class, item->name,
-                              item->method_class));
+      diag_.Error(
+          item->loc,
+          std::format("no matching extern prototype for '{}::{}' in "
+                      "class '{}'",
+                      item->method_class, item->name, item->method_class));
       continue;
     }
     // Check for duplicate out-of-block declarations.
-    auto key =
-        std::string(item->method_class) + "::" + std::string(item->name);
+    auto key = std::string(item->method_class) + "::" + std::string(item->name);
     if (linked.count(key)) {
-      diag_.Error(
-          item->loc,
-          std::format(
-              "duplicate out-of-block declaration for '{}::{}'",
-              item->method_class, item->name));
+      diag_.Error(item->loc,
+                  std::format("duplicate out-of-block declaration for '{}::{}'",
+                              item->method_class, item->name));
       continue;
     }
     linked.insert(key);
@@ -1837,8 +1829,7 @@ void Elaborator::WalkExprForAggregateCompare(const Expr* expr) {
   // Check binary equality/inequality on named-type operands.
   if (expr->kind == ExprKind::kBinary &&
       (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq)) {
-    if (expr->lhs && expr->rhs &&
-        expr->lhs->kind == ExprKind::kIdentifier &&
+    if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
         expr->rhs->kind == ExprKind::kIdentifier) {
       auto lit = var_named_types_.find(expr->lhs->text);
       auto rit = var_named_types_.find(expr->rhs->text);
@@ -2001,7 +1992,7 @@ void Elaborator::ValidateRealOperatorRestrictions(const ModuleDecl* decl) {
 // --- §11.3.6: Assignment-in-expression restrictions ---
 
 void Elaborator::WalkExprForAssignInExpr(const Expr* expr,
-                                          bool in_event_or_cont) {
+                                         bool in_event_or_cont) {
   if (!expr) return;
   if (expr->kind == ExprKind::kBinary && expr->op == TokenKind::kEq) {
     if (in_event_or_cont) {
@@ -2017,8 +2008,7 @@ void Elaborator::WalkExprForAssignInExpr(const Expr* expr,
   WalkExprForAssignInExpr(expr->false_expr, in_event_or_cont);
   for (auto* elem : expr->elements)
     WalkExprForAssignInExpr(elem, in_event_or_cont);
-  for (auto* arg : expr->args)
-    WalkExprForAssignInExpr(arg, in_event_or_cont);
+  for (auto* arg : expr->args) WalkExprForAssignInExpr(arg, in_event_or_cont);
 }
 
 void Elaborator::WalkStmtsForAssignInExpr(const Stmt* s) {
@@ -2060,8 +2050,7 @@ void Elaborator::ValidateAlias(const ModuleItem* item) {
     auto name = AliasNetIdent(net);
     if (name.empty()) continue;
     if (!seen.insert(name).second) {
-      diag_.Error(item->loc,
-                  std::format("net '{}' aliased to itself", name));
+      diag_.Error(item->loc, std::format("net '{}' aliased to itself", name));
     }
   }
   // Check that alias operands are nets, not variables.

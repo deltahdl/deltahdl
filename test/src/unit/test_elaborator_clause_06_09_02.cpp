@@ -1,6 +1,7 @@
 // Non-LRM tests
 
 #include <gtest/gtest.h>
+
 #include "fixture_elaborator.h"
 #include "model_net_declaration.h"
 

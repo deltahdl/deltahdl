@@ -16,11 +16,11 @@ TEST(ParserA25, UnsizedDimWithInitInferSize) {
 
 // §7.6: Compatible array types in continuous assignment — OK.
 TEST(Elaboration, ArrayAssignCompatibleTypes) {
-  EXPECT_TRUE(ElabOk(
-      "module t;\n"
-      "  int a[4], b[4];\n"
-      "  assign a = b;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int a[4], b[4];\n"
+             "  assign a = b;\n"
+             "endmodule\n"));
 }
 
 // §7.6: Fixed-size array size mismatch — error.
@@ -50,31 +50,31 @@ TEST(Elaboration, ArrayAssignTypeMismatch) {
 
 // §7.6: Same element type, same size — no error.
 TEST(Elaboration, ArrayAssignSameTypeSameSize) {
-  EXPECT_TRUE(ElabOk(
-      "module t;\n"
-      "  logic [7:0] a[10], b[10];\n"
-      "  assign a = b;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [7:0] a[10], b[10];\n"
+             "  assign a = b;\n"
+             "endmodule\n"));
 }
 
 // §7.6: Packed array treated as vector — vector to packed array is OK.
 TEST(Elaboration, PackedArrayVectorAssign) {
-  EXPECT_TRUE(ElabOk(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  logic [7:0] b;\n"
-      "  assign a = b;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [7:0] a;\n"
+             "  logic [7:0] b;\n"
+             "  assign a = b;\n"
+             "endmodule\n"));
 }
 
 // §7.6: Wire-to-variable assignment compatibility.
 TEST(Elaboration, WireToVarArrayAssign) {
-  EXPECT_TRUE(ElabOk(
-      "module t;\n"
-      "  logic [7:0] v[4];\n"
-      "  wire [7:0] w[4];\n"
-      "  assign w = v;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [7:0] v[4];\n"
+             "  wire [7:0] w[4];\n"
+             "  assign w = v;\n"
+             "endmodule\n"));
 }
 
 // §11.2.2: Unpacked array data objects can be used as aggregate expressions.

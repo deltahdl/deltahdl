@@ -33,10 +33,9 @@ TEST(StateOps, ModByZeroProducesX) {
   SimFixture f;
   MakeVar(f, "a", 8, 10);
   MakeVar(f, "b", 8, 0);
-  auto result =
-      EvalExpr(MakeBinary(f.arena, TokenKind::kPercent, MakeId(f.arena, "a"),
-                           MakeId(f.arena, "b")),
-               f.ctx, f.arena);
+  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kPercent,
+                                    MakeId(f.arena, "a"), MakeId(f.arena, "b")),
+                         f.ctx, f.arena);
   EXPECT_FALSE(result.IsKnown());
 }
 

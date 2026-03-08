@@ -56,25 +56,25 @@ TEST(ParserSection6, ParameterizedDataType_MultipleSpecializations) {
 
 // §6.25: Parameterized class with single type parameter, default used.
 TEST(ParserSection6, ParameterizedDataType_DefaultTypeParam) {
-  EXPECT_TRUE(ParseOk(
-      "class container #(type T = int);\n"
-      "  typedef T elem_t;\n"
-      "endclass\n"
-      "module m;\n"
-      "  container::elem_t x;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("class container #(type T = int);\n"
+              "  typedef T elem_t;\n"
+              "endclass\n"
+              "module m;\n"
+              "  container::elem_t x;\n"
+              "endmodule\n"));
 }
 
 // §6.25: Class with only value parameters for data type definition.
 TEST(ParserSection6, ParameterizedDataType_ValueParamOnly) {
-  EXPECT_TRUE(ParseOk(
-      "virtual class bus_def #(parameter WIDTH = 8);\n"
-      "  typedef logic [WIDTH-1:0] data_t;\n"
-      "endclass\n"
-      "module m;\n"
-      "  bus_def#(16)::data_t wide_bus;\n"
-      "  bus_def#(8)::data_t narrow_bus;\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("virtual class bus_def #(parameter WIDTH = 8);\n"
+              "  typedef logic [WIDTH-1:0] data_t;\n"
+              "endclass\n"
+              "module m;\n"
+              "  bus_def#(16)::data_t wide_bus;\n"
+              "  bus_def#(8)::data_t narrow_bus;\n"
+              "endmodule\n"));
 }
 
 }  // namespace

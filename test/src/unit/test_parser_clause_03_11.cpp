@@ -20,19 +20,19 @@ TEST(ParserClause03, Cl3_11_ModuleInstantiatesModule) {
 }
 
 TEST(ParserClause03, Cl3_11_ModuleInstantiatesPrimitive) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  and g1(y, a, b);\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, b, y;\n"
+              "  and g1(y, a, b);\n"
+              "endmodule\n"));
 }
 
 TEST(ParserClause03, Cl3_11_ModuleInstantiatesInterface) {
-  EXPECT_TRUE(ParseOk(
-      "interface ifc; logic req; endinterface\n"
-      "module m;\n"
-      "  ifc u0();\n"
-      "endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("interface ifc; logic req; endinterface\n"
+              "module m;\n"
+              "  ifc u0();\n"
+              "endmodule\n"));
 }
 
 // §3.11: Communication through ports.
@@ -48,8 +48,8 @@ TEST(ParserClause03, Cl3_11_PortConnections) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* inst = FindItemByKind(r.cu->modules[1]->items,
-                               ModuleItemKind::kModuleInst);
+  auto* inst =
+      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
   ASSERT_NE(inst, nullptr);
   EXPECT_FALSE(inst->inst_ports.empty());
 }
@@ -81,10 +81,10 @@ TEST(ParserClause03, Cl3_11_TopMux2to1Example) {
 // §3.11: Multiple levels of hierarchy.
 
 TEST(ParserClause03, Cl3_11_MultipleLevelsOfHierarchy) {
-  EXPECT_TRUE(ParseOk(
-      "module leaf; endmodule\n"
-      "module mid; leaf u0(); endmodule\n"
-      "module top; mid u0(); endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module leaf; endmodule\n"
+              "module mid; leaf u0(); endmodule\n"
+              "module top; mid u0(); endmodule\n"));
 }
 
 // §3.11: Multiple top-level blocks.

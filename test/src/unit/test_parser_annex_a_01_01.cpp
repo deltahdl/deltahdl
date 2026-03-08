@@ -39,8 +39,8 @@ TEST(LibraryText, SingleLibraryDecl) {
 }
 
 TEST(LibraryText, LibraryDeclMultipleFiles) {
-  auto r = ParseLibrary(
-      "library work \"src/a.sv\", \"src/b.sv\", \"src/c.sv\";\n");
+  auto r =
+      ParseLibrary("library work \"src/a.sv\", \"src/b.sv\", \"src/c.sv\";\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->libraries.size(), 1u);
@@ -49,8 +49,8 @@ TEST(LibraryText, LibraryDeclMultipleFiles) {
 }
 
 TEST(LibraryText, LibraryDeclWithIncdir) {
-  auto r = ParseLibrary(
-      "library mylib \"rtl/*.sv\" -incdir \"inc1\", \"inc2\";\n");
+  auto r =
+      ParseLibrary("library mylib \"rtl/*.sv\" -incdir \"inc1\", \"inc2\";\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->libraries.size(), 1u);

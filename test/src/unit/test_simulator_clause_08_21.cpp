@@ -39,7 +39,8 @@ TEST(ClassSim, PureVirtualMethodNullBody) {
   EXPECT_EQ(resolved, method);
 }
 
-// §8.21: Abstract base with multiple pure virtuals — concrete must override all.
+// §8.21: Abstract base with multiple pure virtuals — concrete must override
+// all.
 TEST(ClassSim, MultiplePureVirtualsOverridden) {
   SimFixture f;
   auto* abstract_type = MakeClassType(f, "Base", {});

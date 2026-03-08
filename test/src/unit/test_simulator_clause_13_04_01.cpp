@@ -180,7 +180,8 @@ TEST(Sim1341, FunctionNameAssignReturnsValue) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [15:0] x;\n"
-      "  function logic [15:0] myfunc1(input logic [7:0] a, input logic [7:0] b);\n"
+      "  function logic [15:0] myfunc1(input logic [7:0] a, input logic [7:0] "
+      "b);\n"
       "    myfunc1 = a * b - 16'd1;\n"
       "  endfunction\n"
       "  initial begin\n"
