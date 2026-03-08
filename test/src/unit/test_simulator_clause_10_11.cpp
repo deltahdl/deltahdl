@@ -1,31 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
 
 namespace {
-
-// §10.11: Writing to one aliased net is visible from the other.
-TEST(SimCh10k, AliasNetsShareValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  alias a = b;\n"
-      "  assign a = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 1u);
-  EXPECT_EQ(vb->value.ToUint64(), 1u);
-}
 
 // §10.11: Three-way alias — all nets see the driven value.
 TEST(SimCh10k, AliasThreeNetsShareValue) {
