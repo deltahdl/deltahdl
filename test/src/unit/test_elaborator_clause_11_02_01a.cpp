@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: IsConstantExpr — binary on constants is constant.
-TEST(ConstExpr, BinaryOnConstantsIsConstant) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("3 + 4", f);
-  EXPECT_TRUE(IsConstantExpr(e));
-}
-
 // §11.2.1: IsConstantExpr — binary with non-constant operand is not constant.
 TEST(ConstExpr, BinaryWithNonConstantNotConstant) {
   EvalFixture f;

@@ -143,4 +143,11 @@ TEST(ConstExpr, UnaryOnConstantIsConstant) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
+// §11.2.1: IsConstantExpr — binary on constants is constant.
+TEST(ConstExpr, BinaryOnConstantsIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("3 + 4", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
 }  // namespace
