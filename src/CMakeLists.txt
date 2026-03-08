@@ -29,6 +29,8 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_defparam.cpp
     elaborator/elaborator_gates.cpp
     elaborator/elaborator_validate.cpp
+    elaborator/elaborator_validate_classes.cpp
+    elaborator/elaborator_validate_types.cpp
     elaborator/type_eval.cpp
     elaborator/const_eval.cpp
     elaborator/sensitivity.cpp
