@@ -126,14 +126,6 @@ TEST(ParserA212, NetPortTypeTriType) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "bus");
 }
 
-TEST(ParserA23, ListOfPortIdentifiersSingle) {
-  auto r = ParseWithPreprocessor("module m(inout wire a); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInout);
-}
-
 TEST(ParserA23, ListOfPortIdentifiersWithUnpackedDim) {
   auto r = ParseWithPreprocessor("module m(inout logic a [3:0]); endmodule\n");
   ASSERT_NE(r.cu, nullptr);

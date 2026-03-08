@@ -98,4 +98,12 @@ TEST(ParserA23, ListOfPortIdentifiersMultipleNonAnsi) {
   }
 }
 
+TEST(ParserA23, ListOfPortIdentifiersSingle) {
+  auto r = ParseWithPreprocessor("module m(inout wire a); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInout);
+}
+
 }  // namespace
