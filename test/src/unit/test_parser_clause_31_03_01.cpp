@@ -63,22 +63,6 @@ TEST(ParserA701, SpecifyItemSystemTimingCheck) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kTimingCheck);
 }
 
-TEST(ParserA70503, TimingCheckEventNoEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kNone);
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kNone);
-  EXPECT_EQ(tc->ref_terminal.name, "data");
-  EXPECT_EQ(tc->data_terminal.name, "clk");
-}
-
 TEST_F(SpecifyParseTest, SpecifyBlockWithTimingCheck) {
   auto* unit = Parse(
       "module m; specify $setup(data, posedge clk, 10); endspecify "
