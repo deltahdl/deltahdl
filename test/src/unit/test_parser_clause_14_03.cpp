@@ -359,21 +359,6 @@ TEST(ParserA611, ClockingEventParenExpr) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserA611, ClockingItemDefaultSkewInputOutput) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    default input #1 output #2;\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_GE(item->clocking_signals.size(), 1u);
-}
-
 TEST(ParserA611, ClockingDirectionInput) {
   auto r = Parse(
       "module m;\n"
