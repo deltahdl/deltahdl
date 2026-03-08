@@ -181,4 +181,17 @@ TEST(ParserSection12, StatementLabelOnForever) {
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
 
+// §9.3.5: Label and block name simultaneously is illegal.
+TEST(ParserClause09_03_05, LabelAndBlockNameErrors) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    my_label: begin : block_name\n"
+      "      $display(\"hello\");\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

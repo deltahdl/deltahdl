@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
 
@@ -53,19 +55,6 @@ TEST(ElabClause09_03_05, LabelOnForkBlockElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-// §9.3.5: Label and block name simultaneously is illegal.
-TEST(ParserClause09_03_05, LabelAndBlockNameErrors) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    my_label: begin : block_name\n"
-      "      $display(\"hello\");\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
 }
 
 // §9.3.5: Label on if statement elaborates.
