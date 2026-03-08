@@ -14,6 +14,7 @@ add_library(deltahdl_lib STATIC
     parser/parser_port.cpp
     parser/parser_decl.cpp
     parser/parser_generate.cpp
+    parser/parser_class.cpp
     parser/parser_toplevel.cpp
     parser/expr_parser.cpp
     parser/expr_parser_aux.cpp
