@@ -28,4 +28,16 @@ TEST(SimCh10j, EmptyConcatClearsQueue) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
+// §10.10: Queue target with unpacked array concatenation.
+TEST(ElabCh10j, QueueConcatElaborates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial q = {1, 2, 3};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+}
+
 }  // namespace
