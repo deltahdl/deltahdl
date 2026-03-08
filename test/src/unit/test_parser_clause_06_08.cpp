@@ -452,4 +452,12 @@ TEST(ParserSection6, Sec6_8_InputVarLogicPort) {
   EXPECT_EQ(ports[0].direction, Direction::kInput);
 }
 
+TEST(ImplicitDataType, ImplicitDataType) {
+  auto r = Parse("module m(input [7:0] d); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_NE(port.data_type.packed_dim_left, nullptr);
+}
+
 }  // namespace

@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -5,14 +7,6 @@
 using namespace delta;
 
 namespace {
-
-TEST(ParserA221, ImplicitDataType) {
-  auto r = Parse("module m(input [7:0] d); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_NE(port.data_type.packed_dim_left, nullptr);
-}
 
 TEST(ParserA221, ImplicitDataTypeSigned) {
   auto r = Parse("module m(input signed [7:0] d); endmodule");
@@ -84,6 +78,7 @@ TEST(ParserSection23, Sec23_2_2_EmptyPortsAndMiscVariants) {
 
   EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
 }
+
 TEST(ParserSection23, ModuleEmptyPortList) {
   auto r = Parse("module m(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
