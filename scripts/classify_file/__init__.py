@@ -7,15 +7,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lib.python.git import commit_and_push
 from classify_test._github import fetch_issue_body, update_issue_body
-from lib.python.github import close_issue
 from lib.python.classify import (
     add_github_args,
     add_output_args,
     add_run_mode_args,
     append_classify_cmd_flags,
 )
+from lib.python.git import commit_and_push
+from lib.python.github import close_issue
 
 
 _TEST_RE = re.compile(
