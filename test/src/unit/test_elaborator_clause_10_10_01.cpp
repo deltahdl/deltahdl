@@ -170,4 +170,16 @@ TEST(UnpackedArrayConcatDescending, UnpackedArrayConcatDescending) {
   EXPECT_EQ(e0->value.ToUint64(), 30u);
 }
 
+// §10.10: Mixed scalars and arrays in unpacked array concatenation.
+TEST(MixedScalarArrayConcatenation, MixedScalarArrayElaborates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int A[2], B[3];\n"
+      "  initial B = {A, 5};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+}
+
 }  // namespace
