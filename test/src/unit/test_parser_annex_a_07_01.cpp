@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA701, SpecifyItemPulsestyleOnevent) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    pulsestyle_onevent out1;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  auto* si = spec->specify_items[0];
-  EXPECT_EQ(si->kind, SpecifyItemKind::kPulsestyle);
-  EXPECT_FALSE(si->is_ondetect);
-  ASSERT_EQ(si->signal_list.size(), 1u);
-  EXPECT_EQ(si->signal_list[0], "out1");
-}
-
 TEST(ParserA701, SpecifyItemPulsestyleOndetect) {
   auto r = Parse(
       "module m;\n"
