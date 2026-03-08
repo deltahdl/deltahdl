@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, BinaryModulePathXnor) {
-  auto r = Parse(
-      "module m(input a, input b, output y);\n"
-      "  specify\n"
-      "    if (a ^~ b) (a => y) = 8;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §A.8.6 — unary_module_path_operator
 TEST(ParserA86, UnaryModulePathNot) {
   auto r = Parse(

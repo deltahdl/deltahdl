@@ -126,4 +126,15 @@ TEST(ParserA86, BinaryModulePathXor) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ParserA86, BinaryModulePathXnor) {
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a ^~ b) (a => y) = 8;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
