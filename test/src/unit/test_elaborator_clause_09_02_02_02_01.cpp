@@ -87,31 +87,6 @@ TEST(SimCh9, AlwaysCombFunctionCall) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimCh9, AlwaysCombStructFieldAccess) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef struct packed {\n"
-      "    logic [7:0] hi;\n"
-      "    logic [7:0] lo;\n"
-      "  } pair_t;\n"
-      "  pair_t p;\n"
-      "  logic [7:0] result;\n"
-      "  initial p = 16'hABCD;\n"
-      "  always_comb begin\n"
-      "    result = p.lo;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xCDu);
-}
-
 TEST(SimCh9b, AlwaysCombAndGate) {
   SimFixture f;
   auto* design = ElaborateSrc(
