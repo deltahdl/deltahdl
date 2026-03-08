@@ -77,3 +77,23 @@ TEST(ElabClause09_04_05, RepeatEventNonblockingElaborates) {
 }
 
 }
+TEST(BlockingIntraAssignDelay, BlockingIntraAssignDelay) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    b = 8'd42;\n"
+      "    a = #5 b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 42u);
+}
+
