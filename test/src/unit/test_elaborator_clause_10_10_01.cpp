@@ -35,4 +35,16 @@ TEST(SimCh10j, ConcatAndPatternEquivalent) {
   }
 }
 
+// §10.10: Mixed scalars and arrays in unpacked array concatenation.
+TEST(ElabCh10j, MixedScalarArrayElaborates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int A[2], B[3];\n"
+      "  initial B = {A, 5};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+}
+
 }  // namespace

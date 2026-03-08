@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 
@@ -37,18 +39,6 @@ TEST(ElabCh10j, ArrayItemExpansionElaborates) {
       "module m;\n"
       "  int A[2], B[2], C[4];\n"
       "  initial C = {A, B};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-}
-
-// §10.10: Mixed scalars and arrays in unpacked array concatenation.
-TEST(ElabCh10j, MixedScalarArrayElaborates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int A[2], B[3];\n"
-      "  initial B = {A, 5};\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
