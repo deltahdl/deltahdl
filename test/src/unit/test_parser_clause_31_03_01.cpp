@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -45,6 +47,7 @@ TEST(ParserAnnexA, A7TimingCheckSetup) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
+
 TEST(ParserA701, SpecifyItemSystemTimingCheck) {
   auto r = Parse(
       "module m;\n"
@@ -58,20 +61,6 @@ TEST(ParserA701, SpecifyItemSystemTimingCheck) {
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kTimingCheck);
-}
-
-TEST(ParserA70502, TimingCheckLimitExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->limits.size(), 1u);
-  EXPECT_NE(tc->limits[0], nullptr);
 }
 
 TEST(ParserA70503, TimingCheckEventNoEdge) {

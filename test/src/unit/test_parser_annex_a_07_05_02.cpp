@@ -47,4 +47,18 @@ TEST(ParserA70502, ThresholdExpression) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
+TEST(TimingCheckLimitExpression, TimingCheckLimitExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  ASSERT_EQ(tc->limits.size(), 1u);
+  EXPECT_NE(tc->limits[0], nullptr);
+}
+
 }  // namespace
