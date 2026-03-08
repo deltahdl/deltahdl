@@ -50,6 +50,52 @@ def install_fake_script(tmp_path, name, content):
     return str(fake_bin)
 
 
+def install_fake_gh(tmp_path, issue_body="", handle_post=False):
+    """Install a fake ``gh`` CLI that handles common API patterns.
+
+    Handles ``--jq .body`` (returns *issue_body*), PATCH (no-op success),
+    and optionally POST (returns ``{"number": 999}``).
+    """
+    escaped = issue_body.replace("'", "'\\''")
+    lines = ['#!/bin/sh\n']
+    if handle_post:
+        lines.append(
+            'for arg in "$@"; do\n'
+            '  if [ "$arg" = "POST" ]; then\n'
+            '    echo \'{"number": 999}\'\n'
+            '    exit 0\n'
+            '  fi\n'
+            'done\n',
+        )
+    lines.append(
+        'for arg in "$@"; do\n'
+        '  if [ "$arg" = ".body" ]; then\n'
+        f'    printf \'%s\' \'{escaped}\'\n'
+        '    exit 0\n'
+        '  fi\n'
+        'done\n'
+        'exit 0\n',
+    )
+    return install_fake_script(tmp_path, "gh", "".join(lines))
+
+
+def install_fake_package(tmp_path, name, exit_code=0):
+    """Install a fake Python package that exits with *exit_code*.
+
+    Returns the directory to prepend to PYTHONPATH so the fake
+    shadows the real package.
+    """
+    fake_scripts = tmp_path / "fake_scripts"
+    fake_pkg = fake_scripts / name
+    fake_pkg.mkdir(parents=True)
+    (fake_pkg / "__init__.py").write_text("", encoding="utf-8")
+    (fake_pkg / "__main__.py").write_text(
+        f"import sys; sys.exit({exit_code})\n",
+        encoding="utf-8",
+    )
+    return str(fake_scripts)
+
+
 def invoke_module(module_name, *args, cwd=None, env=None):
     """Run *module_name* in a child process via ``python -m``."""
     run_env = (env or os.environ).copy()

@@ -4,7 +4,7 @@ import argparse
 import runpy
 import subprocess
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -42,71 +42,49 @@ def test_parse_subclauses_rejects_one_invalid_in_list(iscs):
 # ---- parse_args --------------------------------------------------------------
 
 
-def _base_argv(tmp_path):
-    """Return minimal valid argv for parse_args."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    return [
-        "--lrm", str(lrm), "--subclauses", "6.1,6.2",
-        "--clause-issue", "8", "--master-issue", "1",
-        "--organization", "deltahdl", "--repo", "deltahdl",
-    ]
-
-
-def test_parse_args_subclauses_parsed(iscs, tmp_path):
+def test_parse_args_subclauses_parsed(iscs, base_argv):
     """--subclauses is parsed into a list."""
-    args = iscs.parse_args(_base_argv(tmp_path))
-    assert args.subclauses == ["6.1", "6.2"]
+    assert iscs.parse_args(base_argv).subclauses == ["6.1", "6.2"]
 
 
-def test_parse_args_clause_issue_is_int(iscs, tmp_path):
+def test_parse_args_clause_issue_is_int(iscs, base_argv):
     """--clause-issue is parsed as an integer."""
-    args = iscs.parse_args(_base_argv(tmp_path))
-    assert args.clause_issue == 8
+    assert iscs.parse_args(base_argv).clause_issue == 8
 
 
-def test_parse_args_master_issue_is_int(iscs, tmp_path):
+def test_parse_args_master_issue_is_int(iscs, base_argv):
     """--master-issue is parsed as an integer."""
-    args = iscs.parse_args(_base_argv(tmp_path))
-    assert args.master_issue == 1
+    assert iscs.parse_args(base_argv).master_issue == 1
 
 
-def test_parse_args_organization(iscs, tmp_path):
+def test_parse_args_organization(iscs, base_argv):
     """--organization is parsed correctly."""
-    args = iscs.parse_args(_base_argv(tmp_path))
-    assert args.organization == "deltahdl"
+    assert iscs.parse_args(base_argv).organization == "o"
 
 
-def test_parse_args_repo(iscs, tmp_path):
+def test_parse_args_repo(iscs, base_argv):
     """--repo is parsed correctly."""
-    args = iscs.parse_args(_base_argv(tmp_path))
-    assert args.repo == "deltahdl"
+    assert iscs.parse_args(base_argv).repo == "r"
 
 
-def test_parse_args_model_default(iscs, tmp_path):
+def test_parse_args_model_default(iscs, base_argv):
     """--model defaults to 'opus'."""
-    args = iscs.parse_args(_base_argv(tmp_path))
-    assert args.model == "opus"
+    assert iscs.parse_args(base_argv).model == "opus"
 
 
-def test_parse_args_model_override(iscs, tmp_path):
+def test_parse_args_model_override(iscs, base_argv):
     """--model can be overridden."""
-    argv = _base_argv(tmp_path) + ["--model", "sonnet"]
-    args = iscs.parse_args(argv)
-    assert args.model == "sonnet"
+    assert iscs.parse_args(base_argv + ["--model", "sonnet"]).model == "sonnet"
 
 
-def test_parse_args_continue_default_false(iscs, tmp_path):
+def test_parse_args_continue_default_false(iscs, base_argv):
     """continue_session defaults to False."""
-    args = iscs.parse_args(_base_argv(tmp_path))
-    assert args.continue_session is False
+    assert iscs.parse_args(base_argv).continue_session is False
 
 
-def test_parse_args_continue_flag(iscs, tmp_path):
+def test_parse_args_continue_flag(iscs, base_argv):
     """--continue sets continue_session to True."""
-    argv = _base_argv(tmp_path) + ["--continue"]
-    args = iscs.parse_args(argv)
-    assert args.continue_session is True
+    assert iscs.parse_args(base_argv + ["--continue"]).continue_session is True
 
 
 def test_parse_args_rejects_missing_lrm(iscs, tmp_path):
@@ -232,12 +210,12 @@ def _patch_main(monkeypatch, iscs, *, all_complete=False):
     mock_invoke = MagicMock()
     monkeypatch.setattr(iscs, "invoke_implement_subclause", mock_invoke)
 
-    body = "- [x] 6.1\n- [x] 6.2\n" if all_complete else "- [ ] 6.3\n"
-    monkeypatch.setattr(iscs, "fetch_issue_body", lambda *_a: body)
-    monkeypatch.setattr(
-        iscs, "next_unchecked",
-        lambda _b: None if all_complete else "6.3",
-    )
+    if all_complete:
+        monkeypatch.setattr(iscs, "fetch_issue_body", lambda *_a: "- [x] done\n")
+        monkeypatch.setattr(iscs, "next_unchecked", lambda _b: None)
+    else:
+        monkeypatch.setattr(iscs, "fetch_issue_body", lambda *_a: "- [ ] 6.3\n")
+        monkeypatch.setattr(iscs, "next_unchecked", lambda _b: "6.3")
 
     mock_close = MagicMock()
     monkeypatch.setattr(iscs, "close_issue", mock_close)
@@ -248,120 +226,63 @@ def _patch_main(monkeypatch, iscs, *, all_complete=False):
     return mock_invoke, mock_close, mock_mark
 
 
-def test_main_invokes_each_subclause(iscs, monkeypatch, tmp_path):
+def test_main_invokes_each_subclause(iscs, monkeypatch, base_argv):
     """main() invokes implement_subclause for each subclause."""
     mock_invoke, _, __ = _patch_main(monkeypatch, iscs)
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    iscs.main([
-        "--lrm", str(lrm), "--subclauses", "6.1,6.2",
-        "--clause-issue", "8", "--master-issue", "1",
-        "--organization", "o", "--repo", "r",
-    ])
+    iscs.main(base_argv)
     assert mock_invoke.call_count == 2
 
 
-def test_main_first_subclause_no_continue(iscs, monkeypatch, tmp_path):
+def test_main_first_subclause_no_continue(iscs, monkeypatch, base_argv):
     """First subclause does not pass continue_session=True."""
     mock_invoke, _, __ = _patch_main(monkeypatch, iscs)
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    iscs.main([
-        "--lrm", str(lrm), "--subclauses", "6.1,6.2",
-        "--clause-issue", "8", "--master-issue", "1",
-        "--organization", "o", "--repo", "r",
-    ])
+    iscs.main(base_argv)
     assert mock_invoke.call_args_list[0][0][4] is False
 
 
-def test_main_second_subclause_uses_continue(iscs, monkeypatch, tmp_path):
+def test_main_second_subclause_uses_continue(iscs, monkeypatch, base_argv):
     """Second subclause passes continue_session=True."""
     mock_invoke, _, __ = _patch_main(monkeypatch, iscs)
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    iscs.main([
-        "--lrm", str(lrm), "--subclauses", "6.1,6.2",
-        "--clause-issue", "8", "--master-issue", "1",
-        "--organization", "o", "--repo", "r",
-    ])
+    iscs.main(base_argv)
     assert mock_invoke.call_args_list[1][0][4] is True
 
 
-def test_main_continue_flag_on_first(iscs, monkeypatch, tmp_path):
+def test_main_continue_flag_on_first(iscs, monkeypatch, base_argv):
     """--continue flag makes the first subclause use continue_session=True."""
     mock_invoke, _, __ = _patch_main(monkeypatch, iscs)
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    iscs.main([
-        "--lrm", str(lrm), "--subclauses", "6.1",
-        "--clause-issue", "8", "--master-issue", "1",
-        "--organization", "o", "--repo", "r",
-        "--continue",
-    ])
+    iscs.main(base_argv + ["--continue"])
     assert mock_invoke.call_args_list[0][0][4] is True
 
 
-def test_main_closes_issue_when_all_complete(iscs, monkeypatch, tmp_path):
+def test_main_closes_issue_when_all_complete(iscs, monkeypatch, base_argv):
     """Clause issue is closed when all subclauses are complete."""
-    _, mock_close, __ = _patch_main(
-        monkeypatch, iscs, all_complete=True,
-    )
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    iscs.main([
-        "--lrm", str(lrm), "--subclauses", "6.1",
-        "--clause-issue", "8", "--master-issue", "1",
-        "--organization", "o", "--repo", "r",
-    ])
+    _, mock_close, __ = _patch_main(monkeypatch, iscs, all_complete=True)
+    iscs.main(base_argv)
     assert mock_close.call_args == (
         ("o", "r", 8, "all subclauses are implemented"),
     )
 
 
-def test_main_marks_master_when_all_complete(iscs, monkeypatch, tmp_path):
+def test_main_marks_master_when_all_complete(iscs, monkeypatch, base_argv):
     """Master issue is marked complete when clause issue is done."""
-    _, __, mock_mark = _patch_main(
-        monkeypatch, iscs, all_complete=True,
-    )
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    iscs.main([
-        "--lrm", str(lrm), "--subclauses", "6.1",
-        "--clause-issue", "8", "--master-issue", "1",
-        "--organization", "o", "--repo", "r",
-    ])
+    _, __, mock_mark = _patch_main(monkeypatch, iscs, all_complete=True)
+    iscs.main(base_argv)
     assert mock_mark.call_args == (("o", "r", 1, 8),)
 
 
-def test_main_does_not_close_when_incomplete(iscs, monkeypatch, tmp_path):
+def test_main_does_not_close_when_incomplete(iscs, monkeypatch, base_argv):
     """Clause issue is not closed when subclauses remain."""
-    _, mock_close, __ = _patch_main(
-        monkeypatch, iscs, all_complete=False,
-    )
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    iscs.main([
-        "--lrm", str(lrm), "--subclauses", "6.1",
-        "--clause-issue", "8", "--master-issue", "1",
-        "--organization", "o", "--repo", "r",
-    ])
+    _, mock_close, __ = _patch_main(monkeypatch, iscs, all_complete=False)
+    iscs.main(base_argv)
     assert not mock_close.called
 
 
 def test_main_does_not_mark_master_when_incomplete(
-    iscs, monkeypatch, tmp_path,
+    iscs, monkeypatch, base_argv,
 ):
     """Master issue is not marked when subclauses remain."""
-    _, __, mock_mark = _patch_main(
-        monkeypatch, iscs, all_complete=False,
-    )
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    iscs.main([
-        "--lrm", str(lrm), "--subclauses", "6.1",
-        "--clause-issue", "8", "--master-issue", "1",
-        "--organization", "o", "--repo", "r",
-    ])
+    _, __, mock_mark = _patch_main(monkeypatch, iscs, all_complete=False)
+    iscs.main(base_argv)
     assert not mock_mark.called
 
 

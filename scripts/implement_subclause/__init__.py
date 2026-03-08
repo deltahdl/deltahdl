@@ -12,6 +12,7 @@ from pathlib import Path
 
 from classify_test import clause_to_filename
 from classify_test._patterns import STAGE_TO_PREFIX
+from lib.python.cli import add_continue_arg, add_lrm_arg, add_model_arg, validate_lrm
 from lib.python.git import commit_and_push, run_git
 
 
@@ -231,12 +232,7 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Generate an implementation prompt for a given LRM clause.",
     )
-    parser.add_argument(
-        "--lrm",
-        type=Path,
-        required=True,
-        help="Path to the LRM PDF.",
-    )
+    add_lrm_arg(parser)
     parser.add_argument(
         "--subclause",
         type=str,
@@ -249,23 +245,11 @@ def parse_args(argv=None):
         required=True,
         help="GitHub Issue number to read and correct after implementation.",
     )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="opus",
-        help="Claude model to use (default: opus).",
-    )
-    parser.add_argument(
-        "--continue",
-        action="store_true",
-        default=False,
-        dest="continue_session",
-        help="Continue the previous Claude conversation.",
-    )
+    add_model_arg(parser)
+    add_continue_arg(parser)
     args = parser.parse_args(argv)
 
-    if not args.lrm.is_file():
-        parser.error(f"LRM file not found: {args.lrm}")
+    validate_lrm(parser, args)
 
     if not CLAUSE_RE.match(args.subclause):
         parser.error(

@@ -12,6 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from lib.python.cli import invoke_implement_subclause as _invoke_subclause
 from lib.python.github import (
     build_synced_body,
     close_issue,
@@ -106,18 +107,10 @@ def invoke_implement_subclause(
     continue_session: bool = False,
 ) -> None:
     """Shell out to ``python -m implement_subclause``."""
-    print(f"Invoking implement_subclause for {subclause}...")
-    cmd = [
-        sys.executable, "-m", "implement_subclause",
-        "--lrm", args.lrm,
-        "--subclause", subclause,
-        "--issue", str(args.sub_issue),
-    ]
-    if continue_session:
-        cmd.append("--continue")
-    result = subprocess.run(cmd, check=False)
-    if result.returncode != 0:
-        sys.exit(result.returncode)
+    _invoke_subclause(
+        args.lrm, subclause, args.sub_issue,
+        "opus", continue_session,
+    )
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

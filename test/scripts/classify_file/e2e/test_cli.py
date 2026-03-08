@@ -2,7 +2,12 @@
 
 from pathlib import Path
 
-from lib.python.test_utils import build_base_env, install_fake_script, invoke_module
+from lib.python.test_utils import (
+    build_base_env,
+    install_fake_gh,
+    install_fake_package,
+    invoke_module,
+)
 
 _SCRIPTS_DIR = str(
     Path(__file__).resolve().parents[4] / "scripts",
@@ -18,14 +23,10 @@ def _install_fake_classify_test(tmp_path, exit_code=0):
     Returns the directory to prepend to PYTHONPATH so the fake
     shadows the real classify_test.
     """
-    fake_scripts = tmp_path / "fake_scripts"
-    fake_pkg = fake_scripts / "classify_test"
-    fake_pkg.mkdir(parents=True)
-    (fake_pkg / "__init__.py").write_text("", encoding="utf-8")
-    (fake_pkg / "__main__.py").write_text(
-        f"import sys; sys.exit({exit_code})\n",
-        encoding="utf-8",
+    fake_scripts = install_fake_package(
+        tmp_path, "classify_test", exit_code=exit_code,
     )
+    fake_pkg = Path(fake_scripts) / "classify_test"
     (fake_pkg / "_git.py").write_text(
         "def commit_and_push(changed, deleted, message):\n"
         "    pass\n",
@@ -62,34 +63,14 @@ def _install_fake_classify_test(tmp_path, exit_code=0):
         "        sys.exit(1)\n",
         encoding="utf-8",
     )
-    return str(fake_scripts)
-
-
-def _install_fake_gh(tmp_path, issue_body=""):
-    """Install a fake gh that handles POST, PATCH, and --jq requests."""
-    escaped_body = issue_body.replace("'", "'\\''")
-    return install_fake_script(
-        tmp_path, "gh",
-        '#!/bin/sh\n'
-        'for arg in "$@"; do\n'
-        '  if [ "$arg" = "POST" ]; then\n'
-        '    echo \'{"number": 999}\'\n'
-        '    exit 0\n'
-        '  fi\n'
-        'done\n'
-        'for arg in "$@"; do\n'
-        '  if [ "$arg" = ".body" ]; then\n'
-        f'    printf \'%s\' \'{escaped_body}\'\n'
-        '    exit 0\n'
-        '  fi\n'
-        'done\n'
-        'exit 0\n',
-    )
+    return fake_scripts
 
 
 def _base_env(tmp_path, fake_scripts_dir, issue_body=""):
     """Build subprocess env with fake classify_test before real scripts."""
-    fake_bin = _install_fake_gh(tmp_path, issue_body=issue_body)
+    fake_bin = install_fake_gh(
+        tmp_path, issue_body=issue_body, handle_post=True,
+    )
     return build_base_env(tmp_path, fake_scripts_dir, fake_bin)
 
 

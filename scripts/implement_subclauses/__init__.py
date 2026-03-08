@@ -7,10 +7,14 @@ issue and marks it done on the master issue.
 
 import argparse
 import re
-import subprocess
-import sys
-from pathlib import Path
 
+from lib.python.cli import (
+    add_continue_arg,
+    add_lrm_arg,
+    add_model_arg,
+    invoke_implement_subclause,
+    validate_lrm,
+)
 from lib.python.github import (
     close_issue,
     fetch_issue_body,
@@ -53,12 +57,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Invoke implement_subclause for multiple subclauses.",
     )
-    parser.add_argument(
-        "--lrm",
-        type=Path,
-        required=True,
-        help="Path to the LRM PDF.",
-    )
+    add_lrm_arg(parser)
     parser.add_argument(
         "--subclauses",
         type=parse_subclauses,
@@ -87,52 +86,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=True,
         help="GitHub repository.",
     )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="opus",
-        help="Claude model to use (default: opus).",
-    )
-    parser.add_argument(
-        "--continue",
-        action="store_true",
-        default=False,
-        dest="continue_session",
-        help="Continue the previous Claude conversation.",
-    )
+    add_model_arg(parser)
+    add_continue_arg(parser)
     args = parser.parse_args(argv)
 
-    if not args.lrm.is_file():
-        parser.error(f"LRM file not found: {args.lrm}")
+    validate_lrm(parser, args)
 
     return args
-
-
-# ---------------------------------------------------------------------------
-# Subprocess invocation
-# ---------------------------------------------------------------------------
-
-def invoke_implement_subclause(
-    lrm: str,
-    subclause: str,
-    issue: int,
-    model: str,
-    continue_session: bool,
-) -> None:
-    """Shell out to ``python -m implement_subclause``."""
-    print(f"Invoking implement_subclause for {subclause}...")
-    cmd = [
-        sys.executable, "-m", "implement_subclause",
-        "--lrm", lrm,
-        "--subclause", subclause,
-        "--issue", str(issue),
-        "--model", model,
-    ]
-    if continue_session:
-        cmd.append("--continue")
-    result = subprocess.run(cmd, check=False)
-    if result.returncode != 0:
-        sys.exit(result.returncode)
 
 
 # ---------------------------------------------------------------------------
