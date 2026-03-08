@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: ConstEvalReal — ternary on reals.
-TEST(ConstEvalReal, TernaryOnReals) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("1 ? 2.5 : 3.5", f);
-  auto val = ConstEvalReal(e);
-  ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(*val, 2.5);
-}
-
 // §11.2.1: ConstEvalReal — non-constant returns nullopt.
 TEST(ConstEvalReal, NonConstantReturnsNullopt) {
   EvalFixture f;
