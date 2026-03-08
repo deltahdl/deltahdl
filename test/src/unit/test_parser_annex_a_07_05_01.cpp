@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, RecremBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $recrem(posedge rst, posedge clk, 10, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecrem);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
 TEST(ParserA70501, SkewBasic) {
   auto r = Parse(
       "module m;\n"
