@@ -121,3 +121,27 @@ TEST(BlockingIntraAssignDelay, BlockingIntraAssignDelayBlocksFlow) {
   EXPECT_EQ(c->value.ToUint64(), 99u);
 }
 
+TEST(BlockingIntraAssignDelayRHSCapture, BlockingIntraAssignDelayCapturesRHS) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    b = 8'd10;\n"
+      "    a = #5 b;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #2 b = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("a");
+  ASSERT_NE(a, nullptr);
+
+  EXPECT_EQ(a->value.ToUint64(), 10u);
+}
+
