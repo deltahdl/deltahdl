@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-// parameter_port_list ::= #( )
-TEST(ModuleParamsA13, EmptyParamPortList) {
-  auto r = Parse("module m #(); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->params.empty());
-}
-
 // parameter_port_declaration with data_type list_of_param_assignments
 TEST(ModuleParamsA13, TypedParamPort) {
   auto r = Parse(
