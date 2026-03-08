@@ -81,4 +81,18 @@ TEST(HoldTimingCheck, HoldBasic) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
+TEST(HoldWithNotifier, HoldWithNotifier) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $hold(posedge clk, data, 5, ntfr);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kHold);
+  EXPECT_EQ(tc->notifier, "ntfr");
+}
+
 }  // namespace
