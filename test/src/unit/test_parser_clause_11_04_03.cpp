@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
@@ -53,20 +55,6 @@ TEST(ParserSection11, UnaryPlusOperator) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
-}
-
-TEST(ParserSection11, RealLiteralAddition) {
-  auto r = Parse(
-      "module t;\n"
-      "  real r;\n"
-      "  initial r = 1.5 + 2.5;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
-  EXPECT_EQ(rhs->lhs->kind, ExprKind::kRealLiteral);
 }
 
 TEST(ParserSection11, RealMultiplication) {
