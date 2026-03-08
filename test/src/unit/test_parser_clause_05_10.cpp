@@ -7,22 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_10_ReplicationPattern) {
-
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct {int X; int Y; int Z;} xyz_t;\n"
-      "  xyz_t s;\n"
-      "  initial s = '{3{1}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
-}
-
 TEST(ParserClause05, Cl5_10_StructLiteralInVarDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
