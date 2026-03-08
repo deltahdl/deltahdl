@@ -136,4 +136,11 @@ TEST(ConstExpr, UnresolvedIdentifierNotConstant) {
   EXPECT_FALSE(IsConstantExpr(e));
 }
 
+// §11.2.1: IsConstantExpr — unary on constant is constant.
+TEST(ConstExpr, UnaryOnConstantIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("-42", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
 }  // namespace
