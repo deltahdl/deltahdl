@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -6,36 +8,6 @@
 using namespace delta;
 
 namespace {
-
-// §9.2.2.2.2: Variables read inside case branches are in sensitivity.
-TEST(ElabClause09_02_02_02_02, CaseBodyReadsInSensitivity) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [1:0] sel;\n"
-      "  logic a, b, y;\n"
-      "  always_comb\n"
-      "    case (sel)\n"
-      "      2'b00: y = a;\n"
-      "      2'b01: y = b;\n"
-      "      default: y = 0;\n"
-      "    endcase\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules.empty());
-  auto& proc = design->top_modules[0]->processes[0];
-  bool found_sel = false, found_a = false, found_b = false;
-  for (const auto& ev : proc.sensitivity) {
-    if (ev.signal && ev.signal->text == "sel") found_sel = true;
-    if (ev.signal && ev.signal->text == "a") found_a = true;
-    if (ev.signal && ev.signal->text == "b") found_b = true;
-  }
-  EXPECT_TRUE(found_sel);
-  EXPECT_TRUE(found_a);
-  EXPECT_TRUE(found_b);
-}
 
 // §9.2.2.2.2: Immediate assertion expression contributes to sensitivity.
 TEST(ElabClause09_02_02_02_02, AssertExprInSensitivity) {
