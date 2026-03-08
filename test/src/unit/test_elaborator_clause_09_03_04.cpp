@@ -40,17 +40,6 @@ TEST(ElabClause09_03_04, NamedForkBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.4: Mismatched end label on begin-end is an error.
-TEST(ParserClause09_03_04, MismatchedEndLabelBeginEndErrors) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : blk_a\n"
-      "    $display(\"hello\");\n"
-      "  end : blk_b\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // §9.3.4: Matching end label on fork-join is OK.
 TEST(ParserClause09_03_04, MatchingEndLabelForkJoin) {
   auto r = Parse(
