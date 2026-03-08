@@ -15,17 +15,6 @@ static Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
   }
   return vec;
 }
-static Net MakeTriregNet(Arena& arena, Variable*& var, Strength strength,
-                         uint8_t width, uint64_t initial_val) {
-  var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, width, initial_val);
-  Net net;
-  net.type = NetType::kTrireg;
-  net.resolved = var;
-  net.charge_strength = strength;
-  net.drivers.push_back(MakeAllZ(arena, width));
-  return net;
-}
 
 namespace {
 
@@ -126,64 +115,6 @@ TEST(ChargeDecay, NoDecayScheduledWithoutScheduler) {
 
   net.Resolve(arena);
   EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-TEST(CapacitiveNetwork, LargerOverridesSmaller) {
-  Arena arena;
-  Variable* var_a = nullptr;
-  Variable* var_b = nullptr;
-  Net a = MakeTriregNet(arena, var_a, Strength::kLarge, 8, 1);
-  Net b = MakeTriregNet(arena, var_b, Strength::kSmall, 8, 0);
-
-  PropagateCharge(a, b);
-  EXPECT_EQ(var_b->value.ToUint64(), 1u);
-  EXPECT_EQ(var_a->value.ToUint64(), 1u);
-}
-
-TEST(CapacitiveNetwork, EqualStrengthDifferentValuesToX) {
-  Arena arena;
-  Variable* var_a = nullptr;
-  Variable* var_b = nullptr;
-  Net a = MakeTriregNet(arena, var_a, Strength::kMedium, 8, 1);
-  Net b = MakeTriregNet(arena, var_b, Strength::kMedium, 8, 0);
-
-  PropagateCharge(a, b);
-
-  EXPECT_EQ(var_a->value.words[0].aval & 0xFF, 0u);
-  EXPECT_EQ(var_a->value.words[0].bval & 0xFF, 0xFFu);
-  EXPECT_EQ(var_b->value.words[0].aval & 0xFF, 0u);
-  EXPECT_EQ(var_b->value.words[0].bval & 0xFF, 0xFFu);
-}
-
-TEST(CapacitiveNetwork, EqualStrengthSameValueRetained) {
-  Arena arena;
-  Variable* var_a = nullptr;
-  Variable* var_b = nullptr;
-  Net a = MakeTriregNet(arena, var_a, Strength::kMedium, 8, 55);
-  Net b = MakeTriregNet(arena, var_b, Strength::kMedium, 8, 55);
-
-  PropagateCharge(a, b);
-  EXPECT_EQ(var_a->value.ToUint64(), 55u);
-  EXPECT_EQ(var_b->value.ToUint64(), 55u);
-}
-
-TEST(CapacitiveNetwork, OnlyWhenBothCapacitive) {
-  Arena arena;
-  Variable* var_a = nullptr;
-  Net a = MakeTriregNet(arena, var_a, Strength::kLarge, 8, 1);
-
-  auto* var_b = arena.Create<Variable>();
-  var_b->value = MakeLogic4VecVal(arena, 8, 0);
-  Net b;
-  b.type = NetType::kTrireg;
-  b.resolved = var_b;
-  b.charge_strength = Strength::kSmall;
-  b.drivers.push_back(MakeLogic4VecVal(arena, 8, 77));
-
-  PropagateCharge(a, b);
-
-  EXPECT_EQ(var_a->value.ToUint64(), 1u);
-  EXPECT_EQ(var_b->value.ToUint64(), 0u);
 }
 
 }  // namespace

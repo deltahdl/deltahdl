@@ -52,6 +52,7 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
   net->type = type;
   net->resolved = var;
   net->charge_strength = charge_strength;
+  net->base_charge_strength = charge_strength;
   net->decay_ticks = decay_ticks;
   nets_[name] = net;
   return net;

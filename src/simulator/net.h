@@ -26,6 +26,7 @@ struct Net {
 
   // §6.6.4: Trireg charge strength and decay.
   Strength charge_strength = Strength::kMedium;
+  Strength base_charge_strength = Strength::kMedium;  // §6.6.4.1: Declared strength.
   uint64_t decay_ticks = 0;
   uint64_t decay_generation = 0;
 
@@ -38,6 +39,9 @@ struct Net {
 
 /// §6.6.4.1: Propagate charge between two connected trireg nets.
 void PropagateCharge(Net& a, Net& b);
+
+/// §6.6.4.1: Restore a net's charge strength to its declared value.
+void DisconnectCharge(Net& net);
 
 /// Resolve two Logic4Word values using wire/tri semantics (§28.7).
 Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b);

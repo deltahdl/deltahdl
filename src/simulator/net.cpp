@@ -302,9 +302,11 @@ void PropagateCharge(Net& a, Net& b) {
   auto sb = static_cast<uint8_t>(b.charge_strength);
   if (sa > sb) {
     b.resolved->value = a.resolved->value;
+    b.charge_strength = a.charge_strength;  // §6.6.4.1: Share charge strength.
     b.resolved->NotifyWatchers();
   } else if (sb > sa) {
     a.resolved->value = b.resolved->value;
+    a.charge_strength = b.charge_strength;  // §6.6.4.1: Share charge strength.
     a.resolved->NotifyWatchers();
   } else if (!ValuesEqual(a.resolved->value, b.resolved->value)) {
     SetAllX(a.resolved->value);
@@ -312,6 +314,10 @@ void PropagateCharge(Net& a, Net& b) {
     a.resolved->NotifyWatchers();
     b.resolved->NotifyWatchers();
   }
+}
+
+void DisconnectCharge(Net& net) {
+  net.charge_strength = net.base_charge_strength;
 }
 
 }  // namespace delta
