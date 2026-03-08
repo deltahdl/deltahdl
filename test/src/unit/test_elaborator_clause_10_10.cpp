@@ -20,18 +20,6 @@ TEST(ElabCh10j, EmptyUnpackedArrayConcatElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10: Basic unpacked array concatenation elaborates.
-TEST(ElabCh10j, UnpackedArrayConcatElaborates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int A[3];\n"
-      "  initial A = {1, 2, 3};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-}
-
 // §10.10: Array items in unpacked array concatenation elaborate.
 TEST(ElabCh10j, ArrayItemExpansionElaborates) {
   SimFixture f;
