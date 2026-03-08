@@ -67,4 +67,18 @@ TEST(Elaboration, ExplicitInitOverridesDefault) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §11.2.2: Unpacked struct data objects can be used as aggregate expressions.
+TEST(AggregateExpr, UnpackedStructAssignment) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a; int b; } pair_t;\n"
+      "  pair_t x, y;\n"
+      "  initial y = x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
