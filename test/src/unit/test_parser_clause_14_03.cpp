@@ -781,3 +781,18 @@ TEST(ClockingItemDefaultSkewBoth, ClockingItemDefaultSkewBoth) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ClockingDirectionInputOutput, ClockingDirectionInputOutput) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #2 output #4 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
+}
+
