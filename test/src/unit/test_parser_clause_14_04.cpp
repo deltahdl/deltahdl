@@ -442,3 +442,14 @@ TEST(DefaultSkew_InputOnly, DefaultSkew_InputOnly) {
               "endmodule\n"));
 }
 
+TEST(DefaultSkew_OutputOnly, DefaultSkew_OutputOnly) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    default output #3;\n"
+              "    input a;\n"
+              "    output b;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+

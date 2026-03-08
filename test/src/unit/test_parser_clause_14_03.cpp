@@ -396,17 +396,6 @@ TEST(ParserSection19, ClockingBlockScope_MultipleBlocks) {
   EXPECT_EQ(cb2->name, "cd2");
 }
 
-TEST(ParserSection19, DefaultSkew_OutputOnly) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    default output #3;\n"
-              "    input a;\n"
-              "    output b;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 TEST(ParserSection19, DefaultSkew_1StepInputNegedgeOutput) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
