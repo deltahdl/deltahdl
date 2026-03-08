@@ -129,4 +129,11 @@ TEST(ConstExpr, ParameterIdentifierIsConstant) {
   EXPECT_TRUE(IsConstantExpr(e, scope));
 }
 
+// §11.2.1: IsConstantExpr — unresolved identifier is not constant.
+TEST(ConstExpr, UnresolvedIdentifierNotConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("x", f);
+  EXPECT_FALSE(IsConstantExpr(e));
+}
+
 }  // namespace

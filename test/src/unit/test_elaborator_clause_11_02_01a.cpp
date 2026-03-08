@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: IsConstantExpr — unresolved identifier is not constant.
-TEST(ConstExpr, UnresolvedIdentifierNotConstant) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("x", f);
-  EXPECT_FALSE(IsConstantExpr(e));
-}
-
 // §11.2.1: IsConstantExpr — unary on constant is constant.
 TEST(ConstExpr, UnaryOnConstantIsConstant) {
   EvalFixture f;
