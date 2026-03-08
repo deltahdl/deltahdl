@@ -65,6 +65,7 @@ class TestBlock:
     prefix: str | None = None
     clause: str | None = None
     rationale: str | None = None
+    new_suite_name: str | None = None
 
 
 @dataclass
@@ -516,6 +517,25 @@ def _validate_topic_response(response, test_name):
         sys.exit(1)
 
 
+def _validate_suite_name(name):
+    """Return True if name is a valid C++ identifier."""
+    if not name:
+        return False
+    return bool(re.match(r'^[A-Za-z_]\w*$', name))
+
+
+def _rename_suite(test, new_name):
+    """Rename the suite in a test block's TEST() line."""
+    old = test.suite_name
+    test.lines[0] = re.sub(
+        r'^(TEST(?:_[FP])?)\(' + re.escape(old) + r',',
+        rf'\1({new_name},',
+        test.lines[0],
+    )
+    test.suite_name = new_name
+    test.new_suite_name = new_name
+
+
 def _apply_classification(test, clause_resp, topic_resp=None,
                           *, lrm_path):
     """Apply clause and optional topic responses to a test block."""
@@ -529,6 +549,12 @@ def _apply_classification(test, clause_resp, topic_resp=None,
     test.prefix = _detect_prefix(test, clause, lrm_path)
     test.clause = clause
     test.rationale = clause_resp.get("rationale", "")
+    suite = (topic_resp or clause_resp).get("suite_name", "")
+    if _validate_suite_name(suite):
+        _rename_suite(test, suite)
+    elif suite:
+        print(f"WARNING: Invalid suite_name {suite!r} for"
+              f" {test.test_name}, keeping original")
 
 
 def classify_tests(tests, test_dir, lrm_path):

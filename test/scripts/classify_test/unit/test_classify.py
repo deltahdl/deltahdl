@@ -822,3 +822,111 @@ def test_classify_tests_propagates_validation_error(ct, ct_helpers, monkeypatch,
             [_tb("T", body=["  auto r = Parse(src);"])],
             tmp_path, tmp_path / "lrm.txt",
         )
+
+
+# ---- suite_name in schema and prompt ---------------------------------------
+
+
+def test_clause_schema_has_suite_name(ct):
+    """CLAUSE_SCHEMA includes a suite_name property."""
+    schema = json.loads(ct._CLAUSE_SCHEMA)
+    assert "suite_name" in schema["properties"]
+
+
+def test_clause_prompt_mentions_suite_name(ct):
+    """CLAUSE_PROMPT_TEMPLATE instructs Claude to return a suite name."""
+    assert "suite_name" in ct._CLAUSE_PROMPT_TEMPLATE
+
+
+def test_topic_schema_has_suite_name(ct):
+    """TOPIC_SCHEMA includes a suite_name property."""
+    schema = json.loads(ct._TOPIC_SCHEMA)
+    assert "suite_name" in schema["properties"]
+
+
+# ---- _validate_suite_name --------------------------------------------------
+
+
+def test_validate_suite_name_valid(ct):
+    """Accepts a valid PascalCase C++ identifier."""
+    _validate = getattr(ct, "_validate_suite_name")
+    assert _validate("BinaryOperators") is True
+
+
+def test_validate_suite_name_with_underscore(ct):
+    """Accepts identifiers with underscores."""
+    _validate = getattr(ct, "_validate_suite_name")
+    assert _validate("Always_Comb") is True
+
+
+def test_validate_suite_name_empty(ct):
+    """Rejects empty string."""
+    _validate = getattr(ct, "_validate_suite_name")
+    assert _validate("") is False
+
+
+def test_validate_suite_name_starts_with_digit(ct):
+    """Rejects names starting with a digit."""
+    _validate = getattr(ct, "_validate_suite_name")
+    assert _validate("3Operators") is False
+
+
+def test_validate_suite_name_has_spaces(ct):
+    """Rejects names containing spaces."""
+    _validate = getattr(ct, "_validate_suite_name")
+    assert _validate("Binary Ops") is False
+
+
+# ---- _apply_classification: suite_name -------------------------------------
+
+
+def test_apply_classification_stores_suite_name(ct, ct_helpers):
+    """Stores new_suite_name from clause response."""
+    _tb = ct_helpers.make_test_block
+    _apply = getattr(ct, "_apply_classification")
+    t = _tb("MyTest", body=["  auto r = Parse(src);"])
+    resp = {"clause": "6.1", "rationale": "r", "suite_name": "BinaryOps"}
+    _apply(t, resp, lrm_path="/tmp/lrm.txt")
+    assert t.new_suite_name == "BinaryOps"
+
+
+def test_apply_classification_renames_test_line(ct, ct_helpers):
+    """Renames suite in TEST() line to new suite name."""
+    _tb = ct_helpers.make_test_block
+    _apply = getattr(ct, "_apply_classification")
+    t = _tb("MyTest", body=["  auto r = Parse(src);"])
+    resp = {"clause": "6.1", "rationale": "r", "suite_name": "BinaryOps"}
+    _apply(t, resp, lrm_path="/tmp/lrm.txt")
+    assert t.lines[0] == "TEST(BinaryOps, MyTest) {"
+
+
+def test_apply_classification_updates_suite_name_attr(ct, ct_helpers):
+    """Updates test.suite_name to the new suite name."""
+    _tb = ct_helpers.make_test_block
+    _apply = getattr(ct, "_apply_classification")
+    t = _tb("MyTest", body=["  auto r = Parse(src);"])
+    resp = {"clause": "6.1", "rationale": "r", "suite_name": "BinaryOps"}
+    _apply(t, resp, lrm_path="/tmp/lrm.txt")
+    assert t.suite_name == "BinaryOps"
+
+
+def test_apply_classification_no_suite_name_preserves_original(ct, ct_helpers):
+    """Preserves original suite name when response lacks suite_name."""
+    _tb = ct_helpers.make_test_block
+    _apply = getattr(ct, "_apply_classification")
+    t = _tb("MyTest", body=["  auto r = Parse(src);"])
+    resp = {"clause": "6.1", "rationale": "r"}
+    _apply(t, resp, lrm_path="/tmp/lrm.txt")
+    assert t.suite_name == "S"
+    assert t.new_suite_name is None
+
+
+def test_apply_classification_invalid_suite_name_preserves_original(ct, ct_helpers):
+    """Preserves original suite name when suite_name is invalid."""
+    _tb = ct_helpers.make_test_block
+    _apply = getattr(ct, "_apply_classification")
+    t = _tb("MyTest", body=["  auto r = Parse(src);"])
+    resp = {"clause": "6.1", "rationale": "r", "suite_name": "3Bad"}
+    _apply(t, resp, lrm_path="/tmp/lrm.txt")
+    assert t.suite_name == "S"
+    assert t.new_suite_name is None

@@ -34,6 +34,12 @@ Use the most specific subclause possible (e.g., 9.2.2.2.2 not 9.2).
 Read the LRM to verify — do not guess from titles.
 If no LRM clause applies, respond with "non-lrm".
 
+Also return a suite_name: a PascalCase name that intuitively describes what
+the test exercises. It must be a valid C++ identifier (alphanumeric and
+underscores only, must not start with a digit). Do NOT include clause or
+annex numbers in the name. Examples: BinaryOperators, SpecifyBlocks,
+AlwaysCombLatch, MacroExpansion, CaseStatement, NetResolution.
+
 LRM: {lrm_path}
 
 TEST({suite}, {test_name}):
@@ -43,6 +49,12 @@ TEST({suite}, {test_name}):
 TOPIC_PROMPT_TEMPLATE = """What non-LRM topic does this test belong to?
 
 Return a short snake_case topic name (e.g., "aig", "arena", "dpi_helpers").
+
+Also return a suite_name: a PascalCase name that intuitively describes what
+the test exercises. It must be a valid C++ identifier (alphanumeric and
+underscores only, must not start with a digit). Do NOT include clause or
+annex numbers in the name. Examples: AigGraph, ArenaAllocator, DpiHelpers.
+
 {topics}
 TEST({suite}, {test_name}):
 {test_body}
@@ -53,8 +65,9 @@ CLAUSE_SCHEMA = json.dumps({
     "properties": {
         "clause": {"type": "string"},
         "rationale": {"type": "string"},
+        "suite_name": {"type": "string"},
     },
-    "required": ["clause", "rationale"],
+    "required": ["clause", "rationale", "suite_name"],
     "additionalProperties": False,
 })
 
@@ -63,8 +76,9 @@ TOPIC_SCHEMA = json.dumps({
     "properties": {
         "non_lrm_topic": {"type": "string"},
         "rationale": {"type": "string"},
+        "suite_name": {"type": "string"},
     },
-    "required": ["non_lrm_topic", "rationale"],
+    "required": ["non_lrm_topic", "rationale", "suite_name"],
     "additionalProperties": False,
 })
 
