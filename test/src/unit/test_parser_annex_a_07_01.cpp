@@ -1,21 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-// §A.7.1 — specify block declaration
-
-TEST(ParserA701, SpecifyBlockEmpty) {
-  auto r = Parse("module m; specify endspecify endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  EXPECT_EQ(spec->kind, ModuleItemKind::kSpecifyBlock);
-  EXPECT_EQ(spec->specify_items.size(), 0u);
-}
 
 TEST(ParserA701, SpecifyItemSpecparamDecl) {
   auto r = Parse(
