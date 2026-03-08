@@ -219,3 +219,18 @@ TEST(NestedReplication, Cl5_10_NestedReplication) {
               "endmodule\n"));
 }
 
+TEST(EmptyAssignmentPattern, Cl5_10_EmptyAssignmentPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = '{};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
+  EXPECT_EQ(rhs->elements.size(), 0u);
+}
+
