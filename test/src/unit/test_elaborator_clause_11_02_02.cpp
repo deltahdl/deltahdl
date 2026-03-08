@@ -69,20 +69,6 @@ TEST(AggregateExpr, ArrayEqualityComparison) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.2.2: Unpacked struct and array constructors can be aggregate expressions.
-TEST(AggregateExpr, AssignmentPatternAsAggregate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  typedef struct { int x; int y; } point_t;\n"
-      "  point_t p;\n"
-      "  initial p = '{1, 2};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §11.2.2: Aggregate comparison of non-equivalent types shall be an error.
 TEST(AggregateExpr, NonEquivalentTypeComparisonError) {
   ElabFixture f;

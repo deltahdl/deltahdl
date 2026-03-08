@@ -192,4 +192,18 @@ TEST(ElabA60701, StructNamedPatternElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
+// §11.2.2: Unpacked struct and array constructors can be aggregate expressions.
+TEST(AggregateExpr, AssignmentPatternAsAggregate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int x; int y; } point_t;\n"
+      "  point_t p;\n"
+      "  initial p = '{1, 2};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
