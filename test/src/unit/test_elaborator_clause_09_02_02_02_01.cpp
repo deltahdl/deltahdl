@@ -1,5 +1,6 @@
-#include <unordered_set>
+// Non-LRM tests
 
+#include <unordered_set>
 #include "builders_sensitivity.h"
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
@@ -32,15 +33,6 @@ TEST(Elaborator, AlwaysCombSensitivityInferred) {
     if (ev.signal && ev.signal->text == "a") found_a = true;
   }
   EXPECT_TRUE(found_a);
-}
-
-TEST(Sensitivity, SelectVarIdxUsesLSP) {
-  Arena arena;
-  auto* expr = SensSelect(arena, SensId(arena, "a"), SensId(arena, "i"));
-  std::unordered_set<std::string> reads;
-  CollectExprReads(expr, reads);
-  EXPECT_TRUE(reads.count("a"));
-  EXPECT_TRUE(reads.count("i"));
 }
 
 TEST(SimCh4, AlwaysCombReEvaluatesOnChange) {
