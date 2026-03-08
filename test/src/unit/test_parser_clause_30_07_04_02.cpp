@@ -154,4 +154,21 @@ TEST(ParserA701, ShowcancelledMultipleOutputs) {
   EXPECT_EQ(item->signal_list[2], "out3");
 }
 
+TEST(ParserA701, SpecifyItemShowcancelled) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    showcancelled out1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  auto* si = spec->specify_items[0];
+  EXPECT_EQ(si->kind, SpecifyItemKind::kShowcancelled);
+  EXPECT_FALSE(si->is_noshowcancelled);
+}
+
 }  // namespace
