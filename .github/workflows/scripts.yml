@@ -83,7 +83,7 @@ jobs:
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console lib/python/ test/scripts/ test/lib/python/
   test-classify-file:
-    needs: [test-lib-classify, test-lib-git]
+    needs: [test-lib-classify, test-lib-git, test-lib-github, test-classify-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +115,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/classify_file/e2e/ -v
   test-classify-files:
-    needs: [test-lib-classify, test-lib-github]
+    needs: [test-lib-classify, test-lib-github, test-classify-file, test-classify-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -179,7 +179,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/classify_test/e2e/ -v
   test-implement-clause:
-    needs: [test-lib-github]
+    needs: [test-lib-cli, test-lib-github, test-implement-subclause]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -211,7 +211,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/implement_clause/e2e/ -v
   test-implement-subclause:
-    needs: [test-lib-git, test-lib-github]
+    needs: [test-lib-cli, test-lib-git, test-lib-github, test-classify-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -243,7 +243,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/implement_subclause/e2e/ -v
   test-implement-subclauses:
-    needs: [test-lib-git, test-lib-github]
+    needs: [test-lib-cli, test-lib-git, test-lib-github, test-implement-subclause]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -294,6 +294,29 @@ jobs:
         run: >-
           python3 -m pytest test/lib/python/classify/unit/ -v
           --cov=lib.python.classify
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  test-lib-cli:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/cli/unit/ -v
+          --cov=lib.python.cli
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
