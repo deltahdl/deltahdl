@@ -310,4 +310,27 @@ TEST(SimCh10i, ArrayDescendingRangePositional) {
   EXPECT_EQ(e0->value.ToUint64(), 40u);
 }
 
+// §10.9.1: Variable declaration with array assignment pattern init.
+TEST(SimCh10i, ArrayVarDeclPatternInit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [0:2] = '{5, 10, 15};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  auto* e2 = f.ctx.FindVariable("arr[2]");
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  ASSERT_NE(e2, nullptr);
+  EXPECT_EQ(e0->value.ToUint64(), 5u);
+  EXPECT_EQ(e1->value.ToUint64(), 10u);
+  EXPECT_EQ(e2->value.ToUint64(), 15u);
+}
+
 }  // namespace
