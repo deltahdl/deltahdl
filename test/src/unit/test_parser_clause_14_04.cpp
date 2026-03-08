@@ -464,3 +464,15 @@ TEST(DefaultSkew_1StepInputNegedgeOutput, DefaultSkew_1StepInputNegedgeOutput) {
               "endmodule\n"));
 }
 
+TEST(DefaultSkew_PerSignalOverride, DefaultSkew_PerSignalOverride) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking bus @(posedge clock1);\n"
+              "    default input #10ns output #2ns;\n"
+              "    input data, ready, enable = top.mem1.enable;\n"
+              "    output negedge ack;\n"
+              "    input #1step addr;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
