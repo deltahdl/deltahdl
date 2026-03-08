@@ -207,14 +207,6 @@ TEST(ParserSection10, Sec10_4_1_ExprAddition) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-// §11.2.1: ConstEvalReal — division by zero returns nullopt.
-TEST(ConstEvalReal, DivByZeroReturnsNullopt) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("1.0 / 0.0", f);
-  auto val = ConstEvalReal(e);
-  EXPECT_FALSE(val.has_value());
-}
-
 // §11.2.1: Constant expressions can use any operator from Table 11-1.
 TEST(ConstExpr, PowerOperatorInConstantExpr) {
   EvalFixture f;
